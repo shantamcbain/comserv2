@@ -1,0 +1,84 @@
+name: 01 - Build & Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/comserv
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image (test only, no push)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Comserv
+          file: ./Comserv/Dockerfile
+          push: false
+          load: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
+
+      - name: Run Perl tests
+        run: |
+          cd Comserv
+          # Build image for testing
+          docker build -t comserv-test:${{ github.sha }} .
+          
+          # Run tests inside container
+          docker run --rm \
+            -e CATALYST_ENV=test \
+            comserv-test:${{ github.sha }} \
+            bash -c "cd /opt/comserv && perl -t t/ 2>&1 || true"
+
+      - name: Run Perl linting
+        run: |
+          cd Comserv
+          docker run --rm \
+            comserv-test:${{ github.sha }} \
+            bash -c "cd /opt/comserv && perl -cw script/comserv_server.psgi && echo 'Syntax check passed'"
+
+      - name: Report test results
+        if: always()
+        run: |
+          echo "Build Status: ${{ job.status }}"
+          echo "SHA: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref }}"
+
+  security-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './Comserv'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+

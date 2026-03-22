@@ -1,0 +1,291 @@
+[% META
+   title = "EnvironmentVariables Controller Documentation"
+   description = "Environment variables management controller for Comserv—Create, read, update, delete environment variables with support for secrets, types, role-based access, and audit logging"
+   roles = "admin"
+   TemplateType = "controller"
+   category = "controllers,administration,configuration"
+   page_version = "1.00"
+   last_updated = "Thu Jan 09 2026"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/controllers/EnvironmentVariables.tt,v 1.00 2026/01/09 DocumentationSyncAgent Exp DocumentationSyncAgent - Initial documentation for EnvironmentVariables controller' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">EnvironmentVariables Controller Documentation</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-09 | 
+        Version: 1.00 | 
+        Author: DocumentationSyncAgent | 
+        Status: Active | 
+        Methods: 9 (3 CRUD + 4 helpers + 2 internal)
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Features</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
+                <a href="#api-endpoints" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">API</a>
+                <a href="#access-control" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Access</a>
+                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">See Also</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                The <strong>EnvironmentVariables controller</strong> (395 lines) provides comprehensive management of application environment variables with support for secrets, typed values, role-based access control, and audit logging. It integrates with the EnvVariable model, EnvFileManager utility, and DockerManager for seamless configuration management.
+            </p>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                <strong>Key Responsibilities</strong>:
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>CRUD Operations</strong>: Create, list, edit, delete environment variables</li>
+                    <li><strong>Type Support</strong>: Handle string, int, bool, json, and list data types</li>
+                    <li><strong>Secret Management</strong>: Flag and protect sensitive variables (passwords, tokens, keys)</li>
+                    <li><strong>Role-Based Access</strong>: Control which roles can edit specific variables</li>
+                    <li><strong>Audit Logging</strong>: Track all variable changes with before/after values</li>
+                    <li><strong>Service Integration</strong>: Track affected services for configuration changes</li>
+                    <li><strong>Docker Restart</strong>: Trigger container restarts after critical variable changes</li>
+                </ul>
+            </p>
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; color: var(--text-color);">
+                <strong>Architecture</strong>: Moose-based Catalyst subcontroller under Admin, with integrated logging (Comserv::Util::Logging), environment file management (EnvFileManager), and Docker integration (DockerManager). All methods require admin role authentication.
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FEATURES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="features" style="color: var(--text-color); font-family: var(--header-font);">2. Key Features</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em;">Variable Management</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Create Variables</strong>: Add new environment variables with validation (name format: ^[A-Za-z_][A-Za-z0-9_]*$)</li>
+                <li><strong>List Variables</strong>: Display all variables with display_value (masked for secrets)</li>
+                <li><strong>Edit Variables</strong>: Modify values, types, descriptions, and secret flags</li>
+                <li><strong>Delete Variables</strong>: Remove variables with soft/hard delete support</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em;">Security & Control</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Secret Protection</strong>: Flag sensitive variables; values masked in UI/exports</li>
+                <li><strong>Admin-Only Access</strong>: All operations require admin role (enforced in begin hook)</li>
+                <li><strong>Role-Based Editing</strong>: Variables can restrict editing to specific roles via editable_by_roles</li>
+                <li><strong>User Tracking</strong>: created_by/updated_by track who modified each variable</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em;">Advanced Features</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Data Type Support</strong>: string, int, bool, json, list types for flexible configuration</li>
+                <li><strong>Audit Logging</strong>: Complete change history with before/after values, timestamps, user info</li>
+                <li><strong>Service Tracking</strong>: Affected_services field identifies which services need restart</li>
+                <li><strong>Docker Integration</strong>: Automatic Docker container restart for critical variable changes</li>
+                <li><strong>Export Functionality</strong>: Export variables to file (secrets excluded by default)</li>
+                <li><strong>Change Preview</strong>: _preview_changes() shows impact before committing modifications</li>
+            </ul>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- METHODS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="methods" style="color: var(--text-color); font-family: var(--header-font);">3. Methods Reference</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em;">Action Methods (Catalyst Routes)</h3>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+                <h4 style="color: var(--text-color); margin-top: 0;">begin() — Private Hook</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Access Control</strong>: Runs before every request. Checks admin role; returns 403 Forbidden if unauthorized.</p>
+            </div>
+
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+                <h4 style="color: var(--text-color); margin-top: 0;">list() — GET /admin/environment_variables</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Display all environment variables ordered by key.</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns</strong>: JSON/HTML list with fields: id, key, value (masked if secret), var_type, is_secret, is_editable, editable_by_roles, description, created_at, updated_at.</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Error Handling</strong>: Logs errors and shows user-friendly error message on failure.</p>
+            </div>
+
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+                <h4 style="color: var(--text-color); margin-top: 0;">create() — GET/POST /admin/environment_variables/create</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>GET</strong>: Shows creation form with empty fields and var_types list (string, int, bool, json, list).</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>POST</strong>: Creates new variable. Validates: key format (^[A-Za-z_][A-Za-z0-9_]*$), duplicate check. Parses affected_services CSV to JSON.</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters</strong>: key, value, var_type, is_secret, description, affected_services</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Logging</strong>: Audit log entry created on success (action='create').</p>
+            </div>
+
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+                <h4 style="color: var(--text-color); margin-top: 0;">edit() — GET/POST /admin/environment_variables/edit/:id</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>GET</strong>: Shows edit form pre-populated with current variable data and affected_services list.</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>POST</strong>: Updates variable value, type, secret flag, and description. Checks permissions via is_user_editable().</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Error Cases</strong>: 404 if variable not found, 403 if user lacks edit permission.</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Logging</strong>: Audit log entry with old_value/new_value on change.</p>
+            </div>
+
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+                <h4 style="color: var(--text-color); margin-top: 0;">delete() — POST /admin/environment_variables/delete/:id</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Delete environment variable by ID.</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Behavior</strong>: Soft-delete (may be supported) or hard delete depending on model configuration.</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Logging</strong>: Audit log entry (action='delete') with variable data.</p>
+            </div>
+
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+                <h4 style="color: var(--text-color); margin-top: 0;">export() — GET /admin/environment_variables/export</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Export variables to a file (e.g., .env format) or JSON.</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Security</strong>: Excludes secret variables by default (unless explicitly requested).</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Output</strong>: File download with exported configuration.</p>
+            </div>
+
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+                <h4 style="color: var(--text-color); margin-top: 0;">audit_log() — GET /admin/environment_variables/audit_log</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Display audit trail of all variable changes (creation, edits, deletes).</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Fields</strong>: timestamp, action, user, variable_id, old_value, new_value, reason, status.</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Paging</strong>: May support pagination for large audit logs.</p>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em;">Helper Methods (Internal)</h3>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+                <h4 style="color: var(--text-color); margin-top: 0;">_handle_docker_restart()</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Trigger Docker container restart for services affected by variable change.</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Logic</strong>: Calls docker_manager to restart containers listed in affected_services.</p>
+            </div>
+
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+                <h4 style="color: var(--text-color); margin-top: 0;">_log_audit()</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Write audit log entry for variable change.</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters</strong>: $c, $var_id, $action, $old_value, $new_value, $status</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Details</strong>: Stores user_id, timestamp, change metadata for compliance and debugging.</p>
+            </div>
+
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+                <h4 style="color: var(--text-color); margin-top: 0;">_preview_changes()</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Show impact of proposed variable changes before committing.</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Output</strong>: Service restart list, affected dependent configurations, validation warnings.</p>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- API ENDPOINTS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="api-endpoints" style="color: var(--text-color); font-family: var(--header-font);">4. API Endpoints</h2>
+            <table style="width: 100%; border-collapse: collapse; color: var(--text-color);">
+                <thead style="background-color: var(--secondary-color);">
+                    <tr>
+                        <th style="border: 1px solid var(--border-color); padding: 8px;">Method</th>
+                        <th style="border: 1px solid var(--border-color); padding: 8px;">Path</th>
+                        <th style="border: 1px solid var(--border-color); padding: 8px;">Action</th>
+                        <th style="border: 1px solid var(--border-color); padding: 8px;">Response</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="background-color: var(--table-row-bg);">
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">GET</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">/admin/environment_variables</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">list()</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">HTML/JSON list of all variables</td>
+                    </tr>
+                    <tr style="background-color: var(--table-row-bg);">
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">GET</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">/admin/environment_variables/create</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">create() [GET]</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">HTML form for new variable</td>
+                    </tr>
+                    <tr style="background-color: var(--table-row-bg);">
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">POST</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">/admin/environment_variables/create</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">create() [POST]</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">201 Created / 400 Bad Request</td>
+                    </tr>
+                    <tr style="background-color: var(--table-row-bg);">
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">GET</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">/admin/environment_variables/edit/:id</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">edit() [GET]</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">HTML form with pre-filled data</td>
+                    </tr>
+                    <tr style="background-color: var(--table-row-bg);">
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">POST</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">/admin/environment_variables/edit/:id</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">edit() [POST]</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">200 OK / 403 Forbidden / 404 Not Found</td>
+                    </tr>
+                    <tr style="background-color: var(--table-row-bg);">
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">POST</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">/admin/environment_variables/delete/:id</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">delete()</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">204 No Content / 404 Not Found</td>
+                    </tr>
+                    <tr style="background-color: var(--table-row-bg);">
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">GET</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">/admin/environment_variables/export</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">export()</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">File download (.env / JSON)</td>
+                    </tr>
+                    <tr style="background-color: var(--table-row-bg);">
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">GET</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">/admin/environment_variables/audit_log</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">audit_log()</td>
+                        <td style="border: 1px solid var(--border-color); padding: 8px;">HTML table with audit history</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- ACCESS CONTROL SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="access-control" style="color: var(--text-color); font-family: var(--header-font);">5. Access Control</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em;">Authorization Rules</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Admin-Only</strong>: All operations require admin role (enforced in begin() hook)</li>
+                <li><strong>Role-Based Editing</strong>: Individual variables can restrict editing to specific roles via editable_by_roles field</li>
+                <li><strong>User Tracking</strong>: created_by and updated_by fields track user identity for audit</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em;">Error Responses</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>403 Forbidden</strong>: User lacks admin role or permission to edit variable</li>
+                <li><strong>404 Not Found</strong>: Variable ID does not exist</li>
+                <li><strong>400 Bad Request</strong>: Invalid key format, duplicate variable name, or validation failure</li>
+            </ul>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div class="success" style="background: #d4edda; border-left: 4px solid #28a745; padding: 12px; margin: 15px 0; border-radius: 4px;">
+                <h3 id="see-also" style="margin-top: 0; color: var(--text-color);">See Also</h3>
+                <ul style="color: var(--text-color);">
+                    <li><a href="/Documentation/models/EnvVariable" style="color: var(--link-color);">EnvVariable Model Documentation</a></li>
+                    <li><a href="/Documentation/Admin" style="color: var(--link-color);">Admin Controller</a></li>
+                    <li><a href="/Documentation/features/environment_variables_management" style="color: var(--link-color);">Environment Variables Management Feature Guide</a></li>
+                    <li><a href="/Documentation/developer/db_config_loading" style="color: var(--link-color);">Database Configuration Loading</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+</div>

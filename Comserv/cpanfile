@@ -16,10 +16,11 @@ requires 'DBIx::Class::TimeStamp';
 requires 'DBIx::Class::Migration';
 requires 'DBIx::Class::EncodedColumn';
 requires 'SQL::Translator';
-requires 'DBD::mysql';
+requires 'DBD::MariaDB';
 requires 'Object::Signature';
 #json
 requires 'JSON';
+requires 'JSON::XS';
 requires 'Config::JSON';
 
 # Template Toolkit and plugins
@@ -66,6 +67,10 @@ requires 'Archive::Tar';
 # Network related
 
 # Cryptography and Security
+requires 'Crypt::CBC';
+requires 'Crypt::OpenSSL::AES';
+requires 'Crypt::Random';
+requires 'MIME::Base64';
 requires 'Digest::SHA';
 
 # Email handling
@@ -81,12 +86,14 @@ requires 'IO::Socket::SSL';
 requires 'URI::Escape';
 requires 'Data::FormValidator';
 requires 'LWP::UserAgent';
+requires 'LWP::Protocol::https';
 requires 'HTTP::Request';
+requires 'WWW::Form::UrlEncoded';
+requires 'HTTP::Entity::Parser';
 requires 'Try::Tiny';
 requires 'Text::Markdown';
-requires 'YAML::XS';
 requires 'YAML::Tiny';
-requires 'YAML::Syck';
+requires 'IPC::Run';
 
 # Development and testing
 requires 'Term::ReadPassword';

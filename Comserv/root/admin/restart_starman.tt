@@ -57,7 +57,7 @@
             <div class="form-group">
                 <label for="sudo_username">Username:</label>
                 <input type="text" name="sudo_username" id="sudo_username" class="form-control" 
-                       value="[% c.user.username || '' %]" required>
+                       value="[% (c.user ? c.user.username : '') %]" required>
             </div>
             <div class="form-group">
                 <label for="sudo_password">Password:</label>

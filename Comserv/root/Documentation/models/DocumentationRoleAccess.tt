@@ -1,0 +1,531 @@
+[% META
+    title = 'DocumentationRoleAccess Model - Role-Based Documentation Access Control'
+    description = 'Comprehensive documentation for DocumentationRoleAccess model covering role-based access rules, pattern matching, access grants, and usage examples for managing documentation visibility and permissions'
+    roles = 'admin,developer'
+    TemplateType = 'model'
+    category = 'models,access-control,documentation-management'
+    page_version = '1.00'
+    last_updated = '2026-01-09 15:20:00 UTC'
+    site_specific = ''
+%]
+
+[% PageVersion = 'Documentation/models/DocumentationRoleAccess.tt,v 1.00 2026/01/09 zencoder-docsync Exp ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 id="documentationroleaccess-model">DocumentationRoleAccess Model - Role-Based Documentation Access Control</h1>
+            
+            <div id="toc" class="alert alert-info">
+                <strong>Contents:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#schema">Database Schema & Fields</a></li>
+                    <li><a href="#access-control">Access Control Model</a></li>
+                    <li><a href="#pattern-matching">Pattern Matching & Wildcards</a></li>
+                    <li><a href="#access-grants">Access Grants & Denials</a></li>
+                    <li><a href="#api-methods">API Methods & Helpers</a></li>
+                    <li><a href="#examples">Usage Examples</a></li>
+                    <li><a href="#troubleshooting">Troubleshooting</a></li>
+                    <li><a href="#see-also">See Also</a></li>
+                </ul>
+            </div>
+
+            <div class="alert alert-success" id="recent-changes">
+                <h3 style="margin-top: 0;">📝 Recent Changes (v1.00 - Jan 9, 2026)</h3>
+                <ul style="margin: 5px 0 0 20px;">
+                    <li><strong>Initial Documentation:</strong> Created comprehensive documentation for DocumentationRoleAccess model</li>
+                    <li><strong>Pattern Matching:</strong> Documented wildcard pattern system for documentation path matching</li>
+                    <li><strong>Access Rules:</strong> Documented grant/deny model with role+pattern uniqueness</li>
+                </ul>
+            </div>
+            
+            <section id="overview">
+                <h2>Overview</h2>
+                <p>
+                    The <strong>DocumentationRoleAccess</strong> model (Comserv/lib/Comserv/Model/Schema/Ency/Result/DocumentationRoleAccess.pm) 
+                    provides a database schema for managing role-based access control (RBAC) to documentation sections in the Comserv application. It is a DBIx::Class Result class that supports:
+                </p>
+                <ul>
+                    <li>Role-based access rules for documentation sections</li>
+                    <li>Pattern-based matching (wildcards) for flexible path matching</li>
+                    <li>Grant and deny rules (can_access boolean flag)</li>
+                    <li>Unique constraints preventing duplicate role+pattern combinations</li>
+                    <li>Timestamp tracking for audit trails</li>
+                    <li>Helper methods for access determination and pattern matching</li>
+                </ul>
+                <p>
+                    DocumentationRoleAccess enables administrators to control which user roles can view specific documentation sections, 
+                    supporting security models where sensitive documentation (admin guides, internal procedures) is hidden from non-admin users.
+                </p>
+            </section>
+
+            <section id="schema">
+                <h2>Database Schema & Fields</h2>
+                
+                <h3>Table: documentationroleaccess</h3>
+                <p><strong>Purpose:</strong> Store role-based access control rules for documentation sections</p>
+                <p><strong>Primary Key:</strong> id (auto-increment)</p>
+                <p><strong>Unique Constraints:</strong> (role, doc_section_pattern) - one rule per role+pattern</p>
+                
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Field Name</th>
+                        <th>Data Type</th>
+                        <th>Nullable</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td>id</td>
+                        <td>INTEGER</td>
+                        <td>NO</td>
+                        <td>auto_increment</td>
+                        <td>Primary key - auto-generated access rule ID</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>role</td>
+                        <td>VARCHAR(100)</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>User role (e.g., 'admin', 'developer', 'editor', 'user') - part of UNIQUE constraint</td>
+                    </tr>
+                    <tr>
+                        <td>doc_section_pattern</td>
+                        <td>VARCHAR(255)</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>Path pattern with wildcards (e.g., 'Documentation/system/*', 'Documentation/admin/*') - part of UNIQUE constraint</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>can_access</td>
+                        <td>BOOLEAN</td>
+                        <td>NO</td>
+                        <td>1 (true)</td>
+                        <td>Access grant: 1=allow access, 0=deny/restrict access (default: 1=ALLOW)</td>
+                    </tr>
+                    <tr>
+                        <td>created_at</td>
+                        <td>TIMESTAMP</td>
+                        <td>NO</td>
+                        <td>CURRENT_TIMESTAMP</td>
+                        <td>Timestamp when rule was created (auto-set)</td>
+                    </tr>
+                </table>
+            </section>
+
+            <section id="access-control">
+                <h2>Access Control Model</h2>
+                
+                <h3>Role-Based Rules</h3>
+                <p>DocumentationRoleAccess uses a simple role-based model with allow/deny flags:</p>
+                
+                <ul>
+                    <li><strong>Role:</strong> Target user role (e.g., 'admin', 'developer', 'editor', 'user')</li>
+                    <li><strong>Pattern:</strong> Documentation path pattern (supports wildcards *)</li>
+                    <li><strong>can_access:</strong> Boolean flag: true=ALLOW, false=DENY</li>
+                </ul>
+
+                <h3>Example Access Rules</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Role</th>
+                        <th>Pattern</th>
+                        <th>can_access</th>
+                        <th>Effect</th>
+                    </tr>
+                    <tr>
+                        <td>admin</td>
+                        <td>Documentation/*</td>
+                        <td>✅ 1 (TRUE)</td>
+                        <td>Admins can access ALL documentation</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>developer</td>
+                        <td>Documentation/system/*</td>
+                        <td>✅ 1 (TRUE)</td>
+                        <td>Developers can access system docs</td>
+                    </tr>
+                    <tr>
+                        <td>developer</td>
+                        <td>Documentation/admin/*</td>
+                        <td>❌ 0 (FALSE)</td>
+                        <td>Developers CANNOT access admin docs</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>user</td>
+                        <td>Documentation/public/*</td>
+                        <td>✅ 1 (TRUE)</td>
+                        <td>Regular users can access public docs only</td>
+                    </tr>
+                    <tr>
+                        <td>user</td>
+                        <td>Documentation/*</td>
+                        <td>❌ 0 (FALSE)</td>
+                        <td>Users cannot access other sections</td>
+                    </tr>
+                </table>
+
+                <h3>Typical Access Hierarchy</h3>
+                <ol>
+                    <li><strong>Admin:</strong> Full access to all documentation</li>
+                    <li><strong>Developer:</strong> Access to technical documentation, code examples, system guides (but not admin/internal)</li>
+                    <li><strong>Editor:</strong> Access to content they manage, unable to view admin sections</li>
+                    <li><strong>User:</strong> Access to public documentation only</li>
+                </ol>
+            </section>
+
+            <section id="pattern-matching">
+                <h2>Pattern Matching & Wildcards</h2>
+                
+                <h3>Wildcard Support</h3>
+                <p>The doc_section_pattern field supports simple wildcard matching using * (asterisk):</p>
+                
+                <h3>Pattern Examples</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Pattern</th>
+                        <th>Matches</th>
+                        <th>Does NOT Match</th>
+                    </tr>
+                    <tr>
+                        <td>Documentation/*</td>
+                        <td>Documentation/controllers, Documentation/models, Documentation/system</td>
+                        <td>Documentation/system/advanced, Documentation (no slash)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>Documentation/system/*</td>
+                        <td>Documentation/system/admin, Documentation/system/config</td>
+                        <td>Documentation/system/admin/advanced, Documentation/models</td>
+                    </tr>
+                    <tr>
+                        <td>Documentation/admin*</td>
+                        <td>Documentation/admin, Documentation/admin_guide, Documentation/admin/settings</td>
+                        <td>Documentation/system/admin, Documentation/user</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>*admin*</td>
+                        <td>Documentation/admin, admin_guide, system/admin (broad match)</td>
+                        <td>(matches anything with 'admin' substring)</td>
+                    </tr>
+                </table>
+
+                <h3>Pattern Matching Implementation</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>How matches_doc_path() works:</strong></p>
+                    <pre><code>my $rule = $schema->resultset('DocumentationRoleAccess')->find($id);
+
+# Pattern: 'Documentation/system/*'
+# Input: 'Documentation/system/admin/users'
+# Converts to: '^Documentation/system/.*$'
+# Result: MATCHES
+
+if ($rule->matches_doc_path('Documentation/system/advanced')) {
+    # Access determination based on can_access flag
+}</code></pre>
+                </div>
+
+                <h3>Pattern Matching Details</h3>
+                <ul>
+                    <li>Wildcards (*) are converted to .* (regex any characters)</li>
+                    <li>Patterns must match the entire path (anchored with ^ and $)</li>
+                    <li>Matching is case-sensitive</li>
+                    <li>No regex escaping needed; patterns are literal paths with * wildcards only</li>
+                </ul>
+            </section>
+
+            <section id="access-grants">
+                <h2>Access Grants & Denials</h2>
+                
+                <h3>can_access Flag</h3>
+                <ul>
+                    <li><strong>can_access = 1 (TRUE):</strong> ALLOW - Role CAN access documentation sections matching the pattern</li>
+                    <li><strong>can_access = 0 (FALSE):</strong> DENY/RESTRICT - Role CANNOT access documentation sections matching the pattern</li>
+                </ul>
+
+                <h3>Decision Logic</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Check if role can access a documentation path:</strong></p>
+                    <pre><code># Query all rules for a role
+my @rules = $schema->resultset('DocumentationRoleAccess')->search({
+    role => 'developer'
+})->all;
+
+my $doc_path = 'Documentation/system/advanced';
+my $can_access = 0;
+
+foreach my $rule (@rules) {
+    if ($rule->matches_doc_path($doc_path)) {
+        $can_access = $rule->grants_access();
+        last; # First matching rule determines access
+    }
+}
+
+if ($can_access) {
+    print "Access GRANTED\n";
+} else {
+    print "Access DENIED\n";
+}</code></pre>
+                </div>
+            </section>
+
+            <section id="api-methods">
+                <h2>API Methods & Helpers</h2>
+                
+                <h3>Standard DBIx::Class Methods</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Creating Access Rules:</strong></p>
+                    <pre><code>my $rule = $schema->resultset('DocumentationRoleAccess')->create({
+    role => 'developer',
+    doc_section_pattern => 'Documentation/system/*',
+    can_access => 1  # Allow access
+});
+
+my $deny_rule = $schema->resultset('DocumentationRoleAccess')->create({
+    role => 'user',
+    doc_section_pattern => 'Documentation/admin/*',
+    can_access => 0  # Deny access
+});</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Retrieving Rules:</strong></p>
+                    <pre><code>my $rule = $schema->resultset('DocumentationRoleAccess')->find(1);
+
+my @dev_rules = $schema->resultset('DocumentationRoleAccess')->search({
+    role => 'developer'
+})->all;
+
+my @allow_rules = $schema->resultset('DocumentationRoleAccess')->search({
+    can_access => 1
+})->all;
+
+my @deny_rules = $schema->resultset('DocumentationRoleAccess')->search({
+    can_access => 0
+})->all;</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Updating Rules:</strong></p>
+                    <pre><code>$rule->update({
+    can_access => 0  # Change from allow to deny
+});
+
+$rule->doc_section_pattern('Documentation/admin/*');
+$rule->update;</code></pre>
+                </div>
+
+                <h3>Helper Methods</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>matches_doc_path($doc_path):</strong> Check if path matches rule pattern</p>
+                    <pre><code>if ($rule->matches_doc_path('Documentation/system/admin')) {
+    print "Pattern matches this path\n";
+}</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>grants_access():</strong> Get access grant boolean</p>
+                    <pre><code>if ($rule->grants_access) {
+    print "Access is ALLOWED\n";
+} else {
+    print "Access is DENIED\n";
+}</code></pre>
+                </div>
+            </section>
+
+            <section id="examples">
+                <h2>Usage Examples</h2>
+                
+                <h3>Example 1: Create Admin Access Rule</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $admin_rule = $schema->resultset('DocumentationRoleAccess')->create({
+    role => 'admin',
+    doc_section_pattern => 'Documentation/*',
+    can_access => 1
+});
+
+print "Created rule: " . $admin_rule->role . " -> " . $admin_rule->doc_section_pattern . "\n";</code></pre>
+                </div>
+
+                <h3>Example 2: Set Up Developer Permissions</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my @dev_permissions = (
+    { pattern => 'Documentation/models/*', access => 1 },
+    { pattern => 'Documentation/controllers/*', access => 1 },
+    { pattern => 'Documentation/system/*', access => 1 },
+    { pattern => 'Documentation/admin/*', access => 0 }
+);
+
+foreach my $perm (@dev_permissions) {
+    $schema->resultset('DocumentationRoleAccess')->create({
+        role => 'developer',
+        doc_section_pattern => $perm->{pattern},
+        can_access => $perm->{access}
+    });
+}</code></pre>
+                </div>
+
+                <h3>Example 3: Check Access for User</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>sub can_user_access_doc {
+    my ($schema, $user_role, $doc_path) = @_;
+    
+    my @rules = $schema->resultset('DocumentationRoleAccess')->search({
+        role => $user_role
+    })->all;
+    
+    foreach my $rule (@rules) {
+        if ($rule->matches_doc_path($doc_path)) {
+            return $rule->grants_access;
+        }
+    }
+    
+    return 0; # Default deny if no matching rule
+}
+
+# Usage
+if (can_user_access_doc($schema, 'developer', 'Documentation/system/config')) {
+    print "Access GRANTED\n";
+} else {
+    print "Access DENIED\n";
+}</code></pre>
+                </div>
+
+                <h3>Example 4: Update Access Rule</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $rule = $schema->resultset('DocumentationRoleAccess')->search({
+    role => 'developer',
+    doc_section_pattern => 'Documentation/internal/*'
+})->first;
+
+if ($rule) {
+    $rule->update({
+        can_access => 1  # Grant access to internal docs
+    });
+    print "Updated: developers now have access to internal docs\n";
+}</code></pre>
+                </div>
+
+                <h3>Example 5: Query All Rules for Role</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my @editor_rules = $schema->resultset('DocumentationRoleAccess')->search({
+    role => 'editor'
+})->all;
+
+print "Access Rules for Editor Role:\n";
+foreach my $rule (@editor_rules) {
+    my $status = $rule->grants_access ? 'ALLOW' : 'DENY';
+    print "  " . $rule->doc_section_pattern . " -> $status\n";
+}</code></pre>
+                </div>
+            </section>
+
+            <section id="troubleshooting">
+                <h2>Troubleshooting</h2>
+                
+                <div class="alert alert-warning">
+                    <h3>Issue 1: Duplicate Role+Pattern Combination</h3>
+                    <p><strong>Problem:</strong> Error "Duplicate entry" when creating access rule</p>
+                    <p><strong>Cause:</strong> (role, doc_section_pattern) has UNIQUE constraint</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code>my $rule = $schema->resultset('DocumentationRoleAccess')->find_or_create({
+    role => 'developer',
+    doc_section_pattern => 'Documentation/system/*'
+});
+
+# Update existing rule
+$rule->update({ can_access => 1 });</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 2: Pattern Matching Not Working</h3>
+                    <p><strong>Problem:</strong> matches_doc_path() returns false when expecting true</p>
+                    <p><strong>Cause:</strong> Regex anchors require full match; partial paths fail</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code># CORRECT: Full path from root
+$rule->matches_doc_path('Documentation/system/advanced'); # OK
+
+# INCORRECT: Partial path
+$rule->matches_doc_path('system/advanced'); # Returns false
+
+# Pattern: 'Documentation/system/*'
+# Must match entire path with anchors ^...$</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 3: Access Denied When Should Be Allowed</h3>
+                    <p><strong>Problem:</strong> User can't access documentation despite rule being created</p>
+                    <p><strong>Cause:</strong> Multiple rules for same role; first match wins (check ordering)</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code>my @rules = $schema->resultset('DocumentationRoleAccess')->search({
+    role => 'user'
+}, {
+    order_by => 'created_at'  # Check which rule matches first
+})->all;
+
+# Debug: Print all rules and test path
+foreach my $rule (@rules) {
+    my $match = $rule->matches_doc_path('Documentation/admin');
+    print $rule->doc_section_pattern . " -> " . $match . "\n";
+}</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 4: Wildcard Pattern Syntax Error</h3>
+                    <p><strong>Problem:</strong> Pattern with regex metacharacters (., +, ?, [, ]) fails</p>
+                    <p><strong>Cause:</strong> Patterns expect simple wildcards only; no regex</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code># CORRECT: Simple wildcards only
+doc_section_pattern => 'Documentation/system/*'
+doc_section_pattern => '*admin*'
+
+# INCORRECT: Regex syntax
+doc_section_pattern => 'Documentation/system/.*'  # Wrong: use * not .*
+doc_section_pattern => 'Documentation/(admin|user)' # Wrong: no groups</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 5: No Rules Created for New Role</h3>
+                    <p><strong>Problem:</strong> New user role has no access control rules; default behavior</p>
+                    <p><strong>Cause:</strong> No rules exist; access defaults to DENY</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code># Create default rules for new role
+my $new_role = 'viewer';
+
+# Grant public access
+$schema->resultset('DocumentationRoleAccess')->create({
+    role => $new_role,
+    doc_section_pattern => 'Documentation/public/*',
+    can_access => 1
+});
+
+# Deny restricted access
+$schema->resultset('DocumentationRoleAccess')->create({
+    role => $new_role,
+    doc_section_pattern => 'Documentation/admin/*',
+    can_access => 0
+});</code></pre>
+                </div>
+            </section>
+
+            <section id="see-also">
+                <h2>See Also</h2>
+                <div class="alert alert-success">
+                    <ul style="margin: 5px 0 0 20px;">
+                        <li><a href="/Documentation/models/Documentation">Documentation Model</a> - Documentation files and metadata</li>
+                        <li><a href="/Documentation/models/User">User Model</a> - User roles and associations</li>
+                        <li><a href="/Documentation/models/DocumentationMetadataIndex">DocumentationMetadataIndex Model</a> - Documentation metadata</li>
+                        <li><a href="/Documentation/system">System: Access Control</a> - High-level access control architecture</li>
+                    </ul>
+                </div>
+            </section>
+
+            <div class="last-updated">
+                <small>Last updated: <span id="update-date">2026-01-09</span></small>
+            </div>
+        </div>
+    </div>
+</div>

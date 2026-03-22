@@ -1,0 +1,702 @@
+[% META
+    title = 'AI Chat with Documentation Access - Feature Specification'
+    description = 'Complete specification for AI Chat widget with documentation search, role-based access, multi-agent support, conversation resume functionality, Grok API integration, and admin model controls. ✅ Phase 1 Database & Model Layer COMPLETE - All tables created and automated startup initialization implemented. NEW: Grok.ai UI design, conversation persistence/resume, admin model selection, Grok API integration.'
+    roles = 'admin,developer'
+    TemplateType = 'Documentation'
+    category = 'ai,features,architecture'
+    page_version = '0.05'
+    last_updated = 'Mon Jan 06 04:30:00 UTC 2026'
+    site_specific = 'false'
+    author = 'Development Team'
+%]
+[% PageVersion = 'Documentation/AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt,v 0.05 2026/01/06 04:30:00 zencoder Exp - Jan 6 Update: Added Grok API integration, conversation resume page, Grok.ai UI design, admin model/agent controls' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">AI Chat with Documentation Access</h1>
+    <h2 style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-large); margin-top: 0;">Feature Specification & Implementation Plan</h2>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-06 04:30 | 
+        Version: 0.05 |
+        Status: ✅ PHASE 1 COMPLETE (Database & Model Layer) - Phase 2-4 updated with NEW features: Grok API, conversation resume, Grok.ai UI design, admin model controls |
+        Target Release: Q1 2026 | 
+        Next Phase: Backend Services + Grok API integration + Admin Controls
+    </div>
+
+    <!-- RECENT CHANGES -->
+    <div style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 15px 0;">
+        <h3 style="margin-top: 0; color: #155724;">Recent Changes (Jan 6, 2026)</h3>
+        <ul style="margin: 10px 0; color: #155724;">
+            <li><strong>NEW: Grok API Integration (Phase 2)</strong>: Added LLMGrok service for Grok API calls. Grok model support added to model selection dropdown alongside Ollama and XAI.</li>
+            <li><strong>NEW: Conversation Resume Page (Phase 3)</strong>: Created /ai/conversations page for users to view, search, filter, and resume previous conversations with full context preservation.</li>
+            <li><strong>NEW: Grok.ai UI Design (Phase 3)</strong>: Updated chat widget CSS to match Grok.ai aesthetic with modern dark theme, clean typography, and responsive layout.</li>
+            <li><strong>NEW: Admin Model & Agent Controls (Phase 4)</strong>: Extended admin panel to allow dynamic model configuration and agent assignment without code changes.</li>
+            <li><strong>Previous (Jan 2)</strong>: Schema regression fixed - metadata column in ai_conversations table now correctly stores conversation data.</li>
+        </ul>
+    </div>
+
+    <!-- TABLE OF CONTENTS -->
+    <div id="toc" style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-large) 0;">
+        <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Table of Contents</h3>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li><a href="#executive-summary">Executive Summary</a></li>
+            <li><a href="#feature-requirements">Feature Requirements</a></li>
+            <li><a href="#architecture">Architecture Overview</a></li>
+            <li><a href="#database-schema">Database Schema</a></li>
+            <li><a href="#multi-agent-system">Multi-Agent System</a></li>
+            <li><a href="#implementation-plan">Implementation Plan</a></li>
+            <li><a href="#security">Security & Kubernetes Compatibility</a></li>
+            <li><a href="#verification-workflow">Verification Workflow</a></li>
+        </ul>
+    </div>
+
+    <!-- EXECUTIVE SUMMARY -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="executive-summary" style="color: var(--text-color); font-family: var(--header-font);">1. Executive Summary</h2>
+            
+            <div style="background: var(--info-color, #d1ecf1); border-left: 4px solid var(--info-border, #17a2b8); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 3px;">
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;">
+                    <strong>Objective:</strong> Add an intelligent AI Chat widget to the Comserv web application that answers user questions by searching documentation and application code, with role-based access control, multi-model support, and comprehensive audit logging.
+                </p>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Key Capabilities</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Universal Access:</strong> Chat widget visible to all users (authenticated and non-authenticated)</li>
+                <li><strong>Documentation Search:</strong> AI reads from /Documentation/ folder, searches metadata index, returns answers with citations</li>
+                <li><strong>Role-Based Access:</strong> Users only see documentation they have permission to access</li>
+                <li><strong>Multi-Model Support:</strong> Ollama (local, free) for all users; Ollama + XAI for developers/admins</li>
+                <li><strong>Code Search:</strong> Developers and admins can ask AI to find functions, classes, and code patterns in application source</li>
+                <li><strong>Web Search Integration:</strong> AI can search the web for current information, with results stored for verification by admins</li>
+                <li><strong>Knowledge Base Building:</strong> Verified web search results are added to documentation index for reuse</li>
+                <li><strong>Multi-Agent Architecture:</strong> Different AI agents for Documentation, HelpDesk, ENCY (inventory), Beekeeping, Ham Radio, etc.</li>
+                <li><strong>Audit Trail:</strong> All conversations logged to database with user, timestamp, model, and sources used</li>
+                <li><strong>Docker/Kubernetes Ready:</strong> API keys encrypted, env-compatible, container-aware</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- FEATURE REQUIREMENTS -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="feature-requirements" style="color: var(--text-color); font-family: var(--header-font);">2. Feature Requirements</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">2.1 Functional Requirements (Priority-Based)</h3>
+            <table style="width: 100%; color: var(--text-color); font-family: var(--body-font); border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <thead>
+                    <tr style="background: var(--secondary-color, #0066cc); color: white;">
+                        <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">ID</th>
+                        <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">Requirement</th>
+                        <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">Priority</th>
+                        <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">User Visible</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="background: var(--light-color);">
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">FR-1</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Chat widget in lower right, visible to all users (including non-authenticated)</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🔴 Critical</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Yes</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">FR-2</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">AI automatically searches documentation metadata index</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🔴 Critical</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">User sees citations</td>
+                    </tr>
+                    <tr style="background: var(--light-color);">
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">FR-3</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Role-based documentation filtering (users can't see admin docs)</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🔴 Critical</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Transparent</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">FR-4</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">All Q&A logged with user/timestamp/model/sources</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🔴 Critical</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Admin panel only</td>
+                    </tr>
+                    <tr style="background: var(--light-color);">
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">FR-5</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Model selection: Ollama for all; XAI for dev/admin</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🟠 High</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Dropdown selector</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">FR-6</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Web search results with verification workflow</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🟠 High</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Configurable</td>
+                    </tr>
+                    <tr style="background: var(--light-color);">
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">FR-7</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Code search (developers/admins can search .pm and .tt files)</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🟠 High</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Special queries</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">FR-8</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Real-time doc index updates when .tt files change</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🟠 High</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Backend only</td>
+                    </tr>
+                    <tr style="background: var(--light-color);">
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">FR-9</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Conversation resume page at /ai/conversations with search, filter, and context preservation</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🟠 High</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Yes</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">FR-10</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Chat widget UI design matching Grok.ai aesthetic (dark theme, modern typography, responsive)</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🟠 High</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Yes</td>
+                    </tr>
+                    <tr style="background: var(--light-color);">
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">FR-11</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Admin controls to change model and agent assignments without code changes (dynamic config)</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🟠 High</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Admin only</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">FR-12</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Grok API integration for direct API calls with encrypted API key management</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🟠 High</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Configurable per user/role</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ARCHITECTURE -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="architecture" style="color: var(--text-color); font-family: var(--header-font);">3. Architecture Overview</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">3.1 System Design (Key Change: Metadata-Only Index)</h3>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; font-family: var(--body-font); color: var(--text-color);">
+                <p><strong>Important:</strong> .tt files remain on disk as the source of truth. The database stores ONLY metadata (file_path, title, content_hash, role_permissions). When search happens:</p>
+                <ol>
+                    <li>User query → Search metadata_index via FULLTEXT</li>
+                    <li>Return top matches with file_path + excerpt from disk</li>
+                    <li>If .tt file changes → hash changes → re-index on next access</li>
+                    <li>PyCharm IDE AI assistants can read database (if supported) OR read .tt files directly</li>
+                </ol>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">3.2 Widget Visibility by User Type</h3>
+            <table style="width: 100%; color: var(--text-color); font-family: var(--body-font); border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <thead>
+                    <tr style="background: var(--secondary-color, #0066cc); color: white;">
+                        <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">User Type</th>
+                        <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">Can Access Widget</th>
+                        <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">Models Available</th>
+                        <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">Can Search Code</th>
+                        <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">Can Use Web Search</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="background: var(--light-color);">
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Non-Authenticated</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ Yes (limited docs)</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Ollama only</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">❌ No</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">❌ No</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Normal User</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ Yes</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Ollama only</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">❌ No</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">⚙️ Configurable</td>
+                    </tr>
+                    <tr style="background: var(--light-color);">
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Developer/Editor</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ Yes</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Ollama + XAI</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ Yes</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ Yes</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Admin</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ Yes</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Ollama + XAI</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ Yes</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ Yes</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">3.3 Documentation Audit Status - Result Class Implementation Verification</h3>
+            <div style="background: var(--warning-color, #fff3cd); border-left: 4px solid var(--warning-border, #ff9800); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 3px;">
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 0;"><strong>🔍 Audit Focus:</strong> Verify that AI Chat System documentation correctly describes using DBIx::Class Result classes (not raw SQL files) for table creation and schema management.</p>
+            </div>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Related Documentation Files Status</h4>
+            <table style="width: 100%; color: var(--text-color); font-family: var(--body-font); border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <thead>
+                    <tr style="background: var(--secondary-color, #0066cc); color: white;">
+                        <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">Documentation File</th>
+                        <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">Version</th>
+                        <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">Result Class Accuracy</th>
+                        <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="background: var(--light-color);">
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong><a href="/Documentation/AI_Chat_Schema_Documentation" target="_blank" style="color: var(--link-color);">AI_Chat_Schema_Documentation.tt</a></strong></td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">0.01</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ Excellent - Explicitly states "DBIx::Class Result classes (not raw SQL files)"</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ CORRECT</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong><a href="/Documentation/DBSchemaManager_Usage_Guide" target="_blank" style="color: var(--link-color);">DBSchemaManager_Usage_Guide.tt</a></strong></td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">1.0 ⚠️</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🟠 Partial - Correct content but missing explicit Result class emphasis</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">⚠️ NEEDS CORRECTION</td>
+                    </tr>
+                    <tr style="background: var(--light-color);">
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong><a href="/Documentation/Schema" target="_blank" style="color: var(--link-color);">Schema.tt</a></strong></td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">0.1 (outdated)</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">❌ Critical - Describes SQL migration approach, no mention of Result classes</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">❌ INCORRECT</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Critical Findings</h4>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>✅ Best Practice Found:</strong> <a href="/Documentation/AI_Chat_Schema_Documentation" target="_blank" style="color: var(--link-color);">AI_Chat_Schema_Documentation.tt</a> correctly emphasizes Result classes in Overview section (line 47): "This schema is built using <em>DBIx::Class Result classes</em> (not raw SQL files) for type safety and version control"</li>
+                    <li><strong>⚠️ Version Issue:</strong> <a href="/Documentation/DBSchemaManager_Usage_Guide" target="_blank" style="color: var(--link-color);">DBSchemaManager_Usage_Guide.tt</a> uses page_version "1.0" instead of "0.01" per documentation standards</li>
+                    <li><strong>❌ Critical Gap:</strong> <a href="/Documentation/Schema" target="_blank" style="color: var(--link-color);">Schema.tt</a> is completely outdated, references SQL migration scripts and .sql file imports instead of Result class pattern</li>
+                    <li><strong>⚠️ Content Gap:</strong> <a href="/Documentation/DBSchemaManager_Usage_Guide" target="_blank" style="color: var(--link-color);">DBSchemaManager</a> guide needs explicit mention that it works with Result classes, not SQL files</li>
+                    <li><strong>✅ Consistency:</strong> AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt (this file) correctly references Result classes in Database Schema section (4.1-4.3)</li>
+                </ul>
+            </div>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Recommended Actions</h4>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Priority 1:</strong> Fix <a href="/Documentation/DBSchemaManager_Usage_Guide" target="_blank" style="color: var(--link-color);">DBSchemaManager_Usage_Guide.tt</a> - Change page_version from "1.0" to "0.01" and add section on "Result Classes First" approach</li>
+                    <li><strong>Priority 1:</strong> Rewrite <a href="/Documentation/Schema" target="_blank" style="color: var(--link-color);">Schema.tt</a> - Remove SQL migration approach, replace with Result class creation workflow using <a href="/Documentation/DBSchemaManager_Usage_Guide" target="_blank" style="color: var(--link-color);">DBSchemaManager</a></li>
+                    <li><strong>Priority 2:</strong> Add cross-reference links between all three documentation files for consistency</li>
+                    <li><strong>Priority 2:</strong> Create unified "Schema Management Best Practices" section referencing all three guides</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <!-- DATABASE SCHEMA -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="database-schema" style="color: var(--text-color); font-family: var(--header-font);">4. Database Schema (Using Existing Tables + New Extensions)</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">4.1 Extend Existing: ai_messages Table</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Location:</strong> <a href="/Documentation/Result_Class_Development_Guide" target="_blank" style="color: var(--link-color);">/lib/Comserv/Model/Schema/Ency/Result/AiMessage.pm</a> (EXTEND existing fields)</p>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: var(--font-size-small);"><code>Fields to ADD to existing AiMessage table:
+  agent_type => 'enum' (documentation, helpdesk, ency, beekeeping, hamradio, etc.)
+  model_used => 'varchar' (ollama, xai, web)
+  search_context => 'json' (which docs/code were searched)
+  sources_cited => 'json' ([{file, title, excerpt, type}])
+  user_role => 'varchar' (track user role at time of query)
+  response_time_ms => 'integer' (performance tracking)
+  tokens_used => 'integer' (for XAI cost tracking)
+  is_verified => 'boolean' (only for web search results)
+</code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">4.2 New Table: documentation_metadata_index</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Location:</strong> <a href="/Documentation/Result_Class_Development_Guide" target="_blank" style="color: var(--link-color);">/lib/Comserv/Model/Schema/Ency/Result/DocumentationMetadataIndex.pm</a></p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Stores ONLY metadata and searchable excerpts of .tt files. Full content remains on disk.</p>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: var(--font-size-small);"><code>Fields:
+  id => 'integer'
+  file_path => 'varchar(512)' UNIQUE
+  file_type => 'enum' (tt, md)
+  title => 'varchar(512)'
+  excerpt => 'text' (first 500 chars for preview)
+  searchable_text => 'longtext' FULLTEXT INDEX (for search)
+  content_hash => 'varchar(64)' (SHA256 of .tt file)
+  role_access => 'json' (which roles can access)
+  indexed_at => 'timestamp'
+  last_file_modified => 'timestamp'
+  file_size => 'integer'
+</code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">4.3 New Table: code_search_index</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Location:</strong> <a href="/Documentation/Result_Class_Development_Guide" target="_blank" style="color: var(--link-color);">/lib/Comserv/Model/Schema/Ency/Result/CodeSearchIndex.pm</a></p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Index of application source code (.pm and .tt code) for developers/admins</p>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: var(--font-size-small);"><code>Fields:
+  id => 'integer'
+  file_path => 'varchar(512)' UNIQUE
+  file_type => 'enum' (pm, tt, sql)
+  code_elements => 'json' ({functions, classes, variables, line_numbers})
+  searchable_code => 'longtext' FULLTEXT INDEX
+  content_hash => 'varchar(64)'
+  indexed_at => 'timestamp'
+  min_role => 'varchar' (minimum role to search: developer, admin)
+  file_size => 'integer'
+</code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">4.4 New Table: web_search_results</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Location:</strong> <a href="/Documentation/Result_Class_Development_Guide" target="_blank" style="color: var(--link-color);">/lib/Comserv/Model/Schema/Ency/Result/WebSearchResult.pm</a></p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Store web search results BEFORE admin verification. Once verified, can be added to documentation_metadata_index.</p>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: var(--font-size-small);"><code>Fields:
+  id => 'integer'
+  query => 'varchar(500)' (original search query)
+  result_title => 'varchar(512)'
+  result_url => 'varchar(1000)'
+  result_snippet => 'longtext'
+  full_content => 'longtext' (if book/PDF stored)
+  source_type => 'enum' (web, public_domain_book, arxiv, etc.)
+  found_by_user_id => 'integer'
+  is_verified => 'boolean' (admin approval)
+  verified_by_user_id => 'integer'
+  verification_notes => 'text'
+  created_at => 'timestamp'
+  verified_at => 'timestamp'
+  used_in_ai_message_id => 'integer' (FK to ai_messages)
+</code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">4.5 New Table: ai_model_config</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Location:</strong> <a href="/Documentation/Result_Class_Development_Guide" target="_blank" style="color: var(--link-color);">/lib/Comserv/Model/Schema/Ency/Result/AiModelConfig.pm</a></p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Admin configuration for model access by role</p>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: var(--font-size-small);"><code>Fields:
+  id => 'integer'
+  role => 'varchar(100)' (admin, developer, user, guest, etc.)
+  agent_type => 'varchar(100)' (documentation, helpdesk, ency, etc.)
+  model_name => 'varchar(100)' (ollama, xai, etc.)
+  enabled => 'boolean'
+  api_endpoint => 'varchar(500)' (http://localhost:11434 or https://...)
+  api_key_encrypted => 'varchar(512)' (encrypted, Kubernetes-compatible)
+  temperature => 'float' (0.0-1.0)
+  max_tokens => 'integer'
+  search_docs_automatically => 'boolean'
+  allow_web_search => 'boolean'
+  allow_code_search => 'boolean'
+  priority => 'integer' (selection order)
+  created_at => 'timestamp'
+  updated_at => 'timestamp'
+</code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">4.6 New Table: documentation_role_access</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Location:</strong> <a href="/Documentation/Result_Class_Development_Guide" target="_blank" style="color: var(--link-color);">/lib/Comserv/Model/Schema/Ency/Result/DocumentationRoleAccess.pm</a></p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Fine-grained role-based access to documentation sections</p>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: var(--font-size-small);"><code>Fields:
+  id => 'integer'
+  role => 'varchar(100)'
+  doc_section_pattern => 'varchar(255)' (e.g., 'admin/*', 'tutorial/*', 'api/*')
+  can_access => 'boolean' (true=can, false=deny)
+  created_at => 'timestamp'
+  UNIQUE (role, doc_section_pattern)
+</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- MULTI-AGENT SYSTEM -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="multi-agent-system" style="color: var(--text-color); font-family: var(--header-font);">5. Multi-Agent Architecture</h2>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);">Different AI agents can be configured for different purposes. Each agent has its own:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Documentation scope (which docs to search)</li>
+                <li>System prompt (instructions for AI behavior)</li>
+                <li>Models available (Ollama, XAI, etc.)</li>
+                <li>User access control (who can use this agent)</li>
+                <li>Logging and analytics</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Example Agents:</h3>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0;">
+                <table style="width: 100%; color: var(--text-color); font-family: var(--body-font); border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: var(--secondary-color, #0066cc); color: white;">
+                            <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">Agent Name</th>
+                            <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">Purpose</th>
+                            <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">Doc Scope</th>
+                            <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">Users</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="background: var(--light-color);">
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Documentation Agent</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">General help on using Comserv</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">/Documentation/*</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">All users</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Code Assistant</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Help developers understand code</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">/lib/*, /root/*/</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Dev/Admin</td>
+                        </tr>
+                        <tr style="background: var(--light-color);">
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">ENCY Agent</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Help with inventory/encyclodepdia system</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">ENCY docs + database</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">ENCY users</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Beekeeping Agent</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Beekeeping data & docs</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Beekeeping docs</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Beekeeping module users</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="background: var(--warning-color, #fff3cd); border-left: 4px solid var(--warning-border, #ffc107); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 3px;">
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;">
+                    <strong>Note:</strong> Multi-agent architecture is designed into the system but Phase 1 focuses on Documentation Agent only. Other agents can be added in future phases by configuring additional rows in ai_model_config table.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- VERIFICATION WORKFLOW -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="verification-workflow" style="color: var(--text-color); font-family: var(--header-font);">6. Web Search Verification Workflow</h2>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);">When AI finds information via web search, it should NOT immediately add to knowledge base. Instead:</p>
+
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Store in web_search_results table:</strong> Mark as is_verified=false</li>
+                <li><strong>Notify admin:</strong> New unverified web result needs review</li>
+                <li><strong>Admin reviews:</strong> Check accuracy, licensing (for books), relevance</li>
+                <li><strong>Admin approves:</strong> Add to documentation_metadata_index OR reject with notes</li>
+                <li><strong>Future searches:</strong> Use verified results from documentation_metadata_index (faster, no external API call)</li>
+            </ol>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Admin Dashboard Updates:</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>New section: "Pending Web Search Approvals" with counts and recent submissions</li>
+                <li>One-click approve/reject with optional notes</li>
+                <li>Ability to edit title/snippet before adding to docs</li>
+                <li>Track which user found/verified each result</li>
+                <li>Option to import public domain books directly into documentation_metadata_index</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- IMPLEMENTATION PLAN -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="implementation-plan" style="color: var(--text-color); font-family: var(--header-font);">7. Implementation Plan</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Key Principles:</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>✅ <strong>Reuse existing code:</strong> Extend AiConversation/AiMessage rather than create new tables</li>
+                <li>✅ <strong>Theme-compatible CSS:</strong> Use var(--text-color), var(--header-font), etc. from theme system</li>
+                <li>✅ <strong>Template Toolkit integration:</strong> All .tt files use documentation_tt_template.tt as base</li>
+                <li>✅ <strong>Use existing database UI:</strong> Leverage Comserv's database management tools instead of raw SQL scripts</li>
+                <li>✅ <strong>Docker/Kubernetes ready:</strong> Use EnvFileManager pattern for API key storage (encrypted, container-aware)</li>
+                <li>✅ <strong>Never create new file if existing can be extended:</strong> Refactor only if file exceeds reasonable size (~500 lines)</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Phased Approach (8-10 Weeks)</h3>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
+                <table style="width: 100%; color: var(--text-color); font-family: var(--body-font); border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: var(--secondary-color, #0066cc); color: white;">
+                            <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">Phase</th>
+                            <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">Duration</th>
+                            <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">Deliverables</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="background: #d4edda;">
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>✅ 1: Database & Model Layer</strong></td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>COMPLETED Dec 25</strong></td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">
+                                ✅ AiMessage.pm (with new fields)<br>
+                                ✅ DocumentationMetadataIndex.pm (created + fixed)<br>
+                                ✅ CodeSearchIndex.pm (created)<br>
+                                ✅ WebSearchResult.pm (created)<br>
+                                ✅ AiModelConfig.pm (created)<br>
+                                ✅ DocumentationRoleAccess.pm (created)<br>
+                                ✅ <strong>All tables created in ENCY database and automated startup initialization</strong>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">2: Backend Services</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">2-3 weeks</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">
+                                • DocumentationIndexer service<br>
+                                • LLMOllama service<br>
+                                • LLMXAI service (with encryption)<br>
+                                • 🆕 LLMGrok service (Grok API integration with encrypted API key)<br>
+                                • Extend Chat::AI controller<br>
+                                • Role-based access filtering<br>
+                                • 🆕 Model configuration endpoints (allow dynamic model switching)
+                            </td>
+                        </tr>
+                        <tr style="background: var(--light-color);">
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">3: Frontend & UI</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">2-3 weeks</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">
+                                • Chat widget HTML/CSS (theme-compatible)<br>
+                                • 🆕 Chat widget CSS redesign matching Grok.ai aesthetic (dark theme, modern typography)<br>
+                                • JavaScript chat logic<br>
+                                • Model selector dropdown (Ollama, XAI, Grok options)<br>
+                                • Message history UI<br>
+                                • 🆕 /ai/conversations page - conversation browser with search/filter<br>
+                                • 🆕 Conversation resume functionality with full context preservation<br>
+                                • Inject on all pages
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">4: Admin & Verification</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">2-3 weeks</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">
+                                • Admin panel for model config<br>
+                                • 🆕 Admin controls for dynamic model/agent assignment (without code changes)<br>
+                                • 🆕 Agent configuration UI (enable/disable agents, set default models per agent)<br>
+                                • 🆕 Grok API key management with encryption<br>
+                                • Web search approval workflow<br>
+                                • Analytics dashboard<br>
+                                • Database UI integration<br>
+                                • API key management (Kubernetes-ready)
+                            </td>
+                        </tr>
+                        <tr style="background: var(--light-color);">
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">5: Integration & Polish</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">1-2 weeks</td>
+                            <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">
+                                • Docker networking setup (prod → 192.168.1.199)<br>
+                                • XAI encryption testing<br>
+                                • Code search indexing<br>
+                                • Performance tuning<br>
+                                • Unit/integration tests
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECURITY & KUBERNETES -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="security" style="color: var(--text-color); font-family: var(--header-font);">8. Security & Kubernetes Compatibility</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">8.1 API Key Management (Docker/Kubernetes)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Pattern:</strong> Use EnvFileManager or existing .env approach:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Store encrypted API keys in ai_model_config.api_key_encrypted</li>
+                <li>Load encryption key from environment variable: $COMSERV_ENCRYPTION_KEY</li>
+                <li>In Kubernetes: set via Secret and mounted as env var</li>
+                <li>In Docker: set via docker-compose environment section</li>
+                <li>Never log or expose keys in responses</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">8.2 Role-Based Access Enforcement</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>CRITICAL:</strong> Always check documentation_role_access table:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Search returns only docs user can access</li>
+                <li>Code search restricted to dev/admin roles</li>
+                <li>Web search configurable per role</li>
+                <li>Audit log includes user role at time of query</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">8.3 Prompt Injection & Output Safety</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Sanitize user input before LLM (escape quotes, truncate length)</li>
+                <li>Sanitize LLM output before display (prevent XSS in HTML)</li>
+                <li>Use parameterized database queries</li>
+                <li>Rate limiting: 10 messages per user per hour</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">8.4 Audit Trail</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>All ai_messages include: user_id, user_role, timestamp, IP address</li>
+                <li>Model used, tokens consumed, response time tracked</li>
+                <li>Sources cited recorded for verification</li>
+                <li>Admin can query by user, date, model, role for investigation</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">8.5 Network Configuration (Production)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Ollama Server Setup:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Production container (app) needs access to Ollama at 192.168.1.199:11434</li>
+                <li>Docker network configuration: allow traffic between containers</li>
+                <li>docker-compose.prod.yml: add 192.168.1.199 to hosts or network bridge</li>
+                <li>Test endpoint connectivity before deployment</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- SUCCESS CRITERIA -->
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">9. Success Criteria</h2>
+
+            <div style="background: var(--success-color, #d4edda); border-left: 4px solid var(--success-border, #28a745); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 3px;">
+                <strong style="color: var(--text-color); font-family: var(--header-font);">Feature complete when:</strong>
+                <ul style="color: var(--text-color); font-family: var(--body-font); margin: var(--spacing-small) 0;">
+                    <li>✅ Chat widget visible on all pages (non-auth and authenticated users)</li>
+                    <li>✅ Users can ask questions and receive answers in &lt;3s (Ollama)</li>
+                    <li>✅ All Q&A logged with metadata in ai_messages table</li>
+                    <li>✅ Role-based access enforced (users only see permitted docs)</li>
+                    <li>✅ Admins can view conversation logs + analytics</li>
+                    <li>✅ Web search results stored and verification workflow functional</li>
+                    <li>✅ Code search working for developers/admins</li>
+                    <li>✅ API keys encrypted and Kubernetes-compatible</li>
+                    <li>✅ All templates conform to <a href="/Documentation/documentation_tt_template" target="_blank" style="color: var(--link-color);">documentation_tt_template.tt</a></li>
+                    <li>✅ CSS theme-compatible (var(--*) variables used)</li>
+                    <li>✅ Tests passing (unit, integration, role-based access)</li>
+                    <li>✅ Documentation/tutorial for users on how to use AI chat</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEXT STEPS -->
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">10. Next Steps</h2>
+
+            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Ready to Begin Phase 1?</strong></p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Approve this spec:</strong> Confirm architecture and database design</li>
+                    <li><strong>Set up Ollama network:</strong> Ensure 192.168.1.199:11434 accessible from production container</li>
+                    <li><strong>Begin database schema creation:</strong> Create .pm files in /lib/Comserv/Model/Schema/Ency/Result/</li>
+                    <li><strong>Extend Chat::AI controller</strong> with API endpoints</li>
+                    <li><strong>Build frontend widget</strong> with theme-compatible CSS</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="row" style="margin-top: var(--spacing-large); border-top: 1px solid var(--border-color); padding-top: var(--spacing-medium);">
+        <div class="col-100">
+            <p style="color: var(--text-muted-color); font-size: var(--font-size-small); font-family: var(--body-font);">
+                <strong>Document History:</strong><br>
+                v0.01 (2025-12-16): Initial design with user feedback integration. Covers database schema, multi-agent architecture, web search verification, and Kubernetes compatibility.<br>
+                v0.02 (2025-12-16 18:30): Phase 1 Complete - All database model classes (DBIC Result .pm files) created and SQL migrations prepared. Fixtures for default configurations added. Ready for Phase 2: Backend Services.
+            </p>
+        </div>
+    </div>
+
+</div>

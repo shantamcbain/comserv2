@@ -1,0 +1,79 @@
+.PHONY: help dev prod up down logs shell db-shell cache-clear test health
+
+COMPOSE := docker-compose
+
+help:
+	@echo "Comserv Docker Management"
+	@echo "=========================="
+	@echo ""
+	@echo "Usage: make <target>"
+	@echo ""
+	@echo "Environment Targets:"
+	@echo "  make dev              - Start development environment"
+	@echo "  make prod             - Start production environment"
+	@echo ""
+	@echo "Service Management:"
+	@echo "  make up               - Start all services"
+	@echo "  make down             - Stop all services"
+	@echo "  make restart          - Restart services"
+	@echo "  make build            - Build Docker images"
+	@echo "  make logs             - View application logs"
+	@echo ""
+	@echo "Database Operations:"
+	@echo "  make db-shell         - Connect to MySQL"
+	@echo "  make db-backup        - Backup database"
+	@echo ""
+	@echo "Container Access:"
+	@echo "  make shell            - Access application shell"
+	@echo ""
+	@echo "Monitoring:"
+	@echo "  make health           - Run health checks"
+	@echo "  make monitoring       - Show resource usage"
+
+dev:
+	$(COMPOSE) --env-file .env.development up -d
+	@echo "✓ Development environment started"
+
+prod:
+	$(COMPOSE) --env-file .env.production up -d
+	@echo "✓ Production environment started"
+
+up:
+	$(COMPOSE) up -d
+
+down:
+	$(COMPOSE) down
+
+restart:
+	$(COMPOSE) restart
+
+build:
+	$(COMPOSE) build
+
+logs:
+	$(COMPOSE) logs -f --tail=100
+
+db-shell:
+	$(COMPOSE) exec database mysql -u comserv -p
+
+db-backup:
+	@mkdir -p ./.docker/backups
+	$(COMPOSE) exec database mysqldump -u comserv -pcomserv_pass --all-databases > ./.docker/backups/backup-$$(date +%Y%m%d-%H%M%S).sql
+
+cache-clear:
+	$(COMPOSE) exec redis redis-cli -a redispass FLUSHALL
+
+shell:
+	$(COMPOSE) exec web bash
+
+health:
+	@echo "Running health checks..."
+	@curl -s http://localhost:3000/ && echo "✓ Web service OK" || echo "✗ Web service down"
+	@$(COMPOSE) exec database mysqladmin -u comserv -pcomserv_pass ping && echo "✓ Database OK" || echo "✗ Database down"
+	@$(COMPOSE) exec redis redis-cli -a redispass ping && echo "✓ Redis OK" || echo "✗ Redis down"
+
+monitoring:
+	docker stats --no-stream
+
+test:
+	$(COMPOSE) exec web perl -Ilib t/01app.t

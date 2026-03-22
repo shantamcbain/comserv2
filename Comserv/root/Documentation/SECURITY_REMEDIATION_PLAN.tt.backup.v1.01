@@ -1,0 +1,561 @@
+[% META 
+   title = "Security Remediation Master Plan"
+   description = "Comprehensive security vulnerability audit and remediation plan for Comserv application. Covers CRITICAL, HIGH, and MEDIUM severity issues identified in security audit (Jan 2026). Includes 13 vulnerabilities, priority sequencing, implementation timeline, and integration with master plan."
+   roles = "admin,security,developer,devops"
+   TemplateType = "Documentation"
+   category = "security,infrastructure,compliance"
+   page_version = "1.01"
+   last_updated = "Sun Jan 05 2026 21:50:00 UTC"
+%]
+[% PageVersion = 'root/Documentation/SECURITY_REMEDIATION_PLAN.tt,v 1.01 2026/01/05 21:50:00 zencoder Exp - G.1 SQL Injection Fixes COMPLETED (8 vulns fixed)'
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    <h1>Security Remediation Master Plan</h1>
+    
+    <div class="last-updated">
+        <strong>Created:</strong> 2026-01-05 | 
+        <strong>Version:</strong> 1.00 | 
+        <strong>Status:</strong> 🟡 In Progress - G.1 COMPLETED - 13 Vulnerabilities Identified, 5 Immediate Actions, Integration with Master Plan | 
+        <strong>Last Updated:</strong> 2026-01-05 21:50:00 UTC
+    </div>
+
+    <div class="alert alert-danger">
+        <h3>🔴 SECURITY AUDIT SUMMARY (Jan 5, 2026)</h3>
+        <ul>
+            <li><strong>Total Vulnerabilities:</strong> 13 identified</li>
+            <li><strong>CRITICAL (3):</strong> SQL Injection, Database Credentials Exposure, Command Injection</li>
+            <li><strong>HIGH (5):</strong> Weak Password Hashing, Session Security, Hardcoded Admin Bypass, CSRF Protection, Encryption Issues</li>
+            <li><strong>MEDIUM (5):</strong> File Permissions, Input Validation, Logging Exposure, Security Headers, Misc</li>
+            <li><strong>Note on db_config.json:</strong> NOT tracked in git (already gitignored), scheduled for removal after k8s verification - NOT a risk for credential exposure in repository history</li>
+        </ul>
+    </div>
+
+    <div class="nav-dashboard">
+        <h2>Navigation</h2>
+        <div class="nav-links">
+            <a href="#executive-summary" class="nav-btn nav-btn-highlight">📊 Executive Summary & Top 10</a>
+            <a href="#immediate-actions" class="nav-btn nav-btn-highlight">🔴 IMMEDIATE ACTIONS (Week 1)</a>
+            <a href="#vulnerability-matrix" class="nav-btn">📋 Full Vulnerability Matrix</a>
+            <a href="#remediation-plans" class="nav-btn">✅ Individual Remediation Plans</a>
+            <a href="#implementation-timeline" class="nav-btn">📅 Timeline & Sequencing</a>
+            <a href="#dependency-analysis" class="nav-btn">🔗 Dependencies</a>
+        </div>
+    </div>
+
+    <h2 id="executive-summary">Executive Summary: Top 10 Security Priorities</h2>
+    
+    <div class="alert alert-warning">
+        <h3>🚨 Comserv Top 10 Master Plan Priorities (Including Security)</h3>
+        <p><strong>Updated Master Plan Top 10 (Jan 5, 2026):</strong> Integrating security into overall master plan priorities</p>
+    </div>
+
+    <table style="width: 100%; margin: 20px 0; border-collapse: collapse;">
+        <thead style="background: #f5f5f5;">
+            <tr>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 5%;">Rank</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 25%;">Initiative</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 15%;">Category</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 10%;">Severity</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 20%;">Timeline</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 25%;">Impact</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr style="background: #ffebee; border-bottom: 2px solid #c62828;">
+                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">1</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>G.1: SQL Injection Fixes</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Security</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">🔴 CRITICAL (CVSS 9.8)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Week 1 (Jan 6-7)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Database compromise, data theft, system takeover</td>
+            </tr>
+            <tr style="background: #ffebee; border-bottom: 2px solid #c62828;">
+                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">2</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>G.2: Command Injection Prevention</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Security</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">🔴 CRITICAL (CVSS 9.8)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Week 1 (Jan 6-7)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Remote code execution, system compromise</td>
+            </tr>
+            <tr style="background: #ffebee; border-bottom: 2px solid #c62828;">
+                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">3</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>G.3: Weak Password Hashing → Argon2</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Security</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">🔴 CRITICAL (CVSS 8.1)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Week 1-2 (Jan 6-12)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Credential compromise via brute force/rainbow tables</td>
+            </tr>
+            <tr style="background: #fff3cd; border-bottom: 1px solid #ddd;">
+                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">4</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>A.2: K8s Readiness Phase</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Infrastructure</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">🔴 CRITICAL</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Week 1-2 (Jan 6-12)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Deployment readiness, system stability</td>
+            </tr>
+            <tr style="background: #fff3cd; border-bottom: 1px solid #ddd;">
+                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">5</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>A.1: K8s Migration</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Infrastructure</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">🔴 CRITICAL</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Week 2-4 (Jan 13-26)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Production environment modernization</td>
+            </tr>
+            <tr style="background: #d4edda; border-bottom: 1px solid #ddd;">
+                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">6</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>G.4: Session & CSRF Security</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Security</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">🟠 HIGH (CVSS 7.5)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Week 1-2 (Jan 6-12)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Session hijacking, account takeover, data manipulation</td>
+            </tr>
+            <tr style="background: #d4edda; border-bottom: 1px solid #ddd;">
+                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">7</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>E.1: AI Chat System</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Infrastructure</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">🟠 HIGH</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Week 2-4 (Jan 13-26)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Development productivity, documentation access</td>
+            </tr>
+            <tr style="background: #d4edda; border-bottom: 1px solid #ddd;">
+                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">8</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>G.5: Encryption & Key Management</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Security</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">🟠 HIGH (CVSS 7.5)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Week 2-3 (Jan 13-19)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Encrypted credential compromise</td>
+            </tr>
+            <tr style="background: #e8f4f8; border-bottom: 1px solid #ddd;">
+                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">9</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>B.1/B.2: Bug Fixes (Docker Secrets, Auth)</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Bugs</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">🟠 HIGH</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Week 1-2 (Jan 6-12)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">System stability, authentication reliability</td>
+            </tr>
+            <tr style="background: #e8f4f8; border-bottom: 1px solid #ddd;">
+                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">10</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>G.6: Input Validation & Security Headers</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Security</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">🟡 MEDIUM (CVSS 5.3)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Week 2-3 (Jan 13-19)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Defense-in-depth hardening, OWASP compliance</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2 id="immediate-actions">🔴 IMMEDIATE ACTIONS (Week 1: Jan 6-12, 2026)</h2>
+    
+    <div class="alert alert-danger">
+        <h3>Priority Sequence for Week 1</h3>
+        <p><strong>Must complete in order:</strong> SQL Injection → Command Injection → Password Hashing → Session/CSRF</p>
+        <p><strong>Parallel Track:</strong> G.5 Encryption can proceed alongside password hashing if resources available</p>
+    </div>
+
+    <div style="margin: 20px 0;">
+        <h4>Action 1: SQL Injection Fixes (G.1) - Mon-Tue Jan 6-7</h4>
+        <div style="background: #f9f9f9; padding: 15px; border-left: 4px solid #c62828; margin: 10px 0;">
+            <p><strong>Files to Fix:</strong></p>
+            <ul>
+                <li><code>Admin.pm:330</code> - database name interpolation in size_query</li>
+                <li><code>Admin.pm:348</code> - table name interpolation in count_query</li>
+                <li>Search for all other interpolated SQL queries in codebase</li>
+            </ul>
+            <p><strong>Implementation:</strong> Use parameterized queries with placeholders (?)</p>
+            <p><strong>Testing:</strong> Run sql_injection_test.pl before commit</p>
+            <p><strong>Effort:</strong> 3-4 hours</p>
+        </div>
+    </div>
+
+    <div style="margin: 20px 0;">
+        <h4>Action 2: Command Injection Prevention (G.2) - Tue-Wed Jan 7-8</h4>
+        <div style="background: #f9f9f9; padding: 15px; border-left: 4px solid #c62828; margin: 10px 0;">
+            <p><strong>Files to Fix:</strong></p>
+            <ul>
+                <li><code>Admin.pm</code> get_system_stats() function - replace backticks with IPC::Run or Perl equivalents</li>
+                <li>Search for all backtick usage in codebase</li>
+            </ul>
+            <p><strong>Implementation:</strong> Replace unsafe shell invocation with Perl modules</p>
+            <p><strong>Testing:</strong> Verify system stats still display correctly</p>
+            <p><strong>Effort:</strong> 4-5 hours</p>
+        </div>
+    </div>
+
+    <div style="margin: 20px 0;">
+        <h4>Action 3: Weak Password Hashing Migration (G.3) - Wed-Thu Jan 8-9</h4>
+        <div style="background: #f9f9f9; padding: 15px; border-left: 4px solid #c62828; margin: 10px 0;">
+            <p><strong>Files to Modify:</strong></p>
+            <ul>
+                <li><code>Controller/User.pm</code> - hash_password() and password verification</li>
+                <li><code>Model/User.pm</code> - check_password() method</li>
+                <li>Database schema - extend password field to 255 chars (Argon2 hashes are ~97 chars)</li>
+            </ul>
+            <p><strong>Implementation:</strong> Migrate from SHA-256 to Argon2 with backward compatibility</p>
+            <p><strong>Testing:</strong> Create migration script to rehash existing passwords on next login</p>
+            <p><strong>Effort:</strong> 6-8 hours (includes migration strategy)</p>
+        </div>
+    </div>
+
+    <div style="margin: 20px 0;">
+        <h4>Action 4: Session & CSRF Security (G.4) - Thu-Fri Jan 9-10</h4>
+        <div style="background: #f9f9f9; padding: 15px; border-left: 4px solid #c62828; margin: 10px 0;">
+            <p><strong>Tasks:</strong></p>
+            <ul>
+                <li>Enable cookie_secure flag for production environments (Comserv.pm line 88-95)</li>
+                <li>Add cookie_samesite = 'Strict' to session configuration</li>
+                <li>Implement CSRF tokens in all POST/PUT/DELETE actions</li>
+                <li>Update all forms to include hidden CSRF token input</li>
+                <li>Create session base controller to enforce CSRF validation</li>
+            </ul>
+            <p><strong>Testing:</strong> Test CSRF token mismatch scenarios, verify session state</p>
+            <p><strong>Effort:</strong> 5-6 hours</p>
+        </div>
+    </div>
+
+    <h2 id="vulnerability-matrix">Full Vulnerability Matrix</h2>
+
+    <table style="width: 100%; margin: 20px 0; border-collapse: collapse;">
+        <thead style="background: #f5f5f5;">
+            <tr>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 8%;">ID</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 20%;">Vulnerability</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 12%;">Severity</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 12%;">CVSS</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 25%;">Impact</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 23%;">Location</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- CRITICAL VULNERABILITIES -->
+            <tr style="background: #ffebee;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>1</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>SQL Injection</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #c62828; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">CRITICAL</span></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">9.8</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Database compromise, unauthorized data access, data modification, system takeover</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><code>Admin.pm:330</code> (database name), <code>Admin.pm:348</code> (table name)</td>
+            </tr>
+            <tr style="background: #ffebee;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>2</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Command Injection (Shell Execution)</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #c62828; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">CRITICAL</span></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">9.8</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Remote code execution, system compromise, data theft, privilege escalation</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><code>Admin.pm</code> backticks (df, uptime, git commands in get_system_stats)</td>
+            </tr>
+            <tr style="background: #ffebee;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>3</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Weak Password Hashing (No Salt)</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #c62828; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">CRITICAL</span></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">8.1</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Credential compromise via brute force (SHA-256 is fast), rainbow table attacks, account takeover</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><code>Controller/User.pm:279</code> hash_password() uses SHA256 unsalted</td>
+            </tr>
+
+            <!-- HIGH VULNERABILITIES -->
+            <tr style="background: #ffe0b2;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>4</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Session Cookie Insecurity</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f57c00; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">HIGH</span></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">7.5</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Session hijacking via MITM attacks, account takeover, session fixation</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><code>Comserv.pm:88-95</code> cookie_secure=0, missing SameSite attribute</td>
+            </tr>
+            <tr style="background: #ffe0b2;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>5</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>No CSRF Protection</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f57c00; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">HIGH</span></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">7.5</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Unauthorized form submissions, data manipulation, account takeover</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">All controllers - no CSRF token validation in POST/PUT/DELETE handlers</td>
+            </tr>
+            <tr style="background: #ffe0b2;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>6</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Hardcoded Admin Bypass</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f57c00; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">HIGH</span></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">8.8</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Account compromise = full admin access, privilege escalation, system compromise</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><code>Util/AdminAuth.pm:45</code> hardcoded 'Shanta' + 'ai_assistant' usernames grant automatic admin</td>
+            </tr>
+            <tr style="background: #ffe0b2;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>7</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Weak Encryption (AES-256-CBC, No PBKDF2)</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f57c00; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">HIGH</span></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">7.5</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Encrypted credential compromise, key derivation attacks, brute force</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><code>Util/Encryption.pm</code> iterations=1 (should be 10k+), plaintext key files</td>
+            </tr>
+            <tr style="background: #ffe0b2;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>8</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Insecure Session State Storage</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f57c00; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">HIGH</span></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">7.5</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Unauthorized session access, privilege escalation, data theft</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><code>Comserv.pm:94</code> dir=/tmp/session_data (world-readable), loose permissions</td>
+            </tr>
+
+            <!-- MEDIUM VULNERABILITIES -->
+            <tr style="background: #fff9c4;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>9</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Insufficient Input Validation</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f9a825; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">MEDIUM</span></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">5.3</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">XSS attacks, injection attacks, data corruption</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><code>Controller/User.pm:611</code> register() only checks field existence, not format/length</td>
+            </tr>
+            <tr style="background: #fff9c4;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>10</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Sensitive Data in Logs</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f9a825; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">MEDIUM</span></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">5.3</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">User enumeration, credential leakage via logs, information disclosure</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><code>Controller/User.pm</code> logs username in plaintext during auth attempts</td>
+            </tr>
+            <tr style="background: #fff9c4;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>11</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Missing Security Headers</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f9a825; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">MEDIUM</span></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">3.7</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Clickjacking attacks, XSS attacks, MIME-type sniffing</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">All controllers - missing X-Frame-Options, X-Content-Type-Options, HSTS</td>
+            </tr>
+            <tr style="background: #fff9c4;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>12</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Insecure Encryption Key Storage</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f9a825; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">MEDIUM</span></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">5.3</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Encryption key compromise, credential decryption, plaintext credential recovery</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><code>Util/Encryption.pm</code> keys in /config (world-readable if not chmod 600)</td>
+            </tr>
+            <tr style="background: #fff9c4;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>13</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Missing Logging for Auth Events</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f9a825; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">MEDIUM</span></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">4.2</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Undetected brute force attacks, missing audit trail for security incidents</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><code>Controller/User.pm</code> logs failures but no rate limiting or alerting</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2 id="remediation-plans">Individual Remediation Plans (G.1 - G.6)</h2>
+
+    <div class="plan-card" style="background: #ffebee; border-left: 4px solid #c62828; margin: 20px 0; padding: 15px;">
+        <h4>G.1: SQL Injection Remediation</h4>
+        <p><strong>Plan:</strong> <a href="/Documentation/Plans/G1_SQLInjection_Fixes" class="doc-link">G.1_SQLInjection_Fixes.tt</a> (To be created)</p>
+        <p><strong>Severity:</strong> 🔴 CRITICAL | <strong>Timeline:</strong> Week 1 (Jan 6-7) | <strong>Effort:</strong> 3-4 hours</p>
+        <p><strong>Files:</strong> Admin.pm (lines 330, 348), other SQL-related code</p>
+    </div>
+
+    <div class="plan-card" style="background: #ffebee; border-left: 4px solid #c62828; margin: 20px 0; padding: 15px;">
+        <h4>G.2: Command Injection Prevention</h4>
+        <p><strong>Plan:</strong> <a href="/Documentation/Plans/G2_CommandInjection_Prevention" class="doc-link">G.2_CommandInjection_Prevention.tt</a> (To be created)</p>
+        <p><strong>Severity:</strong> 🔴 CRITICAL | <strong>Timeline:</strong> Week 1 (Jan 7-8) | <strong>Effort:</strong> 4-5 hours</p>
+        <p><strong>Files:</strong> Admin.pm (get_system_stats, backtick usage)</p>
+    </div>
+
+    <div class="plan-card" style="background: #ffebee; border-left: 4px solid #c62828; margin: 20px 0; padding: 15px;">
+        <h4>G.3: Password Hashing Migration (SHA-256 → Argon2)</h4>
+        <p><strong>Plan:</strong> <a href="/Documentation/Plans/G3_PasswordHashing_Argon2" class="doc-link">G.3_PasswordHashing_Argon2.tt</a> (To be created)</p>
+        <p><strong>Severity:</strong> 🔴 CRITICAL | <strong>Timeline:</strong> Week 1-2 (Jan 8-12) | <strong>Effort:</strong> 6-8 hours</p>
+        <p><strong>Files:</strong> Controller/User.pm, Model/User.pm, Schema migration</p>
+    </div>
+
+    <div class="plan-card" style="background: #ffe0b2; border-left: 4px solid #f57c00; margin: 20px 0; padding: 15px;">
+        <h4>G.4: Session & CSRF Security Hardening</h4>
+        <p><strong>Plan:</strong> <a href="/Documentation/Plans/G4_Session_CSRF_Security" class="doc-link">G.4_Session_CSRF_Security.tt</a> (To be created)</p>
+        <p><strong>Severity:</strong> 🟠 HIGH | <strong>Timeline:</strong> Week 1-2 (Jan 9-12) | <strong>Effort:</strong> 5-6 hours</p>
+        <p><strong>Files:</strong> Comserv.pm (session config), all POST/PUT/DELETE controllers</p>
+    </div>
+
+    <div class="plan-card" style="background: #ffe0b2; border-left: 4px solid #f57c00; margin: 20px 0; padding: 15px;">
+        <h4>G.5: Encryption & Key Management Hardening</h4>
+        <p><strong>Plan:</strong> <a href="/Documentation/Plans/G5_Encryption_KeyManagement" class="doc-link">G.5_Encryption_KeyManagement.tt</a> (To be created)</p>
+        <p><strong>Severity:</strong> 🟠 HIGH | <strong>Timeline:</strong> Week 2-3 (Jan 13-19) | <strong>Effort:</strong> 5-6 hours</p>
+        <p><strong>Files:</strong> Util/Encryption.pm, key file management</p>
+    </div>
+
+    <div class="plan-card" style="background: #fff9c4; border-left: 4px solid #f9a825; margin: 20px 0; padding: 15px;">
+        <h4>G.6: Input Validation & Security Headers</h4>
+        <p><strong>Plan:</strong> <a href="/Documentation/Plans/G6_InputValidation_SecurityHeaders" class="doc-link">G.6_InputValidation_SecurityHeaders.tt</a> (To be created)</p>
+        <p><strong>Severity:</strong> 🟡 MEDIUM | <strong>Timeline:</strong> Week 2-3 (Jan 13-19) | <strong>Effort:</strong> 4-5 hours</p>
+        <p><strong>Files:</strong> All controllers, Root.pm (headers), User.pm (registration)</p>
+    </div>
+
+    <h2 id="implementation-timeline">Implementation Timeline & Sequencing</h2>
+
+    <div style="margin: 20px 0;">
+        <h3>Week 1 Timeline (Jan 6-12, 2026)</h3>
+        <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+            <tr style="background: #f5f5f5;">
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 20%;">Day</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 30%;">Task</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 15%;">Duration</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 35%;">Deliverable</th>
+            </tr>
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Mon 6th</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">G.1: SQL Injection Analysis & Fixes</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">3-4 hrs</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Fixed Admin.pm, test suite, PR ready</td>
+            </tr>
+            <tr style="background: #f9f9f9;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Tue 7th</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">G.2: Command Injection Prevention</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">4-5 hrs</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">IPC::Run implementation, system_stats() updated, tests</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Wed 8th</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">G.3a: Password Hashing Analysis & Schema Update</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">3 hrs</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Schema migration, backward compatibility plan</td>
+            </tr>
+            <tr style="background: #f9f9f9;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Thu 9th</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">G.3b: Argon2 Implementation (parallel: G.5 Encryption Design)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">3 hrs + 2 hrs</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">User.pm updated with Argon2, migration script ready</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Fri 10th</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">G.4a: Session & CSRF Implementation</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">3 hrs</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Comserv.pm updated, CSRF token generation</td>
+            </tr>
+            <tr style="background: #f9f9f9;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Sat 11th</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">G.4b: CSRF Token Integration (Forms)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">2 hrs</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">All forms updated with tokens, controllers validate</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Sun 12th</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">G.1-G.4 Testing & Validation</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">3 hrs</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Full security test suite, all PRs reviewed</td>
+            </tr>
+        </table>
+    </div>
+
+    <div style="margin: 20px 0;">
+        <h3>Week 2 Timeline (Jan 13-19, 2026)</h3>
+        <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+            <tr style="background: #f5f5f5;">
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 20%;">Day</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 30%;">Task</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 15%;">Duration</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 35%;">Deliverable</th>
+            </tr>
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Mon 13th</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">G.5: Encryption Key Management Hardening</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">3 hrs</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">PBKDF2 implementation, key file permissions (chmod 600)</td>
+            </tr>
+            <tr style="background: #f9f9f9;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Tue 14th</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">G.5 Continuation & Documentation</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">2 hrs</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Encryption.pm updated, secure key rotation guide</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Wed 15th</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">G.6: Input Validation (User Registration)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">2 hrs</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Data::Validate integration, regex patterns, tests</td>
+            </tr>
+            <tr style="background: #f9f9f9;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Thu 16th</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">G.6: Security Headers Implementation</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">2 hrs</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">X-Frame-Options, X-Content-Type-Options, HSTS added to Root.pm</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Fri 17th</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Security Audit Logging & Monitoring Setup</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">3 hrs</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Hashed username logging, rate limiting config, alerting rules</td>
+            </tr>
+            <tr style="background: #f9f9f9;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Sat 18th</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">G.1-G.6 Comprehensive Testing & Documentation</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">4 hrs</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Full security test coverage, OWASP checklist, documentation</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Sun 19th</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Security Plan Validation & Master Plan Integration</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">2 hrs</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">All G.1-G.6 PRs merged, security.md updated, master plan updated</td>
+            </tr>
+        </table>
+    </div>
+
+    <h2 id="dependency-analysis">Dependency Analysis</h2>
+
+    <div style="background: #f5f5f5; padding: 15px; border-radius: 4px; margin: 20px 0;">
+        <h3>Execution Dependencies</h3>
+        <ul>
+            <li><strong>G.1 (SQL Injection) is PREREQUISITE</strong> for testing framework - must fix first</li>
+            <li><strong>G.2 (Command Injection) is INDEPENDENT</strong> - can run in parallel with G.1</li>
+            <li><strong>G.3 (Password Hashing) is INDEPENDENT</strong> - can run in parallel but needs DB schema update before deployment</li>
+            <li><strong>G.4 (Session/CSRF) has SOFT DEPENDENCY</strong> on G.1 for testing but can be developed in parallel</li>
+            <li><strong>G.5 (Encryption) is INDEPENDENT</strong> - can run entirely in parallel with other fixes</li>
+            <li><strong>G.6 (Input Validation/Headers) is INDEPENDENT</strong> - can run in parallel but should be after high-severity fixes</li>
+        </ul>
+        <p><strong>Optimal Execution Sequence:</strong> G.1 first (CRITICAL), then parallel tracks: (G.2 + G.3 + G.4) in parallel with G.5, then G.6 last</p>
+    </div>
+
+    <h2 id="master-plan-integration">Integration with Master Plan</h2>
+
+    <div class="alert alert-info">
+        <h3>🔗 How Security Fits into Master Plan Top 10</h3>
+        <p><strong>Security Category G (New):</strong> Adds 6 security remediation plans to master plan structure</p>
+        <p><strong>Top 10 Updated (Jan 5, 2026):</strong></p>
+        <ol>
+            <li>✅ G.1: SQL Injection Fixes (CRITICAL)</li>
+            <li>✅ G.2: Command Injection Prevention (CRITICAL)</li>
+            <li>✅ G.3: Password Hashing Migration (CRITICAL)</li>
+            <li>✅ A.2: K8s Readiness (CRITICAL) - Parallel track</li>
+            <li>✅ A.1: K8s Migration (CRITICAL) - Parallel track</li>
+            <li>✅ G.4: Session & CSRF Security (HIGH) - Parallel track</li>
+            <li>✅ E.1: AI Chat System (HIGH) - Feature development</li>
+            <li>✅ G.5: Encryption & Key Management (HIGH) - Parallel track</li>
+            <li>✅ B.1/B.2: Bug Fixes (HIGH) - Ongoing</li>
+            <li>✅ G.6: Input Validation & Headers (MEDIUM) - Final hardening</li>
+        </ol>
+    </div>
+
+    <h2 id="compliance-standards">Compliance & Standards</h2>
+
+    <div style="margin: 20px 0;">
+        <h4>Alignment with Security Standards</h4>
+        <ul>
+            <li><strong>OWASP Top 10 2021:</strong> Addresses A01 (Injection), A02 (AuthN), A03 (Injection), A05 (CBAC), A07 (XSS)</li>
+            <li><strong>NIST Cybersecurity Framework:</strong> Implement (ID.RA), Protect (PR.AC, PR.DS, PR.PT)</li>
+            <li><strong>CWE Top 25:</strong> Addresses CWE-89 (SQL Injection), CWE-78 (OS Injection), CWE-916 (Auth), CWE-79 (XSS)</li>
+        </ul>
+    </div>
+
+    <h2 id="success-criteria">Success Criteria</h2>
+
+    <div style="background: #d4edda; padding: 15px; border-radius: 4px; margin: 20px 0;">
+        <h4>By End of Week 2 (Jan 19, 2026):</h4>
+        <ul>
+            <li>✅ All 6 critical/high vulnerabilities fixed (G.1-G.6)</li>
+            <li>✅ Password hashing migration completed with backward compatibility</li>
+            <li>✅ CSRF tokens implemented on all state-changing operations</li>
+            <li>✅ Security test suite created and passing (>90% coverage)</li>
+            <li>✅ All PRs merged to main branch</li>
+            <li>✅ Security.md documentation updated</li>
+            <li>✅ Team trained on new security measures</li>
+        </ul>
+    </div>
+
+</div>
+
+[% INCLUDE footer.tt %]

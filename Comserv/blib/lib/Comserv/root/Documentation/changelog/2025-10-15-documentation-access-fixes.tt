@@ -1,0 +1,119 @@
+[% META 
+   title = "Documentation Access and Display Fixes"
+   description = "Fixes for documentation access control and display issues"
+   roles = "normal,editor,admin,developer"
+   category = "changelog"
+%]
+
+<div class="doc-page">
+    <h1>Documentation Access and Display Fixes</h1>
+    
+    <div class="doc-section">
+        <h2>Overview</h2>
+        <p>
+            This update addresses several issues with the documentation system, focusing on role-based access control,
+            path resolution, and template rendering. These improvements ensure that all users can access the documentation
+            they are authorized to view, with proper formatting and navigation.
+        </p>
+        <p>
+            <strong>Date:</strong> October 15, 2025<br>
+            <strong>Type:</strong> Bug Fix<br>
+            <strong>Priority:</strong> High
+        </p>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Issues Fixed</h2>
+        
+        <h3>Role-Based Access Control</h3>
+        <ul>
+            <li>Fixed issue where normal users couldn't access documentation marked for their role</li>
+            <li>Improved role detection logic to properly handle multiple user roles</li>
+            <li>Enhanced special case handling for 'normal' role to ensure any authenticated user can access content</li>
+            <li>Added detailed logging to help diagnose access control problems</li>
+        </ul>
+        
+        <h3>Path Resolution</h3>
+        <ul>
+            <li>Added support for default paths defined in documentation_config.json</li>
+            <li>Implemented a multi-stage path resolution process to find documentation files</li>
+            <li>Fixed "page not found" errors for valid documentation pages</li>
+            <li>Improved handling of different file types (.md, .tt, etc.)</li>
+        </ul>
+        
+        <h3>Template Rendering</h3>
+        <ul>
+            <li>Created a standardized markdown_viewer.tt template for rendering markdown content</li>
+            <li>Improved error handling with a dedicated error.tt template</li>
+            <li>Enhanced display of documentation metadata (last updated, roles, etc.)</li>
+            <li>Fixed styling inconsistencies across different documentation types</li>
+        </ul>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Technical Changes</h2>
+        
+        <h3>Controller Updates</h3>
+        <pre class="code-block">
+# Enhanced role-based access control logic
+if (lc($role) eq lc($user_role)) {
+    $has_role = 1;
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'view',
+        "Role match: user role $user_role matches required role $role for page $page");
+    last;
+}
+# Special case for normal role - any authenticated user can access normal content
+elsif (lc($role) eq 'normal' && $user_role) {
+    $has_role = 1;
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'view',
+        "Normal role access granted to page $page for user with role $user_role");
+    last;
+}
+        </pre>
+        
+        <h3>Path Resolution Logic</h3>
+        <pre class="code-block">
+# Check if there's a default path defined in the documentation_config.json file
+if ($config->{default_paths} && $config->{default_paths}{$page}) {
+    $default_path = $config->{default_paths}{$page};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+        "Found default path for $page: $default_path");
+}
+
+# If a default path is defined, try to use it
+if ($default_path) {
+    my $full_default_path = $c->path_to('root', $default_path);
+    
+    if (-e $full_default_path) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+            "Using default path for $page: $default_path");
+            
+        # Determine file type based on extension and render appropriately
+        # ...
+    }
+}
+        </pre>
+    </div>
+    
+    <div class="doc-section">
+        <h2>User Impact</h2>
+        <p>
+            These changes improve the documentation system in the following ways:
+        </p>
+        <ul>
+            <li>Normal users can now access all documentation intended for them</li>
+            <li>Documentation pages are properly rendered with consistent styling</li>
+            <li>Error messages are more informative and helpful</li>
+            <li>Navigation between documentation pages is more reliable</li>
+            <li>Role-based access control works correctly for all user types</li>
+        </ul>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Related Documentation</h2>
+        <ul>
+            <li><a href="[% c.uri_for('/Documentation/documentation_migration_to_tt') %]">Documentation Migration to Template Toolkit</a></li>
+            <li><a href="[% c.uri_for('/Documentation/documentation_tt_template') %]">Documentation Template Toolkit Template</a></li>
+        </ul>
+    </div>
+</div>

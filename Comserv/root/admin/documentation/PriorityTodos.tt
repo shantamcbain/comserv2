@@ -1,0 +1,1237 @@
+[% META 
+   title = "Priority Todos & Blocking Dependencies - 13 Active Items"
+   description = "Critical priority tasks ordered by blocking dependencies. Includes Architecture Migration Phase 2, Master Plan Refactor, API Logging Fix, and DailyPlan Synchronization."
+   roles = "admin,developer,devops"
+   TemplateType = "Planning"
+   category = "planning,priorities,coordination"
+   page_version = "0.27"
+   last_updated = "2026-01-29"
+   editable = "true"
+%]
+
+[% PageVersion = 'admin/documentation/PriorityTodos.tt, v 0.27 2026/01/29 02:25:00 Converted from table format back to container format with enhanced detail per priority item.' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<style>
+    .priority-container {
+        background: var(--background-color);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        margin: 15px 0;
+        padding: 0;
+        scroll-margin-top: 170px !important;
+    }
+    
+    [id^="priority-"], #dynamic-daily, #cleanup-todos, #completed {
+        scroll-margin-top: 170px !important;
+    }
+    
+    .priority-container.priority-high {
+        border-left: 5px solid var(--warning-color);
+        background: var(--schema-alert-warning-bg);
+    }
+    
+    .priority-container.priority-medium {
+        border-left: 5px solid var(--accent-color);
+        background: var(--light-color);
+    }
+    
+    .priority-container.priority-low {
+        border-left: 5px solid var(--success-color);
+        background: var(--secondary-color);
+    }
+    
+    .priority-container summary {
+        padding: 15px 20px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 1.1em;
+        list-style: none;
+        user-select: none;
+    }
+    
+    .priority-container summary::-webkit-details-marker {
+        display: none;
+    }
+    
+    .priority-container summary:before {
+        content: "▶ ";
+        display: inline-block;
+        margin-right: 8px;
+        transition: transform 0.2s;
+    }
+    
+    .priority-container[open] summary:before {
+        transform: rotate(90deg);
+    }
+    
+    .priority-content {
+        padding: 0 20px 20px 20px;
+        border-top: 1px solid var(--border-color);
+    }
+    
+    .priority-meta {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin: 15px 0;
+        padding: 15px;
+        background: rgba(255,255,255,0.5);
+        border-radius: 4px;
+    }
+    
+    .priority-meta-item {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .priority-meta-label {
+        font-size: 0.85em;
+        color: var(--text-muted-color);
+        margin-bottom: 5px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .priority-meta-value {
+        font-weight: 500;
+    }
+    
+    .status-pending {
+        color: var(--warning-color);
+        font-weight: bold;
+    }
+    
+    .status-in-progress {
+        color: var(--accent-color);
+        font-weight: bold;
+    }
+    
+    .status-completed {
+        color: var(--success-color);
+        font-weight: bold;
+    }
+    
+    .priority-section {
+        margin: 15px 0;
+    }
+    
+    .priority-section h4 {
+        margin: 0 0 10px 0;
+        color: var(--text-color);
+        font-size: 0.95em;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .priority-tasks {
+        background: var(--background-color);
+        padding: 15px;
+        border-radius: 4px;
+        border: 1px solid var(--border-color);
+    }
+    
+    .priority-tasks ul {
+        margin: 0;
+        padding-left: 20px;
+    }
+    
+    .priority-tasks li {
+        margin: 8px 0;
+        line-height: 1.6;
+    }
+    
+    .blocker-tag {
+        display: inline-block;
+        padding: 4px 10px;
+        background: var(--schema-alert-danger-bg);
+        border: 1px solid var(--warning-color);
+        border-radius: 3px;
+        font-size: 0.9em;
+        margin: 3px;
+    }
+    
+    .unblocks-tag {
+        display: inline-block;
+        padding: 4px 10px;
+        background: var(--schema-alert-success-bg);
+        border: 1px solid var(--success-color);
+        border-radius: 3px;
+        font-size: 0.9em;
+        margin: 3px;
+    }
+    
+    .nav-jump {
+        background: var(--secondary-color);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 0;
+        margin: 20px 0;
+    }
+    
+    .nav-jump summary {
+        padding: 15px 20px;
+        cursor: pointer;
+        font-weight: bold;
+        background: var(--info-color);
+        color: white;
+        border-radius: 6px;
+    }
+    
+    .jump-links-container {
+        padding: 20px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+    }
+    
+    .jump-group h6 {
+        margin: 0 0 10px 0;
+        color: var(--info-color);
+        font-size: 0.9em;
+    }
+    
+    .jump-links {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .jump-link {
+        padding: 8px 12px;
+        background: var(--background-color);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        text-decoration: none;
+        color: var(--info-color);
+        transition: all 0.2s;
+    }
+    
+    .jump-link:hover {
+        background: var(--light-color);
+        border-color: var(--info-color);
+        transform: translateX(5px);
+    }
+    
+    .completed-section {
+        background: var(--secondary-color);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 20px;
+        margin-top: 30px;
+    }
+    
+    .completed-item {
+        padding: 12px;
+        background: var(--background-color);
+        border-left: 4px solid var(--success-color);
+        margin: 10px 0;
+        border-radius: 4px;
+    }
+</style>
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>Priority Todos & Blocking Dependencies</h1>
+        <p>Active work items ordered by blocking priority. Resolve items at the top to unblock downstream work.</p>
+    </div>
+
+    <details class="nav-jump">
+        <summary>🎯 Quick Jump to Priority Item</summary>
+        <div class="jump-links-container">
+            <div class="jump-group">
+                <h6>🔴 HIGH Priority</h6>
+                <div class="jump-links">
+                    <a href="#priority-11" class="jump-link">#11 Architecture Phase 2</a>
+                    <a href="#priority-4" class="jump-link">#4 Refactor Master Plan</a>
+                    <a href="#priority-schema-system" class="jump-link">#Schema System Plan</a>
+                    <a href="#priority-19" class="jump-link">#19 API Logging Fix</a>
+                </div>
+            </div>
+            <div class="jump-group">
+                <h6>🟠 MEDIUM Priority</h6>
+                <div class="jump-links">
+                    <a href="#dynamic-daily" class="jump-link">#Dynamic Daily View</a>
+                    <a href="#priority-3" class="jump-link">#3 Update Format</a>
+                    <a href="#priority-12" class="jump-link">#12 DailyPlan Sync</a>
+                    <a href="#priority-5" class="jump-link">#5 DailyPlan Flag</a>
+                    <a href="#priority-6" class="jump-link">#6 Integrate Priority</a>
+                </div>
+            </div>
+            <div class="jump-group">
+                <h6>🟢 LOW Priority</h6>
+                <div class="jump-links">
+                    <a href="#priority-16" class="jump-link">#16 Project IDs</a>
+                    <a href="#priority-zencoder-efficiency" class="jump-link">#Zencoder Efficiency</a>
+                    <a href="#priority-17" class="jump-link">#17 Theme Sync</a>
+                    <a href="#priority-18" class="jump-link">#18 Doc Cleanup</a>
+                    <a href="#priority-9" class="jump-link">#9 Auto-Sync Test</a>
+                </div>
+            </div>
+            <div class="jump-group">
+                <h6>🛠️ Maintenance</h6>
+                <div class="jump-links">
+                    <a href="#cleanup-todos" class="jump-link">#Cleanup Outdated</a>
+                    <a href="#priority-improvement" class="jump-link">#Layout Improve</a>
+                    <a href="#priority-10" class="jump-link">#10 Archive Docs</a>
+                    <a href="#priority-8" class="jump-link">#8 API Docs</a>
+                    <a href="#priority-7" class="jump-link">#7 Agent Example</a>
+                    <a href="#completed" class="jump-link">✅ Completed Tasks</a>
+                </div>
+            </div>
+        </div>
+    </details>
+
+    <h2>Current Active Priorities</h2>
+
+    <!-- HIGH PRIORITY ITEMS -->
+    <h3 style="color: var(--warning-color); margin-top: 30px;">🔴 HIGH Priority</h3>
+
+    <details class="priority-container priority-high" id="priority-11">
+        <summary>#11 - Architecture Migration Phase 2</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-pending">PENDING</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Owner</span>
+                    <span class="priority-meta-value">Dev Team</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Priority Level</span>
+                    <span class="priority-meta-value">HIGH - Critical Path</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Target</span>
+                    <span class="priority-meta-value">Q1 2026</span>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Move core application components to the new architecture. This involves refactoring several critical controllers and models to improve scalability and maintainability. The migration will establish a foundation for modern development practices and improve system performance.</p>
+            </div>
+
+            <div class="priority-section">
+                <h4>✅ Required Tasks</h4>
+                <div class="priority-tasks">
+                    <ul>
+                        <li>Finalize schema migration scripts for Phase 2 database changes</li>
+                        <li>Update model classes to reflect new architectural patterns</li>
+                        <li>Implement backward compatibility layer for legacy components</li>
+                        <li>Refactor core controllers (Todo, Project, Documentation)</li>
+                        <li>Update API endpoints to support new architecture</li>
+                        <li>Create migration documentation and rollback procedures</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>🔗 Dependencies</h4>
+                <p><span class="unblocks-tag">↳ UNBLOCKS: #7 (Agent Example Documentation)</span></p>
+            </div>
+
+            <div class="priority-section">
+                <h4>📌 Related Links</h4>
+                <p>
+                    <a href="/Documentation/ArchitectureMigrationPhase2">Architecture Phase 2 Documentation</a> | 
+                    <a href="/todo/addtodo?project_id=arch-phase2">Create Task</a>
+                </p>
+            </div>
+        </div>
+    </details>
+
+    <details class="priority-container priority-high" id="priority-4">
+        <summary>#4 - Refactor Master Plan Coordination</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-in-progress">IN PROGRESS</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Owner</span>
+                    <span class="priority-meta-value">Planning Agent</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Priority Level</span>
+                    <span class="priority-meta-value">HIGH</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Phase</span>
+                    <span class="priority-meta-value">0.35 - Active Refactoring</span>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Refactor the Master Plan Coordination system to implement the "Coordinator Only" principle. The master plan should act as a high-level coordinator and dependency mapper rather than containing detailed task lists. This ensures scalability and maintainability as the number of plans grows.</p>
+            </div>
+
+            <div class="priority-section">
+                <h4>✅ Required Tasks</h4>
+                <div class="priority-tasks">
+                    <ul>
+                        <li>Implement Coordination Architecture Principle (Master Plan = Coordinator Only)</li>
+                        <li>Extract detailed content from MasterPlanCoordination.tt to individual plan files</li>
+                        <li>Update priority matrix and dependency mappings for clarity</li>
+                        <li>Create cross-references between master plan and individual plans</li>
+                        <li>Establish naming conventions for plan files (PascalCase)</li>
+                        <li>Document the coordinator architecture pattern for future plans</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>🔗 Dependencies</h4>
+                <p>None - This is a foundational refactor</p>
+            </div>
+
+            <div class="priority-section">
+                <h4>📌 Related Links</h4>
+                <p>
+                    <a href="/Documentation/MasterPlanCoordination">Master Plan Coordination Dashboard</a> | 
+                    <a href="/admin/documentation/PriorityTodos">Priority Todos</a>
+                </p>
+            </div>
+        </div>
+    </details>
+
+    <details class="priority-container priority-high" id="priority-schema-system">
+        <summary>#Schema System Plan & Enhancements</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-in-progress">IN PROGRESS</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Owner</span>
+                    <span class="priority-meta-value">DB Admin</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Priority Level</span>
+                    <span class="priority-meta-value">CRITICAL - Core Functionality</span>
+                </div>
+            </div>
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Complete restoration and enhancement of the bidirectional schema synchronization system.</p>
+            </div>
+            <div class="priority-section">
+                <h4>✅ Required Tasks</h4>
+                <div class="priority-tasks">
+                    <ul>
+                        <li>Add tick box to sync individual attributes</li>
+                        <li>Add ability to edit an attribute</li>
+                        <li>Fix add attribute missing field bug</li>
+                        <li>Fix Schema Metadata comparison sync buttons</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="priority-section">
+                <h4>📌 Related Links</h4>
+                <p><a href="/admin/schema_compare">Schema Comparison</a></p>
+            </div>
+        </div>
+    </details>
+
+    <details class="priority-container priority-high" id="priority-19">
+        <summary>#19 - Fix updateprompt.pl API Logging (AI Persistence)</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-pending">PENDING</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Owner</span>
+                    <span class="priority-meta-value">Backend Team</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Priority Level</span>
+                    <span class="priority-meta-value">HIGH - System Stability</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Impact</span>
+                    <span class="priority-meta-value">AI Chat Persistence Blocked</span>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Resolve the critical functional gap where updateprompt.pl fails to save AI conversation messages to the database. The script successfully logs to YAML files but encounters database recording failures when attempting to create AiMessage and AiConversation records. This blocks the AI persistence layer and prevents conversation history tracking in the application.</p>
+            </div>
+
+            <div class="priority-section">
+                <h4>✅ Required Tasks</h4>
+                <div class="priority-tasks">
+                    <ul>
+                        <li>Investigate AiConversation and AiMessage create() method failures</li>
+                        <li>Verify mandatory guest user (ID: 199) exists in database</li>
+                        <li>Check session_id and conversation_id passing in API payload</li>
+                        <li>Review database constraints and foreign key relationships</li>
+                        <li>Test AiMessage model with minimal test case to isolate failure point</li>
+                        <li>Implement error handling and logging for database operations</li>
+                        <li>Create rollback/recovery mechanism for failed persistence attempts</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>🔗 Dependencies</h4>
+                <p><span class="blocker-tag">🚫 Blocks: AI Persistence, Chat History, Agent Learning</span></p>
+            </div>
+
+            <div class="priority-section">
+                <h4>📌 Related Links</h4>
+                <p>
+                    <a href="/Documentation/AI">AI System Documentation</a> | 
+                    <a href="/api/ai/conversations">AI Conversations API</a> | 
+                    <a href="/admin/database/users">User Management</a>
+                </p>
+            </div>
+        </div>
+    </details>
+
+    <!-- MEDIUM PRIORITY ITEMS -->
+    <h3 style="color: var(--accent-color); margin-top: 30px;">🟠 MEDIUM Priority</h3>
+
+    <div class="doc-section" id="dynamic-daily" style="margin: 20px 0; padding: 20px; background: var(--secondary-color); border: 1px solid var(--border-color); border-radius: 6px;">
+        <h2>Dynamic Daily Tasks</h2>
+        <div class="dynamic-container">
+            [% INCLUDE 'todo/day.tt' %]
+        </div>
+    </div>
+
+    <details class="priority-container priority-medium" id="priority-3">
+        <summary>#3 - Update Format & Multi-Plan Support</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-pending">PENDING</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Owner</span>
+                    <span class="priority-meta-value">Docs Team</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Priority Level</span>
+                    <span class="priority-meta-value">MEDIUM</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Category</span>
+                    <span class="priority-meta-value">Todo API v2, Format Support</span>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Update the Todo system and documentation framework to handle multiple concurrent plans and support different documentation formats (Markdown vs Template Toolkit). This enables flexible planning workflows and accommodates different team preferences for documentation styles.</p>
+            </div>
+
+            <div class="priority-section">
+                <h4>✅ Required Tasks</h4>
+                <div class="priority-tasks">
+                    <ul>
+                        <li>Update Todo API to support multi-plan queries and filtering</li>
+                        <li>Implement Markdown rendering alongside Template Toolkit</li>
+                        <li>Enable cross-referencing between plans and documentation</li>
+                        <li>Create plan-to-plan linking syntax and resolver</li>
+                        <li>Update Documentation controller to handle format detection</li>
+                        <li>Add format preference to user profile settings</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>🔗 Dependencies</h4>
+                <p>
+                    <span class="unblocks-tag">↳ UNBLOCKS: #9 (Auto-Sync Test)</span>
+                    <span class="unblocks-tag">↳ UNBLOCKS: #8 (API Docs Update)</span>
+                </p>
+            </div>
+
+            <div class="priority-section">
+                <h4>📌 Related Links</h4>
+                <p>
+                    <a href="/Documentation/Api">API Documentation</a> | 
+                    <a href="/todo/list">Todo List</a> | 
+                    <a href="/admin/documentation">Documentation Manager</a>
+                </p>
+            </div>
+        </div>
+    </details>
+
+    <details class="priority-container priority-medium" id="priority-12">
+        <summary>#12 - DailyPlan Synchronization</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-in-progress">IN PROGRESS</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Owner</span>
+                    <span class="priority-meta-value">Automation Agent</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Priority Level</span>
+                    <span class="priority-meta-value">MEDIUM</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Category</span>
+                    <span class="priority-meta-value">Daily Workflow, Sync Engine</span>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Ensure the Daily Plan documentation stays automatically synchronized with the actual database todos for the current user and date. This eliminates manual updates and ensures that the daily planning interface always reflects the current state of work items.</p>
+            </div>
+
+            <div class="priority-section">
+                <h4>✅ Required Tasks</h4>
+                <div class="priority-tasks">
+                    <ul>
+                        <li>Sync daily priorities with database todos in real-time</li>
+                        <li>Implement automated daily status reporting and rollups</li>
+                        <li>Verify user-specific view filtering and permissions</li>
+                        <li>Create caching layer for performance optimization</li>
+                        <li>Add change detection and notification system</li>
+                        <li>Implement conflict resolution for concurrent updates</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>🔗 Dependencies</h4>
+                <p><span class="blocker-tag">↳ BLOCKED BY: #16 (Project IDs Sync)</span></p>
+            </div>
+
+            <div class="priority-section">
+                <h4>📌 Related Links</h4>
+                <p>
+                    <a href="/Documentation/DailyPlan">Daily Plan Documentation</a> | 
+                    <a href="/todo/day">Daily Todo View</a> | 
+                    <a href="/admin/automation">Automation Settings</a>
+                </p>
+            </div>
+        </div>
+    </details>
+
+    <details class="priority-container priority-medium" id="priority-5">
+        <summary>#5 - DailyPlan Flag System</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-pending">PENDING</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Owner</span>
+                    <span class="priority-meta-value">DevOps Team</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Priority Level</span>
+                    <span class="priority-meta-value">MEDIUM</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Category</span>
+                    <span class="priority-meta-value">Workflow Automation, System Flags</span>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Implement a system-wide flag to control and monitor the status of the Daily Plan automation pipeline. This provides a kill switch for debugging, maintenance windows, and controlled rollout of daily plan features.</p>
+            </div>
+
+            <div class="priority-section">
+                <h4>✅ Required Tasks</h4>
+                <div class="priority-tasks">
+                    <ul>
+                        <li>Implement 'DailyPlanActive' flag in system configuration table</li>
+                        <li>Integrate flag checks in all daily task automation scripts</li>
+                        <li>Provide admin UI toggle for enabling/disabling daily plan</li>
+                        <li>Add flag status indicator to daily plan dashboard</li>
+                        <li>Create logging for flag state changes and reasons</li>
+                        <li>Implement graceful degradation when flag is disabled</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>🔗 Dependencies</h4>
+                <p>None</p>
+            </div>
+
+            <div class="priority-section">
+                <h4>📌 Related Links</h4>
+                <p>
+                    <a href="/Documentation/SystemSettings">System Settings</a> | 
+                    <a href="/admin/config">Configuration Manager</a>
+                </p>
+            </div>
+        </div>
+    </details>
+
+    <details class="priority-container priority-medium" id="priority-6">
+        <summary>#6 - Integrate Priority into Daily Plan</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-in-progress">IN PROGRESS</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Owner</span>
+                    <span class="priority-meta-value">UI Team</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Priority Level</span>
+                    <span class="priority-meta-value">MEDIUM</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Category</span>
+                    <span class="priority-meta-value">Integration Layer, UI/UX</span>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Bridge the gap between static priority documentation and the dynamic daily workflow by embedding priority items directly into the Daily Plan interface. This ensures developers see blocking dependencies alongside their daily tasks.</p>
+            </div>
+
+            <div class="priority-section">
+                <h4>✅ Required Tasks</h4>
+                <div class="priority-tasks">
+                    <ul>
+                        <li>Add priority list dropdown to DailyPlan.tt interface</li>
+                        <li>Ensure real-time updates when priorities change</li>
+                        <li>Display blocking dependencies directly in daily view</li>
+                        <li>Implement "Quick Resolve" buttons for priority items</li>
+                        <li>Update documentation templates to include priority containers</li>
+                        <li>Add visual indicators for blocking vs blocked items</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>🔗 Dependencies</h4>
+                <p><span class="blocker-tag">↳ BLOCKED BY: #12 (DailyPlan Sync)</span></p>
+            </div>
+
+            <div class="priority-section">
+                <h4>📌 Related Links</h4>
+                <p>
+                    <a href="/Documentation/DailyPlan">Daily Plan</a> | 
+                    <a href="/todo/day">Today's View</a>
+                </p>
+            </div>
+        </div>
+    </details>
+
+    <!-- LOW PRIORITY ITEMS -->
+    <h3 style="color: var(--success-color); margin-top: 30px;">🟢 LOW Priority</h3>
+
+    <details class="priority-container priority-low" id="priority-16">
+        <summary>#16 - Project IDs Synchronization</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-pending">PENDING</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Owner</span>
+                    <span class="priority-meta-value">DB Admin</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Priority Level</span>
+                    <span class="priority-meta-value">LOW</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Category</span>
+                    <span class="priority-meta-value">Data Integrity, Cross-System Sync</span>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Map internal project names to standardized database project IDs across all systems. This ensures consistency between documentation references, todo assignments, and database records.</p>
+            </div>
+
+            <div class="priority-section">
+                <h4>✅ Required Tasks</h4>
+                <div class="priority-tasks">
+                    <ul>
+                        <li>Standardize project ID format across documentation and database</li>
+                        <li>Update legacy projects with new ID mapping table</li>
+                        <li>Implement automated ID validation in project creation forms</li>
+                        <li>Create project ID migration script for historical data</li>
+                        <li>Add ID consistency checks to daily audit workflow</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>🔗 Dependencies</h4>
+                <p><span class="unblocks-tag">↳ UNBLOCKS: #12 (DailyPlan Sync)</span></p>
+            </div>
+
+            <div class="priority-section">
+                <h4>📌 Related Links</h4>
+                <p>
+                    <a href="/project/list">Project List</a> | 
+                    <a href="/admin/system/ids">ID Management</a>
+                </p>
+            </div>
+        </div>
+    </details>
+
+    <details class="priority-container priority-low" id="priority-zencoder-efficiency">
+        <summary>#Zencoder Efficiency Improvements</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-in-progress">IN PROGRESS</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Owner</span>
+                    <span class="priority-meta-value">Zencoder Team</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Priority Level</span>
+                    <span class="priority-meta-value">HIGH - Efficiency</span>
+                </div>
+            </div>
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Critical workflow improvements to reduce resource waste and improve agent throughput.</p>
+            </div>
+            <div class="priority-section">
+                <h4>✅ Required Tasks</h4>
+                <div class="priority-tasks">
+                    <ul>
+                        <li>Batch Processing: Stop editing one thing at a time</li>
+                        <li>Update Prompt Compliance: Adhere to bilateral protocol</li>
+                        <li>Implement automated resource usage monitoring</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="priority-section">
+                <h4>📌 Related Links</h4>
+                <p><a href="/Documentation/system/ZENCODER_AI_ASSISTANT_GUIDE">Zencoder Guide</a></p>
+            </div>
+        </div>
+    </details>
+
+    <details class="priority-container priority-low" id="priority-17">
+        <summary>#17 - Theme Synchronization</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-pending">PENDING</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Owner</span>
+                    <span class="priority-meta-value">UI Team</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Priority Level</span>
+                    <span class="priority-meta-value">LOW</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Category</span>
+                    <span class="priority-meta-value">UI Consistency, Theme Engine</span>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Synchronize documentation CSS variables with application theme engine to ensure consistent visual experience across all documentation and application interfaces.</p>
+            </div>
+
+            <div class="priority-section">
+                <h4>✅ Required Tasks</h4>
+                <div class="priority-tasks">
+                    <ul>
+                        <li>Synchronize theme configuration in DocumentationConfig.json</li>
+                        <li>Update site controllers with correct theme mappings</li>
+                        <li>Verify CSS variable compliance across all themes</li>
+                        <li>Audit documentation templates for hardcoded colors</li>
+                        <li>Implement theme switching testing suite</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>🔗 Dependencies</h4>
+                <p>None</p>
+            </div>
+
+            <div class="priority-section">
+                <h4>📌 Related Links</h4>
+                <p>
+                    <a href="/Documentation/B3ThemeHandlingAuditReport">Theme Audit Report</a> | 
+                    <a href="/admin/themes">Theme Configuration</a>
+                </p>
+            </div>
+        </div>
+    </details>
+
+    <details class="priority-container priority-low" id="priority-18">
+        <summary>#18 - Documentation Cleanup</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-in-progress">IN PROGRESS</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Owner</span>
+                    <span class="priority-meta-value">Audit Team</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Priority Level</span>
+                    <span class="priority-meta-value">LOW</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Category</span>
+                    <span class="priority-meta-value">Standards Compliance, Maintenance</span>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Comprehensive cleanup of documentation files to ensure naming standard compliance, remove redundant files, and fix broken internal links.</p>
+            </div>
+
+            <div class="priority-section">
+                <h4>✅ Required Tasks</h4>
+                <div class="priority-tasks">
+                    <ul>
+                        <li>Standardize all documentation filenames to PascalCase</li>
+                        <li>Remove redundant and duplicate documentation files</li>
+                        <li>Fix broken cross-document links and references</li>
+                        <li>Archive obsolete documentation to legacy directory</li>
+                        <li>Update Documentation index and search functionality</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>🔗 Dependencies</h4>
+                <p>None</p>
+            </div>
+
+            <div class="priority-section">
+                <h4>📌 Related Links</h4>
+                <p>
+                    <a href="/Documentation/DocumentationSystemComprehensive">Documentation Standards</a> | 
+                    <a href="/admin/documentation">Documentation Manager</a>
+                </p>
+            </div>
+        </div>
+    </details>
+
+    <details class="priority-container priority-low" id="priority-9">
+        <summary>#9 - Auto-Sync Test System</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-pending">PENDING</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Owner</span>
+                    <span class="priority-meta-value">QA Team</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Priority Level</span>
+                    <span class="priority-meta-value">LOW</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Category</span>
+                    <span class="priority-meta-value">Automated Testing, QA</span>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Automated testing suite for todo/documentation synchronization to verify that database and documentation stay in sync without manual intervention.</p>
+            </div>
+
+            <div class="priority-section">
+                <h4>✅ Required Tasks</h4>
+                <div class="priority-tasks">
+                    <ul>
+                        <li>Develop comprehensive test suite for auto-sync verification</li>
+                        <li>Implement "Test Sync" trigger in admin panel</li>
+                        <li>Log sync discrepancies to system audit trail</li>
+                        <li>Create automated reports for sync health metrics</li>
+                        <li>Add integration tests for multi-plan scenarios</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>🔗 Dependencies</h4>
+                <p><span class="blocker-tag">↳ BLOCKED BY: #3 (Multi-Plan Support)</span></p>
+            </div>
+
+            <div class="priority-section">
+                <h4>📌 Related Links</h4>
+                <p>
+                    <a href="/admin/system/test">System Test Panel</a> | 
+                    <a href="/Documentation/TestingFramework">Testing Framework</a>
+                </p>
+            </div>
+        </div>
+    </details>
+
+    <details class="priority-container priority-low" id="priority-10">
+        <summary>#10 - Archive Documentation Cleanup</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-pending">PENDING</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Owner</span>
+                    <span class="priority-meta-value">Cleanup Agent</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Priority Level</span>
+                    <span class="priority-meta-value">LOW</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Category</span>
+                    <span class="priority-meta-value">Maintenance, Storage Optimization</span>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Properly archive completed initiatives and obsolete files to optimize documentation storage and improve search relevance.</p>
+            </div>
+
+            <div class="priority-section">
+                <h4>✅ Required Tasks</h4>
+                <div class="priority-tasks">
+                    <ul>
+                        <li>Move completed tasks to CompletedTasks.tt archive</li>
+                        <li>Compress or delete obsolete planning documents</li>
+                        <li>Update archive index and search functionality</li>
+                        <li>Create archival policy and retention guidelines</li>
+                        <li>Implement automated archival triggers based on task age</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>🔗 Dependencies</h4>
+                <p>None</p>
+            </div>
+
+            <div class="priority-section">
+                <h4>📌 Related Links</h4>
+                <p>
+                    <a href="/Documentation/Archive">Documentation Archive</a> | 
+                    <a href="/admin/documentation/cleanup">Cleanup Tools</a>
+                </p>
+            </div>
+        </div>
+    </details>
+
+    <details class="priority-container priority-low" id="priority-8">
+        <summary>#8 - API Documentation Update</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-pending">PENDING</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Owner</span>
+                    <span class="priority-meta-value">Backend Team</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Priority Level</span>
+                    <span class="priority-meta-value">LOW</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Category</span>
+                    <span class="priority-meta-value">API Lifecycle, Documentation</span>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Update API reference documentation to reflect v2 changes and token-based authentication. Ensure all endpoints are correctly documented with examples.</p>
+            </div>
+
+            <div class="priority-section">
+                <h4>✅ Required Tasks</h4>
+                <div class="priority-tasks">
+                    <ul>
+                        <li>Update API docs to reflect v2 endpoint changes</li>
+                        <li>Document token-based Bearer authentication flow</li>
+                        <li>Implement automated Swagger/OpenAPI doc generation</li>
+                        <li>Verify all endpoints have request/response examples</li>
+                        <li>Add deprecation notices for v1 endpoints</li>
+                        <li>Create API migration guide for developers</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <h4>🔗 Dependencies</h4>
+                <p><span class="blocker-tag">↳ BLOCKED BY: #3 (Format Support)</span></p>
+            </div>
+
+            <div class="priority-section">
+                <h4>📌 Related Links</h4>
+                <p>
+                    <a href="/Documentation/Api">API Reference</a> | 
+                    <a href="/api/v1/swagger">Swagger UI</a> | 
+                    <a href="/Documentation/ApiTokenReferenceGuide">Token Auth Guide</a>
+                </p>
+            </div>
+        </div>
+    </details>
+
+    <!-- MAINTENANCE & IMPROVEMENTS -->
+    <h3 style="color: var(--text-color); margin-top: 30px;">🛠️ Maintenance & Improvements</h3>
+
+    <details class="priority-container" id="cleanup-todos">
+        <summary>#Cleanup Outdated Todos</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-pending">PENDING</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Priority Level</span>
+                    <span class="priority-meta-value">LOW</span>
+                </div>
+            </div>
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Identify and archive todos older than 6 months with no activity to maintain database hygiene.</p>
+            </div>
+            <div class="priority-section">
+                <h4>✅ Required Tasks</h4>
+                <div class="priority-tasks">
+                    <ul>
+                        <li>Identify stale todos (no activity > 6 months)</li>
+                        <li>Archive to legacy tables</li>
+                        <li>Update status of active stale items to 'Deferred'</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </details>
+
+    <details class="priority-container" id="priority-improvement">
+        <summary>#Priority Todos Layout Improvement</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-in-progress">IN PROGRESS</span>
+                </div>
+            </div>
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Standardize priority containers and integrate dynamic daily view (todo/day.tt) for better UX.</p>
+            </div>
+        </div>
+    </details>
+
+    <details class="priority-container" id="priority-7">
+        <summary>#7 - Agent Example Documentation</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-pending">PENDING</span>
+                </div>
+            </div>
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Create example documentation for agent integration based on Architecture Phase 2 outcomes.</p>
+            </div>
+            <div class="priority-section">
+                <h4>🔗 Dependencies</h4>
+                <p><span class="blocker-tag">↳ BLOCKED BY: #11 (Arch Phase 2)</span></p>
+            </div>
+        </div>
+    </details>
+
+    <!-- COMPLETED TASKS SECTION -->
+    <div class="completed-section" id="completed">
+        <h2>✅ Recently Completed Tasks</h2>
+        <p style="color: var(--text-muted-color); margin-bottom: 20px;">Successfully completed priority items archived for reference.</p>
+        
+        <div class="completed-item">
+            <h4 style="margin: 0 0 5px 0;">#1 CRITICAL: Fix Todo Display Bug</h4>
+            <p style="margin: 0; color: var(--text-muted-color);">
+                <strong>Completed:</strong> 2026-01-25 | 
+                <strong>Result:</strong> Fixed bug in Todo.pm rendering logic. Todos now display correctly in daily list view.
+            </p>
+        </div>
+
+        <div class="completed-item">
+            <h4 style="margin: 0 0 5px 0;">#2: API Auth Migration</h4>
+            <p style="margin: 0; color: var(--text-muted-color);">
+                <strong>Completed:</strong> 2026-01-25 | 
+                <strong>Result:</strong> Successfully migrated to token-based Bearer authentication. All API endpoints now use secure token auth.
+            </p>
+        </div>
+
+        <div class="completed-item">
+            <h4 style="margin: 0 0 5px 0;">Plan A.2: K8s Readiness Assessment</h4>
+            <p style="margin: 0; color: var(--text-muted-color);">
+                <strong>Completed:</strong> 2026-01-13 | 
+                <strong>Result:</strong> Infrastructure assessment finalized. Kubernetes migration path validated and documented.
+            </p>
+        </div>
+
+        <div class="completed-item">
+            <h4 style="margin: 0 0 5px 0;">Plan A.3: Credentials Audit</h4>
+            <p style="margin: 0; color: var(--text-muted-color);">
+                <strong>Completed:</strong> 2026-01-13 | 
+                <strong>Result:</strong> Security-critical credentials audit completed. All credentials rotated and secured.
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Automatically open the targeted <details> container when navigating via anchor
+    function openTargetDetails() {
+        const hash = window.location.hash;
+        if (hash) {
+            const target = document.querySelector(hash);
+            if (target && target.tagName === 'DETAILS') {
+                target.open = true;
+                // If it's nested inside another details (like nav-jump), we don't necessarily want to open the parent
+            }
+        }
+    }
+
+    // Run on load and on hash change
+    window.addEventListener('load', openTargetDetails);
+    window.addEventListener('hashchange', openTargetDetails);
+</script>

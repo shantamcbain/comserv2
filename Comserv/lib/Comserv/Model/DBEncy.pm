@@ -41,11 +41,32 @@ sub COMPONENT {
         $connection_info = $remote_db->get_connection_info('ency');
     };
 
+    # Fallback to SQLite if primary connections fail
     if ($@ || !$connection_info) {
         my $error = $@ || "No connection info returned from RemoteDB";
+        
+        # Write error to STDERR for debugging  (bypasses logging system if broken)
+        warn "\n=== DBEncy CRITICAL ERROR ===\n";
+        warn "Failed to get connection from RemoteDB\n";
+        warn "Error: $error\n";
+        warn "===========================\n\n";
+        
         $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
-            "DBEncy: Failed to get connection from RemoteDB: $error");
-        die "DBEncy: Failed to establish database connection: $error";
+            "DBEncy CRITICAL: Failed to get connection from RemoteDB: $error");
+        $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
+            "DBEncy CRITICAL: Falling back to SQLite offline mode - APPLICATION WILL HAVE LIMITED FUNCTIONALITY");
+        
+        # Create a fallback SQLite connection
+        $connection_info = {
+            connection_name => 'sqlite_ency_fallback',
+            config => {
+                db_type => 'sqlite',
+                database_path => 'data/ency_offline.db',
+                description => 'SQLite Fallback - ENCY Database (offline mode)',
+                priority => 999
+            },
+            database_name => 'ency'
+        };
     }
 
     # Extract connection details from RemoteDB
@@ -104,12 +125,46 @@ sub COMPONENT {
             on_connect_do => ["PRAGMA foreign_keys = ON"],
         };
     } else {
+        # CRITICAL FIX (November 2025): Select available database driver
+        # Try MariaDB first (preferred), fall back to mysql if not installed
+        my $driver = 'MariaDB';
+        my $driver_available = 0;
+        
+        # Check if MariaDB driver is available
+        eval {
+            require DBD::MariaDB;
+            $driver_available = 1;
+        };
+        
+        # Fall back to mysql driver if MariaDB not available
+        if (!$driver_available) {
+            eval {
+                require DBD::mysql;
+                $driver = 'mysql';
+                $driver_available = 1;
+            };
+        }
+        
+        $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+            "DBEncy: Using database driver: $driver (available: $driver_available)");
+        
         $connect_info = {
-            dsn => "dbi:mysql:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port},
+            dsn => "dbi:$driver:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port},
             user => $conn->{username},
             password => $conn->{password},
-            mysql_enable_utf8 => 1,
-            on_connect_do => ["SET NAMES 'utf8'", "SET CHARACTER SET 'utf8'"],
+            RaiseError => 1,
+            PrintError => 0,
+            AutoCommit => 1,
+            quote_names => 1,
+            quote_char => '`',
+            name_sep => '.',
+            limit_dialect => 'LimitXY',
+            on_connect_do => [
+                "SET NAMES 'utf8'",
+                "SET CHARACTER SET 'utf8'",
+                "SET SESSION net_read_timeout=30",
+                "SET SESSION net_write_timeout=30",
+            ],
         };
     }
 
@@ -124,10 +179,29 @@ sub get_connection_info {
     my $storage = $self->schema->storage;
     my $connect_info = $storage->connect_info;
     
+    # Handle both hash ref and string formats for connect_info
+    # DBIx::Class may store as [ { dsn => "...", user => "...", password => "..." } ]
+    # OR as [ "dbi:mysql:...", "user", "password" ]
+    my $current_dsn = 'Unknown';
+    my $current_username = 'Unknown';
+    
+    if ($connect_info && ref($connect_info) eq 'ARRAY' && @$connect_info) {
+        # First element is a hash ref with keys (dsn, user, password)
+        if (ref($connect_info->[0]) eq 'HASH') {
+            $current_dsn = $connect_info->[0]{dsn} if $connect_info->[0]{dsn};
+            $current_username = $connect_info->[0]{user} if $connect_info->[0]{user};
+        }
+        # First element is the DSN string, second is username
+        elsif (defined $connect_info->[0] && $connect_info->[0] ne '') {
+            $current_dsn = $connect_info->[0];
+            $current_username = $connect_info->[1] if defined $connect_info->[1] && $connect_info->[1] ne '';
+        }
+    }
+    
     my $info = {
         # Current runtime connection info
-        current_dsn => $connect_info->[0]{dsn} || $connect_info->[0] || 'Unknown',
-        current_username => $connect_info->[0]{user} || $connect_info->[1] || 'Unknown',
+        current_dsn => $current_dsn,
+        current_username => $current_username,
         connection_type => ref($storage) || 'Unknown',
         
         # Startup connection selection info
@@ -144,9 +218,18 @@ sub get_startup_connection_info {
 sub list_tables {
     my $self = shift;
 
-    return $self->schema->storage->dbh->selectcol_arrayref(
-        "SHOW TABLES"  # Adjust if the database uses a different query for metadata
-    );
+    my $dbh = $self->schema->storage->dbh;
+    my $driver = $dbh->{Driver}->{Name};
+    
+    if ($driver eq 'SQLite') {
+        return $dbh->selectcol_arrayref(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        );
+    } else {
+        return $dbh->selectcol_arrayref(
+            "SHOW TABLES"
+        );
+    }
 }
 
 sub get_active_projects {

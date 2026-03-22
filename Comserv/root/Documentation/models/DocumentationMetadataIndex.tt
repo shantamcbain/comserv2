@@ -1,0 +1,610 @@
+[% META
+    title = 'DocumentationMetadataIndex Model - Documentation Metadata and Citation Indexing'
+    description = 'Comprehensive documentation for DocumentationMetadataIndex model covering metadata extraction, citation tracking, content staleness detection, role-based access, and usage examples for managing documentation indexes'
+    roles = 'admin,developer'
+    TemplateType = 'model'
+    category = 'models,search-integration,documentation-management'
+    page_version = '1.00'
+    last_updated = '2026-01-09 15:23:00 UTC'
+    site_specific = ''
+%]
+
+[% PageVersion = 'Documentation/models/DocumentationMetadataIndex.tt,v 1.00 2026/01/09 zencoder-docsync Exp ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 id="documentationmetadataindex-model">DocumentationMetadataIndex Model - Documentation Metadata and Citation Indexing</h1>
+            
+            <div id="toc" class="alert alert-info">
+                <strong>Contents:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#schema">Database Schema & Fields</a></li>
+                    <li><a href="#file-types">Supported File Types</a></li>
+                    <li><a href="#metadata-extraction">Metadata Extraction & Indexing</a></li>
+                    <li><a href="#citation-tracking">Citation Tracking</a></li>
+                    <li><a href="#staleness-detection">Content Staleness Detection</a></li>
+                    <li><a href="#role-access">Role-Based Access Control</a></li>
+                    <li><a href="#api-methods">API Methods & Helpers</a></li>
+                    <li><a href="#examples">Usage Examples</a></li>
+                    <li><a href="#troubleshooting">Troubleshooting</a></li>
+                    <li><a href="#see-also">See Also</a></li>
+                </ul>
+            </div>
+
+            <div class="alert alert-success" id="recent-changes">
+                <h3 style="margin-top: 0;">📝 Recent Changes (v1.00 - Jan 9, 2026)</h3>
+                <ul style="margin: 5px 0 0 20px;">
+                    <li><strong>Initial Documentation:</strong> Created comprehensive documentation for DocumentationMetadataIndex model</li>
+                    <li><strong>Citation Tracking:</strong> Documented AI message citation relationships</li>
+                    <li><strong>Staleness Detection:</strong> Documented content freshness checking (24-hour threshold)</li>
+                </ul>
+            </div>
+            
+            <section id="overview">
+                <h2>Overview</h2>
+                <p>
+                    The <strong>DocumentationMetadataIndex</strong> model (Comserv/lib/Comserv/Model/Schema/Ency/Result/DocumentationMetadataIndex.pm) 
+                    provides a database schema for indexing and managing documentation metadata in the Comserv application. It is a DBIx::Class Result class that supports:
+                </p>
+                <ul>
+                    <li>Documentation metadata extraction and storage (title, excerpt, searchable content)</li>
+                    <li>Support for multiple file types (Template Toolkit .tt and Markdown .md)</li>
+                    <li>Content change detection via hash-based staleness tracking</li>
+                    <li>Role-based access control for documentation visibility</li>
+                    <li>Citation tracking (links to AI messages that cite documents)</li>
+                    <li>Timestamp management (indexed_at, last_file_modified)</li>
+                    <li>File size tracking for quota and performance management</li>
+                    <li>Unique constraints on file paths to prevent duplicate indexes</li>
+                </ul>
+                <p>
+                    DocumentationMetadataIndex enables the search system to quickly find and display documentation with proper access controls, 
+                    while tracking which AI messages have cited specific documents for audit and traceability.
+                </p>
+            </section>
+
+            <section id="schema">
+                <h2>Database Schema & Fields</h2>
+                
+                <h3>Table: documentationmetadataindex</h3>
+                <p><strong>Purpose:</strong> Index documentation metadata, content, and access control</p>
+                <p><strong>Primary Key:</strong> id (auto-increment)</p>
+                <p><strong>Unique Constraints:</strong> file_path (one index per file)</p>
+                
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Field Name</th>
+                        <th>Data Type</th>
+                        <th>Nullable</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td>id</td>
+                        <td>INTEGER</td>
+                        <td>NO</td>
+                        <td>auto_increment</td>
+                        <td>Primary key - auto-generated index ID</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>file_path</td>
+                        <td>VARCHAR(512)</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>Relative file path from root (REQUIRED, up to 512 chars, UNIQUE)</td>
+                    </tr>
+                    <tr>
+                        <td>file_type</td>
+                        <td>ENUM</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>File type: 'tt' (Template Toolkit), 'md' (Markdown)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>title</td>
+                        <td>VARCHAR(512)</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>Document title extracted from metadata (REQUIRED, up to 512 chars)</td>
+                    </tr>
+                    <tr>
+                        <td>excerpt</td>
+                        <td>TEXT</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Short excerpt for search results display (optional, unlimited length)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>searchable_text</td>
+                        <td>LONGTEXT</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>Full searchable content (normalized text, no markup)</td>
+                    </tr>
+                    <tr>
+                        <td>content_hash</td>
+                        <td>VARCHAR(64)</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>SHA256 hash of file content (for staleness detection)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>role_access</td>
+                        <td>JSON</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>JSON array of accessible roles (e.g., ['admin', 'developer']) or ['*'] for all</td>
+                    </tr>
+                    <tr>
+                        <td>indexed_at</td>
+                        <td>TIMESTAMP</td>
+                        <td>NO</td>
+                        <td>CURRENT_TIMESTAMP</td>
+                        <td>Timestamp when index was created (auto-set)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>last_file_modified</td>
+                        <td>TIMESTAMP</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Last modification time of indexed file (for staleness detection)</td>
+                    </tr>
+                    <tr>
+                        <td>file_size</td>
+                        <td>INTEGER</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>File size in bytes (for quota/performance tracking)</td>
+                    </tr>
+                </table>
+            </section>
+
+            <section id="file-types">
+                <h2>Supported File Types</h2>
+                <p>DocumentationMetadataIndex supports 2 documentation file formats:</p>
+                
+                <table class="table table-bordered">
+                    <tr>
+                        <th>File Type</th>
+                        <th>Extension</th>
+                        <th>Purpose</th>
+                        <th>Metadata Source</th>
+                    </tr>
+                    <tr>
+                        <td><strong>'tt'</strong></td>
+                        <td>.tt</td>
+                        <td>Template Toolkit documents (primary documentation format)</td>
+                        <td>[% META ... %] block at top of file</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td><strong>'md'</strong></td>
+                        <td>.md</td>
+                        <td>Markdown documents (legacy or draft format)</td>
+                        <td>YAML frontmatter or first heading</td>
+                    </tr>
+                </table>
+
+                <h3>File Type Indexing Examples</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>use Digest::SHA;
+
+# Index a Template Toolkit file
+my $index = $schema->resultset('DocumentationMetadataIndex')->create({
+    file_path => 'Comserv/root/Documentation/models/User.tt',
+    file_type => 'tt',
+    title => 'User Model - User Management',
+    excerpt => 'The User model provides database schema for managing...',
+    searchable_text => $file_content,
+    content_hash => Digest::SHA::sha256_hex($file_content),
+    file_size => length($file_content),
+    role_access => JSON::MaybeXS::encode_json(['admin', 'developer'])
+});</code></pre>
+                </div>
+            </section>
+
+            <section id="metadata-extraction">
+                <h2>Metadata Extraction & Indexing</h2>
+                
+                <h3>Template Toolkit Metadata</h3>
+                <p>For .tt files, metadata is extracted from the [% META ... %] block:</p>
+                <ul>
+                    <li><strong>title:</strong> From META title field</li>
+                    <li><strong>description:</strong> Can be used for excerpt</li>
+                    <li><strong>roles:</strong> Comma-separated list for access control</li>
+                    <li><strong>category:</strong> For classification/tagging</li>
+                </ul>
+
+                <h3>Markdown Metadata</h3>
+                <p>For .md files, metadata can come from YAML frontmatter:</p>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>---
+title: Installation Guide
+excerpt: Steps to install and configure Comserv
+roles: [admin, developer]
+---
+
+# Installation Guide
+...content...</code></pre>
+                </div>
+
+                <h3>Searchable Text Normalization</h3>
+                <p>The searchable_text field contains normalized content:</p>
+                <ul>
+                    <li>Template Toolkit markup removed ([% %] blocks)</li>
+                    <li>Markdown syntax removed (*, #, -, [])</li>
+                    <li>HTML tags removed</li>
+                    <li>Whitespace normalized (multiple spaces collapsed)</li>
+                    <li>Full text preserved for full-text search</li>
+                </ul>
+            </section>
+
+            <section id="citation-tracking">
+                <h2>Citation Tracking</h2>
+                
+                <h3>AI Message Citations</h3>
+                <p>DocumentationMetadataIndex has a has_many relationship to AiMessage citations:</p>
+                
+                <h3>How Citations Work</h3>
+                <ul>
+                    <li>When an AiMessage cites this documentation, sources_cited field includes the file_path</li>
+                    <li>The ai_citations relationship tracks all messages citing this document</li>
+                    <li>Uses LIKE pattern matching on sources_cited JSON field</li>
+                    <li>Enables audit trail and citation analytics</li>
+                </ul>
+
+                <h3>Accessing Citations</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $doc_index = $schema->resultset('DocumentationMetadataIndex')->find($id);
+
+# Get all AI messages that cited this document
+my @citations = $doc_index->ai_citations->all;
+
+foreach my $message (@citations) {
+    print "Message #" . $message->id . " cites this document\n";
+    print "Model: " . $message->model_used . "\n";
+    print "Created: " . $message->created_at . "\n";
+}</code></pre>
+                </div>
+
+                <h3>Citation Analytics</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code># Count how many times a document was cited
+my $doc_index = $schema->resultset('DocumentationMetadataIndex')->find($id);
+my $citation_count = $doc_index->ai_citations->count;
+
+print "This document was cited $citation_count times\n";</code></pre>
+                </div>
+            </section>
+
+            <section id="staleness-detection">
+                <h2>Content Staleness Detection</h2>
+                
+                <h3>Staleness Threshold</h3>
+                <p>A document is considered STALE if:</p>
+                <ul>
+                    <li>last_file_modified timestamp exists AND</li>
+                    <li>Time since last_file_modified is >= 24 hours</li>
+                </ul>
+
+                <h3>Detecting Stale Content</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>is_content_stale():</strong> Check if documentation needs refresh</p>
+                    <pre><code>my $index = $schema->resultset('DocumentationMetadataIndex')->find($id);
+
+if ($index->is_content_stale) {
+    print "Documentation is stale (>24 hours old)\n";
+    # Trigger re-indexing or refresh workflow
+} else {
+    print "Documentation is fresh\n";
+}</code></pre>
+                </div>
+
+                <h3>Refreshing Stale Documentation</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>use DateTime;
+use Digest::SHA;
+
+my @stale = $schema->resultset('DocumentationMetadataIndex')->search({
+    last_file_modified => { '<' => DateTime->now->subtract( hours => 24 ) }
+})->all;
+
+foreach my $index (@stale) {
+    print "Refreshing: " . $index->file_path . "\n";
+    
+    # Re-read and update
+    my $content = read_file($index->file_path);
+    $index->update({
+        searchable_text => $content,
+        content_hash => Digest::SHA::sha256_hex($content),
+        last_file_modified => DateTime->now,
+        file_size => length($content)
+    });
+}</code></pre>
+                </div>
+            </section>
+
+            <section id="role-access">
+                <h2>Role-Based Access Control</h2>
+                
+                <h3>Role Access Configuration</h3>
+                <p>The role_access JSON field defines which roles can view the documentation:</p>
+                <ul>
+                    <li><strong>['*']:</strong> Public - anyone can access</li>
+                    <li><strong>['admin']:</strong> Admin only</li>
+                    <li><strong>['admin', 'developer']:</strong> Admins and developers</li>
+                    <li><strong>NULL:</strong> No access restrictions (public)</li>
+                </ul>
+
+                <h3>Checking User Access</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>can_user_access($user_roles):</strong> Check if user can view document</p>
+                    <pre><code>my $index = $schema->resultset('DocumentationMetadataIndex')->find($id);
+my $user_roles = ['developer', 'editor'];
+
+if ($index->can_user_access($user_roles)) {
+    print "User can access this documentation\n";
+} else {
+    print "Access denied\n";
+}</code></pre>
+                </div>
+
+                <h3>Accessible Roles Retrieval</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>get_accessible_by_roles():</strong> Get roles with access</p>
+                    <pre><code>my $index = $schema->resultset('DocumentationMetadataIndex')->find($id);
+my @accessible = @{ $index->get_accessible_by_roles() };
+
+print "Accessible by roles: " . join(', ', @accessible) . "\n";</code></pre>
+                </div>
+            </section>
+
+            <section id="api-methods">
+                <h2>API Methods & Helpers</h2>
+                
+                <h3>Standard DBIx::Class Methods</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Creating Index Entries:</strong></p>
+                    <pre><code>use Digest::SHA;
+use JSON::MaybeXS;
+
+my $index = $schema->resultset('DocumentationMetadataIndex')->create({
+    file_path => 'Comserv/root/Documentation/models/User.tt',
+    file_type => 'tt',
+    title => 'User Model Documentation',
+    excerpt => 'Comprehensive documentation for the User model...',
+    searchable_text => $file_content,
+    content_hash => Digest::SHA::sha256_hex($file_content),
+    file_size => length($file_content),
+    role_access => JSON::MaybeXS::encode_json(['admin', 'developer']),
+    last_file_modified => DateTime->now
+});</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Retrieving Indexes:</strong></p>
+                    <pre><code>my $index = $schema->resultset('DocumentationMetadataIndex')->find(1);
+
+my @tt_docs = $schema->resultset('DocumentationMetadataIndex')->search({
+    file_type => 'tt'
+})->all;
+
+my @by_title = $schema->resultset('DocumentationMetadataIndex')->search({
+    title => { like => '%Model%' }
+})->all;</code></pre>
+                </div>
+
+                <h3>Helper Methods</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>get_accessible_by_roles():</strong> Get array of accessible roles</p>
+                    <pre><code>my @roles = @{ $index->get_accessible_by_roles() };
+# Returns: ['admin', 'developer'] or ['*'] for public</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>can_user_access($user_roles):</strong> Check user access (array ref)</p>
+                    <pre><code>if ($index->can_user_access(['developer', 'admin'])) {
+    # User has access
+}</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>is_content_stale():</strong> Check if >24 hours old</p>
+                    <pre><code>if ($index->is_content_stale) {
+    # Schedule re-indexing
+}</code></pre>
+                </div>
+            </section>
+
+            <section id="examples">
+                <h2>Usage Examples</h2>
+                
+                <h3>Example 1: Index New Template Toolkit Document</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>use File::Slurp;
+use Digest::SHA;
+use JSON::MaybeXS;
+
+my $file_path = 'Comserv/root/Documentation/models/Project.tt';
+my $content = read_file($file_path);
+
+my $index = $schema->resultset('DocumentationMetadataIndex')->create({
+    file_path => $file_path,
+    file_type => 'tt',
+    title => 'Project Model - Project Management',
+    excerpt => 'Database schema for managing projects and their lifecycle',
+    searchable_text => $content,
+    content_hash => Digest::SHA::sha256_hex($content),
+    file_size => length($content),
+    role_access => JSON::MaybeXS::encode_json(['*']),  # Public
+    last_file_modified => DateTime->now
+});
+
+print "Indexed: " . $index->file_path . "\n";</code></pre>
+                </div>
+
+                <h3>Example 2: Search Documents by Title</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my @results = $schema->resultset('DocumentationMetadataIndex')->search({
+    title => { like => '%Model%' }
+})->all;
+
+foreach my $doc (@results) {
+    print $doc->title . " (" . $doc->file_type . ")\n";
+    print "  Path: " . $doc->file_path . "\n";
+    print "  Excerpt: " . substr($doc->excerpt, 0, 50) . "...\n\n";
+}</code></pre>
+                </div>
+
+                <h3>Example 3: Filter Documents by Role Access</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $user_roles = ['developer'];
+my @docs = $schema->resultset('DocumentationMetadataIndex')->search({
+    file_type => 'tt'
+})->all;
+
+my @accessible = grep {
+    $_->can_user_access($user_roles)
+} @docs;
+
+print "Found " . scalar(@accessible) . " accessible docs for developer\n";</code></pre>
+                </div>
+
+                <h3>Example 4: Find and Refresh Stale Documentation</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my @all_docs = $schema->resultset('DocumentationMetadataIndex')->all;
+my @stale = grep { $_->is_content_stale } @all_docs;
+
+print "Found " . scalar(@stale) . " stale documents\n";
+
+foreach my $doc (@stale) {
+    my $content = read_file($doc->file_path);
+    $doc->update({
+        searchable_text => $content,
+        content_hash => Digest::SHA::sha256_hex($content),
+        last_file_modified => DateTime->now
+    });
+    print "Refreshed: " . $doc->file_path . "\n";
+}</code></pre>
+                </div>
+
+                <h3>Example 5: Track Document Citations</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $doc = $schema->resultset('DocumentationMetadataIndex')->find(50);
+
+my @citations = $doc->ai_citations->search(
+    {},
+    { order_by => { -desc => 'created_at' }, rows => 10 }
+)->all;
+
+print "Recent citations of: " . $doc->title . "\n";
+foreach my $msg (@citations) {
+    print "  Message #" . $msg->id . " (" . $msg->model_used . ")\n";
+    print "  " . $msg->get_formatted_time . "\n";
+}</code></pre>
+                </div>
+            </section>
+
+            <section id="troubleshooting">
+                <h2>Troubleshooting</h2>
+                
+                <div class="alert alert-warning">
+                    <h3>Issue 1: Duplicate file_path Entries</h3>
+                    <p><strong>Problem:</strong> Error "Duplicate entry" when creating index</p>
+                    <p><strong>Cause:</strong> file_path has UNIQUE constraint</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code>my $index = $schema->resultset('DocumentationMetadataIndex')->find_or_create({
+    file_path => $file
+});
+
+# Update if exists
+$index->update({
+    searchable_text => $new_content,
+    content_hash => $new_hash
+});</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 2: Role Access JSON Parsing</h3>
+                    <p><strong>Problem:</strong> role_access returned as string, not array</p>
+                    <p><strong>Cause:</strong> DBIx::Class may not auto-inflate JSON</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code>use JSON::MaybeXS;
+
+my $roles = $index->role_access;
+my $roles_array = ref $roles eq 'ARRAY' ? $roles : JSON::MaybeXS::decode_json($roles);
+foreach my $role (@$roles_array) {
+    print "Role: $role\n";
+}</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 3: Citations Not Tracking</h3>
+                    <p><strong>Problem:</strong> ai_citations returns empty even though messages cite doc</p>
+                    <p><strong>Cause:</strong> LIKE pattern search requires exact file_path match in sources_cited</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code># Verify message has this doc in sources_cited
+my @all_msgs = $schema->resultset('AiMessage')->all;
+foreach my $msg (@all_msgs) {
+    my $sources = $msg->sources_cited;
+    if ($sources && $sources =~ /$doc->file_path/) {
+        print "Message #" . $msg->id . " cites this doc\n";
+    }
+}</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 4: Staleness Check Always Returns False</h3>
+                    <p><strong>Problem:</strong> is_content_stale() always returns 0</p>
+                    <p><strong>Cause:</strong> last_file_modified is NULL</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code>unless ($index->last_file_modified) {
+    $index->update({
+        last_file_modified => DateTime->now
+    });
+}
+
+# Now staleness checks will work
+if ($index->is_content_stale) {
+    print "Stale\n";
+}</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 5: Role Access Always Grants Permission</h3>
+                    <p><strong>Problem:</strong> can_user_access() returns true when should deny</p>
+                    <p><strong>Cause:</strong> role_access is NULL (no restrictions) or ['*']</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code># Set explicit role restrictions
+$index->update({
+    role_access => JSON::MaybeXS::encode_json(['admin', 'developer'])
+});
+
+# Now access is restricted to specified roles
+unless ($index->can_user_access(['user'])) {
+    print "Access denied\n";
+}</code></pre>
+                </div>
+            </section>
+
+            <section id="see-also">
+                <h2>See Also</h2>
+                <div class="alert alert-success">
+                    <ul style="margin: 5px 0 0 20px;">
+                        <li><a href="/Documentation/models/Documentation">Documentation Model</a> - Documentation files and basic metadata</li>
+                        <li><a href="/Documentation/models/DocumentationRoleAccess">DocumentationRoleAccess Model</a> - Role-based access rules</li>
+                        <li><a href="/Documentation/models/AiMessage">AiMessage Model</a> - Messages citing documentation</li>
+                        <li><a href="/Documentation/models/CodeSearchIndex">CodeSearchIndex Model</a> - Code search indexing</li>
+                    </ul>
+                </div>
+            </section>
+
+            <div class="last-updated">
+                <small>Last updated: <span id="update-date">2026-01-09</span></small>
+            </div>
+        </div>
+    </div>
+</div>

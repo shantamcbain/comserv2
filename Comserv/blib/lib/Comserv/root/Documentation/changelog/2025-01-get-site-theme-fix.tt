@@ -1,0 +1,58 @@
+ThemeConfig get_site_theme Method Fix - January 2025
+
+Overview
+Fixed critical missing method get_site_theme in Comserv::Model::ThemeConfig that was causing application crashes when themes were being loaded.
+
+Problem
+Application was throwing exception:
+Can't locate object method "get_site_theme" via package "Comserv::Model::ThemeConfig" at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm line 1120.
+
+Root Cause
+The get_site_theme method was missing from the ThemeConfig model but was being called by the Root controller to determine site-specific themes.
+
+Solution
+Implemented the missing get_site_theme method with the following features:
+
+Method Functionality
+- Site-to-theme mapping: Maps site names to themes using site_themes configuration from theme_definitions.json
+- Session caching: Caches theme selections in user session for performance
+- Fallback handling: Returns 'default' theme if no mapping found or on errors
+- Case normalization: Handles case-insensitive site name matching
+- Validation: Verifies selected theme exists in theme definitions
+- Comprehensive logging: Logs all theme selection decisions for debugging
+
+Method Signature
+sub get_site_theme {
+    my ($self, $c, $site_name) = @_;
+    return $theme_name;
+}
+
+Configuration Integration
+Uses the site_themes section from /root/static/config/theme_definitions.json:
+{
+  "site_themes": {
+    "default": "default",
+    "apis": "apis", 
+    "usbm": "usbm",
+    "csc": "csc",
+    "bmaster": "apis",
+    "mcoop": "mcoop"
+  }
+}
+
+Files Modified
+- /Comserv/lib/Comserv/Model/ThemeConfig.pm - Added missing get_site_theme method
+
+Testing
+- Application now starts without crashes
+- Theme selection works correctly for all configured sites
+- Session-based theme caching is functional
+- Proper fallback to default theme when no mapping exists
+
+Deployment Impact
+- Zero downtime: Method addition is backwards compatible
+- No configuration changes needed: Uses existing theme configuration
+- Immediate effect: Application restart automatically picks up the fix
+
+Related Issues
+This fix resolves the controller-level exception that was preventing proper theme application across the system.

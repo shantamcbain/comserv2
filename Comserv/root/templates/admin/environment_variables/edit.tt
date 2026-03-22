@@ -1,0 +1,111 @@
+[% META
+   title = "Edit Environment Variable"
+   description = "Create or edit an environment variable"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Administration"
+   page_version = "0.01"
+   last_updated = "Tue Dec 09 18:15:00 UTC 2025"
+%]
+
+[% PageVersion = 'admin/environment_variables/edit.tt,v 0.01 2025/12/09 18:15:00 UTC Exp' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    
+    <div class="page-header">
+        <h1>[% variable.id ? "Edit" : "Create" %] Environment Variable</h1>
+        <p class="page-subtitle">Configure system environment variable</p>
+    </div>
+    
+    <div class="content-container">
+        
+        <div class="content-primary">
+            
+            [% IF error_msg %]
+            <div class="alert alert-error" style="background-color: var(--light-color); border-left: 4px solid var(--error-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--error-color);">Validation Error</h4>
+                <p>[% error_msg | html %]</p>
+            </div>
+            [% END %]
+            
+            <div class="form-container">
+                <form method="post" action="[% IF variable.id %][% c.uri_for('/admin/environment_variables/edit', variable.id) %][% ELSE %][% c.uri_for('/admin/environment_variables/create') %][% END %]" class="app-form">
+                    
+                    <div class="form-section">
+                        <h3>Variable Information</h3>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="key" style="color: var(--text-color); font-family: var(--header-font);">Variable Name:</label>
+                                <input type="text" id="key" name="key" 
+                                       value="[% variable.key | html %]" class="form-input"
+                                       placeholder="e.g., DATABASE_URL"
+                                       [% IF variable.id %]readonly[% END %]
+                                       required>
+                                <p style="color: var(--text-muted-color); font-size: var(--font-size-small); margin-top: var(--spacing-small);">
+                                    Variable names should be uppercase with underscores
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="value" style="color: var(--text-color); font-family: var(--header-font);">Value:</label>
+                                <textarea id="value" name="value" class="form-input" 
+                                          rows="6" placeholder="Enter the variable value..."
+                                          required>[% variable.value | html %]</textarea>
+                            </div>
+                        </div>
+                        
+                    </div>
+                    
+                    <div class="form-section">
+                        <h3>Security Settings</h3>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label style="color: var(--text-color); font-family: var(--header-font);">
+                                    <input type="checkbox" name="is_secret" value="1" 
+                                           [% IF variable.is_secret %]checked[% END %]>
+                                    Mark as Secret/Sensitive
+                                </label>
+                                <p style="color: var(--text-muted-color); font-size: var(--font-size-small); margin-top: var(--spacing-small);">
+                                    Secret values will be masked in logs and will not be displayed in plaintext
+                                </p>
+                            </div>
+                        </div>
+                        
+                    </div>
+                    
+                    <div class="form-section">
+                        <h3>Description</h3>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="description" style="color: var(--text-color); font-family: var(--header-font);">Notes/Description:</label>
+                                <textarea id="description" name="description" class="form-input" 
+                                          rows="4" placeholder="Optional: Add notes about this variable...">[% variable.description | html %]</textarea>
+                                <p style="color: var(--text-muted-color); font-size: var(--font-size-small); margin-top: var(--spacing-small);">
+                                    This helps other administrators understand the purpose of this variable
+                                </p>
+                            </div>
+                        </div>
+                        
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save Variable</button>
+                        <a href="[% c.uri_for('/admin/environment_variables') %]" class="btn btn-secondary">Cancel</a>
+                    </div>
+                    
+                </form>
+            </div>
+            
+        </div>
+        
+    </div>
+    
+</div>

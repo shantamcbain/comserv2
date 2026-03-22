@@ -1,0 +1,220 @@
+[% META title = 'Add New Category' %]
+
+<style>
+.config-manager {
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 20px;
+}
+
+.section {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.section h2 {
+    margin-top: 0;
+    color: #333;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 10px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.form-group input[type="text"],
+.form-group textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.form-group textarea {
+    resize: vertical;
+}
+
+.role-checkbox {
+    display: inline-block;
+    margin-right: 15px;
+    margin-bottom: 5px;
+}
+
+.role-checkbox input {
+    margin-right: 5px;
+}
+
+.btn {
+    display: inline-block;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 14px;
+    margin-right: 10px;
+}
+
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.btn:hover {
+    opacity: 0.9;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.categories-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.category-item {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #f9f9f9;
+    overflow: hidden;
+}
+
+.category-header {
+    padding: 15px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: background-color 0.2s;
+}
+
+.category-header:hover {
+    background: #f0f0f0;
+}
+
+.toggle-icon {
+    transition: transform 0.3s;
+    margin-left: 10px;
+}
+
+.category-details {
+    padding: 0 15px 15px 15px;
+    border-top: 1px solid #eee;
+    background: white;
+}
+
+.category-item.expanded .toggle-icon {
+    transform: rotate(180deg);
+}
+</style>
+
+<div class="config-manager">
+    [% IF existing_categories.keys.size > 0 %]
+    <div class="section">
+        <h2>Existing Categories</h2>
+        <div class="categories-list">
+            [% FOREACH cat_key IN existing_categories.keys.sort %]
+                [% cat = existing_categories.$cat_key %]
+                <div class="category-item">
+                    <div class="category-header" onclick="toggleCategory('cat_[% cat_key %]')">
+                        <i class="[% cat.icon || 'fas fa-file-alt' %]" style="margin-right: 8px; color: #667eea;"></i>
+                        <strong style="color: #333;">[% cat.title %]</strong>
+                        <span style="margin-left: auto; font-size: 12px; color: #666;">([% cat_key %])</span>
+                        <i class="fas fa-chevron-down toggle-icon" id="icon_cat_[% cat_key %]"></i>
+                    </div>
+                    <div class="category-details" id="cat_[% cat_key %]" style="display: none;">
+                        [% IF cat.description %]
+                            <p style="margin: 8px 0; color: #555; font-size: 14px;">[% cat.description %]</p>
+                        [% END %]
+                        [% IF cat.roles && cat.roles.size > 0 %]
+                            <div style="margin-top: 8px;">
+                                <small style="color: #666;">Roles: [% cat.roles.join(', ') %]</small>
+                            </div>
+                        [% END %]
+                        <div style="margin-top: 15px;">
+                            <a href="[% c.uri_for('/Documentation/edit_category', cat_key) %]" class="btn btn-secondary btn-sm">
+                                <i class="fas fa-edit"></i> Edit Category
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            [% END %]
+        </div>
+    </div>
+    [% END %]
+
+    <div class="section">
+        <h2>Add New Category</h2>
+        <form method="POST" action="[% c.uri_for('/Documentation/save_config') %]">
+            <input type="hidden" name="action" value="add_category">
+
+            <div class="form-group">
+                <label>Category Key:</label>
+                <input type="text" name="category_key" required>
+            </div>
+
+            <div class="form-group">
+                <label>Title:</label>
+                <input type="text" name="category_title" required>
+            </div>
+
+            <div class="form-group">
+                <label>Description:</label>
+                <textarea name="category_description" rows="3"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Icon:</label>
+                <input type="text" name="category_icon" value="fas fa-file-alt">
+            </div>
+
+            <div class="form-group">
+                <label>Roles:</label>
+                [% FOREACH role IN available_roles %]
+                    <label class="role-checkbox">
+                        <input type="checkbox" name="category_roles" value="[% role %]">
+                        [% role | ucfirst %]
+                    </label>
+                [% END %]
+            </div>
+
+            <button type="submit" class="btn btn-success">Add Category</button>
+            <a href="[% c.uri_for('/Documentation/manage_config') %]" class="btn">Cancel</a>
+        </form>
+    </div>
+</div>
+
+<script>
+function toggleCategory(categoryId) {
+    const details = document.getElementById(categoryId);
+    const item = details.closest('.category-item');
+    const icon = document.getElementById('icon_' + categoryId);
+
+    if (details.style.display === 'none' || details.style.display === '') {
+        details.style.display = 'block';
+        item.classList.add('expanded');
+    } else {
+        details.style.display = 'none';
+        item.classList.remove('expanded');
+    }
+}
+</script>

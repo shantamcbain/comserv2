@@ -1,0 +1,44 @@
+name: Grok and Ollama Recovery Setup
+version: 1.0.0
+schema: v1
+
+models:
+  # Fixed Grok setup (OpenAI-compatible)
+  - name: Grok
+    provider: openai
+    model: grok-4
+    apiBase: https://api.x.ai/v1
+    apiKey: <YOUR_XAI_API_KEY>  # Replace with your actual key
+    roles:
+      - chat
+      - edit
+      - apply
+    defaultCompletionOptions:
+      temperature: 0.7
+      maxTokens: 2048
+
+  # Local Ollama fallback for chat/edit
+  - name: Llama 3.1
+    provider: ollama
+    model: llama3.1
+    roles:
+      - chat
+      - edit
+    defaultCompletionOptions:
+      temperature: 0.7
+      maxTokens: 1500
+
+  # Fast local autocomplete
+  - name: Phi-3 Mini
+    provider: ollama
+    model: phi3:mini
+    roles:
+      - autocomplete
+    autocompleteOptions:
+      debounceDelay: 250
+      maxPromptTokens: 1024
+      onlyMyCode: true
+
+# Defaults for startup (optional but recommended)
+modelsToUseOnStartup:
+  - Grok

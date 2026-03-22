@@ -1,0 +1,496 @@
+[% META
+        title = "Security Audit Findings - Comserv2"
+   description = "Complete security vulnerability audit with tracking and remediation steps"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "security"
+   page_version = "0.01"
+   last_updated = "Mon Dec 08 15:50:00 UTC 2025"
+   site_specific = "false"
+   audit_status = "ACTIVE - 12 Critical/High Issues Identified"
+%]
+[% PageVersion = 'Documentation/security/security_audit_findings.tt,v 0.01 15:50:00 2025/12/08 SecuritySentinel Exp shanta - Security Audit Report' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Security Audit Findings Report</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2025-12-08 | 
+        Version: 0.01 |
+        Author: SecuritySentinel AI | 
+        Status: Active Review | 
+        Total Issues: 12 (Critical: 3, High: 5, Medium: 4)
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Comprehensive security audit of Comserv2 codebase identifying 12 vulnerabilities across credential exposure, authentication, input validation, and deployment security. This document tracks each issue with status, evidence, and step-by-step remediation steps for team implementation.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Executive Summary</h2>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Severity</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Count</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Status</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Timeline</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); background-color: #ffe6e6;"><strong>CRITICAL</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); background-color: #ffe6e6;">3</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); background-color: #ffe6e6;">[ ] NOT STARTED</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); background-color: #ffe6e6;">Immediate (Week 1)</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>HIGH</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">5</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">[ ] NOT STARTED</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Short-term (2 weeks)</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>MEDIUM</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">4</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">[ ] NOT STARTED</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Medium-term (30 days)</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">CRITICAL ISSUES (3)</h2>
+            
+            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large);">ISSUE #1: Exposed Cloudflare API Token in Repository</h3>
+                
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Severity:</strong> CRITICAL (CVSS 9.1)</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Status:</strong> [ ] NOT STARTED | [ ] IN PROGRESS | [ ] COMPLETE | [ ] VERIFIED</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Assigned To:</strong> _________________ | <strong>Due Date:</strong> _________________</p>
+                
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Description:</strong></p>
+                <p style="color: var(--text-color); font-family: var(--body-font);">Live Cloudflare API token committed to repository and visible in plaintext in configuration files.</p>
+                
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Evidence (File Locations):</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Comserv/config/cloudflare_config.json - Line 18</li>
+                    <li>Comserv/config/api_credentials.json - Line 8</li>
+                    <li>Token value exposed: cXPhJ9FFvNI6XcV7Xf-TxVI_IDC2zdlVPePa_n5w</li>
+                </ul>
+                
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Attack Vector:</strong></p>
+                <p style="color: var(--text-color); font-family: var(--body-font);">Attackers with repository access (cloned repo, developer machines, CI/CD logs) can modify DNS records for all managed domains, purge CDN cache, modify SSL settings, and create security policies.</p>
+                
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Impact:</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Unauthorized DNS modification (point domains to attacker servers)</li>
+                    <li>SSL certificate changes</li>
+                    <li>Denial of service via CDN manipulation</li>
+                    <li>Cache poisoning attacks</li>
+                    <li>Affects: computersystemconsulting.ca, beemaster.ca, helpdesk.computersystemconsulting.ca</li>
+                </ul>
+                
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Remediation Steps:</strong></p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>STEP 1 - Rotate Token (Within 24 hours):</strong>
+                        <ul>
+                            <li>Log into Cloudflare account: https://dash.cloudflare.com/</li>
+                            <li>Navigate to: Account Profile → API Tokens</li>
+                            <li>Revoke token: cXPhJ9FFvNI6XcV7Xf-TxVI_IDC2zdlVPePa_n5w</li>
+                            <li>Create new token with same permissions</li>
+                            <li>Document new token (temporary location only)</li>
+                        </ul>
+                    </li>
+                    <li><strong>STEP 2 - Remove from Git History (Use git-filter-repo):</strong>
+                        <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                            <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Install git-filter-repo
+pip install git-filter-repo
+
+# Remove sensitive data from ALL history
+git filter-repo --replace-text <(echo 'cXPhJ9FFvNI6XcV7Xf-TxVI_IDC2zdlVPePa_n5w==<REDACTED>')
+
+# Force push to update repository
+git push origin --force --all
+git push origin --force --tags
+                            </code></pre>
+                        </div>
+                    </li>
+                    <li><strong>STEP 3 - Update Configuration Files:</strong>
+                        <ul>
+                            <li>Edit Comserv/config/cloudflare_config.json</li>
+                            <li>Replace: "api_token" : "[REDACTED - REAL TOKEN MUST NOT BE COMMITTED]"</li>
+                            <li>With: "api_token" : "[% ENV.CLOUDFLARE_API_TOKEN %]"</li>
+                        </ul>
+                    </li>
+                    <li><strong>STEP 4 - Update .env Template:</strong>
+                        <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                            <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Add to .env.example
+CLOUDFLARE_API_TOKEN=your_token_here
+CLOUDFLARE_EMAIL=shantamcbain@gmail.com
+                            </code></pre>
+                        </div>
+                    </li>
+                    <li><strong>STEP 5 - Update Perl Code to Load from Environment:</strong>
+                        <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                            <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# In CloudflareManager.pm or similar
+my $api_token = $ENV{CLOUDFLARE_API_TOKEN} 
+    or die "CLOUDFLARE_API_TOKEN environment variable not set";
+                            </code></pre>
+                        </div>
+                    </li>
+                    <li><strong>STEP 6 - Verification:</strong>
+                        <ul>
+                            <li>Verify new token works: curl -H "Authorization: Bearer NEW_TOKEN" https://api.cloudflare.com/client/v4/user</li>
+                            <li>Test in staging environment</li>
+                            <li>Confirm old token is fully revoked</li>
+                        </ul>
+                    </li>
+                </ol>
+                
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>References:</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>OWASP A7:2021 - Identification and Authentication Failures</li>
+                    <li>CWE-798: Use of Hard-Coded Credentials</li>
+                    <li>Cloudflare API Security: https://developers.cloudflare.com/api/</li>
+                </ul>
+            </div>
+
+            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large);">ISSUE #2: Database Credentials in .env Files</h3>
+                
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Severity:</strong> CRITICAL (CVSS 8.8)</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Status:</strong> [ ] NOT STARTED | [ ] IN PROGRESS | [ ] COMPLETE | [ ] VERIFIED</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Assigned To:</strong> _________________ | <strong>Due Date:</strong> _________________</p>
+                
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Description:</strong></p>
+                <p style="color: var(--text-color); font-family: var(--body-font);">Plain text database credentials stored in .env files that are in version control or discoverable on systems.</p>
+                
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Evidence (File Locations):</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>.env - DB_PASSWORD=comserv_pass, DB_ROOT_PASSWORD=rootpassword_dev, REDIS_PASSWORD=redispass_dev</li>
+                    <li>Comserv/.env.development</li>
+                    <li>Comserv/db_config.template.json (multiple password fields)</li>
+                </ul>
+                
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Impact:</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Complete database access (read/write/delete all data)</li>
+                    <li>Data exfiltration of all sites' information</li>
+                    <li>Data destruction/ransomware attacks</li>
+                    <li>Privilege escalation to root database user</li>
+                </ul>
+                
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Remediation Steps:</strong></p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>STEP 1 - Rotate All Database Passwords:</strong>
+                        <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                            <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Log into MySQL/MariaDB as root
+mysql -h 192.168.1.198 -u root -p
+
+# Change application user password
+ALTER USER 'comserv'@'%' IDENTIFIED BY 'NEW_STRONG_PASSWORD_HERE';
+
+# Change root password
+ALTER USER 'root'@'%' IDENTIFIED BY 'NEW_ROOT_PASSWORD_HERE';
+
+# Flush privileges
+FLUSH PRIVILEGES;
+                            </code></pre>
+                        </div>
+                    </li>
+                    <li><strong>STEP 2 - Remove .env from Git History:</strong>
+                        <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                            <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+git filter-repo --path .env --invert-paths
+git filter-repo --path .env.development --invert-paths
+git filter-repo --path Comserv/.env --invert-paths
+git filter-repo --path Comserv/.env.development --invert-paths
+git push origin --force --all
+                            </code></pre>
+                        </div>
+                    </li>
+                    <li><strong>STEP 3 - Ensure .gitignore Blocks These Files:</strong>
+                        <ul>
+                            <li>Verify .gitignore contains: .env, .env.*, !.env.example</li>
+                            <li>Confirm template only (.env.example) is committed</li>
+                        </ul>
+                    </li>
+                    <li><strong>STEP 4 - Deploy New Credentials Securely:</strong>
+                        <ul>
+                            <li>Use environment variables in Docker Compose</li>
+                            <li>Use secrets management tool (HashiCorp Vault, AWS Secrets Manager, Kubernetes Secrets)</li>
+                            <li>Pass via secure configuration at runtime</li>
+                        </ul>
+                    </li>
+                    <li><strong>STEP 5 - Verification:</strong>
+                        <ul>
+                            <li>Test database connection with new credentials</li>
+                            <li>Confirm application starts with new passwords</li>
+                            <li>Verify old passwords no longer work</li>
+                        </ul>
+                    </li>
+                </ol>
+            </div>
+
+            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large);">ISSUE #3: Weak Credential Obfuscation (Not Encryption)</h3>
+                
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Severity:</strong> CRITICAL (CVSS 7.5)</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Status:</strong> [ ] NOT STARTED | [ ] IN PROGRESS | [ ] COMPLETE | [ ] VERIFIED</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Assigned To:</strong> _________________ | <strong>Due Date:</strong> _________________</p>
+                
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Description:</strong></p>
+                <p style="color: var(--text-color); font-family: var(--body-font);">ProxmoxCredentials module uses non-cryptographic obfuscation scheme that stores plaintext passwords with a hard-coded salt, providing no real security.</p>
+                
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Evidence (File Locations):</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Comserv/lib/Comserv/Util/ProxmoxCredentials.pm - Lines 47-80</li>
+                    <li>Hard-coded salt: 'ComservProxmoxSalt2025'</li>
+                    <li>Obfuscation format: "OBFS:[hash]:[PLAINTEXT_PASSWORD]"</li>
+                </ul>
+                
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Issues:</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Salt is hard-coded in source code (publicly available)</li>
+                    <li>Plaintext password stored in the "obfuscated" value itself</li>
+                    <li>No actual encryption - only string concatenation</li>
+                    <li>False sense of security</li>
+                </ul>
+                
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Remediation Steps:</strong></p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>STEP 1 - Implement Proper Encryption:</strong>
+                        <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                            <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# In ProxmoxCredentials.pm, replace obfuscation with encryption
+
+use Crypt::CBC;
+use Digest::SHA qw(sha256);
+
+sub encrypt_credential {
+    my ($plaintext, $master_key) = @_;
+    
+    my $cipher = Crypt::CBC->new(
+        -key    => sha256($master_key),
+        -cipher => 'Cipher::AES',
+        -header => 'salt'
+    );
+    
+    return $cipher->encrypt_hex($plaintext);
+}
+
+sub decrypt_credential {
+    my ($encrypted, $master_key) = @_;
+    
+    my $cipher = Crypt::CBC->new(
+        -key    => sha256($master_key),
+        -cipher => 'Cipher::AES',
+        -header => 'salt'
+    );
+    
+    return $cipher->decrypt_hex($encrypted);
+}
+                            </code></pre>
+                        </div>
+                    </li>
+                    <li><strong>STEP 2 - Migrate to Environment Variables:</strong>
+                        <ul>
+                            <li>Store master encryption key in environment variable</li>
+                            <li>Load Proxmox credentials from secure vault at startup</li>
+                            <li>Never persist credentials in files</li>
+                        </ul>
+                    </li>
+                    <li><strong>STEP 3 - Update cpanfile Dependencies:</strong>
+                        <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                            <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+requires 'Crypt::CBC';
+requires 'Crypt::Cipher::AES';
+                            </code></pre>
+                        </div>
+                    </li>
+                    <li><strong>STEP 4 - Verification:</strong>
+                        <ul>
+                            <li>Test encryption/decryption cycle</li>
+                            <li>Verify Proxmox connections work with encrypted credentials</li>
+                            <li>Confirm old obfuscation method is completely removed</li>
+                        </ul>
+                    </li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">HIGH SEVERITY ISSUES (5)</h2>
+            
+            <div style="background-color: var(--light-color); border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: #ff9800; font-family: var(--header-font); font-size: var(--font-size-large);">ISSUE #4: Missing CSRF Protection</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Severity:</strong> HIGH (CVSS 8.8) | <strong>Status:</strong> [ ] NOT STARTED | [ ] IN PROGRESS | [ ] COMPLETE</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Evidence:</strong> No CSRF token validation in Controllers (Admin.pm, User.pm, etc.) - Forms accept POST/PUT/DELETE without token verification</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Assigned To:</strong> _________________ | <strong>Due Date:</strong> _________________</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Reference:</strong> OWASP A4:2021 - Insecure Design | CWE-352</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: #ff9800; font-family: var(--header-font); font-size: var(--font-size-large);">ISSUE #5: Hardcoded Admin User Bypass</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Severity:</strong> HIGH (CVSS 7.2) | <strong>Status:</strong> [ ] NOT STARTED | [ ] IN PROGRESS | [ ] COMPLETE</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Evidence:</strong> Comserv/lib/Comserv/Util/AdminAuth.pm lines 60-70 - Usernames 'Shanta' and 'ai_assistant' bypass authorization checks</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Assigned To:</strong> _________________ | <strong>Due Date:</strong> _________________</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Reference:</strong> OWASP A1:2021 - Broken Access Control | CWE-284</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: #ff9800; font-family: var(--header-font); font-size: var(--font-size-large);">ISSUE #6: Plaintext Passwords in Configuration Files</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Severity:</strong> HIGH (CVSS 7.5) | <strong>Status:</strong> [ ] NOT STARTED | [ ] IN PROGRESS | [ ] COMPLETE</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Evidence:</strong> Comserv/comserv.conf - SMTP and Virtualmin passwords marked "Replace with actual password" but may contain real credentials</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Assigned To:</strong> _________________ | <strong>Due Date:</strong> _________________</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Reference:</strong> OWASP A7:2021 | CWE-798</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: #ff9800; font-family: var(--header-font); font-size: var(--font-size-large);">ISSUE #7: Container Running as Root</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Severity:</strong> HIGH (CVSS 7.0) | <strong>Status:</strong> [ ] NOT STARTED | [ ] IN PROGRESS | [ ] COMPLETE</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Evidence:</strong> Comserv/Dockerfile - Comment states "Don't switch to comserv user - entrypoint runs as root"</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Assigned To:</strong> _________________ | <strong>Due Date:</strong> _________________</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Reference:</strong> CIS Docker Benchmark | NIST SP 800-190</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: #ff9800; font-family: var(--header-font); font-size: var(--font-size-large);">ISSUE #8: Sensitive Environment Variables in Docker Compose</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Severity:</strong> HIGH (CVSS 6.5) | <strong>Status:</strong> [ ] NOT STARTED | [ ] IN PROGRESS | [ ] COMPLETE</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Evidence:</strong> docker-compose.yml passes DB_PASS_PROD in plaintext environment variables that may be logged</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Assigned To:</strong> _________________ | <strong>Due Date:</strong> _________________</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Reference:</strong> Docker Best Practices | OWASP A2:2021</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">MEDIUM SEVERITY ISSUES (4)</h2>
+            
+            <div style="background-color: var(--light-color); border-left: 4px solid #2196F3; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: #2196F3; font-family: var(--header-font); font-size: var(--font-size-large);">ISSUE #9: Insufficient Input Validation</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Severity:</strong> MEDIUM (CVSS 6.5) | <strong>Status:</strong> [ ] NOT STARTED | [ ] IN PROGRESS | [ ] COMPLETE</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Evidence:</strong> Comserv/lib/Comserv/Controller/Admin.pm - User input from $c->req->param() used with minimal validation</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Assigned To:</strong> _________________ | <strong>Due Date:</strong> _________________</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Reference:</strong> OWASP A3:2021 - Injection | CWE-20</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid #2196F3; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: #2196F3; font-family: var(--header-font); font-size: var(--font-size-large);">ISSUE #10: Sensitive Data Logging</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Severity:</strong> MEDIUM (CVSS 5.9) | <strong>Status:</strong> [ ] NOT STARTED | [ ] IN PROGRESS | [ ] COMPLETE</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Evidence:</strong> Comserv/lib/Comserv/Util/Logging.pm - Session details with user IDs and roles logged without sanitization</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Assigned To:</strong> _________________ | <strong>Due Date:</strong> _________________</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Reference:</strong> OWASP A9:2021 - Logging & Monitoring Failures | CWE-532</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid #2196F3; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: #2196F3; font-family: var(--header-font); font-size: var(--font-size-large);">ISSUE #11: Debug Code in Production</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Severity:</strong> MEDIUM (CVSS 4.3) | <strong>Status:</strong> [ ] NOT STARTED | [ ] IN PROGRESS | [ ] COMPLETE</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Evidence:</strong> Comserv/lib/Comserv/Controller/Admin/SchemaComparison.pm - warn statements expose system information</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Assigned To:</strong> _________________ | <strong>Due Date:</strong> _________________</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Reference:</strong> OWASP A9:2021 | CWE-215</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid #2196F3; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: #2196F3; font-family: var(--header-font); font-size: var(--font-size-large);">ISSUE #12: Weak Session Security</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Severity:</strong> MEDIUM (CVSS 5.4) | <strong>Status:</strong> [ ] NOT STARTED | [ ] IN PROGRESS | [ ] COMPLETE</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Evidence:</strong> No evidence of HTTPOnly, Secure, or SameSite cookie flags in session configuration</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Assigned To:</strong> _________________ | <strong>Due Date:</strong> _________________</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Reference:</strong> OWASP A1:2021 - Broken Authentication | CWE-614</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Remediation Timeline</h2>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Phase</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Timeline</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Issues</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Actions</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); background-color: #ffe6e6;"><strong>IMMEDIATE</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); background-color: #ffe6e6;">Week 1</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); background-color: #ffe6e6;">Issues #1, #2, #3</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); background-color: #ffe6e6;">Rotate credentials, remove from Git history</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>SHORT-TERM</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">2 weeks</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Issues #4, #5, #6, #7, #8</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Add CSRF tokens, remove hardcoded bypasses, secure Docker</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>MEDIUM-TERM</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">30 days</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Issues #9, #10, #11, #12</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Input validation framework, logging sanitization, session hardening</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Verification Checklist</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>[ ] All 12 issues reviewed by security team</li>
+                <li>[ ] Issues assigned to responsible parties</li>
+                <li>[ ] Critical credentials rotated (Week 1)</li>
+                <li>[ ] Git history cleaned of secrets</li>
+                <li>[ ] CSRF protection implemented on all forms</li>
+                <li>[ ] Hardcoded admin bypasses removed</li>
+                <li>[ ] Environment-based credential management deployed</li>
+                <li>[ ] Docker security hardened</li>
+                <li>[ ] Input validation framework added</li>
+                <li>[ ] Session security enhanced with HTTPOnly/Secure/SameSite</li>
+                <li>[ ] All fixes tested in staging</li>
+                <li>[ ] Security tests added to CI/CD pipeline</li>
+                <li>[ ] Team security training completed</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font);">References & Standards</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>OWASP Top 10 2021:</strong> A1-Broken Access Control, A2-Cryptographic Failures, A3-Injection, A7-Identification & Auth Failures</li>
+                    <li><strong>CWE:</strong> CWE-20, CWE-78, CWE-89, CWE-284, CWE-352, CWE-532, CWE-614, CWE-798</li>
+                    <li><strong>Standards:</strong> NIST SP 800-53, PCI-DSS, HIPAA Security Rule, ISO 27001</li>
+                    <li><strong>Container Security:</strong> CIS Docker Benchmark, NIST SP 800-190</li>
+                    <li><strong>API Security:</strong> OWASP API Security Top 10</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p><strong>Document Control:</strong> This audit file tracks security vulnerabilities and remediation progress. Update status checkboxes as fixes are implemented and verified.</p>
+                <p><strong>For Support:</strong> Contact security team for clarification on any findings or remediation steps.</p>
+                <p><em>This documentation is part of the Comserv Security Program.</em></p>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,783 @@
+[% META 
+   title = "Daily Plan - Weekly Priority View"
+   description = "Weekly priority tasks organized by day with collapsible daily sections. Current day open, others collapsed."
+   roles = "admin,developer,devops"
+   TemplateType = "Application"
+   category = "planning,priorities,daily-tasks"
+   page_version = "1.10"
+   last_updated = "Tue Jan 28 16:43:00 UTC 2026"
+   site_specific = "false"
+%]
+[% PageVersion = 'admin/documentation/DailyPlan.tt, v 1.10 2026/01/28 Zencoder - Version 1.10: Updated [3] Planning System Migration - Phase 1.5 COMPLETE. DBIC Result files created (DailyPlan, DailyPlanProject, PlanSystemMapping, TodoDependency, enhanced Todo/Project). Code audit complete: 28 Todo controller methods analyzed (13 need updates), 11 templates analyzed. Audit doc created: phase1.5_audit.md (533 lines). Status: AWAITING REVIEW before Phase 2.' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<style>
+    /* Sticky Header Styles */
+    .daily-plan-header {
+        position: sticky;
+        top: 0;
+        background-color: var(--background-color);
+        border-bottom: 3px solid var(--primary-color);
+        padding: 10px 15px;
+        margin: -20px -20px 20px -20px;
+        z-index: 100;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .daily-plan-header h1 {
+        margin: 0 0 5px 0;
+        font-size: 1.4em;
+        color: var(--text-color);
+    }
+    
+    .header-nav {
+        display: flex;
+        gap: 20px;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.85em;
+    }
+    
+    .header-nav-links {
+        display: flex;
+        gap: 15px;
+        }
+    
+    .header-nav-links a {
+        color: var(--primary-color);
+        text-decoration: none;
+        padding: 5px 10px;
+        border-radius: 3px;
+    }
+    
+    .header-nav-links a:hover {
+        background-color: var(--bg-secondary);
+    }
+    
+    /* Tab Styles */
+    .tab-navigation {
+        display: flex;
+        border-bottom: 2px solid var(--border-color);
+        margin: 20px 0 0 0;
+        gap: 5px;
+    }
+    
+    .tab-button {
+        padding: 12px 24px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        font-size: 1em;
+        font-weight: 500;
+        color: var(--text-muted-color);
+        border-bottom: 3px solid transparent;
+        transition: all 0.2s ease;
+    }
+    
+    .tab-button:hover {
+        color: var(--text-color);
+        background-color: var(--secondary-color);
+    }
+    
+    .tab-button.active {
+        color: var(--text-color) !important;
+        background-color: var(--bg-secondary) !important;
+        border-bottom-color: var(--primary-color) !important;
+        border-bottom-width: 4px !important;
+        font-weight: bold;
+    }
+    
+    .tab-content {
+        display: none;
+    }
+    
+    .tab-content.active {
+        display: block;
+    }
+</style>
+
+[% 
+    display_date_str = selected_date;
+    
+    days = [
+        { date = '2026-01-21', display = 'Wednesday, January 21, 2026' },
+        { date = '2026-01-22', display = 'Thursday, January 22, 2026' },
+        { date = '2026-01-23', display = 'Friday, January 23, 2026' },
+        { date = '2026-01-24', display = 'Saturday, January 24, 2026' },
+        { date = '2026-01-25', display = 'Sunday, January 25, 2026' },
+        { date = '2026-01-26', display = 'Monday, January 26, 2026' },
+        { date = '2026-01-27', display = 'Tuesday, January 27, 2026' },
+    ];
+%]
+
+<div class="container">
+    <!-- Sticky Header with Navigation -->
+    <div class="daily-plan-header">
+        <h1>[DAILY PLAN] [% display_date %]</h1>
+        <div class="header-nav">
+            <div class="header-nav-links">
+                <span><strong>Today:</strong> [% current_display %]</span>
+                <span>|</span>
+                <a href="/Documentation/DailyPlan/[% current_date_str %]">[Jump to Today]</a>
+                <a href="/Documentation/MasterPlanCoordination" target="_blank">Master Plans</a>
+                <a href="/Documentation">All Docs</a>
+                <a href="/todo">Todo System</a>
+            </div>
+            <div style="text-align: right; color: var(--text-muted-color); font-size: 0.85em;">
+                <a href="/Documentation/DailyPlan/[% prev_date %]" class="prev-day-link">← Prev Day</a>
+                | Viewing [% display_date %] |
+                <a href="/Documentation/DailyPlan/[% next_date %]" class="next-day-link">Next Day →</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="tab-navigation">
+       <button class="tab-button active" onclick="switchTab(event, 'today-work')">
+            DAILY PRIORITIES
+        </button>
+         <button class="tab-button" onclick="switchTab(event, 'weekly-view')">
+            📅 THIS WEEK
+        </button>
+        <button class="tab-button" onclick="switchTab(event, 'month-view')">
+            MONTH VIEW
+        </button>
+        <button class="tab-button" onclick="switchTab(event, 'planning')">
+            PLANNING
+        </button>
+        <button class="tab-button" onclick="switchTab(event, 'resources-view')">
+            RESOURCES & CONTEXT
+        </button>
+        <button class="tab-button" onclick="switchTab(event, 'daily-plan-guide')">
+            DAILY PLAN GUIDE
+        </button>
+        <button class="tab-button" onclick="switchTab(event, 'zencoder-prompt')">
+            ZENCODER PROMPT
+        </button>
+        <button class="tab-button" onclick="switchTab(event, 'master-plan-coordination')">
+            MASTER PLAN COORDINATION
+        </button>
+        <button class="tab-button" onclick="switchTab(event, 'implementation-plan')">
+            📋 IMPLEMENTATION PLAN
+        </button>
+        <button class="tab-button" onclick="switchTab(event, 'completed-tasks')">
+            ✅ COMPLETED TASKS
+        </button>
+    </div>
+
+<!-- TAB 1: TODAY'S WORK (Default) -->
+    <div id="today-work" class="tab-content active">
+        <div id="today-work-content">
+            <div class="focus-area">
+                <h3 style="margin-top: 0;">[TODAY'S FOCUS]</h3>
+                <p>Daily plan for [% display_date %] - Mark completed tasks and sync across all plan files. Review and execute master plan priorities listed below.</p>
+            </div>
+
+            <details style="background: var(--secondary-color); border: 1px solid var(--border-color); border-radius: 4px; margin-bottom: 20px;">
+                <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: var(--secondary-color); border-bottom: 1px solid var(--border-color);">
+                    📊 MASTER PLAN PRIORITY LIST (PriorityTodos.tt)
+                </summary>
+                <div style="padding: 15px;">
+                    [% INCLUDE "admin/documentation/PriorityTodos.tt" %]
+                </div>
+            </details>
+            <details style="background: var(--secondary-color); border: 1px solid var(--border-color); border-radius: 4px; margin-bottom: 20px;">
+                <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: var(--secondary-color); border-bottom: 1px solid var(--border-color);">
+                    📝 DAILY TASK LISTS (Master Plan & App Todos)
+                </summary>
+                <div style="padding: 15px;">
+                    <!-- Master Plan Priorities (Independent Dropdown) -->
+                    <div class="task-list">
+                        <div class="task-list-header master-plan-header" onclick="toggleTaskList(this)">
+                            <span>[MASTER PLAN PRIORITIES] NEXT 5 ITEMS</span>
+                            <span class="task-list-toggle">HIDE</span>
+                        </div>
+                        <div class="task-list-items" id="master-plan-items">
+                            <div class="task-item sortable" draggable="true">
+                                <input type="checkbox" id="task-mp-1">
+                                <label for="task-mp-1" class="task-label">
+                                    [1] <a href="/Documentation/system/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN" target="_blank" style="color: var(--link-color);">A.1: Production DB K8s Migration (CRITICAL)</a> - Status: Ready for VM Rebuild
+                                </label>
+                            </div>
+                            <div class="task-item sortable" draggable="true">
+                                <input type="checkbox" id="task-mp-2">
+                                <label for="task-mp-2" class="task-label">
+                                    [2] <a href="/Documentation/docker_secrets_fallback_debugging_plan" target="_blank" style="color: var(--link-color);">B.1: Docker Secrets Fallback (CRITICAL)</a> - Status: In Progress
+                                </label>
+                            </div>
+                            <div class="task-item sortable" draggable="true">
+                                <input type="checkbox" id="task-mp-3">
+                                <label for="task-mp-3" class="task-label">
+                                    [3] <a href="#planning-system-migration" onclick="switchTab(event, 'resources-view'); setTimeout(function(){ document.getElementById('planning-system-migration').scrollIntoView({behavior: 'smooth', block: 'start'}); }, 100); return false;" style="color: var(--link-color);">Planning System Migration (HIGH)</a> - Phase 1.5 Complete ✅ - <a href="#planning-system-migration" onclick="switchTab(event, 'resources-view'); setTimeout(function(){ document.getElementById('planning-system-migration').scrollIntoView({behavior: 'smooth', block: 'start'}); }, 100); return false;" style="color: var(--link-color);">Click for details in RESOURCES tab</a>
+                                </label>
+                            </div>
+                            <div class="task-item sortable" draggable="true">
+                                <input type="checkbox" id="task-mp-4">
+                                <label for="task-mp-4" class="task-label">
+                                    [4] <a href="/Documentation/ai_workflows/zencoder_reset_plan" target="_blank" style="color: var(--link-color);">B.3: Theme Handling (HIGH)</a> - Status: Planning
+                                </label>
+                            </div>
+                            <div class="task-item sortable" draggable="true">
+                                <input type="checkbox" id="task-mp-5">
+                                <label for="task-mp-5" class="task-label">
+                                    [5] <a href="/Documentation/DOCUMENTATION_SYSTEM_AUDIT_PLAN" target="_blank" style="color: var(--link-color);">C.1: Documentation System Audit (HIGH)</a> - Status: In Progress (Phase 1)
+                                </label>
+                            </div>
+                            <div class="task-item sortable" draggable="true">
+                                <input type="checkbox" id="task-mp-6">
+                                <label for="task-mp-6" class="task-label">
+                                    [6] <a href="/Documentation/PriorityTodos#priority-3" target="_blank" style="color: var(--link-color);">#3: Update Format (MEDIUM)</a> - Status: Pending
+                                </label>
+                            </div>
+                        </div>
+                        <button class="task-add-button" onclick="window.open('/todo/addtodo', '_blank')">+ Add Task to Plan</button>
+                    </div>
+
+                    <!-- App Todos for Today (Independent Dropdown) -->
+                    <div class="task-list">
+                        <div class="task-list-header app-todos-header" onclick="toggleTaskList(this)">
+                            <span>[APP TODOS FOR TODAY] FROM TODO SYSTEM [% IF todos_for_today && todos_for_today.size %]([% todos_for_today.size %])[% END %]</span>
+                            <span class="task-list-toggle">HIDE</span>
+                        </div>
+                        <div class="task-list-items" id="app-todo-items">
+                            [% IF todos_for_today && todos_for_today.size %]
+                                [% FOREACH todo IN todos_for_today %]
+                                    <div class="task-item">
+                                        <input type="checkbox" id="todo-[% todo.record_id %]">
+                                        <label for="todo-[% todo.record_id %]" class="task-label">
+                                            <a href="javascript:void(0)" onclick="window.open('/todo/details?record_id=[% todo.record_id %]', '_blank'); return false;" style="color: var(--link-color); text-decoration: none;">
+                                                <strong>[% todo.sitename || 'CSC' %]:</strong> [% todo.subject || '(No subject)' %]
+                                            </a>
+                                        </label>
+                                    </div>
+                                [% END %]
+                            [% ELSE %]
+                                <div style="padding: 15px; text-align: center; color: #666;">
+                                    <p>No todos scheduled for today.</p>
+                                    <p>Create a new todo using the button below.</p>
+                                </div>
+                            [% END %]
+                        </div>
+                        <button class="task-add-button" onclick="window.open('/todo/addtodo', '_blank')">+ Add New Todo from Todo System</button>
+                    </div>
+                </div>
+            </details>
+
+            <div style="background: var(--schema-missing-color); border-left: 4px solid var(--accent-color); padding: 15px; border-radius: 4px; margin: 20px 0;">
+                <h4 style="margin-top: 0;">Today's Recommendation:</h4>
+                <ol>
+                    <li><strong>Daily Plan Automation:</strong> Workflow now complete and production-ready. Run as part of daily morning routine.</li>
+                    <li><strong>Next Priority:</strong> Select a critical item from Master Plan Priorities (A.3, A.2, or B.3) for today's focus.</li>
+                    <li><strong>Infrastructure:</strong> Monitor K8s readiness planning and credentials audit scope work.</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: WEEKLY VIEW -->
+    <div id="weekly-view" class="tab-content">
+        [% TRY %]
+            [% INCLUDE 'todo/week.tt' %]
+        [% CATCH %]
+            <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 15px; margin: 15px 0;">
+                <h4 style="margin-top: 0; color: #856404;">⚠️ Todo Week View Not Available</h4>
+                <p>The live todo week view component is not currently available.</p>
+            </div>
+        [% END %]
+    </div>
+
+    <!-- TAB 4: DAILY PLAN GUIDE -->
+    <div id="daily-plan-guide" class="tab-content">
+        <h2>Instructions for Admin Working on The Daily Plan</h2>
+        [%  INCLUDE 'admin/documentation/DailyAuditGuide.tt' %]
+        <div style="background: var(--light-color); border: 1px solid var(--info-color); border-radius: 4px; padding: 20px; margin: 20px 0;">
+            <h3>How to Update This Daily Plan</h3>
+            <ol style="line-height: 1.8;">
+                <li><strong>Read First:</strong> Always read the entire DailyPlan.tt file before making changes. Understand the tab structure and container relationships.</li>
+                <li><strong>Preserve Floating Header:</strong> The sticky header with navigation must remain at the top. Do not remove or modify the floating position.</li>
+                <li><strong>Preserve Tab Structure:</strong> Never remove existing tabs without explicit user permission. You may add new tabs, but do not delete TODAY'S WORK, RESOURCES & CONTEXT, or COMPLETED tabs.</li>
+                <li><strong>Update Within Containers:</strong> Edit task content within task-list containers, not the containers themselves. Preserve checkbox structure and task items.</li>
+                <li><strong>Link to Master Docs:</strong> Reference PriorityTodos.tt at /admin/documentation/PriorityTodos - never duplicate the full table into daily plans.</li>
+                <li><strong>Track Progress:</strong> Update checkbox status as tasks complete. Move items to COMPLETED tab when done.</li>
+                <li><strong>Conditional Planning:</strong> If a critical blocker succeeds, update the next day's plan to show unblocked work.</li>
+                <li><strong>Log Changes:</strong> After edits, execute updateprompt.pl --phase after with files modified and changes made.</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- TAB 3: RESOURCES & CONTEXT -->
+    <div id="resources-view" class="tab-content">
+        <h3>[RESOURCES & SUPPORTING CONTEXT]</h3>
+        
+        <!-- Planning System Migration Progress Section -->
+        <div id="planning-system-migration" style="background: var(--schema-alert-success-bg); border-left: 4px solid var(--success-color); padding: 20px; margin-bottom: 30px; border-radius: 4px;">
+            <h3 style="margin-top: 0; color: var(--success-color);">📋 Planning System Migration - Phase 1.5 Complete</h3>
+            
+            <div style="background: white; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
+                <h4 style="margin-top: 0;">✅ Phase 1: Database Schema (COMPLETE)</h4>
+                <p><strong>Created DBIC Result Files (5 files):</strong></p>
+                <ul>
+                    <li><code>DailyPlan.pm</code> - Main plan aggregator (id, plan_name, status, dates, priority)</li>
+                    <li><code>DailyPlanProject.pm</code> - Many-to-many plan↔project links</li>
+                    <li><code>PlanSystemMapping.pm</code> - System-to-plan sync tracking</li>
+                    <li><code>TodoDependency.pm</code> - Explicit todo dependencies with circular validation</li>
+                    <li><code>Todo.pm</code> - Enhanced with 6 new columns: plan_id, parent_id, blocked_by_todo_id, sort_order, is_blocking, scheduled_date</li>
+                    <li><code>Project.pm</code> - Enhanced with dailyplans relationship</li>
+                </ul>
+            </div>
+            
+            <div style="background: white; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
+                <h4 style="margin-top: 0;">✅ Phase 1.5: Code Audit (COMPLETE)</h4>
+                <p><strong>Analyzed existing code dependencies:</strong></p>
+                <ul>
+                    <li><strong>Todo.pm Controller:</strong> 1,397 lines, 28 methods analyzed
+                        <ul>
+                            <li>13 methods require updates (create, modify, edit - HIGH impact)</li>
+                            <li>7 new actions needed: add_dependency, remove_dependency, add_subtodo, reorder_subtodos, reschedule, get_dependency_chain</li>
+                            <li>3 API endpoints need new field support</li>
+                        </ul>
+                    </li>
+                    <li><strong>Project.pm Controller:</strong> 799 lines, 9 methods analyzed
+                        <ul>
+                            <li>3 methods require updates for daily plan relationships</li>
+                        </ul>
+                    </li>
+                    <li><strong>Templates:</strong> 24 todo templates analyzed
+                        <ul>
+                            <li>11 require updates (addtodo.tt, edit.tt, details.tt - highest priority)</li>
+                            <li>Need dropdowns for: plan_id, parent_id, blocked_by_todo_id</li>
+                            <li>Need displays for: subtodos list, dependency chains, scheduled dates</li>
+                        </ul>
+                    </li>
+                </ul>
+                <p><strong>📄 Complete Audit Document:</strong> <code>.zenflow/tasks/new-task-46bb/phase1.5_audit.md</code> (533 lines)</p>
+                <p><strong>Includes:</strong> Detailed refactoring requirements, API changes, template code examples, timeline estimates (10-12 days MVP / 15-24 days full), risk assessment, testing requirements</p>
+            </div>
+            
+            <div style="background: #fff3e0; border: 1px solid #ff9800; padding: 15px; border-radius: 4px;">
+                <h4 style="margin-top: 0; color: #e65100;">⏸️ Phase 2: AWAITING USER REVIEW</h4>
+                <p><strong>Next Steps:</strong> Create DailyPlan controller with CRUD operations and API endpoints</p>
+                <p><strong>Status:</strong> Work paused - awaiting user approval of Phase 1.5 audit before proceeding</p>
+                <p><strong>Review Required:</strong> <code>.zenflow/tasks/new-task-46bb/phase1.5_audit.md</code></p>
+            </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
+                <h4>Related Documentation</h4>
+                <ul style="margin: 0; padding-left: 20px;">
+                    <li><a href="/Documentation/MasterPlanCoordination" style="color: var(--primary-color);">Master Plan Coordination</a></li>
+                    <li><a href="/admin/documentation/PriorityTodos" style="color: var(--primary-color);">Priority Todos (Top 13 Blocking Dependencies)</a></li>
+                    <li><a href="/admin/documentation/DailyAuditGuide" style="color: var(--primary-color);">Daily Audit Guide</a></li>
+                    <li><a href="/Documentation/DailyPlanSystem" style="color: var(--primary-color);">DailyPlan System Architecture</a></li>
+                </ul>
+            </div>
+
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
+                <h4>Quick Links</h4>
+                <ul style="margin: 0; padding-left: 20px;">
+                    <li><strong>Todo Controller:</strong> Comserv/lib/Comserv/Controller/Todo.pm</li>
+                    <li><a href="/todo" style="color: var(--primary-color);">Open Todo System</a></li>
+                    <li><strong>Audit Document:</strong> .zenflow/tasks/new-task-46bb/phase1.5_audit.md</li>
+                </ul>
+            </div>
+        </div>
+
+        <p style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; border-radius: 4px; margin: 15px 0;">
+            <strong>Supporting Resources:</strong> Below are additional resources and context for current tasks.
+        </p>
+        
+        <h4 style="margin-top: 30px;">Quick Todo Actions</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
+                <a href="/todo" style="display: block; color: var(--link-color); text-decoration: none; font-weight: bold; padding: 10px; border: 1px solid var(--primary-color); border-radius: 3px; text-align: center;">📋 Open Todo System</a>
+            </div>
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
+                <a href="/todo/addtodo" onclick="window.open('/todo/addtodo', '_blank'); return false;" style="display: block; color: var(--link-color); text-decoration: none; font-weight: bold; padding: 10px; border: 1px solid var(--success-color); border-radius: 3px; text-align: center;">➕ Add New Todo</a>
+            </div>
+        </div>
+
+        <h4>Daily Notes for [% display_date %]:</h4>
+        <div style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 15px; min-height: 150px;">
+            <p><em>Add notes about this day's work here...</em></p>
+        </div>
+    </div>
+
+    <!-- TAB: MONTH VIEW -->
+    <div id="month-view" class="tab-content">
+        <h4 style="margin-top: 30px;">Todo Month View</h4>
+        <p style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; border-radius: 4px; margin: 15px 0;">
+            <strong>Live Todo System Integration:</strong> Below is the current month's todo items.
+        </p>
+        [% TRY %]
+            [% INCLUDE 'todo/month.tt' %]
+        [% CATCH %]
+            <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 15px; margin: 15px 0;">
+                <h4 style="margin-top: 0; color: #856404;">⚠️ Todo Month View Not Available</h4>
+                <p>The live todo month view component is not currently available.</p>
+            </div>
+        [% END %]
+    </div>
+
+    <!-- TAB: PLANNING (renamed from PRIORITY TODOS (NEW)) -->
+    <div id="planning" class="tab-content">
+        [% INCLUDE "admin/documentation/Planning.tt" %]
+    </div>
+
+    <!-- TAB 5: ZENCODER PROMPT -->
+    <div id="zencoder-prompt" class="tab-content">
+        [% INCLUDE "admin/documentation/ZencoderOpeningPrompt.tt" %]
+    </div>
+
+    <!-- TAB 6: MASTER PLAN COORDINATION -->
+    <div id="master-plan-coordination" class="tab-content">
+        [% INCLUDE "Documentation/MasterPlanCoordination.tt" %]
+    </div>
+
+    <!-- TAB 7: IMPLEMENTATION PLAN -->
+    <div id="implementation-plan" class="tab-content">
+        <h2>Planning System Migration - Implementation Plan</h2>
+        <p style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; border-radius: 4px; margin: 15px 0;">
+            <strong>Overview:</strong> This implementation plan outlines the migration from a text-based planning system to a dynamic, database-driven application with role-based access control, project-documentation linking, and comprehensive audit trails.
+        </p>
+
+        <div style="display: flex; gap: 15px; margin: 20px 0;">
+            <button onclick="createProject()" style="padding: 10px 20px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                ➕ Create Project in DB
+            </button>
+            <button onclick="window.open('/todo/addtodo', '_blank')" style="padding: 10px 20px; background: var(--success-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                ➕ Create Todo in DB
+            </button>
+        </div>
+
+        <details open style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+                📊 Phase 1: Database Schema & Models
+            </summary>
+            <div style="padding: 15px;">
+                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
+                <p><strong>Description:</strong> Create new database schema and DBIC Result classes for role-based access control and audit trail.</p>
+                <h4>Tasks:</h4>
+                <ul>
+                    <li>Create <code>SiteRole.pm</code> Result class</li>
+                    <li>Create <code>UserSiteRole.pm</code> Result class</li>
+                    <li>Create <code>PlanAudit.pm</code> Result class</li>
+                    <li>Update <code>DailyPlan.pm</code>: Add <code>allowed_roles</code> column and JSON helper methods</li>
+                    <li>Update <code>Todo.pm</code>: Add <code>allowed_roles</code> column and JSON helper methods</li>
+                    <li>Access <a href="/admin/schema-comparison" target="_blank">/admin/schema-comparison</a> to sync Result classes to database tables</li>
+                    <li>Verify schema changes in database</li>
+                </ul>
+                <p><strong>Reference:</strong> spec.md sections 2.2, 2.3, 9.4</p>
+                <p><strong>Verification:</strong> Run schema-comparison tool, verify tables created, test JSON methods</p>
+            </div>
+        </details>
+
+        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+                📊 Phase 2: Data Seeding
+            </summary>
+            <div style="padding: 15px;">
+                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
+                <p><strong>Description:</strong> Seed initial role data for existing sites (CSC, Bmaster) and assign roles to existing users.</p>
+                <h4>Tasks:</h4>
+                <ul>
+                    <li>Create <code>scripts/seed_site_roles.pl</code> script with default roles (admin, developer, user, custom per site)</li>
+                    <li>Test seeding script on development database</li>
+                    <li>Verify role data in <code>site_roles</code> and <code>user_site_roles</code> tables</li>
+                    <li>Document seeding process for future sites</li>
+                </ul>
+                <p><strong>Reference:</strong> spec.md section 6.3</p>
+                <p><strong>Verification:</strong> Query database to confirm roles exist for CSC and Bmaster sites</p>
+            </div>
+        </details>
+
+        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+                📊 Phase 3: Access Control Utilities
+            </summary>
+            <div style="padding: 15px;">
+                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
+                <p><strong>Description:</strong> Create utility modules for checking user permissions and site access.</p>
+                <h4>Tasks:</h4>
+                <ul>
+                    <li>Create <code>lib/Comserv/Util/PlanAccess.pm</code> with permission checking methods</li>
+                    <li>Add unit tests for PlanAccess utility</li>
+                    <li>Create <code>lib/Comserv/Util/PlanAudit.pm</code> with audit logging methods</li>
+                    <li>Add unit tests for PlanAudit utility</li>
+                </ul>
+                <p><strong>Reference:</strong> spec.md sections 3.1, 3.2</p>
+                <p><strong>Verification:</strong> Run unit tests, manually test permission checks</p>
+            </div>
+        </details>
+
+        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+                📊 Phase 4: Plan Controller
+            </summary>
+            <div style="padding: 15px;">
+                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
+                <p><strong>Description:</strong> Create new Plan controller to replace Documentation controller for planning routes.</p>
+                <h4>Tasks:</h4>
+                <ul>
+                    <li>Create <code>lib/Comserv/Controller/Plan.pm</code> with base actions</li>
+                    <li>Implement <code>daily</code> action with date/sitename parameters</li>
+                    <li>Implement <code>weekly</code> action with week_start parameter</li>
+                    <li>Implement <code>monthly</code> action with month parameter</li>
+                    <li>Add error handling and logging to all actions</li>
+                    <li>Test controller actions with different user roles</li>
+                </ul>
+                <p><strong>Reference:</strong> spec.md sections 4.1, 4.2</p>
+                <p><strong>Verification:</strong> Access <a href="/admin/plan/daily" target="_blank">/admin/plan/daily</a>, verify filtering, check logs</p>
+            </div>
+        </details>
+
+        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+                📊 Phase 5-6: Templates (Daily, Weekly, Monthly Views)
+            </summary>
+            <div style="padding: 15px;">
+                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
+                <p><strong>Description:</strong> Create template files for daily, weekly, and monthly plan views that dynamically render from database.</p>
+                <h4>Tasks:</h4>
+                <ul>
+                    <li>Create <code>root/admin/plan/daily.tt</code> template</li>
+                    <li>Create <code>root/admin/plan/weekly.tt</code> template</li>
+                    <li>Create <code>root/admin/plan/monthly.tt</code> template</li>
+                    <li>Create <code>root/admin/plan/master.tt</code> template</li>
+                    <li>Add checkbox functionality for marking todos complete (AJAX)</li>
+                    <li>Test templates with various data sets</li>
+                </ul>
+                <p><strong>Reference:</strong> spec.md sections 5.1-5.4; requirements.md FR-1, FR-7</p>
+                <p><strong>Verification:</strong> Visual inspection, test with different dates/sites/roles</p>
+            </div>
+        </details>
+
+        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+                📊 Phase 7: Project-Documentation Integration
+            </summary>
+            <div style="padding: 15px;">
+                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
+                <p><strong>Description:</strong> Implement project linking and documentation mapping features.</p>
+                <h4>Tasks:</h4>
+                <ul>
+                    <li>Extend Plan controller with project actions</li>
+                    <li>Create <code>root/admin/plan/projects.tt</code> template</li>
+                    <li>Implement auto-match algorithm for project-documentation linking</li>
+                    <li>Create <code>root/admin/plan/project_detail.tt</code> template</li>
+                    <li>Test project-documentation linking workflow</li>
+                </ul>
+                <p><strong>Reference:</strong> spec.md sections 4.5, 5.5; requirements.md FR-3</p>
+                <p><strong>Verification:</strong> Link projects to docs, verify display on detail page</p>
+            </div>
+        </details>
+
+        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+                📊 Phase 8: Audit Trail Viewer
+            </summary>
+            <div style="padding: 15px;">
+                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
+                <p><strong>Description:</strong> Implement audit trail viewing and filtering.</p>
+                <h4>Tasks:</h4>
+                <ul>
+                    <li>Add audit logging hooks to Plan controller</li>
+                    <li>Create <code>root/admin/plan/audit.tt</code> template</li>
+                    <li>Implement <code>audit</code> action with filters</li>
+                    <li>Test audit logging with various operations</li>
+                </ul>
+                <p><strong>Reference:</strong> spec.md sections 4.6, 5.6; requirements.md FR-6</p>
+                <p><strong>Verification:</strong> Perform actions, verify audit log entries, test filters</p>
+            </div>
+        </details>
+
+        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+                📊 Phase 9-10: URL Migration & Todo Controller Integration
+            </summary>
+            <div style="padding: 15px;">
+                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
+                <p><strong>Description:</strong> Update existing routes and integrate with Todo controller.</p>
+                <h4>Tasks:</h4>
+                <ul>
+                    <li>Add redirect in Documentation controller</li>
+                    <li>Update navigation links in templates</li>
+                    <li>Search codebase for hardcoded DailyPlan URLs and update</li>
+                    <li>Update Todo controller methods for audit logging</li>
+                    <li>Update todo templates with role filtering</li>
+                </ul>
+                <p><strong>Reference:</strong> spec.md sections 7, 8.1</p>
+                <p><strong>Verification:</strong> Navigation works, todos log audit events</p>
+            </div>
+        </details>
+
+        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+                📊 Phase 11: Testing & Verification
+            </summary>
+            <div style="padding: 15px;">
+                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
+                <p><strong>Description:</strong> Comprehensive testing across all implemented features.</p>
+                <h4>Tasks:</h4>
+                <ul>
+                    <li>Permission Testing (user roles)</li>
+                    <li>Functionality Testing (navigation, filtering, completion)</li>
+                    <li>Performance Testing (page load &lt; 2s, queries &lt; 10)</li>
+                    <li>Browser Testing (Chrome, Firefox, Safari)</li>
+                    <li>Data Migration (text-based plans to database)</li>
+                </ul>
+                <p><strong>Reference:</strong> spec.md section 9; requirements.md success metrics</p>
+                <p><strong>Verification:</strong> All tests pass, performance targets met, migration complete</p>
+            </div>
+        </details>
+
+        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+                📊 Phase 12: Documentation & Cleanup
+            </summary>
+            <div style="padding: 15px;">
+                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
+                <p><strong>Description:</strong> Document the new system and clean up obsolete files.</p>
+                <h4>Tasks:</h4>
+                <ul>
+                    <li>Create user documentation</li>
+                    <li>Create admin documentation</li>
+                    <li>Update developer documentation</li>
+                    <li>Archive obsolete files</li>
+                    <li>Update project README</li>
+                </ul>
+                <p><strong>Reference:</strong> spec.md section 12; requirements.md problem statement</p>
+                <p><strong>Verification:</strong> Documentation reviewed and accessible</p>
+            </div>
+        </details>
+
+        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+                📊 Phase 13: Production Deployment
+            </summary>
+            <div style="padding: 15px;">
+                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
+                <p><strong>Description:</strong> Deploy to production with database migration and monitoring.</p>
+                <h4>Tasks:</h4>
+                <ul>
+                    <li>Pre-deployment: Backup database, review checklist, notify users</li>
+                    <li>Deployment: Deploy code, run schema sync, seed roles</li>
+                    <li>Post-deployment: Verify routes, test accounts, monitor logs</li>
+                    <li>Rollback Plan: Document procedure, keep backup for 7 days</li>
+                </ul>
+                <p><strong>Reference:</strong> spec.md sections 9.3, Appendix A.3</p>
+                <p><strong>Verification:</strong> Production system functional, no errors, positive feedback</p>
+            </div>
+        </details>
+
+        <div style="background: #fff3cd; border-left: 4px solid #ff9800; padding: 15px; border-radius: 4px; margin: 20px 0;">
+            <h4 style="margin-top: 0;">Success Criteria:</h4>
+            <ul>
+                <li>✅ All database schema changes applied via schema-comparison tool</li>
+                <li>✅ Role-based access control working for all user types</li>
+                <li>✅ Dynamic daily plan view rendering from database</li>
+                <li>✅ Project-documentation linking functional</li>
+                <li>✅ Audit trail capturing all planning changes</li>
+                <li>✅ Page load time &lt; 2 seconds</li>
+                <li>✅ Zero critical errors in production</li>
+                <li>✅ User documentation complete and accessible</li>
+                <li>✅ Migration from text-based plans to database complete</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- TAB 8: COMPLETED TASKS -->
+    <div id="completed-tasks" class="tab-content">
+        [% INCLUDE "admin/documentation/CompletedTasks.tt" %]
+    </div>
+</div>
+
+<script>
+    function switchTab(evt, tabName) {
+        var i, tabcontent, tabbuttons;
+        tabcontent = document.getElementsByClassName("tab-content");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].classList.remove("active");
+        }
+        tabbuttons = document.getElementsByClassName("tab-button");
+        for (i = 0; i < tabbuttons.length; i++) {
+            tabbuttons[i].classList.remove("active");
+        }
+        document.getElementById(tabName).classList.add("active");
+        
+        // Only set active if evt is provided and has currentTarget
+        if (evt && evt.currentTarget && evt.currentTarget.classList.contains('tab-button')) {
+            evt.currentTarget.classList.add("active");
+        } else {
+            // Find the button and set it to active
+            var buttons = document.getElementsByClassName("tab-button");
+            for (i = 0; i < buttons.length; i++) {
+                if (buttons[i].getAttribute('onclick').indexOf("'" + tabName + "'") !== -1) {
+                    buttons[i].classList.add("active");
+                }
+            }
+        }
+        
+        // Update hash without scrolling
+        if (history.pushState) {
+            history.pushState(null, null, '#' + tabName);
+        } else {
+            location.hash = '#' + tabName;
+        }
+    }
+
+    // Handle hash on load
+    window.addEventListener('load', function() {
+        var hash = window.location.hash.substring(1);
+        if (hash) {
+            var target = document.getElementById(hash);
+            if (target && target.classList.contains('tab-content')) {
+                switchTab(null, hash);
+            }
+        }
+        updateNavLinks();
+    });
+
+    // Handle hash change
+    window.addEventListener('hashchange', function() {
+        var hash = window.location.hash.substring(1);
+        if (hash) {
+            var target = document.getElementById(hash);
+            if (target && target.classList.contains('tab-content')) {
+                switchTab(null, hash);
+            }
+        }
+        updateNavLinks();
+    });
+
+    function updateNavLinks() {
+        var hash = window.location.hash;
+        if (hash) {
+            document.querySelectorAll('.prev-day-link, .next-day-link').forEach(function(link) {
+                var url = new URL(link.href, window.location.origin);
+                url.hash = hash;
+                link.href = url.pathname + url.search + url.hash;
+            });
+        }
+    }
+
+    function createProject() {
+        // Placeholder function for creating a project in the database
+        // This will be implemented in a future phase
+        var projectName = prompt("Enter project name:");
+        if (projectName) {
+            var projectDescription = prompt("Enter project description:");
+            var siteName = prompt("Enter site name (CSC, Bmaster, etc.):");
+            
+            // TODO: Implement AJAX call to create project in database
+            // For now, just show a message
+            alert("Project creation functionality will be implemented in Phase 7.\n\n" +
+                  "Project: " + projectName + "\n" +
+                  "Description: " + projectDescription + "\n" +
+                  "Site: " + siteName + "\n\n" +
+                  "For now, please use the existing project management interface.");
+        }
+    }
+</script>

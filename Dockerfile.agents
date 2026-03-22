@@ -1,0 +1,45 @@
+# Zencoder Agents Environment
+# Multi-stage build for Node.js agent runtime
+
+FROM node:20-alpine as builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies including dev dependencies for building
+RUN npm ci && \
+    npm cache clean --force
+
+# Stage 2: Runtime
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init curl
+
+# Copy from builder
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package*.json ./
+
+# Copy agent configurations and scripts
+COPY .qodo .qodo/
+COPY agents ./agents/
+
+# Set environment
+ENV NODE_ENV=production \
+    NODE_OPTIONS="--experimental-modules" \
+    PATH="/app/node_modules/.bin:$PATH"
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD node --version && echo "healthy" || exit 1
+
+EXPOSE 4000
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["/sbin/dumb-init", "--"]
+
+CMD ["node", "agents/index.js"]

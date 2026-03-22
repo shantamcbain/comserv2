@@ -139,7 +139,7 @@ sub table :Path('table') :Args(2) {
     }
     
     # Get sample data (first 10 rows)
-    my $data = $remote_db->execute_query($c, $conn_name, "SELECT * FROM $table_name LIMIT 10", []);
+    my $data = $remote_db->execute_query($c, $conn_name, "SELECT * FROM `$table_name` LIMIT 10", []);
     
     $c->stash(
         template => 'remotedb/table.tt',

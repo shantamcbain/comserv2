@@ -1,0 +1,60 @@
+[% META title = 'Access Granted' %]
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h4>Proxy Management Access Granted</h4>
+                </div>
+                <div class="card-body">
+                    [% IF debug_msg %]
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> [% debug_msg %]
+                    </div>
+                    [% END %]
+                    
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> Access has been granted successfully.
+                    </div>
+                    
+                    <h5>Grant Details:</h5>
+                    <ul class="list-group mb-3">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Username
+                            <span class="badge bg-primary rounded-pill">[% username %]</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            User ID
+                            <span class="badge bg-primary rounded-pill">[% user_id %]</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Access Type
+                            <span class="badge bg-primary rounded-pill">[% duration %]</span>
+                        </li>
+                        [% IF duration == 'temporary' %]
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Duration
+                            <span class="badge bg-primary rounded-pill">[% duration_hours %] hours</span>
+                        </li>
+                        [% END %]
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Granted By
+                            <span class="badge bg-secondary rounded-pill">[% granted_by %]</span>
+                        </li>
+                    </ul>
+                    
+                    <p>The user has been notified of their new access rights.</p>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="[% c.uri_for('/proxy_manager/grant_access') %]" class="btn btn-secondary me-md-2">Grant Another</a>
+                        <a href="[% c.uri_for('/proxy_manager') %]" class="btn btn-primary">Return to Proxy Manager</a>
+                    </div>
+                </div>
+                <div class="card-footer text-muted">
+                    <small>Access granted on [% USE date %][% date.format(date.now, '%Y-%m-%d %H:%M:%S') %]</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

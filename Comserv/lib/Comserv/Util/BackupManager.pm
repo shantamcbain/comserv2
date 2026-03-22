@@ -767,7 +767,7 @@ sub create_database_backup {
             # Parse DSN to extract database information
             my ($db_type, $db_name, $host, $port, $user, $password);
             
-            if ($dsn =~ /^dbi:mysql:database=([^;]+)(?:;host=([^;]+))?(?:;port=(\d+))?/i) {
+            if ($dsn =~ /^dbi:(?:mysql|MariaDB):database=([^;]+)(?:;host=([^;]+))?(?:;port=(\d+))?/i) {
                 $db_type = 'mysql';
                 $db_name = $1;
                 $host = $2 || 'localhost';

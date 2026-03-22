@@ -125,13 +125,13 @@
                     <p>After installing Docker, you'll also need Docker Compose to run multi-container applications like Nginx Proxy Manager:</p>
                     
                     <div class="bg-light p-3 mb-3 rounded">
-                        <code>sudo apt-get install -y docker-compose</code>
+                        <code>sudo apt-get install -y docker compose</code>
                     </div>
                     
                     <p>Or install the latest version using pip:</p>
                     
                     <div class="bg-light p-3 mb-3 rounded">
-                        <code>pip install docker-compose</code>
+                        <code>pip install docker compose</code>
                     </div>
                     
                     <h5>Troubleshooting</h5>

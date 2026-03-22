@@ -1,0 +1,136 @@
+[% META 
+   title = "API Token Reference Guide"
+   description = "Comprehensive guide for managing and using Comserv API tokens via UI and CLI. Includes setup instructions, security best practices, and code examples."
+   roles = "admin,developer,devops"
+   TemplateType = "Reference"
+   category = "api,authentication,security,cli"
+   page_version = "1.00"
+   last_updated = "2026-01-19"
+%]
+[% PageVersion = 'root/Documentation/ApiTokenReferenceGuide.tt,v 1.00 2026/01/19 15:00:00 CleanupAgent Exp - Initial guide created for API token management and usage instructions.' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    <h1>API Token Reference Guide</h1>
+    
+    <div class="alert alert-info">
+        <h3>🔑 What are API Tokens?</h3>
+        <p>API tokens are secure strings used to authenticate requests to the Comserv REST API without requiring your password. They allow external tools, scripts, and command-line interfaces to interact with your data safely.</p>
+    </div>
+
+    <nav class="toc">
+        <h3>Contents</h3>
+        <ul>
+            <li><a href="#generating-tokens">1. Generating Tokens</a></li>
+            <li><a href="#using-tokens">2. Using Tokens</a></li>
+            <li><a href="#cli-setup">3. Command-Line Setup</a></li>
+            <li><a href="#security-best-practices">4. Security Best Practices</a></li>
+            <li><a href="#troubleshooting">5. Troubleshooting</a></li>
+        </ul>
+    </nav>
+
+    <hr style="margin: 30px 0;" />
+
+    <section id="generating-tokens">
+        <h2>1. Generating Tokens</h2>
+        
+        <h3>Via Web Interface</h3>
+        <ol>
+            <li>Log in to Comserv and navigate to <strong>Admin > API Management</strong> (or visit <code>/api/tokens</code>).</li>
+            <li>Click <strong>Generate New Token</strong>.</li>
+            <li>Provide a descriptive name (e.g., "GrokIntegration", "BackupScript").</li>
+            <li>Set an expiration period (default is 90 days).</li>
+            <li>Click <strong>Generate</strong>.</li>
+            <li><strong>IMPORTANT:</strong> Copy your token immediately. It will only be displayed once for security reasons.</li>
+        </ol>
+
+        <h3>Via CLI (Recommended for DevOps)</h3>
+        <p>If you have <code>comserv-cli</code> installed, you can generate a token directly:</p>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>comserv-cli token generate --name "DailyBackup" --expires 30d</code></pre>
+    </section>
+
+    <section id="using-tokens">
+        <h2>2. Using Tokens</h2>
+        <p>Pass your token in the <code>Authorization</code> header of every API request using the <code>Bearer</code> scheme.</p>
+
+        <h3>Example: curl</h3>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>curl -X GET "https://comserv.local/api/todo/1" \
+     -H "Authorization: Bearer YOUR_API_TOKEN" \
+     -H "Accept: application/json"</code></pre>
+
+        <h3>Example: Python</h3>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>import requests
+
+api_key = "YOUR_API_TOKEN"
+url = "https://comserv.local/api/todo/create"
+headers = {
+    "Authorization": f"Bearer {api_key}",
+    "Content-Type": "application/json"
+}
+data = {
+    "subject": "New Task from Script",
+    "priority": 2,
+    "status": 1,
+    "start_date": "2026-01-19",
+    "due_date": "2026-01-20"
+}
+
+response = requests.post(url, headers=headers, json=data)
+print(response.json())</code></pre>
+    </section>
+
+    <section id="cli-setup">
+        <h2>3. Command-Line Setup (Storing the Key)</h2>
+        <p>To avoid passing your key manually in every command, store it in your environment or a credentials file.</p>
+
+        <h3>Option A: Environment Variable (Temporary)</h3>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>export COMSERV_API_KEY="your_token_here"
+# Now use it in commands:
+curl -H "Authorization: Bearer $COMSERV_API_KEY" ...</code></pre>
+
+        <h3>Option B: Credentials File (Permanent)</h3>
+        <p>Store your key in <code>~/.comserv/credentials</code>:</p>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code># ~/.comserv/credentials
+COMSERV_API_KEY=your_token_here
+COMSERV_URL=https://comserv.local</code></pre>
+        <p>Set secure permissions on this file:</p>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>chmod 600 ~/.comserv/credentials</code></pre>
+    </section>
+
+    <section id="security-best-practices">
+        <h2>4. Security Best Practices</h2>
+        <ul>
+            <li><strong>Never commit tokens to version control.</strong> Use environment variables or local credentials files.</li>
+            <li><strong>Use descriptive names</strong> for tokens so you can identify them in the management list.</li>
+            <li><strong>Set short expiration dates</strong> for one-off scripts or temporary integrations.</li>
+            <li><strong>Revoke tokens immediately</strong> if they are exposed or no longer needed.</li>
+            <li><strong>Monitor token usage</strong> in the API management dashboard (check <code>last_used_at</code>).</li>
+        </ul>
+    </section>
+
+    <section id="troubleshooting">
+        <h2>5. Troubleshooting</h2>
+        <dl>
+            <dt>401 Unauthorized</dt>
+            <dd>The token is missing, malformed, or doesn't match our records. Verify the Bearer scheme and token string.</dd>
+            
+            <dt>403 Forbidden (Expired)</dt>
+            <dd>The token has passed its expiration date. Generate a new token.</dd>
+            
+            <dt>403 Forbidden (Revoked)</dt>
+            <dd>The token has been manually revoked by an administrator.</dd>
+            
+            <dt>500 Internal Server Error</dt>
+            <dd>This may occur if the <code>api_tokens</code> table is missing from the database. Contact your administrator.</dd>
+        </dl>
+    </section>
+
+    <div class="footer" style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #eee; font-size: 0.9em; color: #666;">
+        <p>Related Documents: 
+            <a href="/Documentation/ImplementationPlanTodoAPIAndMasterPlanSync">Implementation Plan</a> | 
+            <a href="/Documentation/Api">API Reference</a>
+        </p>
+    </div>
+</div>

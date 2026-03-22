@@ -1,0 +1,527 @@
+[% META
+        title = "Documentation System Audit & Planning"
+   description = "Comprehensive audit and planning for Comserv documentation system - documentation files, code compatibility, and system improvements"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "system"
+   page_version = "0.05"
+   last_updated = "Thu Dec 18 2025"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/DOCUMENTATION_SYSTEM_AUDIT_PLAN.tt,v 0.05 2025/12/18 shanta Exp shanta - Added documentation_role_access.tt to Phase 1 (item 14); Added Code-to-Documentation Compliance Issues section with findings on role hierarchy, debug code, and format violations; Added links and file paths to audit table' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium); line-height: 1.6;">Documentation System Audit & Planning</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small); margin-bottom: var(--spacing-medium); line-height: 1.6;">
+        Last Updated: 2025-12-18 | 
+        Version: 0.05 |
+        Author: Shanta | 
+        Status: In Progress - Phase 1 Audit with Code Compliance Findings
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium); line-height: 1.6;">Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-small); line-height: 1.8;">
+                This document serves as the master audit and planning guide for the Comserv documentation system. It systematically inventories all documentation files, compares documentation against code implementations, and identifies areas for improvement. We are building this audit incrementally, one documentation file at a time.
+            </p>
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-small); line-height: 1.8;">
+                <strong>Methodology:</strong> For each documentation file, we will:
+                <ol style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 2em;">
+                    <li style="margin-bottom: var(--spacing-small);">Ask clarifying questions about the file's purpose and completeness</li>
+                    <li style="margin-bottom: var(--spacing-small);">Create a properly formatted .tt file with complete META tags</li>
+                    <li style="margin-bottom: var(--spacing-small);">Compare documentation content to actual code implementation</li>
+                    <li style="margin-bottom: var(--spacing-small);">Identify any gaps, inconsistencies, or improvements needed</li>
+                    <li style="margin-bottom: var(--spacing-small);">Log findings to this plan for future cleanup work</li>
+                </ol>
+            </p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium); line-height: 1.6;" id="toc">Table of Contents</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 2em;">
+                <li style="margin-bottom: var(--spacing-small);"><a href="#audit-summary">Audit Summary</a></li>
+                <li style="margin-bottom: var(--spacing-small);"><a href="#phase-1">Phase 1: Documentation System Documentation Files</a></li>
+                <li style="margin-bottom: var(--spacing-small);"><a href="#phase-2">Phase 2: Code Controller Audit</a></li>
+                <li style="margin-bottom: var(--spacing-small);"><a href="#phase-3">Phase 3: Consolidation & Cleanup</a></li>
+                <li style="margin-bottom: var(--spacing-small);"><a href="#findings">Key Findings</a></li>
+                <li style="margin-bottom: var(--spacing-small);"><a href="#improvement-plan">Improvement Plan</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium); line-height: 1.6;" id="audit-summary">Audit Summary</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8;">
+                <strong>Current Status:</strong> Phase 1 - Initiating documentation system files audit
+            </p>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0; line-height: 1.8;">
+                <tr style="background-color: var(--table-header-bg);">
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Item</th>
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Description</th>
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Status</th>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Total Documentation Files Found</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Approximately 300+ .tt files in Documentation folder</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--success-color);">✓ Identified</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Documentation System Files</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Files describing how the documentation system works</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--warning-color);">⧖ Starting</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Code Controllers Audit</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Compare documentation files to actual code</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-muted-color);">⧐ Pending</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Consolidation Work</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Merge duplicate/related documentation</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-muted-color);">⧐ Pending</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium); line-height: 1.6;" id="phase-1">Phase 1: Documentation System Documentation Files</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8;">
+                Audit files that describe how the documentation system itself works (for both developers and documentation creators).
+            </p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-bottom: var(--spacing-medium); line-height: 1.6;">Audit Progress</h3>
+            
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0; margin-bottom: var(--spacing-medium); line-height: 1.8;">
+                <h4 style="color: var(--primary-color); margin-top: 0; margin-bottom: var(--spacing-small); line-height: 1.6;">Audit Compliance Definition</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-small); line-height: 1.8;">
+                    <strong>Compliant</strong> means: Document accurately reflects how the system currently works AND matches planned behavior. Code violations or future improvements are noted separately but do not block compliance status.
+                </p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0; margin-bottom: var(--spacing-medium); line-height: 1.8;">
+                <h4 style="color: var(--info-color); margin-top: 0; margin-bottom: var(--spacing-small); line-height: 1.6;">Documentation Template Files Identified</h4>
+                <ul style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 1.5em;">
+                    <li style="margin-bottom: var(--spacing-small);"><strong>documentation_tt_template.tt</strong>
+                        <ul style="margin-left: 1.5em; margin-top: var(--spacing-small); margin-bottom: var(--spacing-small);">
+                            <li style="margin-bottom: var(--spacing-small);"><strong>Status:</strong> ✓ Reviewed & Complete</li>
+                            <li style="margin-bottom: var(--spacing-small);"><strong>Current State:</strong> Well-structured, uses proper META tags with return-to-menu button in footer</li>
+                            <li style="margin-bottom: var(--spacing-small);"><strong>Issue Found:</strong> None</li>
+                            <li style="margin-bottom: var(--spacing-small);"><strong>Recommendation:</strong> Maintain current implementation</li>
+                            <li style="margin-bottom: var(--spacing-small);"><strong>Action Needed:</strong> None</li>
+                        </ul>
+                    </li>
+                    <li style="margin-bottom: var(--spacing-small);"><strong>documentation_system.tt</strong>
+                        <ul style="margin-left: 1.5em; margin-top: var(--spacing-small); margin-bottom: var(--spacing-small);">
+                            <li style="margin-bottom: var(--spacing-small);"><strong>Status:</strong> ⧖ To Review</li>
+                            <li style="margin-bottom: var(--spacing-small);"><strong>Current State:</strong> File exists but appears to be Markdown content in .tt file (not proper format)</li>
+                            <li style="margin-bottom: var(--spacing-small);"><strong>Issue Found:</strong> Missing META block, no proper TT structure</li>
+                            <li style="margin-bottom: var(--spacing-small);"><strong>Recommendation:</strong> Reformat to proper .tt with META tags</li>
+                            <li style="margin-bottom: var(--spacing-small);"><strong>Action Needed:</strong> Ask clarifying questions before reformatting</li>
+                        </ul>
+                    </li>
+                    <li style="margin-bottom: var(--spacing-small);"><strong>documentation_workflow.tt</strong>
+                        <ul style="margin-left: 1.5em; margin-top: var(--spacing-small); margin-bottom: var(--spacing-small);">
+                            <li style="margin-bottom: var(--spacing-small);"><strong>Status:</strong> ⧖ To Review</li>
+                            <li style="margin-bottom: var(--spacing-small);"><strong>Current State:</strong> File exists with proper structure but may be outdated</li>
+                            <li style="margin-bottom: var(--spacing-small);"><strong>Issue Found:</strong> Missing META block</li>
+                            <li style="margin-bottom: var(--spacing-small);"><strong>Recommendation:</strong> Add META block and verify content matches current workflow</li>
+                            <li style="margin-bottom: var(--spacing-small);"><strong>Action Needed:</strong> Ask clarifying questions about current workflow</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0; margin-bottom: var(--spacing-medium); line-height: 1.8;">
+                <h4 style="color: var(--warning-color); margin-top: 0; margin-bottom: var(--spacing-small); line-height: 1.6;">Documentation Organization Files</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-small); line-height: 1.8;">
+                    These files help organize and categorize the documentation system:
+                </p>
+                <ul style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 1.5em;">
+                    <li style="margin-bottom: var(--spacing-small);"><strong>documentation_config.json</strong> - Configuration file for documentation categories</li>
+                    <li style="margin-bottom: var(--spacing-small);"><strong>admin_guides.tt / admin_guides_template.tt</strong> - Template for admin documentation</li>
+                    <li style="margin-bottom: var(--spacing-small);"><strong>developer_guides.tt</strong> - Template for developer documentation</li>
+                    <li style="margin-bottom: var(--spacing-small);"><strong>user_guides.tt</strong> - Documentation for regular users</li>
+                </ul>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-bottom: var(--spacing-medium); line-height: 1.6;">Audit Criteria for Each File</h3>
+            
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0; margin-bottom: var(--spacing-medium); line-height: 1.8;">
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-small); line-height: 1.8;">
+                    Each file is evaluated against FOUR comprehensive criteria. The "Purpose" column accumulates detailed audit findings as we review each file.
+                </p>
+                <ol style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 2em;">
+                    <li style="margin-bottom: var(--spacing-small);"><strong>Template Compliance:</strong> Does file match documentation_tt_template.tt structure? (META block, PageVersion, TOC, sections, CSS variables, footer)</li>
+                    <li style="margin-bottom: var(--spacing-small);"><strong>Code Accuracy:</strong> Does documentation match the actual code it describes? Check against source controllers, models, and utilities.</li>
+                    <li style="margin-bottom: var(--spacing-small);"><strong>System Plan Alignment:</strong> Does file serve documented purpose in the documentation system? Does it align with Phase 1, 2, 3 goals?</li>
+                    <li style="margin-bottom: var(--spacing-small);"><strong>Consolidation Opportunities:</strong> Are there duplicate files, overlapping content, or files that should merge?</li>
+                </ol>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-bottom: var(--spacing-medium); line-height: 1.6;">Phase 1: Complete Inventory List</h3>
+            
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0; margin-bottom: var(--spacing-medium); line-height: 1.8;">
+                <h4 style="color: var(--info-color); margin-top: 0; margin-bottom: var(--spacing-small); line-height: 1.6;">Documentation System Files to Review (14 Files)</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-small); line-height: 1.8;">
+                    These files describe how the documentation system works. We will review each one to verify its purpose, check for proper formatting (META tags, .tt structure), identify duplication, and determine if updates are needed.
+                </p>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0; line-height: 1.8; font-size: 0.9em;">
+                <tr style="background-color: var(--table-header-bg);">
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: left;">File Name</th>
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: left;">File Type</th>
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: left;">Purpose</th>
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: center;">Status</th>
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: center;">Priority</th>
+                </tr>
+
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><a href="/Documentation/documentation_tt_template" style="color: var(--link-color);">Documentation/documentation_tt_template.tt</a></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Template</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Standard template for all .tt documentation files (META block, TOC, sections, styling)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--success-color); text-align: center;">✓ Complete</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: center;">HIGH</td>
+                </tr>
+
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><a href="/Documentation/documentation_system" style="color: var(--link-color);">Documentation/documentation_system.tt</a></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">.tt File</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>AUDIT FINDINGS:</strong> Template Compliance: ✓ PASS (proper META, PageVersion, TOC, CSS vars, footer). Code Accuracy: ❌ CRITICAL GAPS - (1) Docs claim "higher roles see lower role docs" (line 67) but NO role hierarchy implemented (code only does direct matching - Documentation.pm:437-459). (2) Docs claim role-based filtering works but TEMPORARY DEBUG CODE (Documentation.pm:414-416) bypasses ALL filtering showing all pages to all users (marked "REMOVE THIS LATER"). (3) Docs undocument hardcoded usernames (Shanta, admin) getting special CSC access (Documentation.pm:636-643). System Plan: ⚠ File describes intended behavior but code doesn't match. Consolidation: ✓ No duplicates. Status: Template-compliant but content has 3 code-accuracy mismatches.</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--warning-color); text-align: center;">⚠ Code-Gaps</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: center;">HIGH</td>
+                </tr>
+
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><a href="/Documentation/Documentation" style="color: var(--link-color);">Documentation/Documentation.md</a></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">TT (hybrid)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>AUDIT FINDINGS:</strong> Purpose: Landing/index page displaying docs based on user role/site (NOT system documentation). Template: ❌ FAIL - Minimal META (only title), no PageVersion, no debug conditional, no TOC, no proper .tt structure (has inline CSS, Template Toolkit conditionals but not template standard). Code Accuracy: ✓ PASS - Correctly implements dynamic documentation listing (cards, role-based filtering, admin actions). System Plan: ✓ Serves intended purpose as display layer. Format Issue: File is .md extension but contains Template Toolkit code (hybrid). Consolidation: ⚠ Related to but separate from documentation_system.tt (which explains HOW the system works; this DISPLAYS results). Status: Functionally correct but violates format standards - should be .tt file with proper META block.</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--warning-color); text-align: center;">⚠ Format</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: center;">HIGH</td>
+                </tr>
+
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><a href="/Documentation/documentation_workflow" style="color: var(--link-color);">Documentation/documentation_workflow.tt</a></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">.tt File</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>AUDIT FINDINGS:</strong> Purpose: HOW TO WRITE documentation (workflow guide for editors/developers). Template: ❌ FAIL - Missing META block entirely, has PageVersion (v1.0 2024/05/31 - outdated 7mo). No title/author/status in META. Uses non-standard structure (class="documentation-page" not container grid). No CSS variables for theming. Code Accuracy: ✓ PASS - Workflow steps appear valid. System Plan: ✓ Purpose aligns with plans. Currency: ⚠ Outdated (May 2024, last updated Dec 18 needed). Consolidation: ⚠ Similar content to Documentation_Workflow.tt (capitalized version). Status: Needs META block, update timestamp, and consolidation check against Documentation_Workflow.tt.</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--warning-color); text-align: center;">⚠ META Fix</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: center;">HIGH</td>
+                </tr>
+
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><a href="/Documentation/Documentation_Workflow" style="color: var(--link-color);">Documentation/Documentation_Workflow.tt</a></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">.tt File</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>AUDIT FINDINGS:</strong> Purpose: Documentation workflow guide (alternate version to documentation_workflow.tt). Template: ❌ FAIL - No META block, only PageVersion (v1.00 2024/08/09 - outdated 4+mo). Has minimal header (title, author, status in text, not META). Malformed structure (h1-h2 tags, pre block, but inconsistent TT conditionals lines 54-55). No CSS variables. Code Accuracy: ⚠ PARTIAL - Directory structure shown may not match current state (references sites/mcoop which may be site-specific). System Plan: ⚠ Incomplete - file appears truncated/broken (lines 32-53 are mostly blank, lines 54+ show debug code fragment). Consolidation: ❌ CRITICAL DUPLICATE - Nearly identical purpose to documentation_workflow.tt (lowercase version). Status: Malformed file, outdated, incomplete content, duplicate content. RECOMMENDATION: DELETE or consolidate with documentation_workflow.tt.</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--error-color); text-align: center;">❌ Broken</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: center;">HIGH</td>
+                </tr>
+
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><a href="/Documentation/documentation_config" style="color: var(--link-color);">Documentation/config/documentation_config.json</a></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Config (JSON)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>AUDIT FINDINGS:</strong> Purpose: Master config for documentation categories (6380 lines, 15+ categories, role/site filtering). Template: N/A - JSON config. Code Accuracy: ✓ PASS - Matches controller code usage (Documentation.pm loads via _load_categories_from_config()). Categories include: ai-agents, tutorials, controllers, modules, environment, operations, ui_features, etc. Role/site filtering configured correctly. System Plan: ✓ Aligns with documented category structure. Completeness: ⚠ NEEDS DOCUMENTATION - File has no inline comments explaining purpose, structure, or how to add categories. Consolidation: ✓ No duplicates (unique config file). Status: Functional but undocumented. RECOMMENDATION: Create documentation_config_guide.tt if not already done.</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--success-color); text-align: center;">✓ Complete</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: center;">HIGH</td>
+                </tr>
+
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><a href="/Documentation/documentation_config_guide" style="color: var(--link-color);">Documentation/documentation_config_guide.tt</a></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">.tt File</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>AUDIT FINDINGS:</strong> Purpose: Guide for editing documentation_config.json (how to add categories/paths). Template: ❌ FAIL - No META block, only PageVersion (v1.00 2025/05/15). Metadata in manual div/p (not META tag). Non-standard structure (h1, h2, mixed h3 with markdown ### syntax). No CSS variables. Code Accuracy: ⚠ PARTIAL - File path reference incorrect ("documentation_config.json" but actual is "config/documentation_config.json"). Example structure may be outdated (references "pages" field not present in actual config). System Plan: ✓ Purpose valid. Currency: ⚠ Version date (May 15, 2025) predates current time - likely wrong. Consolidation: ✓ Unique purpose. Status: Needs META block, path correction, structure audit against actual config file.</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--warning-color); text-align: center;">⚠ Path Fix</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: center;">MEDIUM</td>
+                </tr>
+
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><a href="/Documentation/documentation_organization" style="color: var(--link-color);">Documentation/documentation_organization.tt</a></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Markdown (not .tt)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>AUDIT FINDINGS:</strong> Purpose: Explains directory structure and naming conventions. Template: ❌ CRITICAL FAIL - File has .tt extension but contains PURE MARKDOWN syntax (# headers, - lists, ``` blocks). Zero Template Toolkit elements. No META block or PageVersion. File claims "Documentation files should be written in Markdown format with .md extension" (line 23) which contradicts system standard (.tt required). Code Accuracy: ⚠ OUTDATED - Directory structure incomplete (missing controllers/, models/, roles/, sites/ subdirs seen in actual filesystem). References obsolete migration script. System Plan: ❌ VIOLATES PLAN - Doc claims Markdown is standard but system requires .tt. Currency: Outdated structure, no version info. Consolidation: Content duplicates documentation_system.tt (Organization section). Status: BROKEN FILE - Must be converted to proper .tt format or deleted. CRITICAL ACTION NEEDED.</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--error-color); text-align: center;">❌ Invalid</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: center;">MEDIUM</td>
+                </tr>
+
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>❌ [DELETED] documentation_system_overview.tt</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"> — </td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Consolidated into documentation_system.tt with merged Debugging + Future Enhancements sections</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--success-color); text-align: center;">✓ Removed</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: center;">—</td>
+                </tr>
+
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><a href="/Documentation/documentation_migration_to_tt" style="color: var(--link-color);">Documentation/documentation_migration_to_tt.tt</a></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">.tt File</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>AUDIT FINDINGS:</strong> Purpose: Guide explaining .md to .tt migration (historical/status document). Template: ⚠ PARTIAL - Has META but incomplete (missing page_version, last_updated, site_specific). NO PageVersion RCS line. Uses custom CSS classes (doc-page, doc-section) instead of container/grid standard. No TOC or back-to-top links. Code Accuracy: ✓ PASS - Migration rationale and process accurate. System Plan: ✓ Purpose valid (historical document). Currency: ⚠ No version/date tracking (can't determine if current). Consolidation: ⚠ Content overlaps with documentation_system.tt (File Formats section). Status: Partial compliance - needs complete META block, PageVersion, standard structure. Recommendation: Update META block and restructure to match template_tt standard.</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--warning-color); text-align: center;">⚠ META+Ver</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: center;">MEDIUM</td>
+                </tr>
+
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><a href="/Documentation/documentation_update_summary" style="color: var(--link-color);">Documentation/documentation_update_summary.tt</a></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Markdown (not .tt)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>AUDIT FINDINGS:</strong> Purpose: Change log/status update summary. Template: ❌ FAIL - Pure Markdown (# headers, - lists) in .tt file. Zero TT code. No META or PageVersion. Code Accuracy: ✓ PARTIAL - References old .md files (documentation_system_overview.md, documentation_filename_issue.md) which now are .tt files. System Plan: ⚠ Duplicates information in DOCUMENTATION_SYSTEM_AUDIT_PLAN.tt. Consolidation: ❌ REDUNDANT - Content overlaps with audit plan findings. Status: Markdown in .tt file, content duplicated elsewhere. Action: DELETE or consolidate into audit plan.</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--error-color); text-align: center;">❌ Delete</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: center;">LOW</td>
+                </tr>
+
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><a href="/Documentation/documentation_filename_issue" style="color: var(--link-color);">Documentation/documentation_filename_issue.tt</a></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Markdown (not .tt)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>AUDIT FINDINGS:</strong> Purpose: Historical issue documentation (Documentation.pm filename mismatch - now resolved). Template: ❌ FAIL - Pure Markdown (# headers, ``` blocks, **bold**) in .tt file. No META or PageVersion. Code Accuracy: ✓ PASS - Documents real historical issue (Documantation.pm vs Documentation.pm). Issue is NOW RESOLVED so document is historical/archive. System Plan: ⚠ Good as reference but belongs in changelog, not system docs. Consolidation: ⚠ Could be moved to changelog/ directory as it's historical. Status: Archive document. Action: Move to changelog/ or delete.</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--warning-color); text-align: center;">⚠ Archive</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: center;">LOW</td>
+                </tr>
+
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><a href="/Documentation/DOCUMENTATION_SYSTEM_AUDIT_PLAN" style="color: var(--link-color);">Documentation/DOCUMENTATION_SYSTEM_AUDIT_PLAN.tt</a></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">.tt File</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>AUDIT FINDINGS:</strong> Purpose: Master audit plan (this file - live document). Template: ✓ PASS - Complete META block, PageVersion RCS line (v0.05), proper container/grid structure, CSS variables, TOC with anchors, footer, back-to-menu button. Code Accuracy: ✓ PASS - Audit findings based on actual code review (Documentation.pm). System Plan: ✓ PASS - Serves documented purpose as Phase 1 living document. Currency: ✓ CURRENT - Last updated Dec 18 2025. Consolidation: ✓ UNIQUE - Serves singular consolidation reference. Status: COMPLIANT with standards. Notes: File is actively accumulating audit findings per user requirements.</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--success-color); text-align: center;">✓ Active</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: center;">HIGH</td>
+                </tr>
+
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><a href="/Documentation/documentation_role_access" style="color: var(--link-color);">Documentation/developer/documentation_role_access.tt</a></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Markdown (not .tt)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>AUDIT FINDINGS:</strong> Purpose: Developer guide explaining role-based access control (RBAC). Template: ❌ FAIL - Pure Markdown (# headers, **bold**, ``` code) in .tt file. No META or PageVersion. Code Accuracy: ⚠ PARTIAL - Describes role hierarchy but code shows NO hierarchy implemented (as found in documentation_system.tt audit). Document claims feature exists but feature not actually coded. System Plan: ✓ Purpose valid for developer guides. Consolidation: ⚠ OVERLAPS with documentation_system.tt (Visibility Rules section) and documentation_config_guide.tt. Status: Markdown file, code-inaccuracy (documents missing feature). ACTION REQUIRED: Convert to .tt format, add META block, correct code accuracy gaps. CRITICAL: Do NOT publish until code-accuracy fixed.</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--error-color); text-align: center;">❌ Invalid</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: center;">HIGH</td>
+                </tr>
+            </table>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-bottom: var(--spacing-medium); margin-top: var(--spacing-large); line-height: 1.6;">Review Process</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8;">
+                For each file in the above list, we will:
+            </p>
+            <ol style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 2em;">
+                <li style="margin-bottom: var(--spacing-small);"><strong>Verify File Purpose</strong> - Confirm what the file documents and check if it's actually documentation about the system</li>
+                <li style="margin-bottom: var(--spacing-small);"><strong>Check Format</strong> - Verify proper .tt structure with META block, or identify if it should be .tt instead of .md</li>
+                <li style="margin-bottom: var(--spacing-small);"><strong>Identify Duplication</strong> - Check if multiple files document the same topic (e.g., documentation_system.tt vs documentation_system_overview.tt)</li>
+                <li style="margin-bottom: var(--spacing-small);"><strong>Verify Currency</strong> - Check if content matches current system implementation</li>
+                <li style="margin-bottom: var(--spacing-small);"><strong>Plan Action</strong> - Determine if file needs reformatting, consolidation, updating, or archival</li>
+                <li style="margin-bottom: var(--spacing-small);"><strong>Log Findings</strong> - Record all decisions in the Phase 1 results section below</li>
+            </ol>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-bottom: var(--spacing-medium); margin-top: var(--spacing-large); line-height: 1.6;">Next Step: Begin File Reviews</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8;">
+                We will now proceed through the list, starting with <strong>Priority HIGH</strong> files (items 1-7), one at a time. Each file review will identify its true purpose, current state, and required actions. Consolidation opportunities will be identified during this process.
+            </p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium); line-height: 1.6;" id="phase-2">Phase 2: Code Controller Audit</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-small); line-height: 1.8;">
+                After documenting all documentation system files, we will compare against the actual code:
+            </p>
+            <ul style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 1.5em;">
+                <li style="margin-bottom: var(--spacing-small);"><strong>Documentation.pm</strong> - Main documentation controller</li>
+                <li style="margin-bottom: var(--spacing-small);"><strong>ScanMethods.pm</strong> - Scanning and categorization logic</li>
+                <li style="margin-bottom: var(--spacing-small);"><strong>ConfigBased.pm</strong> - Configuration-based rendering</li>
+                <li style="margin-bottom: var(--spacing-small);"><strong>Config.pm</strong> - Configuration handling</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-top: var(--spacing-small); line-height: 1.8;">
+                <strong>Status:</strong> ⧐ Pending (will start after Phase 1 completion)
+            </p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium); line-height: 1.6;" id="phase-3">Phase 3: Consolidation & Cleanup</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-small); line-height: 1.8;">
+                After complete audit, consolidate findings and identify cleanup opportunities:
+            </p>
+            <ul style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 1.5em;">
+                <li style="margin-bottom: var(--spacing-small);">Merge duplicate or overlapping documentation</li>
+                <li style="margin-bottom: var(--spacing-small);">Standardize format and structure across all files</li>
+                <li style="margin-bottom: var(--spacing-small);">Update outdated documentation</li>
+                <li style="margin-bottom: var(--spacing-small);">Create comprehensive index of all documentation files</li>
+                <li style="margin-bottom: var(--spacing-small);">Document any code-to-documentation mismatches</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-top: var(--spacing-small); line-height: 1.8;">
+                <strong>Status:</strong> ⧐ Pending (will start after Phase 1 &amp; 2 completion)
+            </p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium); line-height: 1.6;" id="findings">Key Findings (Preliminary)</h2>
+            
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0; margin-bottom: var(--spacing-medium); line-height: 1.8;">
+                <h3 style="color: var(--success-color); margin-bottom: var(--spacing-small); line-height: 1.6;">Strengths</h3>
+                <ul style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 1.5em;">
+                    <li style="margin-bottom: var(--spacing-small);">✓ Comprehensive template system with proper CSS variable support</li>
+                    <li style="margin-bottom: var(--spacing-small);">✓ Good separation of concerns (controllers, scanning, config)</li>
+                    <li style="margin-bottom: var(--spacing-small);">✓ Well-organized directory structure with categories</li>
+                    <li style="margin-bottom: var(--spacing-small);">✓ META block usage for metadata extraction</li>
+                    <li style="margin-bottom: var(--spacing-small);">✓ Support for both .tt and .md file formats</li>
+                </ul>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0; margin-bottom: var(--spacing-medium); line-height: 1.8;">
+                <h3 style="color: var(--warning-color); margin-bottom: var(--spacing-small); line-height: 1.6;">Issues Identified</h3>
+                <ul style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 1.5em;">
+                    <li style="margin-bottom: var(--spacing-small);">⚠ Some documentation files using Markdown format inside .tt files (improper structure)</li>
+                    <li style="margin-bottom: var(--spacing-small);">⚠ Some documentation system files missing proper META blocks</li>
+                    <li style="margin-bottom: var(--spacing-small);">⚠ Multiple documentation files describing similar features (potential duplication)</li>
+                    <li style="margin-bottom: var(--spacing-small);">⚠ Documentation workflow may be outdated (need verification)</li>
+                    <li style="margin-bottom: var(--spacing-small);">⚠ <strong>CRITICAL: Code-to-Documentation Mismatches Found</strong> - See detailed compliance section below</li>
+                </ul>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--error-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0; margin-bottom: var(--spacing-medium); line-height: 1.8;">
+                <h3 style="color: var(--error-color); margin-bottom: var(--spacing-small); line-height: 1.6;">⚠ Code-to-Documentation Compliance Issues (Audit Finding)</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8;">
+                    During initial Phase 1 audit, code compliance analysis revealed <strong>4 critical discrepancies</strong> between documentation claims and actual implementation:
+                </p>
+                
+                <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0; line-height: 1.8; font-size: 0.85em;">
+                    <tr style="background-color: var(--table-header-bg);">
+                        <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: left;">Issue</th>
+                        <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: left;">File</th>
+                        <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: left;">What Docs Claim</th>
+                        <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: left;">Code Reality</th>
+                        <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); text-align: center;">Priority</th>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>1. Role Hierarchy Not Implemented</strong></td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">documentation_system.tt (Lines 67)</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">"Higher roles can see documentation for lower roles"</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">No role hierarchy exists; only direct role matching with no "level" concept (Documentation.pm:437-459)</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--error-color); text-align: center;">CRITICAL</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>2. Visibility Rules Disabled (Debug Code)</strong></td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Documentation.pm (Lines 414-416)</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">"Visibility rules apply" - "Users can only see documentation for their site/role"</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">TEMPORARY DEBUG CODE bypasses ALL filtering: shows ALL pages to ALL users regardless of role or site (marked "REMOVE THIS LATER")</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--error-color); text-align: center;">CRITICAL</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>3. Hardcoded Username Access</strong></td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Documentation.pm (Lines 378-387)</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">"Role-based access control" - grants access by role</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Hardcoded usernames ('Shanta', 'admin') get admin role for CSC site only - undermines documented role-based system</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--error-color); text-align: center;">HIGH</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>4. documentation_role_access.tt Format</strong></td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">documentation_role_access.tt</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">"Proper .tt documentation files" with META blocks</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Contains raw Markdown format (# headers, no META block, not proper .tt structure)</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--warning-color); text-align: center;">HIGH</td>
+                    </tr>
+                </table>
+
+                <h4 style="color: var(--text-color); font-family: var(--header-font); margin-top: var(--spacing-medium); margin-bottom: var(--spacing-small); line-height: 1.6;">Remediation Required</h4>
+                <ul style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 1.5em;">
+                    <li style="margin-bottom: var(--spacing-small);"><strong>Issue #1:</strong> Documentation must either document the absence of role hierarchy OR the code must implement role hierarchy as described</li>
+                    <li style="margin-bottom: var(--spacing-small);"><strong>Issue #2 (URGENT):</strong> Remove temporary debug code from Documentation.pm lines 414-416 before production deployment</li>
+                    <li style="margin-bottom: var(--spacing-small);"><strong>Issue #3:</strong> Replace hardcoded username checks with proper role-based logic or document this special case</li>
+                    <li style="margin-bottom: var(--spacing-small);"><strong>Issue #4:</strong> Convert documentation_role_access.tt to proper .tt format with META block and structured HTML</li>
+                </ul>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0; margin-bottom: var(--spacing-medium); line-height: 1.8;">
+                <h3 style="color: var(--info-color); margin-bottom: var(--spacing-small); line-height: 1.6;">Areas for Investigation</h3>
+                <ul style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 1.5em;">
+                    <li style="margin-bottom: var(--spacing-small);">documentation_system.tt vs documentation_system.md - are both needed?</li>
+                    <li style="margin-bottom: var(--spacing-small);">admin_guides.tt vs admin_guides_template.tt - separate purposes or duplicates?</li>
+                    <li style="margin-bottom: var(--spacing-small);">How documentation_config.json relates to actual file discovery</li>
+                    <li style="margin-bottom: var(--spacing-small);">Whether all controller files have corresponding documentation</li>
+                    <li style="margin-bottom: var(--spacing-small);">Completeness of module documentation (Todo, Mail, ENCY, etc.)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium); line-height: 1.6;" id="improvement-plan">Improvement Plan</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8;">
+                Based on preliminary findings, here are improvements we will document and track:
+            </p>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0; line-height: 1.8;">
+                <tr style="background-color: var(--table-header-bg);">
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Item</th>
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Change Type</th>
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Priority</th>
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Status</th>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Reformat documentation_system.tt with proper META</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">File Standardization</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">High</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--warning-color);">Pending Review</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Verify documentation_workflow.tt currency</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Content Audit</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Medium</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--warning-color);">Pending</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Identify duplicate documentation files</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Consolidation</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Medium</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--warning-color);">Pending</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Fix Model documentation path mappings (52 files)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Directory Reorganization + Config Fix</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">High</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--warning-color);">Queued - Chat 63</td>
+                </tr>
+            </table>
+            
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; margin-bottom: var(--spacing-medium); line-height: 1.8;">
+                <h4 style="color: var(--warning-color); margin-top: 0; margin-bottom: var(--spacing-small); line-height: 1.6;">Model Documentation Path Reorganization Task (Jan 13, 2026)</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-small); line-height: 1.8;">
+                    <strong>Issue Found:</strong> RepositoryCodeAudit.json contains 52 Model documentation files with incorrect path mappings pointing to root-level Documentation/ instead of Documentation/models/
+                </p>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-small); line-height: 1.8;">
+                    <strong>Examples:</strong> AiConversation.tt, AiMessage.tt, Category.tt, CodeSearchIndex.tt, etc. are located in Documentation/models/ but RepositoryCodeAudit.json maps them to Documentation/SomeName.tt (root level)
+                </p>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-small); line-height: 1.8;">
+                    <strong>Action Required:</strong>
+                    <ol style="margin-left: 1.5em; margin-top: var(--spacing-small);">
+                        <li>Audit all 52 Model files to verify they exist in Documentation/models/ directory</li>
+                        <li>Move any Model files from root Documentation/ to Documentation/models/ if misplaced</li>
+                        <li>Update RepositoryCodeAudit.json mappings from Documentation/SomeName.tt to Documentation/models/SomeName.tt</li>
+                        <li>Verify View and Controller paths are also correctly mapped (preliminary scan passed)</li>
+                        <li>Re-run documentation_sync_audit.pl to verify fixes</li>
+                    </ol>
+                </p>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: 0; line-height: 1.8;">
+                    <strong>Estimated Effort:</strong> 3-5 prompts to complete full reorganization. Deferred from Chat 63 to avoid scope creep.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small); line-height: 1.8;">
+                <p style="margin-bottom: var(--spacing-small);">This audit plan is a living document. It will be updated as we progress through each phase of the documentation system audit.</p>
+                <p style="margin-bottom: 0;"><em>Started: 2025-12-18 | Last Updated: 2025-12-18 | Status: Phase 1 Inventory Complete + Code Compliance Findings Added</em></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="return-to-menu" style="margin-top: 30px; padding-top: 20px; border-top: 2px solid var(--border-color);">
+        <a href="/Documentation/index" style="background-color: var(--primary-color); color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; font-weight: bold;">← Return to Documentation Menu</a>
+    </div>
+</div>

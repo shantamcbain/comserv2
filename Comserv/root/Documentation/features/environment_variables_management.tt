@@ -1,0 +1,193 @@
+[% META
+        title = "Environment Variables Management System"
+   description = "Comprehensive guide to managing system environment variables in Comserv"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "features"
+   page_version = "0.01"
+   last_updated = "Tue Dec 09 18:15:00 UTC 2025"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/features/environment_variables_management.tt,v 0.01 18:15:00 2025/12/09 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Environment Variables Management System</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2025-12-09 | 
+        Version: 0.01 |
+        Author: Zencoder | 
+        Status: Active
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The Environment Variables Management System provides a centralized interface for administrators to manage system configuration through environment variables. This system supports secure secret management, audit logging, and bulk import from .env files.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-50">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Prerequisites</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Administrator role in Comserv</li>
+                <li>Access to /admin/environment_variables route</li>
+                <li>Knowledge of environment variable naming conventions</li>
+                <li>For bulk import: .env formatted file</li>
+            </ul>
+        </div>
+        <div class="col-50">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Key Features</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Centralized Management</strong>: Web-based interface for variable management</li>
+                <li><strong>Secret Protection</strong>: Sensitive values masked in logs and interface</li>
+                <li><strong>Audit Logging</strong>: Complete tracking of all variable changes</li>
+                <li><strong>Bulk Import</strong>: Import variables from .env files in bulk</li>
+                <li><strong>Docker Integration</strong>: Apply changes to running containers</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Getting Started</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 1: Access the Management Interface</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Navigate to the admin panel and select "Environment Variables" from the administration menu. You must have admin role access.</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+URL: /admin/environment_variables
+Requires: Admin role
+            </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 2: Create a New Variable</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Click "Add New Variable" and provide the following information:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Variable Name</strong>: Use uppercase with underscores (e.g., DATABASE_HOST)</li>
+                <li><strong>Value</strong>: The actual value for the variable</li>
+                <li><strong>Is Secret</strong>: Check if this contains sensitive information</li>
+                <li><strong>Description</strong>: Optional notes about the variable's purpose</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 3: Save and Apply</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Click "Save Variable" to persist the change. The system will automatically log this change in the audit log.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Advanced Usage</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Bulk Import from .env File</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Import multiple variables from a .env formatted file using the import script:</p>
+
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+perl script/import_env_to_db.pl /path/to/.env
+
+# .env file format:
+DATABASE_HOST=localhost
+DATABASE_PORT=3306
+API_KEY=secret_value
+            </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Viewing Audit Log</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Track all changes to environment variables through the audit log. Each entry shows who made the change, when, and what was modified.</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Timestamp of the change</li>
+                <li>Variable name affected</li>
+                <li>Action performed (CREATE, UPDATE, DELETE)</li>
+                <li>Administrator who made the change</li>
+                <li>Detailed description of what changed</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Secret Management Best Practices</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Always mark API keys, tokens, and passwords as secrets</li>
+                <li>Secret values will be masked in logs and UI</li>
+                <li>Secrets are encrypted in the database</li>
+                <li>Only administrators can view secret values</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Troubleshooting</h2>
+            
+            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large);">Problem: Cannot edit existing variable names</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Variable name field is disabled/read-only in edit form</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> This is by design to prevent accidental renaming. Delete the variable and create a new one with the correct name.</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--info-color); font-family: var(--header-font); font-size: var(--font-size-large);">Problem: Bulk import is slow or fails</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Large .env files take a long time to import, or import halts with an error</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> Ensure the .env file is properly formatted, check database connectivity, and verify sufficient disk space for the audit log.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Configuration Reference</h2>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Parameter</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Type</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Default</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Description</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">is_secret</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">boolean</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">false</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Whether value should be masked in logs</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">name</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">string</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">(required)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Environment variable name (uppercase with underscores)</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">value</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">string/JSON</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">(required)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">The actual environment variable value</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font);">See Also</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/controllers/Admin" style="color: var(--link-color);">Admin Controller Documentation</a></li>
+                    <li><a href="/Documentation/models/EnvVariable" style="color: var(--link-color);">EnvVariable Model Reference</a></li>
+                    <li><a href="/admin" style="color: var(--link-color);">Administrative Interface</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p>For technical support or questions about environment variables, contact the system administrator.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>

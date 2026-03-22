@@ -1,0 +1,421 @@
+[% META 
+   title = "Daily Plan - January 12, 2026"
+   description = "Sunday Week 2: Daily work plan with Master Plan priorities, app todos, completed items, and resources for productive execution."
+   roles = "admin,developer,devops"
+   TemplateType = "Documentation"
+   category = "daily-plans,documentation,planning,audits"
+   page_version = "0.03"
+   last_updated = "Sun Jan 12 19:45:00 UTC 2026"
+   site_specific = "false"
+%]
+[% PageVersion = 'root/Documentation/DailyPlans/DailyPlans-2026-01-12.tt,v 0.03 2026/01/12 19:45:00 DailyPlanAutomationEngine Exp - Updated with DEPENDENCY_GRAPH_JAN12 priorities Jan 12' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<style>
+    /* Sticky Header Styles */
+    .daily-plan-header {
+        position: sticky;
+        top: 0;
+        background-color: rgba(255, 255, 255, 0.98);
+        border-bottom: 3px solid var(--primary-color);
+        padding: 10px 15px;
+        margin: -20px -20px 20px -20px;
+        z-index: 100;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .daily-plan-header h1 {
+        margin: 0 0 5px 0;
+        font-size: 1.4em;
+        color: var(--text-color);
+    }
+    
+    .header-nav {
+        display: flex;
+        gap: 20px;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.85em;
+    }
+    
+    .header-nav-links {
+        display: flex;
+        gap: 15px;
+    }
+    
+    .header-nav-links a {
+        color: var(--primary-color);
+        text-decoration: none;
+        padding: 5px 10px;
+        border-radius: 3px;
+    }
+    
+    .header-nav-links a:hover {
+        background-color: var(--bg-secondary);
+    }
+    
+    /* Tab Styles */
+    .tab-navigation {
+        display: flex;
+        border-bottom: 2px solid #ddd;
+        margin: 20px 0 0 0;
+        gap: 5px;
+    }
+    
+    .tab-button {
+        padding: 12px 24px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        font-size: 1em;
+        font-weight: 500;
+        color: var(--text-muted-color);
+        border-bottom: 3px solid transparent;
+        transition: all 0.2s ease;
+    }
+    
+    .tab-button:hover {
+        color: var(--text-color);
+        background-color: #f5f5f5;
+    }
+    
+    .tab-button.active {
+        color: var(--text-color) !important;
+        background-color: var(--bg-secondary) !important;
+        border-bottom-color: var(--primary-color) !important;
+        border-bottom-width: 4px !important;
+        font-weight: bold;
+    }
+    
+    .tab-content {
+        display: none;
+    }
+    
+    .tab-content.active {
+        display: block;
+    }
+    
+    /* Task List Styles */
+    .task-list {
+        background: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin: 20px 0;
+        overflow: hidden;
+    }
+    
+    .task-list-header {
+        padding: 15px;
+        background: #f0f0f0;
+        border-bottom: 1px solid #ddd;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        font-weight: bold;
+    }
+    
+    .task-list-header:hover {
+        background: #e8e8e8;
+    }
+    
+    .task-list-toggle {
+        font-size: 0.85em;
+        background: var(--primary-color);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 3px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    
+    .task-list-toggle.collapsed {
+        background: #999;
+    }
+    
+    /* Drag-and-drop styles */
+    .task-item.dragging {
+        opacity: 0.5;
+        background: #f0f0f0;
+    }
+    
+    .task-item.drag-over {
+        border-top: 3px solid var(--primary-color);
+        padding-top: 7px;
+    }
+    
+    .task-item.sortable {
+        cursor: move;
+    }
+    
+    .task-list-items {
+        padding: 10px;
+    }
+    
+    .task-list-items.hidden {
+        display: none;
+    }
+    
+    .task-item {
+        padding: 10px 15px;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .task-item:last-child {
+        border-bottom: none;
+    }
+    
+    .task-item input[type="checkbox"] {
+        cursor: pointer;
+        width: 18px;
+        height: 18px;
+    }
+    
+    .task-label {
+        flex: 1;
+        cursor: pointer;
+    }
+    
+    .task-label.completed {
+        text-decoration: line-through;
+        color: #999;
+    }
+    
+    .task-add-button {
+        padding: 10px 15px;
+        background-color: var(--success-color);
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 0.9em;
+        margin: 10px 10px 0 10px;
+    }
+    
+    .task-add-button:hover {
+        background-color: #45a049;
+    }
+    
+    /* Color coding for sources */
+    .master-plan-header {
+        background: linear-gradient(to right, #e3f2fd, #f0f0f0);
+        border-left: 4px solid #2196f3;
+    }
+    
+    .app-todos-header {
+        background: linear-gradient(to right, #e8f5e9, #f0f0f0);
+        border-left: 4px solid #4caf50;
+    }
+    
+    .focus-area {
+        background: #e3f2fd;
+        border-left: 4px solid #2196f3;
+        padding: 15px;
+        border-radius: 4px;
+        margin: 20px 0;
+    }
+</style>
+
+<div class="container">
+    <!-- Sticky Header with Navigation -->
+    <div class="daily-plan-header">
+        <h1>[DAILY PLAN] [% day_name %], [% month_name %] [% day %], [% year %]</h1>
+        <div class="header-nav">
+            <div class="header-nav-links">
+                <span><strong>Status:</strong> Week 2 - Daily Plan Automator Complete</span>
+                <span>|</span>
+                [% IF today_date %]<a href="/Documentation/DailyPlans-[% today_date %]">[Jump to Today]</a>[% ELSE %]<a href="#today-work">[Jump to Today]</a>[% END %]
+                <a href="/Documentation/MasterPlanCoordiantion" target="_blank">Master Plans</a>
+                <a href="/Documentation">All Docs</a>
+                <a href="/todo">Todo System</a>
+            </div>
+            <div style="text-align: right; color: var(--text-muted-color); font-size: 0.85em;">
+                [% IF prev_date_str %]
+                    <a href="/Documentation/DailyPlans-[% prev_date_str %]">← Prev Day ([% prev_month_day %])</a>
+                    | Today ([% curr_month_day %]) |
+                    <a href="/Documentation/DailyPlans-[% next_date_str %]">Next Day ([% next_month_day %]) →</a>
+                [% ELSE %]
+                    ← Prev Day | Today | Next Day →
+                [% END %]
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="tab-navigation">
+        <button class="tab-button active" onclick="switchTab(event, 'today-work')">
+            [TODAY'S WORK] (Active)
+        </button>
+        <button class="tab-button" onclick="switchTab(event, 'resources')">
+            [RESOURCES & CONTEXT]
+        </button>
+        <button class="tab-button" onclick="switchTab(event, 'completed')">
+            [COMPLETED]
+        </button>
+    </div>
+
+    <!-- TAB 1: TODAY'S WORK (Default) -->
+    <div id="today-work" class="tab-content active">
+        <div id="today-work-content">
+            <div class="focus-area">
+                <h3 style="margin-top: 0;">[TODAY'S FOCUS] - WEEK 1 START: Critical Infrastructure Planning</h3>
+                <p><strong>Sunday, Jan 12 - Status Update:</strong> Daily Plan Automator workflow complete. Master plan v0.29 synced. COMPLETED TODAY: (1) ✅ A.2 Kubernetes Readiness - Phase 0 plan finalized and approved (ready to unblock A.1), (2) ✅ A.3 Credentials Audit - re-audit verified all findings, docker-compose files use K8s Secrets pattern, .env files properly gitignored. Continue with: (3) B.1 Docker Secrets fallback (validation).</p>
+            </div>
+
+            <!-- Master Plan Priorities (Independent Dropdown) -->
+            <div class="task-list">
+                <div class="task-list-header master-plan-header" onclick="toggleTaskList(this)">
+                    <span>[MASTER PLAN PRIORITIES] NEXT 5 ITEMS</span>
+                    <span class="task-list-toggle">HIDE</span>
+                </div>
+                <div class="task-list-items" id="master-plan-items">
+                    <div class="task-item sortable" draggable="true">
+                        <input type="checkbox" id="task-mp-1" checked>
+                        <label for="task-mp-1" class="task-label"><strike>[COMPLETED] <a href="/Documentation/MASTER_PLAN_COORDINATION#plan-a2" target="_blank">A.2</a>: Phase0KubernetesReadinessPlan.tt - COMPLETED Jan 12</strike></label>
+                    </div>
+                    <div class="task-item sortable" draggable="true">
+                        <input type="checkbox" id="task-mp-2" checked>
+                        <label for="task-mp-2" class="task-label"><strike>[COMPLETED] <a href="/Documentation/MASTER_PLAN_COORDINATION#plan-a3" target="_blank">A.3</a>: Credentials Audit - Re-audit verified all findings COMPLETED Jan 12</strike></label>
+                    </div>
+                    <div class="task-item sortable" draggable="true">
+                        <input type="checkbox" id="task-mp-3">
+                        <label for="task-mp-3" class="task-label">[TODAY] <a href="/Documentation/MASTER_PLAN_COORDINATION#plan-b1" target="_blank">B.1</a>: DEBUG - Test Docker startup without secrets/db_config.json</label>
+                    </div>
+                    <div class="task-item sortable" draggable="true">
+                        <input type="checkbox" id="task-mp-4">
+                        <label for="task-mp-4" class="task-label">[ONGOING] <a href="/Documentation/MASTER_PLAN_COORDINATION#plan-c1" target="_blank">C.1</a>: Documentation Audit Phase 1 (2-3 hours/day incremental)</label>
+                    </div>
+                    <div class="task-item sortable" draggable="true">
+                        <input type="checkbox" id="task-mp-5">
+                        <label for="task-mp-5" class="task-label">[WEEK GOAL] Jan 17 Decision: Approve <a href="/Documentation/MASTER_PLAN_COORDINATION#plan-a2" target="_blank">A.2</a> K8s Readiness (gates all subsequent K8s work)</label>
+                    </div>
+                </div>
+                <button class="task-add-button" onclick="window.open('/todo/addtodo', '_blank')">+ Add Task to Plan</button>
+            </div>
+
+            <!-- App Todos for Today (Independent Dropdown) -->
+            <div class="task-list">
+                <div class="task-list-header app-todos-header" onclick="toggleTaskList(this)">
+                    <span>[APP TODOS FOR TODAY] FROM TODO SYSTEM [% IF todos_for_today && todos_for_today.size %]([% todos_for_today.size %])[% END %]</span>
+                    <span class="task-list-toggle">HIDE</span>
+                </div>
+                <div class="task-list-items" id="app-todo-items">
+                    [% IF todos_for_today && todos_for_today.size %]
+                        [% FOREACH todo IN todos_for_today %]
+                            <div class="task-item">
+                                <input type="checkbox" id="todo-[% todo.record_id %]">
+                                <label for="todo-[% todo.record_id %]" class="task-label">
+                                    <a href="javascript:void(0)" onclick="window.open('/todo/details?record_id=[% todo.record_id %]', '_blank'); return false;" style="color: var(--link-color); text-decoration: none;">
+                                        <strong>[% todo.sitename || 'CSC' %]:</strong> [% todo.subject || '(No subject)' %]
+                                    </a>
+                                </label>
+                            </div>
+                        [% END %]
+                    [% ELSE %]
+                        <div style="padding: 15px; text-align: center; color: #666;">
+                            <p>No todos scheduled for today.</p>
+                            <p>Create a new todo using the button below.</p>
+                        </div>
+                    [% END %]
+                </div>
+                <button class="task-add-button" onclick="window.open('/todo/addtodo', '_blank')">+ Add New Todo from Todo System</button>
+            </div>
+
+            <div style="background: #e8f5e9; border-left: 4px solid #388e3c; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                <h4 style="margin-top: 0;">Today's Completion Summary (Jan 12 - Week Start):</h4>
+                <ol>
+                    <li><strong>✅ A.2 COMPLETED:</strong> Phase0KubernetesReadinessPlan.tt - Infrastructure details finalized, ready to unblock A.1 (K8s Migration Plan).</li>
+                    <li><strong>✅ A.3 COMPLETED:</strong> Credentials Audit - Re-audit verified all findings from Dec 26: docker-compose files use K8s Secrets pattern with env var references, .env files properly gitignored, all credential storage audit findings confirmed.</li>
+                    <li><strong>NEXT PRIORITY:</strong> B.1 Testing - Test Docker startup failure path - verify graceful fallback when secrets/db_config.json missing (schema check issue from SQLite/MySQL compatibility).</li>
+                    <li><strong>ONGOING:</strong> C.1 Documentation audit Phase 1 (2-3 hours incremental work - does not block other priorities).</li>
+                    <li><strong>Week Goal:</strong> Continue parallel infrastructure work. A.2 and A.3 now unblocking downstream K8s migration (A.1).</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: RESOURCES & CONTEXT -->
+    <div id="resources" class="tab-content">
+        <h3>[RESOURCES & SUPPORTING CONTEXT]</h3>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
+                <h4>Related Documentation</h4>
+                <ul style="margin: 0; padding-left: 20px;">
+                    <li><a href="/Documentation/MasterPlanCoordination" style="color: var(--primary-color);">Master Plan Coordination (v0.29)</a></li>
+                    <li><a href="/Documentation/SECURITY_REMEDIATION_PLAN" style="color: var(--primary-color);">Security Remediation Plan</a></li>
+                    <li><a href="/Documentation/MasterPlanCoordiantion#system-features" style="color: var(--primary-color);">System Features Inventory</a></li>
+                </ul>
+            </div>
+
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
+                <h4>Quick Links</h4>
+                <ul style="margin: 0; padding-left: 20px;">
+                    <li><a href="/Documentation/MasterPlanCoordiantion#improvements-tracker" style="color: var(--primary-color);">View Improvements Tracker</a></li>
+                    <li><a href="/todo" style="color: var(--primary-color);">Open Todo System</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <h4>Daily Notes for Today:</h4>
+        <div style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 15px; min-height: 150px;">
+            <p><em>Add notes about today's work here...</em></p>
+        </div>
+    </div>
+
+    <!-- TAB 3: COMPLETED -->
+    <div id="completed" class="tab-content">
+        <h3>[COMPLETED ITEMS]</h3>
+        <div class="task-list">
+            <div class="task-list-items">
+                <div class="task-item">
+                    <input type="checkbox" checked id="completed-1">
+                    <label for="completed-1" class="task-label completed">Daily Plan Automator: 4-agent workflow complete</label>
+                </div>
+                <div class="task-item">
+                    <input type="checkbox" checked id="completed-2">
+                    <label for="completed-2" class="task-label completed">Master Plan v0.29: Updated with Grok integration, Chat enhancements, AI docs</label>
+                </div>
+                <div class="task-item">
+                    <input type="checkbox" checked id="completed-3">
+                    <label for="completed-3" class="task-label completed">8 Daily Plans generated (Jan 12-19) with updated priorities</label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function switchTab(evt, tabName) {
+        var i, tabcontent, tabbuttons;
+        tabcontent = document.getElementsByClassName("tab-content");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].classList.remove("active");
+        }
+        tabbuttons = document.getElementsByClassName("tab-button");
+        for (i = 0; i < tabbuttons.length; i++) {
+            tabbuttons[i].classList.remove("active");
+        }
+        document.getElementById(tabName).classList.add("active");
+        evt.currentTarget.classList.add("active");
+    }
+    
+    function toggleTaskList(header) {
+        var toggle = header.querySelector('.task-list-toggle');
+        var items = header.nextElementSibling;
+        if (items.classList.contains('hidden')) {
+            items.classList.remove('hidden');
+            toggle.textContent = 'HIDE';
+            toggle.classList.remove('collapsed');
+        } else {
+            items.classList.add('hidden');
+            toggle.textContent = 'SHOW';
+            toggle.classList.add('collapsed');
+        }
+    }
+</script>

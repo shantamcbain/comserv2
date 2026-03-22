@@ -1,0 +1,206 @@
+[% META
+    title = "Documentation Controller"
+    description = "Documentation for the Comserv Documentation Controller system - manages documentation routing, access control, and organization by category and role"
+    roles = "all"
+    category = "controllers"
+    page_version = "0.04"
+    last_updated = "2026-01-13"
+    site_specific = "false"
+%]
+
+[% PageVersion = 'Documentation/controllers/Documentation_Controller.tt,v 0.04 2026/01/13 zencoder-audit Exp - Jan 13 Created views directory and TT.tt documentation' %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-100">
+            <h1 style="color: var(--primary-color); font-family: var(--header-font);">Documentation Controller</h1>
+            
+            <div id="toc" style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-bottom: var(--spacing-large);">
+                <h3 style="margin-top: 0; color: var(--primary-color);">Table of Contents</h3>
+                <ul style="list-style-position: inside; color: var(--text-color);">
+                    <li><a href="#overview" style="color: var(--link-color); text-decoration: none;">Overview</a></li>
+                    <li><a href="#file-location" style="color: var(--link-color); text-decoration: none;">File Location</a></li>
+                    <li><a href="#routes" style="color: var(--link-color); text-decoration: none;">Routes</a></li>
+                    <li><a href="#key-methods" style="color: var(--link-color); text-decoration: none;">Key Methods</a></li>
+                    <li><a href="#logging" style="color: var(--link-color); text-decoration: none;">Logging</a></li>
+                    <li><a href="#categories" style="color: var(--link-color); text-decoration: none;">Categories</a></li>
+                    <li><a href="#access-control" style="color: var(--link-color); text-decoration: none;">Access Control</a></li>
+                    <li><a href="#file-types" style="color: var(--link-color); text-decoration: none;">File Types</a></li>
+                    <li><a href="#related-documentation" style="color: var(--link-color); text-decoration: none;">Related Documentation</a></li>
+                    <li><a href="#last-updated" style="color: var(--link-color); text-decoration: none;">Last Updated</a></li>
+                </ul>
+            </div>
+
+            <div id="recent-changes" style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-large) 0; border-radius: 4px; margin-bottom: var(--spacing-large);">
+                <h3 style="margin-top: 0; color: var(--primary-color);">📝 Recent Changes (v0.04 - Jan 13, 2026)</h3>
+                <ul style="color: var(--text-color); margin: 10px 0 0 20px;">
+                    <li><strong>Documentation Structure:</strong> Created /Documentation/views/ directory to organize View documentation parallel to controllers/ and models/ directories</li>
+                    <li><strong>TT View Documentation:</strong> Created Documentation/views/TT.tt (v0.02) documenting Comserv::View::TT configuration, UTF-8 encoding support, and Template Toolkit settings</li>
+                    <li><strong>UTF-8 Encoding Enhanced:</strong> Added charset=utf-8 to HTTP Content-Type headers in Documentation controller (lines 343-344, 592-593) for proper character rendering</li>
+                    <li><strong>Date Calculation Refactor:</strong> Moved all date calculations from Template Toolkit to backend Perl (Time::Piece) for Daily Plans rendering, +142 lines of date handling logic</li>
+                    <li><strong>Variable Stash Updates:</strong> Backend now passes pre-calculated variables (day_name, month_name, curr_month_day, prev_date_str, next_date_str) to templates, enabling complex Daily Plans functionality</li>
+                </ul>
+                <p style="margin: 10px 0 0 0; font-size: 0.9em; color: var(--text-muted-color);">Audit Summary: Documentation sync completed for Views (TT.pm). UTF-8 encoding and date calculation infrastructure production-ready. Views directory structure now consistent with project organization standards.</p>
+            </div>
+
+            <div id="overview" style="margin-bottom: var(--spacing-large);">
+                <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Overview</h2>
+                <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+                    The Documentation Controller (<code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">Comserv::Controller::Documentation</code>) manages the documentation system in the Comserv application. It provides routes for accessing documentation pages, handles role-based access control, and organizes documentation into categories.
+                </p>
+                <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+            </div>
+
+            <div id="file-location" style="margin-bottom: var(--spacing-large);">
+                <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">File Location</h2>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>IMPORTANT</strong>: The controller file must be located at:</p>
+                <pre style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); color: var(--text-color); overflow-x: auto; font-size: var(--font-size-small);">/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Documentation.pm</pre>
+                
+                <div style="background-color: var(--warning-color); opacity: 0.1; border-left: 4px solid var(--warning-color); border-radius: 4px; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; color: var(--text-color);">
+                    <p style="margin-top: 0;"><strong style="color: var(--warning-color);">⚠ WARNING</strong>: There was previously a critical issue where the filename (<code style="background-color: rgba(255,193,7,0.1); padding: 2px 6px; border-radius: 3px;">Documantation.pm</code> with an 'a') did not match the package name (<code style="background-color: rgba(255,193,7,0.1); padding: 2px 6px; border-radius: 3px;">Comserv::Controller::Documentation</code> with an 'o'). This mismatch caused route failures. Always ensure filenames match their package declarations.</p>
+                </div>
+                <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+            </div>
+
+            <div id="routes" style="margin-bottom: var(--spacing-large);">
+                <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Routes</h2>
+                <p style="color: var(--text-color); font-family: var(--body-font);">The controller provides the following routes:</p>
+                
+                <h3 style="color: var(--secondary-color); margin-top: var(--spacing-medium);">Main Routes</h3>
+                <ul style="color: var(--text-color); line-height: 1.8;">
+                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation</code> - Main documentation index (uppercase)</li>
+                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/documentation</code> - Alternative route (lowercase)</li>
+                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation/[page]</code> - View specific documentation page</li>
+                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/documentation/[page]</code> - Alternative route for specific page</li>
+                </ul>
+                
+                <h3 style="color: var(--secondary-color); margin-top: var(--spacing-medium);">Special Routes</h3>
+                <ul style="color: var(--text-color); line-height: 1.8;">
+                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation/documentation_system_overview</code> - Overview of the documentation system</li>
+                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation/documentation_filename_issue</code> - Information about the filename/package mismatch issue</li>
+                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation/logging_best_practices</code> - Best practices for logging</li>
+                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation/ai_guidelines</code> - Guidelines for AI assistants</li>
+                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation/controller_routing_guidelines</code> - Guidelines for controller routing</li>
+                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation/controllers</code> - Documentation for controllers</li>
+                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation/documentation_update_summary</code> - Summary of documentation updates</li>
+                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation/linux_commands</code> - Linux Commands Reference (redirects to HelpDesk controller)</li>
+                </ul>
+                <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+            </div>
+
+            <div id="key-methods" style="margin-bottom: var(--spacing-large);">
+                <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Key Methods</h2>
+                
+                <h3 style="color: var(--secondary-color); margin-top: var(--spacing-medium);">index</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);">The main entry point for the documentation system. It:</p>
+                <ol style="color: var(--text-color); line-height: 1.8;">
+                    <li>Determines the user's role</li>
+                    <li>Filters documentation based on role and site</li>
+                    <li>Organizes documentation into categories</li>
+                    <li>Renders the main documentation index</li>
+                </ol>
+                
+                <h3 style="color: var(--secondary-color); margin-top: var(--spacing-medium);">view</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);">Handles viewing individual documentation pages. It:</p>
+                <ol style="color: var(--text-color); line-height: 1.8;">
+                    <li>Checks if the user has permission to view the page</li>
+                    <li>Determines the appropriate template based on file type</li>
+                    <li>Renders the documentation page</li>
+                </ol>
+                
+                <h3 style="color: var(--secondary-color); margin-top: var(--spacing-medium);">BUILD</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);">Initializes the documentation system by:</p>
+                <ol style="color: var(--text-color); line-height: 1.8;">
+                    <li>Scanning documentation directories</li>
+                    <li>Categorizing documentation files</li>
+                    <li>Setting up role-based access control</li>
+                </ol>
+                <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+            </div>
+
+            <div id="logging" style="margin-bottom: var(--spacing-large);">
+                <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Logging</h2>
+                <p style="color: var(--text-color); font-family: var(--body-font);">The controller uses comprehensive logging to track access and troubleshoot issues:</p>
+                <pre style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); color: var(--text-color); overflow-x: auto; font-size: var(--font-size-small);">$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name',
+    "Detailed message with relevant information");</pre>
+                <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+            </div>
+
+            <div id="categories" style="margin-bottom: var(--spacing-large);">
+                <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Categories</h2>
+                <p style="color: var(--text-color); font-family: var(--body-font);">Documentation is organized into the following categories:</p>
+                <ol style="color: var(--text-color); line-height: 1.8;">
+                    <li><strong>User Guides</strong>: For end users of the system</li>
+                    <li><strong>Admin Guides</strong>: For system administrators</li>
+                    <li><strong>Developer Guides</strong>: For developers</li>
+                    <li><strong>Tutorials</strong>: Step-by-step guides for common tasks</li>
+                    <li><strong>Site-Specific</strong>: Documentation specific to a particular site</li>
+                    <li><strong>Modules</strong>: Documentation for specific system modules</li>
+                    <li><strong>Controllers</strong>: Documentation for system controllers</li>
+                    <li><strong>Models</strong>: Documentation for system models</li>
+                    <li><strong>Changelog</strong>: System changes and updates</li>
+                    <li><strong>General</strong>: Complete list of all documentation files</li>
+                </ol>
+                <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+            </div>
+
+            <div id="access-control" style="margin-bottom: var(--spacing-large);">
+                <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Access Control</h2>
+                <p style="color: var(--text-color); font-family: var(--body-font);">Access to documentation is controlled by:</p>
+                <ol style="color: var(--text-color); line-height: 1.8;">
+                    <li><strong>User Role</strong>: Different roles (normal, editor, admin, developer) have access to different categories</li>
+                    <li><strong>Site</strong>: Site-specific documentation is only shown to users of that site</li>
+                    <li><strong>Admin Override</strong>: Administrators can access all documentation regardless of role or site restrictions</li>
+                </ol>
+                <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+            </div>
+
+            <div id="file-types" style="margin-bottom: var(--spacing-large);">
+                <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">File Types</h2>
+                <p style="color: var(--text-color); font-family: var(--body-font);">The system supports multiple file types:</p>
+                <ol style="color: var(--text-color); line-height: 1.8;">
+                    <li><strong>Markdown (.md)</strong>: For content-focused documentation</li>
+                    <li><strong>Template Toolkit (.tt)</strong>: For interactive or complex documentation</li>
+                    <li><strong>HTML (.html)</strong>: For static HTML content</li>
+                    <li><strong>Text (.txt)</strong>: For plain text documentation</li>
+                </ol>
+                <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+            </div>
+
+            <div id="related-documentation" style="margin-bottom: var(--spacing-large);">
+                <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Related Documentation</h2>
+                <ul style="color: var(--text-color); line-height: 2;">
+                    <li><a href="/Documentation/documentation_system_overview" style="color: var(--link-color); text-decoration: none;">Documentation System Overview</a></li>
+                    <li><a href="/Documentation/documentation_filename_issue" style="color: var(--link-color); text-decoration: none;">Documentation Filename Issue</a></li>
+                    <li><a href="/Documentation/logging_best_practices" style="color: var(--link-color); text-decoration: none;">Logging Best Practices</a></li>
+                    <li><a href="/Documentation/ai_guidelines" style="color: var(--link-color); text-decoration: none;">AI Guidelines</a></li>
+                    <li><a href="/Documentation/controller_routing_guidelines" style="color: var(--link-color); text-decoration: none;">Controller Routing Guidelines</a></li>
+                    <li><a href="/Documentation/controllers" style="color: var(--link-color); text-decoration: none;">Controllers Documentation</a></li>
+                    <li><a href="/Documentation/documentation_update_summary" style="color: var(--link-color); text-decoration: none;">Documentation Update Summary</a></li>
+                </ul>
+                <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+            </div>
+
+            <div id="last-updated" style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-top: var(--spacing-large);">
+                <h3 style="margin-top: 0; color: var(--primary-color);">Last Updated</h3>
+                <p style="color: var(--muted-color); font-size: var(--font-size-small); margin: 0;">
+                    <strong>Date:</strong> Tue Jan 06 2026 15:17:55 UTC<br>
+                    <strong>Version:</strong> 0.02<br>
+                    <strong>Author:</strong> shanta<br>
+                    <strong>Status:</strong> Template Toolkit Compliance - Complete refactor with META block, RFC PageVersion, CSS variables, grid layout, TOC
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+    [% IF debug_msg.defined && debug_msg.size > 0 %]
+        <div class="debug-messages">
+            [% FOREACH msg IN debug_msg %]
+                <p class="debug">Debug: [% msg %]</p>
+            [% END %]
+        </div>
+    [% END %]
+[% END %]

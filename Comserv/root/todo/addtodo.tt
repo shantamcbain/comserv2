@@ -1,4 +1,4 @@
-[% PageVersion = 'addtodo.tt,v 0.05 2025/01/19 AI_Assistant - Fixed date field display width' %]
+[% PageVersion = 'addtodo.tt,v 0.08 2026/02/08 Shanta - Added current time default and fixed selection logic' %]
 [% IF debug_mode == 1 %]
     Version: [% PageVersion %]
 [% END %]
@@ -82,6 +82,7 @@
 <h1>Add a New To-do Item</h1>
 
 <form action="/todo/create" method="post">
+    <input type="hidden" name="return_to" value="[% return_to %]">
     <!-- record_id is auto-increment, no need for manual input -->
     <div>
         <label for="sitename">Site Name:</label>
@@ -106,6 +107,48 @@
     <div>
         <label for="due_date">Due Date:</label>
         <input type="date" id="due_date" name="due_date" value="[% todo.due_date OR '' %]">
+    </div>
+    <div>
+        <label for="time_of_day">Time of Day:</label>
+        <select id="time_of_day" name="time_of_day">
+            <option value="">-- Select Time --</option>
+            [% 
+                USE date;
+                IF time_of_day;
+                    SET default_time = time_of_day;
+                ELSE;
+                    # Default to current system time
+                    SET default_time = date.format(date.now, '%H:%M');
+                END;
+                
+                FOREACH hour IN [0..23];
+                    SET hour_24 = hour < 10 ? '0' _ hour : hour;
+                    
+                    # Convert to 12-hour format
+                    IF hour == 0;
+                        SET hour_12 = 12;
+                        SET period = 'AM';
+                    ELSIF hour < 12;
+                        SET hour_12 = hour;
+                        SET period = 'AM';
+                    ELSIF hour == 12;
+                        SET hour_12 = 12;
+                        SET period = 'PM';
+                    ELSE;
+                        SET hour_12 = hour - 12;
+                        SET period = 'PM';
+                    END;
+                    
+                    FOREACH minute IN ['00', '30'];
+                        SET time_value_24 = hour_24 _ ':' _ minute;
+                        SET time_display = hour_12 _ ':' _ minute _ ' ' _ period;
+            %]
+            <option value="[% time_value_24 %]:00" [% IF default_time == time_value_24 %]selected[% END %]>[% time_display %]</option>
+            [%
+                    END;
+                END;
+            %]
+        </select>
     </div>
     <div>
         <label for="subject">Subject:</label>

@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0",
+  "schema": "v1",
+  "models": [
+    {
+      "title": "Local Agent",
+      "provider": "ollama",
+      "model": "AUTODETECT",
+      "apiBase": "http://localhost:11434"
+    }
+  ],
+  "slashCommands": [
+    {
+      "name": "edit",
+      "description": "Edit code (for .tt docs: enforce template standards)"
+    },
+    {
+      "name": "test",
+      "description": "Generate tests (include doc accuracy checks against codebase)"
+    },
+    {
+      "name": "fix",
+      "description": "Fix bugs (for docs: resolve mismatches like outdated routes)"
+    }
+  ]
+}

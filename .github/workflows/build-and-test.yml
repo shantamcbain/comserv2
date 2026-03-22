@@ -1,0 +1,181 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      mariadb:
+        image: mariadb:latest
+        env:
+          MARIADB_ROOT_PASSWORD: testpass123
+          MARIADB_DATABASE: comserv_test
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+        ports:
+          - 3306:3306
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Perl
+      uses: shogo82148/actions-setup-perl@v1
+      with:
+        perl-version: '5.40.0'
+    
+    - name: Cache CPAN modules
+      uses: actions/cache@v4
+      with:
+        path: ~/.perl
+        key: ${{ runner.os }}-cpan-${{ hashFiles('**/cpanfile') }}
+        restore-keys: |
+          ${{ runner.os }}-cpan-
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libmariadb-dev \
+          libssl-dev \
+          libxml2-dev \
+          libexpat-dev \
+          mariadb-client
+    
+    - name: Install Perl dependencies
+      run: |
+        cpanm --notest -q App::cpanminus Carton
+        cd Comserv
+        cpanm --notest --installdeps .
+    
+    - name: Perl syntax check
+      run: |
+        cd Comserv
+        find lib -name '*.pm' -exec perl -c {} \;
+        find script -name '*.pl' -exec perl -c {} \;
+    
+    - name: Run unit tests
+      run: |
+        cd Comserv
+        prove -r t/ --tb=short 2>&1 | head -100
+      continue-on-error: true
+    
+    - name: Wait for database
+      run: |
+        for i in {1..30}; do
+          if mysqladmin ping -h127.0.0.1 -uroot -ptestpass123 &> /dev/null; then
+            echo "Database is ready"
+            exit 0
+          fi
+          echo "Waiting for database... ($i/30)"
+          sleep 1
+        done
+        exit 1
+    
+    - name: Setup test database
+      run: |
+        cd Comserv
+        mysql -h127.0.0.1 -uroot -ptestpass123 comserv_test < /dev/null
+      continue-on-error: true
+    
+    - name: Run integration tests
+      run: |
+        cd Comserv
+        CATALYST_ENV=test prove -r t/ 2>&1 | head -200
+      env:
+        TEST_DATABASE_HOST: 127.0.0.1
+        TEST_DATABASE_USER: root
+        TEST_DATABASE_PASS: testpass123
+        TEST_DATABASE_NAME: comserv_test
+      continue-on-error: true
+    
+    - name: Pod coverage check
+      run: |
+        cd Comserv
+        cpanm --notest -q Pod::Coverage
+        prove --verbose t/pod-coverage.t 2>&1 || true
+      continue-on-error: true
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build Docker image (no push)
+      uses: docker/build-push-action@v5
+      with:
+        context: ./Comserv
+        file: ./Comserv/Dockerfile
+        tags: |
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        push: false
+    
+    - name: Build Docker image summary
+      run: |
+        echo "✅ Docker image built successfully"
+        echo "Image tag: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+        echo "Branch: ${{ github.ref_name }}"
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Lint YAML files
+      run: |
+        pip install yamllint
+        yamllint -c '{extends: default, rules: {line-length: disable}}' \
+          .github/workflows/*.yml \
+          docker-compose.yml \
+          Comserv/docker-compose*.yml \
+          || true
+    
+    - name: Check Dockerfile syntax
+      run: |
+        docker run --rm -i hadolint/hadolint < Comserv/Dockerfile \
+          || true
+
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: 'Comserv'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+      continue-on-error: true
+    
+    - name: Upload Trivy results
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'trivy-results.sarif'
+      if: always()

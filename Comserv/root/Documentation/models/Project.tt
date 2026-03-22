@@ -1,0 +1,527 @@
+[% META
+    title = 'Project Model - Project Management & Task Organization'
+    description = 'Comprehensive documentation for Project model covering database schema, project lifecycle management, hierarchical project structure, resource estimation, team assignment, and usage examples for managing projects and associated tasks'
+    roles = 'admin,developer,editor,manager'
+    TemplateType = 'model'
+    category = 'models,project-management,workflow'
+    page_version = '1.00'
+    last_updated = '2026-01-09 14:57:00 UTC'
+    site_specific = ''
+%]
+
+[% PageVersion = 'Documentation/models/Project.tt,v 1.00 2026/01/09 zencoder-docsync Exp ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 id="project-model">Project Model - Project Management & Task Organization</h1>
+            
+            <div id="toc" class="alert alert-info">
+                <strong>Contents:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#schema">Database Schema & Fields</a></li>
+                    <li><a href="#relationships">Relationships & Associations</a></li>
+                    <li><a href="#lifecycle">Project Lifecycle & Status</a></li>
+                    <li><a href="#api-methods">API Methods & Queries</a></li>
+                    <li><a href="#examples">Usage Examples</a></li>
+                    <li><a href="#troubleshooting">Troubleshooting</a></li>
+                    <li><a href="#see-also">See Also</a></li>
+                </ul>
+            </div>
+
+            <div class="alert alert-success" id="recent-changes">
+                <h3 style="margin-top: 0;">📝 Recent Changes (v1.00 - Jan 9, 2026)</h3>
+                <ul style="margin: 5px 0 0 20px;">
+                    <li><strong>Initial Documentation:</strong> Created comprehensive documentation for Project model</li>
+                    <li><strong>Relationships:</strong> Documented hierarchical project structure and task associations</li>
+                    <li><strong>Resource Management:</strong> Documented estimation and team assignment capabilities</li>
+                </ul>
+            </div>
+            
+            <section id="overview">
+                <h2>Overview</h2>
+                <p>
+                    The <strong>Project</strong> model (Comserv/lib/Comserv/Model/Schema/Ency/Result/Project.pm) 
+                    provides a comprehensive database schema for managing projects within the Comserv application. It is a DBIx::Class Result class that supports:
+                </p>
+                <ul>
+                    <li>Project creation, tracking, and lifecycle management</li>
+                    <li>Hierarchical project structure (parent/child projects)</li>
+                    <li>Task association and todo list management</li>
+                    <li>Multi-site project deployment (sitename field)</li>
+                    <li>Resource estimation (man-hours, project size)</li>
+                    <li>Team assignment (developer, client, poster information)</li>
+                    <li>Project status tracking (planning, in-progress, completed, on-hold, etc.)</li>
+                    <li>Project metadata and documentation (code, comments)</li>
+                    <li>Audit trail (poster, posted timestamp, group tracking)</li>
+                </ul>
+                <p>
+                    Projects serve as the primary organizational unit for grouping tasks, estimating work, assigning team members, 
+                    and tracking delivery across multiple sites.
+                </p>
+            </section>
+
+            <section id="schema">
+                <h2>Database Schema & Fields</h2>
+                
+                <h3>Table: projects</h3>
+                <p><strong>Purpose:</strong> Store project information, resource allocation, team assignments, and status tracking</p>
+                <p><strong>Primary Key:</strong> id (auto-increment)</p>
+                
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Field Name</th>
+                        <th>Data Type</th>
+                        <th>Nullable</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td>id</td>
+                        <td>INTEGER</td>
+                        <td>NO</td>
+                        <td>auto_increment</td>
+                        <td>Primary key - auto-generated project ID</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>name</td>
+                        <td>VARCHAR(255)</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Project name/title (human-readable)</td>
+                    </tr>
+                    <tr>
+                        <td>description</td>
+                        <td>TEXT</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Detailed project description, scope, and objectives</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>start_date</td>
+                        <td>DATE</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Project start date (YYYY-MM-DD format)</td>
+                    </tr>
+                    <tr>
+                        <td>end_date</td>
+                        <td>DATE</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Project target completion date</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>status</td>
+                        <td>VARCHAR(255)</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Current project status (planning, in-progress, completed, on-hold, archived, etc.)</td>
+                    </tr>
+                    <tr>
+                        <td>record_id</td>
+                        <td>INTEGER</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Reference to external record system (legacy field)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>project_code</td>
+                        <td>VARCHAR(255)</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Unique project identifier code (e.g., 'PROJ-2024-001')</td>
+                    </tr>
+                    <tr>
+                        <td>project_size</td>
+                        <td>INTEGER</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Project scope indicator (1-5 scale or similar classification)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>estimated_man_hours</td>
+                        <td>INTEGER</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Total estimated effort in person-hours for project completion</td>
+                    </tr>
+                    <tr>
+                        <td>developer_name</td>
+                        <td>VARCHAR(255)</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Lead developer or development team name</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>client_name</td>
+                        <td>VARCHAR(255)</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Client or requesting party name</td>
+                    </tr>
+                    <tr>
+                        <td>sitename</td>
+                        <td>VARCHAR(255)</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Site identifier for multi-site deployments (CSC, BMASTER, etc.)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>comments</td>
+                        <td>TEXT</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Additional notes, constraints, or special instructions</td>
+                    </tr>
+                    <tr>
+                        <td>username_of_poster</td>
+                        <td>VARCHAR(255)</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Username of user who created/posted the project</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>parent_id</td>
+                        <td>INTEGER</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Foreign key: ID of parent project (for sub-projects)</td>
+                    </tr>
+                    <tr>
+                        <td>group_of_poster</td>
+                        <td>VARCHAR(255)</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Group or department of user who created the project</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>date_time_posted</td>
+                        <td>DATETIME</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Timestamp when project was created (YYYY-MM-DD HH:MM:SS format)</td>
+                    </tr>
+                </table>
+            </section>
+
+            <section id="relationships">
+                <h2>Relationships & Associations</h2>
+                
+                <h3>One-to-Many Relationships</h3>
+                <ul>
+                    <li><strong>has_many 'todos':</strong> Associated Todo items for this project
+                        <ul>
+                            <li>Foreign Key: Todo.project_id → Project.id</li>
+                            <li>Cascade Delete: YES (deleting project deletes associated todos)</li>
+                            <li>Usage: <code>my @todos = $project->todos->all;</code></li>
+                        </ul>
+                    </li>
+                    <li><strong>has_many 'project_sites':</strong> Project-to-Site associations
+                        <ul>
+                            <li>Foreign Key: ProjectSite.project_id → Project.id</li>
+                            <li>Usage: <code>my @site_assocs = $project->project_sites->all;</code></li>
+                        </ul>
+                    </li>
+                    <li><strong>has_many 'sub_projects':</strong> Child projects (hierarchical structure)
+                        <ul>
+                            <li>Foreign Key: Project.parent_id → Project.id</li>
+                            <li>Usage: <code>my @children = $project->sub_projects->all;</code></li>
+                        </ul>
+                    </li>
+                </ul>
+
+                <h3>Many-to-One Relationships</h3>
+                <ul>
+                    <li><strong>belongs_to 'parent':</strong> Parent project (if this is a sub-project)
+                        <ul>
+                            <li>Foreign Key: Project.parent_id → Project.id</li>
+                            <li>Usage: <code>my $parent = $project->parent;</code></li>
+                        </ul>
+                    </li>
+                </ul>
+
+                <h3>Many-to-Many Relationships</h3>
+                <ul>
+                    <li><strong>many_to_many 'sites':</strong> Sites associated with this project (via project_sites junction table)
+                        <ul>
+                            <li>Bridge: project_sites table</li>
+                            <li>Usage: <code>my @sites = $project->sites->all;</code></li>
+                        </ul>
+                    </li>
+                </ul>
+            </section>
+
+            <section id="lifecycle">
+                <h2>Project Lifecycle & Status Management</h2>
+                
+                <h3>Typical Project Status Values</h3>
+                <ul>
+                    <li><strong>planning</strong> - Project in initial planning phase</li>
+                    <li><strong>in-progress</strong> - Project actively being worked on</li>
+                    <li><strong>on-hold</strong> - Project temporarily suspended</li>
+                    <li><strong>completed</strong> - Project finished and delivered</li>
+                    <li><strong>archived</strong> - Project stored for historical reference</li>
+                    <li><strong>cancelled</strong> - Project stopped before completion</li>
+                </ul>
+
+                <h3>Project Hierarchy</h3>
+                <p>Projects support a hierarchical structure where:</p>
+                <ul>
+                    <li><strong>Parent Project:</strong> Main project with overall scope (parent_id = NULL)</li>
+                    <li><strong>Sub-Project:</strong> Related project within parent scope (parent_id = parent project's id)</li>
+                    <li><strong>Multi-Level:</strong> Sub-projects can have their own sub-projects</li>
+                </ul>
+                <p>Use cases:</p>
+                <ul>
+                    <li>Major project with multiple phases as sub-projects</li>
+                    <li>Master contract with multiple delivery phases</li>
+                    <li>Organizational initiatives with multiple related projects</li>
+                </ul>
+            </section>
+
+            <section id="api-methods">
+                <h2>API Methods & Queries</h2>
+                
+                <h3>Standard DBIx::Class Methods</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Creating Projects:</strong></p>
+                    <pre><code>my $project = $schema->resultset('Project')->create({
+    name => 'New Infrastructure Migration',
+    description => 'Migrate existing servers to cloud platform',
+    start_date => '2026-02-01',
+    end_date => '2026-04-30',
+    status => 'planning',
+    project_code => 'INFRA-2026-001',
+    project_size => 3,
+    estimated_man_hours => 240,
+    developer_name => 'DevOps Team',
+    client_name => 'Acme Corp',
+    sitename => 'CSC',
+    username_of_poster => 'jsmith',
+    group_of_poster => 'Engineering',
+    date_time_posted => DateTime->now->iso8601(),
+});</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Retrieving Projects:</strong></p>
+                    <pre><code>my $project = $schema->resultset('Project')->find(42);
+my @active = $schema->resultset('Project')->search({
+    status => { '!=' => 'archived' },
+    sitename => 'CSC'
+})->all;
+my @by_dev = $schema->resultset('Project')->search({
+    developer_name => 'DevOps Team'
+})->all;</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Updating Projects:</strong></p>
+                    <pre><code>$project->update({
+    status => 'in-progress',
+    start_date => '2026-01-15'
+});
+
+$project->estimated_man_hours(300);
+$project->update;</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Working with Relationships:</strong></p>
+                    <pre><code>my @todos = $project->todos->all;
+my $todo_count = $project->todos->count;
+my @sites = $project->sites->all;
+my @sub_projects = $project->sub_projects->all;
+
+if (my $parent = $project->parent) {
+    print "Parent project: " . $parent->name;
+}</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Hierarchical Queries:</strong></p>
+                    <pre><code>my @top_level = $schema->resultset('Project')->search({
+    parent_id => undef
+})->all;
+
+my @all_children = $parent_project->sub_projects->all;
+my $grandchildren = $parent_project->sub_projects
+    ->search_related('sub_projects')->all;</code></pre>
+                </div>
+
+                <h3>Common Queries</h3>
+                <ul>
+                    <li><strong>Find projects by client:</strong> <code>$schema->resultset('Project')->search({ client_name => 'Client Name' })->all;</code></li>
+                    <li><strong>Find projects by site:</strong> <code>$schema->resultset('Project')->search({ sitename => 'CSC' })->all;</code></li>
+                    <li><strong>Find active projects:</strong> <code>$schema->resultset('Project')->search({ status => 'in-progress' })->all;</code></li>
+                    <li><strong>Find overdue projects:</strong> <code>$schema->resultset('Project')->search({ 'end_date' => { '<' => DateTime->today->ymd } })->all;</code></li>
+                    <li><strong>Find high-effort projects:</strong> <code>$schema->resultset('Project')->search({ 'estimated_man_hours' => { '>' => 100 } })->all;</code></li>
+                </ul>
+            </section>
+
+            <section id="examples">
+                <h2>Usage Examples</h2>
+                
+                <h3>Example 1: Create Project with Sub-Projects</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $parent = $schema->resultset('Project')->create({
+    name => 'Platform Modernization Initiative',
+    status => 'planning',
+    project_code => 'MODERN-2026',
+    estimated_man_hours => 600,
+    developer_name => 'Architecture Team',
+    sitename => 'CSC',
+    username_of_poster => 'awalker'
+});
+
+my $phase1 = $schema->resultset('Project')->create({
+    name => 'Phase 1: API Refactoring',
+    parent_id => $parent->id,
+    estimated_man_hours => 200,
+    developer_name => 'Backend Team'
+});
+
+my $phase2 = $schema->resultset('Project')->create({
+    name => 'Phase 2: UI Migration',
+    parent_id => $parent->id,
+    estimated_man_hours => 250,
+    developer_name => 'Frontend Team'
+});</code></pre>
+                </div>
+
+                <h3>Example 2: Track Project Progress</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $project = $schema->resultset('Project')->find(42);
+print "Project: " . $project->name . "\n";
+print "Status: " . $project->status . "\n";
+print "Started: " . $project->start_date . "\n";
+print "Due: " . $project->end_date . "\n";
+print "Estimated Hours: " . $project->estimated_man_hours . "\n";
+
+my $todo_count = $project->todos->count;
+print "Outstanding tasks: $todo_count\n";
+
+$project->status('in-progress');
+$project->start_date(DateTime->now->ymd);
+$project->update;</code></pre>
+                </div>
+
+                <h3>Example 3: Report on Team Workload</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my @projects = $schema->resultset('Project')->search({
+    developer_name => 'DevOps Team',
+    status => { '!=' => 'completed' }
+})->all;
+
+my $total_hours = 0;
+foreach my $proj (@projects) {
+    $total_hours += $proj->estimated_man_hours || 0;
+    print "- " . $proj->name . ": " . $proj->estimated_man_hours . " hours\n";
+}
+print "Total workload: $total_hours hours\n";</code></pre>
+                </div>
+
+                <h3>Example 4: Find All Sites for a Project</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $project = $schema->resultset('Project')->find(42);
+my @associated_sites = $project->sites->all;
+
+foreach my $site (@associated_sites) {
+    print "- " . $site->name . "\n";
+}</code></pre>
+                </div>
+            </section>
+
+            <section id="troubleshooting">
+                <h2>Troubleshooting</h2>
+                
+                <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                    <h3 style="color: var(--warning-color); margin-top: 0;">Problem: Circular Parent References</h3>
+                    <p style="margin: 5px 0;"><strong>Symptoms:</strong> Setting parent_id creates circular reference (project references itself as parent)</p>
+                    <p style="margin: 5px 0;"><strong>Solution:</strong> Validate before setting parent_id to ensure:
+                        <ul>
+                            <li>parent_id != project's own id</li>
+                            <li>parent doesn't have this project as its parent (check recursively)</li>
+                            <li>Maximum hierarchy depth limits (e.g., no more than 5 levels)</li>
+                        </ul>
+                    </p>
+                </div>
+
+                <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                    <h3 style="color: var(--info-color); margin-top: 0;">Problem: Orphaned Sub-Projects on Deletion</h3>
+                    <p style="margin: 5px 0;"><strong>Symptoms:</strong> Parent project deleted but sub-projects still exist</p>
+                    <p style="margin: 5px 0;"><strong>Solution:</strong> Cascade delete is NOT configured for parent relationships:
+                        <ul>
+                            <li>Either delete sub-projects first, then parent</li>
+                            <li>Or update sub-projects to set parent_id = NULL before deleting parent</li>
+                            <li>Or configure has_many relationship with cascade_delete => 1</li>
+                        </ul>
+                    </p>
+                </div>
+
+                <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                    <h3 style="color: var(--info-color); margin-top: 0;">Problem: Todos Not Cascading with Project Deletion</h3>
+                    <p style="margin: 5px 0;"><strong>Symptoms:</strong> Deleting project throws foreign key error due to associated todos</p>
+                    <p style="margin: 5px 0;"><strong>Solution:</strong> Cascade delete IS configured for todos relationship:
+                        <ul>
+                            <li>Deleting project should automatically delete associated todos</li>
+                            <li>If error occurs, check database constraints are properly set</li>
+                            <li>Verify todos were properly associated before deletion</li>
+                        </ul>
+                    </p>
+                </div>
+
+                <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                    <h3 style="color: var(--info-color); margin-top: 0;">Problem: Missing Date Information</h3>
+                    <p style="margin: 5px 0;"><strong>Symptoms:</strong> start_date or end_date are NULL</p>
+                    <p style="margin: 5px 0;"><strong>Solution:</strong> These fields are optional:
+                        <ul>
+                            <li>Projects don't require dates to be created</li>
+                            <li>Add validation in application layer if dates are required</li>
+                            <li>Use default dates or current date on creation if needed</li>
+                        </ul>
+                    </p>
+                </div>
+
+                <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                    <h3 style="color: var(--info-color); margin-top: 0;">Problem: Many-to-Many Sites Not Appearing</h3>
+                    <p style="margin: 5px 0;"><strong>Symptoms:</strong> $project->sites returns nothing even though project_sites records exist</p>
+                    <p style="margin: 5px 0;"><strong>Solution:</strong> Many-to-many relationship requires proper bridge table configuration:
+                        <ul>
+                            <li>Verify ProjectSite has relationships to both Project and Site</li>
+                            <li>Check project_sites table has correct foreign keys</li>
+                            <li>Use $project->project_sites to access junction table directly if needed</li>
+                        </ul>
+                    </p>
+                </div>
+            </section>
+
+            <section id="see-also">
+                <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                    <h2 style="color: var(--success-color); margin-top: 0;">See Also</h2>
+                    <ul style="margin: 10px 0 0 20px;">
+                        <li><a href="/Documentation/models/Todo">Todo Model</a> - Tasks associated with projects</li>
+                        <li><a href="/Documentation/models/Site">Site Model</a> - Multi-site deployment for projects</li>
+                        <li><a href="/Documentation/models/ProjectSite">ProjectSite Model</a> - Junction table for project-site associations</li>
+                        <li><a href="/Documentation/models/">Model Index</a> - Complete model documentation</li>
+                        <li><a href="/admin">Admin Interface</a> - Project management UI</li>
+                    </ul>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <div class="row" style="margin-top: 40px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+        <div class="col-100">
+            <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+                Last Updated: 2026-01-09 | Version: 1.00 | Category: Model Documentation
+            </div>
+        </div>
+    </div>
+</div>

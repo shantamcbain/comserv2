@@ -443,6 +443,13 @@
   background-image: none;
 }
 
+.icon-arrow-up, .fas.fa-arrow-up {
+  -webkit-mask-image: url('/static/images/icons/arrow-up.svg');
+  mask-image: url('/static/images/icons/arrow-up.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
 /* Missing icons that need to be added */
 .icon-list, .fas.fa-list-ul {
   -webkit-mask-image: url('/static/images/icons/list.svg');

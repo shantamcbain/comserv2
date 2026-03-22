@@ -358,7 +358,7 @@ $(document).ready(function() {
         startInstallation('npm-start');
         // This would need a backend endpoint to start NPM
         // For now, just show a message
-        completeInstallation('info', 'Starting NPM is not implemented yet', 'Please start NPM manually using docker-compose up -d in the NPM directory.');
+        completeInstallation('info', 'Starting NPM is not implemented yet', 'Please start NPM manually using docker compose up -d in the NPM directory.');
     });
     
     // Add vanilla JavaScript event listeners as fallback

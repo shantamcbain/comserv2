@@ -1,0 +1,387 @@
+[% META
+        title = "Result Class Development Guide"
+   description = "Step-by-step guide for creating and maintaining DBIx::Class Result classes"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "database"
+   page_version = "0.01"
+   last_updated = "Thu Dec 25 2025"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/Result_Class_Development_Guide.tt,v 0.01 2025/12/25 shanta Exp shanta - Result Class development guide' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Result Class Development Guide</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2025-12-25 | 
+        Version: 1.0 |
+        Author: Shanta | 
+        Status: Complete - Developer Reference
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#file-structure" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">File Structure</a>
+                <a href="#step-by-step" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Step-by-Step</a>
+                <a href="#data-types" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Data Types</a>
+                <a href="#patterns" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Patterns</a>
+                <a href="#best-practices" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Best Practices</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Result Classes</strong> are Perl modules that define database tables using <strong>DBIx::Class</strong> pattern. They provide:</p>
+            
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Type-safe table definitions (columns, types, constraints)</li>
+                <li>Automatic relationship generation (foreign keys, has_many, belongs_to)</li>
+                <li>Helper methods for common operations</li>
+                <li>Version control friendly definitions (no raw SQL in code)</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Why Result Classes?</h3>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ Advantages</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">❌ Avoid</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Define schema in application code (version controlled)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Raw SQL files without Result classes</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Type safety and validation</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Ad-hoc SQL queries in controllers</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Automatic relationship management</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Manual join management</td>
+                </tr>
+            </table>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FILE STRUCTURE SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="file-structure" style="color: var(--text-color); font-family: var(--header-font);">2. File Structure</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Location Pattern</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>Comserv/lib/Comserv/Model/Schema/[Database]/Result/[TableName].pm
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">For ENCY Database</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>Comserv/lib/Comserv/Model/Schema/Ency/Result/TableName.pm
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">For Forager Database</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>Comserv/lib/Comserv/Model/Schema/Forager/Result/TableName.pm
+                </code></pre>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- STEP-BY-STEP SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="step-by-step" style="color: var(--text-color); font-family: var(--header-font);">3. Step-by-Step Creation Process</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 1: Create File with Correct Package Name</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>package Comserv::Model::Schema::Ency::Result::CodeSearchIndex;
+use base 'DBIx::Class::Core';
+use warnings FATAL => 'all';
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 2: Define Table Name</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>__PACKAGE__->table('code_search_index');
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 3: Define Columns</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>__PACKAGE__->add_columns(
+    id => {
+        data_type => 'integer',
+        is_auto_increment => 1,
+    },
+    file_path => {
+        data_type => 'varchar',
+        size => 512,
+        is_nullable => 0,
+    },
+    indexed_at => {
+        data_type => 'timestamp',
+        default_value => \'CURRENT_TIMESTAMP',
+        is_nullable => 0,
+    },
+);
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 4: Set Primary Key</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>__PACKAGE__->set_primary_key('id');
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 5: Define Unique Constraints</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>__PACKAGE__->add_unique_constraint(['file_path']);
+
+# Composite unique constraint
+__PACKAGE__->add_unique_constraint(
+    uk_role_agent_model => ['role', 'agent_type', 'model_name']
+);
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 6: Define Indexes</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>eval { __PACKAGE__->add_index(['content_hash']); };
+eval { __PACKAGE__->add_index(['file_type']); };
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 7: Define Relationships</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>BelongsTo (Foreign Key - Many to One)</strong>:</p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>__PACKAGE__->belongs_to(
+    'found_by_user' => 'Comserv::Model::Schema::Ency::Result::User',
+    { 'foreign.id' => 'self.found_by_user_id' }
+);
+
+# For optional foreign keys
+__PACKAGE__->belongs_to(
+    'verified_by_user' => 'Comserv::Model::Schema::Ency::Result::User',
+    { 'foreign.id' => 'self.verified_by_user_id' },
+    { join_type => 'left' }
+);
+                </code></pre>
+            </div>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>HasMany (One to Many)</strong>:</p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>__PACKAGE__->has_many(
+    'web_search_results' => 'Comserv::Model::Schema::Ency::Result::WebSearchResults',
+    { 'foreign.used_in_ai_message_id' => 'self.id' }
+);
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 8: Add Helper Methods</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>sub is_verified {
+    my $self = shift;
+    return $self->is_verified ? 1 : 0;
+}
+
+sub can_user_access {
+    my ($self, $user_roles) = @_;
+    my @accessible = @{ $self->get_accessible_roles };
+    for my $role (@$user_roles) {
+        return 1 if grep { $_ eq $role } @accessible;
+    }
+    return 0;
+}
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 9: End File</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>1;
+                </code></pre>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- DATA TYPES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="data-types" style="color: var(--text-color); font-family: var(--header-font);">4. Column Data Types Reference</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Basic Types</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>integer</code> - INT</li>
+                <li><code>varchar</code> - VARCHAR(size) - requires <code>size</code> parameter</li>
+                <li><code>char</code> - CHAR(size)</li>
+                <li><code>text</code> - TEXT</li>
+                <li><code>longtext</code> - LONGTEXT</li>
+                <li><code>boolean</code> - BOOLEAN or TINYINT(1)</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Numeric Types</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>decimal</code> - DECIMAL(precision, scale)</li>
+                <li><code>float</code> - FLOAT</li>
+                <li><code>double</code> - DOUBLE</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Date/Time Types</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>timestamp</code> - TIMESTAMP (with automatic CURRENT_TIMESTAMP)</li>
+                <li><code>date</code> - DATE</li>
+                <li><code>datetime</code> - DATETIME</li>
+                <li><code>time</code> - TIME</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Special Types</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>enum</code> - ENUM with <code>extra => { list => [...] }</code></li>
+                <li><code>json</code> - JSON (MySQL 5.7+)</li>
+                <li><code>blob</code> - BLOB (binary data)</li>
+            </ul>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PATTERNS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="patterns" style="color: var(--text-color); font-family: var(--header-font);">5. Relationship Patterns</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Pattern 1: One-to-Many (Parent → Child)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parent Result Class</strong>:</p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>__PACKAGE__->has_many(
+    'messages' => 'Comserv::Model::Schema::Ency::Result::AiMessage',
+    { 'foreign.conversation_id' => 'self.id' }
+);
+                </code></pre>
+            </div>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Child Result Class</strong>:</p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>__PACKAGE__->belongs_to(
+    'conversation' => 'Comserv::Model::Schema::Ency::Result::AiConversation',
+    { 'foreign.id' => 'self.conversation_id' }
+);
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Pattern 2: Multiple Foreign Keys to Same Table</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>__PACKAGE__->belongs_to(
+    'found_by_user' => 'Comserv::Model::Schema::Ency::Result::User',
+    { 'foreign.id' => 'self.found_by_user_id' }
+);
+
+__PACKAGE__->belongs_to(
+    'verified_by_user' => 'Comserv::Model::Schema::Ency::Result::User',
+    { 'foreign.id' => 'self.verified_by_user_id' },
+    { join_type => 'left' }
+);
+                </code></pre>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- BEST PRACTICES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="best-practices" style="color: var(--text-color); font-family: var(--header-font);">6. Best Practices</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">1. Column Naming</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code># ✅ Good: descriptive, consistent
+user_id, created_at, is_verified, response_time_ms
+
+# ❌ Bad: vague, inconsistent
+uid, ctime, verified, time
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">2. Nullability</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code># ✅ Good: explicit
+is_nullable => 1,  # Allow NULL
+is_nullable => 0,  # NOT NULL
+
+# ❌ Bad: implicit (defaults to nullable)
+# Missing is_nullable means is_nullable => 1
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">3. Relationships</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code># ✅ Good: clear names
+'found_by_user' => (...),
+'verified_by_user' => (...),
+
+# ❌ Bad: ambiguous
+'user' => (...),
+'user2' => (...),
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4. Unique Constraints</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code># ✅ Good: named constraints
+__PACKAGE__->add_unique_constraint(
+    uk_role_agent_model => ['role', 'agent_type', 'model_name']
+);
+
+# ❌ Bad: unnamed
+__PACKAGE__->add_unique_constraint(['role', 'agent_type', 'model_name']);
+                </code></pre>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">7. See Also</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/AI_Chat_Schema_Documentation" style="color: var(--link-color);">AI Chat Schema Documentation</a> - Database schema specifications</li>
+                    <li><a href="/Documentation/DBSchemaManager_Usage_Guide" style="color: var(--link-color);">DBSchemaManager Usage Guide</a> - Schema management tools</li>
+                    <li><a href="/Documentation/DATABASE_CONNECTION_STRATEGY" style="color: var(--link-color);">Database Connection Strategy</a> - Multi-database connections</li>
+                    <li><a href="https://metacpan.org/pod/DBIx::Class" style="color: var(--link-color);" target="_blank">DBIx::Class Official Docs</a> - Official DBIx::Class documentation</li>
+                    <li><a href="/admin" style="color: var(--link-color);">Administrative Interface</a> - Schema management panel</li>
+                </ul>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p>For technical support or questions about this documentation, contact the system administrator.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,145 @@
+
+
+# Simplified Docker Compose for Comserv Development
+# Database: External MySQL on 192.168.1.198 (NOT local)
+# Dev Port: 3000 (with code mounting for debugging via comserv_server.pl)
+# Prod Port: 5000 (Starman workers via Supervisor)
+# All services on shared bridge network (comserv-network) for proper inter-service communication
+
+services:
+  # Redis Cache Service
+  redis:
+    image: redis:7-alpine
+    container_name: comserv-redis
+    restart: unless-stopped
+    labels:
+      - "description=Redis cache server for session storage and application caching"
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redispass_dev} --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redispass_dev}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - comserv-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Development Web Service - Port 3000
+  # Code is mounted for live development with comserv_server.pl debugging
+  web-dev:
+    build:
+      context: ./Comserv
+      dockerfile: Dockerfile
+    container_name: comserv-web-dev
+    restart: always
+    labels:
+      - "description=Development web server (port 3000) with live code reload and debugging"
+    environment:
+      CATALYST_ENV: development
+      CATALYST_DEBUG: 1
+      CATALYST_HOME: /opt/comserv
+      WEB_PORT: 3000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass_dev}
+      TZ: ${TZ:-UTC}
+      # External Database Configuration (192.168.1.198) - via db_config.json
+      DB_LOAD_SOURCE: db_config
+    ports:
+      - "3000:3000"
+    networks:
+      - comserv-network
+    volumes:
+      # Mount source code for development (allows live reload and debugging)
+      - ${APP_MOUNT:-.}/Comserv/lib:/opt/comserv/lib:delegated
+      - ${APP_MOUNT:-.}/Comserv/script:/opt/comserv/script:delegated
+      - ${APP_MOUNT:-.}/Comserv/root:/opt/comserv/root:delegated
+      - ${APP_MOUNT:-.}/Comserv/config:/opt/comserv/config:delegated
+      - ${APP_MOUNT:-.}/Comserv/t:/opt/comserv/t:delegated
+      - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    extra_hosts:
+      - "database:192.168.1.198"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # Production Web Service - Port 5000
+  # Starman workers via Supervisor (production-grade setup)
+  web-prod:
+    build:
+      context: ./Comserv
+      dockerfile: Dockerfile
+    container_name: comserv-web-prod
+    restart: always
+    labels:
+      - "description=Production web server (port 5000) with Starman workers via Supervisor"
+    environment:
+      CATALYST_ENV: production
+      CATALYST_DEBUG: 0
+      CATALYST_HOME: /opt/comserv
+      WEB_PORT: 5000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass_dev}
+      TZ: ${TZ:-UTC}
+      # External Database Configuration (192.168.1.198) - via db_config.json
+      DB_LOAD_SOURCE: db_config
+    ports:
+      - "5000:5000"
+    networks:
+      - comserv-network
+    volumes:
+      # Mount source code for production debugging
+      - ${APP_MOUNT:-.}/Comserv/lib:/opt/comserv/lib:delegated
+      - ${APP_MOUNT:-.}/Comserv/script:/opt/comserv/script:delegated
+      - ${APP_MOUNT:-.}/Comserv/root:/opt/comserv/root:delegated
+      - ${APP_MOUNT:-.}/Comserv/config:/opt/comserv/config:delegated
+      - ${APP_MOUNT:-.}/Comserv/t:/opt/comserv/t:delegated
+      - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
+
+# Volumes for persistent data
+volumes:
+  redis_data:
+    driver: local
+
+# Shared bridge network for all services
+networks:
+  comserv-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
