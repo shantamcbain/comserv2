@@ -85,7 +85,13 @@
                         <div class="form-row">
                             <div class="form-field">
                                 <label for="body_text">Body (Plain Text) <span class="required">*</span></label>
-                                <small>Use [% '[[' %] workshop.title [% ']]' %], [% '[[' %] workshop.date [% ']]' %], [% '[[' %] participant.name [% ']]' %] as placeholders</small>
+                                <small><strong>Available placeholders:</strong>
+                                [% '[[participant.name]]' %] [% '[[participant.first_name]]' %]
+                                [% '[[workshop.title]]' %] [% '[[workshop.date]]' %] [% '[[workshop.time]]' %]
+                                [% '[[workshop.location]]' %] [% '[[workshop.instructor]]' %]
+                                [% '[[leader.name]]' %] [% '[[workshop.url]]' %]
+                                (also work in Subject field: [% '[[workshop.title]]' %] [% '[[leader.name]]' %])
+                                </small>
                                 <textarea id="body_text" name="body_text" class="form-input" rows="12" required>[% mail_template.body_text || form_data.body_text || '' | html %]</textarea>
                             </div>
                         </div>
