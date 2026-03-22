@@ -1,0 +1,204 @@
+[% PageVersion = 'Comserv/root/mail/mass_email_form.tt,v 1.0 2025/01/27 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Mass Email System' %]
+
+<div class="apiary-container">
+    <header class="apiary-header">
+        <h1><i class="fas fa-envelope-bulk"></i> Mass Email System</h1>
+        <div class="apiary-context">
+            <span class="context-item"><strong>Recipients:</strong> [% user_count %] users</span>
+            <span class="context-item"><strong>Site:</strong> [% c.session.site_name || 'Current Site' %]</span>
+        </div>
+    </header>
+
+    [% IF status_msg %]
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> [% status_msg %]
+        </div>
+    [% END %]
+
+    [% IF error_msg %]
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-triangle"></i> [% error_msg %]
+        </div>
+    [% END %]
+
+    [% IF debug_msg && c.session.debug_mode %]
+        <div class="alert alert-info">
+            <h4>Debug Information:</h4>
+            [% IF debug_msg.size %]
+                <ul>
+                [% FOREACH msg IN debug_msg %]
+                    <li>[% msg %]</li>
+                [% END %]
+                </ul>
+            [% ELSE %]
+                <p>[% debug_msg %]</p>
+            [% END %]
+        </div>
+    [% END %]
+
+    <div class="mass-email-form">
+        <form method="POST" action="[% c.uri_for('/mail/send_mass_email') %]" class="email-compose-form">
+            
+            <div class="form-section">
+                <h3><i class="fas fa-users"></i> Recipients</h3>
+                <div class="recipient-info">
+                    <div class="info-card">
+                        <h4>Site Users</h4>
+                        <p><strong>[% user_count %] users</strong> with email addresses will receive this message</p>
+                        <small class="text-muted">All users registered to the current site</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3><i class="fas fa-copy"></i> Additional Recipients (BCC)</h3>
+                <div class="form-group">
+                    <label for="bcc_addresses">Additional Email Addresses:</label>
+                    <textarea name="bcc_addresses" id="bcc_addresses" class="form-control" rows="3" 
+                              placeholder="Enter additional email addresses separated by commas, semicolons, or spaces&#10;Example: admin@example.com, manager@company.com"></textarea>
+                    <small class="form-text text-muted">
+                        These addresses will receive the email in addition to site users. 
+                        Separate multiple addresses with commas, semicolons, or spaces.
+                    </small>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3><i class="fas fa-edit"></i> Email Content</h3>
+                
+                <div class="form-group">
+                    <label for="subject" class="required">Subject:</label>
+                    <input type="text" name="subject" id="subject" class="form-control" required 
+                           placeholder="Enter email subject">
+                </div>
+
+                <div class="form-group">
+                    <label for="body" class="required">Message:</label>
+                    <textarea name="body" id="body" class="form-control" rows="12" required 
+                              placeholder="Enter your message here..."></textarea>
+                    
+                    <div class="personalization-help">
+                        <h4>Personalization Tags:</h4>
+                        <div class="tag-list">
+                            <span class="tag-item"><code>[FIRST_NAME]</code> - User's first name</span>
+                            <span class="tag-item"><code>[LAST_NAME]</code> - User's last name</span>
+                            <span class="tag-item"><code>[EMAIL]</code> - User's email address</span>
+                        </div>
+                        <small class="text-muted">
+                            These tags will be replaced with actual user data for each recipient.
+                            BCC recipients will receive the message without personalization.
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3><i class="fas fa-paper-plane"></i> Send Options</h3>
+                
+                <div class="send-confirmation">
+                    <div class="confirmation-box">
+                        <h4>Confirmation Required</h4>
+                        <p>You are about to send an email to <strong>[% user_count %] site users</strong> 
+                           [% IF user_count > 0 %]plus any additional BCC recipients[% END %].</p>
+                        <div class="form-check">
+                            <input type="checkbox" id="confirm_send" name="confirm_send" class="form-check-input" required>
+                            <label for="confirm_send" class="form-check-label">
+                                I confirm that I want to send this mass email
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="fas fa-paper-plane"></i> Send Mass Email
+                </button>
+                <a href="[% c.uri_for('/mail/lists') %]" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Mailing Lists
+                </a>
+            </div>
+        </form>
+    </div>
+
+    [% IF mailing_lists.size %]
+    <div class="related-info">
+        <h3><i class="fas fa-list"></i> Available Mailing Lists</h3>
+        <div class="mailing-lists-summary">
+            [% FOREACH list IN mailing_lists %]
+                <div class="list-item">
+                    <strong>[% list.name %]</strong>
+                    [% IF list.description %]- [% list.description %][% END %]
+                </div>
+            [% END %]
+        </div>
+        <small class="text-muted">
+            This mass email will be tracked separately from mailing list campaigns.
+        </small>
+    </div>
+    [% END %]
+
+    <footer class="documentation-footer">
+        <hr>
+        <p><em>Mass Email System - Send messages to all site users with BCC support</em></p>
+        <p><strong>Security:</strong> Admin access required | <strong>Tracking:</strong> All sends are logged</p>
+    </footer>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('.email-compose-form');
+    const confirmCheckbox = document.getElementById('confirm_send');
+    const submitButton = form.querySelector('button[type="submit"]');
+    
+    // Enable/disable submit button based on confirmation
+    function updateSubmitButton() {
+        submitButton.disabled = !confirmCheckbox.checked;
+    }
+    
+    confirmCheckbox.addEventListener('change', updateSubmitButton);
+    updateSubmitButton(); // Initial state
+    
+    // Form validation
+    form.addEventListener('submit', function(e) {
+        const subject = document.getElementById('subject').value.trim();
+        const body = document.getElementById('body').value.trim();
+        
+        if (!subject || !body) {
+            e.preventDefault();
+            alert('Please fill in both subject and message fields.');
+            return false;
+        }
+        
+        if (!confirmCheckbox.checked) {
+            e.preventDefault();
+            alert('Please confirm that you want to send this mass email.');
+            return false;
+        }
+        
+        // Final confirmation
+        const userCount = [% user_count %];
+        const bccAddresses = document.getElementById('bcc_addresses').value.trim();
+        let totalRecipients = userCount;
+        
+        if (bccAddresses) {
+            const bccCount = bccAddresses.split(/[,;\s]+/).filter(addr => addr.trim()).length;
+            totalRecipients += bccCount;
+        }
+        
+        if (!confirm(`Are you sure you want to send this email to ${totalRecipients} recipients?\n\nThis action cannot be undone.`)) {
+            e.preventDefault();
+            return false;
+        }
+        
+        // Show loading state
+        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+        submitButton.disabled = true;
+    });
+});
+</script>

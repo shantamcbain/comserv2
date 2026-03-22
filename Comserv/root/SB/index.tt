@@ -1,0 +1,56 @@
+[% META title = 'Shaman Botanicals - Natural Health Products' %]
+[% PageVersion = 'shamanbotanicals/index.tt,v 0.01 2025/01/27 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="content-wrapper">
+    <div class="main-content">
+        <header class="page-header">
+            <h1>Shaman Botanicals</h1>
+            <p class="page-subtitle">Natural Health Products &</header>
+
+        <section class="section Botanical Supplies</p>
+        ">
+            <h2 class="section-header">Welcome to Shaman Botanicals</h2>
+            <div class="content-block">
+                <p>Your trusted source for high-quality natural health products and botanical supplies. We specialize in traditional herbal remedies and modern botanical solutions.</p>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2 class="section-header">Product Categories</h2>
+            <div class="category-grid">
+                <div class="category-item">
+                    <h3>Herbal Tinctures</h3>
+                    <p>Premium quality herbal extracts and tinctures</p>
+                    <a href="/shamanbotanicals/products/tinctures" class="btn-primary">View Tinctures</a>
+                </div>
+                <div class="category-item">
+                    <h3>Dried Herbs</h3>
+                    <p>Carefully sourced and processed dried botanical materials</p>
+                    <a href="/shamanbotanicals/products/dried-herbs" class="btn-primary">View Herbs</a>
+                </div>
+                <div class="category-item">
+                    <h3>Essential Oils</h3>
+                    <p>Pure, therapeutic-grade essential oils</p>
+                    <a href="/shamanbotanicals/products/essential-oils" class="btn-primary">View Oils</a>
+                </div>
+                <div class="category-item">
+                    <h3>Botanical Supplies</h3>
+                    <p>Tools and supplies for botanical preparation</p>
+                    <a href="/shamanbotanicals/products/supplies" class="btn-primary">View Supplies</a>
+                </div>
+            </div>
+        </section>
+
+        [% IF c.session.group == 'admin' || c.session.site == 'SB' || c.session.group == 'csc_admin' %]
+        <section class="section admin-section">
+            <h2 class="section-header">Administration</h2>
+            <div class="admin-links">
+                <a href="/sham" class="btn-secondary">Controller Documentation</a>
+                anbotanicals/documentation" target="_blank" class="btn-secondary">Visit Live Site</a>
+            </div>
+        </section>
+        </div>
+</div>
