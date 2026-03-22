@@ -53,15 +53,16 @@
                             <tr>
                                 <th>Date Sent</th>
                                 <th>Subject</th>
-                                <th>Recipients</th>
+                                <th>Delivered</th>
                                 <th>Status</th>
                                 <th>Sent By</th>
+                                <th>Detail</th>
                             </tr>
                         </thead>
                         <tbody>
                             [% FOREACH email IN emails %]
                             <tr>
-                                <td>[% email.sent_at.strftime('%Y-%m-%d %H:%M') %]</td>
+                                <td>[% email.sent_at %]</td>
                                 <td>
                                     <strong>[% email.subject | html %]</strong><br>
                                     <small class="text-muted">[% email.body.substr(0, 100) | html %][% IF email.body.length > 100 %]...[% END %]</small>
@@ -69,13 +70,13 @@
                                 <td>[% email.recipient_count %]</td>
                                 <td>
                                     [% IF email.status == 'sent' %]
-                                        <span class="success">✓ Sent</span>
+                                        <span class="success">&#10003; Sent</span>
                                     [% ELSIF email.status == 'failed' %]
-                                        <span class="error">✗ Failed</span>
+                                        <span class="error">&#10007; Failed</span>
                                     [% ELSIF email.status == 'partial' %]
-                                        <span class="warning">⚠ Partial</span>
+                                        <span class="warning">&#9888; Partial</span>
                                     [% ELSE %]
-                                        [% email.status %]
+                                        [% email.status | html %]
                                     [% END %]
                                 </td>
                                 <td>
@@ -84,6 +85,9 @@
                                     [% ELSE %]
                                         Unknown
                                     [% END %]
+                                </td>
+                                <td class="action-cell">
+                                    <a href="/workshop/email_detail/[% email.id %]" class="btn btn-sm btn-secondary">View Addresses</a>
                                 </td>
                             </tr>
                             [% END %]
