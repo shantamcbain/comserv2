@@ -1,0 +1,967 @@
+[% META 
+    title = 'Docker + PyCharm Setup Guide for Comserv Development'
+    description = 'Comprehensive guide to creating and using Docker containers for Comserv development with PyCharm IDE'
+    roles = 'developer, admin'
+    TemplateType = 'Documentation'
+    category = 'developer_guide'
+    page_version = '1.3'
+    last_updated = 'Sun Oct 26 08:14:11 PM PDT 2025'
+    site_specific = 'no'
+%]
+[% PageVersion = 'Documentation/docker_pycharm_setup_guide.tt,v 1.3 20:14:11 2025/10/26 AI Exp - Docker Startup with Manual Server Shutdown and Port Configuration' %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-100">
+            <h1 style="color: var(--text-color); font-family: var(--header-font);">Docker + PyCharm Setup Guide for Comserv Development</h1>
+            <p style="color: var(--text-color); font-family: var(--body-font); font-size: var(--font-size-large);">Complete guide to containerize Comserv application and develop using Docker with PyCharm IDE</p>
+            
+            <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+                Last Updated: 2025-10-26 | Version: 1.3 | Status: Current
+            </div>
+            
+            <!-- Navigation Breadcrumb -->
+            <nav aria-label="breadcrumb" style="margin: var(--spacing-small) 0;">
+                <ol style="list-style: none; padding: 0; margin: 0; display: flex; gap: var(--spacing-small); color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="[% c.uri_for('/') %]" style="color: var(--link-color);">Home</a></li>
+                    <li style="color: var(--text-muted-color);">›</li>
+                    <li><a href="[% c.uri_for('/documentation') %]" style="color: var(--link-color);">Documentation</a></li>
+                    <li style="color: var(--text-muted-color);">›</li>
+                    <li style="color: var(--text-color);">Docker + PyCharm Setup</li>
+                </ol>
+            </nav>
+
+            <!-- Alert: Purpose of This Guide -->
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 0 0 var(--spacing-small) 0;"><strong style="color: var(--info-color);">Purpose:</strong> This guide enables developers to:</p>
+                <ul style="color: var(--text-color); font-family: var(--body-font); margin: 0; padding-left: var(--spacing-medium);">
+                    <li><strong>Create</strong> a Docker container for Comserv development</li>
+                    <li><strong>Use PyCharm</strong> IDE to develop inside the container</li>
+                    <li><strong>Share</strong> the container image so future developers can clone it</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table of Contents -->
+    <div class="row" style="margin-top: var(--spacing-medium);">
+        <div class="col-100">
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden;">
+                <div style="background-color: var(--table-header-bg); padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="color: var(--text-color); font-family: var(--header-font); margin: 0;">Table of Contents</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <ol style="color: var(--text-color); font-family: var(--body-font);">
+                        <li><a href="#prerequisites" style="color: var(--link-color);">Prerequisites & System Requirements</a></li>
+                        <li><a href="#phase1" style="color: var(--link-color);">Phase 1: Docker Installation (5 minutes)</a></li>
+                        <li><a href="#shutdown-manual" style="color: var(--link-color);">CRITICAL: Stop Manual comserv_server.pl</a></li>
+                        <li><a href="#phase2" style="color: var(--link-color);">Phase 2: Build Comserv Container (10 minutes)</a></li>
+                        <li><a href="#phase3" style="color: var(--link-color);">Phase 3: PyCharm IDE Configuration (15 minutes)</a></li>
+                        <li><a href="#phase4" style="color: var(--link-color);">Phase 4: Development Workflow</a></li>
+                        <li><a href="#phase5" style="color: var(--link-color);">Phase 5: Sharing Container with Team</a></li>
+                        <li><a href="#troubleshooting" style="color: var(--link-color);">Troubleshooting</a></li>
+                        <li><a href="#faq" style="color: var(--link-color);">FAQ</a></li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PREREQUISITES SECTION -->
+    <div class="row" style="margin-top: var(--spacing-medium);">
+        <div class="col-100">
+            <h2 id="prerequisites" style="color: var(--text-color); font-family: var(--header-font);">Prerequisites & System Requirements</h2>
+            
+            <div class="row">
+                <div class="col-50">
+                    <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                        <div style="background-color: var(--success-color); color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                            <h5 style="font-family: var(--header-font); margin: 0;">Required Software</h5>
+                        </div>
+                        <div style="padding: var(--spacing-medium);">
+                            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                                <li><strong>Docker Desktop</strong> (version 4.0+)
+                                    <ul>
+                                        <li>Windows 10/11 Pro, Enterprise, or Education</li>
+                                        <li>macOS 11 (Big Sur) or newer</li>
+                                        <li>Linux (any modern distribution)</li>
+                                    </ul>
+                                </li>
+                                <li><strong>PyCharm IDE</strong> (Professional or Community)
+                                    <ul>
+                                        <li>Version 2023.1 or newer recommended</li>
+                                        <li>Must have Docker plugin enabled</li>
+                                    </ul>
+                                </li>
+                                <li><strong>Git</strong> (for cloning Comserv repository)</li>
+                                <li><strong>8 GB RAM</strong> minimum (16 GB recommended)</li>
+                                <li><strong>20 GB free disk space</strong> for container images</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-50">
+                    <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                        <div style="background-color: var(--info-color); color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                            <h5 style="font-family: var(--header-font); margin: 0;">Verify Your System</h5>
+                        </div>
+                        <div style="padding: var(--spacing-medium);">
+                            <p style="color: var(--text-color); font-family: var(--body-font);">Before starting, verify your system setup:</p>
+                            <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; font-size: var(--font-size-small);">
+                                <code style="color: var(--text-color);">
+                                    # Check Docker installation<br>
+                                    docker --version<br>
+                                    docker run hello-world<br>
+                                    <br>
+                                    # Check Git<br>
+                                    git --version<br>
+                                    <br>
+                                    # Check RAM and Disk<br>
+                                    # Windows: Task Manager → Performance<br>
+                                    # Mac/Linux: top or free -h<br>
+                                </code>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PHASE 1: DOCKER INSTALLATION -->
+    <div class="row" style="margin-top: var(--spacing-medium);">
+        <div class="col-100">
+            <h2 id="phase1" style="color: var(--text-color); font-family: var(--header-font);">Phase 1: Docker Installation (5 minutes)</h2>
+            
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: var(--primary-color); color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Windows / macOS: Docker Desktop</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <ol>
+                        <li>Download Docker Desktop from <a href="https://www.docker.com/products/docker-desktop" target="_blank">docker.com</a></li>
+                        <li>Install following the installer prompts</li>
+                        <li>Launch Docker Desktop (watch for the whale icon in taskbar/menu)</li>
+                        <li>Wait for "Docker is running" confirmation</li>
+                        <li>Open terminal/PowerShell and verify:
+                            <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-top: var(--spacing-small);">
+                                <code style="color: var(--text-color);">docker --version</code>
+                            </div>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: var(--primary-color); color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Linux: Docker Engine & Compose</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Ubuntu/Debian:</strong></p>
+                    <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-bottom: var(--spacing-medium);">
+                        <code style="color: var(--text-color);">
+                            sudo apt-get update<br>
+                            sudo apt-get install -y docker.io docker-compose<br>
+                            sudo usermod -aG docker $USER<br>
+                            newgrp docker<br>
+                            docker --version
+                        </code>
+                    </div>
+
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>CentOS/RHEL:</strong></p>
+                    <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace;">
+                        <code style="color: var(--text-color);">
+                            sudo yum install -y docker docker-compose<br>
+                            sudo systemctl start docker<br>
+                            sudo systemctl enable docker<br>
+                            sudo usermod -aG docker $USER<br>
+                            newgrp docker<br>
+                            docker --version
+                        </code>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong style="color: var(--warning-color);">After Installation:</strong> Restart your computer to ensure Docker daemon starts properly.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- CRITICAL: SHUTDOWN MANUAL SERVER -->
+    <div class="row" style="margin-top: var(--spacing-medium);">
+        <div class="col-100">
+            <h2 id="shutdown-manual" style="color: var(--text-color); font-family: var(--header-font);">CRITICAL: Stop Manual comserv_server.pl Before Docker Startup</h2>
+            
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--danger-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong style="color: var(--danger-color);">⚠️ IMPORTANT:</strong> If you are currently running <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">comserv_server.pl</code> in reload mode (-r flag) on your development machine, you <strong>MUST stop it before starting Docker containers</strong>. Running both simultaneously will cause port conflicts and application errors.</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: var(--danger-color); color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Stop the Manual Server</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>If running in a terminal:</strong></p>
+                    <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-bottom: var(--spacing-medium);">
+                        <code style="color: var(--text-color);">
+                            # Stop the currently running server (Ctrl+C)<br>
+                            # In the terminal where comserv_server.pl is running:<br>
+                            Ctrl+C
+                        </code>
+                    </div>
+
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>If running in background or lost terminal:</strong></p>
+                    <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-bottom: var(--spacing-medium);">
+                        <code style="color: var(--text-color);">
+                            # Find and kill the comserv_server process<br>
+                            pkill -f "comserv_server.pl"<br>
+                            <br>
+                            # Verify it's stopped (should show no output)<br>
+                            pgrep -f "comserv_server.pl"
+                        </code>
+                    </div>
+
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Port Conflicts to Avoid:</strong></p>
+                    <ul style="color: var(--text-color); font-family: var(--body-font);">
+                        <li><strong>Port 3000:</strong> Development server (Catalyst debug mode - debug=1)</li>
+                        <li><strong>Port 5000:</strong> Production server proxy (debug=0, simulates production)</li>
+                        <li><strong>Port 3306:</strong> MySQL Database</li>
+                        <li><strong>Port 6379:</strong> Redis Cache</li>
+                    </ul>
+
+                    <p style="color: var(--text-color); font-family: var(--body-font); margin-top: var(--spacing-medium);"><strong>Verify Ports Are Free:</strong></p>
+                    <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace;">
+                        <code style="color: var(--text-color);">
+                            # Check if ports are in use (no output = port is free)<br>
+                            lsof -i :3000<br>
+                            lsof -i :5000<br>
+                            lsof -i :3306<br>
+                            lsof -i :6379
+                        </code>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PHASE 2: BUILD COMSERV CONTAINER -->
+    <div class="row" style="margin-top: var(--spacing-medium);">
+        <div class="col-100">
+            <h2 id="phase2" style="color: var(--text-color); font-family: var(--header-font);">Phase 2: Build Comserv Container (10 minutes)</h2>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: var(--primary-color); color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Step 1: Clone Comserv Repository</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace;">
+                        <code style="color: var(--text-color);">
+                            cd ~/projects  # or your preferred directory<br>
+                            git clone https://github.com/your-org/comserv.git<br>
+                            cd comserv
+                        </code>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: var(--primary-color); color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Step 2: Build Docker Image</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <p style="color: var(--text-color); font-family: var(--body-font);">Run this command from the Comserv repository root:</p>
+                    <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-bottom: var(--spacing-medium);">
+                        <code style="color: var(--text-color);">
+                            docker build -t comserv:latest -f Dockerfile .<br>
+                            <br>
+                            # Expected output: Successfully tagged comserv:latest
+                        </code>
+                    </div>
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>What this does:</strong></p>
+                    <ul style="color: var(--text-color); font-family: var(--body-font);">
+                        <li>Reads Dockerfile configuration</li>
+                        <li>Downloads base image (Perl environment)</li>
+                        <li>Installs all Comserv dependencies</li>
+                        <li>Creates image named "comserv" with tag "latest"</li>
+                    </ul>
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>First build takes 5-15 minutes</strong> (downloading dependencies). Subsequent builds are faster due to Docker layer caching.</p>
+                </div>
+            </div>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: var(--primary-color); color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Step 3: Verify Image Was Created</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-bottom: var(--spacing-medium);">
+                        <code style="color: var(--text-color);">
+                            docker images<br>
+                            <br>
+                            # Should show output like:<br>
+                            # REPOSITORY  TAG      IMAGE ID      CREATED        SIZE<br>
+                            # comserv     latest   abc123def456  2 minutes ago   2.5GB
+                        </code>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: var(--primary-color); color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Step 4: Start Services with Docker Compose</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Setup Configuration:</strong></p>
+                    <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-bottom: var(--spacing-medium);">
+                        <code style="color: var(--text-color);">
+                            cd /home/shanta/PycharmProjects/comserv2<br>
+                            cp .env.development .env<br>
+                            <br>
+                            # Start all services (MySQL, Redis, App, Nginx)<br>
+                            docker-compose up -d<br>
+                            <br>
+                            # Verify all containers are running<br>
+                            docker-compose ps<br>
+                            <br>
+                            # Should show all services with status "Up"
+                        </code>
+                    </div>
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>What This Does:</strong></p>
+                    <ul style="color: var(--text-color); font-family: var(--body-font);">
+                        <li>Reads <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">docker-compose.yml</code> configuration</li>
+                        <li>Starts 4 services: MySQL database, Redis cache, Comserv application, Nginx proxy</li>
+                        <li>Creates Docker network (172.20.0.0/16) for service communication</li>
+                        <li>Exposes Catalyst development server at: <strong>http://localhost:3000</strong> (debug=1)</li>
+                        <li>Exposes Nginx production proxy at: <strong>http://localhost:5000</strong> (debug=0, simulates production)</li>
+                        <li>Database accessible at: <strong>localhost:3306</strong> (dev only)</li>
+                        <li>Redis accessible at: <strong>localhost:6379</strong> (dev only)</li>
+                    </ul>
+                    
+                    <p style="color: var(--text-color); font-family: var(--body-font); margin-top: var(--spacing-medium);"><strong>Port Explanation:</strong></p>
+                    <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; border: 1px solid var(--border-color); margin-bottom: var(--spacing-medium);">
+                        <div style="background-color: var(--table-header-bg); padding: var(--spacing-small);">
+                            <strong style="color: var(--text-color);">Port 3000 - Development Server (debug=1)</strong>
+                        </div>
+                        <div style="padding: var(--spacing-small);">
+                            <ul style="color: var(--text-color); font-family: var(--body-font); margin: 0; padding-left: var(--spacing-medium);">
+                                <li><strong>Direct Catalyst access:</strong> Full debugging features enabled</li>
+                                <li><strong>Error details:</strong> Stack traces and full debug output visible</li>
+                                <li><strong>Hot reload:</strong> Changes to .tt templates refresh automatically</li>
+                                <li><strong>Use case:</strong> Active development, debugging issues, testing features</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; border: 1px solid var(--border-color);">
+                        <div style="background-color: var(--table-header-bg); padding: var(--spacing-small);">
+                            <strong style="color: var(--text-color);">Port 5000 - Production Server (debug=0)</strong>
+                        </div>
+                        <div style="padding: var(--spacing-small);">
+                            <ul style="color: var(--text-color); font-family: var(--body-font); margin: 0; padding-left: var(--spacing-medium);">
+                                <li><strong>Nginx reverse proxy:</strong> Simulates production environment</li>
+                                <li><strong>Error handling:</strong> User-friendly error pages (no debug output)</li>
+                                <li><strong>Performance testing:</strong> How application behaves in production</li>
+                                <li><strong>Use case:</strong> Testing before deployment, verifying production behavior</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin-top: var(--spacing-medium);">
+                        <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong style="color: var(--info-color);">Multi-Service Setup:</strong> Unlike single-container approaches, docker-compose orchestrates the complete infrastructure: application + database + cache + proxy. This is closer to production and prevents local port conflicts.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PHASE 3: PYCHARM CONFIGURATION -->
+    <div class="row" style="margin-top: var(--spacing-medium);">
+        <div class="col-100">
+            <h2 id="phase3" style="color: var(--text-color); font-family: var(--header-font);">Phase 3: PyCharm IDE Configuration (15 minutes)</h2>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: var(--primary-color); color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Step 1: Open Comserv Project in PyCharm</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <ol style="color: var(--text-color); font-family: var(--body-font);">
+                        <li>Open PyCharm</li>
+                        <li>File → Open → Navigate to comserv directory</li>
+                        <li>Click "Open" button</li>
+                        <li>Wait for PyCharm to index the project</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: var(--primary-color); color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Step 2: Configure Docker Connection</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <ol style="color: var(--text-color); font-family: var(--body-font);">
+                        <li>Go to: <strong>PyCharm → Preferences</strong> (Mac) or <strong>File → Settings</strong> (Windows/Linux)</li>
+                        <li>Navigate to: <strong>Project: [ProjectName] → Python Interpreter</strong></li>
+                        <li>Click gear icon ⚙️ → <strong>Add</strong></li>
+                        <li>Select <strong>Docker</strong> from the left panel</li>
+                        <li>Docker connection should auto-detect; if not:
+                            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                                <li>Click <strong>New...</strong> next to "Docker"</li>
+                                <li>Name: "Docker Desktop" or "Local Docker"</li>
+                                <li>Connection settings auto-populate</li>
+                                <li>Click <strong>OK</strong></li>
+                            </ul>
+                        </li>
+                        <li>Select your Docker connection and click <strong>OK</strong></li>
+                    </ol>
+                </div>
+            </div>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: var(--primary-color); color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Step 3: Configure Perl Interpreter</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <ol style="color: var(--text-color); font-family: var(--body-font);">
+                        <li>In Python Interpreter settings, click the "+" button</li>
+                        <li>Select <strong>Docker Container</strong></li>
+                        <li>Set Image: <strong>comserv:latest</strong></li>
+                        <li>Container name: <strong>comserv-dev</strong></li>
+                        <li>Perl executable path: <strong>/usr/bin/perl</strong></li>
+                        <li>Click <strong>OK</strong> and <strong>Apply</strong></li>
+                    </ol>
+                    
+                    <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin-top: var(--spacing-medium);">
+                        <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong style="color: var(--info-color);">Note:</strong> For Perl projects, PyCharm uses the Python Interpreter settings for remote execution configuration. You can also configure a custom Perl run configuration if needed.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: var(--primary-color); color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Step 4: Verify PyCharm ↔ Container Connection</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <ol style="color: var(--text-color); font-family: var(--body-font);">
+                        <li>Terminal → New Terminal (or Alt+F12)</li>
+                        <li>Execute in terminal:
+                            <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-top: var(--spacing-small);">
+                                <code style="color: var(--text-color);">perl -v</code>
+                            </div>
+                        </li>
+                        <li>Should show Perl version from container (v5.40.0 or similar)</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PHASE 4: DEVELOPMENT WORKFLOW -->
+    <div class="row" style="margin-top: var(--spacing-medium);">
+        <div class="col-100">
+            <h2 id="phase4" style="color: var(--text-color); font-family: var(--header-font);">Phase 4: Development Workflow</h2>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: var(--success-color); color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Daily Development Steps</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <ol style="color: var(--text-color); font-family: var(--body-font);">
+                        <li><strong>Start All Services (if not running):</strong>
+                            <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-top: var(--spacing-small);">
+                                <code style="color: var(--text-color);">cd /home/shanta/PycharmProjects/comserv2<br>docker-compose up -d</code>
+                            </div>
+                        </li>
+                        <li><strong>Verify Services are Running:</strong>
+                            <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-top: var(--spacing-small);">
+                                <code style="color: var(--text-color);">docker-compose ps</code>
+                            </div>
+                        </li>
+                        <li><strong>Open PyCharm Project</strong> (File → Open Recent)</li>
+                        <li><strong>Edit Code</strong> in PyCharm (your changes sync to the application container)</li>
+                        <li><strong>Run Tests or App</strong> using PyCharm's run configurations or terminal</li>
+                        <li><strong>View Application Logs:</strong>
+                            <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-top: var(--spacing-small);">
+                                <code style="color: var(--text-color);">docker-compose logs -f web</code>
+                            </div>
+                        </li>
+                        <li><strong>View Database Logs:</strong>
+                            <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-top: var(--spacing-small);">
+                                <code style="color: var(--text-color);">docker-compose logs -f database</code>
+                            </div>
+                        </li>
+                        <li><strong>Access Container Shell:</strong>
+                            <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-top: var(--spacing-small);">
+                                <code style="color: var(--text-color);">docker-compose exec web bash</code>
+                            </div>
+                        </li>
+                        <li><strong>Stop Services (end of day):</strong>
+                            <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-top: var(--spacing-small);">
+                                <code style="color: var(--text-color);">docker-compose down</code>
+                            </div>
+                        </li>
+                        <li><strong>Commit and Push Changes:</strong>
+                            <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-top: var(--spacing-small);">
+                                <code style="color: var(--text-color);">git add . &amp;&amp; git commit -m "Your message" &amp;&amp; git push</code>
+                            </div>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: var(--success-color); color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Execute Commands in Container</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>From PyCharm Terminal:</strong></p>
+                    <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-bottom: var(--spacing-medium);">
+                        <code style="color: var(--text-color);">
+                            # Run perl command<br>
+                            perl -c Comserv/Makefile.PL<br>
+                            <br>
+                            # Run tests<br>
+                            prove -l t/controller_*.t<br>
+                            <br>
+                            # Install dependencies<br>
+                            cpanm Module::Name<br>
+                        </code>
+                    </div>
+
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>From Host Machine Terminal:</strong></p>
+                    <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace;">
+                        <code style="color: var(--text-color);">
+                            docker exec comserv-dev perl -v<br>
+                            docker exec comserv-dev prove -l t/<br>
+                            docker exec comserv-dev cpanm --list<br>
+                        </code>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: var(--success-color); color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Debug Workflow</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Set Breakpoints:</strong></p>
+                    <ol style="color: var(--text-color); font-family: var(--body-font);">
+                        <li>Click in the left margin of your Perl code at line you want to break on</li>
+                        <li>Red circle appears indicating breakpoint</li>
+                    </ol>
+
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Run Debugger:</strong></p>
+                    <ol style="color: var(--text-color); font-family: var(--body-font);">
+                        <li>Right-click test file or script</li>
+                        <li>Select "Debug 'filename'" (or use Shift+F9)</li>
+                        <li>Debugger will stop at your breakpoints</li>
+                        <li>Use Debug panel to Step Over, Step Into, Resume, etc.</li>
+                    </ol>
+
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Inspect Variables:</strong></p>
+                    <ul style="color: var(--text-color); font-family: var(--body-font);">
+                        <li>Hover over variables to see their values</li>
+                        <li>Use Debug Console tab to execute Perl code on-the-fly</li>
+                        <li>Check Variables panel for detailed object information</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: var(--warning-color); color: var(--text-color); padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Container Maintenance</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Stop Container (end of day):</strong></p>
+                    <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-bottom: var(--spacing-medium);">
+                        <code style="color: var(--text-color);">docker stop comserv-dev</code>
+                    </div>
+
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Remove Old Containers:</strong></p>
+                    <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-bottom: var(--spacing-medium);">
+                        <code style="color: var(--text-color);">docker rm comserv-old-container</code>
+                    </div>
+
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>View Container Details:</strong></p>
+                    <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-bottom: var(--spacing-medium);">
+                        <code style="color: var(--text-color);">docker inspect comserv-dev</code>
+                    </div>
+
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Clean Up Unused Images (free disk space):</strong></p>
+                    <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace;">
+                        <code style="color: var(--text-color);">docker image prune -a</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PHASE 5: SHARING CONTAINER -->
+    <div class="row" style="margin-top: var(--spacing-medium);">
+        <div class="col-100">
+            <h2 id="phase5" style="color: var(--text-color); font-family: var(--header-font);">Phase 5: Sharing Container with Team</h2>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong style="color: var(--success-color);">Goal:</strong> After setting up your container successfully, push it to a registry so other developers can clone it instead of building from scratch.</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: var(--primary-color); color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Option A: Docker Hub (Easiest for Teams)</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <ol style="color: var(--text-color); font-family: var(--body-font);">
+                        <li><strong>Create Docker Hub Account:</strong>
+                            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                                <li>Go to <a href="https://hub.docker.com" target="_blank" style="color: var(--link-color);">hub.docker.com</a></li>
+                                <li>Sign up (free)</li>
+                            </ul>
+                        </li>
+                        <li><strong>Login from Your Machine:</strong>
+                            <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-top: var(--spacing-small);">
+                                <code style="color: var(--text-color);">docker login</code>
+                            </div>
+                            <div style="margin-top: var(--spacing-small); color: var(--text-color); font-family: var(--body-font);">Enter your Docker Hub username and password</div>
+                        </li>
+                        <li><strong>Tag Your Image:</strong>
+                            <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-top: var(--spacing-small);">
+                                <code style="color: var(--text-color);">
+                                    docker tag comserv:latest your-docker-username/comserv:latest<br>
+                                    docker tag comserv:latest your-docker-username/comserv:v1.0.0
+                                </code>
+                            </div>
+                        </li>
+                        <li><strong>Push to Docker Hub:</strong>
+                            <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-top: var(--spacing-small);">
+                                <code style="color: var(--text-color);">docker push your-docker-username/comserv:latest</code>
+                            </div>
+                            <div style="margin-top: var(--spacing-small); color: var(--text-muted-color); font-family: var(--body-font);">(Takes 3-15 minutes depending on image size and network speed)</div>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: var(--primary-color); color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Option B: GitHub Container Registry (Best for Private Repos)</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <ol style="color: var(--text-color); font-family: var(--body-font);">
+                        <li><strong>Create GitHub Token:</strong>
+                            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                                <li>Go to github.com → Settings → Developer Settings → Personal Access Tokens</li>
+                                <li>Click "Generate new token"</li>
+                                <li>Select scopes: <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">write:packages</code>, <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">read:packages</code>, <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">delete:packages</code></li>
+                                <li>Copy the token (save it!)</li>
+                            </ul>
+                        </li>
+                        <li><strong>Login to GitHub Container Registry:</strong>
+                            <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-top: var(--spacing-small);">
+                                <code style="color: var(--text-color);">
+                                    echo YOUR_TOKEN | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+                                </code>
+                            </div>
+                        </li>
+                        <li><strong>Tag and Push:</strong>
+                            <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-top: var(--spacing-small);">
+                                <code style="color: var(--text-color);">
+                                    docker tag comserv:latest ghcr.io/your-org/comserv:latest<br>
+                                    docker push ghcr.io/your-org/comserv:latest
+                                </code>
+                            </div>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: var(--success-color); color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">For Other Developers: Clone the Image</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Once the container is shared, new developers can start with:</strong></p>
+                    <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-bottom: var(--spacing-medium);">
+                        <code style="color: var(--text-color);">
+                            # Pull the image<br>
+                            docker pull your-docker-username/comserv:latest<br>
+                            <br>
+                            # Clone Comserv code<br>
+                            git clone [repo-url]<br>
+                            cd comserv<br>
+                            <br>
+                            # Run container from pulled image<br>
+                            docker run -d \<br>
+                            &nbsp;&nbsp;--name comserv-dev \<br>
+                            &nbsp;&nbsp;-p 3000:3000 \<br>
+                            &nbsp;&nbsp;-v "$(pwd):/app" \<br>
+                            your-docker-username/comserv:latest<br>
+                            <br>
+                            # Configure PyCharm (same as Phase 3)<br>
+                            # Done! They're ready to develop!
+                        </code>
+                    </div>
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Time saved: 15-20 minutes</strong> (no dependency installation needed)</p>
+                </div>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong style="color: var(--info-color);">Tip:</strong> Create a <strong>Dockerfile</strong> and push it to your git repo along with a <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">README.md</code> explaining how to build and use the container. This ensures teammates can rebuild if needed.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- TROUBLESHOOTING -->
+    <div class="row" style="margin-top: var(--spacing-medium);">
+        <div class="col-100">
+            <h2 id="troubleshooting" style="color: var(--text-color); font-family: var(--header-font);">Troubleshooting</h2>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: #c0392b; color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Error: "Docker daemon is not running"</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                    <ul style="color: var(--text-color); font-family: var(--body-font);">
+                        <li><strong>Windows/Mac:</strong> Open Docker Desktop application</li>
+                        <li><strong>Linux:</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">sudo systemctl start docker</code></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: #c0392b; color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Error: "Permission denied while trying to connect to Docker daemon"</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution (Linux):</strong></p>
+                    <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace;">
+                        <code style="color: var(--text-color);">
+                            sudo usermod -aG docker $USER<br>
+                            newgrp docker<br>
+                            docker ps  # Test the command
+                        </code>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: #c0392b; color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Error: "Port 3000 already in use"</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                    <ol style="color: var(--text-color); font-family: var(--body-font);">
+                        <li>Find what's using port 3000:
+                            <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-top: var(--spacing-small);">
+                                <code style="color: var(--text-color);">
+                                    # Mac/Linux:<br>
+                                    sudo lsof -i :3000<br>
+                                    <br>
+                                    # Windows (PowerShell):<br>
+                                    netstat -ano | findstr :3000
+                                </code>
+                            </div>
+                        </li>
+                        <li>Kill the process or map to different port:
+                            <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-top: var(--spacing-small);">
+                                <code style="color: var(--text-color);">
+                                    docker stop comserv-dev<br>
+                                    docker run -d --name comserv-dev -p 3001:3000 -v "$(pwd):/app" comserv:latest
+                                </code>
+                            </div>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: #c0392b; color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Error: "Cannot connect from PyCharm to container"</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                    <ol style="color: var(--text-color); font-family: var(--body-font);">
+                        <li>Verify container is running: <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">docker ps</code></li>
+                        <li>In PyCharm, go to Settings → Project → Python Interpreter</li>
+                        <li>Click gear → Docker → Connection settings</li>
+                        <li>Test connection by clicking "Test" button</li>
+                        <li>If still failing, restart Docker Desktop completely</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: #c0392b; color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Error: "Build fails - module not found"</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                    <ol style="color: var(--text-color); font-family: var(--body-font);">
+                        <li>Ensure Dockerfile is in project root</li>
+                        <li>Check Dockerfile PATH instruction matches your repo structure</li>
+                        <li>Rebuild with verbose output:
+                            <div style="background-color: var(--light-color); padding: var(--spacing-small); border-radius: 4px; font-family: monospace; margin-top: var(--spacing-small);">
+                                <code style="color: var(--text-color);">docker build -t comserv:latest --progress=plain -f Dockerfile .</code>
+                            </div>
+                        </li>
+                        <li>Review error message carefully for missing dependency</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-medium);">
+                <div style="background-color: #c0392b; color: white; padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); margin: 0;">Slow File Sync Between Host and Container</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>On macOS/Windows (Docker Desktop):</strong></p>
+                    <p style="color: var(--text-color); font-family: var(--body-font);">File syncing can be slow due to virtualization layer. Consider:</p>
+                    <ul style="color: var(--text-color); font-family: var(--body-font);">
+                        <li>Use <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">cached</code> option in volume mount: <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">-v "$(pwd):/app:cached"</code></li>
+                        <li>Upgrade to latest Docker Desktop version</li>
+                        <li>For critical performance, migrate to Linux native Docker (not virtualized)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FAQ -->
+    <div class="row" style="margin-top: var(--spacing-medium); margin-bottom: var(--spacing-medium);">
+        <div class="col-100">
+            <h2 id="faq" style="color: var(--text-color); font-family: var(--header-font);">Frequently Asked Questions</h2>
+
+            <div>
+                <!-- FAQ 1 -->
+                <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-small);">
+                    <div style="background-color: var(--table-header-bg); padding: var(--spacing-medium); cursor: pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+                        <h6 style="font-family: var(--header-font); color: var(--text-color); margin: 0;">Can I develop on Windows with WSL2?</h6>
+                    </div>
+                    <div style="display: none; padding: var(--spacing-medium); background-color: white;">
+                        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Yes!</strong> Docker Desktop for Windows with WSL2 backend is recommended. It provides native Docker experience with better performance than Hyper-V.</p>
+                        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Setup:</strong> Enable WSL2 in Docker Desktop settings → Resources → WSL Integration</p>
+                    </div>
+                </div>
+
+                <!-- FAQ 2 -->
+                <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-small);">
+                    <div style="background-color: var(--table-header-bg); padding: var(--spacing-medium); cursor: pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+                        <h6 style="font-family: var(--header-font); color: var(--text-color); margin: 0;">Do I need to install Perl locally?</h6>
+                    </div>
+                    <div style="display: none; padding: var(--spacing-medium); background-color: white;">
+                        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>No!</strong> Docker container includes everything. Your host machine only needs Docker and PyCharm installed.</p>
+                    </div>
+                </div>
+
+                <!-- FAQ 3 -->
+                <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-small);">
+                    <div style="background-color: var(--table-header-bg); padding: var(--spacing-medium); cursor: pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+                        <h6 style="font-family: var(--header-font); color: var(--text-color); margin: 0;">What happens to my code when I stop the container?</h6>
+                    </div>
+                    <div style="display: none; padding: var(--spacing-medium); background-color: white;">
+                        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Your code is safe!</strong> Since we use volume mounts (<code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">-v "$(pwd):/app"</code>), all code exists on your host machine. Stopping/deleting the container doesn't affect your source files.</p>
+                    </div>
+                </div>
+
+                <!-- FAQ 4 -->
+                <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-small);">
+                    <div style="background-color: var(--table-header-bg); padding: var(--spacing-medium); cursor: pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+                        <h6 style="font-family: var(--header-font); color: var(--text-color); margin: 0;">Can multiple developers share one container image?</h6>
+                    </div>
+                    <div style="display: none; padding: var(--spacing-medium); background-color: white;">
+                        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Yes!</strong> That's the entire point of Phase 5. Once you push the image to Docker Hub or GitHub Container Registry, teammates can pull it and run their own instances. Each developer gets their own container instance but from the same image.</p>
+                    </div>
+                </div>
+
+                <!-- FAQ 5 -->
+                <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-small);">
+                    <div style="background-color: var(--table-header-bg); padding: var(--spacing-medium); cursor: pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+                        <h6 style="font-family: var(--header-font); color: var(--text-color); margin: 0;">How do I update the container when dependencies change?</h6>
+                    </div>
+                    <div style="display: none; padding: var(--spacing-medium); background-color: white;">
+                        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Three approaches:</strong></p>
+                        <ol style="color: var(--text-color); font-family: var(--body-font);">
+                            <li><strong>Quick update:</strong> Install module inside running container: <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">docker exec comserv-dev cpanm New::Module</code></li>
+                            <li><strong>Persist in image:</strong> Update Dockerfile with new dependency, rebuild: <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">docker build -t comserv:latest .</code></li>
+                            <li><strong>Team update:</strong> Update Dockerfile in git, bump version tag, rebuild and push to registry for team to pull</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <!-- FAQ 6 -->
+                <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-small);">
+                    <div style="background-color: var(--table-header-bg); padding: var(--spacing-medium); cursor: pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+                        <h6 style="font-family: var(--header-font); color: var(--text-color); margin: 0;">Can I run database alongside Comserv in containers?</h6>
+                    </div>
+                    <div style="display: none; padding: var(--spacing-medium); background-color: white;">
+                        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Yes!</strong> Use Docker Compose. The Docker migration strategy (see linked document) includes Phase 2 which containerizes MySQL/PostgreSQL alongside the app. Future documentation will cover docker-compose orchestration.</p>
+                    </div>
+                </div>
+
+                <!-- FAQ 7 -->
+                <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-small);">
+                    <div style="background-color: var(--table-header-bg); padding: var(--spacing-medium); cursor: pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+                        <h6 style="font-family: var(--header-font); color: var(--text-color); margin: 0;">What's the difference between container and image?</h6>
+                    </div>
+                    <div style="display: none; padding: var(--spacing-medium); background-color: white;">
+                        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Image = Blueprint, Container = Running instance</strong></p>
+                        <ul style="color: var(--text-color); font-family: var(--body-font);">
+                            <li><strong>Image:</strong> Template file (read-only). Like a class definition.</li>
+                            <li><strong>Container:</strong> Active instance running from an image. Like an object instance.</li>
+                        </ul>
+                        <p style="color: var(--text-color); font-family: var(--body-font);">One image can spawn multiple containers. All containers from same image have identical software, but different file systems and states.</p>
+                    </div>
+                </div>
+
+                <!-- FAQ 8 -->
+                <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-small);">
+                    <div style="background-color: var(--table-header-bg); padding: var(--spacing-medium); cursor: pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+                        <h6 style="font-family: var(--header-font); color: var(--text-color); margin: 0;">How much disk space does a container use?</h6>
+                    </div>
+                    <div style="display: none; padding: var(--spacing-medium); background-color: white;">
+                        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Varies:</strong></p>
+                        <ul style="color: var(--text-color); font-family: var(--body-font);">
+                            <li>Comserv image: ~2-3 GB</li>
+                            <li>Running container: +500 MB - 2 GB (depends on data accumulated)</li>
+                            <li>Multiple containers from same image: Share image layers, minimal additional disk per container</li>
+                        </ul>
+                        <p style="color: var(--text-color); font-family: var(--body-font);">Clean up unused images: <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">docker image prune -a</code></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reference Section -->
+    <div class="row" style="margin-top: var(--spacing-medium); margin-bottom: var(--spacing-medium);">
+        <div class="col-100">
+            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden;">
+                <div style="background-color: var(--table-header-bg); padding: var(--spacing-medium); border-bottom: 1px solid var(--border-color);">
+                    <h5 style="font-family: var(--header-font); color: var(--text-color); margin: 0;">Reference & Next Steps</h5>
+                </div>
+                <div style="padding: var(--spacing-medium);">
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Related Documentation:</strong></p>
+                    <ul style="color: var(--text-color); font-family: var(--body-font);">
+                        <li><a href="[% c.uri_for('/documentation') %]/DOCKER_KUBERNETES_MIGRATION_STRATEGY" style="color: var(--link-color);">Docker & Kubernetes Migration Strategy</a> - Long-term containerization roadmap</li>
+                        <li><a href="https://docs.docker.com" target="_blank" style="color: var(--link-color);">Official Docker Documentation</a></li>
+                        <li><a href="https://www.jetbrains.com/help/pycharm/docker.html" target="_blank" style="color: var(--link-color);">PyCharm Docker Support</a></li>
+                    </ul>
+
+                    <p style="color: var(--text-color); font-family: var(--body-font); margin-top: var(--spacing-medium);"><strong>Next Steps After Setup:</strong></p>
+                    <ol style="color: var(--text-color); font-family: var(--body-font);">
+                        <li>Complete all 5 phases above</li>
+                        <li>Create a Dockerfile and commit to version control</li>
+                        <li>Push container image to Docker Hub or GitHub Container Registry (Phase 5)</li>
+                        <li>Share registry link with team</li>
+                        <li>Document your Dockerfile with comments explaining each layer</li>
+                        <li>When ready, advance to Phase 2 of migration strategy: Docker Compose orchestration</li>
+                    </ol>
+
+                    <p style="color: var(--text-color); font-family: var(--body-font); margin-top: var(--spacing-medium);"><strong>Questions or Issues?</strong></p>
+                    <p style="color: var(--text-color); font-family: var(--body-font);">Contact the development team or open an issue in the Comserv project repository.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>

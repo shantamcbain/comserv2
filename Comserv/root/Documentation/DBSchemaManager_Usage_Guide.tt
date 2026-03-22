@@ -1,0 +1,284 @@
+[% META
+   title = "DBSchemaManager Usage Guide"
+   description = "Guide for developers on using DBSchemaManager for database schema management. Emphasizes Result classes over raw SQL for schema creation."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "database"
+   page_version = "0.01"
+   last_updated = "Thu Dec 25 2025"
+   site_specific = "false"
+%]
+
+
+[% PageVersion = 'Documentation/DBSchemaManager_Usage_Guide.tt,v 0.01 2025/12/25 shanta Exp - DBSchemaManager usage guide emphasizing Result classes over SQL' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">DBSchemaManager Usage Guide</h1>
+    
+    <div class="last-updated" style="color: var(--text-color); opacity: 0.7; font-size: var(--font-size-small);">
+        Last Updated: 2025-12-25 | 
+        Version: 0.01 |
+        Author: Shanta | 
+        Status: Complete - Architectural Component Documentation
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row toc-nav" style="margin: var(--spacing-large) 0; background-color: var(--secondary-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-color); opacity: 0.7; font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#architecture" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Architecture</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Core Methods</a>
+                <a href="#usage-patterns" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Usage Patterns</a>
+                <a href="#best-practices" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Best Practices</a>
+                <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Troubleshooting</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>DBSchemaManager</strong> is a Catalyst Model that provides comprehensive database schema management capabilities. It handles schema initialization, table listing, and schema comparison across multiple database types (ENCY, Forager).</p>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Key Responsibilities</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Manage schema creation from <strong>DBIx::Class Result classes</strong> (not raw SQL files)</li>
+                <li>List and discover tables in connected databases</li>
+                <li>Manage schema initialization at application startup</li>
+                <li>Support multiple database connections</li>
+                <li>Provide schema introspection and comparison capabilities</li>
+            </ul>
+
+            <div class="info-box" style="background: var(--secondary-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 3px;">
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 0;"><strong>🔑 Core Philosophy:</strong> DBSchemaManager works exclusively with <strong>DBIx::Class Result classes</strong> (files in <code>lib/Comserv/Model/Schema/Ency/Result/</code>), not raw SQL files. This approach provides:</p>
+                <ul style="color: var(--text-color); font-family: var(--body-font); margin-bottom: 0;">
+                    <li>Type safety through Perl class definitions</li>
+                    <li>Version control of schema changes in source code</li>
+                    <li>Relationships defined in code, not just foreign keys</li>
+                    <li>Helper methods for common operations</li>
+                    <li>Easy integration with Catalyst ORM layer</li>
+                </ul>
+            </div>
+
+            <div class="warning-box" style="background: var(--secondary-color); border-left: 4px solid var(--accent-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 3px;">
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 0;"><strong>⚠️ Documentation Status:</strong> The <strong>DBEncy</strong> and <strong>DBForager</strong> models referenced in this guide do not yet have dedicated documentation files. See <a href="/Documentation/Models" target="_blank" style="color: var(--link-color);">Models Documentation</a> for model index. Each Result class in <code>lib/Comserv/Model/Schema/Ency/Result/</code> should follow patterns documented in <a href="/Documentation/Result_Class_Development_Guide" target="_blank" style="color: var(--link-color);">Result Class Development Guide</a>.</p>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- ARCHITECTURE SECTION -->
+    <div class="row">
+        <div class="col-50">
+            <h2 id="architecture" style="color: var(--text-color); font-family: var(--header-font);">2. Architecture</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">File Location</h3>
+            <div style="background-color: var(--secondary-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 3px;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>Comserv/lib/Comserv/Model/DBSchemaManager.pm
+(615 lines)
+                </code></pre>
+            </div>
+        </div>
+        <div class="col-50">
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Integration Points</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Models</strong>: <a href="/Documentation/Models" target="_blank" style="color: var(--link-color);">DBEncy, DBForager</a></li>
+                <li><strong>Catalyst</strong>: Used as a Model component</li>
+                <li><strong>Logging</strong>: <a href="/Documentation/Logging" target="_blank" style="color: var(--link-color);">Comserv::Util::Logging</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- CORE METHODS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="methods" style="color: var(--text-color); font-family: var(--header-font);">3. Core Methods</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">list_tables($c, $database)</h3>
+            
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: List all tables in a specified database</p>
+            
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters</strong>:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>$c</code> - Catalyst context</li>
+                <li><code>$database</code> - Database name ('ENCY' or 'FORAGER')</li>
+            </ul>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns</strong>: Array of table names</p>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Example</strong>:</p>
+            <div style="background-color: var(--secondary-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>my @tables = $c->model('DBSchemaManager')->list_tables($c, 'ENCY');
+# Returns: ['ai_messages', 'users', 'content', ...]
+                </code></pre>
+            </div>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Database Support</strong>:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>ENCY</strong>: Primary application database</li>
+                <li><strong>FORAGER</strong>: Herbal/beekeeping database</li>
+            </ul>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- USAGE PATTERNS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="usage-patterns" style="color: var(--text-color); font-family: var(--header-font);">4. Usage Patterns</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Pattern 1: In a Controller (see <a href="/Documentation/Admin" target="_blank" style="color: var(--link-color);">Admin.tt</a>)</h3>
+            <div style="background-color: var(--secondary-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>package Comserv::Controller::Admin;
+use base 'Catalyst::Controller';
+
+sub schema_info : Local {
+    my ( $self, $c ) = @_;
+    
+    my $schema_manager = $c->model('DBSchemaManager');
+    my @tables = $schema_manager->list_tables($c, 'ENCY');
+    
+    $c->stash->{tables} = \@tables;
+}
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Pattern 2: In a Model Method</h3>
+            <div style="background-color: var(--secondary-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>package Comserv::Model::CustomDB;
+
+sub get_table_list {
+    my ($self, $c) = @_;
+    return $c->model('DBSchemaManager')->list_tables($c, 'ENCY');
+}
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Pattern 3: During Application Initialization</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">DBSchemaManager is invoked automatically during Catalyst's startup phase via initialization methods.</p>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- BEST PRACTICES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="best-practices" style="color: var(--text-color); font-family: var(--header-font);">5. Best Practices</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">1. Always Use Catalyst Context</h3>
+            <div style="background-color: var(--secondary-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code># ✅ Good
+my @tables = $schema_mgr->list_tables($c, 'ENCY');
+
+# ❌ Bad - Missing context
+my @tables = $schema_mgr->list_tables(undef, 'ENCY');
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">2. Handle Database Selection Carefully</h3>
+            <div style="background-color: var(--secondary-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code># ✅ Good - Clear database choice
+if ($need_forager) {
+    @tables = $schema_mgr->list_tables($c, 'FORAGER');
+} else {
+    @tables = $schema_mgr->list_tables($c, 'ENCY');
+}
+
+# ❌ Bad - Unclear which database
+my @tables = $schema_mgr->list_tables($c, $db);
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">3. Log Operations for Debugging</h3>
+            <div style="background-color: var(--secondary-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>$c->model('DBSchemaManager')->logging->log_with_details(
+    $c, 'info', __FILE__, __LINE__, 'method_name', 
+    "Listing tables for database: ENCY"
+);
+                </code></pre>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- TROUBLESHOOTING SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="troubleshooting" style="color: var(--text-color); font-family: var(--header-font);">6. Troubleshooting</h2>
+            
+            <div class="warning" style="background-color: var(--secondary-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-config" style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Issue: "Could not load db_config.json"</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause</strong>: Configuration file not found in expected locations</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution</strong>: Ensure db_config.json exists in Comserv root directory</p>
+            </div>
+
+            <div style="background-color: var(--secondary-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-database" style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Issue: "Unknown database: INVALID"</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause</strong>: Invalid database name passed to list_tables()</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution</strong>: Use only 'ENCY' or 'FORAGER'</p>
+            </div>
+
+            <div style="background-color: var(--secondary-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-connection" style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Issue: Database connection refused</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause</strong>: Network/credentials issue</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution</strong>: Test credentials manually, check network connectivity</p>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="success" style="background-color: var(--secondary-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">7. See Also</h2>
+                
+                <h3 style="color: var(--success-color); font-family: var(--header-font); font-size: var(--font-size-large);">📚 Related Schema Management Documentation</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: var(--spacing-small) 0;"><strong>Comprehensive Schema Management Trilogy:</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/Schema" style="color: var(--link-color);">Database Schema Management (Result Classes Approach)</a> - Overview of code-first schema management, why Result classes over SQL, architecture, and best practices</li>
+                    <li><strong>DBSchemaManager Usage Guide (this file)</strong> - API reference, usage patterns, and integration points for the DBSchemaManager component</li>
+                    <li><a href="/Documentation/AI_Chat_Schema_Documentation" style="color: var(--link-color);">AI Chat Schema Documentation</a> - Real-world example of Result class implementation with 6 tables and their relationships</li>
+                </ul>
+
+                <h3 style="color: var(--success-color); font-family: var(--header-font); font-size: var(--font-size-large);">🔗 Supporting Documentation</h3>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/Result_Class_Development_Guide" style="color: var(--link-color);">Result Class Development Guide</a> - Detailed patterns for creating Result classes</li>
+                    <li><a href="/Documentation/Models" target="_blank" style="color: var(--link-color);">Models Documentation</a> - Database model overview and reference</li>
+                    <li><a href="/Documentation/Logging" target="_blank" style="color: var(--link-color);">Logging Guide</a> - Understanding the Comserv logging system used by DBSchemaManager</li>
+                    <li><strong>⚠️ Database Connection Strategy</strong> - Multi-database connections and configuration (⚠️ Currently .md file - awaiting conversion to .tt format)</li>
+                    <li><a href="/Documentation/AI_CHAT_DOCUMENTATION_FEATURE_SPEC" style="color: var(--link-color);">AI Chat Feature Specification</a> - Complete architecture including Section 3.3 Documentation Audit Status</li>
+                </ul>
+
+                <h3 style="color: var(--success-color); font-family: var(--header-font); font-size: var(--font-size-large);">🛠️ Tools & Administration</h3>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/admin" style="color: var(--link-color);">Administrative Interface</a> - Schema administration tools (/admin/database_schema, /admin/compare_schema, /admin/migrate_schema)</li>
+                </ul>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-color); opacity: 0.7; font-size: var(--font-size-small);">
+                <p>For technical support or questions about this documentation, contact the system administrator.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>

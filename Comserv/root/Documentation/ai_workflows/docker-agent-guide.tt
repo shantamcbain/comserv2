@@ -1,0 +1,358 @@
+[% META
+        title = "Docker Agent: Role & Configuration"
+   description = "Specification and usage guide for Zencoder Docker Agent. Updated Jan 1, 2026: All agent specifications now consolidated in /.zencoder/coding-standards.yaml (v1.0-STABLE). This guide provides IDE setup and workflow examples. Read coding-standards.yaml for authoritative agent specifications."
+   roles = "admin,developer,devops"
+   TemplateType = "Documentation"
+   category = "ai-agents"
+   page_version = "1.01"
+   last_updated = "Thu Jan 01 15:30:00 UTC 2026"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/ai_workflows/docker-agent-guide.tt,v 1.01 15:30:00 2026/01/01 zencoder Exp - Updated references to central coding-standards.yaml (v1.0-STABLE); consolidated agent specs; deprecated .md files removed; added Recent Changes section' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Docker Agent: Role Specification & Configuration</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-01 | 
+        Version: 1.01 |
+        Type: Agent Setup Guide |
+        Status: Active - Docker Agent specifications now in coding-standards.yaml v1.0-STABLE |
+        ⚠️ IMPORTANT: Read /.zencoder/coding-standards.yaml (agents:docker section) for authoritative specifications
+    </div>
+
+    <div id="toc" style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-medium) 0;">
+        <h2 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Quick Navigation</h2>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li><a href="#overview" style="color: var(--link-color);">Overview</a></li>
+            <li><a href="#creation" style="color: var(--link-color);">How to Create This Agent in IDE</a></li>
+            <li><a href="#quick-start" style="color: var(--link-color);">Quick Start</a></li>
+            <li><a href="#responsibilities" style="color: var(--link-color);">Key Responsibilities</a></li>
+            <li><a href="#use-cases" style="color: var(--link-color);">Common Use Cases</a></li>
+            <li><a href="#tools" style="color: var(--link-color);">Tools & Commands</a></li>
+            <li><a href="#success" style="color: var(--link-color);">Success Criteria</a></li>
+            <li><a href="#recent-changes" style="color: var(--link-color);">Recent Changes</a></li>
+        </ul>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The Docker Agent specializes in Docker container diagnosis, configuration management, and Kubernetes migration implementation for Comserv. It handles container runtime issues, docker-compose file management, and infrastructure readiness assessment.</p>
+            
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Type:</strong> Custom Agent for Zencoder IDE</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Command:</strong> <code>/docker</code></p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Status:</strong> Active (available in PyCharm Zencoder)</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="creation" style="color: var(--text-color); font-family: var(--header-font);">How to Create This Agent in IDE</h2>
+            
+            <p style="color: var(--text-color); font-family: var(--body-font);">To register the Docker Agent in your Zencoder IDE:</p>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 1: Open Agent Settings</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Press <code>Ctrl + .</code> (or <code>Cmd + .</code> on Mac)</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 2: Add Custom Agent</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Click three dots (⋮) at top right → Select <strong>Agents</strong></li>
+                <li>Click <strong>Add custom agent</strong></li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 3: Configure Agent</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Fill in these fields:</p>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Field</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Value</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Name</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Docker Agent</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Command/Alias</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/docker</code></td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Instructions</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Copy entire "Agent Instructions" section below</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Tools to Enable</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Shell Command, File Editor, File Search, Full Text Search</td>
+                </tr>
+            </table>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Agent Instructions (Copy This)</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0; overflow-x: auto;"><code>Specialize in Docker container diagnosis, configuration management, and Kubernetes migration implementation for Comserv. Focus on:
+- Diagnosing and fixing Docker container issues (network isolation, volume mounting, startup failures, database connectivity)
+- Managing docker-compose files, environment variables, and container configurations
+- Implementing Kubernetes migration strategy per DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt roadmap
+- Ensuring container consistency across dev/test/prod environments
+- Resolving infrastructure bottlenecks blocking application deployment
+
+PRIMARY REFERENCE: Always consult /Comserv/root/Documentation/system/DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt (Version 1.23+) for:
+- Current state analysis (port status, network issues, database connectivity)
+- Target state vision (Kubernetes readiness checklist)
+- Migration phases (Phase 0.5, Phase 1, Phase 2, etc.)
+- Configuration guidance (docker-compose v2 syntax, network_mode options, volume mounting)
+- Troubleshooting steps and verified solutions
+
+SCOPE - You ARE responsible for:
+✅ Diagnosing Docker container runtime issues (logs, health checks, network connectivity)
+✅ Modifying docker-compose.yml, docker-compose.dev.yml, docker-compose.prod.yml
+✅ Configuring .env files, environment variables, volume mounts for containers
+✅ Implementing network solutions (network_mode: host, bridge networks, macvlan driver)
+✅ Kubernetes configuration and migration planning (K8s manifests, readiness assessment)
+✅ Container image builds, registry setup, CI/CD docker integration
+✅ Database connectivity solutions (MySQL, Redis in-container setup)
+✅ Performance optimization for containerized environments
+
+SCOPE - You are NOT responsible for:
+❌ Application code modifications (refer to Coding Agent or other development agents)
+❌ Zencoder configuration management (refer to project maintainers)
+❌ Continue/Cursor/AI tool configuration (those tools manage their own directories)
+❌ General project documentation (refer to documentation agents)
+❌ Non-containerized deployment strategies (bare-metal setups)
+
+COMMON USE CASES:
+1. Container cannot connect to production database (network isolation issue)
+2. Prepare application for Kubernetes migration
+3. Docker container crashing on startup
+
+TOOLS YOU CAN USE: Shell Command, File Editor, File Search, Full Text Search, Web Search
+
+ALWAYS START: Read DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt first for current state analysis and known solutions.</code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 4: Save & Activate</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Click <strong>Save</strong></li>
+                <li>Close settings dialog</li>
+                <li>Docker Agent now available in your agent list</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="quick-start" style="color: var(--text-color); font-family: var(--header-font);">Quick Start</h2>
+            
+            <p style="color: var(--text-color); font-family: var(--body-font);">Once Docker Agent is registered, use it like this:</p>
+
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>/docker [your question or task]</code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Examples</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>/docker container won't connect to production database</code></li>
+                <li><code>/docker prepare app for kubernetes migration</code></li>
+                <li><code>/docker container keeps crashing on startup, check logs</code></li>
+                <li><code>/docker fix docker-compose.prod.yml network config</code></li>
+            </ul>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>✅ Works from ANY agent</strong> - You don't need to switch to Docker Agent. Just type the <code>/docker</code> command and the Docker Agent handles your request.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="responsibilities" style="color: var(--text-color); font-family: var(--header-font);">Key Responsibilities</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">1. Docker Container Diagnosis</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Identify and resolve container runtime issues.</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Typical Actions:</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Read docker-compose files to understand service architecture</li>
+                    <li>Check container logs (<code>docker logs &lt;container&gt;</code>, <code>docker-compose logs</code>)</li>
+                    <li>Verify port bindings, network connectivity, health checks</li>
+                    <li>Diagnose database connection failures</li>
+                    <li>Analyze volume mount issues</li>
+                    <li>Review startup failures and exit codes</li>
+                </ul>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">2. Docker Configuration Management</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Create, update, and optimize docker-compose and related configs.</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Typical Actions:</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Write/modify docker-compose.yml variants (dev, prod, test)</li>
+                    <li>Configure environment variables (.env files)</li>
+                    <li>Set up volume mounts (bind mounts, named volumes, permissions)</li>
+                    <li>Configure networking (bridge, host network_mode, custom networks)</li>
+                    <li>Define health checks and restart policies</li>
+                    <li>Optimize resource limits</li>
+                </ul>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">3. Kubernetes Migration Implementation</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Plan and implement Kubernetes readiness per migration strategy.</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Typical Actions:</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Assess CI/CD readiness using checklist from strategy document</li>
+                    <li>Create Kubernetes manifests (Deployments, Services, ConfigMaps, Secrets)</li>
+                    <li>Implement liveness/readiness probes for container health</li>
+                    <li>Set up persistent volume claims for data storage</li>
+                    <li>Configure namespace isolation and RBAC rules</li>
+                    <li>Document migration phases and blockers</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="use-cases" style="color: var(--text-color); font-family: var(--header-font);">Common Use Cases</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Use Case 1: Container Cannot Connect to Production Database</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>When to Activate:</strong> Symptom: "Connection refused" or timeout to 192.168.1.198:3306</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Root Cause:</strong> Docker network isolation (172.20.0.0/16 isolated from 192.168.0.0/16)</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution Path:</strong> Configure network_mode: host or macvlan driver</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Use Case 2: Prepare for Kubernetes Migration</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>When to Activate:</strong> Need to transition from docker-compose to Kubernetes</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Requirement:</strong> Ensure application is K8s-ready (stateless, health checks, liveness probes)</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Output:</strong> Readiness assessment, phase planning, Kubernetes manifests</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Use Case 3: Docker Container Crashing on Startup</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>When to Activate:</strong> Container exits immediately with non-zero code</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Debug:</strong> Review container logs, health checks, environment variables</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Root Cause:</strong> Often missing env vars, volume mount errors, or configuration mismatch</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="tools" style="color: var(--text-color); font-family: var(--header-font);">Tools & Commands</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Preferred Tools (in priority order)</h3>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>File Search / Full Text Search</strong> - Locate config files, understand structure</li>
+                <li><strong>Edit Tool</strong> - Modify docker-compose, .env, Kubernetes manifests</li>
+                <li><strong>Shell Command</strong> - Execute docker commands, verify configurations</li>
+                <li><strong>Read Tool</strong> - Examine migration strategy documents, existing configs</li>
+            </ol>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Common Docker Commands</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0; overflow-x: auto;"><code>docker ps                           # List running containers
+docker logs &lt;container&gt;            # View container logs
+docker-compose logs                 # View all service logs
+docker-compose config               # Validate docker-compose syntax
+docker-compose up -d                # Start services
+docker network ls                   # List Docker networks
+docker exec &lt;container&gt; &lt;cmd&gt;      # Run command in container
+kubectl get pods                    # Query Kubernetes resources (if K8s-ready)</code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Avoid These</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Modifying application code via shell scripts (use BugBuster for code changes)</li>
+                <li>Creating new agent roles (that's Cleanup Agent work)</li>
+                <li>Editing Continue/Cursor/Zencoder config files (those tools manage their own configs)</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="success" style="color: var(--text-color); font-family: var(--header-font);">Success Criteria</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">For Diagnostic Prompts</h3>
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>✓</strong> Root cause identified and explained</li>
+                    <li><strong>✓</strong> Current state vs. target state clearly stated</li>
+                    <li><strong>✓</strong> Solution references DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt</li>
+                    <li><strong>✓</strong> Specific docker command or config change provided</li>
+                    <li><strong>✓</strong> Testing method documented (how to verify fix)</li>
+                </ul>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">For Configuration Prompts</h3>
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>✓</strong> Docker-compose changes reviewed for syntax correctness (<code>docker-compose config</code> passes)</li>
+                    <li><strong>✓</strong> Environment variables documented in .env template</li>
+                    <li><strong>✓</strong> Network configuration aligns with strategy</li>
+                    <li><strong>✓</strong> No hardcoded credentials in config files (use env vars)</li>
+                    <li><strong>✓</strong> Testing steps provided to verify configuration</li>
+                </ul>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">For Kubernetes Migration Prompts</h3>
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>✓</strong> CI/CD readiness checklist completed</li>
+                    <li><strong>✓</strong> Kubernetes manifests follow best practices</li>
+                    <li><strong>✓</strong> Migration phases mapped to timeline and blockers identified</li>
+                    <li><strong>✓</strong> Rollback strategy documented</li>
+                    <li><strong>✓</strong> Documentation updated in DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font);">See Also</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/system/DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt" style="color: var(--link-color);">Docker & Kubernetes Migration Strategy</a> - Primary reference for all Docker Agent work</li>
+                    <li><a href="/.zencoder/DOCKER_AGENT_USAGE.md" style="color: var(--link-color);">Docker Agent Usage Quick Reference</a> - Quick start and examples</li>
+                    <li><a href="/Documentation/ai_workflows/zencoder-tracking-template.md" style="color: var(--link-color);">Zencoder Session Tracking</a> - How Docker Agent prompts are logged</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="recent-changes" style="color: var(--text-color); font-family: var(--header-font);">Recent Changes</h2>
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>v1.01 (Jan 1, 2026):</strong> Major consolidation update following Cleanup Agent Phase 3 completion</p>
+            </div>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>✅ Centralized Agent Specifications</strong> - Docker Agent specifications now consolidated in /.zencoder/coding-standards.yaml (agents:docker section) as v1.0-STABLE</li>
+                <li><strong>✅ Removed Deprecated References</strong> - Deprecated .md files (docker-agent-role.md, etc.) removed from codebase Dec 31, 2025</li>
+                <li><strong>✅ Updated Authority References</strong> - This guide now points to coding-standards.yaml as authoritative source for agent specifications</li>
+                <li><strong>✅ Added Startup Protocol Note</strong> - All agents now MUST read coding-standards.yaml FIRST per mandatory startup protocol (see /.zencoder/rules/repo.md STARTUP PROTOCOL section)</li>
+                <li><strong>⚠️ This File Purpose</strong> - Now serves as IDE setup guide and workflow examples only; technical specifications live in coding-standards.yaml</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p><strong>Version History:</strong></p>
+                <ul style="color: var(--text-muted-color);">
+                    <li><strong>1.01</strong> (2026-01-01): Consolidated references to central coding-standards.yaml (v1.0-STABLE); removed deprecated .md file references; added Recent Changes section; updated agent specifications authority</li>
+                    <li><strong>1.00</strong> (2025-12-13): Initial documentation moved from /.zencoder/rules/docker-agent-role.md to Documentation format (.tt file) for human accessibility</li>
+                </ul>
+                <p>For technical support or questions about Docker Agent configuration, refer to the Zencoder documentation or contact the system administrator.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>

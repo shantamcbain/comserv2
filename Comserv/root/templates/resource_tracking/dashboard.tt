@@ -1,0 +1,239 @@
+[% WRAPPER 'global/page_template.tt' 
+    page_title = page_title
+    section = 'resource-tracking'
+%]
+
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1 class="mb-3">
+                <i class="fas fa-tachometer-alt"></i> AI Resource Tracking Dashboard
+            </h1>
+            <p class="text-muted">Real-time monitoring of AI assistant resource usage and prompt counters</p>
+        </div>
+    </div>
+
+    <!-- Current Status Cards -->
+    <div class="row mb-4">
+        <!-- Prompt Counter Card -->
+        <div class="col-md-3">
+            <div class="card [% IF current_status.status_level == 'CRITICAL' %]border-danger[% ELSIF current_status.status_level == 'WARNING' %]border-warning[% ELSIF current_status.status_level == 'CAUTION' %]border-info[% ELSE %]border-success[% END %]">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Prompt Counter</h6>
+                    <div class="display-4 text-primary">
+                        [% current_status.current_prompt %]
+                        <span class="text-muted" style="font-size: 1.5rem;">/ [% current_status.total_prompts_limit %]</span>
+                    </div>
+                    <div class="progress mt-3">
+                        <div class="progress-bar 
+                            [% IF current_status.percent_used >= 100 %]bg-danger[% ELSIF current_status.percent_used >= 85 %]bg-warning[% ELSIF current_status.percent_used >= 70 %]bg-info[% ELSE %]bg-success[% END %]"
+                            role="progressbar" 
+                            style="width: [% current_status.percent_used %]%"
+                            aria-valuenow="[% current_status.percent_used %]"
+                            aria-valuemin="0" 
+                            aria-valuemax="100">
+                            [% current_status.percent_used %]%
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Card -->
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Status</h6>
+                    <div class="display-4">
+                        [% current_status.status_emoji %]
+                    </div>
+                    <p class="mt-2 mb-0">
+                        <strong>[% current_status.status_level %]</strong>
+                    </p>
+                    [% IF current_status.caution_reasons.size > 0 %]
+                    <small class="text-danger mt-2 d-block">
+                        [% current_status.caution_reasons.join(', ') %]
+                    </small>
+                    [% END %]
+                </div>
+            </div>
+        </div>
+
+        <!-- Commands Card -->
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Commands Executed</h6>
+                    <div class="display-4 text-info">
+                        [% current_status.command_count %]
+                    </div>
+                    <p class="text-muted mt-2 mb-0">
+                        Tool operations this session
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Handoff Readiness Card -->
+        <div class="col-md-3">
+            <div class="card [% IF handoff_recommendation.handoff_needed %]border-danger[% ELSE %]border-success[% END %]">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Handoff Status</h6>
+                    [% IF handoff_recommendation.handoff_needed %]
+                    <div class="alert alert-danger mb-2 py-2">
+                        <strong>READY</strong>
+                    </div>
+                    [% ELSE %]
+                    <div class="alert alert-success mb-2 py-2">
+                        <strong>SAFE</strong>
+                    </div>
+                    [% END %]
+                    <small class="text-muted d-block">
+                        [% handoff_recommendation.reason %]
+                    </small>
+                    <small class="text-info mt-2 d-block">
+                        <i class="fas fa-arrow-right"></i>
+                        [% handoff_recommendation.suggested_action %]
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recommendation Alert -->
+    [% IF handoff_recommendation.handoff_needed %]
+    <div class="alert alert-warning mb-4" role="alert">
+        <h6 class="alert-heading">
+            <i class="fas fa-exclamation-triangle"></i>
+            [% handoff_recommendation.urgency %]
+        </h6>
+        <p class="mb-0">
+            [% handoff_recommendation.reason %]
+        </p>
+        <hr class="my-2">
+        <p class="mb-0">
+            <strong>Action:</strong> [% handoff_recommendation.suggested_action %]
+        </p>
+    </div>
+    [% END %]
+
+    <!-- Recent Sessions -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history"></i> Recent Sessions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    [% IF sessions_summary.size > 0 %]
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Session Start</th>
+                                    <th>Focus</th>
+                                    <th>Current Prompts</th>
+                                    <th>Limit</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% FOREACH session IN sessions_summary %]
+                                <tr>
+                                    <td>
+                                        <small>[% session.session_start || 'N/A' %]</small>
+                                    </td>
+                                    <td>
+                                        <small>[% session.focus || 'N/A' %]</small>
+                                    </td>
+                                    <td>
+                                        <strong>[% session.current_prompt || 0 %]</strong>
+                                    </td>
+                                    <td>19</td>
+                                    <td>
+                                        <span class="badge bg-success">ACTIVE</span>
+                                    </td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                    [% ELSE %]
+                    <p class="text-muted mb-0">No sessions tracked yet</p>
+                    [% END %]
+                </div>
+                <div class="card-footer bg-light text-end">
+                    <a href="[% c.uri_for('/resource-tracking/sessions') %]" class="btn btn-sm btn-outline-primary">
+                        View All Sessions <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Update Script -->
+    <script>
+    (function() {
+        const updateInterval = 2000; // Update every 2 seconds
+        
+        function updateStatus() {
+            fetch('[% c.uri_for("/api/resource-tracking/status") %]')
+                .then(response => response.json())
+                .then(data => {
+                    // Update prompt counter
+                    const promptElement = document.querySelector('[data-metric="prompt-count"]');
+                    if (promptElement) {
+                        promptElement.textContent = data.current_prompt + ' / ' + data.total_prompts_limit;
+                    }
+                    
+                    // Update progress bar
+                    const progressBar = document.querySelector('[data-metric="progress-bar"]');
+                    if (progressBar) {
+                        progressBar.style.width = data.percent_used + '%';
+                        progressBar.setAttribute('aria-valuenow', data.percent_used);
+                    }
+                    
+                    // Update status indicator
+                    const statusElement = document.querySelector('[data-metric="status"]');
+                    if (statusElement) {
+                        statusElement.textContent = data.status_emoji + ' ' + data.status_level;
+                    }
+                })
+                .catch(error => console.error('Update error:', error));
+        }
+        
+        // Initial update
+        updateStatus();
+        
+        // Set interval for continuous updates
+        setInterval(updateStatus, updateInterval);
+    })();
+    </script>
+
+    <!-- Resource Optimization Tips -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card bg-light">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-lightbulb"></i> Resource Optimization Tips
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0 small">
+                        <li>Combine multiple file edits in a single tool call when possible</li>
+                        <li>Use batch operations instead of sequential operations</li>
+                        <li>Plan handoff at 70% resource usage to prevent degradation</li>
+                        <li>Check handoff status indicator in top-right of dashboard</li>
+                        <li>Review session history to identify resource usage patterns</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+[% END %]

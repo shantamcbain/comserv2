@@ -1,0 +1,230 @@
+[% META title = 'Admin Authentication System Refactor - January 2025' %]
+[% PageVersion = '2025-01-20-admin-authentication-refactor.tt,v 1.0 2025/01/20 Development Team Exp Development Team' %]
+
+<h1>Admin Authentication System Refactor</h1>
+<p><strong>Date:</strong> January 20, 2025</p>
+<p><strong>Version:</strong> 2.0</p>
+<p><strong>Type:</strong> Major Enhancement</p>
+
+<div class="alert alert-info">
+<h2>Overview</h2>
+<p>This update introduces a centralized authentication system for admin functions and separates Git operations into a dedicated controller. This addresses authentication issues with CSC admin users and improves code maintainability.</p>
+</div>
+
+<h2>Problems Addressed</h2>
+
+<h3>Authentication Issues</h3>
+<ul>
+<li><strong>CSC Admin Access Denied:</strong> CSC admin users were being forced to login despite having proper credentials</li>
+<li><strong>Inconsistent Auth Patterns:</strong> Multiple different authentication patterns scattered throughout Admin.pm controller</li>
+<li><strong>Session vs User Object Conflicts:</strong> Authentication logic relied on <code>$c->user_exists</code> which failed in session-based authentication</li>
+<li><strong>Code Duplication:</strong> Each admin function required custom authentication logic</li>
+</ul>
+
+<h3>Code Maintainability Issues</h3>
+<ul>
+<li><strong>Large Controller File:</strong> Admin.pm controller was over 3,356 lines and difficult to maintain</li>
+<li><strong>Mixed Responsibilities:</strong> Git operations mixed with other admin functions in single file</li>
+<li><strong>Inconsistent Error Handling:</strong> Different error messages and redirect patterns</li>
+</ul>
+
+<h2>Solutions Implemented</h2>
+
+<h3>1. Centralized Authentication Utility</h3>
+<div class="alert alert-success">
+<p><strong>New File:</strong> <code>/Comserv/lib/Comserv/Util/AdminAuth.pm</code></p>
+<p>Single source of truth for all admin authentication checks.</p>
+</div>
+
+<h4>Key Methods:</h4>
+<ul>
+<li><code>check_admin_access($c, $action_name)</code> - Returns 1/0 for admin access</li>
+<li><code>require_admin_access($c, $action_name)</code> - Checks access and redirects if denied</li>
+<li><code>is_csc_admin($c)</code> - Helper for CSC admin detection</li>
+<li><code>get_admin_type($c)</code> - Returns admin type (standard/csc/special/none)</li>
+</ul>
+
+<h4>Authentication Logic:</h4>
+<ul>
+<li><strong>Session-Based:</strong> Uses <code>$c->session->{username}</code> instead of <code>$c->user_exists</code></li>
+<li><strong>CSC Admin Support:</strong> Recognizes SiteName = 'CSC' + admin role combination</li>
+<li><strong>Special User Support:</strong> Handles username 'Shanta' as special case</li>
+<li><strong>Comprehensive Logging:</strong> Detailed authentication logging for debugging</li>
+</ul>
+
+<h3>2. Dedicated Git Controller</h3>
+<div class="alert alert-success">
+<p><strong>New File:</strong> <code>/Comserv/lib/Comserv/Controller/Admin/Git.pm</code></p>
+<p>Handles all Git-related operations separately from main Admin controller.</p>
+</div>
+
+<h4>Functions Moved:</h4>
+<ul>
+<li><code>git_pull</code> - Main git pull interface with branch selection</li>
+<li><code>execute_git_pull</code> - Actual git pull execution with error handling</li>
+<li><code>get_current_branch</code> - Get current Git branch</li>
+<li><code>get_available_branches</code> - List available remote branches</li>
+</ul>
+
+<h4>Enhanced Features:</h4>
+<ul>
+<li><strong>Branch Selection:</strong> Users can select which branch to pull from</li>
+<li><strong>Theme File Protection:</strong> Automatically stashes local theme_mappings.json changes</li>
+<li><strong>Backup Creation:</strong> Creates backups before potentially destructive operations</li>
+<li><strong>Comprehensive Output:</strong> Detailed command output for troubleshooting</li>
+</ul>
+
+<h3>3. Updated Admin Controller</h3>
+<div class="alert alert-warning">
+<p><strong>Modified File:</strong> <code>/Comserv/lib/Comserv/Controller/Admin.pm</code></p>
+<p>Reduced from 3,356 to 3,262 lines (94 lines removed).</p>
+</div>
+
+<h4>Changes Made:</h4>
+<ul>
+<li><strong>Added AdminAuth Integration:</strong> <code>use Comserv::Util::AdminAuth;</code></li>
+<li><strong>Replaced Custom Auth Logic:</strong> All functions now use <code>$self->admin_auth->require_admin_access($c, 'action_name')</code></li>
+<li><strong>Removed Git Functions:</strong> Moved to dedicated Admin::Git controller</li>
+<li><strong>Consistent Error Handling:</strong> Standardized authentication error messages</li>
+</ul>
+
+<h2>Technical Implementation Details</h2>
+
+<h3>Authentication Pattern</h3>
+<div class="code-block">
+<h4>Old Pattern (Inconsistent):</h4>
+<pre><code>unless ($c->user_exists && ($c->check_user_roles('admin') || $c->session->{username} eq 'Shanta')) {
+    $c->flash->{error_msg} = "Custom error message";
+    $c->response->redirect($c->uri_for('/user/login'));
+    return;
+}</code></pre>
+
+<h4>New Pattern (Centralized):</h4>
+<pre><code>return unless $self->admin_auth->require_admin_access($c, 'action_name');</code></pre>
+</div>
+
+<h3>CSC Admin Support</h3>
+<ul>
+<li><strong>Standard Admin:</strong> Has 'admin' role in any site</li>
+<li><strong>CSC Admin:</strong> Has SiteName = 'CSC' AND 'admin' role</li>
+<li><strong>Special User:</strong> Username = 'Shanta' (legacy support)</li>
+</ul>
+
+<h3>Session-Based Authentication</h3>
+<p>The new system uses session data directly instead of relying on Catalyst's user object, which resolves compatibility issues with the current session-based authentication system.</p>
+
+<h2>Files Modified</h2>
+
+<h3>New Files Created</h3>
+<ul>
+<li><code>/Comserv/lib/Comserv/Util/AdminAuth.pm</code> - Centralized authentication utility</li>
+<li><code>/Comserv/lib/Comserv/Controller/Admin/Git.pm</code> - Dedicated Git operations controller</li>
+</ul>
+
+<h3>Existing Files Modified</h3>
+<ul>
+<li><code>/Comserv/lib/Comserv/Controller/Admin.pm</code> - Updated to use centralized authentication</li>
+<li><code>/Comserv/root/admin/git_pull.tt</code> - Enhanced with branch selection UI</li>
+</ul>
+
+<h2>Benefits Achieved</h2>
+
+<div class="row">
+<div class="col-md-6">
+<h3>Authentication Improvements</h3>
+<ul>
+<li>✅ Consistent authentication across all admin functions</li>
+<li>✅ CSC admin users can access admin functions without login redirect</li>
+<li>✅ Session-based authentication works reliably</li>
+<li>✅ Comprehensive authentication logging for debugging</li>
+</ul>
+</div>
+
+<div class="col-md-6">
+<h3>Code Quality Improvements</h3>
+<ul>
+<li>✅ Reduced Admin.pm controller size by 94 lines</li>
+<li>✅ Better separation of concerns (Git operations separate)</li>
+<li>✅ Easier to add new admin functions (just call require_admin_access)</li>
+<li>✅ Consistent error handling and user feedback</li>
+</ul>
+</div>
+</div>
+
+<h2>Testing Requirements</h2>
+
+<h3>Authentication Testing</h3>
+<ol>
+<li><strong>CSC Admin User:</strong> Test that CSC admin users can access git_pull and other admin functions</li>
+<li><strong>Standard Admin User:</strong> Verify standard admin users still have proper access</li>
+<li><strong>Non-Admin User:</strong> Confirm non-admin users are properly redirected to login</li>
+<li><strong>Special User 'Shanta':</strong> Verify special user access still works</li>
+</ol>
+
+<h3>Git Operations Testing</h3>
+<ol>
+<li><strong>Branch Selection:</strong> Test git pull with different branch selections</li>
+<li><strong>Theme File Protection:</strong> Verify local theme_mappings.json changes are preserved</li>
+<li><strong>Error Handling:</strong> Test git pull with network issues or invalid branches</li>
+<li><strong>Output Display:</strong> Confirm detailed command output is shown to users</li>
+</ol>
+
+<h2>Deployment Instructions</h2>
+
+<div class="alert alert-warning">
+<h3>Pre-Deployment Checklist</h3>
+<ul>
+<li>✅ Backup current Admin.pm controller</li>
+<li>✅ Ensure all admin users have proper session data</li>
+<li>✅ Test authentication with CSC admin user in development</li>
+<li>✅ Verify git operations work in development environment</li>
+</ul>
+</div>
+
+<h3>Deployment Steps</h3>
+<ol>
+<li><strong>Deploy New Files:</strong> Upload AdminAuth.pm and Admin/Git.pm</li>
+<li><strong>Update Existing Files:</strong> Deploy updated Admin.pm</li>
+<li><strong>Restart Application:</strong> Restart Catalyst application to load new modules</li>
+<li><strong>Test Authentication:</strong> Verify admin access works for all user types</li>
+<li><strong>Test Git Operations:</strong> Confirm git_pull functionality works</li>
+</ol>
+
+<h2>Future Enhancements</h2>
+
+<h3>Planned Improvements</h3>
+<ul>
+<li><strong>Apply Pattern to All Admin Functions:</strong> Update remaining admin functions to use centralized authentication</li>
+<li><strong>Enhanced Branch Management:</strong> Add branch creation and deletion capabilities</li>
+<li><strong>Development Server Integration:</strong> Add development server testing workflow</li>
+<li><strong>Automated Testing:</strong> Create automated tests for authentication patterns</li>
+</ul>
+
+<h2>Support Information</h2>
+
+<div class="alert alert-info">
+<h3>If You Experience Issues</h3>
+<ul>
+<li><strong>Authentication Problems:</strong> Check application logs for detailed authentication debugging</li>
+<li><strong>Git Operations Failing:</strong> Verify git repository permissions and network connectivity</li>
+<li><strong>Template Errors:</strong> Ensure all template files are properly deployed</li>
+<li><strong>Session Issues:</strong> Clear browser cookies and re-login</li>
+</ul>
+</div>
+
+<h3>Log Locations</h3>
+<ul>
+<li><strong>Application Logs:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log</code></li>
+<li><strong>Authentication Logs:</strong> Search for "AdminAuth" in application logs</li>
+<li><strong>Git Operation Logs:</strong> Search for "execute_git_pull" in application logs</li>
+</ul>
+
+<p><strong>Contact:</strong> Development Team for technical support</p>
+<p><strong>Documentation:</strong> See <a href="/documentation/admin/admin_authentication_system.tt">Admin Authentication System Documentation</a></p>
+
+[% IF c.session.debug_mode == 1 %]
+<div class="debug-info">
+  <p>Template: 2025-01-20-admin-authentication-refactor.tt</p>
+  <p>Last Modified: [% PageVersion %]</p>
+</div>
+[% END %]

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- File: /home/shanta/PycharmProjects/comserv/Comserv/root/layout.tt -->
-<html>[% PageVersion = 'layout.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
+<html data-debug-mode="[% c.session.debug_mode || 0 %]">[% PageVersion = 'layout.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
 [%# DBI is now provided by the application context, no need to include DefaultDBI.tt %]
 [% INCLUDE 'setup/DefaultVariables.tt' %]
     [% TRY %]
@@ -23,6 +23,12 @@
 [%# INCLUDE 'home.tt' %]
     [% content %]
     [% INCLUDE 'AdminNotes.tt' %]
+    
+    <!-- Back to Top Button -->
+    <button id="back-to-top" title="Back to Top" aria-label="Back to Top">
+        <i class="fas fa-arrow-up" aria-hidden="true"></i>
+    </button>
+
     [% TRY %]
         [% INCLUDE 'footer.tt' %]
     [% CATCH %]
@@ -37,5 +43,10 @@
             </div>
         </footer>
     [% END %]
+    
+
+    
+    <script src="/static/js/local-chat.js"></script>
 </body>
+
 </html>

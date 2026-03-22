@@ -1,0 +1,1373 @@
+{
+   "documentation_files_needing_update" : [
+      {
+         "documentation_file" : "/Documentation/OllamAssit.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/OllamAssit.tt",
+         "code_file" : "root/Documentation/OllamAssit.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)"
+      },
+      {
+         "documentation_file" : "/Documentation/usbm.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/usbm.tt",
+         "code_file" : "root/Documentation/usbm.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)"
+      },
+      {
+         "documentation_file" : "/Documentation/controllers/EnvironmentVariables.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/EnvironmentVariables.tt",
+         "exists" : null,
+         "code_file" : "lib/Comserv/Controller/Admin/EnvironmentVariables.pm",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "action" : "UPDATE - Bump version from 0.01 to 0.02, add Recent Changes section",
+         "version" : "0.01",
+         "last_updated" : "Wed Jan 08 18:43:00 UTC 2026",
+         "documentation_file" : "/Documentation/controllers/SchemaComparison.tt",
+         "code_file" : "lib/Comserv/Controller/Admin/SchemaComparison.pm",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/SchemaComparison.tt",
+         "exists" : 1
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "action" : "UPDATE - Bump version from 1.01 to 1.02, add Recent Changes section",
+         "version" : "1.01",
+         "last_updated" : "Tue Jan 06 13:47:00 UTC 2026",
+         "documentation_file" : "/Documentation/controllers/ProxyManager.tt",
+         "code_file" : "lib/Comserv/Controller/ProxyManager.pm",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/ProxyManager.tt",
+         "exists" : 1
+      },
+      {
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/AI.tt",
+         "code_file" : "root/Documentation/AI.tt",
+         "documentation_file" : "/Documentation/AI.tt",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "documentation_file" : "/Documentation/AIAssistants.tt",
+         "code_file" : "root/Documentation/AIAssistants.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/AIAssistants.tt",
+         "exists" : null
+      },
+      {
+         "version" : "1.00",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/AIIntegrationComprehensiveAudit.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/AIIntegrationComprehensiveAudit.tt",
+         "documentation_file" : "/Documentation/AIIntegrationComprehensiveAudit.tt"
+      },
+      {
+         "version" : "1.00",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt",
+         "documentation_file" : "/Documentation/AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt"
+      },
+      {
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/AI_Chat_Conversation_Saving_Fix.tt",
+         "exists" : null,
+         "code_file" : "root/Documentation/AI_Chat_Conversation_Saving_Fix.tt",
+         "documentation_file" : "/Documentation/AI_Chat_Conversation_Saving_Fix.tt",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Tue Jan 06 04:02:00 UTC 2026",
+         "action" : "UPDATE - Bump version from 0.02 to 0.03, add Recent Changes section",
+         "version" : "0.02",
+         "documentation_file" : "/Documentation/AI_Chat_Interface_Architecture_Audit.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/AI_Chat_Interface_Architecture_Audit.tt",
+         "code_file" : "root/Documentation/AI_Chat_Interface_Architecture_Audit.tt"
+      },
+      {
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/AI_Chat_Multi_Turn_Conversation_Fix.tt",
+         "code_file" : "root/Documentation/AI_Chat_Multi_Turn_Conversation_Fix.tt",
+         "documentation_file" : "/Documentation/AI_Chat_Multi_Turn_Conversation_Fix.tt",
+         "last_updated" : "Sat Dec 27 01:27:00 UTC 2025",
+         "action" : "UPDATE - Bump version from 0.01 to 0.02, add Recent Changes section",
+         "version" : "0.01",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "last_updated" : "Thu Dec 25 22:06:00 UTC 2025",
+         "version" : "0.02",
+         "action" : "UPDATE - Bump version from 0.02 to 0.03, add Recent Changes section",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/AI_Chat_Schema_Documentation.tt",
+         "exists" : 1,
+         "code_file" : "root/Documentation/AI_Chat_Schema_Documentation.tt",
+         "documentation_file" : "/Documentation/AI_Chat_Schema_Documentation.tt"
+      },
+      {
+         "version" : "0.02",
+         "action" : "UPDATE - Bump version from 0.02 to 0.03, add Recent Changes section",
+         "last_updated" : "Wed Dec 31 20:28:00 UTC 2025",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/AI_Chat_System_Fixes_Dec26.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/AI_Chat_System_Fixes_Dec26.tt",
+         "documentation_file" : "/Documentation/AI_Chat_System_Fixes_Dec26.tt"
+      },
+      {
+         "documentation_file" : "/Documentation/AI_Guidelines.tt",
+         "code_file" : "root/Documentation/AI_Guidelines.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/AI_Guidelines.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown"
+      },
+      {
+         "code_file" : "root/Documentation/Admin.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Admin.tt",
+         "exists" : 1,
+         "documentation_file" : "/Documentation/Admin.tt",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "documentation_file" : "/Documentation/admin_guides.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/admin_guides.tt",
+         "code_file" : "root/Documentation/admin_guides.tt"
+      },
+      {
+         "documentation_file" : "/Documentation/all_changelog.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/all_changelog.tt",
+         "code_file" : "root/Documentation/all_changelog.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)"
+      },
+      {
+         "last_updated" : "Unknown",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/all_docs.tt",
+         "code_file" : "root/Documentation/all_docs.tt",
+         "documentation_file" : "/Documentation/all_docs.tt"
+      },
+      {
+         "last_updated" : "Unknown",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "version" : "1.00",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Api.tt",
+         "code_file" : "root/Documentation/Api.tt",
+         "documentation_file" : "/Documentation/Api.tt"
+      },
+      {
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/api_credentials.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/api_credentials.tt",
+         "exists" : null,
+         "documentation_file" : "/Documentation/api_credentials.tt"
+      },
+      {
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/application_tt_template.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/application_tt_template.tt",
+         "exists" : null,
+         "documentation_file" : "/Documentation/application_tt_template.tt"
+      },
+      {
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/authentication_evolution_plan.tt",
+         "code_file" : "root/Documentation/authentication_evolution_plan.tt",
+         "documentation_file" : "/Documentation/authentication_evolution_plan.tt"
+      },
+      {
+         "documentation_file" : "/Documentation/B3_Theme_Handling_Audit_Report.tt",
+         "code_file" : "root/Documentation/B3_Theme_Handling_Audit_Report.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/B3_Theme_Handling_Audit_Report.tt",
+         "exists" : null,
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown"
+      },
+      {
+         "documentation_file" : "/Documentation/bug_fixes_documentation.tt",
+         "code_file" : "root/Documentation/bug_fixes_documentation.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/bug_fixes_documentation.tt",
+         "exists" : null,
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "last_updated" : "Unknown"
+      },
+      {
+         "documentation_file" : "/Documentation/changelog.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/changelog.tt",
+         "exists" : null,
+         "code_file" : "root/Documentation/changelog.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00"
+      },
+      {
+         "code_file" : "root/Documentation/changelog_system.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/changelog_system.tt",
+         "exists" : null,
+         "documentation_file" : "/Documentation/changelog_system.tt",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "documentation_file" : "/Documentation/cloudflare.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/cloudflare.tt",
+         "exists" : null,
+         "code_file" : "root/Documentation/cloudflare.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)"
+      },
+      {
+         "code_file" : "root/Documentation/cloudflare_api_authentication.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/cloudflare_api_authentication.tt",
+         "exists" : null,
+         "documentation_file" : "/Documentation/cloudflare_api_authentication.tt",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "documentation_file" : "/Documentation/cloudflare_api_token_guide.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/cloudflare_api_token_guide.tt",
+         "code_file" : "root/Documentation/cloudflare_api_token_guide.tt"
+      },
+      {
+         "code_file" : "root/Documentation/cloudflare_integration.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/cloudflare_integration.tt",
+         "exists" : null,
+         "documentation_file" : "/Documentation/cloudflare_integration.tt",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "documentation_file" : "/Documentation/comserv_systems.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/comserv_systems.tt",
+         "code_file" : "root/Documentation/comserv_systems.tt"
+      },
+      {
+         "documentation_file" : "/Documentation/config.tt",
+         "code_file" : "root/Documentation/config.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/config.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "last_updated" : "Unknown"
+      },
+      {
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controller_routing_guidelines.tt",
+         "exists" : null,
+         "code_file" : "root/Documentation/controller_routing_guidelines.tt",
+         "documentation_file" : "/Documentation/controller_routing_guidelines.tt",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/controllers.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers.tt",
+         "exists" : null,
+         "documentation_file" : "/Documentation/controllers.tt"
+      },
+      {
+         "last_updated" : "Thu Dec 25 2025",
+         "action" : "UPDATE - Bump version from 0.01 to 0.02, add Recent Changes section",
+         "version" : "0.01",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DBSchemaManager_Usage_Guide.tt",
+         "exists" : 1,
+         "code_file" : "root/Documentation/DBSchemaManager_Usage_Guide.tt",
+         "documentation_file" : "/Documentation/DBSchemaManager_Usage_Guide.tt"
+      },
+      {
+         "documentation_file" : "/Documentation/DOCUMENTATION_SYSTEM_AUDIT_PLAN.tt",
+         "code_file" : "root/Documentation/DOCUMENTATION_SYSTEM_AUDIT_PLAN.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DOCUMENTATION_SYSTEM_AUDIT_PLAN.tt",
+         "exists" : 1,
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "action" : "UPDATE - Bump version from 0.05 to 0.06, add Recent Changes section",
+         "version" : "0.05",
+         "last_updated" : "Thu Dec 18 2025"
+      },
+      {
+         "documentation_file" : "/Documentation/DailyPlans/Daily_Plans-2025-12-29.tt",
+         "code_file" : "root/Documentation/DailyPlans/Daily_Plans-2025-12-29.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/Daily_Plans-2025-12-29.tt",
+         "exists" : 1,
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.00",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "last_updated" : "Unknown"
+      },
+      {
+         "code_file" : "root/Documentation/DailyPlans/Daily_Plans-2025-12-30.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/Daily_Plans-2025-12-30.tt",
+         "exists" : 1,
+         "documentation_file" : "/Documentation/DailyPlans/Daily_Plans-2025-12-30.tt",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.00",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "last_updated" : "Unknown",
+         "documentation_file" : "/Documentation/DailyPlans/Daily_Plans-2025-12-31.tt",
+         "code_file" : "root/Documentation/DailyPlans/Daily_Plans-2025-12-31.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/Daily_Plans-2025-12-31.tt"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Thu Jan 02 16:52:00 UTC 2026",
+         "version" : "0.02",
+         "action" : "UPDATE - Bump version from 0.02 to 0.03, add Recent Changes section",
+         "documentation_file" : "/Documentation/DailyPlans/Daily_Plans-2026-01-02.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/Daily_Plans-2026-01-02.tt",
+         "code_file" : "root/Documentation/DailyPlans/Daily_Plans-2026-01-02.tt"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "action" : "UPDATE - Bump version from 0.02 to 0.03, add Recent Changes section",
+         "version" : "0.02",
+         "last_updated" : "Thu Jan 02 17:13:00 UTC 2026",
+         "documentation_file" : "/Documentation/DailyPlans/Daily_Plans-2026-01-03.tt",
+         "code_file" : "root/Documentation/DailyPlans/Daily_Plans-2026-01-03.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/Daily_Plans-2026-01-03.tt",
+         "exists" : 1
+      },
+      {
+         "version" : "0.02",
+         "action" : "UPDATE - Bump version from 0.02 to 0.03, add Recent Changes section",
+         "last_updated" : "Thu Jan 02 17:13:00 UTC 2026",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/DailyPlans/Daily_Plans-2026-01-04.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/Daily_Plans-2026-01-04.tt",
+         "documentation_file" : "/Documentation/DailyPlans/Daily_Plans-2026-01-04.tt"
+      },
+      {
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/Daily_Plans-2026-01-05.tt",
+         "exists" : 1,
+         "code_file" : "root/Documentation/DailyPlans/Daily_Plans-2026-01-05.tt",
+         "documentation_file" : "/Documentation/DailyPlans/Daily_Plans-2026-01-05.tt",
+         "last_updated" : "Sat Jan 04 17:45:00 UTC 2026",
+         "action" : "UPDATE - Bump version from 0.03 to 0.04, add Recent Changes section",
+         "version" : "0.03",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Daily_Plans-2025-12-25.tt",
+         "code_file" : "root/Documentation/Daily_Plans-2025-12-25.tt",
+         "documentation_file" : "/Documentation/Daily_Plans-2025-12-25.tt",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Daily_Plans-2025-12-26.tt",
+         "code_file" : "root/Documentation/Daily_Plans-2025-12-26.tt",
+         "documentation_file" : "/Documentation/Daily_Plans-2025-12-26.tt",
+         "last_updated" : "Unknown",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "documentation_file" : "/Documentation/Daily_Plans-2025-12-27.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Daily_Plans-2025-12-27.tt",
+         "exists" : null,
+         "code_file" : "root/Documentation/Daily_Plans-2025-12-27.tt"
+      },
+      {
+         "code_file" : "root/Documentation/developer_guides.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/developer_guides.tt",
+         "exists" : null,
+         "documentation_file" : "/Documentation/developer_guides.tt",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "documentation_file" : "/Documentation/development_plans.tt",
+         "code_file" : "root/Documentation/development_plans.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/development_plans.tt"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "action" : "UPDATE - Bump version from 1.0 to 1.01, add Recent Changes section",
+         "version" : "1.0",
+         "last_updated" : "Mon Dec 22 2025",
+         "documentation_file" : "/Documentation/DockerSecretsFallbackDebuggingPlan.tt",
+         "code_file" : "root/Documentation/DockerSecretsFallbackDebuggingPlan.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DockerSecretsFallbackDebuggingPlan.tt"
+      },
+      {
+         "code_file" : "root/Documentation/DocumentManagement.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DocumentManagement.tt",
+         "exists" : 1,
+         "documentation_file" : "/Documentation/DocumentManagement.tt",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "action" : "UPDATE - Bump version from 0.01 to 0.02, add Recent Changes section",
+         "version" : "0.01",
+         "last_updated" : "Thu Dec 25 2025",
+         "documentation_file" : "/Documentation/DocumentationConfigAuditFindings.tt",
+         "code_file" : "root/Documentation/DocumentationConfigAuditFindings.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DocumentationConfigAuditFindings.tt",
+         "exists" : 1
+      },
+      {
+         "code_file" : "root/Documentation/documentation_config_guide.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/documentation_config_guide.tt",
+         "documentation_file" : "/Documentation/documentation_config_guide.tt",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "documentation_file" : "/Documentation/documentation_filename_issue.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/documentation_filename_issue.tt",
+         "code_file" : "root/Documentation/documentation_filename_issue.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown",
+         "documentation_file" : "/Documentation/documentation_migration_to_tt.tt",
+         "code_file" : "root/Documentation/documentation_migration_to_tt.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/documentation_migration_to_tt.tt"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown",
+         "documentation_file" : "/Documentation/documentation_organization.tt",
+         "code_file" : "root/Documentation/documentation_organization.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/documentation_organization.tt"
+      },
+      {
+         "action" : "UPDATE - Bump version from 2.01 to 2.02, add Recent Changes section",
+         "version" : "2.01",
+         "last_updated" : "Thu Dec 18 2025",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/DocumentationSystem.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DocumentationSystem.tt",
+         "exists" : 1,
+         "documentation_file" : "/Documentation/DocumentationSystem.tt"
+      },
+      {
+         "documentation_file" : "/Documentation/documentation_tt_template.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/documentation_tt_template.tt",
+         "exists" : null,
+         "code_file" : "root/Documentation/documentation_tt_template.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "documentation_file" : "/Documentation/documentation_update_summary.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/documentation_update_summary.tt",
+         "code_file" : "root/Documentation/documentation_update_summary.tt"
+      },
+      {
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/documentation_workflow.tt",
+         "code_file" : "root/Documentation/documentation_workflow.tt",
+         "documentation_file" : "/Documentation/documentation_workflow.tt",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/error.tt",
+         "code_file" : "root/Documentation/error.tt",
+         "documentation_file" : "/Documentation/error.tt",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/fix_project_edit_button.tt",
+         "code_file" : "root/Documentation/fix_project_edit_button.tt",
+         "documentation_file" : "/Documentation/fix_project_edit_button.tt",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/fix_project_edit_form.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/fix_project_edit_form.tt",
+         "exists" : null,
+         "documentation_file" : "/Documentation/fix_project_edit_form.tt"
+      },
+      {
+         "code_file" : "root/Documentation/getting_started.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/getting_started.tt",
+         "documentation_file" : "/Documentation/getting_started.tt",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "documentation_file" : "/Documentation/guidelines.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/guidelines.tt",
+         "exists" : null,
+         "code_file" : "root/Documentation/guidelines.tt"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "documentation_file" : "/Documentation/index.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/index.tt",
+         "code_file" : "root/Documentation/index.tt"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Wed Jan 08 18:16:01 UTC 2026",
+         "version" : "0.25",
+         "action" : "UPDATE - Bump version from 0.25 to 0.26, add Recent Changes section",
+         "documentation_file" : "/Documentation/MASTER_PLAN_COORDINATION.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/MASTER_PLAN_COORDINATION.tt",
+         "code_file" : "root/Documentation/MASTER_PLAN_COORDINATION.tt"
+      },
+      {
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/mail_configuration_guide.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/mail_configuration_guide.tt",
+         "exists" : null,
+         "documentation_file" : "/Documentation/mail_configuration_guide.tt"
+      },
+      {
+         "documentation_file" : "/Documentation/MailSystem.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/MailSystem.tt",
+         "exists" : 1,
+         "code_file" : "root/Documentation/MailSystem.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "version" : "1.00"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "documentation_file" : "/Documentation/mail_troubleshooting.tt",
+         "code_file" : "root/Documentation/mail_troubleshooting.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/mail_troubleshooting.tt"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "documentation_file" : "/Documentation/main_changelog.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/main_changelog.tt",
+         "exists" : null,
+         "code_file" : "root/Documentation/main_changelog.tt"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown",
+         "documentation_file" : "/Documentation/markdown_viewer.tt",
+         "code_file" : "root/Documentation/markdown_viewer.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/markdown_viewer.tt"
+      },
+      {
+         "documentation_file" : "/Documentation/mcoop_module.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/mcoop_module.tt",
+         "exists" : null,
+         "code_file" : "root/Documentation/mcoop_module.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)"
+      },
+      {
+         "code_file" : "root/Documentation/menu_system.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/menu_system.tt",
+         "exists" : null,
+         "documentation_file" : "/Documentation/menu_system.tt",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "last_updated" : "Unknown",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/models.tt",
+         "code_file" : "root/Documentation/models.tt",
+         "documentation_file" : "/Documentation/models.tt"
+      },
+      {
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/project_management_system.tt",
+         "code_file" : "root/Documentation/project_management_system.tt",
+         "documentation_file" : "/Documentation/project_management_system.tt",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/project_selection_log_creation.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/project_selection_log_creation.tt",
+         "documentation_file" : "/Documentation/project_selection_log_creation.tt"
+      },
+      {
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/Proxmox.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Proxmox.tt",
+         "documentation_file" : "/Documentation/Proxmox.tt"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "documentation_file" : "/Documentation/proxmox_commands.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/proxmox_commands.tt",
+         "exists" : null,
+         "code_file" : "root/Documentation/proxmox_commands.tt"
+      },
+      {
+         "documentation_file" : "/Documentation/proxmox_integration.tt",
+         "code_file" : "root/Documentation/proxmox_integration.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/proxmox_integration.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown"
+      },
+      {
+         "documentation_file" : "/Documentation/proxy_troubleshooting.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/proxy_troubleshooting.tt",
+         "code_file" : "root/Documentation/proxy_troubleshooting.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown",
+         "documentation_file" : "/Documentation/recent_updates.tt",
+         "code_file" : "root/Documentation/recent_updates.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/recent_updates.tt",
+         "exists" : null
+      },
+      {
+         "version" : "0.01",
+         "action" : "UPDATE - Bump version from 0.01 to 0.02, add Recent Changes section",
+         "last_updated" : "Thu Dec 25 2025",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/Result_Class_Development_Guide.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Result_Class_Development_Guide.tt",
+         "exists" : 1,
+         "documentation_file" : "/Documentation/Result_Class_Development_Guide.tt"
+      },
+      {
+         "code_file" : "root/Documentation/Schema.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Schema.tt",
+         "documentation_file" : "/Documentation/Schema.tt",
+         "action" : "UPDATE - Bump version from 0.01 to 0.02, add Recent Changes section",
+         "version" : "0.01",
+         "last_updated" : "Thu Dec 25 2025",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "documentation_file" : "/Documentation/sessionplan.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/sessionplan.tt",
+         "code_file" : "root/Documentation/sessionplan.tt"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown",
+         "documentation_file" : "/Documentation/setup.tt",
+         "code_file" : "root/Documentation/setup.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/setup.tt",
+         "exists" : null
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "documentation_file" : "/Documentation/setupcontorller.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/setupcontorller.tt",
+         "code_file" : "root/Documentation/setupcontorller.tt"
+      },
+      {
+         "documentation_file" : "/Documentation/site_domain_resolution.tt",
+         "code_file" : "root/Documentation/site_domain_resolution.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/site_domain_resolution.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown"
+      },
+      {
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/site_specific.tt",
+         "code_file" : "root/Documentation/site_specific.tt",
+         "documentation_file" : "/Documentation/site_specific.tt"
+      },
+      {
+         "code_file" : "root/Documentation/software_management_system.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/software_management_system.tt",
+         "exists" : null,
+         "documentation_file" : "/Documentation/software_management_system.tt",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "last_updated" : "Unknown",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/theme_system.tt",
+         "code_file" : "root/Documentation/theme_system.tt",
+         "documentation_file" : "/Documentation/theme_system.tt"
+      },
+      {
+         "last_updated" : "Unknown",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/todo_system.tt",
+         "code_file" : "root/Documentation/todo_system.tt",
+         "documentation_file" : "/Documentation/todo_system.tt"
+      },
+      {
+         "documentation_file" : "/Documentation/todo_system_comprehensive.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/todo_system_comprehensive.tt",
+         "exists" : null,
+         "code_file" : "root/Documentation/todo_system_comprehensive.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)"
+      },
+      {
+         "code_file" : "root/Documentation/tt_file_standardization_guide.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/tt_file_standardization_guide.tt",
+         "documentation_file" : "/Documentation/tt_file_standardization_guide.tt",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "documentation_file" : "/Documentation/tutorials.tt",
+         "code_file" : "root/Documentation/tutorials.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/tutorials.tt",
+         "exists" : null,
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "last_updated" : "Unknown"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "documentation_file" : "/Documentation/Usbm.tt",
+         "code_file" : "root/Documentation/Usbm.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Usbm.tt",
+         "exists" : 1
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown",
+         "documentation_file" : "/Documentation/user_docs.tt",
+         "code_file" : "root/Documentation/user_docs.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/user_docs.tt"
+      },
+      {
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/user_manual.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/user_manual.tt",
+         "exists" : null,
+         "documentation_file" : "/Documentation/user_manual.tt"
+      },
+      {
+         "documentation_file" : "/Documentation/ai_workflows/docker-agent-guide.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/ai_workflows/docker-agent-guide.tt",
+         "code_file" : "root/Documentation/ai_workflows/docker-agent-guide.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Thu Jan 01 15:30:00 UTC 2026",
+         "action" : "UPDATE - Bump version from 1.01 to 1.02, add Recent Changes section",
+         "version" : "1.01"
+      },
+      {
+         "documentation_file" : "/Documentation/ai_workflows/zencoder_reset_plan.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/ai_workflows/zencoder_reset_plan.tt",
+         "exists" : 1,
+         "code_file" : "root/Documentation/ai_workflows/zencoder_reset_plan.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Thu Jan 02 15:47:00 UTC 2026",
+         "action" : "UPDATE - Bump version from 0.03 to 0.04, add Recent Changes section",
+         "version" : "0.03"
+      },
+      {
+         "documentation_file" : "/Documentation/deployment/cicd_setup_instructions.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/deployment/cicd_setup_instructions.tt",
+         "exists" : 1,
+         "code_file" : "root/Documentation/deployment/cicd_setup_instructions.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Fri Nov 14 01:54:18 PM UTC 2025",
+         "version" : "1.0",
+         "action" : "UPDATE - Bump version from 1.0 to 1.01, add Recent Changes section"
+      },
+      {
+         "version" : "2.0",
+         "action" : "UPDATE - Bump version from 2.0 to 2.01, add Recent Changes section",
+         "last_updated" : "2025-12-05 15:09:00",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/deployment/docker_port_configuration.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/deployment/docker_port_configuration.tt",
+         "documentation_file" : "/Documentation/deployment/docker_port_configuration.tt"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.0",
+         "action" : "UPDATE - Bump version from 1.0 to 1.01, add Recent Changes section",
+         "last_updated" : "Fri Nov 14 01:54:18 PM UTC 2025",
+         "documentation_file" : "/Documentation/deployment/pipeline_setup_guide.tt",
+         "code_file" : "root/Documentation/deployment/pipeline_setup_guide.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/deployment/pipeline_setup_guide.tt",
+         "exists" : 1
+      },
+      {
+         "last_updated" : "Tue Dec 23 17:30:00 UTC 2025",
+         "action" : "UPDATE - Bump version from 1.01 to 1.02, add Recent Changes section",
+         "version" : "1.01",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/developer/opnsense_vm_proxmox_k8s_setup.tt",
+         "exists" : 1,
+         "code_file" : "root/Documentation/developer/opnsense_vm_proxmox_k8s_setup.tt",
+         "documentation_file" : "/Documentation/developer/opnsense_vm_proxmox_k8s_setup.tt"
+      },
+      {
+         "last_updated" : "Unknown",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "version" : "1.00",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/environment/BACKUP_TARGETS.tt",
+         "code_file" : "root/Documentation/environment/BACKUP_TARGETS.tt",
+         "documentation_file" : "/Documentation/environment/BACKUP_TARGETS.tt"
+      },
+      {
+         "version" : "1.00",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/environment/DATA_SOURCES.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/environment/DATA_SOURCES.tt",
+         "documentation_file" : "/Documentation/environment/DATA_SOURCES.tt"
+      },
+      {
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/environment/Environment_Overview.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/environment/Environment_Overview.tt",
+         "documentation_file" : "/Documentation/environment/Environment_Overview.tt"
+      },
+      {
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/environment/INVENTORY.tt",
+         "code_file" : "root/Documentation/environment/INVENTORY.tt",
+         "documentation_file" : "/Documentation/environment/INVENTORY.tt",
+         "last_updated" : "Unknown",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "version" : "1.00",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "documentation_file" : "/Documentation/environment/NETWORK_TOPOLOGY.tt",
+         "code_file" : "root/Documentation/environment/NETWORK_TOPOLOGY.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/environment/NETWORK_TOPOLOGY.tt",
+         "exists" : 1,
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.00",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "last_updated" : "Unknown"
+      },
+      {
+         "last_updated" : "Tue Dec 09 18:15:00 UTC 2025",
+         "action" : "UPDATE - Bump version from 0.01 to 0.02, add Recent Changes section",
+         "version" : "0.01",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/features/environment_variables_management.tt",
+         "code_file" : "root/Documentation/features/environment_variables_management.tt",
+         "documentation_file" : "/Documentation/features/environment_variables_management.tt"
+      },
+      {
+         "last_updated" : "Sun Dec 21 03:55:00 UTC 2025",
+         "version" : "1.01",
+         "action" : "UPDATE - Bump version from 1.01 to 1.02, add Recent Changes section",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/kubernetes/K8S_SECRETS_SETUP.tt",
+         "exists" : 1,
+         "code_file" : "root/Documentation/kubernetes/K8S_SECRETS_SETUP.tt",
+         "documentation_file" : "/Documentation/kubernetes/K8S_SECRETS_SETUP.tt"
+      },
+      {
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/proxmox/opnsense_vm_proxmox_k83_setup.tt",
+         "exists" : 1,
+         "code_file" : "root/Documentation/proxmox/opnsense_vm_proxmox_k83_setup.tt",
+         "documentation_file" : "/Documentation/proxmox/opnsense_vm_proxmox_k83_setup.tt",
+         "last_updated" : "Tue Dec 23 17:25:00 UTC 2025",
+         "action" : "UPDATE - Bump version from 1.01 to 1.02, add Recent Changes section",
+         "version" : "1.01",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "version" : "1.00",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "last_updated" : "Wed Dec 17 21:55:00 PM UTC 2025",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/security/comprehensive_security_audit_2025.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/security/comprehensive_security_audit_2025.tt",
+         "exists" : 1,
+         "documentation_file" : "/Documentation/security/comprehensive_security_audit_2025.tt"
+      },
+      {
+         "code_file" : "root/Documentation/security/security_audit_findings.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/security/security_audit_findings.tt",
+         "exists" : 1,
+         "documentation_file" : "/Documentation/security/security_audit_findings.tt",
+         "action" : "UPDATE - Bump version from 0.01 to 0.02, add Recent Changes section",
+         "version" : "0.01",
+         "last_updated" : "Mon Dec 08 15:50:00 UTC 2025",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Tue Dec 23 17:18:00 UTC 2025",
+         "action" : "UPDATE - Bump version from 1.1 to 1.11, add Recent Changes section",
+         "version" : "1.1",
+         "documentation_file" : "/Documentation/system/COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/system/COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT.tt",
+         "exists" : 1,
+         "code_file" : "root/Documentation/system/COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT.tt"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.04",
+         "action" : "UPDATE - Bump version from 1.04 to 1.05, add Recent Changes section",
+         "last_updated" : "Fri Dec 26 18:45:00 UTC 2025",
+         "documentation_file" : "/Documentation/system/CREDENTIALS_AUDIT_AND_PLAN.tt",
+         "code_file" : "root/Documentation/system/CREDENTIALS_AUDIT_AND_PLAN.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/system/CREDENTIALS_AUDIT_AND_PLAN.tt",
+         "exists" : 1
+      },
+      {
+         "last_updated" : "Wed Dec 24 00:35:00 UTC 2025",
+         "action" : "UPDATE - Bump version from 1.31 to 1.32, add Recent Changes section",
+         "version" : "1.31",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/system/DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt",
+         "code_file" : "root/Documentation/system/DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt",
+         "documentation_file" : "/Documentation/system/DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt"
+      },
+      {
+         "documentation_file" : "/Documentation/Installation.tt",
+         "code_file" : "root/Documentation/Installation.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Installation.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown"
+      },
+      {
+         "version" : "0.01",
+         "action" : "UPDATE - Bump version from 0.01 to 0.02, add Recent Changes section",
+         "last_updated" : "Wed Dec 24 2025",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/system/K3S_PRODUCTION_MIGRATION_GUIDE.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/system/K3S_PRODUCTION_MIGRATION_GUIDE.tt",
+         "documentation_file" : "/Documentation/system/K3S_PRODUCTION_MIGRATION_GUIDE.tt"
+      },
+      {
+         "version" : "0.01",
+         "action" : "UPDATE - Bump version from 0.01 to 0.02, add Recent Changes section",
+         "last_updated" : "Wed Dec 24 2025",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/system/K3S_QUICK_REFERENCE.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/system/K3S_QUICK_REFERENCE.tt",
+         "documentation_file" : "/Documentation/system/K3S_QUICK_REFERENCE.tt"
+      },
+      {
+         "last_updated" : "Tue Dec 23 17:12:00 UTC 2025",
+         "action" : "UPDATE - Bump version from 0.02 to 0.03, add Recent Changes section",
+         "version" : "0.02",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/system/PHASE_0_KUBERNETES_READINESS_PLAN.tt",
+         "exists" : 1,
+         "code_file" : "root/Documentation/system/PHASE_0_KUBERNETES_READINESS_PLAN.tt",
+         "documentation_file" : "/Documentation/system/PHASE_0_KUBERNETES_READINESS_PLAN.tt"
+      },
+      {
+         "version" : "1.5",
+         "action" : "UPDATE - Bump version from 1.5 to 1.51, add Recent Changes section",
+         "last_updated" : "Tue Dec 23 20:00:00 UTC 2025",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/system/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/system/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN.tt",
+         "documentation_file" : "/Documentation/system/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN.tt"
+      },
+      {
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/system/REBUILD_AND_DEPLOY_INSTRUCTIONS.tt",
+         "code_file" : "root/Documentation/system/REBUILD_AND_DEPLOY_INSTRUCTIONS.tt",
+         "documentation_file" : "/Documentation/system/REBUILD_AND_DEPLOY_INSTRUCTIONS.tt"
+      },
+      {
+         "documentation_file" : "/Documentation/SYSTEM_DOCUMENTATION_TEMPLATE.tt",
+         "code_file" : "root/Documentation/SYSTEM_DOCUMENTATION_TEMPLATE.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/SYSTEM_DOCUMENTATION_TEMPLATE.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "documentation_file" : "/Documentation/SYSTEM_FILE_STRUCTURE_GUIDE.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/SYSTEM_FILE_STRUCTURE_GUIDE.tt",
+         "exists" : null,
+         "code_file" : "root/Documentation/SYSTEM_FILE_STRUCTURE_GUIDE.tt"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "documentation_file" : "/Documentation/system/Server_Room_IP_Registry.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/system/Server_Room_IP_Registry.tt",
+         "code_file" : "root/Documentation/system/Server_Room_IP_Registry.tt"
+      },
+      {
+         "action" : "UPDATE - Bump version from 0.04 to 0.05, add Recent Changes section",
+         "version" : "0.04",
+         "last_updated" : "Thu Jan 02 15:48:00 UTC 2026",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/system/ZENCODER_AI_ASSISTANT_GUIDE.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/system/ZENCODER_AI_ASSISTANT_GUIDE.tt",
+         "documentation_file" : "/Documentation/system/ZENCODER_AI_ASSISTANT_GUIDE.tt"
+      },
+      {
+         "documentation_file" : "/Documentation/architecture.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/architecture.tt",
+         "code_file" : "root/Documentation/architecture.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00"
+      },
+      {
+         "documentation_file" : "/Documentation/deployment_checklist.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/deployment_checklist.tt",
+         "code_file" : "root/Documentation/deployment_checklist.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "last_updated" : "Unknown",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.00",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "last_updated" : "Unknown",
+         "documentation_file" : "/Documentation/system/docker_container_port_3000_diagnostics.tt",
+         "code_file" : "root/Documentation/system/docker_container_port_3000_diagnostics.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/system/docker_container_port_3000_diagnostics.tt"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.00",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "last_updated" : "Unknown",
+         "documentation_file" : "/Documentation/system/docker_container_prod_build_failure_diagnostics.tt",
+         "code_file" : "root/Documentation/system/docker_container_prod_build_failure_diagnostics.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/system/docker_container_prod_build_failure_diagnostics.tt"
+      },
+      {
+         "code_file" : "root/Documentation/system/docker_pycharm_setup_guide.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/system/docker_pycharm_setup_guide.tt",
+         "exists" : 1,
+         "documentation_file" : "/Documentation/system/docker_pycharm_setup_guide.tt",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)"
+      },
+      {
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "code_file" : "root/Documentation/linux_commands_reference.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/linux_commands_reference.tt",
+         "exists" : null,
+         "documentation_file" : "/Documentation/linux_commands_reference.tt"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "documentation_file" : "/Documentation/network_diagnostics.tt",
+         "code_file" : "root/Documentation/network_diagnostics.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/network_diagnostics.tt",
+         "exists" : null
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "documentation_file" : "/Documentation/system_info.tt",
+         "code_file" : "root/Documentation/system_info.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/system_info.tt"
+      },
+      {
+         "documentation_file" : "/Documentation/system_overview.tt",
+         "code_file" : "root/Documentation/system_overview.tt",
+         "exists" : null,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/system_overview.tt",
+         "reason" : "Code changed in git diff (HEAD~10..HEAD)",
+         "version" : "1.00",
+         "action" : "CREATE - New documentation file needed (controller recently added)",
+         "last_updated" : "Unknown"
+      }
+   ],
+   "git_range" : "HEAD~10..HEAD",
+   "files_changed" : 205,
+   "summary" : {
+      "docs_missing" : 77,
+      "ready_to_sync" : 1,
+      "total_code_changes" : 205,
+      "docs_needing_update" : 136
+   },
+   "audit_timestamp" : "2026-01-08T20:07:00Z"
+}

@@ -225,6 +225,23 @@ $c->stash(
         <li>Font Awesome 5.x is required for icons</li>
     </ul>
 
+    <h2 id="active-hierarchies">Active Project Hierarchies</h2>
+    <div style="background: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 4px;">
+        <h3>1. Planning & Task Management</h3>
+        <ul style="list-style: none;">
+            <li>📂 <strong>Project Management</strong> (ID: 1)
+                <ul style="list-style: none; margin-top: 10px;">
+                    <li>└─ 📂 <strong>DailyPlan</strong> (ID: 12)
+                        <ul style="list-style: none; margin-top: 5px;">
+                            <li>&nbsp;&nbsp;&nbsp;&nbsp;└─ 📂 <strong>Daily Priorities</strong> (Sub-project for daily task execution)</li>
+                        </ul>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <p><em>Note: This hierarchy is used to organize system-level tasks and daily development priorities.</em></p>
+    </div>
+
     <h2 id="projects-troubleshooting">Troubleshooting</h2>
     
     <h3>CSS Display Issues</h3>

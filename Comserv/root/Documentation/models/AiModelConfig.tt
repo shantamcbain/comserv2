@@ -1,0 +1,547 @@
+[% META
+    title = 'AiModelConfig Model - AI Assistant Configuration Management'
+    description = 'Comprehensive documentation for AiModelConfig model covering database schema, configuration management, API encryption, model capabilities, site-specific deployment, and usage examples for managing AI model endpoints and credentials'
+    roles = 'admin,developer,editor'
+    TemplateType = 'model'
+    category = 'models,configuration,ai-integration'
+    page_version = '1.00'
+    last_updated = '2026-01-08 20:26:00 UTC'
+    site_specific = ''
+%]
+
+[% PageVersion = 'Documentation/models/AiModelConfig.tt,v 1.00 2026/01/08 zencoder-docsync Exp ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 id="aimodelconfig-model">AiModelConfig Model - AI Assistant Configuration Management</h1>
+            
+            <div id="toc" class="alert alert-info">
+                <strong>Contents:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#schema">Database Schema & Fields</a></li>
+                    <li><a href="#configuration">Configuration & Site-Specific Deployment</a></li>
+                    <li><a href="#api-methods">API Methods & Helpers</a></li>
+                    <li><a href="#encryption">API Key Encryption & Security</a></li>
+                    <li><a href="#examples">Usage Examples</a></li>
+                    <li><a href="#troubleshooting">Troubleshooting</a></li>
+                    <li><a href="#see-also">See Also</a></li>
+                </ul>
+            </div>
+
+            <div class="alert alert-success" id="recent-changes">
+                <h3 style="margin-top: 0;">📝 Recent Changes (v1.00 - Jan 8, 2026)</h3>
+                <ul style="margin: 5px 0 0 20px;">
+                    <li><strong>AiModelConfig.pm Addition:</strong> New DBIx::Class Result model for managing AI model configurations</li>
+                    <li><strong>Initial Documentation:</strong> Created comprehensive documentation for AiModelConfig schema and helper methods</li>
+                    <li><strong>Multi-Site Support:</strong> Documented site_id-based configuration isolation for multi-tenant deployments</li>
+                </ul>
+            </div>
+            
+            <section id="overview">
+                <h2>Overview</h2>
+                <p>
+                    The <strong>AiModelConfig</strong> model (Comserv/lib/Comserv/Model/Schema/Ency/Result/AiModelConfig.pm) 
+                    provides a centralized database schema for managing AI model endpoints, credentials, and configuration settings 
+                    across the Comserv application. It is a DBIx::Class Result class that supports:
+                </p>
+                <ul>
+                    <li>Multi-AI model configuration storage (Claude, GPT-4, Ollama, etc.)</li>
+                    <li>Per-site AI model assignment (site_id isolation)</li>
+                    <li>Encrypted API key storage (Crypt::CBC with OpenSSL::AES)</li>
+                    <li>Role-based model availability (admin, user, * for all)</li>
+                    <li>Agent type tracking (MainAgent, ReviewAgent, etc.)</li>
+                    <li>Model capability flags (web search, code search, doc search)</li>
+                    <li>Priority-based fallback selection</li>
+                    <li>Enable/disable toggle for model lifecycle management</li>
+                </ul>
+                <p>
+                    AiModelConfig is the central configuration registry for the E.1 AI Chat System integration, 
+                    allowing multi-site deployments to independently configure which AI models are available to which roles and agents.
+                </p>
+            </section>
+
+            <section id="schema">
+                <h2>Database Schema & Fields</h2>
+                
+                <h3>Table: ai_model_config</h3>
+                <p><strong>Purpose:</strong> Store AI model endpoint configurations, credentials, and capability settings</p>
+                <p><strong>Unique Constraint:</strong> (site_id, role, agent_type, model_name) - ensures no duplicate configurations</p>
+                
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Field Name</th>
+                        <th>Data Type</th>
+                        <th>Nullable</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><code>id</code></td>
+                        <td>INTEGER</td>
+                        <td>No</td>
+                        <td>Auto-increment</td>
+                        <td>Primary key - unique record identifier</td>
+                    </tr>
+                    <tr>
+                        <td><code>site_id</code></td>
+                        <td>INTEGER</td>
+                        <td>No</td>
+                        <td>—</td>
+                        <td>Site reference (multi-tenant isolation). Foreign key to Site table</td>
+                    </tr>
+                    <tr>
+                        <td><code>role</code></td>
+                        <td>VARCHAR(100)</td>
+                        <td>No</td>
+                        <td>—</td>
+                        <td>User role (admin, user, * for all roles)</td>
+                    </tr>
+                    <tr>
+                        <td><code>agent_type</code></td>
+                        <td>VARCHAR(100)</td>
+                        <td>No</td>
+                        <td>—</td>
+                        <td>AI agent identifier (MainAgent, ReviewAgent, DailyAuditAgent, etc.)</td>
+                    </tr>
+                    <tr>
+                        <td><code>model_name</code></td>
+                        <td>VARCHAR(100)</td>
+                        <td>No</td>
+                        <td>—</td>
+                        <td>Model identifier (claude-3-5-sonnet, gpt-4-turbo, ollama-llama2, etc.)</td>
+                    </tr>
+                    <tr>
+                        <td><code>enabled</code></td>
+                        <td>BOOLEAN</td>
+                        <td>No</td>
+                        <td>1</td>
+                        <td>Enable/disable flag (1=active, 0=disabled but kept for audit trail)</td>
+                    </tr>
+                    <tr>
+                        <td><code>api_endpoint</code></td>
+                        <td>VARCHAR(500)</td>
+                        <td>No</td>
+                        <td>—</td>
+                        <td>API URL (e.g., https://api.anthropic.com/v1, http://localhost:11434/api)</td>
+                    </tr>
+                    <tr>
+                        <td><code>api_key_encrypted</code></td>
+                        <td>VARCHAR(512)</td>
+                        <td>Yes</td>
+                        <td>NULL</td>
+                        <td>Encrypted API key (use get_decrypted_api_key() to retrieve)</td>
+                    </tr>
+                    <tr>
+                        <td><code>temperature</code></td>
+                        <td>FLOAT</td>
+                        <td>Yes</td>
+                        <td>NULL</td>
+                        <td>Model temperature parameter (0.0-1.0; NULL = use model default)</td>
+                    </tr>
+                    <tr>
+                        <td><code>max_tokens</code></td>
+                        <td>INTEGER</td>
+                        <td>Yes</td>
+                        <td>NULL</td>
+                        <td>Max output tokens (NULL = use model default)</td>
+                    </tr>
+                    <tr>
+                        <td><code>search_docs_automatically</code></td>
+                        <td>BOOLEAN</td>
+                        <td>No</td>
+                        <td>1</td>
+                        <td>Enable automatic documentation search before responding</td>
+                    </tr>
+                    <tr>
+                        <td><code>allow_web_search</code></td>
+                        <td>BOOLEAN</td>
+                        <td>No</td>
+                        <td>0</td>
+                        <td>Allow web search capability (requires agent/model support)</td>
+                    </tr>
+                    <tr>
+                        <td><code>allow_code_search</code></td>
+                        <td>BOOLEAN</td>
+                        <td>No</td>
+                        <td>0</td>
+                        <td>Allow code search capability (GitHub, internal repos)</td>
+                    </tr>
+                    <tr>
+                        <td><code>priority</code></td>
+                        <td>INTEGER</td>
+                        <td>No</td>
+                        <td>1</td>
+                        <td>Selection priority (lower = higher priority) for fallback logic</td>
+                    </tr>
+                    <tr>
+                        <td><code>created_at</code></td>
+                        <td>TIMESTAMP</td>
+                        <td>No</td>
+                        <td>CURRENT_TIMESTAMP</td>
+                        <td>Record creation timestamp</td>
+                    </tr>
+                    <tr>
+                        <td><code>updated_at</code></td>
+                        <td>TIMESTAMP</td>
+                        <td>No</td>
+                        <td>CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP</td>
+                        <td>Last modification timestamp</td>
+                    </tr>
+                </table>
+
+                <h3>Unique Constraint Details</h3>
+                <p>
+                    The unique constraint on <code>(site_id, role, agent_type, model_name)</code> ensures 
+                    that each site can only have one configuration per agent+role+model combination. This prevents 
+                    duplicate configurations while allowing:
+                </p>
+                <ul>
+                    <li>Same model used by multiple agents (different agent_type)</li>
+                    <li>Same agent/model used by multiple roles (different role)</li>
+                    <li>Different models per site (different site_id)</li>
+                </ul>
+            </section>
+
+            <section id="configuration">
+                <h2>Configuration & Site-Specific Deployment</h2>
+                
+                <h3>Multi-Tenant Architecture</h3>
+                <p>
+                    AiModelConfig supports multi-site deployments where each site (site_id) can independently 
+                    configure its available AI models. This enables:
+                </p>
+                <ul>
+                    <li><strong>Site Isolation:</strong> Site A uses Claude, Site B uses GPT-4</li>
+                    <li><strong>Cost Control:</strong> Different API quotas per site</li>
+                    <li><strong>Compliance:</strong> Site-specific model restrictions (e.g., no external APIs)</li>
+                    <li><strong>Flexibility:</strong> Enable/disable models without deleting configurations</li>
+                </ul>
+
+                <h3>Role-Based Model Assignment</h3>
+                <p>
+                    The <code>role</code> field controls which user roles can access a model configuration:
+                </p>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Role Value</th>
+                        <th>Meaning</th>
+                        <th>Typical Use Case</th>
+                    </tr>
+                    <tr>
+                        <td><code>admin</code></td>
+                        <td>Administrators only</td>
+                        <td>Admin-only tools (code generation, schema analysis)</td>
+                    </tr>
+                    <tr>
+                        <td><code>user</code></td>
+                        <td>Regular users</td>
+                        <td>General-purpose AI chat, documentation assistant</td>
+                    </tr>
+                    <tr>
+                        <td><code>editor</code></td>
+                        <td>Content editors</td>
+                        <td>Documentation writing, content generation</td>
+                    </tr>
+                    <tr>
+                        <td><code>*</code></td>
+                        <td>All roles</td>
+                        <td>Widely-available models (fallback option)</td>
+                    </tr>
+                </table>
+
+                <h3>Agent Type Assignment</h3>
+                <p>
+                    The <code>agent_type</code> field specifies which AI agent can use a configuration. Examples:
+                </p>
+                <ul>
+                    <li><code>MainAgent</code> - Primary task execution agent (Docker V2, bug fixes, docs)</li>
+                    <li><code>ReviewAgent</code> - Code review and quality assessment</li>
+                    <li><code>DailyAuditAgent</code> - Infrastructure and compliance auditing</li>
+                    <li><code>DocumentationAgent</code> - API and schema documentation generation</li>
+                    <li><code>*</code> - Available to all agents</li>
+                </ul>
+            </section>
+
+            <section id="api-methods">
+                <h2>API Methods & Helper Functions</h2>
+                
+                <h3>Instance Methods</h3>
+                
+                <h4 id="is_enabled">is_enabled()</h4>
+                <pre><code>my $is_active = $config->is_enabled();</code></pre>
+                <p><strong>Returns:</strong> Boolean (1 if enabled, 0 if disabled)</p>
+                <p><strong>Purpose:</strong> Check if this model configuration is currently active.</p>
+                <p><strong>Usage:</strong> Filter disabled models from selection logic.</p>
+
+                <h4 id="get_decrypted_api_key">get_decrypted_api_key($encryption_key)</h4>
+                <pre><code>my $api_key = $config->get_decrypted_api_key($encryption_key);
+die "No API key configured" unless $api_key;
+# Use $api_key for API calls</code></pre>
+                <p><strong>Parameters:</strong></p>
+                <ul>
+                    <li><code>$encryption_key</code> - Decryption key (typically from app config or K8s secrets)</li>
+                </ul>
+                <p><strong>Returns:</strong> Decrypted API key string, or undef if api_key_encrypted is NULL</p>
+                <p><strong>Purpose:</strong> Retrieve plaintext API key for authentication.</p>
+                <p><strong>Encryption Method:</strong> Crypt::CBC with OpenSSL::AES cipher</p>
+                <p><strong>⚠ Security Note:</strong> The returned string is plaintext in memory. Keep it scoped to minimal use.</p>
+
+                <h4 id="set_encrypted_api_key">set_encrypted_api_key($api_key, $encryption_key)</h4>
+                <pre><code>$config->set_encrypted_api_key('sk-proj-abc123xyz', $encryption_key);
+$config->update();</code></pre>
+                <p><strong>Parameters:</strong></p>
+                <ul>
+                    <li><code>$api_key</code> - Plaintext API key to encrypt</li>
+                    <li><code>$encryption_key</code> - Encryption key (must match decryption key)</li>
+                </ul>
+                <p><strong>Returns:</strong> 1 on success</p>
+                <p><strong>Purpose:</strong> Encrypt and store API key securely.</p>
+                <p><strong>Side Effects:</strong> Updates the <code>api_key_encrypted</code> field in memory (call update() to persist)</p>
+
+                <h4 id="get_capabilities">get_capabilities()</h4>
+                <pre><code>my $caps = $config->get_capabilities();
+if ($caps->{web_search}) {
+    # Web search enabled
+}</code></pre>
+                <p><strong>Returns:</strong> HashRef with keys:</p>
+                <ul>
+                    <li><code>search_docs</code> - Boolean (search_docs_automatically value)</li>
+                    <li><code>web_search</code> - Boolean (allow_web_search value)</li>
+                    <li><code>code_search</code> - Boolean (allow_code_search value)</li>
+                </ul>
+                <p><strong>Purpose:</strong> Retrieve all capability flags in one call.</p>
+
+                <h4 id="can_role_use">can_role_use($user_role)</h4>
+                <pre><code>if ($config->can_role_use('admin')) {
+    # Current model available to admin users
+}</code></pre>
+                <p><strong>Parameters:</strong></p>
+                <ul>
+                    <li><code>$user_role</code> - User's role (admin, user, editor, etc.)</li>
+                </ul>
+                <p><strong>Returns:</strong> Boolean (1 if accessible, 0 if denied)</p>
+                <p><strong>Purpose:</strong> Check if a specific user role can access this model.</p>
+                <p><strong>Logic:</strong> Returns true if model is enabled AND role matches (or role is '*')</p>
+            </section>
+
+            <section id="encryption">
+                <h2>API Key Encryption & Security</h2>
+                
+                <h3>Encryption Strategy</h3>
+                <p>
+                    AiModelConfig stores API keys encrypted at rest using <strong>Crypt::CBC</strong> with 
+                    <strong>OpenSSL::AES</strong> cipher. This protects keys if the database is compromised.
+                </p>
+                
+                <h3>Encryption & Decryption Flow</h3>
+                <ol>
+                    <li>Administrator provides plaintext API key via admin interface</li>
+                    <li><code>set_encrypted_api_key($api_key, $encryption_key)</code> encrypts the key</li>
+                    <li>Encrypted key stored in <code>api_key_encrypted</code> field</li>
+                    <li>At runtime, <code>get_decrypted_api_key($encryption_key)</code> retrieves plaintext for API calls</li>
+                    <li>Plaintext exists only in memory during request processing</li>
+                </ol>
+
+                <h3>Encryption Key Management</h3>
+                <p><strong>⚠ CRITICAL:</strong> Encryption keys must be:</p>
+                <ul>
+                    <li>Stored securely (K8s Secrets, Vault, environment variables)</li>
+                    <li>Rotated regularly (e.g., quarterly)</li>
+                    <li>Never committed to version control</li>
+                    <li>Backed by strong randomness (256-bit recommended)</li>
+                </ul>
+                <p>
+                    <strong>Configuration:</strong> Encryption key typically loaded from:
+                </p>
+                <pre><code>
+# Option 1: K8s Secrets
+$encryption_key = $c->config->{encryption}->{api_key_secret};
+
+# Option 2: Environment variable
+$encryption_key = $ENV{COMSERV_API_KEY_ENCRYPTION_SECRET};
+                </code></pre>
+
+                <h3>Key Rotation Considerations</h3>
+                <p>If you need to rotate the encryption key:</p>
+                <ol>
+                    <li>Fetch all AiModelConfig records with api_key_encrypted set</li>
+                    <li>For each record: decrypt with old key, re-encrypt with new key</li>
+                    <li>Update database in transaction</li>
+                    <li>Verify all records decrypt successfully with new key</li>
+                    <li>Retire old key after verification period</li>
+                </ol>
+            </section>
+
+            <section id="examples">
+                <h2>Usage Examples</h2>
+                
+                <h3>Example 1: Retrieve Model Configuration for an Agent</h3>
+                <pre><code>
+use Comserv::Model::Schema::Ency::Result::AiModelConfig;
+
+# Get AiModelConfig result source
+my $schema = $c->model('Ency::Schema');
+my $rs = $schema->resultset('AiModelConfig');
+
+# Find config for MainAgent using claude model on site 1
+my $config = $rs->search({
+    site_id      => 1,
+    agent_type   => 'MainAgent',
+    model_name   => 'claude-3-5-sonnet',
+    role         => 'admin',
+    enabled      => 1,
+})->first;
+
+die "Model configuration not found" unless $config;
+print "Using model: " . $config->model_name . "\n";
+                </code></pre>
+
+                <h3>Example 2: Decrypt and Use API Key</h3>
+                <pre><code>
+my $encryption_key = $c->config->{encryption}->{api_key_secret};
+my $api_key = $config->get_decrypted_api_key($encryption_key);
+
+# Make API call with key
+my $ua = LWP::UserAgent->new();
+my $req = HTTP::Request->new(
+    POST => $config->api_endpoint,
+    ['Authorization' => "Bearer $api_key"],
+    JSON::encode_json({ ... })
+);
+my $res = $ua->request($req);
+                </code></pre>
+
+                <h3>Example 3: Check Role-Based Access</h3>
+                <pre><code>
+my $user_role = $c->user->role();  # 'admin', 'user', etc.
+my @available_models = $rs->search({
+    site_id  => $site_id,
+    enabled  => 1,
+})->all;
+
+my @accessible = grep { $_->can_role_use($user_role) } @available_models;
+
+if (@accessible) {
+    my $model = $accessible[0];
+    print "Available model: " . $model->model_name . "\n";
+} else {
+    die "No models available for your role\n";
+}
+                </code></pre>
+
+                <h3>Example 4: Store New API Key</h3>
+                <pre><code>
+my $new_config = $rs->create({
+    site_id      => 1,
+    role         => 'admin',
+    agent_type   => 'ReviewAgent',
+    model_name   => 'gpt-4-turbo',
+    enabled      => 1,
+    api_endpoint => 'https://api.openai.com/v1',
+    temperature  => 0.7,
+    max_tokens   => 4096,
+});
+
+my $encryption_key = $c->config->{encryption}->{api_key_secret};
+$new_config->set_encrypted_api_key('sk-proj-...', $encryption_key);
+$new_config->update();
+
+print "Configuration stored with ID: " . $new_config->id . "\n";
+                </code></pre>
+
+                <h3>Example 5: List Capabilities</h3>
+                <pre><code>
+my $caps = $config->get_capabilities();
+
+print "Capabilities:\n";
+print "  Document search:  " . ($caps->{search_docs} ? 'Yes' : 'No') . "\n";
+print "  Web search:       " . ($caps->{web_search} ? 'Yes' : 'No') . "\n";
+print "  Code search:      " . ($caps->{code_search} ? 'Yes' : 'No') . "\n";
+
+if ($caps->{web_search}) {
+    # Agent can perform web searches
+}
+                </code></pre>
+            </section>
+
+            <section id="troubleshooting">
+                <h2>Troubleshooting</h2>
+                
+                <h3>Issue: "Model configuration not found"</h3>
+                <p><strong>Cause:</strong> AiModelConfig record doesn't exist for the requested combination.</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Check database: query ai_model_config with correct site_id, agent_type, model_name</li>
+                    <li>Verify <code>enabled = 1</code></li>
+                    <li>Check role compatibility: does role match the request?</li>
+                    <li>Use admin interface to add missing configuration</li>
+                </ul>
+
+                <h3>Issue: "Failed to decrypt API key"</h3>
+                <p><strong>Cause:</strong> Decryption key mismatch or corrupted encrypted data.</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Verify encryption_key is loaded correctly (check app logs)</li>
+                    <li>Ensure key hasn't been rotated (old records need old key)</li>
+                    <li>Check if api_key_encrypted field contains valid data (not NULL)</li>
+                    <li>Re-encrypt key if suspected corruption: use <code>set_encrypted_api_key()</code></li>
+                </ul>
+
+                <h3>Issue: "API key is NULL"</h3>
+                <p><strong>Cause:</strong> api_key_encrypted field is not set (NULL value).</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Record was created but key was never stored (incomplete setup)</li>
+                    <li>Use admin interface or Perl to set key: <code>$config->set_encrypted_api_key(...)</code></li>
+                    <li>Verify after update: <code>$config->discard_changes; $config->get_decrypted_api_key(...)</code></li>
+                </ul>
+
+                <h3>Issue: "Unique constraint violation"</h3>
+                <p><strong>Cause:</strong> Attempting to insert duplicate (site_id, role, agent_type, model_name).</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Check existing records: <code>SELECT * FROM ai_model_config WHERE site_id=X AND role='Y' AND agent_type='Z' AND model_name='W'</code></li>
+                    <li>Either update existing record or use different agent_type/role/model_name combination</li>
+                    <li>To replace: DELETE old record first, then INSERT new (use transaction)</li>
+                </ul>
+
+                <h3>Issue: "Model not accessible for this role"</h3>
+                <p><strong>Cause:</strong> <code>can_role_use($user_role)</code> returned false.</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Check configuration: is role correct? (admin, user, editor, *)</li>
+                    <li>Verify model enabled: <code>$config->enabled == 1</code></li>
+                    <li>Update configuration to allow role: change role field to '*' or target role</li>
+                </ul>
+            </section>
+
+            <section id="see-also">
+                <h2>See Also</h2>
+                <div class="alert alert-success">
+                    <strong>Related Documentation:</strong>
+                    <ul style="margin: 5px 0 0 20px;">
+                        <li><a href="/Documentation/system/ZENCODER_AI_ASSISTANT_GUIDE">Zencoder AI Assistant Guide</a> - Agent configuration and usage</li>
+                        <li><a href="/Documentation/AI_Chat_System_Master_Audit">AI Chat System Master Audit</a> - System architecture overview</li>
+                        <li><a href="/Documentation/controllers/AI">AI Controller Documentation</a> - API endpoints for model management</li>
+                        <li><a href="/Documentation/models/RemoteDB">RemoteDB Model</a> - Database connection management</li>
+                    </ul>
+                </div>
+            </section>
+
+            <hr style="margin: 40px 0;">
+            <footer style="color: #666; font-size: 12px;">
+                <p>
+                    <strong>File:</strong> Comserv/lib/Comserv/Model/Schema/Ency/Result/AiModelConfig.pm<br>
+                    <strong>Documentation Version:</strong> 1.00 (2026-01-08)<br>
+                    <strong>Last Updated:</strong> 2026-01-08 20:26:00 UTC<br>
+                    <strong>Maintained By:</strong> Zencoder (MainAgent)
+                </p>
+            </footer>
+        </div>
+    </div>
+</div>

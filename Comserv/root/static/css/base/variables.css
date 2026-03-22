@@ -12,6 +12,9 @@
   --table-header-bg: #f2f2f2;
   --warning-color: #ff0000;
   --success-color: #009900;
+  --info-color: #17a2b8;
+  --light-color: #f8f9fa;
+  --text-muted-color: #6c757d;
   
   /* Typography */
   --header-font: Verdana, Helvetica, sans-serif;
@@ -37,4 +40,24 @@
   --nav-hover-bg: rgba(0, 0, 0, 0.1);
   --dropdown-bg: #f9f9f9;
   --dropdown-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+  
+  /* Schema Comparison Colors */
+  --schema-table-data-color: #007bff;
+  --schema-result-data-color: #6f42c1;
+  --schema-warning-color: #ffecb3;
+  --schema-missing-color: #fff3cd;
+  --legend-bg: #f8f9fa;
+  --debug-bg: #f0f0f0;
+  --schema-stat-db-bg: var(--primary-color);
+  --schema-stat-connected-bg: var(--success-color);
+  --schema-stat-tables-bg: var(--accent-color);
+  --schema-stat-status-bg: #e8f4f8;
+  --schema-alert-warning-bg: #fff3cd;
+  --schema-alert-warning-border: #ffeaa7;
+  --schema-alert-danger-bg: #f8d7da;
+  --schema-alert-danger-border: #f5c6cb;
+  --schema-alert-danger-text: #721c24;
+  --schema-alert-success-bg: #d4edda;
+  --schema-alert-success-border: #c3e6cb;
+  --schema-text-muted: #6c757d;
 }

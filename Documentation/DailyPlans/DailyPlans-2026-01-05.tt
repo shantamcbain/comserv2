@@ -1,0 +1,119 @@
+[% META 
+   title = "Daily Plan - January 5, 2026"
+   description = "Monday: A.3 Credentials Audit Execution Phase 1, B.1 Docker Secrets implementation, B.2 Authentication assessment, B.3 theme refactoring Phase 1"
+   roles = "admin,developer,devops"
+   TemplateType = "Documentation"
+   category = "daily-plans,infrastructure,security,bug-fixes"
+   page_version = "0.03"
+   last_updated = "Sat Jan 04 17:45:00 UTC 2026"
+   site_specific = "false"
+%]
+[% PageVersion = 'root/Documentation/DailyPlans/Daily_Plans-2026-01-05.tt,v 0.03 2026/01/04 17:45:00 zencoder Exp - Monday: A.3 audit phase 1 start (deferred from Jan 4); A.2 Phase 1 completion moved to Jan 5; B.1/B.2/B.3 bug fixes week' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color);">Daily Plan: Monday, January 5, 2026 (A.2 Phase 1 Completion + A.3 Scope Planning)</h1>
+    
+    <div class="alert alert-warning" style="background-color: #fff3cd; padding: 15px; border-left: 4px solid #ff9800; margin: 15px 0;">
+        <h3 style="color: #d9534f; margin-top: 0;">⚠️ TIMELINE ADJUSTMENT (Jan 4 Documentation Infrastructure Priority)</h3>
+        <p><strong>Note:</strong> Jan 4 focused on establishing daily audit plan infrastructure (variance tracking) rather than A.2 Phase 1. A.2 Phase 1 (Database Connection Pooling) and A.3 Scope Planning are NOW priority for Jan 5-6. Original A.3 audit execution moves to Jan 6+. This ensures proper documentation tracking for all future infrastructure work.</p>
+    </div>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        <strong>Context:</strong> New work week - 4 parallel priority tracks | 
+        <strong>Status:</strong> 4 Main Tasks | 
+        <strong>Last Updated:</strong> 2026-01-05
+    </div>
+
+    <h2>🔴 Priority 1: A.2 K8s Readiness - Phase 1 Completion (2-3 hours) [MOVED FROM JAN 4]</h2>
+    
+    <p><strong>Complete A.2 Phase 1 - Database Connection Pooling & Specification Finalization:</strong> Incorporate findings from previous analysis and complete the full specification.</p>
+    <ol>
+        <li><strong>Finalize Database Connection Pooling Design:</strong>
+            <ul>
+                <li>Document: Connection limits for multi-pod K8s environment</li>
+                <li>Plan: Dynamic connection string via environment variables</li>
+                <li>Design: K8s Secrets integration (DB_HOST, DB_USER, DB_PASS, etc.)</li>
+                <li>Create: example-secrets.yaml template for K8s deployment</li>
+            </ul>
+        </li>
+        <li><strong>Complete A.2 Requirements Specification:</strong>
+            <ul>
+                <li>File: /Documentation/A2_Kubernetes_Readiness_Specification.tt</li>
+                <li>Add: Implementation checklist (who does what, when)</li>
+                <li>Add: Risk assessment and mitigation strategies</li>
+                <li>Final review and mark as COMPLETE</li>
+            </ul>
+        </li>
+    </ol>
+    <p><strong>Expected Deliverable:</strong> Complete A.2 Requirements Specification (final) + example-secrets.yaml template</p>
+
+    <h2>🟠 Priority 2: A.3 Credentials Audit - Scope & Planning (2-3 hours) [MOVED FROM JAN 4]</h2>
+    
+    <p><strong>Define A.3 Audit Scope and Create Remediation Plan:</strong> This should have been completed Jan 4 but now moves to Jan 5 to follow A.2 completion.</p>
+    <ol>
+        <li><strong>Define A.3 Audit Scope:</strong>
+            <ul>
+                <li>List all credential types: API keys, SSH keys, DB passwords, OAuth tokens, TLS certs</li>
+                <li>Identify: Where currently stored (code, env vars, secrets manager, .env files)</li>
+                <li>Document: Which are likely hardcoded/insecure (plan scope for Jan 6+)</li>
+                <li>Plan: Migration timeline to secure secrets management</li>
+            </ul>
+        </li>
+        <li><strong>Create A.3 Audit Scope Document:</strong>
+            <ul>
+                <li>File: /Documentation/A3_Credentials_Audit_Plan.tt</li>
+                <li>Sections: Current State, Scope of Audit, Risk Classification Framework, Remediation Timeline</li>
+            </ul>
+        </li>
+    </ol>
+    <p><strong>Expected Deliverable:</strong> A.3 Audit Scope Document + Risk Classification Framework</p>
+    
+    <h2>🟡 Priority 3: B.1 Docker Secrets - Assessment Phase 1 (1-2 hours)</h2>
+    
+    <p><strong>Quick assessment to support A.3 scope:</strong> Understand current Docker Secrets usage and what B.1 plan requires.</p>
+    <ol>
+        <li>Review: Current Docker Compose configurations (secret declarations)</li>
+        <li>Identify: What secrets are currently defined vs what's missing</li>
+        <li>Plan: B.1 remediation (required for A.3 credentials migration)</li>
+    </ol>
+    <p><strong>Expected Deliverable:</strong> B.1 Assessment document with remediation plan</p>
+
+    <table border="1" style="width: 100%; margin: 20px 0;">
+        <tr style="background: #f5f5f5;">
+            <th style="padding: 10px;">Task</th>
+            <th style="padding: 10px;">Duration</th>
+            <th style="padding: 10px;">Priority</th>
+            <th style="padding: 10px;">Note</th>
+        </tr>
+        <tr>
+            <td style="padding: 10px;">A.2 K8s Phase 1 Completion</td>
+            <td style="padding: 10px;">2-3 hours</td>
+            <td style="padding: 10px;">🔴 P1</td>
+            <td style="padding: 10px;">Connection pooling + spec</td>
+        </tr>
+        <tr style="background: #f5f5f5;">
+            <td style="padding: 10px;">A.3 Scope & Planning</td>
+            <td style="padding: 10px;">2-3 hours</td>
+            <td style="padding: 10px;">🟠 P2</td>
+            <td style="padding: 10px;">Audit scope document</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px;">B.1 Docker Secrets Assessment</td>
+            <td style="padding: 10px;">1-2 hours</td>
+            <td style="padding: 10px;">🟡 P3</td>
+            <td style="padding: 10px;">Assessment only</td>
+        </tr>
+    </table>
+
+    <div style="background-color: #e3f2fd; padding: 15px; border-left: 4px solid #2196f3; margin: 20px 0;">
+        <h3>Tomorrow's Plan (Jan 6 - Tuesday)</h3>
+        <p><strong>A.3 Credentials Audit Execution Phase 1:</strong> Scan codebase for hardcoded credentials, classify findings, create interim report with quick wins identified. Supports B.1 and B.2 remediation planning.</p>
+    </div>
+
+    <div style="color: var(--text-muted-color); font-size: var(--font-size-small); margin-top: 30px;">
+        <p><strong>Daily Plan v0.03 (Updated Jan 4) | Monday January 5, 2026 | A.2 completion + A.3 scope planning week</strong></p>
+    </div>
+</div>

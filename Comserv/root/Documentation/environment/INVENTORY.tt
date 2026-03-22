@@ -1,0 +1,34 @@
+[% META title = 'Environment Inventory' %]
+[% PageVersion = 'Documentation/environment/INVENTORY.tt,v 0.01 2025/11/14 Codebuddy Exp Codebuddy ' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<div class="environment-inventory">
+    <h1>Core Inventory</h1>
+    <p>Machine-readable inventory of major components. Do not include credentials. Use placeholders or references to secure Vault where secrets are stored.</p>
+    <pre>
+{
+  "physical_hosts": [
+    {"hostname": "host-01", "role": "core", "ip": "10.0.0.11"},
+    {"hostname": "host-02", "role": "compute", "ip": "10.0.0.12"}
+  ],
+  "proxmox_nodes": [
+    {"node": "proxmox-01", "00_vmid": "101", "00_ctid": "201", "ip": "10.0.0.101"}
+  ],
+  "databases": [
+    {"name": "ency_db", "host": "db01", "ip": "10.0.0.50", "port": 3306}
+  ],
+  "gateways": [
+    {"name": "gateway-01", "ip": "10.0.0.1"}
+  ],
+  "storage_targets": [
+    {"type": "nfs", "server": "nas01", "export": "/exports/vol1"}
+  ]
+}
+    </pre>
+</div>
+
+...rest of the code...

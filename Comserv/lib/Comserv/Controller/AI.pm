@@ -22,6 +22,9 @@ use namespace::autoclean;
 use Try::Tiny;
 use JSON;
 use Comserv::Util::Logging;
+use Comserv::Model::Ollama;
+use Comserv::Model::Grok;
+use Comserv::Util::SystemInfo;
 
 BEGIN { extends 'Catalyst::Controller' }
 
@@ -56,15 +59,22 @@ Main AI interface page with interactive query form.
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
     
-    # Check authentication
-    unless ($c->session->{username}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-            'index', "Unauthorized access attempt to AI interface");
-        $c->response->redirect($c->uri_for('/user/login'));
-        return;
-    }
-    
+    # Determine if user is authenticated or guest
     my $username = $c->session->{username};
+    my $guest_session_id = $c->session->{guest_session_id};
+    
+    # If not logged in, create guest session for accessing the UI
+    unless ($username) {
+        unless ($guest_session_id) {
+            use Data::UUID;
+            my $ug = Data::UUID->new;
+            $guest_session_id = $ug->create_str();
+            $c->session->{guest_session_id} = $guest_session_id;
+        }
+        $username = "Guest-" . substr($guest_session_id, 0, 8);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+            'index', "Guest user accessing AI interface: $username");
+    }
     
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
         'index', "User accessing AI interface");
@@ -85,7 +95,7 @@ sub index :Path :Args(0) {
     
     # Set template variables
     $c->stash(
-        template => 'ai/index.md',
+        template => 'ai/index.tt',
         page_title => 'AI Assistant',
         username => $username,
         can_select_model => $can_select_model,
@@ -116,29 +126,141 @@ sub generate :Local :Args(0) {
     # Set response content type
     $c->response->content_type('application/json');
     
-    # Check authentication
-    unless ($c->session->{username}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-            'generate', "Unauthorized access attempt to AI generate");
-        
-        my $error_response = encode_json({
-            success => JSON::false,
-            error => 'Authentication required'
-        });
-        $c->response->body($error_response);
-        $c->response->status(401);
-        return;
-    }
-    
+    # Determine if user is authenticated or guest
     my $username = $c->session->{username};
+    my $user_id = $c->session->{user_id};
+    my $is_guest = 0;
+    my $guest_session_id = $c->session->{guest_session_id};
+    
+    # If not logged in, create guest session
+    if (!$username) {
+        $is_guest = 1;
+        
+        # Create a unique guest session ID if not already present
+        unless ($guest_session_id) {
+            use Data::UUID;
+            my $ug = Data::UUID->new;
+            $guest_session_id = $ug->create_str();
+            $c->session->{guest_session_id} = $guest_session_id;
+        }
+        
+        # Use guest user (ID 199) - created earlier
+        $user_id = 199;
+        $username = "Guest-" . substr($guest_session_id, 0, 8);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+            'generate', "Guest user session created: $username (session: $guest_session_id)");
+    } else {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'generate', "Authenticated user: $username");
+    }
     
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
         'generate', "Processing AI generate request");
     
-    # Get parameters
-    my $prompt = $c->request->params->{prompt} || '';
-    my $format = $c->request->params->{format} || '';
-    my $system = $c->request->params->{system} || '';
+    # Get parameters - handle JSON body
+    my $prompt = '';
+    my $format = '';
+    my $system = '';
+    my $provider = 'ollama';  # Default provider: ollama, grok, or deepseek
+    my $page_context = 'general';
+    my $page_path = '';
+    my $page_title = '';
+    my $agent_id = 'general';
+    my $agent_name = 'AI Assistant';
+    my $conversation_id = undef;  # For continuing existing conversations
+    
+    # Check if request body is JSON
+    my $content_type = $c->request->content_type || '';
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+        'generate', "Request content-type: '$content_type'");
+    
+    if ($content_type =~ /application\/json/i) {
+        # For JSON requests, read body using most reliable method
+        my $json_data;
+        try {
+            my $raw_body;
+            
+            # Try multiple methods to read body (most reliable first)
+            if ($c->req->can('content')) {
+                $raw_body = $c->req->content;
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'generate', "Using \$c->req->content method");
+            } elsif ($c->req->can('body')) {
+                my $body = $c->req->body;
+                if (ref($body) && $body->can('seek')) {
+                    seek($body, 0, 0);
+                    $raw_body = do { local $/; <$body> };
+                    seek($body, 0, 0);
+                } else {
+                    $raw_body = $body;
+                }
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'generate', "Using \$c->req->body method");
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "Raw body length: " . (defined $raw_body ? length($raw_body) : 'UNDEF') . ", first 200 chars: " . (defined $raw_body ? substr($raw_body, 0, 200) : 'N/A'));
+            
+            if ($raw_body && length($raw_body) > 0) {
+                $json_data = decode_json($raw_body);
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'generate', "JSON parsed successfully: keys=" . join(', ', keys %$json_data) . ", prompt exists=" . (defined $json_data->{prompt} ? 'yes (len=' . length($json_data->{prompt}) . ')' : 'no'));
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                    'generate', "No JSON body content received or body is empty");
+            }
+        } catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                'generate', "Failed to read/parse JSON body: $_");
+        };
+        
+        if ($json_data && ref($json_data) eq 'HASH') {
+            $prompt = $json_data->{prompt} || '';
+            $format = $json_data->{format} || '';
+            $system = $json_data->{system} || '';
+            $provider = $json_data->{provider} || 'ollama';
+            $page_context = $json_data->{page_context} || 'general';
+            $page_path = $json_data->{page_path} || '';
+            $page_title = $json_data->{page_title} || '';
+            $agent_id = $json_data->{agent_id} || 'general';
+            $agent_name = $json_data->{agent_name} || 'AI Assistant';
+            $conversation_id = $json_data->{conversation_id};  # May be undef if new conversation
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "Extracted from JSON: prompt='" . substr($prompt, 0, 100) . "', provider='$provider', conversation_id=" . ($conversation_id || 'NEW'));
+        } else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                'generate', "JSON parsing resulted in no data or invalid hash");
+        }
+    } else {
+        # Fall back to form/query parameters
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'generate', "Using form/query parameters (content-type: '$content_type')");
+        
+        $prompt = $c->request->params->{prompt} || '';
+        $format = $c->request->params->{format} || '';
+        $system = $c->request->params->{system} || '';
+        $provider = $c->request->params->{provider} || 'ollama';
+        $page_context = $c->request->params->{page_context} || 'general';
+        $page_path = $c->request->params->{page_path} || '';
+        $page_title = $c->request->params->{page_title} || '';
+        $agent_id = $c->request->params->{agent_id} || 'general';
+        $agent_name = $c->request->params->{agent_name} || 'AI Assistant';
+        $conversation_id = $c->request->params->{conversation_id};  # May be undef if new conversation
+    }
+    
+    # Fall back to session-stored conversation_id if not provided in request
+    unless ($conversation_id) {
+        $conversation_id = $c->session->{current_conversation_id};
+        if ($conversation_id) {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "Using session-stored conversation_id: $conversation_id");
+        }
+    }
+    
+    # DEBUG: Log conversation_id status
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+        'generate', "BEFORE_VALIDATION: conversation_id is " . (defined($conversation_id) ? "'$conversation_id'" : "undef"));
     
     # Validate prompt
     unless ($prompt && length($prompt) > 0) {
@@ -165,52 +287,315 @@ sub generate :Local :Args(0) {
         'generate', "Request parameters - format: '$format', system: " . 
         (length($system) > 0 ? 'provided' : 'none'));
     
+    # Normalize agent_type to database enum values
+    # Normalize agent_type for dynamic storage (was database enum)
+    my $normalized_agent_type = $agent_id || 'documentation';
+    if ($agent_id && $agent_id =~ /^(documentation|helpdesk|ency|beekeeping|hamradio|chat|cleanup|cleanup-agent|docker|master-plan-updater|daily-audit|daily-plan-automator|master-plan-manager|daily-plans-generator|daily-plans|documentation-sync|main|MainAgent|planning|prompt-logging)$/i) {
+        $normalized_agent_type = lc($agent_id);
+        # Special case for MainAgent which is camelcase in enum
+        $normalized_agent_type = 'MainAgent' if lc($agent_id) eq 'mainagent';
+    } elsif ($agent_id && ($agent_id eq 'general' || $agent_id eq 'documentation-agent')) {
+        $normalized_agent_type = 'documentation';  # map general and documentation-agent to documentation
+    } else {
+        # Allow any agent_id since we switched to VARCHAR
+        $normalized_agent_type = $agent_id if $agent_id;
+    }
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+        'generate', "Agent type normalization: agent_id=$agent_id -> normalized_agent_type=$normalized_agent_type");
+    
     my $response_data;
+    my $ollama_started = 0;
+    my $model_used = 'unknown';
     
     try {
-        # Get Ollama model
-        my $ollama = $c->model('Ollama');
-        unless ($ollama) {
-            die "Failed to load Ollama model";
-        }
+        my $response;
         
-        # Configure with user's current settings
-        my $user_roles = $c->session->{roles} || [];
-        if (!ref($user_roles)) {
-            $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
-        }
-        my $can_select_model = 0;
-        if (ref($user_roles) eq 'ARRAY') {
-            $can_select_model = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles;
-        }
-        my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
-        
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-            'generate', "Ollama model configured (host: $current_host), querying API...");
-        
-        # Query the API
-        my $response = $ollama->query(
-            prompt => $prompt,
-            format => $format eq 'json' ? 'json' : undef,
-            system => $system || undef
-        );
-        
-        unless ($response) {
-            my $error = $ollama->last_error || 'Unknown error';
-            die "Ollama query failed: $error";
+        # Route to the appropriate provider
+        if (lc($provider) eq 'grok') {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                'generate', "Using Grok provider for query");
+            
+            my $grok = $c->model('Grok');
+            unless ($grok) {
+                die "Failed to load Grok model";
+            }
+            
+            # Check if API key is configured
+            unless ($grok->api_key) {
+                die "Grok API key not configured. Set GROK_API_KEY environment variable or configure Kubernetes secret.";
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "Querying Grok API");
+            
+            $response = $grok->chat(
+                messages => [
+                    { role => 'system', content => $system || 'You are a helpful assistant.' },
+                    { role => 'user', content => $prompt }
+                ]
+            );
+            
+            unless ($response) {
+                my $error = $grok->last_error || 'Unknown error';
+                die "Grok query failed: $error";
+            }
+            
+            $model_used = $response->{model} || $grok->model;
+        } else {
+            # Default to Ollama
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                'generate', "Using Ollama provider for query");
+            
+            my $ollama = $c->model('Ollama');
+            unless ($ollama) {
+                die "Failed to load Ollama model";
+            }
+            
+            # Configure with user's current settings
+            my $user_roles = $c->session->{roles} || [];
+            if (!ref($user_roles)) {
+                $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
+            }
+            my $can_select_model = 0;
+            if (ref($user_roles) eq 'ARRAY') {
+                $can_select_model = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles;
+            }
+            my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
+            
+            $ollama->host($current_host);
+            $ollama->port($current_port) if $current_port;
+            $ollama->model($current_model) if $current_model;
+            $ollama->clear_endpoint;
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "Ollama model configured (host: $current_host), checking connection...");
+            
+            # Check if server is connected, if not try to start it
+            unless ($ollama->check_connection()) {
+                # Only localhost can be auto-started
+                if ($current_host eq 'localhost' || $current_host eq '127.0.0.1') {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                        'generate', "Ollama not connected on $current_host, attempting to start server...");
+                    
+                    my $start_result = $ollama->start_server(method => 'command', async => 0);
+                    if ($start_result && $start_result->{success}) {
+                        $ollama_started = 1;
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                            'generate', "Ollama server started successfully for user '$username'");
+                    } else {
+                        my $error = $start_result->{error} || 'Unknown error';
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                            'generate', "Failed to auto-start Ollama server for user '$username': $error");
+                    }
+                } else {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                        'generate', "Ollama not connected on remote host $current_host, cannot auto-start");
+                }
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "Querying Ollama API with model: $current_model");
+            
+            # Query the API
+            $response = $ollama->query(
+                prompt => $prompt,
+                format => $format eq 'json' ? 'json' : undef,
+                system => $system || undef
+            );
+            
+            unless ($response) {
+                my $error = $ollama->last_error || 'Unknown error';
+                die "Ollama query failed: $error";
+            }
+            
+            $model_used = $response->{model} || $ollama->model;
         }
         
         # Log success metrics
         my $response_length = length($response->{response} || '');
-        my $model_used = $response->{model} || $ollama->model;
+        $model_used = $response->{model} || $model_used;
+        my $ai_response = $response->{response} || '';
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
             'generate', "Query successful for user '$username' - Model: $model_used, Response length: $response_length chars");
+        
+        # Save conversation and messages to database
+        try {
+            # user_id was already set above (either from session or as guest)
+            unless ($user_id) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                    'generate', "CRITICAL: user_id not found. Session keys: " . join(', ', keys %{$c->session}));
+                die "USER_ID_NULL";
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "SAVE_CONV_START: user_id=$user_id, is_guest=$is_guest");
+            
+            my $schema = $c->model('DBEncy')->schema;
+            unless ($schema) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                    'generate', "CRITICAL: Failed to get database schema from model");
+                die "SCHEMA_NULL";
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "PRE_CREATE: user_id=$user_id, schema_loaded=1, conversation_id=" . (defined($conversation_id) ? "'$conversation_id' (defined, len=" . length($conversation_id) . ")" : "UNDEF"));
+            
+            # Debug: check if conversation_id looks valid
+            if ($conversation_id) {
+                if ($conversation_id =~ /^\d+$/) {
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                        'generate', "conversation_id=$conversation_id is numeric - should reuse");
+                } else {
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                        'generate', "conversation_id='$conversation_id' is NOT numeric - treating as invalid");
+                    $conversation_id = undef;
+                }
+            }
+            
+            # Create new conversation only if conversation_id not provided
+            unless ($conversation_id) {
+                # Use first 80 chars of prompt as title
+                my $title = substr($prompt, 0, 80);
+                $title =~ s/\n/ /g;
+                $title = 'AI Query' if !$title || length($title) == 0;
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'generate', "Creating new conversation with title: $title (page_context: $page_context, page_path: $page_path)");
+                
+                my $conversation_metadata = {
+                    page_context => $page_context,
+                    page_path => $page_path,
+                    page_title => $page_title,
+                    agent_id => $agent_id,
+                    agent_name => $agent_name,
+                    created_from_widget => 1,
+                    widget_version => '2.0',
+                    is_guest => $is_guest ? 1 : 0,
+                    guest_session_id => $guest_session_id
+                };
+                
+                my $conversation = $schema->resultset('AiConversation')->create({
+                    user_id => $user_id,
+                    title => $title,
+                    status => 'active',
+                    metadata => encode_json($conversation_metadata)
+                });
+                
+                unless ($conversation) {
+                    die "CONVERSATION_CREATE_FAILED: create() returned undef/false";
+                }
+                
+                $conversation_id = $conversation->id;
+                
+                unless ($conversation_id) {
+                    die "CONVERSATION_ID_NULL: conversation record created but id is null";
+                }
+                
+                # Store conversation_id in session for persistence across prompts
+                $c->session->{current_conversation_id} = $conversation_id;
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'generate', "POST_CREATE: conversation_id=$conversation_id successfully created and stored in session");
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'generate', "Conversation created successfully with ID: $conversation_id");
+            } else {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'generate', "Using existing conversation_id=$conversation_id (continuing conversation)");
+                
+                # Store conversation_id in session even when reusing (maintains persistence)
+                $c->session->{current_conversation_id} = $conversation_id;
+            }
+            
+            # Save user's message (the prompt)
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "Saving user message to conversation: $conversation_id");
+            
+            my $user_metadata = {
+                system_prompt => $system || '',
+                format => $format || 'text',
+                page_context => $page_context,
+                page_path => $page_path,
+                page_title => $page_title
+            };
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "USER_MSG: conversation_id=$conversation_id, role=user, content_length=" . length($prompt));
+            
+            my $user_msg = $schema->resultset('AiMessage')->create({
+                conversation_id => $conversation_id,
+                user_id => $user_id,
+                role => 'user',
+                content => $prompt,
+                agent_type => $normalized_agent_type,
+                model_used => $model_used,
+                metadata => encode_json($user_metadata),
+                ip_address => $c->request->address,
+                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
+            });
+            
+            unless ($user_msg) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                    'generate', "FAILED_USER_MSG: create() returned undef for conversation_id=$conversation_id");
+            } else {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'generate', "SUCCESS_USER_MSG: created message ID=" . $user_msg->id . " for conversation_id=$conversation_id");
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "Saved user message to conversation $conversation_id");
+            
+            # Save AI's response message
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "Saving AI response to conversation: $conversation_id");
+            
+            my $ai_metadata = {
+                total_duration => $response->{total_duration} || 0,
+                eval_count => $response->{eval_count} || 0
+            };
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "ASSIST_MSG: conversation_id=$conversation_id, role=assistant, content_length=" . length($ai_response));
+            
+            my $ai_msg = $schema->resultset('AiMessage')->create({
+                conversation_id => $conversation_id,
+                user_id => $user_id,
+                role => 'assistant',
+                content => $ai_response,
+                agent_type => $normalized_agent_type,
+                model_used => $model_used,
+                metadata => encode_json($ai_metadata),
+                ip_address => $c->request->address,
+                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
+            });
+            
+            unless ($ai_msg) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                    'generate', "FAILED_ASSIST_MSG: create() returned undef for conversation_id=$conversation_id");
+            } else {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'generate', "SUCCESS_ASSIST_MSG: created message ID=" . $ai_msg->id . " for conversation_id=$conversation_id");
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "Saved AI response to conversation $conversation_id");
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                'generate', "Messages saved to conversation ID: $conversation_id for user: $username");
+            
+        } catch {
+            my $db_error = $_;
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                'generate', "Failed to save conversation to database: $db_error (Conversation ID: $conversation_id, User ID: $user_id)");
+        };
         
         # Build JSON response
         $response_data = {
             success => JSON::true,
-            response => $response->{response} || '',
-            model => $response->{model} || $model_used,
+            response => $ai_response,
+            model => $model_used,
+            conversation_id => $conversation_id || undef,
             created_at => $response->{created_at} || '',
             total_duration => $response->{total_duration} || 0,
             eval_count => $response->{eval_count} || 0
@@ -256,7 +641,7 @@ sub query_form :Local :Args(0) {
     
     # Set template variables
     $c->stash(
-        template => 'ai/query_form.md',
+        template => 'ai/query_form.tt',
         page_title => 'AI Query Form',
         username => $username
     );
@@ -298,7 +683,7 @@ sub result :Local :Args(0) {
             'result', "Empty prompt in form submission from user: $username");
         
         $c->stash(
-            template => 'ai/result.md',
+            template => 'ai/result.tt',
             page_title => 'AI Result',
             error => 'Prompt is required',
             prompt => $prompt
@@ -315,6 +700,8 @@ sub result :Local :Args(0) {
     my $ai_response;
     my $error_message;
     my $response_metadata = {};
+    my $conversation_id;
+    my $start_time = time();
     
     try {
         # Get Ollama model
@@ -339,6 +726,8 @@ sub result :Local :Args(0) {
         }
         
         $ai_response = $response->{response} || '';
+        my $response_time = int((time() - $start_time) * 1000); # milliseconds
+        
         $response_metadata = {
             model => $response->{model} || $ollama->model,
             created_at => $response->{created_at} || '',
@@ -352,6 +741,116 @@ sub result :Local :Args(0) {
             'result', "Form query successful for user '$username' - Model: " . 
             $response_metadata->{model} . ", Response length: $response_length chars");
         
+        # Save conversation to database
+        try {
+            my $user_id = $c->session->{user_id};
+            
+            unless ($user_id) {
+                die "USER_ID_NULL: user_id not found in session. Session keys: " . join(', ', keys %{$c->session});
+            }
+            
+            my $schema = $c->model('DBEncy')->schema;
+            unless ($schema) {
+                die "SCHEMA_NULL: Failed to get database schema from model";
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'result', "PRE_CREATE: user_id=$user_id, schema_loaded=1, about to create conversation");
+            
+            # Get first prompt words for title
+            my $title_text = substr($prompt, 0, 80);
+            $title_text =~ s/\n/ /g;
+            my $title = $title_text;
+            
+            # Create new conversation
+            my $conversation = $schema->resultset('AiConversation')->create({
+                user_id => $user_id,
+                title => $title,
+                status => 'active'
+            });
+            
+            unless ($conversation) {
+                die "CONVERSATION_CREATE_FAILED: create() returned undef/false";
+            }
+            
+            $conversation_id = $conversation->id;
+            
+            unless ($conversation_id) {
+                die "CONVERSATION_ID_NULL: conversation record created but id is null";
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'result', "POST_CREATE: conversation_id=$conversation_id successfully created");
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'result', "Created conversation ID: $conversation_id for user: $username");
+            
+            # Save user's query message
+            my $user_metadata = {
+                system_prompt => $system || '',
+                format => $format || 'text'
+            };
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'result', "USER_MSG_RESULT: conversation_id=$conversation_id, content_length=" . length($prompt));
+            
+            my $user_msg = $schema->resultset('AiMessage')->create({
+                conversation_id => $conversation_id,
+                user_id => $user_id,
+                role => 'user',
+                content => $prompt,
+                agent_type => 'documentation',
+                model_used => $response_metadata->{model},
+                metadata => encode_json($user_metadata),
+                ip_address => $c->request->remote_address,
+                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
+            });
+            
+            if ($user_msg) {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'result', "SUCCESS_USER_MSG: Saved user message, ID=" . $user_msg->id . " to conversation $conversation_id");
+            } else {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                    'result', "FAILED_USER_MSG: create() returned undef for conversation_id=$conversation_id");
+            }
+            
+            # Save AI's response message
+            my $ai_metadata = {
+                total_duration => $response_metadata->{total_duration},
+                eval_count => $response_metadata->{eval_count}
+            };
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'result', "ASSIST_MSG_RESULT: conversation_id=$conversation_id, content_length=" . length($ai_response));
+            
+            my $ai_msg = $schema->resultset('AiMessage')->create({
+                conversation_id => $conversation_id,
+                user_id => $user_id,
+                role => 'assistant',
+                content => $ai_response,
+                agent_type => 'documentation',
+                model_used => $response_metadata->{model},
+                response_time_ms => $response_time,
+                metadata => encode_json($ai_metadata),
+                ip_address => $c->request->remote_address,
+                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
+            });
+            
+            if ($ai_msg) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                    'result', "SUCCESS_ASSIST_MSG: Conversation saved - ID: $conversation_id, AI Message ID=" . $ai_msg->id . ", Response time: ${response_time}ms");
+            } else {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                    'result', "FAILED_ASSIST_MSG: create() returned undef for conversation_id=$conversation_id");
+            }
+            
+        } catch {
+            my $db_error = $_;
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                'result', "Failed to save conversation to database: $db_error");
+            # Don't fail the request if database save fails - still show response to user
+        };
+        
     } catch {
         my $error = $_;
         $error_message = 'Failed to process AI request';
@@ -362,13 +861,14 @@ sub result :Local :Args(0) {
     
     # Set template variables
     $c->stash(
-        template => 'ai/result.md',
+        template => 'ai/result.tt',
         page_title => 'AI Result',
         prompt => $prompt,
         ai_response => $ai_response,
         error => $error_message,
         response_metadata => $response_metadata,
-        username => $username
+        username => $username,
+        conversation_id => $conversation_id
     );
 }
 
@@ -389,48 +889,96 @@ sub chat :Local :Args(0) {
     # Set response content type
     $c->response->content_type('application/json');
     
-    # Check authentication
-    unless ($c->session->{username}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-            'chat', "Unauthorized access attempt to AI chat");
+    # Determine if user is authenticated or guest
+    my $username = $c->session->{username};
+    my $user_id = $c->session->{user_id};
+    my $guest_session_id = $c->session->{guest_session_id};
+    my $is_guest = 0;
+    
+    # If not logged in, create guest session
+    if (!$username) {
+        $is_guest = 1;
         
-        my $error_response = encode_json({
-            success => JSON::false,
-            error => 'Authentication required'
-        });
-        $c->response->body($error_response);
-        $c->response->status(401);
-        return;
+        # Create a unique guest session ID if not already present
+        unless ($guest_session_id) {
+            use Data::UUID;
+            my $ug = Data::UUID->new;
+            $guest_session_id = $ug->create_str();
+            $c->session->{guest_session_id} = $guest_session_id;
+        }
+        
+        # Use guest user (ID 199)
+        $user_id = 199;
+        $username = "Guest-" . substr($guest_session_id, 0, 8);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+            'chat', "Guest user session created: $username (session: $guest_session_id)");
+    } else {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'chat', "Authenticated user: $username");
     }
     
-    my $username = $c->session->{username};
+    # Parse JSON body - try multiple methods to get the body content
+    my $json_data = {};
+    my $content_type = $c->request->content_type || '';
     
-    # Parse JSON body
-    my $json_data;
-    try {
-        my $body = $c->request->body;
-        if ($body) {
-            seek($body, 0, 0);  # Reset file handle position
-            my $json_text = do { local $/; <$body> };
-            $json_data = decode_json($json_text) if $json_text;
-        }
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-            'chat', "Failed to parse JSON body: $_");
-        
-        my $error_response = encode_json({
-            success => JSON::false,
-            error => 'Invalid JSON in request body'
-        });
-        $c->response->body($error_response);
-        $c->response->status(400);
-        return;
-    };
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+        'chat', "Request content-type: '$content_type', method: " . $c->request->method);
+    
+    if ($content_type =~ /application\/json/i) {
+        try {
+            # Try to get raw body content using multiple methods
+            my $raw_body;
+            
+            # Method 1: Try $c->req->content (most reliable)
+            if ($c->req->can('content')) {
+                $raw_body = $c->req->content;
+            } else {
+                # Method 2: Fallback to body
+                $raw_body = $c->request->body;
+                if (ref($raw_body)) {
+                    # If it's a filehandle, read it
+                    seek($raw_body, 0, 0);
+                    $raw_body = do { local $/; <$raw_body> };
+                }
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'chat', "Raw body retrieved, length: " . (defined $raw_body ? length($raw_body) : 'UNDEF'));
+            
+            if ($raw_body && length($raw_body) > 0) {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'chat', "Body content (first 200 chars): " . substr($raw_body, 0, 200));
+                
+                $json_data = decode_json($raw_body);
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'chat', "JSON parsed successfully, keys: " . join(', ', keys %$json_data));
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                    'chat', "JSON content-type but body is empty or undef");
+            }
+        } catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                'chat', "Failed to parse JSON body: $_");
+            
+            my $error_response = encode_json({
+                success => JSON::false,
+                error => 'Invalid JSON in request body'
+            });
+            $c->response->body($error_response);
+            $c->response->status(400);
+            return;
+        };
+    } else {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'chat', "Not JSON content-type, using form parameters");
+    }
     
     # Get parameters from JSON or fallback to form params
     my $prompt = $json_data->{prompt} || $c->request->params->{prompt} || '';
     my $model = $json_data->{model} || $c->request->params->{model} || '';
     my $history = $json_data->{history} || [];
+    my $conversation_id = $json_data->{conversation_id} || $c->request->params->{conversation_id};
     
     # Validate prompt
     unless ($prompt && length($prompt) > 0) {
@@ -527,11 +1075,132 @@ sub chat :Local :Args(0) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
             'chat', "Chat successful for user '$username' - Model: $model_used, Response length: $response_length chars");
         
+        # Save conversation to database
+        my $final_conversation_id = $conversation_id;
+        try {
+            # user_id was already set above (either from session or as guest)
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'chat', "SAVE_CONV_START: user_id=$user_id, provided_conv_id=$conversation_id, is_guest=$is_guest");
+            
+            unless ($user_id) {
+                die "User ID not found";
+            }
+            
+            my $schema = $c->model('DBEncy')->schema;
+            
+            # If no conversation_id provided, create a new conversation
+            unless ($final_conversation_id) {
+                # Get title from request if provided
+                my $title = $json_data->{title} || $c->request->params->{title};
+                
+                # If no title provided, generate from prompt
+                unless ($title) {
+                    my $title_text = '';
+                    if ($prompt && length($prompt) > 0) {
+                        $title_text = substr($prompt, 0, 80);
+                    } elsif (@$history > 0 && $history->[0]->{content}) {
+                        $title_text = substr($history->[0]->{content}, 0, 80);
+                    }
+                    $title_text =~ s/\n/ /g;
+                    $title = $title_text || 'Chat Conversation';
+                }
+                
+                # Create new conversation
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'chat', "Creating new conversation with title: $title");
+                
+                my $conversation_metadata = {
+                    is_guest => $is_guest ? 1 : 0,
+                    guest_session_id => $guest_session_id
+                };
+                
+                my $conversation = $schema->resultset('AiConversation')->create({
+                    user_id => $user_id,
+                    title => $title,
+                    status => 'active',
+                    metadata => encode_json($conversation_metadata)
+                });
+                
+                unless ($conversation) {
+                    die "Failed to create conversation object";
+                }
+                
+                $final_conversation_id = $conversation->id;
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'chat', "Conversation created successfully with ID: $final_conversation_id");
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'chat', "Created new conversation ID: $final_conversation_id for user: $username");
+            } else {
+                # Conversation exists - just log it
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'chat', "Continuing existing conversation ID: $final_conversation_id for user: $username");
+            }
+            
+            # Save user's message
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'chat', "Saving user message to conversation: $final_conversation_id");
+            
+            $schema->resultset('AiMessage')->create({
+                conversation_id => $final_conversation_id,
+                user_id => $user_id,
+                role => 'user',
+                content => $prompt,
+                agent_type => 'documentation',
+                model_used => $model_used,
+                metadata => encode_json({
+                    system_prompt => '',
+                    format => 'text',
+                    is_guest => $is_guest ? 1 : 0,
+                    guest_session_id => $guest_session_id
+                }),
+                ip_address => $c->request->remote_address,
+                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
+            });
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'chat', "Saved user message to conversation $final_conversation_id");
+            
+            # Save AI's response message
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'chat', "Saving AI response to conversation: $final_conversation_id");
+            
+            $schema->resultset('AiMessage')->create({
+                conversation_id => $final_conversation_id,
+                user_id => $user_id,
+                role => 'assistant',
+                content => $ai_response,
+                agent_type => 'documentation',
+                model_used => $model_used,
+                metadata => encode_json({
+                    total_duration => $response->{total_duration} || 0,
+                    eval_count => $response->{eval_count} || 0,
+                    is_guest => $is_guest ? 1 : 0,
+                    guest_session_id => $guest_session_id
+                }),
+                ip_address => $c->request->remote_address,
+                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
+            });
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'chat', "Saved AI response to conversation $final_conversation_id");
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                'chat', "Messages saved to conversation ID: $final_conversation_id for user: $username");
+            
+        } catch {
+            my $db_error = $_;
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                'chat', "Failed to save conversation to database: $db_error (Final Conv ID: $final_conversation_id, User ID: $user_id)");
+        };
+        
         # Build JSON response
         $response_data = {
             success => JSON::true,
             response => $ai_response,
             model => $model_used,
+            conversation_id => $final_conversation_id || undef,
             created_at => $response->{created_at} || '',
             total_duration => $response->{total_duration} || 0,
             eval_count => $response->{eval_count} || 0
@@ -667,15 +1336,46 @@ sub models :Local :Args(0) {
         push @$servers, $server_info;
     }
     
+    # Fetch user's API keys
+    my @user_api_keys;
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $user_id = $c->session->{user_id};
+        
+        if ($user_id) {
+            my $keys_rs = $schema->resultset('UserApiKeys')->search(
+                { user_id => $user_id, is_active => 1 },
+                { order_by => { -asc => 'service' } }
+            );
+            
+            foreach my $key ($keys_rs->all) {
+                push @user_api_keys, {
+                    id => $key->id,
+                    service => $key->service,
+                    created_at => $key->created_at->strftime('%Y-%m-%d'),
+                    has_key => $key->api_key_encrypted ? 1 : 0
+                };
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'models', "Found " . scalar(@user_api_keys) . " API keys for user $username");
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'models', "Failed to fetch user API keys: $_");
+    };
+    
     # Set template variables
     $c->stash(
-        template => 'ai/models.md',
+        template => 'ai/models.tt',
         page_title => 'AI Models',
         username => $username,
         servers => $servers,
-        can_select_model => $can_select_model
+        can_select_model => $can_select_model,
+        servers_json => encode_json($servers || []),
+        user_api_keys => \@user_api_keys
     );
-    
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
         'models', "AI models interface loaded for user: $username (can_select: " . ($can_select_model ? 'yes' : 'no') . ") with " . scalar(@$servers) . " servers configured");
 }
@@ -1294,6 +1994,156 @@ sub set_host :Local :Args(0) {
     $c->response->body($json_response);
 }
 
+=head2 start_server
+
+Start the Ollama server. Supports both systemctl and direct command methods.
+Only allows starting localhost server.
+
+=cut
+
+sub start_server :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Set response content type
+    $c->response->content_type('application/json');
+    
+    # Check authentication
+    unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'start_server', "Unauthorized access attempt to AI start server");
+        
+        my $error_response = encode_json({
+            success => JSON::false,
+            error => 'Authentication required'
+        });
+        $c->response->body($error_response);
+        $c->response->status(401);
+        return;
+    }
+    
+    my $username = $c->session->{username};
+    
+    # Check permissions - only admin/developer/editor can start servers
+    my $user_roles = $c->session->{roles} || [];
+    if (!ref($user_roles)) {
+        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
+    }
+    my $can_manage_servers = 0;
+    if (ref($user_roles) eq 'ARRAY') {
+        $can_manage_servers = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles;
+    }
+    
+    unless ($can_manage_servers) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'start_server', "Unauthorized server start attempt by user: $username");
+        
+        my $error_response = encode_json({
+            success => JSON::false,
+            error => 'Insufficient permissions to start servers'
+        });
+        $c->response->body($error_response);
+        $c->response->status(403);
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+        'start_server', "Processing AI start server request");
+    
+    # Get JSON payload
+    my $json_data;
+    try {
+        my $body = $c->request->body_data;
+        if ($body && ref($body) eq 'HASH') {
+            $json_data = $body;
+        } else {
+            # Try to parse raw body as JSON
+            my $raw_body = $c->request->body;
+            $json_data = decode_json($raw_body) if $raw_body;
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'start_server', "Failed to parse JSON request body: $_");
+    };
+    
+    unless ($json_data) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'start_server', "No JSON data received in start server request");
+        
+        my $error_response = encode_json({
+            success => JSON::false,
+            error => 'JSON data is required'
+        });
+        $c->response->body($error_response);
+        $c->response->status(400);
+        return;
+    }
+    
+    # Extract parameters
+    my $server_host = $json_data->{host} || 'localhost';
+    my $server_port = $json_data->{port} || 11434;
+    my $method = $json_data->{method} || 'systemctl';  # Default to systemctl
+    my $async = $json_data->{async} || 0;              # Default to synchronous
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'start_server', "Start server request from user '$username': host=$server_host, port=$server_port, method=$method, async=$async");
+    
+    my $response_data;
+    
+    try {
+        # Get Ollama model
+        my $ollama = $c->model('Ollama');
+        unless ($ollama) {
+            die "Failed to load Ollama model";
+        }
+        
+        # Configure for specific server
+        $ollama->host($server_host);
+        $ollama->port($server_port);
+        $ollama->clear_endpoint;  # Force rebuild of endpoint URL
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'start_server', "Ollama model configured for $server_host:$server_port, attempting to start server...");
+        
+        # Start the server
+        my $result = $ollama->start_server(
+            method => $method,
+            async => $async
+        );
+        
+        unless ($result && $result->{success}) {
+            my $error = $result->{error} || $ollama->last_error || 'Unknown error';
+            die "Server start failed: $error";
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+            'start_server', "Server start successful for user '$username': $server_host:$server_port via $method");
+        
+        # Build JSON response
+        $response_data = {
+            success => JSON::true,
+            message => $result->{message} || "Ollama server started successfully",
+            server => "$server_host:$server_port",
+            method => $method,
+            already_running => $result->{already_running} ? JSON::true : JSON::false,
+            connection_pending => $result->{connection_pending} ? JSON::true : JSON::false
+        };
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'start_server', "Server start failed for user '$username': $error");
+        
+        $response_data = {
+            success => JSON::false,
+            error => 'Failed to start server: ' . $error
+        };
+        $c->response->status(500);
+    };
+    
+    my $json_response = encode_json($response_data);
+    $c->response->body($json_response);
+}
+
 =head2 _get_current_ollama_config
 
 Private method to determine current Ollama configuration with automatic fallback.
@@ -1306,14 +2156,21 @@ sub _get_current_ollama_config {
     my $ollama = $c->model('Ollama');
     my $current_host = 'localhost';  # Default
     my $current_port = 11434;
-    my $current_model = 'llama3.1';
+    my $current_model = 'qwen2.5-coder:1.5b-base';  # Default to 1.5B model for low-memory systems (was llama3.1:8b which requires 5.6GB)
     my $installed_models = [];
     
-    # For regular users (non-admin/developer/editor), always force 192.168.1.171
+    # For regular users (non-admin/developer/editor), test localhost first, then fallback to 192.168.1.171
     unless ($can_select_model) {
-        $current_host = '192.168.1.171';
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-            '_get_current_ollama_config', "Regular user, forcing host to $current_host (requirement: regular users only see 192.168.1.171)");
+        my $test_ollama = Comserv::Model::Ollama->new(host => 'localhost', port => 11434);
+        if ($test_ollama && $test_ollama->check_connection()) {
+            $current_host = 'localhost';
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                '_get_current_ollama_config', "Regular user: localhost is available, using localhost");
+        } else {
+            $current_host = '192.168.1.171';
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                '_get_current_ollama_config', "Regular user: localhost unavailable, using fallback $current_host");
+        }
     } else {
         # For privileged users, check session preference or test localhost first
         my $preferred_host = $c->session->{ollama_host};
@@ -1324,8 +2181,9 @@ sub _get_current_ollama_config {
                 '_get_current_ollama_config', "Using session preferred host: $current_host");
         } else {
             # Test localhost first, fallback to 192.168.1.171 if not available
-            $ollama->set_host('localhost');
-            if ($ollama->check_connection()) {
+            # NOTE: Create a temporary instance for testing to avoid modifying the shared model instance
+            my $test_ollama = Comserv::Model::Ollama->new(host => 'localhost', port => 11434);
+            if ($test_ollama && $test_ollama->check_connection()) {
                 $current_host = 'localhost';
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                     '_get_current_ollama_config', "Localhost is available, using localhost");
@@ -1358,6 +2216,910 @@ sub _get_current_ollama_config {
     };
     
     return ($current_host, $current_port, $current_model, $installed_models);
+}
+
+sub server_status : Local {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    my $json_data;
+    try {
+        my $body = $c->request->body_data;
+        if ($body && ref($body) eq 'HASH') {
+            $json_data = $body;
+        } else {
+            my $raw_body = $c->request->body;
+            $json_data = decode_json($raw_body) if $raw_body;
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'server_status', "Failed to parse JSON: $_");
+    };
+    
+    my $host = $json_data->{host} || $c->session->{ollama_host} || 'localhost';
+    my $port = $json_data->{port} || $c->session->{ollama_port} || 11434;
+    
+    my $response;
+    try {
+        my $ua = LWP::UserAgent->new(timeout => 3);
+        my $url = "http://$host:$port/api/tags";
+        my $http_response = $ua->get($url);
+        
+        if ($http_response->is_success) {
+            $response = encode_json({
+                success => JSON::true,
+                running => JSON::true,
+                host => $host,
+                port => $port
+            });
+        } else {
+            $response = encode_json({
+                success => JSON::true,
+                running => JSON::false,
+                host => $host,
+                port => $port,
+                error => 'Server not responding'
+            });
+        }
+    } catch {
+        $response = encode_json({
+            success => JSON::true,
+            running => JSON::false,
+            host => $host,
+            port => $port,
+            error => $_
+        });
+    };
+    
+    $c->response->body($response);
+}
+
+=head2 conversations
+
+Display all saved conversations for the current user with optional filters.
+
+=cut
+
+sub conversations :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Determine if user is authenticated or guest
+    my $username = $c->session->{username};
+    my $user_id = $c->session->{user_id};
+    my $guest_session_id = $c->session->{guest_session_id};
+    my $is_guest = 0;
+    
+    # If not logged in, create guest session
+    if (!$username) {
+        $is_guest = 1;
+        
+        # Create a unique guest session ID if not already present
+        unless ($guest_session_id) {
+            use Data::UUID;
+            my $ug = Data::UUID->new;
+            $guest_session_id = $ug->create_str();
+            $c->session->{guest_session_id} = $guest_session_id;
+        }
+        
+        # Use guest user (ID 199)
+        $user_id = 199;
+        $username = "Guest-" . substr($guest_session_id, 0, 8);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+            'conversations', "Guest user accessing conversations: $username");
+    }
+    
+    my $user_roles = $c->session->{roles} || [];
+    if (!ref($user_roles)) {
+        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
+    }
+    my $is_admin = ref($user_roles) eq 'ARRAY' ? grep { $_ =~ /^admin$/i } @$user_roles : 0;
+    
+    # Guests cannot view all conversations
+    my $view_all = (!$is_guest && $is_admin && ($c->req->params->{view_all} || $c->req->params->{view} eq 'all')) ? 1 : 0;
+    
+    my $page_title = $view_all ? 'All Conversations (Admin)' : 'My Conversations';
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+        'conversations', "Fetching conversations for user: $username (view_all=$view_all, is_admin=$is_admin)");
+    
+    my @conversations;
+    my $total_conversations = 0;
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'conversations', "DEBUG: user_id=$user_id, view_all=$view_all, is_admin=$is_admin");
+        
+        my $search_criteria = $view_all ? {} : { user_id => $user_id };
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'conversations', "DEBUG: Search criteria: " . ($view_all ? "no filter (all conversations)" : "user_id=$user_id"));
+        
+        my $count_rs = $schema->resultset('AiConversation')->search($search_criteria);
+        $total_conversations = $count_rs->count;
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'conversations', "DEBUG: Query returned count=$total_conversations, about to iterate");
+        
+        my $conv_rs = $schema->resultset('AiConversation')->search(
+            $search_criteria,
+            { 
+                order_by => { -desc => 'created_at' }
+            }
+        );
+        
+        my @conv_rows = $conv_rs->all;
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'conversations', "DEBUG: Got all rows, count = " . scalar(@conv_rows));
+        
+        foreach my $conv (@conv_rows) {
+            try {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'conversations', "Processing conversation ID=" . $conv->id);
+                
+                # For guests, only show conversations that belong to this guest session
+                if ($is_guest) {
+                    my $conv_metadata = {};
+                    if ($conv->metadata) {
+                        try {
+                            $conv_metadata = decode_json($conv->metadata);
+                        } catch {
+                            # Metadata parsing failed, skip this conversation
+                            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                                'conversations', "Failed to parse conversation metadata for ID=" . $conv->id);
+                        };
+                    }
+                    
+                    # Check if this conversation belongs to this guest session
+                    unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id) {
+                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                            'conversations', "Skipping conversation ID=" . $conv->id . " - not owned by this guest session");
+                        next;
+                    }
+                }
+                
+                my @messages = $conv->ai_messages->all;
+                my $message_count = scalar(@messages);
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'conversations', "  - Found $message_count messages");
+                
+                my $preview = '';
+                if (@messages > 0) {
+                    my $user_msg = '';
+                    my $ai_msg = '';
+                    
+                    foreach my $msg (@messages) {
+                        if ($msg->role eq 'user' && !$user_msg) {
+                            $user_msg = $msg->content;
+                        }
+                        if ($msg->role eq 'assistant' && !$ai_msg) {
+                            $ai_msg = $msg->content;
+                        }
+                        last if $user_msg && $ai_msg;
+                    }
+                    
+                    if ($user_msg) {
+                        $preview = "Q: " . substr($user_msg, 0, 60);
+                        if (length($user_msg) > 60) {
+                            $preview .= '...';
+                        }
+                        if ($ai_msg) {
+                            $preview .= " | A: " . substr($ai_msg, 0, 40);
+                            if (length($ai_msg) > 40) {
+                                $preview .= '...';
+                            }
+                        }
+                    } else {
+                        my $latest_message = $conv->get_latest_message;
+                        $preview = $latest_message ? substr($latest_message->content, 0, 100) : '';
+                    }
+                }
+                
+                my $username = 'Unknown';
+                if ($conv->user) {
+                    $username = $conv->user->username;
+                }
+                
+                my @message_data;
+                foreach my $msg (@messages) {
+                    push @message_data, {
+                        id => $msg->id,
+                        conversation_id => $msg->conversation_id,
+                        user_id => $msg->user_id,
+                        role => $msg->role,
+                        content => $msg->content,
+                        created_at => $msg->created_at,
+                        agent_type => $msg->agent_type || 'chat',
+                        model_used => $msg->model_used || '',
+                        ip_address => $msg->ip_address || '',
+                        user_role => $msg->user_role || '',
+                        metadata => $msg->metadata || '{}'
+                    };
+                }
+                
+                my $conv_data = {
+                    id => $conv->id,
+                    user_id => $conv->user_id,
+                    username => $username,
+                    title => $conv->get_display_title,
+                    created_at => $conv->created_at,
+                    updated_at => $conv->updated_at,
+                    message_count => $message_count,
+                    status => $conv->status,
+                    preview => $preview,
+                    messages => \@message_data
+                };
+                
+                push @conversations, $conv_data;
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'conversations', "  - Pushed to array. Total now: " . scalar(@conversations));
+            } catch {
+                my $error = $_;
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                    'conversations', "Error processing conversation: $error");
+            };
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+            'conversations', "Retrieved $total_conversations conversations. Array size: " . scalar(@conversations));
+        
+        if (scalar(@conversations) == 0 && $total_conversations > 0) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                'conversations', "WARNING: Count says $total_conversations conversations but array is empty!");
+        }
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'conversations', "Failed to fetch conversations: $error");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'conversations', "Stack trace: " . $error);
+    };
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'conversations', "FINAL: Stashing conversations. Count=$total_conversations, Array size=" . scalar(@conversations));
+    
+    foreach my $idx (0 .. $#conversations) {
+        my $conv = $conversations[$idx];
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'conversations', "  [$idx] ID=" . $conv->{id} . ", Title=" . $conv->{title} . ", Messages=" . $conv->{message_count});
+    }
+    
+    $c->stash(
+        template => 'ai/conversations.tt',
+        page_title => $page_title,
+        conversations => \@conversations,
+        total_conversations => $total_conversations,
+        username => $username,
+        is_admin => $is_admin,
+        view_all => $view_all,
+        is_guest => $is_guest
+    );
+}
+
+=head2 session_details
+
+API endpoint to retrieve session information (username, hostname, conversation_id)
+based on the provided session cookie.
+
+=cut
+
+sub session_details :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Set response content type
+    $c->response->content_type('application/json');
+    
+    my $session_id = $c->sessionid;
+    my $username = $c->session->{username} || 'Guest';
+    my $user_id = $c->session->{user_id} || 199;
+    my $conversation_id = $c->session->{current_conversation_id} || $c->session->{conversation_id};
+    
+    # Get hostname from system utility
+    my $hostname = Comserv::Util::SystemInfo->get_server_hostname();
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'session_details', "Session details requested for user: $username (Session: $session_id)");
+    
+    $c->response->body(encode_json({
+        success => JSON::true,
+        session_id => $session_id,
+        username => $username,
+        user_id => $user_id,
+        conversation_id => $conversation_id,
+        hostname => $hostname,
+        roles => $c->session->{roles} || [],
+    }));
+}
+
+sub get_conversation_list :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    my $username = $c->session->{username};
+    my $user_id = $c->session->{user_id};
+    my $guest_session_id = $c->session->{guest_session_id};
+    my $is_guest = 0;
+    
+    if (!$username) {
+        $is_guest = 1;
+        $user_id = 199;
+        unless ($guest_session_id) {
+            use Data::UUID;
+            my $ug = Data::UUID->new;
+            $guest_session_id = $ug->create_str();
+            $c->session->{guest_session_id} = $guest_session_id;
+        }
+    }
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $conv_rs = $schema->resultset('AiConversation')->search(
+            { user_id => $user_id },
+            { 
+                order_by => { -desc => 'updated_at' },
+                rows => 50
+            }
+        );
+        
+        my @conv_list;
+        foreach my $conv ($conv_rs->all) {
+            if ($is_guest) {
+                my $conv_metadata = {};
+                if ($conv->metadata) {
+                    try {
+                        $conv_metadata = decode_json($conv->metadata);
+                    } catch {};
+                }
+                next unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id);
+            }
+            
+            my $message_count = $conv->ai_messages->count;
+            my $first_msg = $conv->ai_messages->search({ role => 'user' }, { rows => 1, order_by => { -asc => 'created_at' } })->first;
+            my $preview = $first_msg ? substr($first_msg->content, 0, 60) : 'No messages';
+            
+            push @conv_list, {
+                id => $conv->id,
+                title => $conv->get_display_title,
+                message_count => $message_count,
+                preview => $preview,
+                created_at => $conv->created_at->strftime('%Y-%m-%d %H:%M:%S'),
+                updated_at => $conv->updated_at->strftime('%Y-%m-%d %H:%M:%S')
+            };
+        }
+        
+        $c->response->body(encode_json({
+            success => JSON::true,
+            conversations => \@conv_list
+        }));
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'get_conversation_list', "Error: $_");
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error => "Failed to load conversations: $_"
+        }));
+    };
+}
+
+sub get_conversation_messages :Local :Args(1) {
+    my ($self, $c, $conversation_id) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    unless ($conversation_id) {
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error => 'Conversation ID required'
+        }));
+        return;
+    }
+    
+    my $username = $c->session->{username};
+    my $user_id = $c->session->{user_id};
+    my $guest_session_id = $c->session->{guest_session_id};
+    my $is_guest = 0;
+    
+    if (!$username) {
+        $is_guest = 1;
+        $user_id = 199;
+    }
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $conv = $schema->resultset('AiConversation')->find($conversation_id);
+        
+        unless ($conv) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error => 'Conversation not found'
+            }));
+            return;
+        }
+        
+        if ($conv->user_id != $user_id) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error => 'Access denied'
+            }));
+            return;
+        }
+        
+        if ($is_guest) {
+            my $conv_metadata = {};
+            if ($conv->metadata) {
+                try {
+                    $conv_metadata = decode_json($conv->metadata);
+                } catch {};
+            }
+            unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id) {
+                $c->response->body(encode_json({
+                    success => JSON::false,
+                    error => 'Access denied'
+                }));
+                return;
+            }
+        }
+        
+        my @messages;
+        foreach my $msg ($conv->ai_messages->search({}, { order_by => { -asc => 'created_at' } })->all) {
+            push @messages, {
+                id => $msg->id,
+                role => $msg->role,
+                content => $msg->content,
+                created_at => $msg->created_at->strftime('%Y-%m-%d %H:%M:%S')
+            };
+        }
+        
+        $c->response->body(encode_json({
+            success => JSON::true,
+            conversation => {
+                id => $conv->id,
+                title => $conv->get_display_title,
+                created_at => $conv->created_at->strftime('%Y-%m-%d %H:%M:%S')
+            },
+            messages => \@messages
+        }));
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'get_conversation_messages', "Error: $_");
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error => "Failed to load messages: $_"
+        }));
+    };
+}
+
+=head2 manage_api_keys
+
+Display and manage user API keys for AI providers
+
+=cut
+
+sub manage_api_keys :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'manage_api_keys', "Unauthorized access attempt - no session");
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $user_id = $c->session->{user_id};
+    my $username = $c->session->{username};
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'manage_api_keys', "User $username (ID: $user_id) accessing API keys management");
+    
+    my @api_keys;
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $keys_rs = $schema->resultset('UserApiKeys')->search(
+            { user_id => $user_id },
+            { order_by => { -asc => 'service' } }
+        );
+        
+        my $key_count = $keys_rs->count;
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'manage_api_keys', "Found $key_count API keys for user $user_id");
+        
+        foreach my $key ($keys_rs->all) {
+            push @api_keys, {
+                id => $key->id,
+                service => $key->service,
+                is_active => $key->is_active,
+                created_at => $key->created_at->strftime('%Y-%m-%d %H:%M'),
+                updated_at => $key->updated_at->strftime('%Y-%m-%d %H:%M')
+            };
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'manage_api_keys', "Failed to fetch API keys for user $user_id: $_");
+        $c->flash->{error_msg} = "Failed to load API keys: $_";
+    };
+    
+    $c->stash(
+        template => 'ai/manage_api_keys.tt',
+        page_title => 'Manage API Keys',
+        username => $username,
+        api_keys => \@api_keys
+    );
+}
+
+=head2 add_api_key
+
+Display form to add a new API key
+
+=cut
+
+sub add_api_key :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'add_api_key', "Unauthorized access attempt - no session");
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $username = $c->session->{username};
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'add_api_key', "User $username accessing add API key form");
+    
+    $c->stash(
+        template => 'ai/add_api_key.tt',
+        page_title => 'Add API Key',
+        username => $username
+    );
+}
+
+=head2 edit_api_key
+
+Display form to edit an existing API key
+
+=cut
+
+sub edit_api_key :Local :Args(1) {
+    my ($self, $c, $key_id) = @_;
+    
+    unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'edit_api_key', "Unauthorized access attempt - no session");
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $user_id = $c->session->{user_id};
+    my $username = $c->session->{username};
+    
+    unless ($key_id) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'edit_api_key', "No key ID provided by user $username");
+        $c->flash->{error_msg} = 'No API key ID specified';
+        $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'edit_api_key', "User $username editing API key ID: $key_id");
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $key_obj = $schema->resultset('UserApiKeys')->find($key_id);
+        
+        unless ($key_obj) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                'edit_api_key', "API key $key_id not found");
+            $c->flash->{error_msg} = 'API key not found';
+            $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+            return;
+        }
+        
+        unless ($key_obj->user_id == $user_id) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                'edit_api_key', "Access denied: User $user_id attempted to edit key $key_id owned by user " . $key_obj->user_id);
+            $c->flash->{error_msg} = 'Access denied';
+            $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+            return;
+        }
+        
+        $c->stash(
+            template => 'ai/add_api_key.tt',
+            page_title => 'Edit API Key',
+            username => $username,
+            key_id => $key_obj->id,
+            service => $key_obj->service
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'edit_api_key', "Error loading API key $key_id: $_");
+        $c->flash->{error_msg} = "Failed to load API key: $_";
+        $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+    };
+}
+
+=head2 save_api_key
+
+Save or update user API key
+
+=cut
+
+sub save_api_key :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'save_api_key', "Unauthorized access attempt - no session");
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $user_id = $c->session->{user_id};
+    my $username = $c->session->{username};
+    my $service = $c->request->params->{service};
+    my $api_key = $c->request->params->{api_key};
+    my $key_id = $c->request->params->{id};
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'save_api_key', "User $username attempting to " . ($key_id ? "update key ID $key_id" : "add new key") . " for service: $service");
+    
+    # Validation
+    unless ($service) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'save_api_key', "Validation failed: service missing for user $username");
+        $c->flash->{error_msg} = 'Service is required';
+        $c->response->redirect($c->uri_for($key_id ? '/ai/edit_api_key/' . $key_id : '/ai/add_api_key'));
+        return;
+    }
+    
+    # For new keys, api_key is required. For edits, it's optional (keep existing if blank)
+    if (!$key_id && !$api_key) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'save_api_key', "Validation failed: API key missing for new key, user $username");
+        $c->flash->{error_msg} = 'API key is required';
+        $c->response->redirect($c->uri_for('/ai/add_api_key'));
+        return;
+    }
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        
+        my $key_obj;
+        if ($key_id) {
+            # Update existing key
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'save_api_key', "Looking up existing key ID $key_id for user $user_id");
+            
+            $key_obj = $schema->resultset('UserApiKeys')->find($key_id);
+            
+            unless ($key_obj) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                    'save_api_key', "Key ID $key_id not found in database");
+                $c->flash->{error_msg} = 'API key not found';
+                $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+                return;
+            }
+            
+            unless ($key_obj->user_id == $user_id) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                    'save_api_key', "Access denied: User $user_id attempted to update key $key_id owned by user " . $key_obj->user_id);
+                $c->flash->{error_msg} = 'API key not found or access denied';
+                $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+                return;
+            }
+            
+            # Only update api_key if provided
+            if ($api_key && length($api_key) > 0) {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'save_api_key', "Updating API key for service $service");
+                $key_obj->set_api_key($api_key);
+            } else {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'save_api_key', "No new API key provided, keeping existing key for service $service");
+            }
+            
+            $key_obj->update;
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                'save_api_key', "API key ID $key_id updated successfully for service $service, user $username");
+            
+            $c->flash->{status_msg} = "API key for $service updated successfully";
+            
+        } else {
+            # Create new key
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'save_api_key', "Creating new API key for service $service, user $user_id");
+            
+            # Check for duplicate
+            my $existing = $schema->resultset('UserApiKeys')->search({
+                user_id => $user_id,
+                service => $service
+            })->first;
+            
+            if ($existing) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                    'save_api_key', "Duplicate key attempt: User $user_id already has key for service $service");
+                $c->flash->{error_msg} = "You already have an API key for $service. Please edit the existing key instead.";
+                $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+                return;
+            }
+            
+            $key_obj = $schema->resultset('UserApiKeys')->create({
+                user_id => $user_id,
+                service => $service,
+                is_active => 1
+            });
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'save_api_key', "UserApiKeys record created, ID: " . $key_obj->id . ", now encrypting API key");
+            
+            $key_obj->set_api_key($api_key);
+            $key_obj->update;
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                'save_api_key', "API key created successfully for service $service, user $username, key ID: " . $key_obj->id);
+            
+            $c->flash->{status_msg} = "API key for $service added successfully";
+        }
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'save_api_key', "Failed to save API key for service $service, user $username: $error");
+        $c->flash->{error_msg} = "Failed to save API key: $error";
+    };
+    
+    $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+}
+
+=head2 delete_api_key
+
+Delete user API key
+
+=cut
+
+sub delete_api_key :Local :Args(1) {
+    my ($self, $c, $key_id) = @_;
+    
+    unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'delete_api_key', "Unauthorized access attempt - no session");
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $user_id = $c->session->{user_id};
+    my $username = $c->session->{username};
+    
+    unless ($key_id) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'delete_api_key', "No key ID provided by user $username");
+        $c->flash->{error_msg} = 'No API key ID specified';
+        $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'delete_api_key', "User $username attempting to delete API key ID: $key_id");
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $key_obj = $schema->resultset('UserApiKeys')->find($key_id);
+        
+        unless ($key_obj) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                'delete_api_key', "API key $key_id not found");
+            $c->flash->{error_msg} = 'API key not found';
+            $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+            return;
+        }
+        
+        unless ($key_obj->user_id == $user_id) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                'delete_api_key', "Access denied: User $user_id attempted to delete key $key_id owned by user " . $key_obj->user_id);
+            $c->flash->{error_msg} = 'API key not found or access denied';
+            $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+            return;
+        }
+        
+        my $service = $key_obj->service;
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'delete_api_key', "Deleting API key ID $key_id for service $service, user $username");
+        
+        $key_obj->delete;
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+            'delete_api_key', "API key ID $key_id for service $service deleted successfully by user $username");
+        
+        $c->flash->{status_msg} = "API key for $service deleted successfully";
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'delete_api_key', "Failed to delete API key $key_id for user $username: $error");
+        $c->flash->{error_msg} = "Failed to delete API key: $error";
+    };
+    
+    $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+}
+
+=head2 get_user_providers
+
+Get list of user's configured AI providers for chat widget
+
+=cut
+
+sub get_user_providers :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    my $user_id = $c->session->{user_id};
+    my @providers;
+    
+    # Map service names to display names
+    my %service_display = (
+        grok => 'Grok (xAI)',
+        openai => 'OpenAI',
+        claude => 'Claude',
+        gemini => 'Gemini',
+        anthropic => 'Anthropic',
+        cohere => 'Cohere'
+    );
+    
+    if ($user_id) {
+        try {
+            my $schema = $c->model('DBEncy')->schema;
+            my $keys_rs = $schema->resultset('UserApiKeys')->search(
+                { user_id => $user_id, is_active => 1 },
+                { order_by => { -asc => 'service' } }
+            );
+            
+            foreach my $key ($keys_rs->all) {
+                push @providers, {
+                    service => $key->service,
+                    display_name => $service_display{$key->service} || ucfirst($key->service)
+                };
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'get_user_providers', "Found " . scalar(@providers) . " providers for user $user_id");
+        } catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                'get_user_providers', "Failed to fetch providers: $_");
+        };
+    }
+    
+    $c->response->body(encode_json({
+        success => JSON::true,
+        providers => \@providers
+    }));
+}
+
+sub reset_conversation :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Clear the session-stored conversation_id to start a new conversation
+    delete $c->session->{current_conversation_id};
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+        'reset_conversation', "Conversation session cleared - next prompt will start a new conversation");
+    
+    my $response = encode_json({
+        success => JSON::true,
+        message => 'Conversation reset - next chat will start fresh'
+    });
+    
+    $c->response->content_type('application/json');
+    $c->response->body($response);
 }
 
 =head1 AUTHOR

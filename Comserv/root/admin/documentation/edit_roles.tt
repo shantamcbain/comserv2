@@ -1,5 +1,12 @@
 [%# Edit Roles Template for Documentation %]
 [% META title = 'Edit Documentation Roles' %]
+
+<div style="margin-bottom: 20px;">
+    <a href="[% c.uri_for('/Documentation/manage_config') %]" 
+       style="padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; display: inline-block;">
+        Open Full Configuration Manager
+    </a>
+</div>
 [% META description = 'Edit roles for a documentation page' %]
 [% PageVersion = 'admin/documentation/edit_roles.tt,v 1.01 2025/10/15 14:09:39 system Exp system ' %]
 
@@ -297,6 +304,7 @@
             
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Save Role Changes</button>
+                <a href="/Documentation/manage_config?file=[% page_name | uri %]" class="btn btn-primary" style="background: #48bb78;">Manage File Config</a>
                 <a href="/Documentation" class="btn btn-secondary">Cancel</a>
             </div>
         </form>

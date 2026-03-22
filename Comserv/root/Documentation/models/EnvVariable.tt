@@ -1,0 +1,490 @@
+[% META
+    title = 'EnvVariable Model - Environment Configuration Management'
+    description = 'Comprehensive documentation for EnvVariable model covering environment variable storage, type management, role-based access control, secret masking, audit logging, and usage examples for managing application configuration with change history and service impact tracking'
+    roles = 'admin,developer,editor'
+    TemplateType = 'model'
+    category = 'models,configuration,environment'
+    page_version = '1.00'
+    last_updated = '2026-01-08 20:45:00 UTC'
+    site_specific = ''
+%]
+
+[% PageVersion = 'Documentation/models/EnvVariable.tt,v 1.00 2026/01/08 zencoder-docsync Exp ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 id="envvariable-model">EnvVariable Model - Environment Configuration Management</h1>
+            
+            <div id="toc" class="alert alert-info">
+                <strong>Contents:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#schema">Database Schema & Fields</a></li>
+                    <li><a href="#relationships">Relationships</a></li>
+                    <li><a href="#security">Security & Access Control</a></li>
+                    <li><a href="#api-methods">API Methods & Helpers</a></li>
+                    <li><a href="#examples">Usage Examples</a></li>
+                    <li><a href="#troubleshooting">Troubleshooting</a></li>
+                    <li><a href="#see-also">See Also</a></li>
+                </ul>
+            </div>
+
+            <div class="alert alert-success" id="recent-changes">
+                <h3 style="margin-top: 0;">📝 Recent Changes (v1.00 - Jan 8, 2026)</h3>
+                <ul style="margin: 5px 0 0 20px;">
+                    <li><strong>EnvVariable.pm Addition:</strong> New DBIx::Class Result model for managing application environment variables</li>
+                    <li><strong>Initial Documentation:</strong> Created comprehensive documentation for schema, access control, and audit features</li>
+                    <li><strong>Security Features:</strong> Documented secret masking, role-based editing, and change tracking</li>
+                </ul>
+            </div>
+            
+            <section id="overview">
+                <h2>Overview</h2>
+                <p>
+                    The <strong>EnvVariable</strong> model (Comserv/lib/Comserv/Model/Schema/Ency/Result/EnvVariable.pm) 
+                    provides a database-driven configuration management system for application environment variables. 
+                    It is a DBIx::Class Result class that supports:
+                </p>
+                <ul>
+                    <li>Environment variable storage with type classification (string, number, boolean, json)</li>
+                    <li>Secret value masking (for credentials, API keys, tokens)</li>
+                    <li>Role-based access control (configurable by roles)</li>
+                    <li>Editability flags (lock certain config for stability)</li>
+                    <li>Service impact tracking (which services affected by changes)</li>
+                    <li>Complete audit trail (creator/updater tracking with timestamps)</li>
+                    <li>Audit log relationship for detailed change history</li>
+                </ul>
+                <p>
+                    EnvVariable enables centralized management of application configuration without relying solely on 
+                    OS environment variables or config files. Changes are tracked, auditable, and apply role-based access control.
+                </p>
+            </section>
+
+            <section id="schema">
+                <h2>Database Schema & Fields</h2>
+                
+                <h3>Table: env_variables</h3>
+                <p><strong>Purpose:</strong> Store application configuration variables with security, editability, and audit features</p>
+                
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Field Name</th>
+                        <th>Data Type</th>
+                        <th>Nullable</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><code>id</code></td>
+                        <td>INTEGER</td>
+                        <td>No</td>
+                        <td>Auto-increment</td>
+                        <td>Primary key - unique environment variable identifier</td>
+                    </tr>
+                    <tr>
+                        <td><code>key</code></td>
+                        <td>VARCHAR(255)</td>
+                        <td>No</td>
+                        <td>—</td>
+                        <td>Configuration key name (UNIQUE; e.g., DB_HOST, SLACK_API_TOKEN)</td>
+                    </tr>
+                    <tr>
+                        <td><code>value</code></td>
+                        <td>LONGTEXT</td>
+                        <td>Yes</td>
+                        <td>NULL</td>
+                        <td>Configuration value (can be large; NULL for unset variables)</td>
+                    </tr>
+                    <tr>
+                        <td><code>var_type</code></td>
+                        <td>VARCHAR(50)</td>
+                        <td>No</td>
+                        <td>'string'</td>
+                        <td>Variable type (string, number, boolean, json, list)</td>
+                    </tr>
+                    <tr>
+                        <td><code>is_secret</code></td>
+                        <td>BOOLEAN</td>
+                        <td>No</td>
+                        <td>0</td>
+                        <td>If 1, value is masked in UI/logs (for passwords, tokens, API keys)</td>
+                    </tr>
+                    <tr>
+                        <td><code>is_editable</code></td>
+                        <td>BOOLEAN</td>
+                        <td>No</td>
+                        <td>1</td>
+                        <td>If 1, allows editing via UI/API; 0 locks config for stability</td>
+                    </tr>
+                    <tr>
+                        <td><code>editable_by_roles</code></td>
+                        <td>JSON</td>
+                        <td>No</td>
+                        <td>'["admin"]'</td>
+                        <td>Array of roles allowed to edit (JSON; e.g., ["admin", "developer"])</td>
+                    </tr>
+                    <tr>
+                        <td><code>affected_services</code></td>
+                        <td>JSON</td>
+                        <td>Yes</td>
+                        <td>NULL</td>
+                        <td>Array of service names affected by changes (JSON; e.g., ["web", "worker"])</td>
+                    </tr>
+                    <tr>
+                        <td><code>description</code></td>
+                        <td>TEXT</td>
+                        <td>Yes</td>
+                        <td>NULL</td>
+                        <td>Human-readable description of what this variable controls</td>
+                    </tr>
+                    <tr>
+                        <td><code>created_at</code></td>
+                        <td>DATETIME</td>
+                        <td>No</td>
+                        <td>NOW()</td>
+                        <td>Record creation timestamp</td>
+                    </tr>
+                    <tr>
+                        <td><code>updated_at</code></td>
+                        <td>DATETIME</td>
+                        <td>No</td>
+                        <td>NOW() (set_on_create/update)</td>
+                        <td>Last modification timestamp (auto-updated on every change)</td>
+                    </tr>
+                    <tr>
+                        <td><code>created_by</code></td>
+                        <td>INTEGER</td>
+                        <td>Yes</td>
+                        <td>NULL</td>
+                        <td>User ID of creator (foreign key to users.id)</td>
+                    </tr>
+                    <tr>
+                        <td><code>updated_by</code></td>
+                        <td>INTEGER</td>
+                        <td>Yes</td>
+                        <td>NULL</td>
+                        <td>User ID of last updater (foreign key to users.id)</td>
+                    </tr>
+                </table>
+
+                <h3>Field Details</h3>
+                
+                <h4>key (UNIQUE)</h4>
+                <p>Configuration variable name. Examples:</p>
+                <ul>
+                    <li><code>DATABASE_HOST</code></li>
+                    <li><code>REDIS_PORT</code></li>
+                    <li><code>SLACK_API_TOKEN</code></li>
+                    <li><code>DEBUG_MODE</code></li>
+                    <li><code>MAX_UPLOAD_SIZE</code></li>
+                </ul>
+                <p><strong>Convention:</strong> UPPERCASE_WITH_UNDERSCORES</p>
+
+                <h4>var_type</h4>
+                <p>Classifies the value type for parsing and validation:</p>
+                <ul>
+                    <li><code>string</code> - Text value (default)</li>
+                    <li><code>number</code> - Integer or float</li>
+                    <li><code>boolean</code> - true/false or 0/1</li>
+                    <li><code>json</code> - JSON object or array</li>
+                    <li><code>list</code> - Comma-separated or newline-separated values</li>
+                </ul>
+
+                <h4>is_secret</h4>
+                <p>
+                    If 1, the value is hidden in:
+                </p>
+                <ul>
+                    <li>Web UI (shown as "(masked)")</li>
+                    <li>Audit logs (hashed or omitted)</li>
+                    <li>Error messages</li>
+                </ul>
+                <p><strong>Typical Secret Values:</strong> API keys, passwords, tokens, encryption keys</p>
+
+                <h4>editable_by_roles (JSON Array)</h4>
+                <p>
+                    Restricts editing to specific roles. Examples:
+                </p>
+                <pre><code>
+["admin"]                    # Only admins can edit
+["admin", "developer"]       # Admins or developers
+[]                           # No one can edit (locked)
+                </code></pre>
+            </section>
+
+            <section id="relationships">
+                <h2>Relationships</h2>
+                
+                <h3>has_many: audit_logs</h3>
+                <pre><code>my @logs = $env_var->audit_logs()->all;
+foreach my $log (@logs) {
+    print "Changed by " . $log->changed_by_user->username . "\n";
+}</code></pre>
+                <p><strong>Relationship Type:</strong> has_many</p>
+                <p><strong>Target:</strong> EnvVariableAuditLog</p>
+                <p><strong>Purpose:</strong> Get all change history records for this variable</p>
+                <p><strong>Cascade:</strong> Deletes all audit logs when variable is deleted</p>
+
+                <h3>belongs_to: created_by_user</h3>
+                <pre><code>my $creator = $env_var->created_by_user();
+if ($creator) {
+    print "Created by: " . $creator->username . "\n";
+}</code></pre>
+                <p><strong>Relationship Type:</strong> belongs_to (LEFT JOIN)</p>
+                <p><strong>Foreign Key:</strong> created_by → users.id</p>
+                <p><strong>Nullable:</strong> YES (created_by can be NULL for system-generated vars)</p>
+
+                <h3>belongs_to: updated_by_user</h3>
+                <pre><code>my $updater = $env_var->updated_by_user();
+if ($updater) {
+    print "Last updated by: " . $updater->username . "\n";
+}</code></pre>
+                <p><strong>Relationship Type:</strong> belongs_to (LEFT JOIN)</p>
+                <p><strong>Foreign Key:</strong> updated_by → users.id</p>
+                <p><strong>Changes On:** Every update() operation</p>
+            </section>
+
+            <section id="security">
+                <h2>Security & Access Control</h2>
+                
+                <h3>Secret Masking Strategy</h3>
+                <p>
+                    The <code>is_secret</code> flag protects sensitive values:
+                </p>
+                <ol>
+                    <li>Value stored encrypted or hashed in database (assume encryption layer)</li>
+                    <li>display_value() returns "(masked)" for secrets</li>
+                    <li>Audit logs omit secret values</li>
+                    <li>UI masks secrets in form fields</li>
+                </ol>
+
+                <h3>Role-Based Editability</h3>
+                <p>
+                    The <code>editable_by_roles</code> JSON array restricts who can modify variables:
+                </p>
+                <pre><code>
+# Only admins can edit database configuration
+{
+    key: "DATABASE_HOST",
+    editable_by_roles: ["admin"]
+}
+
+# Developers and admins can tweak debug settings
+{
+    key: "DEBUG_LEVEL",
+    editable_by_roles: ["admin", "developer"]
+}
+
+# Locked configuration (no one can edit)
+{
+    key: "SYSTEM_SECRET_KEY",
+    is_editable: false,
+    editable_by_roles: []
+}
+                </code></pre>
+
+                <h3>Access Control Method</h3>
+                <p>Use the <code>is_user_editable($user_roles)</code> method to check permissions:</p>
+                <pre><code>
+my $user_roles = ['user'];  # User roles as array
+if ($env_var->is_user_editable($user_roles)) {
+    # User can edit this variable
+} else {
+    # User cannot edit - deny operation
+}
+                </code></pre>
+            </section>
+
+            <section id="api-methods">
+                <h2>API Methods & Helpers</h2>
+                
+                <h3>is_user_editable($user_roles)</h3>
+                <pre><code>my $user_roles = $c->user->roles();  # ['admin']
+my $can_edit = $env_var->is_user_editable($user_roles);
+
+if ($can_edit) {
+    # Allow editing via form/API
+} else {
+    # Return 403 Forbidden
+}</code></pre>
+                <p><strong>Parameters:</strong> $user_roles - ArrayRef of user role strings</p>
+                <p><strong>Returns:</strong> 1 (editable) or 0 (not editable)</p>
+                <p><strong>Logic:</strong> Returns true if is_editable=1 AND user has role in editable_by_roles</p>
+
+                <h3>display_value()</h3>
+                <pre><code>my $safe_value = $env_var->display_value();
+# Returns "(masked)" for secrets, value or "(empty)" for others
+print "Value: " . $safe_value . "\n";</code></pre>
+                <p><strong>Returns:</strong> Safe string for displaying in UI</p>
+                <p><strong>Purpose:</strong> Prevent accidental secret exposure</p>
+
+                <h3>Standard DBIx::Class Methods</h3>
+                <pre><code>
+# Create environment variable
+my $var = $rs->create({
+    key                => 'API_TOKEN',
+    value              => 'secret-token-123',
+    var_type           => 'string',
+    is_secret          => 1,
+    is_editable        => 0,
+    editable_by_roles  => '["admin"]',
+    affected_services  => '["web", "worker"]',
+    description        => 'API authentication token',
+    created_by         => $user_id,
+    updated_by         => $user_id,
+});
+
+# Update variable
+$var->value('new-token-456');
+$var->updated_by($current_user_id);
+$var->update();
+
+# Search variables
+my @editable = $rs->search({ is_editable => 1 })->all;
+my @secrets = $rs->search({ is_secret => 1 })->all;
+                </code></pre>
+            </section>
+
+            <section id="examples">
+                <h2>Usage Examples</h2>
+                
+                <h3>Example 1: Check User Can Edit Variable</h3>
+                <pre><code>
+my $schema = $c->model('Ency::Schema');
+my $rs = $schema->resultset('EnvVariable');
+
+my $db_host = $rs->find_by_key('DATABASE_HOST');
+die "No DATABASE_HOST config" unless $db_host;
+
+my $user_roles = $c->user->roles();  # ArrayRef of role strings
+
+if ($db_host->is_user_editable($user_roles)) {
+    # Allow form submission for editing
+    $c->stash->{can_edit} = 1;
+} else {
+    # Return access denied
+    $c->res->status(403);
+    $c->forward('View::JSON', { error => 'Not authorized' });
+}
+                </code></pre>
+
+                <h3>Example 2: Display Config Value Safely</h3>
+                <pre><code>
+my @configs = $rs->search({})->all;
+
+foreach my $cfg (@configs) {
+    my $display = $cfg->display_value();  # "(masked)" for secrets
+    print "  " . $cfg->key . " = " . $display . "\n";
+}
+                </code></pre>
+
+                <h3>Example 3: Update Config with Audit Trail</h3>
+                <pre><code>
+my $var = $rs->find_by_key('DEBUG_LEVEL');
+
+$var->value('2');
+$var->updated_by($c->user->id);
+$var->update();
+
+# Audit log is created automatically (by trigger or app logic)
+$c->log->info("DEBUG_LEVEL updated to 2 by " . $c->user->username);
+                </code></pre>
+
+                <h3>Example 4: List Affected Services</h3>
+                <pre><code>
+use JSON::MaybeXS;
+
+my $var = $rs->find_by_key('REDIS_HOST');
+
+if ($var->affected_services) {
+    my $services = decode_json($var->affected_services);
+    print "Affects services: " . join(", ", @$services) . "\n";
+    # Output: "Affects services: web, cache, worker"
+}
+                </code></pre>
+
+                <h3>Example 5: Audit Trail Query</h3>
+                <pre><code>
+my $var = $rs->find_by_key('API_TOKEN');
+
+my @history = $var->audit_logs()->search({}, {
+    order_by => { -desc => 'created_at' },
+    rows     => 10
+})->all;
+
+foreach my $log (@history) {
+    print "  " . $log->created_at . " - "
+        . ($log->changed_by_user ? $log->changed_by_user->username : "system")
+        . " - " . $log->action . "\n";
+}
+                </code></pre>
+            </section>
+
+            <section id="troubleshooting">
+                <h2>Troubleshooting</h2>
+                
+                <h3>Issue: "is_user_editable always returns false"</h3>
+                <p><strong>Cause:</strong> is_editable=0 (locked) or user role not in editable_by_roles JSON.</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Check is_editable flag: `$var->is_editable` must be 1</li>
+                    <li>Check editable_by_roles: `SELECT key, editable_by_roles FROM env_variables WHERE key='YOUR_VAR'`</li>
+                    <li>Verify user roles: `print join(",", @{$c->user->roles()})`</li>
+                    <li>Update permissions: `$var->editable_by_roles('["admin","developer"]')->update()`</li>
+                </ul>
+
+                <h3>Issue: "JSON parsing error on affected_services"</h3>
+                <p><strong>Cause:</strong> Invalid JSON in affected_services field.</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Validate JSON: `use JSON::Validator` before storing</li>
+                    <li>Fix bad JSON: `UPDATE env_variables SET affected_services = '["web"]' WHERE id=X`</li>
+                    <li>Use JSON helper: `JSON::MaybeXS::encode_json(['web', 'worker'])`</li>
+                </ul>
+
+                <h3>Issue: "Secret value visible in audit logs"</h3>
+                <p><strong>Cause:</strong> Audit logging not masking secret values.</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Check EnvVariableAuditLog model - ensure it calls display_value() or masks is_secret=1</li>
+                    <li>Log only metadata (key, old_value_hash, new_value_hash) not actual secrets</li>
+                    <li>Review audit table schema for proper secret handling</li>
+                </ul>
+
+                <h3>Issue: "Key field not unique"</h3>
+                <p><strong>Cause:</strong> Multiple records with same key (database constraint failure).</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Check for duplicates: `SELECT key, COUNT(*) FROM env_variables GROUP BY key HAVING COUNT(*) > 1`</li>
+                    <li>Delete duplicates (keep one): `DELETE FROM env_variables WHERE key='DUP_KEY' AND id NOT IN (...)`</li>
+                    <li>Verify unique index exists: `SHOW INDEX FROM env_variables WHERE Column_name='key'`</li>
+                </ul>
+            </section>
+
+            <section id="see-also">
+                <h2>See Also</h2>
+                <div class="alert alert-success">
+                    <strong>Related Documentation:</strong>
+                    <ul style="margin: 5px 0 0 20px;">
+                        <li><a href="/Documentation/models/EnvVariableAuditLog">EnvVariableAuditLog Model</a> - Change history tracking</li>
+                        <li><a href="/Documentation/system/ConfigurationManagement">Configuration Management Guide</a> - System config best practices</li>
+                    </ul>
+                </div>
+            </section>
+
+            <hr style="margin: 40px 0;">
+            <footer style="color: #666; font-size: 12px;">
+                <p>
+                    <strong>File:</strong> Comserv/lib/Comserv/Model/Schema/Ency/Result/EnvVariable.pm<br>
+                    <strong>Documentation Version:</strong> 1.00 (2026-01-08)<br>
+                    <strong>Last Updated:</strong> 2026-01-08 20:45:00 UTC<br>
+                    <strong>Maintained By:</strong> Zencoder (MainAgent)
+                </p>
+            </footer>
+        </div>
+    </div>
+</div>

@@ -182,8 +182,8 @@ sub project :Path('project') :Args(0) {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'project', 
         "Filter parameters - Role: $role_filter, Project: $project_filter, Priority: $priority_filter");
 
-    # Use the existing method to fetch projects with sub-projects
-    my $projects = $self->fetch_projects_with_subprojects($c);
+    # Use the existing method to fetch projects with sub-projects (request full data including todos)
+    my $projects = $self->fetch_projects_with_subprojects($c, 1);
     
     # Enhance project data with additional fields needed for filtering
     $projects = $self->enhance_project_data($c, $projects);
@@ -293,6 +293,18 @@ sub details :Path('details') :Args(0) {
     # Fetch sub-projects and their todos recursively
     my $project_tree = $self->build_project_tree($c, $project);
 
+    # Log what we're putting in the stash
+    if ($project_tree) {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'details', 
+            "Project tree built successfully. Project name: " . ($project_tree->{name} || 'UNDEFINED') . 
+            ", ID: " . ($project_tree->{id} || 'UNDEFINED') . 
+            ", Todos count: " . (scalar(@{$project_tree->{todos} || []}) || 0) .
+            ", Sub-projects count: " . (scalar(@{$project_tree->{sub_projects} || []}) || 0));
+    } else {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details', 
+            "Project tree is undefined or empty after build_project_tree call");
+    }
+
     # Add the project tree (including sub-projects and todos) to the stash
     $c->stash(
         project => $project_tree,
@@ -310,11 +322,15 @@ sub details :Path('details') :Args(0) {
 # See the implementation there
 
 sub fetch_projects_with_subprojects :Private {
-    my ($self, $c) = @_;
+    my ($self, $c, $full_data) = @_;
+    
+    # Default to basic data (just names, IDs) unless explicitly requested
+    $full_data //= 0;
+    
     # Log the start of the project-fetching subroutine
     $self->logging->log_with_details(
         $c, 'info', __FILE__, __LINE__, 'fetch_projects_with_subprojects',
-        'Fetching parent projects with sub-projects'
+        'Fetching parent projects with sub-projects (full_data=' . ($full_data ? 'true' : 'false') . ')'
     );
 
     # Get the schema and SiteName
@@ -356,88 +372,46 @@ sub fetch_projects_with_subprojects :Private {
 
     # Process each top-level project
     foreach my $project (@top_projects) {
-        # Create a hashref for this project
-        my $project_hash = {
-            id => $project->id,
-            name => $project->name,
-            parent_id => $project->parent_id,
-            status => $project->status || 1, # Default to 'New' status
-            start_date => $project->start_date,
-            end_date => $project->end_date,
-            developer_name => $project->developer_name || '',
-            client_name => $project->client_name || '',
-            priority => 2, # Default to medium priority since field doesn't exist
-            sub_projects => []
-        };
-
-        # Fetch first-level sub-projects
-        my @level1_subprojects;
-        eval {
-            @level1_subprojects = $schema->resultset('Project')->search(
-                { parent_id => $project->id },
-                { order_by => { -asc => 'name' } }
-            )->all;
-        };
-
-        if ($@) {
-            $self->logging->log_with_details(
-                $c, 'error', __FILE__, __LINE__, 'fetch_projects_with_subprojects',
-                "Error fetching level 1 sub-projects for project ID " . $project->id . ": $@"
-            );
-            next;
-        }
-
-        # Process first-level sub-projects
-        foreach my $subproject1 (@level1_subprojects) {
-            my $subproject1_hash = {
-                id => $subproject1->id,
-                name => $subproject1->name,
-                parent_id => $subproject1->parent_id,
-                status => $subproject1->status || 1, # Default to 'New' status
-                start_date => $subproject1->start_date,
-                end_date => $subproject1->end_date,
-                developer_name => $subproject1->developer_name || '',
-                client_name => $subproject1->client_name || '',
-                priority => 2, # Default to medium priority since field doesn't exist
+        my $project_hash;
+        
+        if ($full_data) {
+            # Use build_project_tree to get full project data including todos
+            $project_hash = $self->build_project_tree($c, $project, 0);
+        } else {
+            # Basic data only (for dropdowns, etc.)
+            $project_hash = {
+                id => $project->id,
+                name => $project->name,
+                parent_id => $project->parent_id,
+                status => $project->status || 1,
+                start_date => $project->start_date,
+                end_date => $project->end_date,
+                developer_name => $project->developer_name || '',
+                client_name => $project->client_name || '',
+                priority => 2,
                 sub_projects => []
             };
-
-            # Fetch second-level sub-projects
-            my @level2_subprojects;
+            
+            # Fetch first-level sub-projects (basic data only)
+            my @level1_subprojects;
             eval {
-                @level2_subprojects = $schema->resultset('Project')->search(
-                    { parent_id => $subproject1->id },
+                @level1_subprojects = $schema->resultset('Project')->search(
+                    { parent_id => $project->id },
                     { order_by => { -asc => 'name' } }
                 )->all;
             };
-
-            if ($@) {
-                $self->logging->log_with_details(
-                    $c, 'error', __FILE__, __LINE__, 'fetch_projects_with_subprojects',
-                    "Error fetching level 2 sub-projects for project ID " . $subproject1->id . ": $@"
-                );
-                next;
-            }
-
-            # Process second-level sub-projects
-            foreach my $subproject2 (@level2_subprojects) {
-                push @{$subproject1_hash->{sub_projects}}, {
-                    id => $subproject2->id,
-                    name => $subproject2->name,
-                    parent_id => $subproject2->parent_id,
-                    status => $subproject2->status || 1, # Default to 'New' status
-                    start_date => $subproject2->start_date,
-                    end_date => $subproject2->end_date,
-                    developer_name => $subproject2->developer_name || '',
-                    client_name => $subproject2->client_name || '',
-                    priority => 2, # Default to medium priority since field doesn't exist
-                    sub_projects => [] # Empty array, we don't go deeper
+            
+            foreach my $subproject1 (@level1_subprojects) {
+                push @{$project_hash->{sub_projects}}, {
+                    id => $subproject1->id,
+                    name => $subproject1->name,
+                    parent_id => $subproject1->parent_id,
+                    status => $subproject1->status || 1,
+                    sub_projects => []
                 };
             }
-
-            push @{$project_hash->{sub_projects}}, $subproject1_hash;
         }
-
+        
         push @projects, $project_hash;
     }
 
@@ -622,6 +596,10 @@ sub build_project_tree :Private {
     # Create an array of todo hashrefs with only the needed attributes
     my @todo_hashrefs = ();
     foreach my $todo (@todos) {
+        # Safely get accumulated_time (may not exist in all schemas)
+        my $accumulated_time = 0;
+        eval { $accumulated_time = $todo->accumulated_time || 0; };
+        
         push @todo_hashrefs, {
             id => $todo->id,
             record_id => $todo->record_id,
@@ -630,7 +608,8 @@ sub build_project_tree :Private {
             start_date => $todo->start_date,
             due_date => $todo->due_date,
             status => $todo->status,
-            priority => $todo->priority
+            priority => $todo->priority,
+            accumulated_time => $accumulated_time
         };
     }
     $project_hash->{todos} = \@todo_hashrefs;

@@ -1,0 +1,279 @@
+[% META
+        title = "Admin Controller Documentation"
+   description = "Comprehensive documentation for Admin controller providing system management, monitoring, backup/restore, database schema management, and software updates"
+   roles = "admin,developer,editor"
+   TemplateType = "controller"
+   category = "controllers,administration,database"
+   page_version = "0.05"
+   last_updated = "2026-01-11 15:50:00 UTC"
+   site_specific = ""
+%]
+
+[% PageVersion = 'Documentation/controllers/Admin.tt,v 0.05 2026/01/11 DocumentationSyncAgent Exp - Admin.pm code changes documented' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Admin Controller Documentation</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-11 15:50:00 UTC | 
+        Version: 0.05 |
+        Author: DocumentationSyncAgent |
+        Status: Admin.pm code changes synchronized; audit script testing in progress
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#auth" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Authentication</a>
+                <a href="#dashboard" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Dashboard</a>
+                <a href="#database" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Database</a>
+                <a href="#refactoring" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Refactoring Audit</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
+                <a href="#integration" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Integration</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            
+            <p style="color: var(--text-color); font-family: var(--body-font);">The Admin controller (`Comserv/lib/Comserv/Controller/Admin.pm`) is a comprehensive administration interface for Comserv that provides system management, monitoring, backup/restore, database schema management, and software updates. All admin actions require administrator role authentication.</p>
+            
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>File Size:</strong> 4,101 lines | <strong>Methods:</strong> 71 total methods (31 core admin + 40 schema operations) | <strong>Routes:</strong> /admin/* namespace</p>
+            
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- RECENT CHANGES SECTION -->
+    <div class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--success-color); border-radius: 4px;">
+        <div class="col-100">
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Recent Changes (v0.05 - Jan 11, 2026)</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+              <li><strong>v0.05 (2026-01-11):</strong> Admin.pm code changes synchronized. Testing documentation sync audit script behavior - verifying that uncommitted documentation updates are properly ignored by audit logic.</li>
+            </ul>
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Previous Changes (v0.04 - Jan 11, 2026)</h3>
+            <ul style="margin: 5px 0 0 20px; font-size: 0.9em; color: var(--text-color);">
+                <li><strong>v0.04 (2026-01-11):</strong> Version consolidation from v1.12 to v0.04 (corrected starting version). Code changes integrated per git HEAD~1..HEAD audit. Maintained all existing features, methods, and integration points.</li>
+                <li><strong>v1.12 (2026-01-08) - Consolidated:</strong> Added refactoring audit for schema code bloat, identified consolidation opportunities in schema management methods.</li>
+                <li><strong>Earlier Versions:</strong> Incremental development of backup/restore, database schema management, software update endpoints.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- AUTHENTICATION SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="auth" style="color: var(--text-color); font-family: var(--header-font);">2. Authentication &amp; Authorization</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">2.1 Admin Auth System</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">All admin operations are protected by the `AdminAuth` utility:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Method:</strong> `admin_auth()` returns AdminAuth utility instance</li>
+                <li><strong>Check:</strong> `check_admin_access($c, 'admin_base')` validates admin role</li>
+                <li><strong>Failure:</strong> Non-admins redirected to login with error message</li>
+                <li><strong>Begin Hook:</strong> `begin` private action initializes logging and debug messages</li>
+            </ul>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">2.2 Base Action (Chained)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The `base` action chains from root and is the entry point for all admin routes:</p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>sub base :Chained('/') :PathPart('admin') :CaptureArgs(0)</code></pre>
+            </div>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Sets section stash to 'admin' and validates admin access.</p>
+            
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- DASHBOARD SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="dashboard" style="color: var(--text-color); font-family: var(--header-font);">3. Dashboard &amp; System Monitoring</h2>
+
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">3.1 Admin Index (Dashboard)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Route:</strong> `/admin/` (GET) | <strong>Method:</strong> `index :Chained('base') :PathPart('') :Args(0)`</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Displays the main admin dashboard with system statistics (CPU, memory, disk), recent user activity, system notifications, and software update status.</p>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">3.2 System Statistics</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Method:</strong> `get_system_stats($c)` (Helper - Private)</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Collects and returns system metrics including CPU usage, memory usage, disk usage, uptime information, load averages, and process count.</p>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">3.3 Recent Activity &amp; Notifications</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Methods:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>get_recent_activity($c)</code> - Returns recent user activity log with timestamps and action descriptions</li>
+                <li><code>get_system_notifications($c)</code> - Generates notifications for disk space, memory, updates, service issues, and backup status</li>
+            </ul>
+            
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- DATABASE MANAGEMENT SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="database" style="color: var(--text-color); font-family: var(--header-font);">4. Database Management</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.1 Database Status</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Route:</strong> `/admin/db-status` | <strong>Method:</strong> `db_status :Chained('base') :PathPart('db-status') :Args(0)`</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Displays database connection status, table counts, and schema information.</p>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.2 Schema Comparison</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Route:</strong> `/admin/compare_schema` | <strong>Method:</strong> `compare_schema :Chained('base') :PathPart('compare_schema') :Args(0)`</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Compares database schema between live database and schema definition files to identify inconsistencies. <em>Note: Heavy use of comparison logic; see Refactoring Audit section below.</em></p>
+
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.3 Schema Management Methods</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Core schema operations (see Refactoring Audit for consolidation plans):</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>get_table_schema</code>, <code>get_field_comparison</code> - Schema introspection</li>
+                <li><code>sync_table_to_result</code>, <code>sync_result_to_table</code> - Bidirectional synchronization</li>
+                <li><code>create_result_from_table</code>, <code>create_table_from_result</code> - Code/schema generation</li>
+            </ul>
+            
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- REFACTORING AUDIT SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="refactoring" style="color: var(--text-color); font-family: var(--header-font);">5. Refactoring Audit - Schema Code Consolidation (v1.12)</h2>
+            
+            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: #ff9800; font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">⚠️ BLOAT ALERT</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Problem:</strong> Admin.pm has become severely bloated with ~2,900 lines of schema-related code (approximately 71% of the file, lines 1191-4076). This code was added to handle database schema fixes but creates maintenance issues.</p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>File size:</strong> Actual 4,101 lines (Jan 8 code) vs. documented 2,118 (Jan 5) = 93% increase</li>
+                    <li><strong>Root cause:</strong> Schema comparison/synchronization code added without refactoring to dedicated Admin/SchemaComparison controller (created in Chat 41)</li>
+                    <li><strong>Impact:</strong> Code duplication, single responsibility violation, testing complexity, maintenance burden</li>
+                </ul>
+            </div>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.1 Duplicate Methods (Immediate Priority)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>These methods exist in both Admin.pm and Admin/SchemaComparison.pm:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>sync_table_to_result</code> (Admin.pm:3385 vs SchemaComparison.pm:43)</li>
+                <li><code>sync_result_to_table</code> (Admin.pm:3453 vs SchemaComparison.pm:111)</li>
+                <li><code>create_result_from_table</code> (Admin.pm:3880 vs SchemaComparison.pm:179)</li>
+                <li><code>get_table_field_info</code> (Admin.pm:3521 vs SchemaComparison.pm:277)</li>
+                <li><code>get_result_field_info</code> (Admin.pm:3637 vs SchemaComparison.pm:306)</li>
+                <li><code>update_result_field_from_table</code> (Admin.pm:3751 vs SchemaComparison.pm:361)</li>
+                <li><code>update_table_field_from_result</code> (Admin.pm:3860 vs SchemaComparison.pm:409)</li>
+                <li><code>generate_result_file_content</code> (Admin.pm:3987 vs SchemaComparison.pm:457)</li>
+                <li><code>get_result_file_path</code> (Admin.pm:4076 vs SchemaComparison.pm:681)</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Action:</strong> Remove duplicates from Admin.pm; route to Admin/SchemaComparison. <strong>Expected result:</strong> Remove ~700-800 lines.</p>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.2 Methods to Migrate (Secondary Priority)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">All comparison, parsing, and analysis methods should move to Admin/SchemaComparison.pm:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Comparison methods:</strong> compare_table_schema, compare_columns, compare_primary_keys, compare_unique_constraints, compare_relationships</li>
+                <li><strong>Parsing methods:</strong> parse_result_file_schema, parse_mysql_column_type, parse_result_file_columns</li>
+                <li><strong>Utility methods:</strong> find_result_file, find_orphaned_result_files, build_result_table_mapping, table_name_to_result_name, result_name_to_table_name</li>
+                <li><strong>Database introspection:</strong> get_database_tables, get_ency_table_schema, get_forager_table_schema, get_database_table_schema</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Expected result:</strong> Remove ~1,800-2,000 lines from Admin.pm.</p>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.3 Methods to Keep in Admin.pm</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Core admin functions (~31 methods = 1,300-1,500 lines target):</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Routing:</strong> index, base, begin</li>
+                <li><strong>Dashboard:</strong> get_system_stats, get_recent_activity, get_system_notifications</li>
+                <li><strong>Management:</strong> users, content, settings, system_info, logs, backup</li>
+                <li><strong>Updates:</strong> git_pull, execute_git_pull, restart_starman, starman_diagnostics</li>
+                <li><strong>Delegation dispatchers:</strong> database_config, db_status (dispatch to SchemaComparison as needed)</li>
+            </ul>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.4 Current Admin/SchemaComparison.pm Status</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Location: Comserv/lib/Comserv/Controller/Admin/SchemaComparison.pm (738 lines, 17 methods)</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Already has implementations ready to expand. Routes use /schema-comparison/* namespace (separate from /admin/*).</p>
+            
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- METHODS REFERENCE SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="methods" style="color: var(--text-color); font-family: var(--header-font);">6. Core Methods Summary</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Quick reference of primary admin control methods. For complete schema method list, see Admin/SchemaComparison documentation.</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Authentication:</strong> logging(), admin_auth(), begin</li>
+                <li><strong>Dashboard:</strong> index, get_system_stats, get_recent_activity, get_system_notifications</li>
+                <li><strong>Database:</strong> database_config, db_status, compare_schema (dispatcher)</li>
+                <li><strong>Software:</strong> git_pull, execute_git_pull, restart_starman, starman_diagnostics</li>
+                <li><strong>Backup:</strong> backup (view interface), restore functionality</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- INTEGRATION SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="integration" style="color: var(--text-color); font-family: var(--header-font);">7. Integration &amp; Dependencies</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">7.1 Perl Module Dependencies</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Comserv::Util::Logging</strong> - Centralized logging</li>
+                <li><strong>Comserv::Util::AdminAuth</strong> - Admin authentication/authorization</li>
+                <li><strong>Comserv::Util::DockerManager</strong> - Docker management utilities</li>
+                <li><strong>Comserv::Controller::Admin::Git</strong> - Git operation handling</li>
+                <li><strong>Comserv::Controller::Admin::SchemaComparison</strong> - Schema operations (v1.12: consolidate more schema code here)</li>
+            </ul>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">7.2 Utility Libraries</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Data::Dumper, JSON, Try::Tiny, File::Slurp, Digest::SHA, POSIX</li>
+            </ul>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">7.3 Integration Best Practices</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>All operations logged with timestamps and user identification</li>
+                <li>Authentication enforced at base action level</li>
+                <li>File operations include validation and checksums</li>
+                <li>Dangerous operations require confirmation steps</li>
+                <li>System stats use threshold-based alerts</li>
+                <li>Schema operations should delegate to Admin/SchemaComparison for maintainability</li>
+            </ul>
+            
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h3 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">See Also</h3>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/controllers/Admin/SchemaComparison" style="color: var(--link-color);">Admin/SchemaComparison Controller</a> - Dedicated schema operations</li>
+                    <li><a href="/Documentation/controllers/Admin/Git" style="color: var(--link-color);">Admin/Git Controller</a> - Git operation handling</li>
+                    <li><a href="/admin" style="color: var(--link-color);">Admin Dashboard</a> - Web interface</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p>For technical support or questions about this documentation, contact the system administrator.</p>
+                <p><em>This documentation is part of the Comserv system. Admin.pm refactoring is planned for v1.13+.</em></p>
+            </div>
+        </div>
+    </div>
+</div>

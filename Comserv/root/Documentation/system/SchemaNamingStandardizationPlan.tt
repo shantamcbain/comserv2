@@ -1,0 +1,539 @@
+[% META
+        title = "Schema Naming Standardization Plan"
+   description = "Standardize database table naming conventions to eliminate false positives in schema comparison"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "system"
+   page_version = "0.01"
+   last_updated = "Wed Jan 08 2026"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/system/SchemaNamingStandardizationPlan.tt,v 0.01 2026/01/08 admin Exp admin - Initial standardization plan for Result file naming conventions' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Schema Naming Standardization Plan</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-08 | 
+        Version: 0.01 |
+        Author: Admin | 
+        Status: PROPOSAL FOR REVIEW
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#problem" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Problem Statement</a>
+                <a href="#solution" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Proposed Solution</a>
+                <a href="#scope" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Scope</a>
+                <a href="#implementation" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Implementation</a>
+                <a href="#risks" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Risks</a>
+                <a href="#timeline" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Timeline</a>
+                <a href="#decision" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Decision</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Objective</strong>: Standardize naming conventions across database tables and Result files to eliminate false positives in schema comparison and enforce industry best practices.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Root Cause</strong>: Result file table declarations are inconsistent. Some follow Catalyst/DBIx::Class standards (snake_case) while others use all-lowercase without underscores, causing false positives in table-to-result-file matching.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Expected Outcome</strong>: All Result files follow the established convention: PascalCase filenames paired with snake_case table declarations.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PROBLEM STATEMENT SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="problem" style="color: var(--text-color); font-family: var(--header-font);">2. Problem Statement</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">2.1 Current Inconsistency</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Result files use <strong>PascalCase</strong> filenames (e.g., <code>AiModelConfig.pm</code>, <code>CodeSearchIndex.pm</code>)</li>
+                <li>Result file table declarations are <strong>inconsistent</strong>:
+                    <ul style="color: var(--text-color); font-family: var(--body-font);">
+                        <li>Correct pattern: PascalCase file + proper snake_case declaration (e.g., <code>AiModelConfig.pm</code> → <code>ai_model_config</code>) ✓</li>
+                        <li>Broken pattern: PascalCase file + all-lowercase declaration (e.g., <code>CodeSearchIndex.pm</code> → <code>codesearchindex</code>) ✗</li>
+                    </ul>
+                </li>
+                <li>Database tables may not match Result file declarations</li>
+                <li>Schema compare page shows false positives (&quot;Tables without Result Files&quot;) when declarations don't match actual table names</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">2.2 Root Cause Analysis</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Result file declarations do not follow consistent naming conventions aligned with Catalyst/DBIx::Class standards. The application standard is: <strong>PascalCase filenames paired with snake_case table declarations</strong>. Currently, 4 Result files violate this by using all-lowercase declarations instead of proper snake_case.</p>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SOLUTION SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="solution" style="color: var(--text-color); font-family: var(--header-font);">3. Proposed Solution</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Standardize all Result files to follow the <strong>established Catalyst/DBIx::Class convention</strong>:</p>
+            
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Result file names</strong>: PascalCase (e.g., <code>AiModelConfig.pm</code>) ✓ Already correct</li>
+                <li><strong>Declared table names</strong>: snake_case (e.g., <code>ai_model_config</code>) - Fix 4 files</li>
+                <li><strong>Database table names</strong>: Match declared names exactly</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">3.1 Benefits of Standardization</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Eliminates Technical Debt</strong> - No workaround/normalization code needed</li>
+                <li><strong>Enforces Standards</strong> - Future developers follow established convention</li>
+                <li><strong>Reduces Bugs</strong> - Naming consistency prevents schema mismatch issues</li>
+                <li><strong>Simplifies Maintenance</strong> - Single naming rule instead of complex workarounds</li>
+                <li><strong>Improves Code Quality</strong> - Aligns with industry best practices for Catalyst/DBIx::Class</li>
+                <li><strong>Fixes Root Cause</strong> - Eliminates schema_compare false positives at source</li>
+            </ul>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SCOPE SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="scope" style="color: var(--text-color); font-family: var(--header-font);">4. Scope: Result Files Requiring Fix</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.1 Category A: Files with Non-Standard Declarations (Requires Fix)</h3>
+
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Result File</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Current Declaration</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Should Be (Standard)</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Database Table</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>CodeSearchIndex.pm</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>codesearchindex</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>code_search_index</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>codesearchindex</code> (needs rename)</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>DocumentationMetadataIndex.pm</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>documentationmetadataindex</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>documentation_metadata_index</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>documentationmetadataindex</code> (needs rename)</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>WebSearchResult.pm</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>websearchresult</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>web_search_result</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>websearchresult</code> (needs rename)</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>SiteDomain.pm</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>sitedomain</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>site_domain</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>sitedomain</code> (needs rename)</td>
+                </tr>
+            </table>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.2 Category B: Correct (No Changes Needed)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">20+ Result files already follow the proper convention: PascalCase filenames with snake_case declarations (e.g., <code>AiModelConfig.pm</code> correctly declares <code>ai_model_config</code>). These require no changes.</p>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- IMPLEMENTATION SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="implementation" style="color: var(--text-color); font-family: var(--header-font);">5. Implementation Plan</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.1 Phase 1: Update Result File Declarations (Code Changes Only)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Scope</strong>: 4 Result files requiring declaration fix</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Risk Level</strong>: VERY LOW - Code-only changes, no database impact</p>
+
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>Comserv/lib/Comserv/Model/Schema/Ency/Result/CodeSearchIndex.pm</code>
+                    <ul>
+                        <li>Line 5: Change <code>__PACKAGE__->table('codesearchindex');</code> to <code>__PACKAGE__->table('code_search_index');</code></li>
+                    </ul>
+                </li>
+                <li><code>Comserv/lib/Comserv/Model/Schema/Ency/Result/DocumentationMetadataIndex.pm</code>
+                    <ul>
+                        <li>Line 5: Change <code>__PACKAGE__->table('documentationmetadataindex');</code> to <code>__PACKAGE__->table('documentation_metadata_index');</code></li>
+                    </ul>
+                </li>
+                <li><code>Comserv/lib/Comserv/Model/Schema/Ency/Result/WebSearchResult.pm</code>
+                    <ul>
+                        <li>Line 5: Change <code>__PACKAGE__->table('websearchresult');</code> to <code>__PACKAGE__->table('web_search_result');</code></li>
+                    </ul>
+                </li>
+                <li><code>Comserv/lib/Comserv/Model/Schema/Ency/Result/SiteDomain.pm</code>
+                    <ul>
+                        <li>Line 4: Change <code>__PACKAGE__->table('sitedomain');</code> to <code>__PACKAGE__->table('site_domain');</code></li>
+                    </ul>
+                </li>
+            </ol>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Testing After Phase 1</strong>: Verify Perl module compilation and DBIx::Class schema loading without errors.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.2 Phase 2: Update Database Table Names (if required)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Prerequisites</strong>: Phase 1 code changes must be deployed and tested</p>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Determine if database tables exist with old names (query MySQL information_schema)</li>
+                <li>Create migration script: <code>Comserv/script/migrate_table_names.pl</code></li>
+                <li>Execute migrations with full backup and validation</li>
+            </ol>
+
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>ALTER TABLE codesearchindex RENAME TO code_search_index;
+ALTER TABLE documentationmetadataindex RENAME TO documentation_metadata_index;
+ALTER TABLE websearchresult RENAME TO web_search_result;
+ALTER TABLE sitedomain RENAME TO site_domain;</code></pre>
+            </div>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Risk Level</strong>: LOW if tables are only accessed through DBIx::Class (not raw SQL)</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.3 Phase 3: Update Code References</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Locations to Search</strong>:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>Comserv/lib/Comserv/Controller/</code> - Any hardcoded table name strings</li>
+                <li><code>Comserv/root/</code> - Template files with table references</li>
+                <li>Raw SQL queries (if any) using old table names</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Expected Impact</strong>: MINIMAL - DBIx::Class abstraction should shield most code from table name changes</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.4 Phase 4: Clean Up (Remove Workaround Code)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Files to Delete</strong>:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>Comserv/lib/Comserv/Util/TableNameNormalizer.pm</code> - No longer needed</li>
+            </ul>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Result</strong>: Simple, maintainable code that enforces naming standards without workarounds</p>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- RISKS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="risks" style="color: var(--text-color); font-family: var(--header-font);">6. Risks and Mitigations</h2>
+
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Risk</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Mitigation</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Database migration failures</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Test migrations on database copy, perform full backup before execution, use transactions</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Code references to old table names</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Grep search entire codebase before migration, update all references</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Application downtime</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Execute migrations during scheduled maintenance window, have rollback plan</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Data loss or corruption</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Verify data integrity post-migration with checksums and record counts</td>
+                </tr>
+            </table>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- TIMELINE SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="timeline" style="color: var(--text-color); font-family: var(--header-font);">7. Timeline</h2>
+
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Phase 1</strong>: ~30 minutes (4 file updates, compilation test)</li>
+                <li><strong>Phase 2</strong>: ~1 hour (migration script, backup, database execution)</li>
+                <li><strong>Phase 3</strong>: ~30 minutes (code search, reference updates)</li>
+                <li><strong>Phase 4</strong>: ~15 minutes (cleanup, file deletions/reversions)</li>
+                <li><strong>Total Estimated</strong>: ~2.5 hours</li>
+            </ul>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- DECISION SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="decision" style="color: var(--text-color); font-family: var(--header-font);">8. Decision Points</h2>
+
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Accept Plan</strong>: Proceed with all phases as outlined</li>
+                <li><strong>Phase 1 Only</strong>: Start with code-only changes, defer database changes to separate approval</li>
+                <li><strong>Modify Scope</strong>: Adjust which files are prioritized</li>
+                <li><strong>Alternative</strong>: Keep normalization workaround (NOT RECOMMENDED - violates standards)</li>
+            </ol>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">8.1 Recommendation</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Approve Phase 1 immediately</strong> (low-risk, code-only changes), then Phase 2-4 after testing in development environment. This allows verification that the changes work without database impact before proceeding to production database changes.</p>
+
+            <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h3 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">Important Note</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);">This plan fixes the root cause of schema_compare false positives by enforcing consistent naming conventions from the source (Result file declarations), rather than implementing workaround/normalization logic. This approach eliminates technical debt, improves code quality, and prevents future naming-related issues.</p>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">9. See Also</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/system/SchemaComparison" style="color: var(--link-color);">Schema Comparison and Validation</a></li>
+                    <li><a href="/Documentation/developer/DatabaseConventions" style="color: var(--link-color);">Database Naming Conventions</a></li>
+                    <li><a href="/admin" style="color: var(--link-color);">Administrative Interface</a></li>
+                </ul>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p>For technical support or questions about this documentation, contact the system administrator.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>
+<p><strong>Objective</strong>: Standardize naming conventions across database tables and Result files to eliminate false positives in schema_compare page categorization.</p>
+<p><strong>Root Cause</strong>: Result file table declarations are inconsistent - some follow Catalyst/DBIx::Class standards (snake_case) while others use all-lowercase without underscores, causing false positives in table-to-result-file matching.</p>
+
+<h2>Problem Statement</h2>
+
+<h3>Current Inconsistency</h3>
+
+<ul>
+<li>Result files use <strong>PascalCase</strong> filenames (e.g., <code>AiModelConfig.pm</code>, <code>CodeSearchIndex.pm</code>)</li>
+<li>Result file table declarations are <strong>inconsistent</strong>:
+  <ul>
+  <li>Correct pattern: PascalCase file + proper snake_case declaration (e.g., <code>AiModelConfig.pm</code> → <code>ai_model_config</code>) ✓</li>
+  <li>Broken pattern: PascalCase file + all-lowercase declaration (e.g., <code>CodeSearchIndex.pm</code> → <code>codesearchindex</code>) ✗</li>
+  </ul>
+</li>
+<li>Database tables may not match Result file declarations</li>
+<li>Schema compare page shows false positives ("Tables without Result Files") when declarations don't match actual table names</li>
+</ul>
+
+<h3>Root Cause Analysis</h3>
+
+<p>Result file declarations do not follow consistent naming convention aligned with Catalyst/DBIx::Class standards. The application standard is: <strong>PascalCase filenames paired with snake_case table declarations</strong>. Currently, 4 Result files violate this by using all-lowercase declarations instead of proper snake_case.</p>
+
+<h2>Proposed Solution</h2>
+
+<p>Standardize all Result files to follow the <strong>established Catalyst/DBIx::Class convention</strong>:</p>
+<ul>
+<li><strong>Result file names</strong>: PascalCase (e.g., <code>AiModelConfig.pm</code>) ✓ Already correct</li>
+<li><strong>Declared table names</strong>: snake_case (e.g., <code>ai_model_config</code>) - Fix 4 files</li>
+<li><strong>Database table names</strong>: Match declared names exactly</li>
+</ul>
+
+<h3>Benefits of Standardization</h3>
+
+<ul>
+<li><strong>Eliminates Technical Debt</strong> - No workaround/normalization code needed</li>
+<li><strong>Enforces Standards</strong> - Future developers follow established convention</li>
+<li><strong>Reduces Bugs</strong> - Naming consistency prevents schema mismatch issues</li>
+<li><strong>Simplifies Maintenance</strong> - Single naming rule instead of complex workarounds</li>
+<li><strong>Improves Code Quality</strong> - Aligns with industry best practices for Catalyst/DBIx::Class</li>
+<li><strong>Fixes Root Cause</strong> - Eliminates schema_compare false positives at source</li>
+</ul>
+
+<h2>Scope: Result Files Requiring Fix</h2>
+
+<h3>Category A: Files with Non-Standard Declarations (Requires Fix)</h3>
+
+<table border="1">
+<tr>
+<th>Result File</th>
+<th>Current Declaration</th>
+<th>Should Be (Standard)</th>
+<th>Database Table</th>
+</tr>
+<tr>
+<td><code>CodeSearchIndex.pm</code></td>
+<td><code>codesearchindex</code></td>
+<td><code>code_search_index</code></td>
+<td><code>codesearchindex</code> (needs rename)</td>
+</tr>
+<tr>
+<td><code>DocumentationMetadataIndex.pm</code></td>
+<td><code>documentationmetadataindex</code></td>
+<td><code>documentation_metadata_index</code></td>
+<td><code>documentationmetadataindex</code> (needs rename)</td>
+</tr>
+<tr>
+<td><code>WebSearchResult.pm</code></td>
+<td><code>websearchresult</code></td>
+<td><code>web_search_result</code></td>
+<td><code>websearchresult</code> (needs rename)</td>
+</tr>
+<tr>
+<td><code>SiteDomain.pm</code></td>
+<td><code>sitedomain</code></td>
+<td><code>site_domain</code></td>
+<td><code>sitedomain</code> (needs rename)</td>
+</tr>
+</table>
+
+<h3>Category B: Correct (No Changes Needed)</h3>
+
+<p>20+ Result files already follow the proper convention: PascalCase filenames with snake_case declarations (e.g., <code>AiModelConfig.pm</code> correctly declares <code>ai_model_config</code>). These require no changes.</p>
+
+<h2>Implementation Plan</h2>
+
+<h3>Phase 1: Update Result File Declarations (Code Changes Only)</h3>
+
+<p><strong>Scope</strong>: 4 Result files requiring declaration fix</p>
+<p><strong>Risk Level</strong>: VERY LOW - Code-only changes, no database impact</p>
+
+<ol>
+<li><code>Comserv/lib/Comserv/Model/Schema/Ency/Result/CodeSearchIndex.pm</code>
+  <ul>
+  <li>Line 5: Change <code>__PACKAGE__->table('codesearchindex');</code> to <code>__PACKAGE__->table('code_search_index');</code></li>
+  </ul>
+</li>
+<li><code>Comserv/lib/Comserv/Model/Schema/Ency/Result/DocumentationMetadataIndex.pm</code>
+  <ul>
+  <li>Line 5: Change <code>__PACKAGE__->table('documentationmetadataindex');</code> to <code>__PACKAGE__->table('documentation_metadata_index');</code></li>
+  </ul>
+</li>
+<li><code>Comserv/lib/Comserv/Model/Schema/Ency/Result/WebSearchResult.pm</code>
+  <ul>
+  <li>Line 5: Change <code>__PACKAGE__->table('websearchresult');</code> to <code>__PACKAGE__->table('web_search_result');</code></li>
+  </ul>
+</li>
+<li><code>Comserv/lib/Comserv/Model/Schema/Ency/Result/SiteDomain.pm</code>
+  <ul>
+  <li>Line 4: Change <code>__PACKAGE__->table('sitedomain');</code> to <code>__PACKAGE__->table('site_domain');</code></li>
+  </ul>
+</li>
+</ol>
+
+<p><strong>Testing After Phase 1</strong>: Verify Perl module compilation and DBIx::Class schema loading without errors.</p>
+
+<h3>Phase 2: Update Database Table Names (if required)</h3>
+
+<p><strong>Prerequisites</strong>: Phase 1 code changes must be deployed and tested</p>
+
+<ol>
+<li>Determine if database tables exist with old names (query MySQL information_schema)</li>
+<li>Create migration script: <code>Comserv/script/migrate_table_names.pl</code></li>
+<li>Execute migrations with full backup and validation</li>
+</ol>
+
+<p><strong>Database Alterations (if old tables exist)</strong>:</p>
+
+<pre>
+ALTER TABLE codesearchindex RENAME TO code_search_index;
+ALTER TABLE documentationmetadataindex RENAME TO documentation_metadata_index;
+ALTER TABLE websearchresult RENAME TO web_search_result;
+ALTER TABLE sitedomain RENAME TO site_domain;
+</pre>
+
+<p><strong>Risk Level</strong>: LOW if tables are only accessed through DBIx::Class (not raw SQL)</p>
+
+<h3>Phase 3: Update Code References</h3>
+
+<p><strong>Locations to Search</strong>:</p>
+<ul>
+<li><code>Comserv/lib/Comserv/Controller/</code> - Any hardcoded table name strings</li>
+<li><code>Comserv/root/</code> - Template files with table references</li>
+<li>Raw SQL queries (if any) using old table names</li>
+</ul>
+
+<p><strong>Expected Impact</strong>: MINIMAL - DBIx::Class abstraction should shield most code from table name changes</p>
+
+<h3>Phase 4: Clean Up (Remove Workaround Code)</h3>
+
+<p><strong>Files to Delete</strong>:</p>
+<ul>
+<li><code>Comserv/lib/Comserv/Util/TableNameNormalizer.pm</code> - No longer needed</li>
+</ul>
+
+<p><strong>Files to Revert in Admin.pm</strong>:</p>
+<ul>
+<li>Remove import of TableNameNormalizer</li>
+<li>Revert <code>build_result_table_mapping()</code> function to standard <code>lc()</code> comparison</li>
+<li>Revert <code>compare_table_with_result_file_v2()</code> function to use <code>lc()</code></li>
+<li>Revert <code>find_orphaned_result_files_v2()</code> function to use <code>lc()</code></li>
+</ul>
+
+<p><strong>Result</strong>: Simple, maintainable code that enforces naming standards without workarounds</p>
+
+<h2>Risks and Mitigations</h2>
+
+<table border="1">
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+<tr>
+<td>Database migration failures</td>
+<td>Test migrations on database copy, perform full backup before execution, use transactions</td>
+</tr>
+<tr>
+<td>Code references to old table names</td>
+<td>Grep search entire codebase before migration, update all references</td>
+</tr>
+<tr>
+<td>Application downtime</td>
+<td>Execute migrations during scheduled maintenance window, have rollback plan</td>
+</tr>
+<tr>
+<td>Data loss or corruption</td>
+<td>Verify data integrity post-migration with checksums and record counts</td>
+</tr>
+</table>
+
+<h2>Timeline</h2>
+
+<ul>
+<li><strong>Phase 1</strong>: ~30 minutes (4 file updates, compilation test)</li>
+<li><strong>Phase 2</strong>: ~1 hour (migration script, backup, database execution)</li>
+<li><strong>Phase 3</strong>: ~30 minutes (code search, reference updates)</li>
+<li><strong>Phase 4</strong>: ~15 minutes (cleanup, file deletions/reversions)</li>
+<li><strong>Total Estimated</strong>: ~2.5 hours</li>
+</ul>
+
+<h2>Decision Points</h2>
+
+<ol>
+<li><strong>Accept Plan</strong>: Proceed with all phases as outlined</li>
+<li><strong>Phase 1 Only</strong>: Start with code-only changes, defer database changes to separate approval</li>
+<li><strong>Modify Scope</strong>: Adjust which files are prioritized</li>
+<li><strong>Alternative</strong>: Keep normalization workaround (NOT RECOMMENDED - violates standards)</li>
+</ol>
+
+<h3>Recommendation</h3>
+
+<p><strong>Approve Phase 1 immediately</strong> (low-risk, code-only changes), then Phase 2-4 after testing in development environment. This allows verification that the changes work without database impact before proceeding to production database changes.</p>
+
+<h2>Note</h2>
+
+<p><strong>Important</strong>: This plan fixes the root cause of schema_compare false positives by enforcing consistent naming conventions from the source (Result file declarations), rather than implementing workaround/normalization logic. This approach eliminates technical debt, improves code quality, and prevents future naming-related issues.</p>

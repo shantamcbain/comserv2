@@ -1,0 +1,564 @@
+[% META
+   title = "AI Model Configuration"
+   description = "Manage AI model configurations and API settings"
+   roles = "admin"
+   category = "AI Module"
+%]
+
+<div class="admin-container">
+    <div class="page-header">
+        <h1>AI Model Configuration</h1>
+        <div class="header-actions">
+            <button id="add-model-btn" class="btn-primary">+ Add New Model</button>
+            <a href="/ai/admin/agents" class="btn-secondary">Manage Agents</a>
+            <a href="/ai" class="btn-secondary">← Back to AI Chat</a>
+        </div>
+    </div>
+
+    <div class="models-grid">
+        [% FOREACH model IN models %]
+        <div class="model-card" data-model-id="[% model.id %]">
+            <div class="model-header">
+                <h3>[% model.model_name %]</h3>
+                <span class="model-status [% model.enabled ? 'enabled' : 'disabled' %]">
+                    [% model.enabled ? '✓ Enabled' : '✗ Disabled' %]
+                </span>
+            </div>
+            <div class="model-details">
+                <div class="detail-row">
+                    <span class="label">Role:</span>
+                    <span class="value">[% model.role %]</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Agent Type:</span>
+                    <span class="value">[% model.agent_type %]</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Endpoint:</span>
+                    <span class="value endpoint">[% model.api_endpoint %]</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">API Key:</span>
+                    <span class="value">[% model.has_api_key ? '🔒 Configured' : '⚠️ Not configured' %]</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Temperature:</span>
+                    <span class="value">[% model.temperature %]</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Max Tokens:</span>
+                    <span class="value">[% model.max_tokens %]</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Priority:</span>
+                    <span class="value">[% model.priority %]</span>
+                </div>
+                <div class="capabilities">
+                    <strong>Capabilities:</strong>
+                    <div class="capability-badges">
+                        [% IF model.capabilities.search_docs %]<span class="badge">📚 Doc Search</span>[% END %]
+                        [% IF model.capabilities.web_search %]<span class="badge">🌐 Web Search</span>[% END %]
+                        [% IF model.capabilities.code_search %]<span class="badge">💻 Code Search</span>[% END %]
+                    </div>
+                </div>
+            </div>
+            <div class="model-actions">
+                <button class="btn-edit" onclick="editModel([% model.id %])">Edit</button>
+                <button class="btn-delete" onclick="deleteModel([% model.id %])">Delete</button>
+            </div>
+        </div>
+        [% END %]
+        
+        [% UNLESS models.size %]
+        <div class="no-models">
+            <p>No AI models configured yet.</p>
+            <p>Click "Add New Model" to get started.</p>
+        </div>
+        [% END %]
+    </div>
+</div>
+
+<!-- Add/Edit Model Modal -->
+<div id="model-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modal-title">Add New Model</h2>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <form id="model-form">
+            <input type="hidden" id="model-id" name="id">
+            
+            <div class="form-group">
+                <label for="model-name">Model Name *</label>
+                <select id="model-name" name="model_name" required>
+                    <option value="">Select a model...</option>
+                    <optgroup label="X.AI (Grok)">
+                        <option value="grok-beta">Grok Beta</option>
+                        <option value="grok-2-latest">Grok 2 Latest</option>
+                    </optgroup>
+                    <optgroup label="Google">
+                        <option value="gemini-pro">Gemini Pro</option>
+                        <option value="gemini-ultra">Gemini Ultra</option>
+                    </optgroup>
+                    <optgroup label="OpenAI">
+                        <option value="gpt-4">GPT-4</option>
+                        <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                    </optgroup>
+                    <optgroup label="Local (Ollama)">
+                        <option value="llama3.1">Llama 3.1</option>
+                        <option value="llama2">Llama 2</option>
+                        <option value="mistral">Mistral</option>
+                    </optgroup>
+                    <optgroup label="Other">
+                        <option value="custom">Custom Model</option>
+                    </optgroup>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="api-endpoint">API Endpoint *</label>
+                <input type="url" id="api-endpoint" name="api_endpoint" required
+                       placeholder="https://api.x.ai/v1/chat/completions">
+            </div>
+            
+            <div class="form-group">
+                <label for="api-key">API Key (leave blank to keep existing)</label>
+                <input type="password" id="api-key" name="api_key"
+                       placeholder="Enter API key">
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="role">User Role *</label>
+                    <select id="role" name="role" required>
+                        <option value="user">User (Not logged in)</option>
+                        <option value="normal">Normal (Registered)</option>
+                        <option value="developer">Developer</option>
+                        <option value="editor">Editor</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="agent-type">Agent Type *</label>
+                    <select id="agent-type" name="agent_type" required>
+                        <option value="helpdesk">HelpDesk</option>
+                        <option value="ency">Encyclopedia</option>
+                        <option value="developer">Developer</option>
+                        <option value="coding">Coding</option>
+                        <option value="editor">Editor</option>
+                        <option value="documentation">Documentation</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="temperature">Temperature</label>
+                    <input type="number" id="temperature" name="temperature" min="0" max="2" step="0.1" value="0.7">
+                </div>
+                
+                <div class="form-group">
+                    <label for="max-tokens">Max Tokens</label>
+                    <input type="number" id="max-tokens" name="max_tokens" min="100" max="10000" value="2048">
+                </div>
+                
+                <div class="form-group">
+                    <label for="priority">Priority</label>
+                    <input type="number" id="priority" name="priority" min="1" max="10" value="1">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="enabled" name="enabled" checked>
+                    Enabled
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="search-docs" name="search_docs_automatically" checked>
+                    Auto-search Documentation
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="allow-web" name="allow_web_search">
+                    Allow Web Search
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="allow-code" name="allow_code_search">
+                    Allow Code Search
+                </label>
+            </div>
+            
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn-primary">Save Model</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.admin-container {
+    max-width: 1400px;
+    margin: 20px auto;
+    padding: 20px;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.models-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 20px;
+}
+
+.model-card {
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    transition: transform 0.2s;
+}
+
+.model-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.model-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.model-header h3 {
+    margin: 0;
+    color: var(--text-color);
+}
+
+.model-status {
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.model-status.enabled {
+    background: #28a745;
+    color: white;
+}
+
+.model-status.disabled {
+    background: #6c757d;
+    color: white;
+}
+
+.model-details {
+    margin: 15px 0;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.detail-row .label {
+    font-weight: bold;
+    color: var(--text-color);
+}
+
+.detail-row .value {
+    color: var(--text-color);
+    text-align: right;
+}
+
+.detail-row .endpoint {
+    font-family: monospace;
+    font-size: 12px;
+}
+
+.capabilities {
+    margin-top: 15px;
+}
+
+.capability-badges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.badge {
+    padding: 4px 8px;
+    background: var(--link-color);
+    color: white;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.model-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.btn-primary, .btn-secondary, .btn-edit, .btn-delete {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: opacity 0.2s;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-edit {
+    background: #ffc107;
+    color: black;
+    flex: 1;
+}
+
+.btn-delete {
+    background: #dc3545;
+    color: white;
+    flex: 1;
+}
+
+.btn-primary:hover, .btn-secondary:hover, .btn-edit:hover, .btn-delete:hover {
+    opacity: 0.8;
+}
+
+.no-models {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-color);
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: var(--background-color);
+    border-radius: 8px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text-color);
+}
+
+#model-form {
+    padding: 20px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: var(--text-color);
+}
+
+.form-group input, .form-group select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--secondary-color);
+    color: var(--text-color);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: auto;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+</style>
+
+<script>
+let editingModelId = null;
+
+function openModal(title = 'Add New Model') {
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('model-modal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('model-modal').style.display = 'none';
+    document.getElementById('model-form').reset();
+    editingModelId = null;
+}
+
+document.getElementById('add-model-btn').addEventListener('click', function() {
+    openModal('Add New Model');
+});
+
+document.getElementById('model-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const data = Object.fromEntries(formData.entries());
+    
+    data.enabled = document.getElementById('enabled').checked ? 1 : 0;
+    data.search_docs_automatically = document.getElementById('search-docs').checked ? 1 : 0;
+    data.allow_web_search = document.getElementById('allow-web').checked ? 1 : 0;
+    data.allow_code_search = document.getElementById('allow-code').checked ? 1 : 0;
+    
+    const url = editingModelId ? '/ai/admin/update_model' : '/ai/admin/add_model';
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(result.message);
+            location.reload();
+        } else {
+            alert('Error: ' + result.error);
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+});
+
+async function deleteModel(modelId) {
+    if (!confirm('Are you sure you want to delete this model configuration?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/ai/admin/delete_model', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({ id: modelId })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(result.message);
+            location.reload();
+        } else {
+            alert('Error: ' + result.error);
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+function editModel(modelId) {
+    editingModelId = modelId;
+    openModal('Edit Model');
+}
+
+document.getElementById('model-name').addEventListener('change', function() {
+    const modelName = this.value;
+    const endpointInput = document.getElementById('api-endpoint');
+    
+    const endpoints = {
+        'grok-beta': 'https://api.x.ai/v1/chat/completions',
+        'grok-2-latest': 'https://api.x.ai/v1/chat/completions',
+        'gemini-pro': 'https://generativelanguage.googleapis.com/v1/models/gemini-pro',
+        'gpt-4': 'https://api.openai.com/v1/chat/completions',
+        'gpt-4-turbo': 'https://api.openai.com/v1/chat/completions',
+        'gpt-3.5-turbo': 'https://api.openai.com/v1/chat/completions',
+        'llama3.1': 'http://localhost:11434',
+        'llama2': 'http://localhost:11434',
+        'mistral': 'http://localhost:11434'
+    };
+    
+    if (endpoints[modelName]) {
+        endpointInput.value = endpoints[modelName];
+    }
+});
+</script>

@@ -1,0 +1,417 @@
+[% PageVersion = 'Documentation/REBUILD_AND_DEPLOY_INSTRUCTIONS.tt,v 1.0 2025/12/19 Zencoder Exp Shanta ' %]
+
+<h1 id="rebuild_top">Docker Container Rebuild & Deployment Instructions</h1>
+
+<div class="toc" id="toc">
+<h3>Quick Navigation</h3>
+<ul>
+    <li><a href="#summary">Summary of Changes</a></li>
+    <li><a href="#web_dev_rebuild">web-dev Container - Rebuild Steps</a></li>
+    <li><a href="#web_prod_rebuild">web-prod Container - Rebuild Steps</a></li>
+    <li><a href="#verification">Verification & Testing</a></li>
+    <li><a href="#troubleshooting">Troubleshooting</a></li>
+</ul>
+</div>
+
+<div class="container warning" id="summary">
+    <div class="container-header">Summary of Changes Made</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <h3>web-dev (Port 3000) - Development Container</h3>
+            <table class="diagnostic-table">
+                <tbody>
+                    <tr>
+                        <td><strong>File</strong></td>
+                        <td>Comserv/docker-entrypoint.sh</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Change</strong></td>
+                        <td>Added line 94: <code>chown -R comserv:comserv ${CATALYST_HOME}/root/log</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Why</strong></td>
+                        <td>Fixes EACCES (permission denied) error when supervisor tries to spawn comserv-server process</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Status</strong></td>
+                        <td>✅ Applied - Needs rebuild</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <h3>web-prod (Port 5000) - Production Container</h3>
+            <table class="diagnostic-table">
+                <tbody>
+                    <tr>
+                        <td><strong>File</strong></td>
+                        <td>Comserv/docker-compose.prod.yml</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Change</strong></td>
+                        <td>Removed entire ./root bind mount; now mount only:
+                            <ul>
+                            <li><code>./root/static:/opt/comserv/root/static:ro</code> (read-only)</li>
+                            <li><code>./root/Documentation:/opt/comserv/root/Documentation:ro</code> (read-only)</li>
+                            </ul>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>Why</strong></td>
+                        <td>Fixes OCI runtime error caused by nested volume mount conflict inside read-only parent directory</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Status</strong></td>
+                        <td>✅ Applied - Needs rebuild</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="container" id="web_dev_rebuild">
+    <div class="container-header">web-dev Container - Step-by-Step Rebuild</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <h3>Option 1: Using Docker Desktop GUI (Recommended for Learning)</h3>
+            
+            <ol>
+                <li><strong>Open Docker Desktop</strong> on your machine</li>
+                <li><strong>Navigate to Containers</strong> section</li>
+                <li><strong>Find comserv-web-dev</strong> container
+                    <ul>
+                        <li>Status should show "Up" (running)</li>
+                        <li>Port 3000 is currently NOT listening due to old image</li>
+                    </ul>
+                </li>
+                <li><strong>Stop the container</strong>
+                    <ul>
+                        <li>Click the "Stop" button (square icon) next to comserv-web-dev</li>
+                        <li>Wait for status to change to "Exited"</li>
+                    </ul>
+                </li>
+                <li><strong>Delete the old container</strong>
+                    <ul>
+                        <li>Right-click on comserv-web-dev → "Delete" or click trash icon</li>
+                        <li>Confirm deletion</li>
+                    </ul>
+                </li>
+                <li><strong>Delete the old image</strong>
+                    <ul>
+                        <li>Go to "Images" section</li>
+                        <li>Find "comserv" image (should have "dev" tags)</li>
+                        <li>Click trash icon to delete</li>
+                        <li>This forces Docker to rebuild from scratch with our changes</li>
+                    </ul>
+                </li>
+                <li><strong>Rebuild the image</strong>
+                    <ul>
+                        <li>Open terminal/command prompt</li>
+                        <li>Navigate to: <code>cd /home/shanta/PycharmProjects/comserv2</code></li>
+                        <li>Run: <code>docker-compose up -d web-dev</code></li>
+                        <li>Docker will rebuild the image with the chown fix</li>
+                        <li>Wait 30-60 seconds for build to complete</li>
+                    </ul>
+                </li>
+                <li><strong>Verify port 3000 is listening</strong>
+                    <ul>
+                        <li>Run: <code>curl http://localhost:3000/health</code></li>
+                        <li>Should return HTTP 200 response</li>
+                    </ul>
+                </li>
+            </ol>
+            
+            <h3>Option 2: Using Command Line (Faster)</h3>
+            
+            <pre><code># Stop and remove old container
+docker-compose down
+
+# Remove cached image to force rebuild
+docker rmi comserv-web-dev 2>/dev/null || true
+
+# Rebuild and start with our changes
+docker-compose up -d web-dev
+
+# Wait for startup and health check
+sleep 15
+docker ps | grep web-dev
+
+# Test port 3000
+curl http://localhost:3000/health</code></pre>
+            
+            <h3>Expected Output After Rebuild</h3>
+            <pre><code>$ curl http://localhost:3000/health
+HTTP/1.1 200 OK
+[JSON response or health indicator]
+
+$ docker ps
+CONTAINER ID   STATUS            NAMES
+abc123def456   Up 2m (healthy)   comserv-web-dev
+
+$ docker logs comserv-web-dev | grep EACCES
+[No output - errors are gone]</code></pre>
+        </div>
+    </div>
+</div>
+
+<div class="container" id="web_prod_rebuild">
+    <div class="container-header">web-prod Container - Step-by-Step Rebuild</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <h3>IMPORTANT: Check Environment Variables First</h3>
+            
+            <p>web-prod requires environment variables to be set. Before rebuilding, verify these are configured:</p>
+            
+            <pre><code>COMSERV_DB_PRODUCTION_SERVER_HOST=192.168.1.198
+COMSERV_DB_PRODUCTION_SERVER_PORT=3306
+COMSERV_DB_PRODUCTION_SERVER_USERNAME=shanta_forager
+COMSERV_DB_PRODUCTION_SERVER_PASSWORD=[your_password]
+COMSERV_DB_PRODUCTION_SERVER_DATABASE=ency
+COMSERV_DB_PRODUCTION_FORAGER_HOST=192.168.1.198
+COMSERV_DB_PRODUCTION_FORAGER_PORT=3306
+COMSERV_DB_PRODUCTION_FORAGER_USERNAME=shanta_forager
+COMSERV_DB_PRODUCTION_FORAGER_PASSWORD=[your_password]
+COMSERV_DB_PRODUCTION_FORAGER_DATABASE=shanta_forager</code></pre>
+            
+            <h3>Option 1: Using Docker Desktop GUI</h3>
+            
+            <ol>
+                <li><strong>Open Docker Desktop</strong></li>
+                <li><strong>Go to Containers section</strong></li>
+                <li><strong>Find comserv-web-prod</strong>
+                    <ul>
+                        <li>Status should show "Created" (not running) from previous failed build</li>
+                    </ul>
+                </li>
+                <li><strong>Delete the failed container</strong>
+                    <ul>
+                        <li>Right-click → "Delete" or click trash icon</li>
+                    </ul>
+                </li>
+                <li><strong>Go to Images section</strong></li>
+                <li><strong>Delete the old image</strong>
+                    <ul>
+                        <li>Forces rebuild from scratch</li>
+                    </ul>
+                </li>
+                <li><strong>Rebuild using command line</strong> (see Option 2 below)</li>
+            </ol>
+            
+            <h3>Option 2: Using Command Line (Recommended)</h3>
+            
+            <pre><code># Navigate to Comserv directory
+cd /home/shanta/PycharmProjects/comserv2/Comserv
+
+# Build the image (uses docker-compose.prod.yml)
+docker-compose -f docker-compose.prod.yml build
+
+# Wait for build to complete...
+
+# Start the container
+docker-compose -f docker-compose.prod.yml up -d web-prod
+
+# Wait 30-60 seconds for startup and health checks
+
+# Verify it's running and healthy
+docker ps | grep web-prod
+
+# Check logs for any errors
+docker logs comserv-web-prod | tail -20
+
+# Test port 5000
+curl http://localhost:5000/health</code></pre>
+            
+            <h3>Expected Output After Rebuild</h3>
+            <pre><code>$ curl http://localhost:5000/health
+HTTP/1.1 200 OK
+[JSON response or health indicator]
+
+$ docker ps
+CONTAINER ID   STATUS            NAMES
+xyz789abc123   Up 2m (healthy)   comserv-web-prod
+
+$ docker logs comserv-web-prod | grep "read-only"
+[No output - mount errors are gone]</code></pre>
+            
+            <h3>If Build Still Fails</h3>
+            <pre><code># Check what volumes are mounted
+docker exec comserv-web-prod mount | grep comserv
+
+# Verify specific mount points exist
+docker exec comserv-web-prod ls -la /opt/comserv/root/
+
+# Check if log directory is writable
+docker exec comserv-web-prod touch /opt/comserv/root/log/test.log && echo "Writable" || echo "Read-only"</code></pre>
+        </div>
+    </div>
+</div>
+
+<div class="container warning" id="verification">
+    <div class="container-header">Complete Verification Checklist</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <h3>web-dev (Port 3000) Verification</h3>
+            
+            <table class="diagnostic-table">
+                <thead>
+                    <tr>
+                        <th>Check</th>
+                        <th>Command</th>
+                        <th>Expected Result</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Container Status</td>
+                        <td><code>docker ps | grep web-dev</code></td>
+                        <td>Shows "(healthy)" status</td>
+                        <td>☐</td>
+                    </tr>
+                    <tr>
+                        <td>Port Listening</td>
+                        <td><code>curl http://localhost:3000/</code></td>
+                        <td>HTTP 200 with HTML content</td>
+                        <td>☐</td>
+                    </tr>
+                    <tr>
+                        <td>Health Endpoint</td>
+                        <td><code>curl http://localhost:3000/health</code></td>
+                        <td>HTTP 200 response</td>
+                        <td>☐</td>
+                    </tr>
+                    <tr>
+                        <td>No EACCES Errors</td>
+                        <td><code>docker logs comserv-web-dev | grep EACCES</code></td>
+                        <td>No output (no errors)</td>
+                        <td>☐</td>
+                    </tr>
+                    <tr>
+                        <td>Log Directory Writable</td>
+                        <td><code>docker exec comserv-web-dev ls -la /opt/comserv/root/log/</code></td>
+                        <td>Directory listing shows catalyst.log files</td>
+                        <td>☐</td>
+                    </tr>
+                    <tr>
+                        <td>Application Process</td>
+                        <td><code>docker exec comserv-web-dev ps aux | grep starman</code></td>
+                        <td>Shows starman process with workers</td>
+                        <td>☐</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <h3>web-prod (Port 5000) Verification</h3>
+            
+            <table class="diagnostic-table">
+                <thead>
+                    <tr>
+                        <th>Check</th>
+                        <th>Command</th>
+                        <th>Expected Result</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Container Status</td>
+                        <td><code>docker ps | grep web-prod</code></td>
+                        <td>Shows "(healthy)" status</td>
+                        <td>☐</td>
+                    </tr>
+                    <tr>
+                        <td>Container Started</td>
+                        <td><code>docker ps -a | grep web-prod</code></td>
+                        <td>NOT "Created" - should be "Up"</td>
+                        <td>☐</td>
+                    </tr>
+                    <tr>
+                        <td>Port Listening</td>
+                        <td><code>curl http://localhost:5000/</code></td>
+                        <td>HTTP 200 with HTML content</td>
+                        <td>☐</td>
+                    </tr>
+                    <tr>
+                        <td>Health Endpoint</td>
+                        <td><code>curl http://localhost:5000/health</code></td>
+                        <td>HTTP 200 response</td>
+                        <td>☐</td>
+                    </tr>
+                    <tr>
+                        <td>No Mount Errors</td>
+                        <td><code>docker logs comserv-web-prod | grep "read-only\|OCI\|mount"</code></td>
+                        <td>No output (no errors)</td>
+                        <td>☐</td>
+                    </tr>
+                    <tr>
+                        <td>Volume Mounts</td>
+                        <td><code>docker exec comserv-web-prod mount | grep comserv</code></td>
+                        <td>Shows prod-logs, prod-sessions, prod-backups mounted</td>
+                        <td>☐</td>
+                    </tr>
+                    <tr>
+                        <td>Log Directory Exists</td>
+                        <td><code>docker exec comserv-web-prod ls -la /opt/comserv/root/log/</code></td>
+                        <td>Directory exists and is writable</td>
+                        <td>☐</td>
+                    </tr>
+                    <tr>
+                        <td>Session Directory Exists</td>
+                        <td><code>docker exec comserv-web-prod ls -la /opt/comserv/root/session/</code></td>
+                        <td>Directory exists and is writable</td>
+                        <td>☐</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="container" id="troubleshooting">
+    <div class="container-header">Troubleshooting Common Issues</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <h3>Issue: "Port 3000 is already in use"</h3>
+            <p><strong>Solution:</strong> Stop all containers, check for hung processes</p>
+            <pre><code>docker-compose down
+pkill -f "starman\|supervisor" || true
+sleep 5
+docker-compose up -d web-dev</code></pre>
+            
+            <h3>Issue: "EACCES permission denied still appears"</h3>
+            <p><strong>Solution:</strong> Image wasn't rebuilt with changes. Delete and rebuild:</p>
+            <pre><code>docker rmi comserv-web-dev 2>/dev/null || true
+docker-compose down
+docker-compose build --no-cache web-dev
+docker-compose up -d web-dev</code></pre>
+            
+            <h3>Issue: "OCI runtime error - read-only file system"</h3>
+            <p><strong>Solution:</strong> web-prod not using new docker-compose.prod.yml. Rebuild:</p>
+            <pre><code>cd Comserv
+docker-compose -f docker-compose.prod.yml down
+docker rmi comserv-web-prod 2>/dev/null || true
+docker-compose -f docker-compose.prod.yml build --no-cache
+docker-compose -f docker-compose.prod.yml up -d web-prod</code></pre>
+            
+            <h3>Issue: "Health check failing (unhealthy)"</h3>
+            <p><strong>Check logs:</strong></p>
+            <pre><code>docker logs comserv-web-dev 2>&1 | tail -50
+# or
+docker logs comserv-web-prod 2>&1 | tail -50</code></pre>
+            
+            <h3>Issue: "curl: (7) Failed to connect"</h3>
+            <p><strong>Solution:</strong> Container started but application not listening yet. Wait 30-60 seconds, then retry:</p>
+            <pre><code>sleep 30
+curl http://localhost:3000/health</code></pre>
+        </div>
+    </div>
+</div>
+
+<div style="margin-top: 40px; padding: 20px; background-color: #f5f5f5; border-radius: 4px;">
+    <p style="font-size: 12px; color: #666;">
+        <strong>Document Version:</strong> 1.0<br>
+        <strong>Created:</strong> 2025-12-19<br>
+        <strong>Last Updated:</strong> 2025-12-19<br>
+        <strong>Status:</strong> Ready for deployment
+    </p>
+</div>

@@ -1,0 +1,664 @@
+[% META
+    title = 'CodeSearchIndex Model - Code and Template Search Indexing'
+    description = 'Comprehensive documentation for CodeSearchIndex model covering searchable code storage, file type support, code element extraction, role-based access control, and usage examples for managing code search indexes'
+    roles = 'admin,developer'
+    TemplateType = 'model'
+    category = 'models,search-integration,code-management'
+    page_version = '1.00'
+    last_updated = '2026-01-09 15:16:00 UTC'
+    site_specific = ''
+%]
+
+[% PageVersion = 'Documentation/models/CodeSearchIndex.tt,v 1.00 2026/01/09 zencoder-docsync Exp ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 id="codesearchindex-model">CodeSearchIndex Model - Code and Template Search Indexing</h1>
+            
+            <div id="toc" class="alert alert-info">
+                <strong>Contents:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#schema">Database Schema & Fields</a></li>
+                    <li><a href="#file-types">Supported File Types</a></li>
+                    <li><a href="#code-elements">Code Element Extraction</a></li>
+                    <li><a href="#access-control">Role-Based Access Control</a></li>
+                    <li><a href="#content-hashing">Content Hash & Change Detection</a></li>
+                    <li><a href="#api-methods">API Methods & Helpers</a></li>
+                    <li><a href="#examples">Usage Examples</a></li>
+                    <li><a href="#troubleshooting">Troubleshooting</a></li>
+                    <li><a href="#see-also">See Also</a></li>
+                </ul>
+            </div>
+
+            <div class="alert alert-success" id="recent-changes">
+                <h3 style="margin-top: 0;">📝 Recent Changes (v1.00 - Jan 9, 2026)</h3>
+                <ul style="margin: 5px 0 0 20px;">
+                    <li><strong>Initial Documentation:</strong> Created comprehensive documentation for CodeSearchIndex model</li>
+                    <li><strong>File Types:</strong> Documented support for 3 file types (pm, tt, sql) with element extraction</li>
+                    <li><strong>Access Control:</strong> Documented role-based access (developer, admin) enforcement</li>
+                </ul>
+            </div>
+            
+            <section id="overview">
+                <h2>Overview</h2>
+                <p>
+                    The <strong>CodeSearchIndex</strong> model (Comserv/lib/Comserv/Model/Schema/Ency/Result/CodeSearchIndex.pm) 
+                    provides a database schema for storing searchable code and template content in the Comserv application. It is a DBIx::Class Result class that supports:
+                </p>
+                <ul>
+                    <li>Indexing of Perl modules (.pm), Template Toolkit (.tt), and SQL files</li>
+                    <li>Extraction of code elements (functions, classes, variables) for semantic search</li>
+                    <li>Content hashing for detecting changes and managing index freshness</li>
+                    <li>Role-based access control (developer and admin roles)</li>
+                    <li>Searchable content storage for full-text search capabilities</li>
+                    <li>File metadata tracking (path, size, type)</li>
+                    <li>Timestamp tracking for index staleness detection</li>
+                    <li>Unique constraints on file paths to prevent duplicates</li>
+                </ul>
+                <p>
+                    CodeSearchIndex enables developers to search across the codebase for specific functions, classes, 
+                    modules, and code snippets while respecting role-based access restrictions for sensitive code.
+                </p>
+            </section>
+
+            <section id="schema">
+                <h2>Database Schema & Fields</h2>
+                
+                <h3>Table: codesearchindex</h3>
+                <p><strong>Purpose:</strong> Store indexed code/templates and searchable content for fast code search</p>
+                <p><strong>Primary Key:</strong> id (auto-increment)</p>
+                <p><strong>Unique Constraints:</strong> file_path (one index per file)</p>
+                
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Field Name</th>
+                        <th>Data Type</th>
+                        <th>Nullable</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td>id</td>
+                        <td>INTEGER</td>
+                        <td>NO</td>
+                        <td>auto_increment</td>
+                        <td>Primary key - auto-generated index ID</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>file_path</td>
+                        <td>VARCHAR(512)</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>Relative file path from repository root (REQUIRED, up to 512 chars, UNIQUE)</td>
+                    </tr>
+                    <tr>
+                        <td>file_type</td>
+                        <td>ENUM</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>File type: 'pm' (Perl modules), 'tt' (Template Toolkit), 'sql' (SQL files)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>code_elements</td>
+                        <td>JSON</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>JSON structure of extracted code elements (functions, classes, variables)</td>
+                    </tr>
+                    <tr>
+                        <td>searchable_code</td>
+                        <td>LONGTEXT</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>Full searchable content (code with comments, normalized for search)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>content_hash</td>
+                        <td>VARCHAR(64)</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>SHA256 hash of original file content (for change detection, up to 64 chars)</td>
+                    </tr>
+                    <tr>
+                        <td>indexed_at</td>
+                        <td>TIMESTAMP</td>
+                        <td>NO</td>
+                        <td>CURRENT_TIMESTAMP</td>
+                        <td>Timestamp when file was indexed (auto-set)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>min_role</td>
+                        <td>ENUM</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>Minimum role required to search this file: 'developer' (anyone) or 'admin' (admin only)</td>
+                    </tr>
+                    <tr>
+                        <td>file_size</td>
+                        <td>INTEGER</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Original file size in bytes (for quota/performance tracking)</td>
+                    </tr>
+                </table>
+            </section>
+
+            <section id="file-types">
+                <h2>Supported File Types</h2>
+                <p>CodeSearchIndex supports 3 file types with appropriate parsing and element extraction:</p>
+                
+                <table class="table table-bordered">
+                    <tr>
+                        <th>File Type</th>
+                        <th>Extension</th>
+                        <th>Purpose</th>
+                        <th>Extracted Elements</th>
+                    </tr>
+                    <tr>
+                        <td><strong>'pm'</strong></td>
+                        <td>.pm</td>
+                        <td>Perl modules (Comserv application code)</td>
+                        <td>Subroutines, package declarations, use statements, variables</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td><strong>'tt'</strong></td>
+                        <td>.tt</td>
+                        <td>Template Toolkit templates (views and documentation)</td>
+                        <td>Template blocks, macros, variable definitions, control structures</td>
+                    </tr>
+                    <tr>
+                        <td><strong>'sql'</strong></td>
+                        <td>.sql</td>
+                        <td>SQL database schemas and queries</td>
+                        <td>Table definitions, column names, indexes, stored procedures</td>
+                    </tr>
+                </table>
+
+                <h3>File Type Usage</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $index = $schema->resultset('CodeSearchIndex')->create({
+    file_path => 'Comserv/lib/Comserv/Controller/Admin.pm',
+    file_type => 'pm',
+    searchable_code => $file_content,
+    content_hash => Digest::SHA::sha256_hex($file_content),
+    min_role => 'developer',
+    file_size => length($file_content)
+});
+
+# Query by file type
+my @templates = $schema->resultset('CodeSearchIndex')->search({
+    file_type => 'tt'
+})->all;
+
+my @sql_files = $schema->resultset('CodeSearchIndex')->search({
+    file_type => 'sql'
+})->all;</code></pre>
+                </div>
+            </section>
+
+            <section id="code-elements">
+                <h2>Code Element Extraction</h2>
+                
+                <h3>Code Elements (JSON Structure)</h3>
+                <p>The code_elements field stores structured metadata about extracted code components:</p>
+                
+                <h3>Perl Module (.pm) Elements</h3>
+                <ul>
+                    <li><strong>functions:</strong> Array of subroutine names (e.g., 'new', 'action_list', 'index')</li>
+                    <li><strong>classes:</strong> Package/class declarations (e.g., 'Comserv::Controller::Admin')</li>
+                    <li><strong>variables:</strong> Global variables/constants (e.g., '$VERSION', '@EXPORT')</li>
+                    <li><strong>use_statements:</strong> Imported modules for dependency tracking</li>
+                </ul>
+
+                <h3>Template Toolkit (.tt) Elements</h3>
+                <ul>
+                    <li><strong>blocks:</strong> Named template blocks (e.g., 'header', 'content', 'footer')</li>
+                    <li><strong>macros:</strong> Template macros defined in file</li>
+                    <li><strong>variables:</strong> Template variables (from META or definitions)</li>
+                    <li><strong>includes:</strong> Other templates included via [% INCLUDE %]</li>
+                </ul>
+
+                <h3>SQL File Elements</h3>
+                <ul>
+                    <li><strong>tables:</strong> CREATE TABLE definitions</li>
+                    <li><strong>columns:</strong> Column names and types per table</li>
+                    <li><strong>indexes:</strong> Index definitions</li>
+                    <li><strong>procedures:</strong> Stored procedures or triggers</li>
+                </ul>
+
+                <h3>Example: Perl Module Code Elements</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>use JSON::MaybeXS;
+
+my $code_elements = {
+    functions => ['new', 'index', 'list_users', 'create_user'],
+    classes => ['Comserv::Controller::Admin'],
+    variables => ['$VERSION', '@EXPORT', '$logger'],
+    use_statements => ['Moose', 'DBIx::Class', 'JSON::MaybeXS']
+};
+
+my $index = $schema->resultset('CodeSearchIndex')->create({
+    file_path => 'Comserv/lib/Comserv/Controller/Admin.pm',
+    file_type => 'pm',
+    code_elements => JSON::MaybeXS::encode_json($code_elements),
+    searchable_code => $content,
+    content_hash => $hash,
+    min_role => 'developer'
+});</code></pre>
+                </div>
+            </section>
+
+            <section id="access-control">
+                <h2>Role-Based Access Control</h2>
+                
+                <h3>Minimum Role (min_role)</h3>
+                <p>The min_role field enforces access restrictions on searchable code:</p>
+                
+                <ul>
+                    <li><strong>'developer':</strong> Accessible to anyone with developer role or higher (admin)
+                        <ul>
+                            <li>Use for public application code, libraries, standard utilities</li>
+                            <li>Default for most files</li>
+                        </ul>
+                    </li>
+                    <li><strong>'admin':</strong> Accessible only to administrators
+                        <ul>
+                            <li>Use for sensitive code: security filters, authentication, internal tools</li>
+                            <li>Restricts code search visibility for non-admin users</li>
+                        </ul>
+                    </li>
+                </ul>
+
+                <h3>Access Control Examples</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Developer role can access:</strong></p>
+                    <pre><code>my @accessible = $schema->resultset('CodeSearchIndex')->search({
+    min_role => 'developer'
+})->all;</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Admin-only code search:</strong></p>
+                    <pre><code>my @admin_code = $schema->resultset('CodeSearchIndex')->search({
+    min_role => 'admin'
+})->all;</code></pre>
+                </div>
+
+                <h3>Helper Method: is_accessible_by_role()</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $index = $schema->resultset('CodeSearchIndex')->find($id);
+
+if ($index->is_accessible_by_role($user->role)) {
+    # Show code search results to user
+    print $index->searchable_code;
+} else {
+    # Deny access - user lacks sufficient role
+    warn "Access denied for role: " . $user->role;
+}</code></pre>
+                </div>
+            </section>
+
+            <section id="content-hashing">
+                <h2>Content Hash & Change Detection</h2>
+                
+                <h3>Purpose of content_hash</h3>
+                <p>The content_hash field (SHA256) enables detection of file changes:</p>
+                <ul>
+                    <li>Identify when a file has been modified and needs re-indexing</li>
+                    <li>Avoid re-parsing unchanged files</li>
+                    <li>Track file integrity</li>
+                    <li>Detect accidental changes or corruption</li>
+                </ul>
+
+                <h3>Change Detection Pattern</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>use Digest::SHA;
+use File::Slurp;
+
+my $file_path = 'Comserv/lib/Comserv/Controller/Admin.pm';
+my $current_content = read_file($file_path);
+my $current_hash = Digest::SHA::sha256_hex($current_content);
+
+my $index = $schema->resultset('CodeSearchIndex')->find_or_create({
+    file_path => $file_path
+});
+
+if ($index->content_hash ne $current_hash) {
+    # File has changed - re-index
+    print "File modified, re-indexing...\n";
+    
+    $index->update({
+        content_hash => $current_hash,
+        searchable_code => $current_content,
+        indexed_at => DateTime->now,
+        file_size => length($current_content)
+    });
+} else {
+    print "File unchanged, skipping re-index\n";
+}</code></pre>
+                </div>
+            </section>
+
+            <section id="api-methods">
+                <h2>API Methods & Helpers</h2>
+                
+                <h3>Standard DBIx::Class Methods</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Creating Index Entries:</strong></p>
+                    <pre><code>my $index = $schema->resultset('CodeSearchIndex')->create({
+    file_path => 'Comserv/lib/Comserv/Model/Schema/Ency/Result/User.pm',
+    file_type => 'pm',
+    code_elements => JSON::MaybeXS::encode_json({
+        functions => ['new', 'validation_rules'],
+        classes => ['Comserv::Model::Schema::Ency::Result::User']
+    }),
+    searchable_code => $file_content,
+    content_hash => Digest::SHA::sha256_hex($file_content),
+    min_role => 'developer',
+    file_size => length($file_content)
+});</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Retrieving Indexes:</strong></p>
+                    <pre><code>my $index = $schema->resultset('CodeSearchIndex')->find(1);
+
+my @by_path = $schema->resultset('CodeSearchIndex')->search({
+    file_path => 'Comserv/lib/Comserv/Controller/Admin.pm'
+})->all;
+
+my @by_type = $schema->resultset('CodeSearchIndex')->search({
+    file_type => 'pm'
+})->all;
+
+my @by_role = $schema->resultset('CodeSearchIndex')->search({
+    min_role => 'developer'
+})->all;</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Updating Indexes:</strong></p>
+                    <pre><code>$index->update({
+    searchable_code => $new_content,
+    content_hash => Digest::SHA::sha256_hex($new_content),
+    indexed_at => DateTime->now
+});</code></pre>
+                </div>
+
+                <h3>Code Element Extraction Helpers</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>get_code_elements():</strong> Get parsed code elements as hash</p>
+                    <pre><code>my $elements = $index->get_code_elements();
+# Returns: { functions => [...], classes => [...], ... }</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>get_functions():</strong> Get list of functions/subroutines</p>
+                    <pre><code>my @functions = @{ $index->get_functions() };
+# Returns: ['new', 'action_list', 'index', ...]</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>get_classes():</strong> Get package/class names</p>
+                    <pre><code>my @classes = @{ $index->get_classes() };
+# Returns: ['Comserv::Controller::Admin', ...]</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>get_variables():</strong> Get variable names</p>
+                    <pre><code>my @vars = @{ $index->get_variables() };
+# Returns: ['$VERSION', '@EXPORT', ...]</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>is_accessible_by_role($user_role):</strong> Check access permission</p>
+                    <pre><code>if ($index->is_accessible_by_role('developer')) {
+    # User can search this file
+}</code></pre>
+                </div>
+            </section>
+
+            <section id="examples">
+                <h2>Usage Examples</h2>
+                
+                <h3>Example 1: Index a Perl Module</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>use File::Slurp;
+use Digest::SHA;
+use JSON::MaybeXS;
+
+my $file = 'Comserv/lib/Comserv/Controller/Admin.pm';
+my $content = read_file($file);
+my $hash = Digest::SHA::sha256_hex($content);
+
+my $index = $schema->resultset('CodeSearchIndex')->create({
+    file_path => $file,
+    file_type => 'pm',
+    searchable_code => $content,
+    content_hash => $hash,
+    min_role => 'developer',
+    file_size => length($content),
+    code_elements => JSON::MaybeXS::encode_json({
+        functions => ['list', 'create', 'edit', 'delete'],
+        classes => ['Comserv::Controller::Admin']
+    })
+});
+
+print "Indexed: " . $index->file_path . "\n";</code></pre>
+                </div>
+
+                <h3>Example 2: Search Code by Function Name</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>use JSON::MaybeXS;
+
+my $search_term = 'authenticate';
+my @results;
+
+my @indexes = $schema->resultset('CodeSearchIndex')->search({
+    file_type => 'pm'
+})->all;
+
+foreach my $index (@indexes) {
+    if ($index->is_accessible_by_role($user_role)) {
+        if ($index->searchable_code =~ /$search_term/i) {
+            push @results, {
+                file => $index->file_path,
+                size => $index->file_size,
+                functions => $index->get_functions
+            };
+        }
+    }
+}
+
+print "Found " . scalar(@results) . " matching files\n";</code></pre>
+                </div>
+
+                <h3>Example 3: Detect File Changes and Re-index</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>use File::Slurp;
+use Digest::SHA;
+
+my @all_indexes = $schema->resultset('CodeSearchIndex')->all;
+my $reindexed = 0;
+
+foreach my $index (@all_indexes) {
+    my $file = $index->file_path;
+    next unless -f $file;
+    
+    my $content = read_file($file);
+    my $new_hash = Digest::SHA::sha256_hex($content);
+    
+    if ($index->content_hash ne $new_hash) {
+        $index->update({
+            content_hash => $new_hash,
+            searchable_code => $content,
+            indexed_at => DateTime->now,
+            file_size => length($content)
+        });
+        $reindexed++;
+        print "Re-indexed: $file\n";
+    }
+}
+
+print "Total re-indexed: $reindexed files\n";</code></pre>
+                </div>
+
+                <h3>Example 4: Extract and Display Code Elements</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $index = $schema->resultset('CodeSearchIndex')->search({
+    file_path => 'Comserv/lib/Comserv/Controller/User.pm'
+})->first;
+
+if ($index) {
+    print "File: " . $index->file_path . "\n";
+    print "File Type: " . $index->file_type . "\n";
+    print "Indexed: " . $index->indexed_at . "\n";
+    print "Size: " . $index->file_size . " bytes\n\n";
+    
+    my @functions = @{ $index->get_functions() };
+    print "Functions:\n";
+    foreach my $func (@functions) {
+        print "  - $func\n";
+    }
+    
+    my @classes = @{ $index->get_classes() };
+    print "\nClasses:\n";
+    foreach my $class (@classes) {
+        print "  - $class\n";
+    }
+}</code></pre>
+                </div>
+
+                <h3>Example 5: Admin Code Search (Restricted Access)</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px static var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $search_results;
+my @all_indexes = $schema->resultset('CodeSearchIndex')->all;
+
+foreach my $index (@all_indexes) {
+    # Check role-based access
+    next unless $index->is_accessible_by_role($current_user->role);
+    
+    # Admin-restricted results only appear for admins
+    if ($index->min_role eq 'admin' && $current_user->role ne 'admin') {
+        next;
+    }
+    
+    if ($index->searchable_code =~ /security|crypt|password/i) {
+        push @$search_results, {
+            file => $index->file_path,
+            functions => $index->get_functions,
+            access => $index->min_role
+        };
+    }
+}
+
+print "Security-related code found: " . scalar(@$search_results) . " files\n";</code></pre>
+                </div>
+            </section>
+
+            <section id="troubleshooting">
+                <h2>Troubleshooting</h2>
+                
+                <div class="alert alert-warning">
+                    <h3>Issue 1: Duplicate Index Entries</h3>
+                    <p><strong>Problem:</strong> Error "Duplicate entry" when creating index for file</p>
+                    <p><strong>Cause:</strong> file_path has UNIQUE constraint; same file indexed twice</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code>my $index = $schema->resultset('CodeSearchIndex')->find_or_create({
+    file_path => $file
+});
+
+$index->update({
+    searchable_code => $new_content,
+    content_hash => $new_hash
+});</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 2: Code Elements Not Extracted</h3>
+                    <p><strong>Problem:</strong> code_elements is NULL after indexing</p>
+                    <p><strong>Cause:</strong> Parser not running or extraction failed</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code>use JSON::MaybeXS;
+
+my $elements = extract_elements($file_content, $file_type);
+my $index = $schema->resultset('CodeSearchIndex')->create({
+    ...
+    code_elements => JSON::MaybeXS::encode_json($elements)
+});
+
+# Validate after create
+unless ($index->code_elements) {
+    warn "Element extraction failed for $file\n";
+}</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 3: Access Denied for Developer</h3>
+                    <p><strong>Problem:</strong> Developer can't see search results for admin-only code</p>
+                    <p><strong>Cause:</strong> min_role is 'admin'; correctly restricting access</p>
+                    <p><strong>Solution:</strong> This is by design. Admin review or request admin access if needed.</p>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 4: Large Files Causing Memory Issues</h3>
+                    <p><strong>Problem:</strong> Indexing multi-MB files causes out-of-memory errors</p>
+                    <p><strong>Cause:</strong> searchable_code (LONGTEXT) loads entire file into memory</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code># Check file size before indexing
+if (-s $file > 5_000_000) { # 5 MB limit
+    warn "File too large: $file\n";
+    next;
+}
+
+# Or process in chunks (application-level)
+my $index = $schema->resultset('CodeSearchIndex')->create({
+    ...
+    file_size => -s $file
+});</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 5: Stale Index Not Detected</h3>
+                    <p><strong>Problem:</strong> Index shows old content even though file changed</p>
+                    <p><strong>Cause:</strong> content_hash not updated during manual changes</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code>use Digest::SHA;
+
+my $current_content = read_file($file);
+my $current_hash = Digest::SHA::sha256_hex($current_content);
+
+unless ($index->content_hash eq $current_hash) {
+    print "Index is stale, re-indexing...\n";
+    $index->update({
+        content_hash => $current_hash,
+        searchable_code => $current_content,
+        indexed_at => DateTime->now
+    });
+}</code></pre>
+                </div>
+            </section>
+
+            <section id="see-also">
+                <h2>See Also</h2>
+                <div class="alert alert-success">
+                    <ul style="margin: 5px 0 0 20px;">
+                        <li><a href="/Documentation/models/Documentation">Documentation Model</a> - Documentation metadata and relationships</li>
+                        <li><a href="/Documentation/models/WebSearchResult">WebSearchResult Model</a> - Search results and source tracking</li>
+                        <li><a href="/Documentation/features">Feature: Code Search</a> - High-level code search workflows</li>
+                        <li><a href="/Documentation/system">System: Search Infrastructure</a> - Indexing and query processing</li>
+                    </ul>
+                </div>
+            </section>
+
+            <div class="last-updated">
+                <small>Last updated: <span id="update-date">2026-01-09</span></small>
+            </div>
+        </div>
+    </div>
+</div>

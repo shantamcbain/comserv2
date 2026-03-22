@@ -1,338 +1,673 @@
-[% META title = 'Admin Module Documentation' %]
-[% PageVersion = 'Documentation/admin.tt,v 0.03 2025/01/27 Shanta Exp shanta ' %]
+[% META
+    title = 'Admin Controller - System Management'
+    description = 'Comprehensive documentation for the Admin controller including system status, database schema management, service control, backup/restore, software updates, and diagnostics'
+    roles = 'admin'
+    TemplateType = 'controller'
+    category = 'controllers'
+    page_version = '1.10'
+    last_updated = '2026-01-05'
+    site_specific = ''
+%]
+
+[% PageVersion = 'Documentation/Admin.tt,v 1.10 2026/01/05 zencoder-docsync Exp ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-<h2 id="admin_module"><a href="#documentation_top">Admin Module</a></h2>
-
-<h3>Table of Contents</h3>
-<ul>
-    <li><a href="#overview">Overview</a></li>
-    <li><a href="#admin_dashboard">Admin Dashboard</a></li>
-    <li><a href="#software_management">Software Management</a></li>
-    <li><a href="#database_management">Database Management</a></li>
-    <li><a href="#system_management">System Management</a></li>
-    <li><a href="#network_management">Network Management</a></li>
-    <li><a href="#admin_controllers">Admin Controllers</a></li>
-    <li><a href="#authentication">Authentication & Security</a></li>
-    <li><a href="#git_management">Git Management</a></li>
-    <li><a href="#recent_enhancements">Recent System Enhancements</a></li>
-</ul>
-
-<h3 id="overview"><a href="#admin_module">Overview</a></h3>
-
-<p>The Admin module provides a comprehensive suite of administrative tools for managing the Comserv application. The system is built with a modular architecture, featuring a centralized dashboard and specialized sub-controllers for different administrative functions.</p>
-
-<p><strong>Key Features:</strong></p>
-<ul>
-    <li>Centralized admin dashboard with real-time system status</li>
-    <li>Software deployment and management tools</li>
-    <li>Database schema management and migration tools</li>
-    <li>System monitoring and diagnostics</li>
-    <li>Network management and mapping tools</li>
-    <li>Theme and visual customization management</li>
-    <li>Comprehensive logging and audit trails</li>
-</ul>
-
-<h3 id="admin_dashboard"><a href="#admin_module">Admin Dashboard</a></h3>
-
-<p>The admin dashboard (<code>/admin</code>) serves as the central hub for all administrative activities. It provides:</p>
-
-<h4>Real-time System Status</h4>
-<ul>
-    <li><strong>System Statistics:</strong> User count, content count, disk usage, memory usage, load average, uptime</li>
-    <li><strong>Git Repository Status:</strong> Current branch, last commit, commits behind origin, uncommitted changes</li>
-    <li><strong>Starman Service Status:</strong> Service health, uptime information, process details</li>
-    <li><strong>Database Information:</strong> Database size, table counts, connection status</li>
-</ul>
-
-<h4>Software Management Status</h4>
-<p>The dashboard prominently displays software management status with:</p>
-<ul>
-    <li><strong>Git Status Cards:</strong> Visual indicators of repository state</li>
-    <li><strong>Service Status Cards:</strong> Real-time Starman service monitoring</li>
-    <li><strong>Deployment Recommendations:</strong> Intelligent suggestions based on current system state</li>
-    <li><strong>Quick Action Buttons:</strong> One-click access to common deployment tasks</li>
-</ul>
-
-<h4>System Notifications</h4>
-<p>The dashboard automatically checks for and displays:</p>
-<ul>
-    <li>Pending user registrations requiring approval</li>
-    <li>Low disk space warnings (80% and 90% thresholds)</li>
-    <li>Pending comments requiring moderation</li>
-    <li>System health alerts and recommendations</li>
-</ul>
-
-<h3 id="software_management"><a href="#admin_module">Software Management</a></h3>
-
-<p>The software management system provides comprehensive deployment and update capabilities:</p>
-
-<h4 id="production_deploy"><a href="#software_management">Production Deploy</a></h4>
-<p>Full deployment workflow with backup and restart capabilities. This is the recommended method for production updates.</p>
-
-<h4 id="git_pull"><a href="#software_management">Git Pull</a></h4>
-<p>The Git Pull feature allows administrators to update the application codebase directly from the web interface.</p>
-
-<p><strong>How it works:</strong></p>
-<ol>
-    <li>Navigate to Admin Dashboard → Git Pull or use the quick action button</li>
-    <li>Review the current repository status and any warnings</li>
-    <li>Execute the git pull operation</li>
-    <li>View detailed output and results</li>
-    <li>Follow up with service restart if needed</li>
-</ol>
-
-<p><strong>Features:</strong></p>
-<ul>
-    <li>Pre-deployment backup creation</li>
-    <li>Conflict detection and resolution guidance</li>
-    <li>Detailed operation logging</li>
-    <li>Integration with CSC admin support</li>
-</ul>
-
-<h4 id="restart_starman"><a href="#software_management">Restart Starman Server</a></h4>
-<p>Web-safe Starman service restart with credential-based authentication.</p>
-
-<p><strong>How it works:</strong></p>
-<ol>
-    <li>Navigate to Admin Dashboard → Restart Service</li>
-    <li>Review the service status and warnings</li>
-    <li>Provide system credentials when prompted</li>
-    <li>Confirm the restart operation</li>
-    <li>Monitor the restart process and verify service status</li>
-</ol>
-
-<p><strong>Security Features:</strong></p>
-<ul>
-    <li>Requires system user credentials with sudo privileges</li>
-    <li>Secure password handling (cleared from memory after use)</li>
-    <li>Detailed operation logging</li>
-    <li>Service status verification after restart</li>
-</ul>
-
-<h4 id="starman_diagnostics"><a href="#software_management">Starman Diagnostics</a></h4>
-<p>Comprehensive diagnostic and repair system for Starman service issues.</p>
-
-<p><strong>Features:</strong></p>
-<ul>
-    <li><strong>Diagnostic System:</strong> Automated detection of common service issues</li>
-    <li><strong>Auto-Repair:</strong> Automated resolution of detected problems</li>
-    <li><strong>Service File Management:</strong> Creation and management of systemd service files</li>
-    <li><strong>PSGI File Management:</strong> Automated PSGI application file creation</li>
-</ul>
-
-<h3 id="database_management"><a href="#admin_module">Database Management</a></h3>
-
-<p>Comprehensive database administration tools:</p>
-
-<h4 id="schema_manager"><a href="#database_management">Schema Manager</a></h4>
-<p>Central interface for managing database schemas and table structures.</p>
-
-<h4 id="compare_schema"><a href="#database_management">Compare Schema</a></h4>
-<p>Tool for comparing application schema definitions with actual database structure.</p>
-
-<h4 id="migrate_schema"><a href="#database_management">Migrate Schema</a></h4>
-<p>Automated schema migration system for applying database changes.</p>
-
-<h4 id="migrate_pages"><a href="#database_management">Migrate Pages</a></h4>
-<p>Specialized migration tool for moving content from Forager to Ency database systems.</p>
-
-<h4 id="get_table_information"><a href="#database_management">Get Table Information</a></h4>
-<p>Retrieves detailed information about specific database tables, including schema structure and relationships.</p>
-
-<h3 id="system_management"><a href="#admin_module">System Management</a></h3>
-
-<p>System-level administrative tools:</p>
-
-<h4 id="theme_management"><a href="#system_management">Theme Management</a></h4>
-<p>Comprehensive theme system with CSS variable management and customization tools.</p>
-
-<h4 id="view_log"><a href="#system_management">View Application Log</a></h4>
-<p>Real-time log viewing with filtering, search, and archived log access.</p>
-
-<h4 id="system_info"><a href="#system_management">System Information</a></h4>
-<p>Detailed system information display including hardware, software, and configuration details.</p>
-
-<h3 id="network_management"><a href="#admin_module">Network Management</a></h3>
-
-<p>Network administration and monitoring tools:</p>
-
-<h4 id="network_map"><a href="#network_management">Network Map</a></h4>
-<p>Visual network topology mapping and device management system.</p>
-
-<h4 id="network_devices"><a href="#network_management">Network Devices</a></h4>
-<p>Device inventory and management system with JSON-based storage.</p>
-
-<h4 id="network_diagnostics"><a href="#network_management">Network Diagnostics</a></h4>
-<p>Network connectivity testing and diagnostic tools.</p>
-
-<h3 id="admin_controllers"><a href="#admin_module">Admin Controllers</a></h3>
-
-<p>The admin system is built with a modular controller architecture:</p>
-
-<h4>Main Admin Controller</h4>
-<p><strong>File:</strong> <code>Comserv::Controller::Admin</code></p>
-<p><strong>Responsibilities:</strong></p>
-<ul>
-    <li>Dashboard functionality and system status</li>
-    <li>Starman service management and diagnostics</li>
-    <li>System statistics and monitoring</li>
-    <li>User activity tracking</li>
-    <li>System notifications</li>
-</ul>
-
-<h4>Git Operations Controller</h4>
-<p><strong>File:</strong> <code>Comserv::Controller::Admin::Git</code></p>
-<p><strong>Responsibilities:</strong></p>
-<ul>
-    <li>Git repository operations (pull, status, branch management)</li>
-    <li>Deployment workflows</li>
-    <li>Backup creation and management</li>
-    <li>CSC admin integration</li>
-</ul>
-
-<h4>Theme Management Controller</h4>
-<p><strong>File:</strong> <code>Comserv::Controller::Admin::Theme</code></p>
-<p><strong>Responsibilities:</strong></p>
-<ul>
-    <li>CSS variable extraction and management</li>
-    <li>Theme customization and deployment</li>
-    <li>Style sheet processing</li>
-</ul>
-
-<h4>Network Management Controllers</h4>
-<p><strong>Files:</strong></p>
-<ul>
-    <li><code>Comserv::Controller::Admin::NetworkMap</code></li>
-    <li><code>Comserv::Controller::Admin::NetworkDevices</code></li>
-    <li><code>Comserv::Controller::Admin::NetworkDiagnostics</code></li>
-</ul>
-<p><strong>Responsibilities:</strong></p>
-<ul>
-    <li>Network topology visualization</li>
-    <li>Device inventory management</li>
-    <li>Network connectivity testing</li>
-    <li>JSON-based data storage with database migration path</li>
-</ul>
-
-<h3 id="authentication"><a href="#admin_module">Authentication & Security</a></h3>
-
-<p>The admin system implements comprehensive security measures:</p>
-
-<h4>Centralized Authentication</h4>
-<p>All admin controllers use the <code>Comserv::Util::AdminAuth</code> utility for consistent authentication:</p>
-<ul>
-    <li><strong>Session-based authentication:</strong> Requires valid user session</li>
-    <li><strong>Role-based access control:</strong> Requires 'admin' role in user session</li>
-    <li><strong>Automatic redirects:</strong> Unauthorized users redirected to login with destination parameter</li>
-    <li><strong>Comprehensive logging:</strong> All access attempts logged with user details</li>
-</ul>
-
-<h4>Security Features</h4>
-<ul>
-    <li><strong>Credential Protection:</strong> System passwords cleared from memory after use</li>
-    <li><strong>Audit Trails:</strong> Detailed logging of all administrative actions</li>
-    <li><strong>Access Control:</strong> Granular permissions for different admin functions</li>
-    <li><strong>Session Management:</strong> Secure session handling with timeout protection</li>
-</ul>
-
-<h4>Admin Access Methods</h4>
-<p>The system provides two main authentication methods:</p>
-<ul>
-    <li><strong><code>check_admin_access($c, $action)</code>:</strong> Returns boolean, allows custom handling</li>
-    <li><strong><code>require_admin_access($c, $action)</code>:</strong> Enforces access, handles redirects automatically</li>
-</ul>
-
-<h3 id="git_management"><a href="#admin_module">Git Management</a></h3>
-
-<p>The Git management system has been significantly enhanced with production-safe deployment capabilities:</p>
-
-<h4>Admin::Git Controller</h4>
-<p><strong>File:</strong> <code>Comserv::Controller::Admin::Git</code> (965+ lines of functionality)</p>
-<p><strong>Key Features:</strong></p>
-<ul>
-    <li><strong>Safe Git Pull:</strong> Production-safe git operations with automatic backup and rollback</li>
-    <li><strong>File Protection:</strong> Advanced file protection using File::Copy, File::Path, Archive::Tar</li>
-    <li><strong>Branch Management:</strong> Support for multiple branches with safety checks</li>
-    <li><strong>Rollback Capability:</strong> Automatic rollback on deployment failures</li>
-    <li><strong>Enhanced Debugging:</strong> Multi-source username checking and detailed session validation</li>
-</ul>
-
-<h4>Production Safety Features</h4>
-<ul>
-    <li><strong>Backup Creation:</strong> Automatic backup of critical files before deployment</li>
-    <li><strong>Validation Checks:</strong> Pre-deployment validation of code and configuration</li>
-    <li><strong>Rollback Mechanism:</strong> Automatic rollback if deployment issues detected</li>
-    <li><strong>Status Monitoring:</strong> Real-time monitoring of deployment progress</li>
-</ul>
-
-<h3 id="recent_enhancements"><a href="#admin_module">Recent System Enhancements</a></h3>
-
-<p>The admin system has undergone significant enhancements to improve reliability, security, and functionality:</p>
-
-<h4>Authentication System Overhaul</h4>
-<p><strong>Centralized AdminAuth Utility:</strong></p>
-<ul>
-    <li><strong>Enhanced Session Validation:</strong> Checks multiple username sources (session, user object)</li>
-    <li><strong>Fallback Username Handling:</strong> Uses user_id or 'session_user' when username missing but roles exist</li>
-    <li><strong>Improved Debugging:</strong> Better logging for authentication failures with detailed session info</li>
-    <li><strong>Flexible Session Checking:</strong> Accepts valid sessions even if username location varies</li>
-</ul>
-
-<h4>Controller Standardization</h4>
-<p>All admin controllers have been updated to use the centralized authentication system:</p>
-<ul>
-    <li><strong>Admin.pm:</strong> 51 lines changed - AdminAuth integration</li>
-    <li><strong>NetworkMap.pm:</strong> 14 lines changed - authentication standardization</li>
-    <li><strong>ApiCredentials.pm:</strong> 13 lines changed - auth improvements</li>
-    <li><strong>IT.pm:</strong> 16 lines changed - auth integration</li>
-    <li><strong>Root.pm:</strong> 18 lines changed - auth updates</li>
-    <li><strong>ThemeAdmin.pm:</strong> 28 lines changed - auth standardization</li>
-</ul>
-
-<h4>Documentation System Improvements</h4>
-<ul>
-    <li><strong>Documentation.pm:</strong> 106 lines changed - major functionality updates</li>
-    <li><strong>ScanMethods.pm:</strong> 60 lines changed - enhanced scanning capabilities</li>
-    <li><strong>Enhanced Documentation Config:</strong> 10 new documentation categories added</li>
-</ul>
-
-<h4>New Dependencies</h4>
-<ul>
-    <li><strong>Term::Size::Any:</strong> Added for terminal size detection functionality</li>
-</ul>
-
-<h3>Usage Guidelines</h3>
-
-<h4>Best Practices</h4>
-<ul>
-    <li><strong>Use Production Deploy</strong> for comprehensive updates with backup</li>
-    <li><strong>Monitor system status</strong> regularly through the dashboard</li>
-    <li><strong>Review logs</strong> after administrative operations</li>
-    <li><strong>Test changes</strong> in development before production deployment</li>
-    <li><strong>Keep credentials secure</strong> and use appropriate system accounts</li>
-</ul>
-
-<h4>Typical Workflows</h4>
-
-<p><strong>Code Update Workflow:</strong></p>
-<ol>
-    <li>Check dashboard for current system status</li>
-    <li>Use Production Deploy for comprehensive updates</li>
-    <li>Monitor deployment progress and logs</li>
-    <li>Verify service status after deployment</li>
-    <li>Check application functionality</li>
-</ol>
-
-<p><strong>Troubleshooting Workflow:</strong></p>
-<ol>
-    <li>Check dashboard notifications and recommendations</li>
-    <li>Use Starman Diagnostics for service issues</li>
-    <li>Review application logs for error details</li>
-    <li>Apply auto-repair if available</li>
-    <li>Manual intervention if required</li>
-</ol>
-
-<p>For more detailed information on specific features, please refer to the individual controller documentation and system logs.</p>
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 id="admin-controller">Admin  - System Management</h1>
+            
+            <div id="toc" class="alert alert-info">
+                <strong>Contents:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#dashboard">Dashboard & System Status</a></li>
+                    <li><a href="#schema-management">Database Schema Management</a></li>
+                    <li><a href="#service-management">Service Management (Starman)</a></li>
+                    <li><a href="#backup-restore">Backup & Restore</a></li>
+                    <li><a href="#software-updates">Software Updates & Deployment</a></li>
+                    <li><a href="#diagnostics">Diagnostics & System Health</a></li>
+                    <li><a href="#methods-reference">Methods Reference</a></li>
+                </ul>
+            </div>
+            
+            <section id="overview">
+                <h2>Overview</h2>
+                <p>
+                    The <code>Admin</code> controller (Comserv/lib/Comserv/Controller/Admin.pm) provides comprehensive 
+                    system administration capabilities for Comserv. It handles:
+                </p>
+                <ul>
+                    <li>System monitoring and dashboard</li>
+                    <li>Database schema management and synchronization</li>
+                    <li>Service (Starman) control and diagnostics</li>
+                    <li>Backup creation and file restoration</li>
+                    <li>Software updates via Git and deployment</li>
+                    <li>System health monitoring and notifications</li>
+                </ul>
+                <p>
+                    <strong>Authentication:</strong> All admin actions require admin role authentication via 
+                    <code>AdminAuth</code> utility. Access denied users are redirected to login page.
+                </p>
+            </section>
+            
+            <section id="dashboard">
+                <h2>Dashboard & System Status</h2>
+                
+                <h3>Admin Index (<code>index</code>)</h3>
+                <p><strong>Route:</strong> <code>GET /admin</code></p>
+                <p>
+                    Main admin dashboard displaying:
+                </p>
+                <ul>
+                    <li><strong>System Statistics:</strong> User count, disk usage, memory usage, uptime, load average</li>
+                    <li><strong>Database Info:</strong> Database size, table counts, Git commits, application version</li>
+                    <li><strong>Recent Activity:</strong> Last 10 user logins and content changes</li>
+                    <li><strong>System Notifications:</strong> Pending registrations, low disk space, pending comments</li>
+                    <li><strong>Software Status:</strong> Current Git branch, uncommitted changes, deployment status</li>
+                </ul>
+                
+                <h3>Helper Methods</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Method</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td><code>get_system_stats($c)</code></td>
+                        <td>Collects disk usage, memory, uptime, load average, Git info, database statistics</td>
+                    </tr>
+                    <tr>
+                        <td><code>get_recent_activity($c)</code></td>
+                        <td>Returns last 10 user logins and content changes from database</td>
+                    </tr>
+                    <tr>
+                        <td><code>get_system_notifications($c)</code></td>
+                        <td>Checks for pending registrations, low disk space, pending comments</td>
+                    </tr>
+                    <tr>
+                        <td><code>get_software_management_status($c)</code></td>
+                        <td>Git status, uncommitted changes, deployment readiness</td>
+                    </tr>
+                </table>
+            </section>
+            
+            <section id="schema-management">
+                <h2>Database Schema Management</h2>
+                
+                <p>
+                    The Admin controller includes multiple methods for managing database schema synchronization 
+                    between MySQL database tables and Perl DBIx::Class Result classes.
+                </p>
+                
+                <h3>Primary Schema Management Endpoints</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Method</th>
+                        <th>Route</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td><code>db_status</code></td>
+                        <td><code>GET /admin/db-status</code></td>
+                        <td>Display current database status and information</td>
+                    </tr>
+                    <tr>
+                        <td><code>schema_manager</code></td>
+                        <td><code>GET /admin/schema_manager</code></td>
+                        <td>Central interface for all schema operations</td>
+                    </tr>
+                    <tr>
+                        <td><code>database_config</code></td>
+                        <td><code>GET /admin/database-config</code></td>
+                        <td>Display and manage database configuration</td>
+                    </tr>
+                    <tr>
+                        <td><code>compare_schema</code></td>
+                        <td><code>POST /admin/compare_schema</code></td>
+                        <td>Compare database tables vs Result classes</td>
+                    </tr>
+                </table>
+                
+                <h3>Schema Synchronization Methods</h3>
+                <p>These methods handle syncing between database and code:</p>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Method</th>
+                        <th>Action</th>
+                    </tr>
+                    <tr>
+                        <td><code>sync_fields</code></td>
+                        <td>Synchronize individual field definitions</td>
+                    </tr>
+                    <tr>
+                        <td><code>sync_table_to_result</code></td>
+                        <td>Create/update Result class from database table</td>
+                    </tr>
+                    <tr>
+                        <td><code>sync_result_to_table</code></td>
+                        <td>Create/update database table from Result class</td>
+                    </tr>
+                    <tr>
+                        <td><code>batch_sync_table</code></td>
+                        <td>Batch synchronize multiple tables</td>
+                    </tr>
+                    <tr>
+                        <td><code>get_table_schema</code></td>
+                        <td>Retrieve table structure from database</td>
+                    </tr>
+                    <tr>
+                        <td><code>get_field_comparison</code></td>
+                        <td>Compare specific field definitions</td>
+                    </tr>
+                </table>
+                
+                <div class="alert alert-warning" style="margin-top: 15px;">
+                    <strong>⚠ Schema Migration Best Practices:</strong>
+                    <ul>
+                        <li>Always create database backup before schema changes (<code>Emergency Restore</code>)</li>
+                        <li>Test migrations in development environment first</li>
+                        <li>Review schema comparison results before applying changes</li>
+                        <li>Document all schema modifications for audit trail</li>
+                    </ul>
+                </div>
+            </section>
+            
+            <section id="service-management">
+                <h2>Service Management (Starman)</h2>
+                
+                <p>
+                    The Admin controller provides web-safe methods to manage the Starman application server 
+                    using sudo commands.
+                </p>
+                
+                <h3>Service Control Methods</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Method</th>
+                        <th>Route</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td><code>restart_starman</code></td>
+                        <td><code>GET/POST /admin/restart_starman</code></td>
+                        <td>Restart Starman service with sudo credentials</td>
+                    </tr>
+                    <tr>
+                        <td><code>starman_diagnostics</code></td>
+                        <td><code>GET/POST /admin/starman_diagnostics</code></td>
+                        <td>Run comprehensive Starman diagnostics</td>
+                    </tr>
+                </table>
+                
+                <h3>Service Control Implementation</h3>
+                <p><strong>Process:</strong></p>
+                <ol>
+                    <li>User provides sudo username and password via web form</li>
+                    <li>Credentials passed to <code>execute_starman_restart()</code></li>
+                    <li>Temporary shell script created with credentials</li>
+                    <li>Script executes: <code>systemctl restart starman</code></li>
+                    <li>Output displayed in web interface</li>
+                    <li>Credentials cleared from memory after execution</li>
+                </ol>
+                
+                <h3>Helper Methods</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Method</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td><code>execute_starman_restart($c, $sudo_username, $sudo_password)</code></td>
+                        <td>Execute systemctl restart via sudo, return success/output</td>
+                    </tr>
+                    <tr>
+                        <td><code>_execute_sudo_command($sudo_password, $command)</code></td>
+                        <td>Helper to execute arbitrary sudo commands with password</td>
+                    </tr>
+                    <tr>
+                        <td><code>run_starman_diagnostics($c)</code></td>
+                        <td>Comprehensive health check of Starman service</td>
+                    </tr>
+                    <tr>
+                        <td><code>get_starman_service_manager($c)</code></td>
+                        <td>Get service manager utility instance</td>
+                    </tr>
+                </table>
+            </section>
+            
+            <section id="backup-restore">
+                <h2>Backup & Emergency Restore</h2>
+                
+                <h3>Emergency Restore Endpoint</h3>
+                <p><strong>Route:</strong> <code>GET /admin/emergency-restore</code></p>
+                <p>
+                    Provides interface to:
+                </p>
+                <ul>
+                    <li>Scan backup directory for available backup files</li>
+                    <li>List available backups with sizes and dates</li>
+                    <li>Restore PSGI files from backups</li>
+                    <li>Restore arbitrary files from backup archives</li>
+                </ul>
+                
+                <h3>Backup/Restore Methods</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Method</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td><code>get_backup_directory_contents($c)</code></td>
+                        <td>List all backup files with metadata</td>
+                    </tr>
+                    <tr>
+                        <td><code>scan_backup_directory($backup_dir)</code></td>
+                        <td>Scan directory and return backup file details</td>
+                    </tr>
+                    <tr>
+                        <td><code>restore_psgi_file($c, $backup_file, $psgi_filename)</code></td>
+                        <td>Restore PSGI file from backup archive</td>
+                    </tr>
+                    <tr>
+                        <td><code>restore_file_from_backup($c, $backup_file, $file_path)</code></td>
+                        <td>Restore arbitrary file from backup tar archive</td>
+                    </tr>
+                </table>
+                
+                <div class="alert alert-info">
+                    <strong>ℹ Backup Format:</strong> Backups are stored as tar archives. Restore operations 
+                    extract files using <code>Archive::Tar</code>.
+                </div>
+            </section>
+            
+            <section id="software-updates">
+                <h2>Software Updates & Deployment</h2>
+                
+                <h3>Software Update Interface</h3>
+                <p><strong>Route:</strong> <code>GET/POST /admin/software-update</code></p>
+                <p>
+                    Complete software update and deployment interface with:
+                </p>
+                <ul>
+                    <li>Check for available updates from Git remote</li>
+                    <li>View pending commits before pulling</li>
+                    <li>Execute Git pull with pre-update backup</li>
+                    <li>Full deployment (dependencies + service restart)</li>
+                    <li>Update history tracking</li>
+                    <li>System requirements verification</li>
+                </ul>
+                
+                <h3>Update Methods</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Method</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td><code>software_update</code></td>
+                        <td>Main update interface and workflow</td>
+                    </tr>
+                    <tr>
+                        <td><code>check_available_updates($c)</code></td>
+                        <td>Git fetch and check commits behind remote</td>
+                    </tr>
+                    <tr>
+                        <td><code>execute_git_pull($c, $sudo_user, $sudo_pass)</code></td>
+                        <td>Git pull with backup creation</td>
+                    </tr>
+                    <tr>
+                        <td><code>execute_deployment($c, $sudo_user, $sudo_pass)</code></td>
+                        <td>Full deployment: check deps, install, restart service</td>
+                    </tr>
+                    <tr>
+                        <td><code>create_pre_update_backup($c)</code></td>
+                        <td>Create backup before pulling updates</td>
+                    </tr>
+                    <tr>
+                        <td><code>get_update_history($c)</code></td>
+                        <td>Retrieve past update records</td>
+                    </tr>
+                    <tr>
+                        <td><code>check_system_requirements($c)</code></td>
+                        <td>Verify Perl, cpanm, Git availability</td>
+                    </tr>
+                </table>
+                
+                <h3>Deployment Workflow</h3>
+                <pre><code>
+1. Check current Git status (branch, uncommitted changes)
+2. Create pre-update backup
+3. Execute: git pull origin
+4. Check available updates: commits behind remote
+5. User confirms deployment
+6. Step 1: Check Perl dependencies (Makefile.PL)
+7. Step 2: Install missing dependencies (cpanm --installdeps)
+8. Step 3: Restart Starman service via sudo
+9. Display results and update history
+                </code></pre>
+            </section>
+            
+            <section id="diagnostics">
+                <h2>Diagnostics & System Health</h2>
+                
+                <h3>System Health Check</h3>
+                <p>
+                    The Admin controller continuously monitors system health through several diagnostic methods.
+                </p>
+                
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Check Type</th>
+                        <th>Details Collected</th>
+                    </tr>
+                    <tr>
+                        <td>Disk Usage</td>
+                        <td>Percentage used, used/total sizes, warning at 80%, critical at 90%</td>
+                    </tr>
+                    <tr>
+                        <td>Memory Usage</td>
+                        <td>Total, used, free memory from system</td>
+                    </tr>
+                    <tr>
+                        <td>System Uptime</td>
+                        <td>Days/hours up, load average (1, 5, 15 min)</td>
+                    </tr>
+                    <tr>
+                        <td>Database</td>
+                        <td>Database size in MB, table count, user count</td>
+                    </tr>
+                    <tr>
+                        <td>Git Repository</td>
+                        <td>Total commits, current version tag, branch</td>
+                    </tr>
+                    <tr>
+                        <td>Starman Service</td>
+                        <td>Service status (active/inactive), worker processes, memory usage</td>
+                    </tr>
+                </table>
+                
+                <h3>Diagnostics Methods</h3>
+                <p><strong>Route:</strong> <code>GET/POST /admin/starman_diagnostics</code></p>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Method</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td><code>get_starman_diagnostics_util($c)</code></td>
+                        <td>Initialize diagnostics utility</td>
+                    </tr>
+                    <tr>
+                        <td><code>run_starman_diagnostics($c)</code></td>
+                        <td>Execute full diagnostic suite and return results</td>
+                    </tr>
+                </table>
+            </section>
+            
+            <section id="methods-reference">
+                <h2>Complete Methods Reference</h2>
+                
+                <h3>Authentication & Initialization</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Method</th>
+                        <th>Type</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td><code>logging()</code></td>
+                        <td>Private</td>
+                        <td>Get logging utility instance</td>
+                    </tr>
+                    <tr>
+                        <td><code>admin_auth()</code></td>
+                        <td>Private</td>
+                        <td>Get admin authentication utility instance</td>
+                    </tr>
+                    <tr>
+                        <td><code>begin()</code></td>
+                        <td>Private</td>
+                        <td>Controller initialization - log entry, setup debug messages</td>
+                    </tr>
+                    <tr>
+                        <td><code>base()</code></td>
+                        <td>Action</td>
+                        <td>Base chained action - check admin access, setup common data</td>
+                    </tr>
+                </table>
+                
+                <h3>Main Actions (Routed Endpoints)</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Method</th>
+                        <th>Route</th>
+                        <th>Args</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td><code>index</code></td>
+                        <td>/admin</td>
+                        <td>0</td>
+                        <td>Admin dashboard with stats and notifications</td>
+                    </tr>
+                    <tr>
+                        <td><code>db_status</code></td>
+                        <td>/admin/db-status</td>
+                        <td>0</td>
+                        <td>Database status information</td>
+                    </tr>
+                    <tr>
+                        <td><code>schema_manager</code></td>
+                        <td>/admin/schema_manager</td>
+                        <td>0</td>
+                        <td>Central schema management interface</td>
+                    </tr>
+                    <tr>
+                        <td><code>database_config</code></td>
+                        <td>/admin/database-config</td>
+                        <td>0</td>
+                        <td>Database configuration display</td>
+                    </tr>
+                    <tr>
+                        <td><code>restart_starman</code></td>
+                        <td>/admin/restart_starman</td>
+                        <td>0</td>
+                        <td>Starman service restart interface</td>
+                    </tr>
+                    <tr>
+                        <td><code>starman_diagnostics</code></td>
+                        <td>/admin/starman_diagnostics</td>
+                        <td>0</td>
+                        <td>Starman diagnostics interface</td>
+                    </tr>
+                    <tr>
+                        <td><code>software_update</code></td>
+                        <td>/admin/software-update</td>
+                        <td>0</td>
+                        <td>Software update and deployment interface</td>
+                    </tr>
+                    <tr>
+                        <td><code>emergency_restore</code></td>
+                        <td>/admin/emergency-restore</td>
+                        <td>0</td>
+                        <td>Backup restoration interface</td>
+                    </tr>
+                </table>
+                
+                <h3>Schema Operations (All Forward to Schema Comparison Controller)</h3>
+                <p>These methods delegate to the dedicated SchemaComparison controller:</p>
+                <ul>
+                    <li><code>compare_schema</code></li>
+                    <li><code>get_table_schema</code></li>
+                    <li><code>get_field_comparison</code></li>
+                    <li><code>sync_fields</code></li>
+                    <li><code>batch_sync_table</code></li>
+                    <li><code>create_table_from_result</code></li>
+                    <li><code>create_result_from_table</code></li>
+                    <li><code>sync_table_to_result</code></li>
+                    <li><code>sync_result_to_table</code></li>
+                </ul>
+            </section>
+            
+            <div class="last-updated" style="margin-top: 40px; padding: 10px; background-color: var(--background-color); border-left: 4px solid var(--primary-color); color: var(--text-color);">
+                <strong>Last Updated:</strong> <span id="update-date">2026-01-05</span> (v1.10 - Comprehensive rewrite documenting all 40+ methods)
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .row {
+        display: flex;
+        flex-wrap: wrap;
+        margin: -10px;
+    }
+    
+    .col-md-12 {
+        flex: 0 0 100%;
+        padding: 10px;
+    }
+    
+    section {
+        margin-bottom: 30px;
+    }
+    
+    h1, h2, h3 {
+        color: var(--text-color);
+        margin-top: 25px;
+    }
+    
+    h1 {
+        border-bottom: 3px solid var(--primary-color);
+        padding-bottom: 10px;
+    }
+    
+    h2 {
+        border-left: 4px solid var(--primary-color);
+        padding-left: 10px;
+        margin-top: 25px;
+    }
+    
+    h3 {
+        color: var(--secondary-color);
+        margin-top: 15px;
+    }
+    
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 15px 0;
+        background-color: var(--background-color);
+    }
+    
+    table th {
+        background-color: var(--primary-color);
+        color: white;
+        padding: 10px;
+        text-align: left;
+        font-weight: bold;
+    }
+    
+    table td {
+        padding: 10px;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    table tr:hover {
+        background-color: var(--hover-color);
+    }
+    
+    code {
+        background-color: var(--code-background);
+        color: var(--code-color);
+        padding: 2px 5px;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+    }
+    
+    pre {
+        background-color: var(--code-background);
+        color: var(--code-color);
+        padding: 15px;
+        border-radius: 5px;
+        overflow-x: auto;
+        border-left: 4px solid var(--primary-color);
+    }
+    
+    .alert {
+        padding: 15px;
+        margin: 15px 0;
+        border-radius: 5px;
+        border-left: 4px solid;
+    }
+    
+    .alert-info {
+        background-color: rgba(23, 162, 184, 0.1);
+        border-color: var(--info-color);
+        color: var(--text-color);
+    }
+    
+    .alert-warning {
+        background-color: rgba(255, 193, 7, 0.1);
+        border-color: var(--warning-color);
+        color: var(--text-color);
+    }
+    
+    ul, ol {
+        margin: 10px 0 10px 20px;
+        color: var(--text-color);
+    }
+    
+    li {
+        margin: 5px 0;
+        line-height: 1.6;
+    }
+    
+    .last-updated {
+        margin-top: 40px;
+        padding: 15px;
+        border-radius: 5px;
+    }
+    
+    #toc {
+        background-color: rgba(23, 162, 184, 0.1);
+        border: 1px solid var(--border-color);
+        padding: 15px;
+        margin: 20px 0;
+    }
+    
+    #toc ul {
+        margin: 10px 0 0 20px;
+    }
+    
+    #toc a {
+        color: var(--link-color);
+        text-decoration: none;
+    }
+    
+    #toc a:hover {
+        text-decoration: underline;
+    }
+    }
+    
+    ul, ol {
+        padding-left: 25px;
+    }
+    
+    li {
+        margin-bottom: 8px;
+    }
+    
+    strong {
+        color: #333;
+    }
+</style>

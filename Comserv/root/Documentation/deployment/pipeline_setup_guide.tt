@@ -1,0 +1,430 @@
+[% META
+        title = "GitHub Actions CI/CD Pipeline Setup Guide"
+   description = "Complete guide for setting up Kubernetes-ready CI/CD pipeline with automated testing, building, and deployment"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "deployment"
+   page_version = "1.0"
+   last_updated = "Fri Nov 14 01:54:18 PM UTC 2025"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/deployment/pipeline_setup_guide.tt,v 1.0 01:54:18 2025/11/14 ai-assistant Exp ai-assistant - GitHub Actions CI/CD Pipeline Setup' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">GitHub Actions CI/CD Pipeline Setup Guide</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2025-11-14 | 
+        Version: 1.0 | 
+        Author: AI Assistant | 
+        Status: Active
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">This guide walks you through setting up the complete Kubernetes-ready CI/CD pipeline for Comserv with automated testing, building, and deployment to three environments (Development, Staging, Production).</p>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Pipeline Architecture</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0; white-space: pre-wrap;"><code>
+┌─────────────┐
+│  Push Code  │
+└──────┬──────┘
+       │
+       ├──▶ 1️⃣  BUILD & TEST (Every push/PR)
+       │     ├─ Perl Syntax Check
+       │     ├─ Unit Tests
+       │     ├─ Integration Tests
+       │     ├─ Pod Coverage
+       │     └─ YAML/Dockerfile Linting
+       │
+       ├──▶ 2️⃣  BUILD DOCKER IMAGE
+       │     ├─ Multi-stage build
+       │     ├─ Layer caching
+       │     └─ Artifact optimization
+       │
+       ├──▶ 3️⃣  PUSH TO REGISTRY
+       │     ├─ GitHub Container Registry
+       │     ├─ Image scanning
+       │     └─ Tag management
+       │
+       └──▶ 4️⃣  DEPLOY TO ENVIRONMENTS
+             ├─ Development (on develop branch)
+             ├─ Staging (on main branch)
+             └─ Production (on version tags)
+                </code></pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-50">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Prerequisites</h2>
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Local Setup (On Each Server)</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Docker & Docker Compose installed</li>
+                <li>Dedicated deployment user account</li>
+                <li>Directory structure at /opt/comserv2</li>
+                <li>Backup directory with proper permissions</li>
+            </ul>
+        </div>
+        <div class="col-50">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Key Features</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Automated Testing</strong>: Perl syntax, unit, and integration tests on every push</li>
+                <li><strong>Docker Build</strong>: Multi-stage builds with layer caching</li>
+                <li><strong>Registry Push</strong>: GitHub Container Registry with image scanning</li>
+                <li><strong>Multi-Environment Deployment</strong>: Dev, staging, and production deployment automation</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Installation Instructions</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 1: Install Docker & Docker Compose</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 2: Create Deployment User</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+sudo useradd -m -s /bin/bash deploy
+sudo usermod -aG docker deploy
+sudo mkdir -p /home/deploy/.ssh
+sudo chmod 700 /home/deploy/.ssh
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 3: Create Directory Structure</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+sudo mkdir -p /opt/comserv2
+sudo chown deploy:deploy /opt/comserv2
+cd /opt/comserv2
+git clone https://github.com/YOUR-ORG/comserv2.git .
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 4: Create Backup Directory</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+mkdir -p ~/backups
+chmod 700 ~/backups
+                </code></pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">GitHub Repository Configuration</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Enable GitHub Container Registry</h3>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Go to your GitHub repository</li>
+                <li>Settings → Developer Settings → Personal Access Tokens</li>
+                <li>Generate new token with: <code>write:packages</code>, <code>read:packages</code>, <code>delete:packages</code></li>
+                <li>Copy the token (use as GITHUB_TOKEN in workflows)</li>
+            </ol>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Create Repository Secrets</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Navigate to:</strong> Settings → Secrets and variables → Actions</p>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Development Server Secrets</h4>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+DEV_SERVER_HOST: your-dev-server.com
+DEV_SERVER_USER: deploy
+DEV_SERVER_SSH_KEY: &lt;paste private key&gt;
+DEV_DATABASE_PASS: &lt;secure password&gt;
+                </code></pre>
+            </div>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Staging Server Secrets</h4>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+STAGING_SERVER_HOST: your-staging-server.com
+STAGING_SERVER_USER: deploy
+STAGING_SERVER_SSH_KEY: &lt;paste private key&gt;
+STAGING_DATABASE_PASS: &lt;secure password&gt;
+STAGING_ALERT_EMAIL: devops@example.com
+                </code></pre>
+            </div>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Production Server Secrets</h4>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+PROD_SERVER_HOST: your-prod-server.com
+PROD_SERVER_USER: deploy
+PROD_SERVER_SSH_KEY: &lt;paste private key&gt;
+PROD_DATABASE_PASS: &lt;secure password&gt;
+PROD_ALERT_EMAIL: ops-team@example.com
+SLACK_WEBHOOK_URL: https://hooks.slack.com/services/... (optional)
+IMAGE_REGISTRY: yourusername/comserv
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Configure Branch Protection Rules</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Navigate to:</strong> Settings → Branches → Branch Protection Rules</p>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Main Branch (Production Ready)</h4>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>✅ Require pull request reviews before merging (1+ reviews)</li>
+                <li>✅ Dismiss stale pull request approvals</li>
+                <li>✅ Require status checks to pass: build-and-test, build, lint, security-scan</li>
+                <li>✅ Require branches to be up to date before merging</li>
+                <li>✅ Restrict who can push to matching branches</li>
+            </ul>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Develop Branch (Testing)</h4>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>✅ Require pull request reviews before merging (optional)</li>
+                <li>✅ Require status checks to pass: build-and-test, build</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Server Setup</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Development Server Setup</h3>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Create Deployment Key Pair</h4>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+ssh-keygen -t ed25519 -f ~/.ssh/comserv-dev-deploy -C "comserv-dev-deploy"
+# Don't set passphrase for CI/CD
+                </code></pre>
+            </div>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Add Public Key to Server</h4>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+mkdir -p ~/.ssh
+echo "$(cat ~/.ssh/comserv-dev-deploy.pub)" >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+                </code></pre>
+            </div>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Clone Repository to Server</h4>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+cd ~/
+git clone https://github.com/YOUR-ORG/comserv2.git
+cd comserv2
+                </code></pre>
+            </div>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Create .env File</h4>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+cd Comserv
+cp .env.development .env
+# Edit .env with actual database credentials
+nano .env
+                </code></pre>
+            </div>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Verify Docker Setup</h4>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+docker run hello-world
+docker-compose --version
+                </code></pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Workflow Triggers & Behavior</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Build & Test Workflow</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Triggers on:</strong> Any push to main/develop or pull request to main/develop</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Steps:</strong> Perl syntax checks, unit tests, integration tests, Pod coverage, Docker image build, YAML linting, security scan</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Duration:</strong> ~8-12 minutes</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Build & Push Registry Workflow</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Triggers on:</strong> Successful build-and-test on main/develop, version tags, or manual workflow_dispatch</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Tags pushed:</strong> latest, branch names, version tags, commit SHA</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Duration:</strong> ~5-8 minutes</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Deploy Workflows</h3>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Development Deployment</h4>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Trigger:</strong> Push to develop branch</li>
+                <li><strong>Environment:</strong> Development server</li>
+                <li><strong>Behavior:</strong> Auto-deploy to dev with auto-migrate</li>
+                <li><strong>Approval:</strong> Manual environment approval in GitHub</li>
+            </ul>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Staging Deployment</h4>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Trigger:</strong> Push to main branch</li>
+                <li><strong>Environment:</strong> Staging server</li>
+                <li><strong>Approval:</strong> Manual environment approval required</li>
+                <li><strong>Tests:</strong> Smoke tests after deployment</li>
+            </ul>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Production Deployment</h4>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Trigger:</strong> Version tag push (e.g., v1.0.0)</li>
+                <li><strong>Approval:</strong> Manual environment approval required</li>
+                <li><strong>Backup:</strong> Auto-backs up before deployment</li>
+                <li><strong>Tests:</strong> Smoke tests verify deployment</li>
+                <li><strong>Notifications:</strong> Slack alert on completion</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Security Best Practices</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Secrets Management</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>✅ Never commit secrets to git</li>
+                <li>✅ Use GitHub Secrets for sensitive data</li>
+                <li>✅ Rotate secrets quarterly</li>
+                <li>✅ Use environment-specific secrets</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">SSH Key Management</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>✅ Use Ed25519 keys (stronger than RSA)</li>
+                <li>✅ Separate keys per environment</li>
+                <li>✅ Store keys only in GitHub Secrets</li>
+                <li>✅ Never commit private keys</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Docker Image Security</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>✅ Regular dependency updates</li>
+                <li>✅ Vulnerability scanning with Trivy</li>
+                <li>✅ Minimal base images</li>
+                <li>✅ Non-root container user</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Database Security</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>✅ Environment-specific databases (when possible)</li>
+                <li>✅ Strong passwords (32+ chars)</li>
+                <li>✅ Network isolation</li>
+                <li>✅ Automated backups</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Performance Optimization</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Build Speed</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Layer Caching:</strong> Base image, system dependencies, CPAN modules (largest layer), app code (invalidates when changed)</li>
+                <li><strong>GitHub Actions Cache:</strong> Perl modules cached across runs, Docker layer caching via buildx, estimated build time: 5-8 minutes</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Deployment Speed</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Rolling updates (future with Kubernetes)</li>
+                <li>Zero-downtime deployments (health checks)</li>
+                <li>Automated rollback capability</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Troubleshooting</h2>
+            
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font);">Docker Build Fails</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Check Dockerfile syntax: <code>docker run --rm -i hadolint/hadolint &lt; Comserv/Dockerfile</code></li>
+                    <li>Test local build: <code>cd Comserv && docker build -t comserv:test .</code></li>
+                </ul>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font);">Deployment SSH Fails</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Verify SSH key added to server: <code>ssh-keyscan &lt;server&gt;</code></li>
+                    <li>Test SSH manually: <code>ssh -i ~/.ssh/comserv-prod-deploy deploy@&lt;server&gt;</code></li>
+                </ul>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font);">Database Migration Fails</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Check database credentials in .env</li>
+                    <li>Verify database is accessible: <code>mysql -h&lt;host&gt; -u&lt;user&gt; -p&lt;pass&gt; &lt;database&gt;</code></li>
+                    <li>Check migration logs: <code>docker-compose logs web-dev</code></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Kubernetes Migration Path</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">This pipeline is designed to support future Kubernetes deployment with the following phased approach:</p>
+            
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Phase 1 (Current):</strong> Docker containers on individual servers</li>
+                <li><strong>Phase 2:</strong> Container registry ready (✅ complete)</li>
+                <li><strong>Phase 3:</strong> Helm charts for Kubernetes</li>
+                <li><strong>Phase 4:</strong> ArgoCD for GitOps deployment</li>
+            </ol>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);">For Kubernetes migration, you'll need:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Helm charts (replace docker-compose)</li>
+                <li>ArgoCD integration</li>
+                <li>Persistent volumes for data</li>
+                <li>Ingress configuration</li>
+                <li>ConfigMaps for environment variables</li>
+                <li>Secrets management (HashiCorp Vault or sealed-secrets)</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font);">See Also</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/deployment/cicd_setup_instructions" style="color: var(--link-color);">CI/CD Setup Instructions</a></li>
+                    <li><a href="/Documentation/system/DOCKER_KUBERNETES_MIGRATION_STRATEGY" style="color: var(--link-color);">Docker Kubernetes Migration Strategy</a></li>
+                    <li><a href="/Documentation/system/server_update_procedure" style="color: var(--link-color);">Server Update Procedure</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p>For technical support or questions about this documentation, contact the system administrator.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>

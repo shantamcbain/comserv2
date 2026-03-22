@@ -26,6 +26,26 @@ BEGIN {
 
     # Add the lib directory to @INC
     use FindBin;
+    
+    # CRITICAL FIX (November 2025): Ensure main lib/ takes ABSOLUTE PRIORITY over blib/lib/
+    # Module::Install may add blib/lib to @INC, which shadows current source code.
+    # This affects all three ports (3001 manual, 5000 Docker, 3000 Docker) and the test suite.
+    # Solution: Explicitly unshift main lib paths to BEGINNING of @INC before any other module loading.
+    # Then remove any blib/lib entries that Module::Install may have added.
+    
+    # STEP 1: Remove any blib/lib entries from @INC (Module::Install artifact)
+    @INC = grep { 
+        $_ !~ /blib[\/\\]lib/ && 
+        $_ !~ /\Qblib\E/ 
+    } @INC;
+    
+    # STEP 2: Add main lib path to VERY BEGINNING of @INC via unshift (takes absolute priority)
+    unshift @INC, "$FindBin::Bin/../lib";
+    
+    # STEP 3: Also add project root for relative module loading
+    unshift @INC, "$FindBin::Bin/..";
+    
+    # Traditional use lib statements (for compatibility) - now comes AFTER unshift
     use lib "$FindBin::Bin/../lib";
     use lib "$FindBin::Bin/..";
 
@@ -81,6 +101,19 @@ BEGIN {
         foreach my $path (@arch_paths) {
             print "  $path\n" if -d $path;
         }
+        
+        # CRITICAL DEBUG (November 2025): Verify blib/lib is NOT in @INC
+        print "\nDEBUG: CRITICAL - Checking for blib/ shadowing in \@INC:\n";
+        my $has_blib = grep { /blib/ } @INC;
+        if ($has_blib) {
+            print "  WARNING: blib/ found in \@INC - may cause stale code loading!\n";
+            foreach my $path (@INC) {
+                print "    $path\n" if $path =~ /blib/;
+            }
+        } else {
+            print "  OK: No blib/ entries in \@INC\n";
+        }
+        print "  First lib path in \@INC: $INC[0]\n";
     }
 }
 
@@ -89,254 +122,39 @@ unless (-d "$FindBin::Bin/../local") {
     mkdir "$FindBin::Bin/../local" or die "Could not create local directory: $!";
 }
 
-# Automatically install dependencies locally
-print "Installing dependencies from cpanfile...\n";
-my $cpanfile_path = "$FindBin::Bin/../cpanfile";
-if (-e $cpanfile_path) {
-    print "Found cpanfile at: $cpanfile_path\n";
+# For Docker compatibility, dependency installation is handled during container build
+# All modules are pre-installed in the Docker image via cpanm during dockerfile build
+# This section has been removed for faster startup times in containerized environments
 
-    # Check if cpanm is installed
-    my $cpanm_check = system("which cpanm > /dev/null 2>&1");
-    if ($cpanm_check != 0) {
-        print "cpanm not found. Installing App::cpanminus...\n";
-        system("curl -L https://cpanmin.us | perl - --sudo App::cpanminus") == 0
-            or die "Failed to install cpanm. Please install it manually with: curl -L https://cpanmin.us | perl - --sudo App::cpanminus\n";
-    }
-
-    # Install all dependencies from cpanfile first
-    print "Installing all dependencies from cpanfile...\n";
-    my $cpanfile_result = system("cpanm --local-lib=$FindBin::Bin/../local --installdeps $FindBin::Bin/..");
-
-    # Force reinstall XS modules to ensure they're compiled with current Perl version
-    print "Force reinstalling XS modules to ensure compatibility...\n";
-    my @xs_modules = ('YAML::XS', 'JSON::XS');
-    foreach my $xs_module (@xs_modules) {
-        print "Force reinstalling $xs_module...\n";
-        system("cpanm --local-lib=$FindBin::Bin/../local --force --reinstall $xs_module");
-    }
-
-    # If there were issues with cpanfile installation, try installing critical modules individually
-    if ($cpanfile_result != 0) {
-        warn "Some dependencies from cpanfile may not have been installed correctly.\n";
-        print "Installing critical modules individually...\n";
-
-        # First, install the base modules that other modules depend on
-        print "Installing base modules...\n";
-        my $base_result = system("cpanm --local-lib=$FindBin::Bin/../local Module::Runtime Class::Load Moose");
-
-        # Then install email-related modules
-        print "Installing email-related modules...\n";
-
-        # Define a list of essential modules without duplicates
-        my @essential_modules = (
-            # Base modules
-            "Module::Runtime",
-            "Class::Load",
-            "Moose",
-
-            # Email modules
-            "Email::Abstract",
-            "Email::Address",
-            "Email::Date::Format",
-            "Email::MIME",
-            "Email::MIME::ContentType",
-            "Email::MIME::Encodings",
-            "Email::MessageID",
-            "Email::Sender::Simple",
-            "Email::Sender::Transport::SMTP",
-            "Email::Simple",
-            "Email::Simple::Creator",
-            "Email::MIME::Creator",
-            "Catalyst::View::Email",
-            "Catalyst::View::Email::Template",
-
-            # Core Catalyst modules
-            "Catalyst::Runtime",
-            "Catalyst::Model",
-            "Catalyst::View::TT",
-            "Catalyst::Plugin::ConfigLoader",
-            "Catalyst::Plugin::Static::Simple",
-            "Catalyst::Plugin::Session",
-            "Catalyst::Plugin::Authentication",
-            "DBIx::Class",
-            "Template",
-
-            # Network modules
-            "Net::CIDR",
-
-            # YAML modules
-            "YAML::XS"
-        );
-
-        my @failed_modules = ();
-
-        foreach my $module (@essential_modules) {
-            print "Installing $module...\n";
-            my $result = system("cpanm --local-lib=$FindBin::Bin/../local $module");
-            if ($result != 0) {
-                warn "Failed to install $module\n";
-                push @failed_modules, $module;
-            } else {
-                print "Successfully installed $module\n";
-            }
-        }
-
-        if (@failed_modules) {
-            warn "Some essential modules may not have been installed correctly.\n";
-            print "Retrying failed modules with force flag...\n";
-
-            foreach my $module (@failed_modules) {
-                print "Force installing $module...\n";
-                my $result = system("cpanm --local-lib=$FindBin::Bin/../local --force $module");
-                if ($result != 0) {
-                    warn "Still failed to install $module even with force flag\n";
-                    warn "Some functionality may be limited\n";
-                } else {
-                    print "Successfully installed $module with force flag\n";
-                }
-            }
-        } else {
-            print "All essential modules installed successfully\n";
-        }
-    } else {
-        print "All dependencies from cpanfile installed successfully\n";
-
-        # Try again with force flag for any problematic modules
-        print "Running a final check with force flag to ensure all modules are installed...\n";
-        system("cpanm --local-lib=$FindBin::Bin/../local --force --installdeps $FindBin::Bin/..");
-    }
-
-    # Add the newly installed modules' path to @INC
-    unshift @INC, "$FindBin::Bin/../local/lib/perl5";
-
-    # Also add architecture-specific paths
-    use Config;
-    my $archname = $Config{archname};
-    my $version = $Config{version};
-    unshift @INC, "$FindBin::Bin/../local/lib/perl5/$archname" if -d "$FindBin::Bin/../local/lib/perl5/$archname";
-    unshift @INC, "$FindBin::Bin/../local/lib/perl5/x86_64-linux-gnu-thread-multi" if -d "$FindBin::Bin/../local/lib/perl5/x86_64-linux-gnu-thread-multi";
-
-    print "Installation complete. New modules are now available.\n";
-} else {
-    warn "cpanfile not found at $cpanfile_path. Skipping dependency installation.\n";
-}
-
-# Specifically install Catalyst::ScriptRunner if not already installed
-eval { require Catalyst::ScriptRunner; };
-if ($@) {
-    print "Installing Catalyst::ScriptRunner...\n";
-    my $result = system("cpanm --local-lib=$FindBin::Bin/../local Catalyst::ScriptRunner");
-
-    if ($result != 0) {
-        die "Failed to install Catalyst::ScriptRunner. Please install it manually with: cpanm --local-lib=$FindBin::Bin/../local Catalyst::ScriptRunner\n";
-    }
-
-    # Add the newly installed module's path to @INC
-    unshift @INC, "$FindBin::Bin/../local/lib/perl5";
-
-    # Also add architecture-specific paths
-    use Config;
-    my $archname = $Config{archname};
-    unshift @INC, "$FindBin::Bin/../local/lib/perl5/$archname" if -d "$FindBin::Bin/../local/lib/perl5/$archname";
-    unshift @INC, "$FindBin::Bin/../local/lib/perl5/x86_64-linux-gnu-thread-multi" if -d "$FindBin::Bin/../local/lib/perl5/x86_64-linux-gnu-thread-multi";
-
-    # Restart the script to ensure the newly installed module is properly loaded
-    print "Restarting script to load the newly installed module...\n";
-    exec($^X, $0, @ARGV);
-    exit;
-}
-
-# Now try to use Catalyst::ScriptRunner
+# Load Catalyst::ScriptRunner (pre-installed in Docker image)
 eval {
     require Catalyst::ScriptRunner;
     Catalyst::ScriptRunner->import();
 };
 if ($@) {
-    die "Failed to load Catalyst::ScriptRunner even after installation: $@\nPlease install it manually.\n";
+    die "Failed to load Catalyst::ScriptRunner: $@\nPlease ensure it is installed in your environment.\n";
 }
 
-# Check for all required modules before starting Catalyst
-my @required_modules = (
-    'YAML::XS',
-    'Net::CIDR',
-    'Email::MIME',
-    'Email::Sender::Simple',
-    'Catalyst::View::Email',
-    'Catalyst::View::Email::Template'
-);
-
-my @missing_modules = ();
-my $need_restart = 0;
-
-# Ensure local lib paths are in @INC before checking modules (already done in BEGIN block)
-# Architecture-specific paths are also already added in BEGIN block
-
-# Check if we've already tried installing modules (to prevent infinite loops)
-my $install_marker = "$FindBin::Bin/../local/.modules_installed";
-my $already_tried_install = -e $install_marker;
-
-# Special handling for YAML modules with fallback options
-my $yaml_module_loaded = 0;
-my @yaml_alternatives = ('YAML::XS', 'YAML::Syck', 'YAML::Tiny', 'YAML');
-
-foreach my $yaml_module (@yaml_alternatives) {
-    eval "require $yaml_module";
-    if (!$@) {
-        print "Debug: Successfully loaded YAML module: $yaml_module\n" if $ENV{CATALYST_DEBUG};
-        $yaml_module_loaded = 1;
-        last;
-    } else {
-        print "Debug: Failed to load $yaml_module: $@\n" if $ENV{CATALYST_DEBUG};
-    }
-}
-
-if (!$yaml_module_loaded && !$already_tried_install) {
-    print "No YAML module found, will install YAML::XS and fallbacks...\n";
-    push @missing_modules, 'YAML::XS', 'YAML::Tiny';
-}
-
-# Check other required modules
-my @other_modules = grep { $_ ne 'YAML::XS' } @required_modules;
-foreach my $module (@other_modules) {
-    eval "require $module";
-    if ($@) {
-        print "Debug: Failed to load $module: $@\n" if $ENV{CATALYST_DEBUG};
-        push @missing_modules, $module unless $already_tried_install;
-    } else {
-        print "Debug: Successfully loaded $module\n" if $ENV{CATALYST_DEBUG};
-    }
-}
-
-if (@missing_modules && !$already_tried_install) {
-    print "Installing missing modules: " . join(', ', @missing_modules) . "\n";
-
-    foreach my $module (@missing_modules) {
-        print "Installing $module...\n";
-        my $result = system("cpanm --local-lib=$FindBin::Bin/../local --force $module");
-        if ($result != 0) {
-            warn "Failed to install $module. Some functionality may be limited.\n";
+# Docker environment: All required modules are pre-installed in the container image
+# Simple verification that modules are available (for debugging purposes only)
+if ($ENV{CATALYST_DEBUG}) {
+    my @required_modules = (
+        'YAML::XS',
+        'Net::CIDR',
+        'Email::MIME',
+        'Email::Sender::Simple',
+        'Catalyst::View::Email',
+        'Catalyst::View::Email::Template'
+    );
+    
+    foreach my $module (@required_modules) {
+        eval "require $module";
+        if ($@) {
+            warn "Warning: $module not available: $@\n";
         } else {
-            print "Successfully installed $module\n";
-            $need_restart = 1;
+            print "Debug: $module loaded successfully\n";
         }
     }
-
-    if ($need_restart) {
-        # Create marker file to prevent infinite loops
-        open my $fh, '>', $install_marker or warn "Could not create install marker: $!";
-        close $fh if $fh;
-
-        # Restart the script to ensure the newly installed modules are properly loaded
-        print "Restarting script to load the newly installed modules...\n";
-        exec($^X, $0, @ARGV);
-        exit;
-    }
-} elsif (@missing_modules && $already_tried_install) {
-    # We've already tried installing, but modules are still missing
-    # Continue anyway but warn about missing functionality
-    warn "Warning: The following modules are still missing after installation attempt: " .
-         join(', ', @missing_modules) . "\n";
-    warn "Some functionality may be limited.\n";
 }
 
 Catalyst::ScriptRunner->run('Comserv', 'Server');

@@ -1,0 +1,611 @@
+[% META
+   title = "Daily Plan - December 26, 2025 - AI Chat Database Verification & Priority Matrix Integration"
+   description = "Daily workflow prioritized by Priority Matrix: Primary (E.1 Strategic) - AI Chat database verification; Secondary (Quick Wins) - A.3 Credentials Audit planning, B.3 Theme Handling audit; Critical Tomorrow - A.2 K8s Readiness approval. Tests table existence, persistence, and query functionality. Integrates results back into Master Plan."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "daily-planning,ai-systems,database-schema,testing,priority-management"
+   page_version = "0.02"
+   last_updated = "Fri Dec 26 18:20:00 UTC 2025"
+%]
+[% PageVersion = 'root/Documentation/Daily_Plans_2025-12-26.tt,v 0.02 2025/12/26 18:20:00 zencoder Exp - Updated: Integrated Priority Matrix findings; added Quick Wins section; emphasized A.2 urgency for tomorrow; added Master Plan update instructions' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    <h1>Daily Plan - December 26, 2025</h1>
+    <h2>AI Chat Database Verification & Message Persistence Testing</h2>
+
+    <div class="last-updated">
+        <strong>Date:</strong> Friday, December 26, 2025 |
+        <strong>Version:</strong> 0.02 (Updated with Priority Matrix) |
+        <strong>Focus:</strong> E.1 AI Chat verification (PRIMARY) + Quick Wins if time (SECONDARY) + A.2 K8s Readiness for tomorrow (CRITICAL) |
+        <strong>Status:</strong> 📋 Ready to Execute - Aligned with Priority Matrix
+    </div>
+
+    <div class="alert alert-info">
+        <h3>📌 Daily Objective (Updated from Priority Matrix)</h3>
+        <p><strong>PRIMARY (E.1 Strategic Initiative):</strong> Verify that AI Chat System database tables are created, properly structured, and that chat messages are being persisted correctly to the database.</p>
+        <p><strong>SECONDARY (Quick Wins if time permits):</strong> Identify and document quick-win improvements that can be removed from todo list.</p>
+        <p><strong>URGENT FOR TOMORROW (A.2):</strong> K8s Readiness Plan is BLOCKING all infrastructure work and must be approved/completed tomorrow.</p>
+        <p>This plan continues from December 25's architectural audit. Yesterday we confirmed the schema design and DBSchemaManager patterns. Today we verify actual functionality: Do the tables exist? Do messages save? Do queries work?</p>
+    </div>
+
+    <div class="alert alert-warning">
+        <h3>⚠️ Priority Matrix Context (NEW - Dec 26)</h3>
+        <p><strong>Master Plan Status:</strong> Priority Matrix now available in MASTER_PLAN_COORDINATION showing all 14 plans categorized by Importance vs. Effort.</p>
+        <ul style="margin: 10px 0;">
+            <li><strong>🔴 Quick Wins (High Importance, Low Effort):</strong> ✅ A.3 (Credentials Audit - COMPLETE), B.3 (Theme Handling) - Consider B.3 if time</li>
+            <li><strong>🟢 Strategic (High/High):</strong> E.1 (AI Chat - active TODAY), A.2 (K8s Readiness - URGENT for tomorrow), A.1 (K8s Migration)</li>
+            <li><strong>🟡 Fill-ins (Low/Low):</strong> C.4, D.1, D.4 - Schedule when critical path clears</li>
+        </ul>
+        <p><strong>Today's Focus:</strong> E.1 Phase 2-3 (AI Chat verification) is a Strategic Initiative. If completed early, consider tackling Quick Wins below.</p>
+    </div>
+
+    <div class="toc" id="toc">
+        <h3>Table of Contents</h3>
+        <ul>
+            <li><strong>Quick Links:</strong>
+                <ul>
+                    <li>🎯 <a href="/Documentation/AI_Chat_Interface_Architecture_Audit" target="_blank" class="doc-link">Phase 3 Chat Interface Architecture Audit (IMPORTANT - Read First!)</a></li>
+                    <li>📋 <a href="/Documentation/B3ThemeHandlingAuditReport" target="_blank" class="doc-link">B.3 Theme Handling Audit Report</a></li>
+                    <li>📊 <a href="/Documentation/MASTER_PLAN_COORDINATION" target="_blank" class="doc-link">Master Plan Coordination</a></li>
+                </ul>
+            </li>
+            <li><a href="#phase-1-verify">Phase 1: Verify Tables Exist</a></li>
+            <li><a href="#phase-2-structure">Phase 2: Validate Table Structures</a></li>
+            <li><a href="#phase-3-test-save">Phase 3: Test Message Persistence</a></li>
+            <li><a href="#phase-4-query-test">Phase 4: Query & Retrieval Testing</a></li>
+            <li><a href="#task-checklist">Daily Task Checklist</a></li>
+            <li><a href="#success-criteria">Success Criteria</a></li>
+            <li><a href="#next-steps">Next Steps (Tomorrow)</a></li>
+        </ul>
+    </div>
+
+    <!-- Yesterday's Completion Status -->
+    <div class="content-section">
+        <h2 id="yesterday-summary">✅ December 25 Completion Summary (Yesterday's Plan)</h2>
+
+        <div class="phase-status">
+            <span class="status-badge complete">COMPLETE</span>
+            <p><strong>Execution:</strong> Full architectural audit of AI Chat system database implementation</p>
+            <p><strong>Duration:</strong> Full day execution across Chats 12-15</p>
+        </div>
+
+        <h3>Completed Work (Yesterday)</h3>
+        <table class="completion-table">
+            <thead>
+                <tr>
+                    <th>Task</th>
+                    <th>Status</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Phase 1: Audit</strong></td>
+                    <td>✅ COMPLETE</td>
+                    <td>Verified SQL schema file, DBSchemaManager, Result classes, startup behavior</td>
+                </tr>
+                <tr>
+                    <td><strong>Phase 2: Documentation</strong></td>
+                    <td>✅ COMPLETE</td>
+                    <td>Created DBSchemaManager Usage Guide, AI Chat Schema Documentation, Result Class Development Guide</td>
+                </tr>
+                <tr>
+                    <td><strong>Phase 3: Implementation</strong></td>
+                    <td>✅ COMPLETE</td>
+                    <td>Created 2 missing Result classes (CodeSearchIndex.pm, WebSearchResults.pm), fixed AiModelConfig.pm</td>
+                </tr>
+                <tr>
+                    <td><strong>All 5 Result Classes Ready</strong></td>
+                    <td>✅ CONFIRMED</td>
+                    <td>AiMessage, DocumentationMetadataIndex, DocumentationRoleAccess, CodeSearchIndex, WebSearchResults, AiModelConfig (6 total)</td>
+                </tr>
+                <tr>
+                    <td><strong>Phase 4: Integration</strong></td>
+                    <td>✅ STARTUP AUTO-CREATION</td>
+                    <td>Updated Comserv.pm to call DBSchemaManager on startup to auto-create tables</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p style="color: #155724; background: #d4edda; padding: 12px; border-radius: 4px; margin-top: 15px;">
+            <strong>✅ All Phases 1-4 Complete:</strong> Architecture audit done, documentation created, Result classes implemented, startup integration configured. Tables should now be auto-created on application startup.
+        </p>
+    </div>
+
+    <!-- Phase 1: Verify Tables Exist -->
+    <div class="content-section">
+        <h2 id="phase-1-verify">🔍 Phase 1: Verify Tables Exist (Table Presence Check)</h2>
+
+        <div class="phase-status">
+            <span class="status-badge complete">✅ COMPLETE - Dec 26 21:53 UTC</span>
+            <p><strong>Execution:</strong> Database queries to verify table presence in ENCY database</p>
+            <p><strong>Duration Act.:</strong> 8 minutes</p>
+            <p><strong>Result:</strong> 8 AI Chat tables created successfully (were missing, manual creation executed)</p>
+        </div>
+
+        <h3>Tasks</h3>
+        
+        <div class="task-card">
+            <h4>Task 1.1: Connect to Database</h4>
+            <ul>
+                <li>Open MySQL/MariaDB client or Admin Console in Comserv</li>
+                <li>Select ENCY database</li>
+                <li>Verify database connection is active</li>
+            </ul>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 1.2: List All AI Chat Tables</h4>
+            <p><strong>Execute Command:</strong></p>
+            <pre><code>SHOW TABLES LIKE 'ai%' OR LIKE 'documentation%' OR LIKE 'code_search%' OR LIKE 'web_search%';</code></pre>
+            
+            <p><strong>Expected Tables (6 total):</strong></p>
+            <ul>
+                <li>✓ <code>ai_conversations</code> - Parent for all messages</li>
+                <li>✓ <code>ai_messages</code> - Individual chat messages</li>
+                <li>✓ <code>ai_model_config</code> - Model configuration per role/agent</li>
+                <li>✓ <code>documentation_metadata_index</code> - Documentation search index</li>
+                <li>✓ <code>code_search_index</code> - Code search index</li>
+                <li>✓ <code>web_search_results</code> - Web search results storage</li>
+                <li>✓ <code>documentation_role_access</code> - Access control rules</li>
+            </ul>
+            
+            <p><strong>Record Results:</strong> Which tables exist? Which are missing? If any missing, note them for Phase 5.</p>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 1.3: Check Startup Logs</h4>
+            <p>Review application startup logs to see if tables were auto-created:</p>
+            <pre><code>tail -f root/log/starman.log | grep -i "ai_chat\|schema\|create"</code></pre>
+            
+            <p><strong>Expected Log Output:</strong></p>
+            <pre><code>[2025-12-26 ...] _initialize_ai_chat_schema - Creating table 'ai_conversations' ...
+[2025-12-26 ...] _initialize_ai_chat_schema - Creating table 'ai_messages' ...
+[2025-12-26 ...] _initialize_ai_chat_schema - All AI Chat tables created successfully.</code></pre>
+            
+            <p><strong>Record Results:</strong> Were tables auto-created on startup? Check logs for creation status.</p>
+        </div>
+
+        <div class="alert alert-success" style="margin-top: 15px;">
+            <h4>✅ Phase 1 Results Summary</h4>
+            <p><strong>All 8 AI Chat tables successfully created:</strong></p>
+            <ul style="margin: 5px 0; column-count: 2;">
+                <li>✅ ai_conversations (5 cols)</li>
+                <li>✅ ai_messages (16 cols)</li>
+                <li>✅ documentation_metadata_index (11 cols)</li>
+                <li>✅ code_search_index (9 cols)</li>
+                <li>✅ web_search_results (13 cols)</li>
+                <li>✅ ai_model_config (15 cols)</li>
+                <li>✅ documentation_role_access (4 cols)</li>
+                <li>✅ ai_chat_context (4 cols)</li>
+            </ul>
+            <p><strong>Critical Finding:</strong> Tables were missing because auto-creation on startup is not implemented. Code changes needed in Comserv.pm to call DBSchemaManager during initialization.</p>
+        </div>
+    </div>
+
+    <!-- Phase 2: Validate Structures -->
+    <div class="content-section">
+        <h2 id="phase-2-structure">📋 Phase 2: Validate Table Structures (Schema Validation)</h2>
+
+        <div class="phase-status">
+            <span class="status-badge complete">✅ COMPLETE - Dec 26 21:55 UTC</span>
+            <p><strong>Execution:</strong> Verify table columns match Result class definitions</p>
+            <p><strong>Duration Act.:</strong> 2 minutes</p>
+            <p><strong>Result:</strong> All 3 critical tables validated - columns and types match Result class definitions exactly</p>
+        </div>
+
+        <h3>Critical Tables to Validate</h3>
+
+        <div class="task-card">
+            <h4>Task 2.1: Validate ai_messages Table</h4>
+            <p><strong>Command:</strong></p>
+            <pre><code>DESCRIBE ai_messages;</code></pre>
+            
+            <p><strong>Expected Columns (18 total, from AiMessage.pm):</strong></p>
+            <ul>
+                <li>id (INT PRIMARY KEY AUTO_INCREMENT)</li>
+                <li>conversation_id (INT, FOREIGN KEY)</li>
+                <li>user_id (INT, FOREIGN KEY)</li>
+                <li>content (LONGTEXT)</li>
+                <li>role (ENUM: 'user', 'assistant')</li>
+                <li>agent_type (VARCHAR)</li>
+                <li>model_used (VARCHAR)</li>
+                <li>search_context (JSON)</li>
+                <li>sources_cited (JSON)</li>
+                <li>response_time_ms (INT)</li>
+                <li>token_count (INT)</li>
+                <li>created_at (DATETIME)</li>
+                <li>updated_at (DATETIME)</li>
+                <li>+ metadata fields</li>
+            </ul>
+            
+            <p style="color: #721c24; background: #f8d7da; padding: 10px; border-radius: 3px;">
+                <strong>Action If Mismatch:</strong> Document differences. If columns missing, note for Phase 5 (schema fix needed).
+            </p>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 2.2: Validate documentation_metadata_index Table</h4>
+            <p><strong>Command:</strong></p>
+            <pre><code>DESCRIBE documentation_metadata_index;</code></pre>
+            
+            <p><strong>Expected Columns (11 total):</strong></p>
+            <ul>
+                <li>id (INT PRIMARY KEY)</li>
+                <li>file_path (VARCHAR UNIQUE)</li>
+                <li>file_type (VARCHAR)</li>
+                <li>title (VARCHAR)</li>
+                <li>excerpt (TEXT)</li>
+                <li>searchable_text (LONGTEXT FULLTEXT)</li>
+                <li>content_hash (VARCHAR)</li>
+                <li>role_access (VARCHAR)</li>
+                <li>indexed_at (DATETIME)</li>
+                <li>last_file_modified (DATETIME)</li>
+                <li>file_size (INT)</li>
+            </ul>
+
+            <p><strong>Verify FULLTEXT Index:</strong></p>
+            <pre><code>SHOW INDEX FROM documentation_metadata_index WHERE Key_name = 'idx_searchable';</code></pre>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 2.3: Quick Spot-Check Other Tables</h4>
+            <ul>
+                <li><code>DESCRIBE code_search_index;</code> - Should have: id, file_path, code_elements(JSON), searchable_code, indexed_at</li>
+                <li><code>DESCRIBE web_search_results;</code> - Should have: id, query, result_title, result_url, found_by_user_id, created_at</li>
+                <li><code>DESCRIBE ai_model_config;</code> - Should have: id, role, agent_type, model_name, enabled, api_endpoint, temperature, max_tokens</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Phase 3: Test Message Persistence -->
+    <div class="content-section">
+        <h2 id="phase-3-test-save">💾 Phase 3: Test Message Persistence (Write & Read Test)</h2>
+
+        <div class="phase-status">
+            <span class="status-badge pending">EXECUTE TODAY - CRITICAL</span>
+            <p><strong>Execution:</strong> Manual test of chat message save/load cycle</p>
+            <p><strong>Duration Est.:</strong> 45 minutes</p>
+        </div>
+
+        <h3>The Core Question This Phase Answers</h3>
+        <p style="font-size: 16px; font-weight: bold; color: #004085; background: #cce5ff; padding: 12px; border-radius: 4px; margin: 15px 0;">
+            <strong>❓ When I chat with the AI, are the messages actually being saved to the database, or just stored in memory?</strong>
+        </p>
+
+        <div class="task-card">
+            <h4>Task 3.1: Manual Test - Create a Test Conversation</h4>
+            <p><strong>Steps:</strong></p>
+            <ol>
+                <li>Open the AI Chat interface in Comserv (http://localhost:5000/ai or /Documentation/AI)</li>
+                <li>Create a new conversation with a test message</li>
+                <li>Send a message like: "Test message from Dec 26 daily plan verification at [HH:MM:SS]"</li>
+                <li>Note the EXACT timestamp and message content</li>
+                <li>Wait for response from AI</li>
+                <li>Verify message appears in chat history</li>
+            </ol>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 3.2: Check Database for Saved Message</h4>
+            <p><strong>Immediately After Chat:</strong></p>
+            <pre><code>-- Find the conversation we just created
+SELECT id, user_id, created_at FROM ai_conversations 
+ORDER BY created_at DESC LIMIT 1;
+
+-- Check conversation ID (let's say it's ID 1):
+SELECT id, conversation_id, role, LEFT(content, 100) as content_preview, created_at 
+FROM ai_messages 
+WHERE conversation_id = 1 
+ORDER BY created_at DESC;</code></pre>
+
+            <p><strong>Expected Result:</strong></p>
+            <ul>
+                <li>✓ Should find the conversation in ai_conversations table</li>
+                <li>✓ Should find both user message and assistant response in ai_messages</li>
+                <li>✓ Timestamps should be recent (within last 5 minutes)</li>
+                <li>✓ Message content should match what you sent</li>
+            </ul>
+
+            <p style="color: #721c24; background: #f8d7da; padding: 10px; border-radius: 3px; margin-top: 10px;">
+                <strong>⚠️ CRITICAL:</strong> If messages don't appear in database, the AI Chat system is not persisting data. This must be fixed before proceeding.
+            </p>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 3.3: Verify Message Integrity</h4>
+            <p><strong>Check that all fields are properly populated:</strong></p>
+            <pre><code>SELECT id, conversation_id, user_id, role, content, agent_type, 
+       model_used, search_context, sources_cited, created_at, updated_at
+FROM ai_messages 
+WHERE conversation_id = [YOUR_CONVERSATION_ID] 
+LIMIT 1\G</code></pre>
+
+            <p><strong>Verify:</strong></p>
+            <ul>
+                <li>✓ role is 'user' or 'assistant' (not null)</li>
+                <li>✓ content is not null or empty</li>
+                <li>✓ agent_type populated (if assistant message)</li>
+                <li>✓ model_used populated (if assistant message)</li>
+                <li>✓ created_at and updated_at are set</li>
+                <li>✓ search_context and sources_cited are JSON or null (not broken)</li>
+            </ul>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 3.4: Test Conversation Reload</h4>
+            <p><strong>Test that messages persist across page reloads:</strong></p>
+            <ol>
+                <li>Note the conversation ID from task 3.2</li>
+                <li>Refresh the page (Ctrl+R or browser reload)</li>
+                <li>Navigate back to the conversation</li>
+                <li>Verify all messages still appear in the UI</li>
+                <li>Verify message order is correct (oldest first, newest last)</li>
+            </ol>
+
+            <p style="color: #155724; background: #d4edda; padding: 10px; border-radius: 3px; margin-top: 10px;">
+                <strong>✅ Success:</strong> If messages persist after reload, data persistence is working correctly.
+            </p>
+        </div>
+    </div>
+
+    <!-- Phase 4: Query Testing -->
+    <div class="content-section">
+        <h2 id="phase-4-query-test">🔎 Phase 4: Query & Retrieval Testing (Search & Filtering)</h2>
+
+        <div class="phase-status">
+            <span class="status-badge pending">EXECUTE TODAY - IF PHASE 3 PASSES</span>
+            <p><strong>Execution:</strong> Test that queries work correctly on saved data</p>
+            <p><strong>Duration Est.:</strong> 20 minutes</p>
+        </div>
+
+        <h3>Tasks</h3>
+
+        <div class="task-card">
+            <h4>Task 4.1: Test Conversation History Retrieval</h4>
+            <p><strong>Query all messages in a conversation:</strong></p>
+            <pre><code>SELECT id, role, LEFT(content, 80) as content_preview, created_at
+FROM ai_messages 
+WHERE conversation_id = [ID]
+ORDER BY created_at ASC;</code></pre>
+
+            <p><strong>Verify:</strong> Messages return in chronological order, all fields present</p>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 4.2: Test User's Message Count</h4>
+            <p><strong>Get count of user's messages:</strong></p>
+            <pre><code>SELECT user_id, COUNT(*) as message_count, 
+       MAX(created_at) as last_message
+FROM ai_messages 
+GROUP BY user_id
+HAVING user_id = [YOUR_USER_ID];</code></pre>
+
+            <p><strong>Verify:</strong> Count matches number of messages you sent in testing</p>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 4.3: Test Documentation Index Search (Optional)</h4>
+            <p><strong>If documentation indexing is active, test FULLTEXT search:</strong></p>
+            <pre><code>SELECT id, file_path, MATCH(searchable_text) AGAINST('test' IN BOOLEAN MODE) as score
+FROM documentation_metadata_index 
+WHERE MATCH(searchable_text) AGAINST('test' IN BOOLEAN MODE)
+LIMIT 5;</code></pre>
+
+            <p><strong>Verify:</strong> FULLTEXT search returns results with relevance scores</p>
+        </div>
+    </div>
+
+    <!-- Task Checklist -->
+    <div class="content-section">
+        <h2 id="task-checklist">✅ Daily Task Checklist</h2>
+
+        <table class="checklist-table">
+            <tbody>
+                <tr>
+                    <td style="width: 40px;"><input type="checkbox" disabled></td>
+                    <td><strong>Phase 1.1:</strong> Connect to database and verify ENCY database available</td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 1.2:</strong> List all AI Chat tables (6 expected)</td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 1.3:</strong> Check startup logs for table creation messages</td>
+                </tr>
+                <tr style="background-color: #fff3cd;">
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 2:</strong> Validate table structure (columns match Result classes)</td>
+                </tr>
+                <tr style="background-color: #fff3cd;">
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 3.1:</strong> Send test chat message and record timestamp</td>
+                </tr>
+                <tr style="background-color: #fff3cd;">
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 3.2:</strong> Verify message saved to ai_messages table</td>
+                </tr>
+                <tr style="background-color: #fff3cd;">
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 3.3:</strong> Verify message fields are populated correctly</td>
+                </tr>
+                <tr style="background-color: #fff3cd;">
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 3.4:</strong> Test conversation reload (page refresh persists data)</td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 4.1:</strong> Test conversation history retrieval query</td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 4.2:</strong> Test user message count aggregation</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p style="margin-top: 20px; font-size: 13px; color: #666;">
+            Highlighted items (yellow) are critical for core functionality verification. If any fail, move to Phase 5.
+        </p>
+    </div>
+
+    <!-- Success Criteria -->
+    <div class="content-section">
+        <h2 id="success-criteria">🎯 Success Criteria</h2>
+
+        <div class="success-card">
+            <h3>✅ FULL SUCCESS (All Tests Pass)</h3>
+            <p><strong>Conditions:</strong></p>
+            <ul>
+                <li>All 6-7 AI Chat tables exist in ENCY database</li>
+                <li>Table schemas match Result class definitions (no missing columns)</li>
+                <li>Test chat message saved to ai_messages table with all fields populated</li>
+                <li>Message persists after page reload</li>
+                <li>Queries return correct results in correct order</li>
+            </ul>
+            <p><strong>Next Step:</strong> Proceed to Phase 5 (Documentation & Cleanup) - move on to tomorrow's plan</p>
+        </div>
+
+        <div class="warning-card" style="background: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 4px; margin: 20px 0;">
+            <h3>⚠️ PARTIAL SUCCESS (Some Tests Fail)</h3>
+            <p><strong>Conditions:</strong></p>
+            <ul>
+                <li>Tables exist but schema doesn't match Result classes</li>
+                <li>Messages save but some fields are null/empty</li>
+                <li>Query results return in wrong order</li>
+            </ul>
+            <p><strong>Next Step:</strong> Phase 5 (Troubleshooting & Schema Fixes)</p>
+        </div>
+
+        <div class="alert alert-danger">
+            <h3>❌ FAILURE (Critical Issues)</h3>
+            <p><strong>Conditions:</strong></p>
+            <ul>
+                <li>AI Chat tables don't exist even after startup</li>
+                <li>Test message doesn't save to database</li>
+                <li>Conversation reload loses all messages</li>
+            </ul>
+            <p><strong>Next Step:</strong> Phase 5 (Manual Table Creation & Debug)</p>
+        </div>
+    </div>
+
+    <!-- Quick Wins Section -->
+    <div class="content-section">
+        <h2 id="quick-wins">⚡ Quick Wins - If AI Chat Phases Complete Early</h2>
+        
+        <p><strong>From Priority Matrix: High Importance, Low-to-Medium Effort</strong></p>
+        <p>If AI Chat verification (Phases 1-4) completes by 2 PM, consider these quick wins that can be marked complete:</p>
+
+        <h3>Quick Win 1: A.3 Credentials Audit - Planning Phase (~2 hours)</h3>
+        <div style="background: #d4edda; padding: 15px; border-radius: 4px; margin: 15px 0; border-left: 4px solid #28a745;">
+            <p><strong>Status:</strong> 🔴 CRITICAL importance, 🟡 MEDIUM effort (1 week to execute, 2 hours to plan)</p>
+            <p><strong>What:</strong> Review where all API credentials/secrets are stored (Proxmox, Cloudflare, Ollama). Audit security: Are they in version control? Hardcoded? Using secure vaults?</p>
+            <p><strong>Quick Planning Task (2 hours max):</strong></p>
+            <ul>
+                <li>Search codebase for hardcoded API keys: `grep -r "api_key\|password\|secret" lib/ config/`</li>
+                <li>List all files: `.env.development`, `.env.staging`, `db_config.json`, `cloudflare_config.json`, credential files</li>
+                <li>Create document: Where each credential is stored, are they in .gitignore?</li>
+                <li>Add to Master Plan: This blocks B.1/B.2 (Docker Secrets, Auth fixes)</li>
+            </ul>
+            <p><strong>Achievable Today?</strong> ✅ YES - planning/audit phase. Actual fix is Phase 2.</p>
+        </div>
+
+        <h3>Quick Win 2: B.3 Theme Handling - Audit Phase (~1.5 hours)</h3>
+        <div style="background: #d4edda; padding: 15px; border-radius: 4px; margin: 15px 0; border-left: 4px solid #28a745;">
+            <p><strong>Status:</strong> 🟠 HIGH importance, 🟡 MEDIUM effort</p>
+            <p><strong>What:</strong> Check if theme system has known issues. Are theme CSS variables working? Do per-site themes apply correctly?</p>
+            <p><strong>Quick Audit Task (1.5 hours max):</strong></p>
+            <ul>
+                <li>Test: Navigate to 3 different sites and verify theme CSS loads correctly</li>
+                <li>Check: `root/static/css/themes/` directory - what themes exist?</li>
+                <li>Verify: `theme_definitions.json` has mappings for all sites</li>
+                <li>Test: Are CSS variables working? (--primary-color, --text-color, etc.)</li>
+                <li>Document findings: What works, what needs fixing?</li>
+            </ul>
+            <p><strong>Achievable Today?</strong> ✅ YES - audit phase. Can move to fix phase if issues found.</p>
+            <p><strong>📋 Audit Report:</strong> <a href="/Documentation/B3ThemeHandlingAuditReport" target="_blank" class="doc-link">B3ThemeHandlingAuditReport</a> - Comprehensive findings and refactoring recommendations</p>
+        </div>
+
+        <h3>Quick Win 3: Master Plan Improvements (Ongoing - Add as found)</h3>
+        <div style="background: #e3f2fd; padding: 15px; border-radius: 4px; margin: 15px 0; border-left: 4px solid #1976d2;">
+            <p><strong>Document Missing Components Found During AI Chat Testing:</strong></p>
+            <ul>
+                <li>Missing Result classes for other tables?</li>
+                <li>Missing controllers or routes that should exist?</li>
+                <li>Documentation gaps discovered?</li>
+                <li>Schema mismatches between code and database?</li>
+            </ul>
+            <p><strong>Action:</strong> When found, add to Master Plan in a new section: "Improvements & Missing Components Identified During E.1 Implementation"</p>
+        </div>
+    </div>
+
+    <!-- Next Steps -->
+    <div class="content-section">
+        <h2 id="next-steps">🔄 Next Steps & Tomorrow's Plan (December 27)</h2>
+
+        <div class="alert alert-danger" style="margin-bottom: 30px;">
+            <h3>🔴 **CRITICAL FOR TOMORROW** - A.2: K8s Readiness Plan</h3>
+            <p><strong>Status:</strong> DRAFT + Awaiting Approval (from Priority Matrix)</p>
+            <p><strong>Why:</strong> This is the BLOCKING task for all infrastructure work (A.1 K8s Migration depends on it). Without A.2 completion, we cannot proceed with K8s setup.</p>
+            <p><strong>Tomorrow's Action:</strong></p>
+            <ul>
+                <li>Review Phase0KubernetesReadinessPlan.tt</li>
+                <li>Gather infrastructure requirements: VM setup, K8s cluster readiness</li>
+                <li>Approve plan or request modifications</li>
+                <li>Assign execution team/timeline</li>
+            </ul>
+            <p><strong>Impact:</strong> A.2 blocks A.1. A.3 (Credentials) unblocks B.1/B.2 (bug fixes). E.1 (AI Chat) supports all.</p>
+        </div>
+
+        <h3>If Phase 3-4 All Pass (E.1 Success)</h3>
+        <ul>
+            <li>✅ AI Chat Phase 2 is COMPLETE</li>
+            <li>→ Add to Master Plan: "E.1 Phase 2 Complete - Database verification passed"</li>
+            <li>→ Move to Phase 3: Frontend widget integration (E.1 Phase 3)</li>
+            <li>→ Continue with Phase 4: Full system testing and documentation</li>
+            <li>→ If time permits: Run Quick Win 1 & 2 (A.3 planning, B.3 audit)</li>
+        </ul>
+
+        <h3>If Phase 3 Fails (Messages Don't Save)</h3>
+        <ul>
+            <li>Debug Result class mappings</li>
+            <li>Check DBIx::Class configuration</li>
+            <li>Review controller code that saves messages</li>
+            <li>Manually execute SQL to create tables if DBSchemaManager not working</li>
+            <li>Test with simpler Result class first (single table)</li>
+            <li>→ Add to Master Plan: "E.1 Phase 2 - Database persistence issue identified"</li>
+        </ul>
+
+        <h3>If Phase 1-2 Fail (Tables Don't Exist)</h3>
+        <ul>
+            <li>Manually create tables using SQL file</li>
+            <li>Debug startup code in Comserv.pm</li>
+            <li>Check DBSchemaManager is being called correctly</li>
+            <li>Verify database user has CREATE TABLE permissions</li>
+            <li>→ Add to Master Plan: "E.1 Phase 2 - Table creation failure - debug required"</li>
+        </ul>
+
+        <h3>Quick Wins If Time Permits</h3>
+        <ul>
+            <li>Quick Win 1: A.3 Credentials Audit (planning phase) - 2 hours</li>
+            <li>Quick Win 2: B.3 Theme Handling (audit phase) - 1.5 hours</li>
+            <li>Quick Win 3: Document any missing components found during E.1 testing</li>
+        </ul>
+
+        <div class="nav-links" style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 4px;">
+            <p><strong>📅 Continue to:</strong> <a href="/Documentation/Daily_Plans-2025-12-27" style="color: #007bff; text-decoration: none; font-weight: bold;">December 27 Daily Plan</a></p>
+            <p><strong>📋 Reference:</strong> <a href="/Documentation/MASTER_PLAN_COORDINATION" style="color: #007bff; text-decoration: none; font-weight: bold;">Master Plan Coordination</a></p>
+            <p><strong>📚 Schema Reference:</strong> <a href="/Documentation/AI_Chat_Schema_Documentation" style="color: #007bff; text-decoration: none; font-weight: bold;">AI Chat Schema Documentation</a></p>
+        </div>
+    </div>
+
+    <div class="footer" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 12px;">
+        <p>Daily Plan for December 26, 2025 | Version 0.02 (Priority Matrix Updated) | E.1 Strategic Initiative + Quick Wins</p>
+        <p>Part of MASTER_PLAN_COORDINATION - Aligned with Priority Matrix | References: A.2 (CRITICAL-Tomorrow), A.3 (Quick Win), B.3 (Quick Win)</p>
+        <p><strong>Key Updates:</strong> Integrated Priority Matrix framework; added Quick Wins section; emphasized A.2 urgency; instruction to update Master Plan with findings</p>
+    </div>
+</div>

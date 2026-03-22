@@ -1,5 +1,10 @@
 package Comserv::Util::SystemInfo;
 
+# CRITICAL: Debug Bar System Information Module - DO NOT REMOVE
+# This module provides hostname, IP, and system info used by the debug bar
+# to display server diagnostics to admins and debug mode users.
+# Removing this breaks Root.pm debug bar rendering and admin page visibility.
+
 use strict;
 use warnings;
 use Socket;
@@ -26,7 +31,12 @@ Returns the hostname of the server
 =cut
 
 sub get_server_hostname {
-    return hostname();
+    my $name = hostname();
+    # CRITICAL: Ensure return value is never empty - must be valid hostname or 'Unknown'
+    if (!$name || $name eq '') {
+        return 'Unknown';
+    }
+    return $name;
 }
 
 =head2 get_server_ip
@@ -40,19 +50,42 @@ sub get_server_ip {
     
     # Try multiple methods to get the server IP
     
-    # Method 1: Use Socket to get IP from hostname
+    # Method 1: Check for Docker environment and get container IP
     eval {
-        my $hostname = hostname();
-        $ip = inet_ntoa(scalar gethostbyname($hostname || 'localhost'));
-        
-        # Skip localhost addresses
-        if ($ip eq '127.0.0.1' || $ip eq '::1') {
-            $ip = undef;
+        # In Docker, check the primary network interface (usually eth0 or similar)
+        # We can identify Docker by checking for /.dockerenv file
+        if (-f '/.dockerenv') {
+            # We're in Docker - try to get the container's IP
+            my $output = `ip addr show 2>/dev/null`;
+            if ($output) {
+                # Look for the first non-loopback IPv4 address
+                while ($output =~ /inet (?:addr:)?(\d+\.\d+\.\d+\.\d+)\/\d+/g) {
+                    my $found_ip = $1;
+                    # Skip localhost addresses
+                    if ($found_ip ne '127.0.0.1') {
+                        $ip = $found_ip;
+                        last;
+                    }
+                }
+            }
         }
     };
     
+    # Method 2: Use Socket to get IP from hostname
+    if (!$ip) {
+        eval {
+            my $hostname = hostname();
+            $ip = inet_ntoa(scalar gethostbyname($hostname || 'localhost'));
+            
+            # Skip localhost addresses
+            if ($ip eq '127.0.0.1' || $ip eq '::1') {
+                $ip = undef;
+            }
+        };
+    }
+    
     if ($@ || !$ip) {
-        # Method 2: Parse ifconfig/ip addr output
+        # Method 3: Parse ifconfig/ip addr output
         eval {
             my $cmd = -x '/sbin/ifconfig' ? '/sbin/ifconfig' : 
                      (-x '/bin/ifconfig' ? '/bin/ifconfig' : 
@@ -61,7 +94,7 @@ sub get_server_ip {
             if ($cmd) {
                 my $output = `$cmd`;
                 # Look for non-loopback IPv4 addresses
-                while ($output =~ /inet (?:addr:)?(\d+\.\d+\.\d+\.\d+).*?(?:netmask|Mask)/g) {
+                while ($output =~ /inet (?:addr:)?(\d+\.\d+\.\d+\.\d+).*?(?:netmask|Mask|\/)/g) {
                     my $found_ip = $1;
                     # Skip localhost addresses
                     if ($found_ip ne '127.0.0.1') {
@@ -82,7 +115,7 @@ sub get_server_ip {
         };
     }
     
-    # Method 3: Try to get IP by connecting to a public server
+    # Method 4: Try to get IP by connecting to a public server
     if ($@ || !$ip) {
         eval {
             # Create a UDP socket
@@ -108,8 +141,12 @@ sub get_server_ip {
         $logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'get_server_ip', "Error getting server IP: $@");
     }
     
-    # Return the IP or a default message
-    return $ip || 'Unknown';
+    # CRITICAL: Ensure return value is never empty string - must be valid IP or 'Unknown'
+    # Don't return undef or empty values as they display as blank in templates
+    if (!$ip || $ip eq '') {
+        return 'Unknown';
+    }
+    return $ip;
 }
 
 =head2 get_system_info
@@ -128,6 +165,32 @@ sub get_system_info {
         os => $^O,
         perl_version => $^V,
     };
+}
+
+=head2 get_app_workflow
+
+Returns the name of the application directory (workflow)
+
+=cut
+
+sub get_app_workflow {
+    my ($class, $app_home) = @_;
+    
+    # CRITICAL: Ensure we have a valid app_home
+    return 'Unknown' if !$app_home;
+    
+    my $workflow = 'Unknown';
+    eval {
+        require File::Spec;
+        require File::Basename;
+        
+        # If app_home is /home/shanta/PycharmProjects/comserv2/Comserv
+        # catdir(.., '..') gives /home/shanta/PycharmProjects/comserv2
+        # basename gives 'comserv2'
+        $workflow = File::Basename::basename(File::Spec->catdir($app_home, '..'));
+    };
+    
+    return $workflow || 'Unknown';
 }
 
 1;

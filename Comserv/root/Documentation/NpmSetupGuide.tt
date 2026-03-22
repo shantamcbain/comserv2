@@ -1,0 +1,249 @@
+[% META
+        title = "Nginx Proxy Manager Setup Guide"
+   description = "Comprehensive guide for setting up Nginx Proxy Manager (NPM) with Comserv, including automated infrastructure setup, Docker/Docker Compose installation, NPM configuration, API key generation, and troubleshooting"
+   roles = "admin,developer"
+   TemplateType = "guide"
+   category = "guides,nginx,proxy,docker,infrastructure"
+   page_version = "1.00"
+   last_updated = "2026-01-09 23:52:00 UTC"
+   site_specific = ""
+%]
+
+[% PageVersion = 'Documentation/NpmSetupGuide.tt,v 1.00 2026/01/09 DocumentationSyncAgent Exp - Initial conversion from markdown, setup automation and manual installation procedures' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Nginx Proxy Manager Setup Guide</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-09 23:52:00 UTC | 
+        Version: 1.00 |
+        Author: DocumentationSyncAgent |
+        Status: New (Converted from Markdown)
+    </div>
+
+    <!-- TABLE OF CONTENTS -->
+    <div id="toc" style="background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; margin: var(--spacing-large) 0;">
+        <h2 style="color: var(--text-color); margin-top: 0;">Quick Navigation</h2>
+        <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+            <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+            <a href="#automated-setup" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Automated Setup</a>
+            <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Prerequisites</a>
+            <a href="#manual-installation" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Manual Installation</a>
+            <a href="#configuration" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Configuration</a>
+            <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Troubleshooting</a>
+        </div>
+    </div>
+
+    <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
+    
+    <p style="color: var(--text-color);">This guide explains how to set up the Nginx Proxy Manager (NPM) for use with the Comserv ProxyManager controller. Nginx Proxy Manager is a simple, powerful reverse proxy solution that works seamlessly with Docker and Kubernetes environments.</p>
+
+    <h2 id="automated-setup" style="color: var(--text-color); font-family: var(--header-font);">Automated Setup</h2>
+    
+    <p style="color: var(--text-color);">The Comserv application now includes an automated infrastructure setup feature that can install the following components:</p>
+    
+    <ul style="color: var(--text-color);">
+        <li>Docker</li>
+        <li>Kubernetes (optional)</li>
+        <li>Nginx Proxy Manager</li>
+    </ul>
+    
+    <p style="color: var(--text-color);"><strong>To use the automated setup:</strong></p>
+    
+    <ol style="color: var(--text-color);">
+        <li>Log in to Comserv with an admin account</li>
+        <li>Navigate to <code>/proxymanager/setup_infrastructure</code></li>
+        <li>Follow the on-screen instructions to install the required components</li>
+    </ol>
+
+    <h2 id="prerequisites" style="color: var(--text-color); font-family: var(--header-font);">Manual Setup Prerequisites</h2>
+    
+    <p style="color: var(--text-color);">If you prefer to set up the components manually, you'll need the following:</p>
+    
+    <ul style="color: var(--text-color);">
+        <li>Docker installed on your server</li>
+        <li>Docker Compose installed on your server</li>
+        <li>Basic understanding of networking concepts</li>
+    </ul>
+
+    <h2 id="manual-installation" style="color: var(--text-color); font-family: var(--header-font);">Manual Installation Steps</h2>
+
+    <h3 style="color: var(--text-color);">Step 1: Install Docker</h3>
+    
+    <p style="color: var(--text-color);">Execute the following commands to install Docker:</p>
+    
+    <pre style="background-color: var(--dark-color); color: var(--light-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;"><code>
+# Update package index
+sudo apt update
+
+# Install required packages
+sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
+
+# Add Docker's official GPG key
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+
+# Add Docker repository
+sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+
+# Update package index again
+sudo apt update
+
+# Install Docker CE
+sudo apt install -y docker-ce
+
+# Add your user to the docker group
+sudo usermod -aG docker $USER
+
+# Apply the new group membership
+newgrp docker
+    </code></pre>
+
+    <h3 style="color: var(--text-color);">Step 2: Install Docker Compose</h3>
+    
+    <pre style="background-color: var(--dark-color); color: var(--light-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;"><code>
+# Download Docker Compose
+sudo curl -L "https://github.com/docker/compose/releases/download/v2.18.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+
+# Apply executable permissions
+sudo chmod +x /usr/local/bin/docker-compose
+
+# Verify installation
+docker-compose --version
+    </code></pre>
+
+    <h3 style="color: var(--text-color);">Step 3: Create Docker Compose File</h3>
+    
+    <p style="color: var(--text-color);">Create a file named <code>docker-compose.yml</code> in a directory of your choice (e.g., <code>/home/shanta/npm</code>):</p>
+    
+    <pre style="background-color: var(--dark-color); color: var(--light-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;"><code>
+version: '3'
+services:
+  app:
+    image: 'jc21/nginx-proxy-manager:latest'
+    restart: unless-stopped
+    ports:
+      - '80:80'    # Public HTTP Port
+      - '443:443'  # Public HTTPS Port
+      - '81:81'    # Admin Web Port
+    environment:
+      DB_MYSQL_HOST: "db"
+      DB_MYSQL_PORT: 3306
+      DB_MYSQL_USER: "npm"
+      DB_MYSQL_PASSWORD: "npm"
+      DB_MYSQL_NAME: "npm"
+    volumes:
+      - ./data:/data
+      - ./letsencrypt:/etc/letsencrypt
+    depends_on:
+      - db
+
+  db:
+    image: 'jc21/mariadb-aria:latest'
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: 'npm'
+      MYSQL_DATABASE: 'npm'
+      MYSQL_USER: 'npm'
+      MYSQL_PASSWORD: 'npm'
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+    </code></pre>
+
+    <h3 style="color: var(--text-color);">Step 4: Start Nginx Proxy Manager</h3>
+    
+    <pre style="background-color: var(--dark-color); color: var(--light-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;"><code>
+# Navigate to the directory containing docker-compose.yml
+cd /home/shanta/npm
+
+# Start the containers in detached mode
+docker-compose up -d
+    </code></pre>
+
+    <h3 style="color: var(--text-color);">Step 5: Access the Admin Interface</h3>
+    
+    <ol style="color: var(--text-color);">
+        <li>Open a web browser and navigate to <code>http://localhost:81</code></li>
+        <li>Log in with the default credentials:
+            <ul>
+                <li><strong>Email:</strong> <code>admin@example.com</code></li>
+                <li><strong>Password:</strong> <code>changeme</code></li>
+            </ul>
+        </li>
+        <li>You will be prompted to change the default credentials on first login</li>
+    </ol>
+
+    <h3 style="color: var(--text-color);">Step 6: Generate an API Key</h3>
+    
+    <ol style="color: var(--text-color);">
+        <li>Log in to the NPM admin interface</li>
+        <li>Navigate to the user profile settings</li>
+        <li>Generate a new API key</li>
+        <li>Copy the API key for use in the Comserv configuration</li>
+    </ol>
+
+    <h2 id="configuration" style="color: var(--text-color); font-family: var(--header-font);">Configure Comserv</h2>
+    
+    <p style="color: var(--text-color);">Create a configuration file for your environment (e.g., <code>npm-development.conf</code>) in the Comserv config directory:</p>
+    
+    <pre style="background-color: var(--dark-color); color: var(--light-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;"><code>
+&lt;NPM&gt;
+    endpoint = http://localhost:81/api
+    api_key = your_generated_api_key
+    environment = development
+    access_scope = full-access
+&lt;/NPM&gt;
+    </code></pre>
+
+    <h2 id="troubleshooting" style="color: var(--text-color); font-family: var(--header-font);">Troubleshooting</h2>
+
+    <h3 style="color: var(--text-color);">Connection Refused</h3>
+    
+    <div style="background-color: var(--light-color); border-left: 4px solid var(--warn-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+        <p style="color: var(--text-color);"><strong>If you see a "Connection refused" error, verify:</strong></p>
+        <ul style="color: var(--text-color);">
+            <li>Docker is running: <code>docker ps</code></li>
+            <li>NPM container is running: <code>docker ps | grep nginx-proxy-manager</code></li>
+            <li>The container is exposing port 81 correctly</li>
+        </ul>
+    </div>
+
+    <h3 style="color: var(--text-color);">API Key Issues</h3>
+    
+    <div style="background-color: var(--light-color); border-left: 4px solid var(--warn-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+        <p style="color: var(--text-color);"><strong>If you see authentication errors:</strong></p>
+        <ul style="color: var(--text-color);">
+            <li>Verify the API key is correct</li>
+            <li>Ensure the API key has not expired</li>
+            <li>Check that the user associated with the API key has appropriate permissions</li>
+        </ul>
+    </div>
+
+    <h3 style="color: var(--text-color);">Docker Not Installed</h3>
+    
+    <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+        <p style="color: var(--text-color);">If Docker is not installed on your development server, you will see mock data in the ProxyManager interface. This is expected behavior to allow development without requiring Docker.</p>
+    </div>
+
+    <h2 style="color: var(--text-color); font-family: var(--header-font);">Production Deployment</h2>
+    
+    <p style="color: var(--text-color);">For production environments, follow these best practices:</p>
+    
+    <ul style="color: var(--text-color);">
+        <li>Use strong, unique passwords for the database</li>
+        <li>Configure proper SSL certificates</li>
+        <li>Set up regular backups of the NPM data directory</li>
+        <li>Consider using a reverse proxy for additional security</li>
+    </ul>
+
+    <h2 style="color: var(--text-color); font-family: var(--header-font);">Additional Resources</h2>
+    
+    <ul style="color: var(--text-color);">
+        <li><a href="https://nginxproxymanager.com/guide/" style="color: var(--link-color);">Nginx Proxy Manager Official Documentation</a></li>
+        <li><a href="https://docs.docker.com/" style="color: var(--link-color);">Docker Documentation</a></li>
+        <li><a href="https://docs.docker.com/compose/" style="color: var(--link-color);">Docker Compose Documentation</a></li>
+    </ul>
+
+</div>

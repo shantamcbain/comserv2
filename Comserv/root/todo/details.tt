@@ -28,6 +28,7 @@
 </div>
 
 <form action="/todo/modify/[% record.get_column('record_id') %]" method="post">
+    <input type="hidden" name="return_to" value="[% return_to %]">
     <div>
         <label for="sitename">Site Name:</label>
         <input type="text" id="sitename" name="sitename" value="[% record.get_column('sitename') %]">
@@ -41,6 +42,11 @@
     <div>
         <label for="due_date">Due Date:</label>
         <input type="date" id="due_date" name="due_date" value="[% record.get_column('due_date') %]">
+    </div>
+
+    <div>
+        <label for="time_of_day">Time of Day:</label>
+        <input type="time" id="time_of_day" name="time_of_day" value="[% record.get_column('time_of_day') %]">
     </div>
 
         <label for="subject">Subject:</label>
@@ -125,8 +131,9 @@
         <input type="hidden" name="comments" value="[% record.get_column('comments') %]">
         <button type="submit">Add Log Entry</button>
     </form>
-    <form action="/todo/edit/[% record.get_column('record_id') %]" method="POST">
+    <form action="/todo/edit/[% record.get_column('record_id') %]" method="POST" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
         <input type="hidden" name="record_id" value="[% record.get_column('record_id') %]">
+        <input type="hidden" name="return_to" value="">
         <button type="submit">Edit Todo</button>
     </form>
 </div>

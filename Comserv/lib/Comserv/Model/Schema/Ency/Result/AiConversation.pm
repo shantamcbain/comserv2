@@ -1,5 +1,6 @@
 package Comserv::Model::Schema::Ency::Result::AiConversation;
 use base 'DBIx::Class::Core';
+__PACKAGE__->load_components("InflateColumn::DateTime");
 use warnings FATAL => 'all';
 
 __PACKAGE__->table('ai_conversations');
@@ -32,6 +33,10 @@ __PACKAGE__->add_columns(
         extra => { list => ['active', 'archived'] },
         default_value => 'active',
         is_nullable => 0,
+    },
+    metadata => {
+        data_type => 'longtext',
+        is_nullable => 1,
     },
 );
 

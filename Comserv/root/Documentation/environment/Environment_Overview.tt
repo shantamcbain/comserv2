@@ -1,0 +1,20 @@
+[% META title = 'Environment Overview' %]
+[% PageVersion = 'Documentation/environment/Environment_Overview.tt,v 0.01 2025/11/14 Codebuddy Exp Codebuddy ' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<div class="environment-overview">
+    <h1>Environment Overview</h1>
+    <p>High-level view of the current physical and virtual environment, including key nodes, VMs/CTs, gateways, storage, and data paths. This page should be kept lightweight and link to more detailed inventories.</p>
+    <ul>
+        <li>Physical racks and core networking gear</li>
+        <li>Proxmox cluster nodes and major VMs/CTs</li>
+        <li>Databases, gateways, and data paths</li>
+        <li>Reference to source inventories and topology diagrams</li>
+    </ul>
+</div>
+
+...rest of the code...
