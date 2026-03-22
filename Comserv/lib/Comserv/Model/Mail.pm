@@ -18,7 +18,8 @@ has 'logging' => (
 
 # Enhanced email sending with detailed logging and error handling
 sub send_email {
-    my ($self, $c, $to, $subject, $body, $site_id) = @_;
+    my ($self, $c, $to, $subject, $body, $site_id, $opts) = @_;
+    $opts ||= {};
     
     # Use site_id from parameter or session
     $site_id //= $c->session->{site_id};
@@ -46,14 +47,23 @@ sub send_email {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
         "Using Net::SMTP for email sending");
     
+    # Build From display name: "Leader Name (via Workshops)" <system@domain>
+    my $system_from = $smtp_config->{from} || 'noreply@computersystemconsulting.ca';
+    my $leader_name = $opts->{leader_name} || '';
+    my $display_from = $leader_name
+        ? qq{"$leader_name (via Workshops)" <$system_from>}
+        : $system_from;
+    my $reply_to = $opts->{reply_to} || $system_from;
+
     # Create a MIME::Lite message
     my $msg = MIME::Lite->new(
-        From    => $smtp_config->{from},
+        From    => $display_from,
         To      => $to,
         Subject => $subject,
         Type    => 'text/plain',
         Data    => $body
     );
+    $msg->add('Reply-To' => $reply_to) if $reply_to ne $system_from;
     
     try {
         # Log SMTP settings for debugging
