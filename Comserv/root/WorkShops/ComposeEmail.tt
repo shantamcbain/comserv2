@@ -4,11 +4,11 @@
    roles = "admin,workshop_leader"
    TemplateType = "Application"
    category = "WorkShops"
-   page_version = "0.03"
-   last_updated = "2026-02-16"
+   page_version = "0.04"
+   last_updated = "2026-03-22"
 %]
 
-[% PageVersion = 'WorkShops/ComposeEmail.tt,v 0.03 2026/02/16 shanta Exp shanta' %]
+[% PageVersion = 'WorkShops/ComposeEmail.tt,v 0.04 2026/03/22 shanta Exp shanta' %]
 [% IF c.session.debug_mode == 1 %]
     <div class="debug-info">PageVersion: [% PageVersion %]</div>
 [% END %]
@@ -45,6 +45,44 @@
             </div>
             [% ELSE %]
             
+            [% all_templates = workshop_templates.merge(global_templates) %]
+            [% IF all_templates.size > 0 %]
+            <div class="content-section">
+                <label for="load_template"><strong>Load from Template:</strong></label>
+                <select id="load_template" class="form-input" style="width:auto;display:inline-block;">
+                    <option value="">-- select a template --</option>
+                    [% IF workshop_templates.size > 0 %]
+                    <optgroup label="This Workshop">
+                        [% FOR tmpl IN workshop_templates %]
+                        <option value="[% tmpl.id %]"
+                                data-subject="[% tmpl.subject | html %]"
+                                data-body="[% tmpl.body_text | html %]">
+                            [% tmpl.name | html %]
+                        </option>
+                        [% END %]
+                    </optgroup>
+                    [% END %]
+                    [% IF global_templates.size > 0 %]
+                    <optgroup label="Global">
+                        [% FOR tmpl IN global_templates %]
+                        <option value="[% tmpl.id %]"
+                                data-subject="[% tmpl.subject | html %]"
+                                data-body="[% tmpl.body_text | html %]">
+                            [% tmpl.name | html %] (global)
+                        </option>
+                        [% END %]
+                    </optgroup>
+                    [% END %]
+                </select>
+                <button type="button" class="btn btn-secondary" onclick="loadTemplate()">Load</button>
+                <a href="/workshop/mail_templates/[% workshop.id %]" class="btn btn-secondary">Manage Templates</a>
+            </div>
+            [% ELSE %]
+            <div class="content-section">
+                <a href="/workshop/mail_templates/[% workshop.id %]" class="btn btn-secondary">+ Create Templates</a>
+            </div>
+            [% END %]
+
             <div class="form-container">
                 <form method="POST" action="/workshop/send_email/[% workshop.id %]" class="app-form">
                     
@@ -80,6 +118,16 @@
                     <a href="/workshop/details?id=[% workshop.id %]" class="btn btn-secondary">Back to Workshop</a>
                 </div>
             </div>
+
+            <script>
+            function loadTemplate() {
+                var sel = document.getElementById('load_template');
+                var opt = sel.options[sel.selectedIndex];
+                if (!opt.value) return;
+                document.getElementById('subject').value = opt.getAttribute('data-subject');
+                document.getElementById('body').value    = opt.getAttribute('data-body');
+            }
+            </script>
             
             [% END %]
             

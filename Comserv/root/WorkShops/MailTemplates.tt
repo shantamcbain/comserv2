@@ -1,0 +1,112 @@
+[% META
+   title = "Mail Templates"
+   description = "Manage reusable email templates for workshop communications"
+   roles = "admin,workshop_leader"
+   TemplateType = "Application"
+   category = "WorkShops"
+   page_version = "0.01"
+   last_updated = "2026-03-22"
+%]
+[% PageVersion = 'WorkShops/MailTemplates.tt,v 0.01 2026/03/22 shanta Exp shanta' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+
+    <div class="page-header">
+        <h1>Mail Templates</h1>
+        <h2 class="page-subtitle">Workshop: [% workshop.title | html %]</h2>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+
+            [% IF c.flash.success_msg %]
+                <div class="success">[% c.flash.success_msg | html %]</div>
+            [% END %]
+            [% IF c.flash.error_msg %]
+                <div class="error">[% c.flash.error_msg | html %]</div>
+            [% END %]
+
+            <div class="form-actions">
+                <a href="/workshop/add_mail_template/[% workshop.id %]" class="btn btn-primary">+ New Template</a>
+                <a href="/workshop/compose_email/[% workshop.id %]" class="btn btn-secondary">Compose Email</a>
+                <a href="/workshop/dashboard" class="btn btn-secondary">Dashboard</a>
+            </div>
+
+            <div class="content-section">
+                <h2>Workshop Templates</h2>
+                [% IF workshop_templates.size > 0 %]
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Subject</th>
+                                <th>Scope</th>
+                                <th class="action-cell">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        [% FOR tmpl IN workshop_templates %]
+                            <tr>
+                                <td>[% tmpl.name | html %]</td>
+                                <td>[% tmpl.template_type | html %]</td>
+                                <td>[% tmpl.subject | html %]</td>
+                                <td>This Workshop</td>
+                                <td class="action-cell">
+                                    <a href="/workshop/edit_mail_template/[% workshop.id %]/[% tmpl.id %]" class="btn btn-sm btn-secondary">Edit</a>
+                                    <a href="/workshop/delete_mail_template/[% workshop.id %]/[% tmpl.id %]"
+                                       class="btn btn-sm btn-danger"
+                                       onclick="return confirm('Delete this template?')">Delete</a>
+                                </td>
+                            </tr>
+                        [% END %]
+                        </tbody>
+                    </table>
+                </div>
+                [% ELSE %]
+                    <p class="empty-state">No workshop-specific templates yet.</p>
+                [% END %]
+            </div>
+
+            <div class="content-section">
+                <h2>Global Templates</h2>
+                [% IF global_templates.size > 0 %]
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Subject</th>
+                                <th>Scope</th>
+                                <th class="action-cell">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        [% FOR tmpl IN global_templates %]
+                            <tr>
+                                <td>[% tmpl.name | html %]</td>
+                                <td>[% tmpl.template_type | html %]</td>
+                                <td>[% tmpl.subject | html %]</td>
+                                <td>All Workshops</td>
+                                <td class="action-cell">
+                                    <a href="/workshop/edit_mail_template/[% workshop.id %]/[% tmpl.id %]" class="btn btn-sm btn-secondary">Edit</a>
+                                    <a href="/workshop/delete_mail_template/[% workshop.id %]/[% tmpl.id %]"
+                                       class="btn btn-sm btn-danger"
+                                       onclick="return confirm('Delete this template?')">Delete</a>
+                                </td>
+                            </tr>
+                        [% END %]
+                        </tbody>
+                    </table>
+                </div>
+                [% ELSE %]
+                    <p class="empty-state">No global templates yet.</p>
+                [% END %]
+            </div>
+
+        </div>
+    </div>
+</div>
