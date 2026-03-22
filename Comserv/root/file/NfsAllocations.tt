@@ -84,26 +84,86 @@
                 </td>
               </tr>
               <tr id="edit_row_[% alloc.id %]" style="display:none">
-                <td colspan="6">
+                <td colspan="7">
                   <form method="post" action="[% c.uri_for('/file/nfs_allocation_edit', alloc.id) %]"
-                        class="app-form">
-                    <div class="form-row">
-                      <div class="form-field">
-                        <label for="edit_desc_[% alloc.id %]">Description:</label>
-                        <input type="text" id="edit_desc_[% alloc.id %]" name="description"
-                               value="[% alloc.description | html %]" class="form-input">
+                        class="app-form" style="padding:12px">
+                    <div class="form-section">
+                      <div class="form-row">
+                        <div class="form-field">
+                          <label for="edit_sitename_[% alloc.id %]">SiteName <span class="required">*</span></label>
+                          [% IF sites && sites.size > 0 %]
+                          <select id="edit_sitename_[% alloc.id %]" name="sitename" class="form-input"
+                                  onchange="editSitenameChanged([% alloc.id %], this.value)" required>
+                            <option value="">-- Select SiteName --</option>
+                            [% FOR site IN sites %]
+                            <option value="[% site.name | html %]"
+                                    data-id="[% site.id | html %]"
+                                    [% 'selected' IF site.name == alloc.sitename %]>[% site.name | html %]</option>
+                            [% END %]
+                          </select>
+                          [% ELSE %]
+                          <input type="text" id="edit_sitename_[% alloc.id %]" name="sitename"
+                                 value="[% alloc.sitename | html %]" class="form-input" required>
+                          [% END %]
+                        </div>
+                        <div class="form-field">
+                          <label for="edit_site_id_[% alloc.id %]">Site ID</label>
+                          <input type="text" id="edit_site_id_[% alloc.id %]" name="site_id"
+                                 value="[% alloc.site_id | html %]" class="form-input"
+                                 placeholder="Optional (numeric only)">
+                        </div>
                       </div>
-                      <div class="form-field">
-                        <label>
-                          <input type="checkbox" name="is_active" value="1"
-                            [% 'checked' IF alloc.is_active %]> Active
-                        </label>
+                      <div class="form-row">
+                        <div class="form-field" style="flex:1">
+                          <label for="edit_nfs_path_[% alloc.id %]">NFS Path <span class="required">*</span></label>
+
+                          [% IF existing_dirs && existing_dirs.size > 0 %]
+                          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+                            <label style="font-size:.82rem;font-weight:normal;white-space:nowrap">
+                              Pick existing directory:
+                            </label>
+                            <select id="edit_existing_dir_[% alloc.id %]" class="form-input" style="max-width:340px"
+                                    onchange="editPickExisting([% alloc.id %], this.value)">
+                              <option value="">-- or choose existing dir --</option>
+                              [% FOR d IN existing_dirs %]
+                              <option value="[% d.path | html %]"
+                                      [% 'selected' IF d.path == alloc.nfs_path %]>[% d.name | html %]</option>
+                              [% END %]
+                            </select>
+                          </div>
+                          [% END %]
+
+                          <input type="text" id="edit_nfs_path_[% alloc.id %]" name="nfs_path"
+                                 value="[% alloc.nfs_path | html %]" class="form-input"
+                                 style="width:100%;max-width:480px"
+                                 oninput="editClearPicker([% alloc.id %])" required>
+                          <div style="font-size:.75rem;color:#666;margin-top:3px">
+                            Must be an absolute path or relative to NFS root: <code>[% nfs_root | html %]</code>
+                          </div>
+                        </div>
                       </div>
-                      <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">Save</button>
-                        <button type="button" class="btn btn-secondary"
-                                onclick="toggleEdit([% alloc.id %])">Cancel</button>
+                      <div class="form-row">
+                        <div class="form-field" style="flex:1">
+                          <label for="edit_desc_[% alloc.id %]">Description</label>
+                          <input type="text" id="edit_desc_[% alloc.id %]" name="description"
+                                 value="[% alloc.description | html %]" class="form-input"
+                                 style="width:100%;max-width:480px"
+                                 placeholder="Optional description">
+                        </div>
                       </div>
+                      <div class="form-row">
+                        <div class="form-field">
+                          <label>
+                            <input type="checkbox" name="is_active" value="1"
+                              [% 'checked' IF alloc.is_active %]> Active
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="form-actions">
+                      <button type="submit" class="btn btn-primary">Save Changes</button>
+                      <button type="button" class="btn btn-secondary"
+                              onclick="toggleEdit([% alloc.id %])">Cancel</button>
                     </div>
                   </form>
                 </td>
@@ -263,5 +323,51 @@ function toggleEdit(id) {
     } else {
         row.style.display = 'none';
     }
+}
+
+function editSitenameChanged(id, val) {
+    var pathEl = document.getElementById('edit_nfs_path_' + id);
+    if (val && pathEl) {
+        pathEl.value = _acNfsRoot + '/' + val;
+    }
+    var pickerEl = document.getElementById('edit_existing_dir_' + id);
+    if (pickerEl) pickerEl.value = '';
+
+    var siteEl = document.getElementById('edit_sitename_' + id);
+    var siteIdEl = document.getElementById('edit_site_id_' + id);
+    if (siteEl && siteEl.tagName === 'SELECT') {
+        var opt = siteEl.options[siteEl.selectedIndex];
+        if (opt && opt.dataset.id) {
+            siteIdEl.value = opt.dataset.id;
+        } else {
+            siteIdEl.value = '';
+        }
+    }
+}
+
+function editPickExisting(id, path) {
+    if (!path) return;
+    var pathEl = document.getElementById('edit_nfs_path_' + id);
+    if (pathEl) pathEl.value = path;
+
+    var siteEl = document.getElementById('edit_sitename_' + id);
+    if (siteEl && siteEl.tagName === 'SELECT') {
+        var dirName = path.replace(/^.*\//, '');
+        for (var i = 0; i < siteEl.options.length; i++) {
+            if (siteEl.options[i].value.toLowerCase() === dirName.toLowerCase()) {
+                siteEl.selectedIndex = i;
+                var opt = siteEl.options[i];
+                if (opt.dataset.id) {
+                    document.getElementById('edit_site_id_' + id).value = opt.dataset.id;
+                }
+                break;
+            }
+        }
+    }
+}
+
+function editClearPicker(id) {
+    var pickerEl = document.getElementById('edit_existing_dir_' + id);
+    if (pickerEl) pickerEl.value = '';
 }
 </script>

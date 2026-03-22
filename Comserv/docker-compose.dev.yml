@@ -1,8 +1,9 @@
 services:
   web-dev:
     build:
-      context: ./Comserv
+      context: .
       dockerfile: Dockerfile
+    image: comserv-web-dev:latest
     container_name: comserv-web-dev
     restart: always
     labels:
@@ -11,6 +12,7 @@ services:
       CATALYST_ENV: development
       CATALYST_DEBUG: 1
       WEB_PORT: 3000
+      SYSTEM_IDENTIFIER: "docker-dev"
       TZ: UTC
       # Set in .env file: CATALYST_SERVER_IP=192.168.1.199  (host LAN IP, shown in admin bar)
       CATALYST_SERVER_IP: "${CATALYST_SERVER_IP}"

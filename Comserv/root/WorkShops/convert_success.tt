@@ -1,0 +1,265 @@
+[% PageVersion = 'WorkShops/convert_success.tt,v 0.01 2024/06/12 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="success-container">
+    <div class="success-header">
+        <h1>Conversion Successful</h1>
+        <div class="success-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+        </div>
+    </div>
+    
+    <div class="success-message">
+        <p>[% success_msg %]</p>
+    </div>
+    
+    <div class="presentation-actions">
+        <h2>Your Presentation is Ready</h2>
+        <p>Your presentation has been successfully converted and is now available to view online.</p>
+        
+        <div class="action-buttons">
+            <a href="[% presentation_url %]" class="view-button" target="_blank">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+                View Presentation
+            </a>
+            
+            <a href="[% c.uri_for('/workshop/files') %]" class="files-button">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                    <polyline points="13 2 13 9 20 9"></polyline>
+                </svg>
+                Manage Files
+            </a>
+            
+            <a href="[% c.uri_for('/workshop/upload') %]" class="upload-button">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                Upload Another Presentation
+            </a>
+            
+            <a href="[% c.uri_for('/workshop/presentations') %]" class="presentations-button">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                </svg>
+                All Presentations
+            </a>
+            
+            <a href="[% c.uri_for('/workshop') %]" class="back-button">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back to Workshops
+            </a>
+        </div>
+    </div>
+    
+    <div class="embed-info">
+        <h2>Embedding Your Presentation</h2>
+        <p>You can embed this presentation in other pages using the following code:</p>
+        
+        <div class="code-block">
+            <code>&lt;iframe src="[% presentation_url %]" width="800" height="600" frameborder="0" allowfullscreen&gt;&lt;/iframe&gt;</code>
+            <button class="copy-button" onclick="copyEmbedCode()">Copy Code</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function copyEmbedCode() {
+        const codeBlock = document.querySelector('.code-block code');
+        const textArea = document.createElement('textarea');
+        textArea.value = codeBlock.textContent;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        const copyButton = document.querySelector('.copy-button');
+        copyButton.textContent = 'Copied!';
+        setTimeout(() => {
+            copyButton.textContent = 'Copy Code';
+        }, 2000);
+    }
+</script>
+
+<style>
+    .success-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .success-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .success-header h1 {
+        color: #2c3e50;
+        margin: 0;
+    }
+    
+    .success-icon {
+        color: #28a745;
+    }
+    
+    .success-message {
+        background-color: #d4edda;
+        color: #155724;
+        padding: 15px;
+        border-radius: 4px;
+        margin-bottom: 30px;
+        font-size: 1.1em;
+    }
+    
+    .presentation-actions {
+        margin-bottom: 30px;
+    }
+    
+    .presentation-actions h2 {
+        color: #343a40;
+        font-size: 1.3em;
+        margin-bottom: 10px;
+    }
+    
+    .action-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-top: 20px;
+    }
+    
+    .view-button, .upload-button, .back-button, .files-button, .presentations-button {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 20px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-weight: bold;
+        transition: background-color 0.2s;
+    }
+    
+    .view-button {
+        background-color: #007bff;
+        color: white;
+    }
+    
+    .view-button:hover {
+        background-color: #0069d9;
+    }
+    
+    .files-button {
+        background-color: #607d8b;
+        color: white;
+    }
+    
+    .files-button:hover {
+        background-color: #546e7a;
+    }
+    
+    .presentations-button {
+        background-color: #2196F3;
+        color: white;
+    }
+    
+    .presentations-button:hover {
+        background-color: #0b7dda;
+    }
+    
+    .upload-button {
+        background-color: #28a745;
+        color: white;
+    }
+    
+    .upload-button:hover {
+        background-color: #218838;
+    }
+    
+    .back-button {
+        background-color: #6c757d;
+        color: white;
+    }
+    
+    .back-button:hover {
+        background-color: #5a6268;
+    }
+    
+    .embed-info {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 4px;
+    }
+    
+    .embed-info h2 {
+        color: #343a40;
+        font-size: 1.3em;
+        margin-top: 0;
+        margin-bottom: 10px;
+    }
+    
+    .code-block {
+        position: relative;
+        background-color: #343a40;
+        color: #f8f9fa;
+        padding: 15px;
+        border-radius: 4px;
+        overflow-x: auto;
+        margin-top: 15px;
+    }
+    
+    .code-block code {
+        font-family: monospace;
+        white-space: nowrap;
+    }
+    
+    .copy-button {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background-color: #6c757d;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+    }
+    
+    .copy-button:hover {
+        background-color: #5a6268;
+    }
+    
+    @media (max-width: 768px) {
+        .action-buttons {
+            flex-direction: column;
+        }
+        
+        .success-header {
+            flex-direction: column;
+            text-align: center;
+            gap: 15px;
+        }
+    }
+</style>

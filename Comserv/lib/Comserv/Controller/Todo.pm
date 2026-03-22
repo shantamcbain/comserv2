@@ -97,36 +97,21 @@ sub begin :Private {
     # Log the path the user is accessing
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "User accessing path: " . $c->req->uri);
 
-    # Fetch the user's roles from the session
-    my $roles = $c->session->{roles} || [];
+    # Fetch roles: prefer stash (set by Root::auto, includes site-specific admin detection)
+    my $roles = $c->stash->{user_roles} || $c->session->{roles} || [];
 
     # Ensure roles are an array reference
     if (ref $roles ne 'ARRAY') {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "Invalid or undefined roles in session for user: " . ($c->session->{username} || 'Guest'));
-
-        # Stash the current path so it can be used for redirection after login
-        $c->stash->{template} = $c->req->uri;
-
-        # Set error message for session problems
-        $c->stash->{error_msg} = "Session expired or invalid. Please log in again.";
-
-        # Redirect to login
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Redirecting to login page due to missing or invalid roles.");
-        $c->res->redirect($c->uri_for('/user/login'));
-        $c->detach;
+        $roles = [];
     }
 
-    # Check if the user has the 'admin' or 'developer' role
-    unless (grep { $_ eq 'admin' || $_ eq 'developer' } @$roles) {
+    # Allow all roles above member: admin, developer, devops, editor, user, normal
+    # Also allow if Root::auto set is_admin (catches site-specific admins from UserSiteRole)
+    unless ($c->stash->{is_admin} || grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal)$/ } @$roles) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
 
-        # Stash the current path for potential use
-        $c->stash->{redirect_to} = $c->req->uri;
-
-        # Redirect unauthorized users to the home page with an error message
-        $c->stash->{error_msg} = "Unauthorized access. You do not have permission to view this page.";
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Redirecting unauthorized user to the home page.");
-        $c->res->redirect($c->uri_for('/'));
+        # Redirect unauthorized users to the login page with the return URL
+        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         $c->detach;
     }
 

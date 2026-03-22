@@ -1,0 +1,173 @@
+[% PageVersion = 'WorkShops/convert.tt,v 0.01 2024/06/12 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="convert-container">
+    <h1>Convert Presentation</h1>
+    
+    [% IF error_msg %]
+    <div class="error-message">
+        <p>[% error_msg %]</p>
+    </div>
+    [% END %]
+    
+    [% IF success_msg %]
+    <div class="success-message">
+        <p>[% success_msg %]</p>
+    </div>
+    [% END %]
+    
+    <div class="file-info">
+        <h2>File Information</h2>
+        <p><strong>File:</strong> [% file_path.split('/').pop() %]</p>
+        <p><strong>Base Name:</strong> [% base_name %]</p>
+    </div>
+    
+    <div class="conversion-options">
+        <h2>Conversion Options</h2>
+        
+        <form method="post" action="[% c.uri_for('/workshop/convert') %]" class="convert-form">
+            <input type="hidden" name="file_path" value="[% file_path %]">
+            <input type="hidden" name="base_name" value="[% base_name %]">
+            
+            <div class="form-group">
+                <label for="presentation_title">Presentation Title (optional):</label>
+                <input type="text" id="presentation_title" name="presentation_title" placeholder="Enter a title for your presentation">
+            </div>
+            
+            <div class="form-group">
+                <label for="quality">Image Quality:</label>
+                <select id="quality" name="quality">
+                    <option value="75">Low (75%)</option>
+                    <option value="85" selected>Medium (85%)</option>
+                    <option value="95">High (95%)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="dpi">Resolution (DPI):</label>
+                <select id="dpi" name="dpi">
+                    <option value="150">Low (150 DPI)</option>
+                    <option value="200" selected>Medium (200 DPI)</option>
+                    <option value="300">High (300 DPI)</option>
+                </select>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="submit-button">Convert to Web Presentation</button>
+                <a href="[% c.uri_for('/workshop/upload') %]" class="cancel-link">Upload Different File</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .convert-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .convert-container h1 {
+        color: #2c3e50;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .error-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 12px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+    
+    .success-message {
+        background-color: #d4edda;
+        color: #155724;
+        padding: 12px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+    
+    .file-info {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+    
+    .file-info h2 {
+        margin-top: 0;
+        font-size: 1.2rem;
+        color: #343a40;
+    }
+    
+    .conversion-options {
+        margin-top: 30px;
+    }
+    
+    .conversion-options h2 {
+        font-size: 1.2rem;
+        color: #343a40;
+        margin-bottom: 15px;
+    }
+    
+    .convert-form {
+        margin-top: 20px;
+    }
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .form-group input[type="text"],
+    .form-group select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+    
+    .form-actions {
+        margin-top: 30px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+    
+    .submit-button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+    }
+    
+    .submit-button:hover {
+        background-color: #0069d9;
+    }
+    
+    .cancel-link {
+        color: #6c757d;
+        text-decoration: none;
+    }
+    
+    .cancel-link:hover {
+        text-decoration: underline;
+    }
+</style>

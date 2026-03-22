@@ -1,17 +1,76 @@
-[% PageVersion = 'Bmaster/environment.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
+[% META title = "Environmental Considerations" %]
+[% PageVersion = 'Bmaster/environment.tt,v 0.02 2026/03/17 shanta Exp shanta' %]
 [% IF debug_mode == 1 %]
+    [% PageVersion %]
 [% END %]
-[% PageVersion %]
-<h1>Environment</h1>
 
-<p>Bees play a crucial role in our environment, and the environment in turn plays a crucial role in the health and productivity of our bees. Here's an overview of the environmental factors that affect our bees:</p>
+<div class="app-container">
 
-<h2>Climate</h2>
-<p>The climate in our area provides ideal conditions for beekeeping, with warm summers for nectar flow and mild winters for overwintering.</p>
+    <div class="page-header">
+        <h1>Environmental Considerations</h1>
+        <p class="page-subtitle">Understanding how the environment affects your bees — and how to work with it.</p>
+    </div>
 
-<h2>Agricultural Practices</h2>
-<p>We work closely with local farmers to ensure that their agricultural practices are bee-friendly, including minimizing the use of pesticides and providing diverse floral resources.</p>
+    <div class="content-container">
+        <div class="content-primary">
 
-<!-- Add more environment information as needed -->
+            <div class="app-section">
+                <p>Bees play a crucial role in our environment, and the environment in turn plays a crucial role in the health and productivity of our bees. Here is an overview of the environmental factors that affect our colonies.</p>
+            </div>
 
-<p>For more information on how the environment affects our bees, please contact us.</p>
+            <div class="app-section">
+                <h2>Climate and Weather</h2>
+                <div class="content-section">
+                    <p>The climate in our area provides the conditions that determine nectar flows, swarming season, and overwintering requirements. Understanding your local climate helps you anticipate colony needs before problems arise:</p>
+                    <ul>
+                        <li>Warm summers drive nectar flow — add supers early</li>
+                        <li>Mild or harsh winters affect overwinter food stores needed</li>
+                        <li>Wet springs can delay buildup — monitor closely</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="app-section">
+                <h2>Agricultural Practices</h2>
+                <div class="content-section">
+                    <p>We work closely with local farmers to ensure that their agricultural practices are bee-friendly. This includes:</p>
+                    <ul>
+                        <li>Minimizing pesticide use near hive sites</li>
+                        <li>Providing diverse floral resources across the landscape</li>
+                        <li>Communicating spray schedules to avoid exposing foragers</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="app-section">
+                <h2>Habitat and Site Selection</h2>
+                <div class="content-section">
+                    <p>Where you place your hives matters. Consider these factors when selecting or evaluating yard sites:</p>
+                    <ul>
+                        <li>Access to diverse forage within 2–3 km</li>
+                        <li>Protection from prevailing winds</li>
+                        <li>Morning sun exposure to encourage early foraging</li>
+                        <li>Access to clean water sources</li>
+                        <li>Distance from high-traffic human and animal areas</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="app-section">
+                <h2>Bee Pasture Planning</h2>
+                <div class="content-section">
+                    <p>One of the best environmental actions a beekeeper can take is improving the forage landscape. Our bee pasture database helps you identify what plants grow in your area and plan new plantings to fill seasonal gaps.</p>
+                    <p><a href="/BMaster/bee_pasture" class="btn btn-primary">Explore Bee Pasture Plants</a></p>
+                </div>
+            </div>
+
+            <div class="page-footer">
+                <div class="footer-actions">
+                    <a href="/BMaster" class="btn btn-secondary">Back to BMaster Home</a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>

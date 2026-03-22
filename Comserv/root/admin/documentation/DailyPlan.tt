@@ -8,10 +8,12 @@
    last_updated = "Tue Jan 28 16:43:00 UTC 2026"
    site_specific = "false"
 %]
-[% PageVersion = 'admin/documentation/DailyPlan.tt, v 1.10 2026/01/28 Zencoder - Version 1.10: Updated [3] Planning System Migration - Phase 1.5 COMPLETE. DBIC Result files created (DailyPlan, DailyPlanProject, PlanSystemMapping, TodoDependency, enhanced Todo/Project). Code audit complete: 28 Todo controller methods analyzed (13 need updates), 11 templates analyzed. Audit doc created: phase1.5_audit.md (533 lines). Status: AWAITING REVIEW before Phase 2.' %]
+[% PageVersion = 'admin/documentation/DailyPlan.tt, v 2.0 2026/03/20 SiteName-aware: CSC-only tabs conditionally shown; DB plan list in PLANNING tab for all sites.' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
+[% SET is_csc = is_csc || (c.stash.SiteName == 'CSC') || (c.session.SiteName == 'CSC') %]
+[% SET plan_sitename = plan_sitename || c.stash.SiteName || c.session.SiteName || 'CSC' %]
 
 <style>
     /* Sticky Header Styles */
@@ -135,10 +137,10 @@
 
     <!-- Tab Navigation -->
     <div class="tab-navigation">
-       <button class="tab-button active" onclick="switchTab(event, 'today-work')">
+        <button class="tab-button active" onclick="switchTab(event, 'today-work')">
             DAILY PRIORITIES
         </button>
-         <button class="tab-button" onclick="switchTab(event, 'weekly-view')">
+        <button class="tab-button" onclick="switchTab(event, 'weekly-view')">
             📅 THIS WEEK
         </button>
         <button class="tab-button" onclick="switchTab(event, 'month-view')">
@@ -150,6 +152,7 @@
         <button class="tab-button" onclick="switchTab(event, 'resources-view')">
             RESOURCES & CONTEXT
         </button>
+        [% IF is_csc %]
         <button class="tab-button" onclick="switchTab(event, 'daily-plan-guide')">
             DAILY PLAN GUIDE
         </button>
@@ -165,6 +168,7 @@
         <button class="tab-button" onclick="switchTab(event, 'completed-tasks')">
             ✅ COMPLETED TASKS
         </button>
+        [% END %]
     </div>
 
 <!-- TAB 1: TODAY'S WORK (Default) -->
@@ -175,6 +179,7 @@
                 <p>Daily plan for [% display_date %] - Mark completed tasks and sync across all plan files. Review and execute master plan priorities listed below.</p>
             </div>
 
+            [% IF is_csc %]
             <details style="background: var(--secondary-color); border: 1px solid var(--border-color); border-radius: 4px; margin-bottom: 20px;">
                 <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: var(--secondary-color); border-bottom: 1px solid var(--border-color);">
                     📊 MASTER PLAN PRIORITY LIST (PriorityTodos.tt)
@@ -183,12 +188,14 @@
                     [% INCLUDE "admin/documentation/PriorityTodos.tt" %]
                 </div>
             </details>
+            [% END %]
             <details style="background: var(--secondary-color); border: 1px solid var(--border-color); border-radius: 4px; margin-bottom: 20px;">
                 <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: var(--secondary-color); border-bottom: 1px solid var(--border-color);">
                     📝 DAILY TASK LISTS (Master Plan & App Todos)
                 </summary>
                 <div style="padding: 15px;">
-                    <!-- Master Plan Priorities (Independent Dropdown) -->
+                    [% IF is_csc %]
+                    <!-- Master Plan Priorities (CSC only — hardcoded, being migrated to DB) -->
                     <div class="task-list">
                         <div class="task-list-header master-plan-header" onclick="toggleTaskList(this)">
                             <span>[MASTER PLAN PRIORITIES] NEXT 5 ITEMS</span>
@@ -210,7 +217,7 @@
                             <div class="task-item sortable" draggable="true">
                                 <input type="checkbox" id="task-mp-3">
                                 <label for="task-mp-3" class="task-label">
-                                    [3] <a href="#planning-system-migration" onclick="switchTab(event, 'resources-view'); setTimeout(function(){ document.getElementById('planning-system-migration').scrollIntoView({behavior: 'smooth', block: 'start'}); }, 100); return false;" style="color: var(--link-color);">Planning System Migration (HIGH)</a> - Phase 1.5 Complete ✅ - <a href="#planning-system-migration" onclick="switchTab(event, 'resources-view'); setTimeout(function(){ document.getElementById('planning-system-migration').scrollIntoView({behavior: 'smooth', block: 'start'}); }, 100); return false;" style="color: var(--link-color);">Click for details in RESOURCES tab</a>
+                                    [3] Planning System Migration (HIGH) - Phase 1.5 Complete ✅
                                 </label>
                             </div>
                             <div class="task-item sortable" draggable="true">
@@ -225,17 +232,12 @@
                                     [5] <a href="/Documentation/DOCUMENTATION_SYSTEM_AUDIT_PLAN" target="_blank" style="color: var(--link-color);">C.1: Documentation System Audit (HIGH)</a> - Status: In Progress (Phase 1)
                                 </label>
                             </div>
-                            <div class="task-item sortable" draggable="true">
-                                <input type="checkbox" id="task-mp-6">
-                                <label for="task-mp-6" class="task-label">
-                                    [6] <a href="/Documentation/PriorityTodos#priority-3" target="_blank" style="color: var(--link-color);">#3: Update Format (MEDIUM)</a> - Status: Pending
-                                </label>
-                            </div>
                         </div>
                         <button class="task-add-button" onclick="window.open('/todo/addtodo', '_blank')">+ Add Task to Plan</button>
                     </div>
+                    [% END %]
 
-                    <!-- App Todos for Today (Independent Dropdown) -->
+                    <!-- App Todos for Today (All sites — DB-driven) -->
                     <div class="task-list">
                         <div class="task-list-header app-todos-header" onclick="toggleTaskList(this)">
                             <span>[APP TODOS FOR TODAY] FROM TODO SYSTEM [% IF todos_for_today && todos_for_today.size %]([% todos_for_today.size %])[% END %]</span>
@@ -265,6 +267,7 @@
                 </div>
             </details>
 
+            [% IF is_csc %]
             <div style="background: var(--schema-missing-color); border-left: 4px solid var(--accent-color); padding: 15px; border-radius: 4px; margin: 20px 0;">
                 <h4 style="margin-top: 0;">Today's Recommendation:</h4>
                 <ol>
@@ -273,6 +276,7 @@
                     <li><strong>Infrastructure:</strong> Monitor K8s readiness planning and credentials audit scope work.</li>
                 </ol>
             </div>
+            [% END %]
         </div>
     </div>
 
@@ -309,9 +313,10 @@
 
     <!-- TAB 3: RESOURCES & CONTEXT -->
     <div id="resources-view" class="tab-content">
-        <h3>[RESOURCES & SUPPORTING CONTEXT]</h3>
-        
-        <!-- Planning System Migration Progress Section -->
+        <h3>[RESOURCES & SUPPORTING CONTEXT] — [% plan_sitename %]</h3>
+
+        [% IF is_csc %]
+        <!-- Planning System Migration Progress Section (CSC only) -->
         <div id="planning-system-migration" style="background: var(--schema-alert-success-bg); border-left: 4px solid var(--success-color); padding: 20px; margin-bottom: 30px; border-radius: 4px;">
             <h3 style="margin-top: 0; color: var(--success-color);">📋 Planning System Migration - Phase 1.5 Complete</h3>
             
@@ -388,7 +393,8 @@
         <p style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; border-radius: 4px; margin: 15px 0;">
             <strong>Supporting Resources:</strong> Below are additional resources and context for current tasks.
         </p>
-        
+        [% END %]<!-- end is_csc resources -->
+
         <h4 style="margin-top: 30px;">Quick Todo Actions</h4>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
             <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
@@ -421,22 +427,167 @@
         [% END %]
     </div>
 
-    <!-- TAB: PLANNING (renamed from PRIORITY TODOS (NEW)) -->
+    <!-- TAB: PLANNING — Project→Plan hierarchy; DB-driven for all sites; CSC also sees legacy Planning.tt -->
     <div id="planning" class="tab-content">
+
+        [%# ── Data from controller stash (fetched in Documentation.pm::daily_plan) ── %]
+        [% SET view_sitename = filter_site || plan_sitename %]
+
+        [%# ── Header row ── %]
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--primary-color);">
+            <h2 style="margin:0;font-size:1.2em;">
+                📁 Projects &amp; Plans:
+                [% IF is_csc && !filter_site %]All Sites[% ELSE %][% view_sitename %][% END %]
+            </h2>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                [% IF is_csc %]
+                <a href="#planning" onclick="switchTab(event,'planning');return false;"
+                   style="font-size:0.8em;color:var(--text-muted-color);text-decoration:none;">[text view ↓]</a>
+                [% END %]
+                [% IF is_admin %]
+                <a href="/admin/plan/create" style="background:var(--primary-color);color:#fff;padding:5px 12px;border-radius:4px;text-decoration:none;font-size:0.85em;">+ New Plan</a>
+                [% END %]
+                <a href="/todo" style="padding:5px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.85em;color:var(--text-color);">Todos</a>
+            </div>
+        </div>
+
+        [%# ── CSC admin: SiteName filter toggle (from stash plan_sitenames) ── %]
+        [% IF is_csc && plan_sitenames && plan_sitenames.size %]
+        <div style="margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:0.85em;">
+            <span style="color:var(--text-muted-color);font-weight:bold;">Filter:</span>
+            <a href="/Documentation/DailyPlan#planning"
+               style="padding:2px 10px;border-radius:3px;text-decoration:none;border:1px solid var(--border-color);
+               [% IF !filter_site %]background:var(--primary-color);color:#fff[% ELSE %]color:var(--text-color)[% END %]">All</a>
+            [% FOREACH sname IN plan_sitenames %]
+            <a href="/Documentation/DailyPlan?filter_site=[% sname %]#planning"
+               style="padding:2px 10px;border-radius:3px;text-decoration:none;border:1px solid var(--border-color);
+               [% IF filter_site == sname %]background:var(--primary-color);color:#fff[% ELSE %]color:var(--text-color)[% END %]">
+                [% sname %]
+            </a>
+            [% END %]
+        </div>
+        [% END %]
+
+        [%# ── Project → Plan hierarchy (from stash planning_projects) ── %]
+        [% IF planning_projects && planning_projects.size %]
+        [% SET current_site_label = '' %]
+        [% FOREACH proj IN planning_projects %]
+            [%# Site group header for CSC all-sites view %]
+            [% IF is_csc && !filter_site && proj.sitename != current_site_label %]
+            [% SET current_site_label = proj.sitename %]
+            <div style="margin:18px 0 6px;padding:4px 10px;background:var(--primary-color);color:#fff;border-radius:4px;font-size:0.85em;font-weight:bold;">
+                🌐 [% proj.sitename %]
+            </div>
+            [% END %]
+
+            [%# Project card %]
+            <details style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;margin-bottom:10px;" open>
+                <summary style="padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;list-style:none;">
+                    <span>
+                        <strong>[% proj.name %]</strong>
+                        [% IF proj.project_code %]<span style="font-size:0.8em;color:var(--text-muted-color);margin-left:6px;">[% proj.project_code %]</span>[% END %]
+                        [% IF proj.developer_name %]<span style="font-size:0.78em;color:var(--text-muted-color);margin-left:6px;">· [% proj.developer_name %]</span>[% END %]
+                    </span>
+                    <span style="display:flex;gap:6px;align-items:center;">
+                        [% IF proj.status %]
+                        <span style="padding:1px 7px;border-radius:3px;font-size:0.75em;font-weight:bold;
+                            [% IF proj.status == 'In-Process' || proj.status == 'active' %]background:#17a2b8;color:#fff
+                            [% ELSIF proj.status == 'Completed' || proj.status == 'completed' %]background:#28a745;color:#fff
+                            [% ELSE %]background:#6c757d;color:#fff[% END %]">
+                            [% proj.status %]
+                        </span>
+                        [% END %]
+                        <a href="/project/details?project_id=[% proj.id %]" style="font-size:0.78em;color:var(--primary-color);text-decoration:none;" onclick="event.stopPropagation()">Details</a>
+                    </span>
+                </summary>
+                <div style="padding:0 14px 12px;">
+                    [% IF proj.description %]
+                    <div style="font-size:0.85em;color:var(--text-color);margin:6px 0 10px;">[% proj.description %]</div>
+                    [% END %]
+
+                    [%# Plans linked to this project (from proj.linked_plans set by controller) %]
+                    [% IF proj.linked_plans && proj.linked_plans.size %]
+                    <div style="margin-left:8px;border-left:2px solid var(--primary-color);padding-left:10px;">
+                        [% FOREACH pln IN proj.linked_plans %]
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border-color);">
+                            <div>
+                                <a href="/admin/plan/[% pln.id %]" style="font-weight:bold;font-size:0.9em;color:var(--primary-color);text-decoration:none;">[% pln.plan_name %]</a>
+                                [% IF pln.due_date %]<span style="font-size:0.78em;color:var(--text-muted-color);margin-left:6px;">due [% pln.due_date %]</span>[% END %]
+                            </div>
+                            <div style="display:flex;gap:6px;align-items:center;">
+                                [% IF pln.priority %]<span style="font-size:0.78em;color:var(--text-muted-color);">P[% pln.priority %]</span>[% END %]
+                                <span style="padding:1px 6px;border-radius:3px;font-size:0.72em;font-weight:bold;
+                                    [% IF pln.status == 'active' %]background:#28a745;color:#fff[% ELSIF pln.status == 'paused' %]background:#ffc107;color:#333[% ELSE %]background:#6c757d;color:#fff[% END %]">
+                                    [% pln.status || 'active' %]
+                                </span>
+                                <a href="/admin/plan/[% pln.id %]" style="font-size:0.78em;color:var(--primary-color);">View</a>
+                            </div>
+                        </div>
+                        [% END %]
+                    </div>
+                    [% ELSE %]
+                    <div style="font-size:0.82em;color:var(--text-muted-color);margin:4px 0 6px;">
+                        No plans linked.
+                        [% IF is_admin %]<a href="/admin/plan/create" style="color:var(--primary-color);">+ Add Plan</a>[% END %]
+                    </div>
+                    [% END %]
+                </div>
+            </details>
+        [% END %]
+
+        [%# ── Standalone plans (not linked to any project) ── %]
+        [% IF orphan_plans && orphan_plans.size %]
+        <div style="margin-top:20px;">
+            <h3 style="font-size:0.95em;color:var(--text-muted-color);margin-bottom:8px;">📋 Standalone Plans (not yet linked to a project)</h3>
+            [% FOREACH pln IN orphan_plans %]
+            <div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <a href="/admin/plan/[% pln.id %]" style="font-weight:bold;color:var(--primary-color);text-decoration:none;">[% pln.plan_name %]</a>
+                    <span style="font-size:0.8em;color:var(--text-muted-color);margin-left:8px;">[% pln.sitename %]</span>
+                    [% IF pln.plan_description %]<div style="font-size:0.82em;color:var(--text-color);margin-top:3px;">[% pln.plan_description | truncate(100) %]</div>[% END %]
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+                    <span style="padding:1px 6px;border-radius:3px;font-size:0.75em;font-weight:bold;
+                        [% IF pln.status == 'active' %]background:#28a745;color:#fff[% ELSIF pln.status == 'paused' %]background:#ffc107;color:#333[% ELSE %]background:#6c757d;color:#fff[% END %]">
+                        [% pln.status || 'active' %]
+                    </span>
+                    <a href="/admin/plan/[% pln.id %]" style="font-size:0.82em;color:var(--primary-color);">View</a>
+                    [% IF is_admin %]<a href="/admin/plan/[% pln.id %]/edit" style="font-size:0.82em;color:var(--primary-color);">Edit</a>[% END %]
+                </div>
+            </div>
+            [% END %]
+        </div>
+        [% END %]
+
+        [% ELSE %]
+        <div style="text-align:center;padding:40px;color:var(--text-muted-color);">
+            <p>No projects found for <strong>[% IF is_csc && !filter_site %]All Sites[% ELSE %][% view_sitename %][% END %]</strong>.</p>
+            [% IF is_admin %]
+            <p>Add a project at <a href="/project/addproject" style="color:var(--primary-color);">/project/addproject</a>, then it will appear here.</p>
+            <a href="/admin/plan/create" style="background:var(--primary-color);color:#fff;padding:8px 18px;border-radius:4px;text-decoration:none;">Create the first plan</a>
+            [% END %]
+        </div>
+        [% END %]
+
+        [% IF is_csc %]
+        <hr style="margin:30px 0;border-color:var(--border-color);">
+        <h3 style="color:var(--text-muted-color);font-size:0.95em;">CSC Text-Based Planning (being migrated to DB above)</h3>
         [% INCLUDE "admin/documentation/Planning.tt" %]
+        [% END %]
     </div>
 
-    <!-- TAB 5: ZENCODER PROMPT -->
+    [% IF is_csc %]
+    <!-- TAB 5: ZENCODER PROMPT (CSC only) -->
     <div id="zencoder-prompt" class="tab-content">
         [% INCLUDE "admin/documentation/ZencoderOpeningPrompt.tt" %]
     </div>
 
-    <!-- TAB 6: MASTER PLAN COORDINATION -->
+    <!-- TAB 6: MASTER PLAN COORDINATION (CSC only) -->
     <div id="master-plan-coordination" class="tab-content">
         [% INCLUDE "Documentation/MasterPlanCoordination.tt" %]
     </div>
 
-    <!-- TAB 7: IMPLEMENTATION PLAN -->
+    <!-- TAB 7: IMPLEMENTATION PLAN (CSC only) -->
     <div id="implementation-plan" class="tab-content">
         <h2>Planning System Migration - Implementation Plan</h2>
         <p style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; border-radius: 4px; margin: 15px 0;">
@@ -688,10 +839,11 @@
         </div>
     </div>
 
-    <!-- TAB 8: COMPLETED TASKS -->
+    <!-- TAB 8: COMPLETED TASKS (CSC only) -->
     <div id="completed-tasks" class="tab-content">
         [% INCLUDE "admin/documentation/CompletedTasks.tt" %]
     </div>
+    [% END %]<!-- end is_csc CSC-only tabs -->
 </div>
 
 <script>

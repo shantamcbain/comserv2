@@ -1,0 +1,206 @@
+[% PageVersion = 'Comserv/root/Documentation/FAQ.tt,v 0.01 2024/05/31 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Frequently Asked Questions' %]
+
+<div class="documentation-page">
+    <div class="doc-header">
+        <h1>Frequently Asked Questions (FAQ)</h1>
+        
+        <div class="doc-meta">
+            <span class="updated">Last Updated: May 31, 2024</span>
+            <span class="author">Author: Support Team</span>
+            <span class="status">Status: Active</span>
+        </div>
+    </div>
+
+    <div class="doc-section">
+        <h2>General Questions</h2>
+        
+        <div class="faq-item">
+            <h3>What is Comserv?</h3>
+            <div class="faq-answer">
+                <p>Comserv is a comprehensive web application platform designed to manage various aspects of community services, 
+                including site management, user administration, and specialized modules for different industries.</p>
+            </div>
+        </div>
+        
+        <div class="faq-item">
+            <h3>How do I report a bug or request a feature?</h3>
+            <div class="faq-answer">
+                <p>You can report bugs or request features by:</p>
+                <ul>
+                    <li>Contacting your site administrator</li>
+                    <li>Using the Help Desk feature if enabled on your site</li>
+                    <li>Submitting a ticket through the support system</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="faq-item">
+            <h3>What browsers are supported?</h3>
+            <div class="faq-answer">
+                <p>Comserv supports all modern browsers, including:</p>
+                <ul>
+                    <li>Google Chrome (recommended)</li>
+                    <li>Mozilla Firefox</li>
+                    <li>Microsoft Edge</li>
+                    <li>Safari</li>
+                </ul>
+                <p>For the best experience, please keep your browser updated to the latest version.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="doc-section">
+        <h2>Account Management</h2>
+        
+        <div class="faq-item">
+            <h3>How do I reset my password?</h3>
+            <div class="faq-answer">
+                <p>To reset your password:</p>
+                <ol>
+                    <li>Click on the "Login" link</li>
+                    <li>Click "Forgot Password"</li>
+                    <li>Enter your email address</li>
+                    <li>Follow the instructions in the password reset email</li>
+                </ol>
+            </div>
+        </div>
+        
+        <div class="faq-item">
+            <h3>Can I change my username?</h3>
+            <div class="faq-answer">
+                <p>Usernames cannot be changed directly by users. If you need to change your username, please contact your site administrator.</p>
+            </div>
+        </div>
+        
+        <div class="faq-item">
+            <h3>What should I do if I'm locked out of my account?</h3>
+            <div class="faq-answer">
+                <p>If you're locked out of your account:</p>
+                <ol>
+                    <li>Try the password reset procedure first</li>
+                    <li>If that doesn't work, contact your site administrator</li>
+                    <li>Provide your username and the email address associated with your account</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <div class="doc-section">
+        <h2>Technical Issues</h2>
+        
+        <div class="faq-item">
+            <h3>The site is loading slowly. What can I do?</h3>
+            <div class="faq-answer">
+                <p>If the site is loading slowly, try these steps:</p>
+                <ol>
+                    <li>Clear your browser cache and cookies</li>
+                    <li>Check your internet connection</li>
+                    <li>Try using a different browser</li>
+                    <li>If the problem persists, contact support</li>
+                </ol>
+            </div>
+        </div>
+        
+        <div class="faq-item">
+            <h3>I'm seeing error messages. What should I do?</h3>
+            <div class="faq-answer">
+                <p>If you encounter error messages:</p>
+                <ol>
+                    <li>Take a screenshot of the error</li>
+                    <li>Note what you were doing when the error occurred</li>
+                    <li>Report the issue to your administrator with these details</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .documentation-page {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+    }
+    
+    .doc-header {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .doc-header h1 {
+        margin-bottom: 10px;
+        color: #0056b3;
+    }
+    
+    .doc-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        font-size: 0.9em;
+        color: #666;
+    }
+    
+    .doc-section {
+        margin-bottom: 30px;
+    }
+    
+    .doc-section h2 {
+        color: #0056b3;
+        margin-bottom: 15px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .faq-item {
+        margin-bottom: 20px;
+        border-bottom: 1px dotted #eee;
+        padding-bottom: 15px;
+    }
+    
+    .faq-item h3 {
+        color: #333;
+        margin: 10px 0;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    
+    .faq-answer {
+        margin-top: 10px;
+    }
+    
+    ul, ol {
+        margin-left: 20px;
+        margin-bottom: 15px;
+    }
+    
+    li {
+        margin-bottom: 5px;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add click handlers to make FAQ items expandable/collapsible
+        const faqItems = document.querySelectorAll('.faq-item h3');
+        faqItems.forEach(item => {
+            item.addEventListener('click', function() {
+                const answer = this.nextElementSibling;
+                if (answer.style.display === 'none') {
+                    answer.style.display = 'block';
+                    this.classList.add('expanded');
+                } else {
+                    answer.style.display = 'none';
+                    this.classList.remove('expanded');
+                }
+            });
+        });
+    });
+</script>

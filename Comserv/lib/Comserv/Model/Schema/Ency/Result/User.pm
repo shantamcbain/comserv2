@@ -107,6 +107,26 @@ __PACKAGE__->has_many(
     { cascade_delete => 1 }
 );
 
+__PACKAGE__->has_many(
+    'memberships' => 'Comserv::Model::Schema::Ency::Result::UserMembership',
+    { 'foreign.user_id' => 'self.id' }
+);
+
+__PACKAGE__->has_many(
+    'payment_transactions' => 'Comserv::Model::Schema::Ency::Result::PaymentTransaction',
+    { 'foreign.user_id' => 'self.id' }
+);
+
+__PACKAGE__->has_one(
+    'currency_account' => 'Comserv::Model::Schema::Ency::Result::InternalCurrencyAccount',
+    { 'foreign.user_id' => 'self.id' }
+);
+
+__PACKAGE__->has_many(
+    'service_access' => 'Comserv::Model::Schema::Ency::Result::MembershipServiceAccess',
+    { 'foreign.user_id' => 'self.id' }
+);
+
 # Add method to check password (needed for authentication)
 sub check_password {
     my ($self, $password) = @_;
