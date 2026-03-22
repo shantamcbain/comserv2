@@ -272,7 +272,51 @@
   </ul>
 </div>
 
-<h3>Step 9: Implement Production Restart</h3>
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 9: Docker Deployment Process (Authoritative Guide)</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--text-color); font-family: var(--header-font);">Phase 1: Pre-Deployment (Workstation)</h4>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Build latest image: <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">docker compose build web-prod</code></li>
+                    <li>Set deployment credentials: <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">export SSHPASS='your_password'</code></li>
+                </ol>
+
+                <h4 style="color: var(--text-color); font-family: var(--header-font);">Phase 2: Production Preparation (Remote)</h4>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Check Disk Space:</strong> <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">df -h /</code> and <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">sudo docker system df -v</code></li>
+                    <li><strong>Cleanup Old State:</strong> <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">sudo docker rm comserv2-web-prod-old 2>/dev/null</code> and <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">sudo docker image prune -f</code></li>
+                </ol>
+
+                <h4 style="color: var(--text-color); font-family: var(--header-font);">Phase 3: Image Transfer & Backup</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font); font-style: italic; margin-bottom: var(--spacing-small);"><strong>Note:</strong> Image transfer via <code>docker save | docker load</code> only moves the <strong>image blueprint</strong>. It does <strong>not</strong> transfer running container instances, local volume data, or network configurations. These must be recreated or moved separately.</p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Transfer via SSH Pipe:</strong> <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">docker save comserv2-web-prod | ssh ubuntu@192.168.1.126 "docker load"</code></li>
+                    <li><strong>Backup Current Container:</strong> <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">sudo docker commit comserv2-web-prod comserv2-web-prod:backup-$(date +%s)</code></li>
+                    <li><strong>Prepare for Switch:</strong> <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">sudo docker rename comserv2-web-prod comserv2-web-prod-old</code> and <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">sudo docker stop comserv2-web-prod-old</code></li>
+                </ol>
+
+                <h4 style="color: var(--text-color); font-family: var(--header-font);">Phase 4: Execution (NFS vs Local Bind)</h4>
+                <p>Test NFS reachability: <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">showmount -e 192.168.1.175</code></p>
+                <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: 10px; margin: 10px 0;">
+                    <strong>Critical:</strong> Ensure stale volumes are removed to avoid conflicts.
+                    <code style="display: block; margin-top: 5px;">sudo docker volume rm comserv2_comserv-workshop</code>
+                </div>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>If NFS OK:</strong> Create volumes using project-prefixed names:
+                        <code style="display: block; margin: 5px 0;">sudo docker volume create --driver local --opt type=nfs --opt o="addr=192.168.1.175,rw,noatime,nfsvers=3,soft" --opt device=":/mnt/data" comserv2_workshop_files_nfs</code>
+                    </li>
+                    <li><strong>Run Container:</strong> Use the updated volume names:
+                        <code style="display: block; margin: 5px 0;">sudo docker run -d --name comserv2-web-prod -p 5000:3000 -v comserv2_comserv-logs:/opt/comserv/root/log -v comserv2_workshop_files_nfs:/data/nfs comserv2-web-prod:latest</code>
+                    </li>
+                </ul>
+
+                <h4 style="color: var(--text-color); font-family: var(--header-font);">Phase 5: Verification & Cleanup</h4>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Health Check:</strong> <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">sudo docker inspect --format="{{.State.Health.Status}}" comserv2-web-prod</code></li>
+                    <li><strong>Final Cleanup:</strong> Remove <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">comserv2-web-prod-old</code> and prune dangling images.</li>
+                </ol>
+            </div>
+
+<h3>Step 10: Implement Production Restart (Manual Method)</h3>
 <div class="procedure-step">
   <h4>Actions:</h4>
   <ol>
@@ -301,7 +345,7 @@
   </ul>
 </div>
 
-<h3>Step 10: Final Testing and Monitoring</h3>
+<h3>Step 11: Final Testing and Monitoring</h3>
 <div class="procedure-step">
   <h4>Actions:</h4>
   <ol>

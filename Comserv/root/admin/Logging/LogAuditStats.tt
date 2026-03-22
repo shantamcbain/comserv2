@@ -1,0 +1,213 @@
+[%# LogAuditStats.tt — bare HTML fragment, rendered without TT wrapper
+   Injected via AJAX into #audit-stats-container on /admin/logging/audit -%]
+[% IF page_error %]
+<div class="error"><strong>Notice:</strong> [% page_error | html %]
+    Some sections below may be incomplete.</div>
+[% END %]
+
+<!-- SECTION 1: What is currently being recorded -->
+<div class="content-section">
+    <h2>What Is Being Recorded</h2>
+
+    [% IF audit.error %]
+        <div class="error"><strong>Audit error:</strong> [% audit.error | html %]</div>
+    [% END %]
+
+    <div class="data-container stats-row">
+        <div>
+            <h3>Total Records in system_log</h3>
+            <p class="stat-large">[% audit.total | html %] <small style="font-size:0.4em;color:#888">(estimate)</small></p>
+            <p>Recorded in last [% audit.hours | html %]h: <strong>[% audit.recent | html %]</strong></p>
+            <p style="font-size:0.85em;color:#888">Total shown is an InnoDB engine estimate; actual count may differ by up to 20%.</p>
+        </div>
+    </div>
+
+    <h3>Records by Level</h3>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Level</th>
+                <th>Total (all time)</th>
+                <th>Last [% audit.hours | html %]h</th>
+                <th>Retention Policy</th>
+                <th>Would Prune Now</th>
+            </tr>
+        </thead>
+        <tbody>
+        [% SET retention = { 'DEBUG' => '1 day', 'INFO' => '2 days', 'WARN' => '7 days', 'ERROR' => '30 days', 'CRITICAL' => '90 days' } %]
+        [% FOR row IN audit.by_level %]
+            [% SET prune_n = audit.prune_estimates.${row.level} || 0 %]
+            <tr class="level-[% row.level | lower %]">
+                <td><strong>[% row.level | html %]</strong></td>
+                <td>[% row.total | html %]</td>
+                <td>[% row.recent | html %]</td>
+                <td>[% retention.${row.level} || '?' %]</td>
+                <td>[% IF prune_n > 0 %]<span class="prune-eligible">[% prune_n | html %]</span>[% ELSE %]0[% END %]</td>
+            </tr>
+        [% END %]
+        </tbody>
+        <tfoot>
+            <tr class="table-foot-bold">
+                <td colspan="4">Total prunable with current policy:</td>
+                <td><span class="prune-total-val">[% audit.prune_total | html %]</span></td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <h3>Top Subroutines Generating Records (last [% audit.hours | html %]h)</h3>
+    <table class="data-table">
+        <thead><tr><th>Subroutine</th><th>Level</th><th>Count</th></tr></thead>
+        <tbody>
+        [% FOR row IN audit.top_subroutines %]
+            <tr class="level-[% row.level | lower %]">
+                <td><code>[% row.subroutine | html %]</code></td>
+                <td>[% row.level | html %]</td>
+                <td>[% row.count | html %]</td>
+            </tr>
+        [% END %]
+        [% IF !audit.top_subroutines.size %]
+            <tr><td colspan="3" class="empty-state">No data for this period.</td></tr>
+        [% END %]
+        </tbody>
+    </table>
+
+    <h3>Top Source Files (last [% audit.hours | html %]h)</h3>
+    <table class="data-table">
+        <thead><tr><th>File</th><th>Count</th></tr></thead>
+        <tbody>
+        [% FOR row IN audit.top_files %]
+            <tr>
+                <td><small>[% row.file | html %]</small></td>
+                <td>[% row.count | html %]</td>
+            </tr>
+        [% END %]
+        [% IF !audit.top_files.size %]
+            <tr><td colspan="2" class="empty-state">No data for this period.</td></tr>
+        [% END %]
+        </tbody>
+    </table>
+
+    [% IF audit.top_instances.size %]
+    <h3>By Server / Container Instance (last [% audit.hours | html %]h)</h3>
+    <table class="data-table">
+        <thead><tr><th>Instance</th><th>Records</th></tr></thead>
+        <tbody>
+        [% FOR row IN audit.top_instances %]
+            <tr>
+                <td><code>[% row.instance | html %]</code></td>
+                <td>[% row.count | html %]</td>
+            </tr>
+        [% END %]
+        </tbody>
+    </table>
+    [% END %]
+</div>
+
+<!-- SECTION 1b: Most Common Errors by Severity -->
+[% IF audit.top_errors.size %]
+<div class="content-section">
+    <h2>Most Common Errors &amp; Warnings (last [% audit.hours | html %]h) — by Severity</h2>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Severity</th><th>Count</th><th>Subroutine</th>
+                <th>Server</th><th>Message</th>
+            </tr>
+        </thead>
+        <tbody>
+        [% FOR row IN audit.top_errors %]
+            <tr class="level-[% row.level | lower %]">
+                <td><strong class="urgency-[% row.level | lower %]">[% row.level | html %]</strong></td>
+                <td>[% row.count | html %]</td>
+                <td><code>[% row.subroutine | html %]</code></td>
+                <td><small>[% row.system | html %]</small></td>
+                <td><small>[% row.message | html %]</small></td>
+            </tr>
+        [% END %]
+        </tbody>
+    </table>
+</div>
+[% END %]
+
+<!-- SECTION 2: Open Health Alerts -->
+<div class="content-section">
+    <h2>What Is Not Working — Open Health Alerts</h2>
+    [% IF alerts.size > 0 %]
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>#</th><th>Urgency</th><th>Category</th><th>Occurrences</th>
+                <th>First Seen</th><th>Last Seen</th><th>Instance</th>
+                <th>Description</th><th>Status</th><th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        [% FOR alert IN alerts %]
+            <tr>
+                <td>[% alert.id | html %]</td>
+                <td><strong class="urgency-[% alert.level | lower %]">[% alert.level | html %]</strong></td>
+                <td>[% alert.category | html %]</td>
+                <td>[% alert.occurrence_count | html %]</td>
+                <td class="nowrap"><small>[% alert.first_seen | html %]</small></td>
+                <td class="nowrap"><small>[% alert.last_seen | html %]</small></td>
+                <td><small>[% alert.system_identifier | html %]</small></td>
+                <td>[% alert.description | html | truncate(100) %]</td>
+                <td>[% alert.status | html %]</td>
+                <td>
+                    <form method="post" action="/admin/logging/audit/alert_action" class="form-inline">
+                        <input type="hidden" name="alert_id" value="[% alert.id | html %]">
+                        [% IF alert.status == 'OPEN' %]
+                            <button type="submit" name="action" value="acknowledge" class="btn btn-warning btn-sm">Ack</button>
+                        [% END %]
+                        <button type="submit" name="action" value="resolve" class="btn btn-success btn-sm"
+                            onclick="return confirm('Mark alert #[% alert.id %] as RESOLVED?')">Resolve</button>
+                    </form>
+                </td>
+            </tr>
+        [% END %]
+        </tbody>
+    </table>
+    [% ELSE %]
+    <div class="data-container">
+        <p class="empty-state">No open health alerts.</p>
+    </div>
+    [% END %]
+</div>
+
+<!-- SECTION 3: Prune old records -->
+<div class="content-section">
+    <h2>Prune Old Records</h2>
+    <p>Remove records from <code>system_log</code> older than the retention period for each level.
+       Records will also be capped at <em>max total rows</em> by deleting the oldest first.</p>
+
+    [% IF audit.prune_total > 0 %]
+    <div class="alert-warning-box">
+        <strong>&#9888; [% audit.prune_total | html %] records</strong> are eligible for pruning with the default policy.
+    </div>
+    [% END %]
+
+    <form method="post" action="/admin/logging/audit/prune" class="app-form"
+          onsubmit="return confirm('This will permanently delete old log records. Continue?')">
+        <div class="prune-form-row">
+            [% SET fields = [
+                { name='debug_days',    label='DEBUG keep (days)',    default=1  },
+                { name='info_days',     label='INFO keep (days)',     default=2  },
+                { name='warn_days',     label='WARN keep (days)',     default=7  },
+                { name='error_days',    label='ERROR keep (days)',    default=30 },
+                { name='critical_days', label='CRITICAL keep (days)', default=90 },
+                { name='max_records',   label='Max total rows',       default=10000 },
+            ] %]
+            [% FOR f IN fields %]
+            <div class="form-field">
+                <label for="[% f.name %]">[% f.label %]:</label>
+                <input type="number" id="[% f.name %]" name="[% f.name %]"
+                       value="[% f.default %]" min="0" class="form-input prune-input">
+            </div>
+            [% END %]
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-danger">Prune Now</button>
+            <small class="prune-note">This action cannot be undone.</small>
+        </div>
+    </form>
+</div>

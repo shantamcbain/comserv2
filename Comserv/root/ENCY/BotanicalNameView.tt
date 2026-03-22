@@ -5,7 +5,7 @@
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
-[% INCLUDE 'ENCY/ImageHelper.tt' %]
+[% PROCESS 'ENCY/ImageHelper.tt' %]
 
 
 
@@ -35,8 +35,8 @@
      
         <h2>Herbs by Botanical name.</h2>
  <!-- Display the Add Herb button only for admin users -->
-[% IF c.session.roles == 'admin' %]
-    <button onclick="window.location.href='/ENCY/add_herb';">Add Herb</button>
+[% IF is_admin %]
+    <a href="/ENCY/add_herb" class="btn btn-primary">Add Herb</a>
 [% END %]
 
 <form action="search" method="POST">
@@ -47,38 +47,10 @@
 
 <p>     <a href="ForumulaView"> Formulas.</a>
 
- <p> These Herbs are in the data base. [% IF group    ==  'Alegro_admin' OR
-			       group    ==  'Apis_Admin' OR
-		          group    == 'BHN_Admin' OR
-			       group    ==  'AltPower_admin' OR
-		  	       group    ==  'Apis_Admin' OR
-			       group    ==  'AnuCollective_admin' OR
-			       group    ==  'Brew_admin' OR
-			       group    ==  'CS_admin' OR
-			       group    ==  'CSC_admin' OR
-			       group    ==  'CSPS_admin' OR
-			       group    ==  'ENCY_admin' OR
-			       group    ==  'Forager_admin' OR
-			       group    ==  'eXtropia_admin' OR
-			       group    ==  'GPMarket_admin' OR
-			       group    ==  'HE_admin' OR
-			       group    ==  'NOWD_admin' OR
-			       group    ==  'News_admin' OR
-			       group    ==  'OKB_admin'OR
-			       group    ==  'Organic_admin' OR
-			       group    ==  'Shanta_admin' OR
-			       group    ==  'VitalVic_admin' OR
-			       group    ==  'rv_admin' OR
-			       group    == 'MJB_Admin' OR
-			       group    ==  'ULC_admin' OR
-			       group    ==  'USBM_admin' OR
-			       group    ==  'WB_admin' OR
-			       group    ==  'WW_admin' OR
-			       username == 'Shanta' OR
-			      group    == 'Demo_admin'
-			 %] 
-			 <a href="/cgi-bin/ENCY/herbs_admin.cgi?site=[% SiteName %]&[% session_string %]&display_add_form=on" target="_blank" target="_blank">Add new Herb</a>
-			[% END %]
+ <p> These Herbs are in the data base.
+[% IF is_admin %]
+    <a href="/ENCY/add_herb" class="btn btn-primary">Add new Herb</a>
+[% END %]
 
 <table>
    <tr>
@@ -94,8 +66,8 @@
              <span style="font-size: 30px;">Idententifing Character:</span> [% link.ident_character %]<br>
             <span style="font-size: 30px;"> Distribution:</span> [% link.distribution %]<br>
             <span style="font-size: 30px;" >Medical Uses:</span> [% link.medical_uses %]<br>
-           <a href="/ENCY/herb_detail/[% link.record_id %]" name="Contact" title="details "><font class="LeftSideBarNavStyle">Details</font></a>
-            [% IF group == "Apis_admin" %] <a href="/cgi-bin/ENCY/herbs_admin.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %]" name="Contact" target="[% link.target %]" title="details "><font class="LeftSideBarNavStyle">Admin</font></a> [% END %]
+           <a href="/ENCY/herb_detail/[% link.record_id %]" title="details">Details</a>
+
         </td>
         <td>
             [% ency_img_tag(link.image, 300, 325) %]

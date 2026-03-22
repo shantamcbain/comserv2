@@ -1,0 +1,301 @@
+[% PageVersion = 'Comserv/root/admin/css_settings.tt,v 1.0 2025/01/27 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'CSS Settings - Theme Management' %]
+
+<div class="apiary-container">
+    <div class="apiary-header">
+        <h1><i class="fas fa-palette"></i> CSS Settings - Theme Management</h1>
+        <p>Configure and customize themes for your site</p>
+        <p><strong>Current Site:</strong> [% site_name %] | <strong>Active Theme:</strong> [% current_theme %]</p>
+    </div>
+
+    <!-- Theme Selection Section -->
+    <section id="theme-selection">
+        <div class="feature-card">
+            <div class="feature-header">
+                <h2><i class="fas fa-swatchbook"></i> Theme Selection</h2>
+            </div>
+            <div class="feature-content">
+                <form id="theme-selection-form" method="post" action="/css_form/update_theme">
+                    <div class="form-group">
+                        <label for="theme-select" class="form-label">Select Theme:</label>
+                        <select id="theme-select" name="theme" class="form-control">
+                            [% FOREACH theme IN available_themes %]
+                                <option value="[% theme %]" [% IF theme == current_theme %]selected[% END %]>
+                                    [% theme.ucfirst %]
+                                </option>
+                            [% END %]
+                        </select>
+                    </div>
+                    <div class="feature-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Apply Theme
+                        </button>
+                        <button type="button" id="preview-theme" class="btn btn-secondary">
+                            <i class="fas fa-eye"></i> Preview Theme
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Theme Preview Section -->
+    <section id="theme-preview">
+        <div class="feature-card">
+            <div class="feature-header">
+                <h2><i class="fas fa-eye"></i> Theme Preview</h2>
+            </div>
+            <div class="feature-content">
+                <div id="preview-container">
+                    <p>Select a theme above to see a preview of how it will look.</p>
+                    
+                    <!-- Sample UI Elements for Preview -->
+                    <div id="preview-elements" style="display: none;">
+                        <div class="feature-grid">
+                            <div class="feature-card">
+                                <div class="feature-header">
+                                    <h3>Sample Card</h3>
+                                </div>
+                                <div class="feature-content">
+                                    <p>This is how content will appear with the selected theme.</p>
+                                    <div class="feature-actions">
+                                        <button class="btn btn-primary">Primary Button</button>
+                                        <button class="btn btn-secondary">Secondary Button</button>
+                                        <button class="btn btn-success">Success Button</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Theme Customization Section -->
+    <section id="theme-customization">
+        <div class="feature-card">
+            <div class="feature-header">
+                <h2><i class="fas fa-cogs"></i> Theme Customization</h2>
+            </div>
+            <div class="feature-content">
+                <form id="theme-customization-form" method="post" action="/css_form/customize_theme">
+                    <div class="admin-grid">
+                        <!-- Primary Colors -->
+                        <div class="admin-card">
+                            <div class="feature-header">
+                                <h3>Primary Colors</h3>
+                            </div>
+                            <div class="feature-content">
+                                <div class="form-group">
+                                    <label for="primary-color" class="form-label">Primary Color:</label>
+                                    <input type="color" id="primary-color" name="primary_color" class="form-control" value="#007bff">
+                                </div>
+                                <div class="form-group">
+                                    <label for="secondary-color" class="form-label">Secondary Color:</label>
+                                    <input type="color" id="secondary-color" name="secondary_color" class="form-control" value="#6c757d">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Status Colors -->
+                        <div class="admin-card">
+                            <div class="feature-header">
+                                <h3>Status Colors</h3>
+                            </div>
+                            <div class="feature-content">
+                                <div class="form-group">
+                                    <label for="success-color" class="form-label">Success Color:</label>
+                                    <input type="color" id="success-color" name="success_color" class="form-control" value="#28a745">
+                                </div>
+                                <div class="form-group">
+                                    <label for="warning-color" class="form-label">Warning Color:</label>
+                                    <input type="color" id="warning-color" name="warning_color" class="form-control" value="#ffc107">
+                                </div>
+                                <div class="form-group">
+                                    <label for="danger-color" class="form-label">Danger Color:</label>
+                                    <input type="color" id="danger-color" name="danger_color" class="form-control" value="#dc3545">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Background Colors -->
+                        <div class="admin-card">
+                            <div class="feature-header">
+                                <h3>Background Colors</h3>
+                            </div>
+                            <div class="feature-content">
+                                <div class="form-group">
+                                    <label for="bg-color" class="form-label">Background Color:</label>
+                                    <input type="color" id="bg-color" name="bg_color" class="form-control" value="#ffffff">
+                                </div>
+                                <div class="form-group">
+                                    <label for="card-bg" class="form-label">Card Background:</label>
+                                    <input type="color" id="card-bg" name="card_bg" class="form-control" value="#f8f9fa">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Text Colors -->
+                        <div class="admin-card">
+                            <div class="feature-header">
+                                <h3>Text Colors</h3>
+                            </div>
+                            <div class="feature-content">
+                                <div class="form-group">
+                                    <label for="text-color" class="form-label">Text Color:</label>
+                                    <input type="color" id="text-color" name="text_color" class="form-control" value="#333333">
+                                </div>
+                                <div class="form-group">
+                                    <label for="border-color" class="form-label">Border Color:</label>
+                                    <input type="color" id="border-color" name="border_color" class="form-control" value="#dee2e6">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="feature-actions">
+                        <button type="button" id="apply-custom-colors" class="btn btn-primary">
+                            <i class="fas fa-palette"></i> Apply Custom Colors
+                        </button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save"></i> Save Custom Theme
+                        </button>
+                        <button type="button" id="reset-colors" class="btn btn-warning">
+                            <i class="fas fa-undo"></i> Reset to Default
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Available Themes Info -->
+    <section id="available-themes">
+        <div class="feature-card">
+            <div class="feature-header">
+                <h2><i class="fas fa-info-circle"></i> Available Themes</h2>
+            </div>
+            <div class="feature-content">
+                <div class="feature-grid">
+                    [% FOREACH theme IN available_themes %]
+                        <div class="admin-card">
+                            <div class="feature-header">
+                                <h3>[% theme.ucfirst %]</h3>
+                            </div>
+                            <div class="feature-content">
+                                <p>Theme file: <code>[% theme %].css</code></p>
+                                [% IF theme == current_theme %]
+                                    <span class="badge badge-success">Currently Active</span>
+                                [% END %]
+                            </div>
+                        </div>
+                    [% END %]
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- JavaScript for Theme Preview and Customization -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const themeSelect = document.getElementById('theme-select');
+    const previewButton = document.getElementById('preview-theme');
+    const previewElements = document.getElementById('preview-elements');
+    const applyCustomColors = document.getElementById('apply-custom-colors');
+    const resetColors = document.getElementById('reset-colors');
+
+    // Theme preview functionality
+    previewButton.addEventListener('click', function() {
+        const selectedTheme = themeSelect.value;
+        previewTheme(selectedTheme);
+    });
+
+    // Auto-preview on theme selection change
+    themeSelect.addEventListener('change', function() {
+        const selectedTheme = this.value;
+        previewTheme(selectedTheme);
+    });
+
+    function previewTheme(themeName) {
+        // Show preview elements
+        previewElements.style.display = 'block';
+        
+        // Load theme CSS for preview
+        const existingPreview = document.getElementById('theme-preview-css');
+        if (existingPreview) {
+            existingPreview.remove();
+        }
+
+        const link = document.createElement('link');
+        link.id = 'theme-preview-css';
+        link.rel = 'stylesheet';
+        link.href = '/static/css/themes/' + themeName + '.css';
+        document.head.appendChild(link);
+
+        // Update preview container message
+        const previewContainer = document.getElementById('preview-container');
+        const message = previewContainer.querySelector('p');
+        message.textContent = 'Preview of ' + themeName.charAt(0).toUpperCase() + themeName.slice(1) + ' theme:';
+    }
+
+    // Custom color application
+    applyCustomColors.addEventListener('click', function() {
+        const colors = {
+            '--primary-color': document.getElementById('primary-color').value,
+            '--secondary-color': document.getElementById('secondary-color').value,
+            '--success-color': document.getElementById('success-color').value,
+            '--warning-color': document.getElementById('warning-color').value,
+            '--danger-color': document.getElementById('danger-color').value,
+            '--bg-color': document.getElementById('bg-color').value,
+            '--card-bg': document.getElementById('card-bg').value,
+            '--text-color': document.getElementById('text-color').value,
+            '--border-color': document.getElementById('border-color').value
+        };
+
+        // Apply custom colors to root element
+        const root = document.documentElement;
+        Object.keys(colors).forEach(property => {
+            root.style.setProperty(property, colors[property]);
+        });
+
+        // Show preview elements with custom colors
+        previewElements.style.display = 'block';
+    });
+
+    // Reset colors to default
+    resetColors.addEventListener('click', function() {
+        const root = document.documentElement;
+        const properties = [
+            '--primary-color', '--secondary-color', '--success-color', 
+            '--warning-color', '--danger-color', '--bg-color', 
+            '--card-bg', '--text-color', '--border-color'
+        ];
+
+        properties.forEach(property => {
+            root.style.removeProperty(property);
+        });
+
+        // Reset form values to defaults
+        document.getElementById('primary-color').value = '#007bff';
+        document.getElementById('secondary-color').value = '#6c757d';
+        document.getElementById('success-color').value = '#28a745';
+        document.getElementById('warning-color').value = '#ffc107';
+        document.getElementById('danger-color').value = '#dc3545';
+        document.getElementById('bg-color').value = '#ffffff';
+        document.getElementById('card-bg').value = '#f8f9fa';
+        document.getElementById('text-color').value = '#333333';
+        document.getElementById('border-color').value = '#dee2e6';
+    });
+
+    // Initialize with current theme preview
+    if (themeSelect.value) {
+        previewTheme(themeSelect.value);
+    }
+});
+</script>

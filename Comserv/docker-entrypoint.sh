@@ -93,6 +93,13 @@ mkdir -p ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME
 chmod 755 ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /var/log/supervisor
 chown -R comserv:comserv ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups
 
+# Ensure Catalyst Session::Store::File directory exists and is writable by comserv user.
+# COMSERV_SESSION_DIR is the session FILES directory (e.g. /tmp/comserv/session).
+SESSION_DIR="${COMSERV_SESSION_DIR:-/tmp/comserv/session}"
+mkdir -p "$SESSION_DIR"
+chmod 700 "$SESSION_DIR"
+chown comserv:comserv "$SESSION_DIR" 2>/dev/null || true
+
 # Create base supervisord.conf if missing or empty
 if [ ! -s /etc/supervisor/supervisord.conf ]; then
     mkdir -p /etc/supervisor/conf.d
@@ -132,15 +139,21 @@ else
 fi
 
 # Create workshop files directory on shared volume
-WORKSHOP_DIR="/data/nfs/workshop_files"
-if [ -d "/data/nfs" ]; then
-  echo "Creating workshop files directory: $WORKSHOP_DIR"
-  mkdir -p "$WORKSHOP_DIR"
-  chmod 755 "$WORKSHOP_DIR"
-  chown comserv:comserv "$WORKSHOP_DIR" 2>/dev/null || true
-  echo "✓ Workshop files directory ready at $WORKSHOP_DIR"
+if [ "${SKIP_NFS_SETUP}" != "1" ]; then
+  WORKSHOP_DIR="/data/nfs/workshop_files"
+  if [ -d "/data/nfs" ]; then
+    echo "✓ Using existing NFS mount at /data/nfs"
+    if [ ! -d "$WORKSHOP_DIR" ]; then
+        echo "Creating workshop files directory: $WORKSHOP_DIR"
+        mkdir -p "$WORKSHOP_DIR"
+        chmod 775 "$WORKSHOP_DIR" 2>/dev/null || true
+        chown comserv:comserv "$WORKSHOP_DIR" 2>/dev/null || true
+    fi
+  else
+    echo "⚠ Warning: Workshop volume /data/nfs not available - workshop file uploads will use fallback directory"
+  fi
 else
-  echo "⚠ Warning: Workshop volume /data/nfs not available - workshop file uploads will use fallback directory"
+  echo "✓ Skipping NFS setup (SKIP_NFS_SETUP=1) - using existing NFS mount"
 fi
 
 # Configure log rotation to prevent disk space issues

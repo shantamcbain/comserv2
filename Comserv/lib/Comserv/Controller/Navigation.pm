@@ -736,6 +736,13 @@ sub populate_navigation_data {
         my $cache_key = "${site_name}_${username}";
         my $current_time = time();
         my $cache_ttl = 300; # 5 minutes cache
+        my $max_cache_age = 3600; # 1 hour max for the whole cache structure
+        
+        # Periodically clear the entire cache to prevent indefinite growth
+        if (($current_time - $self->_cache_timestamp) > $max_cache_age) {
+            $c->log->debug("Navigation cache exceeded max age, clearing all entries");
+            $self->_navigation_cache({});
+        }
         
         # Check if we have valid cached data
         if ($self->_navigation_cache->{$cache_key} && 

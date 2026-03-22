@@ -64,10 +64,15 @@ sub send_error_notification {
         $admin_email = 'helpdesk@computersystemconsulting.ca';
     }
     
-    my $sitename = $c->stash->{SiteName} || 'CSC';
+    my $sitename = ($c && ref($c) && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC';
     my $smtp_config = $self->get_smtp_config($c, $sitename);
     
-    unless ($smtp_config->{smtp_host}) {
+    # If no SMTP config was found (especially if $c was missing), try to load a default one
+    unless ($smtp_config && $smtp_config->{smtp_host}) {
+        $smtp_config = $self->_get_default_smtp_config();
+    }
+    
+    unless ($smtp_config && $smtp_config->{smtp_host}) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_error_notification',
             "No SMTP configuration found - error notification not sent");
         return 0;
@@ -435,85 +440,111 @@ sub get_smtp_config {
     my ($self, $c, $sitename) = @_;
     
     my %config = ();
-    eval {
-        my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
-        if ($site) {
-            my $configs = $c->model('DBEncy')->resultset('SiteConfig')->search({
-                site_id => $site->id,
-                config_key => { -like => 'smtp_%' }
-            });
-            while (my $cfg = $configs->next) {
-                $config{$cfg->config_key} = $cfg->config_value;
-            }
-        }
-    };
+    
+    # If $c is missing, we can't search the database easily via the model
+    # Return empty config and let the caller handle it or use default
+    return \%config unless $c && ref($c) && $c->can('model');
 
-    unless ($config{smtp_host}) {
-        my $fallback = $c->config->{FallbackSMTP} // {};
-        %config = (
-            smtp_host     => $fallback->{host}     // 'harper.whc.ca',
-            smtp_port     => $fallback->{port}     // 465,
-            smtp_ssl      => $fallback->{ssl}      // 'ssl',
-            smtp_user     => $fallback->{username} // '',
-            smtp_password => $fallback->{password} // '',
-            smtp_from     => $fallback->{from}     // '',
-        );
+    my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
+    
+    if ($site) {
+        my $configs = $c->model('DBEncy')->resultset('SiteConfig')->search({
+            site_id => $site->id,
+            config_key => { -like => 'smtp_%' }
+        });
+        
+        while (my $cfg = $configs->next) {
+            $config{$cfg->config_key} = $cfg->config_value;
+        }
     }
 
+    # Force all outbound mail through the PMG relay — never connect to external SMTP servers directly
+    if ($config{smtp_host} && $config{smtp_host} !~ /^192\.168\.1\.(128|129)$/) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
+            "Redirecting smtp_host '$config{smtp_host}' through PMG relay 192.168.1.128");
+        $config{smtp_host}     = '192.168.1.128';
+        $config{smtp_port}     = 25;
+        $config{smtp_ssl}      = 0;
+        $config{smtp_user} = '';
+        $config{smtp_password} = '';
+    }
+
+    return \%config;
+}
+
+sub _get_default_smtp_config {
+    my ($self) = @_;
+    
+    # Fallback SMTP settings for system-level errors
+    my %config = (
+        smtp_host     => $ENV{SMTP_HOST}     || '192.168.1.128', # Default to PMG
+        smtp_port     => $ENV{SMTP_PORT}     || 25,
+        smtp_ssl      => $ENV{SMTP_SSL}      || 0,
+        smtp_user => $ENV{SMTP_USER}     || '',
+        smtp_password => $ENV{SMTP_PASS}     || '',
+        smtp_from     => $ENV{SMTP_FROM}     || 'helpdesk@computersystemconsulting.ca',
+    );
+    
     return \%config;
 }
 
 sub send_email {
     my ($self, $c, $email, $smtp_config) = @_;
     
+    my $to = $email->header('To');
+    my $subject = $email->header('Subject');
+    my $body = $email->body_str;
+    
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
-        "Attempting to send email to: " . $email->header('To') . 
-        " via SMTP: " . $smtp_config->{smtp_host} . ":" . ($smtp_config->{smtp_port} || 587));
+        "Forwarding email request to Model::Mail for: $to");
     
-    my $ssl_mode  = lc($smtp_config->{smtp_ssl} // '');
-    my $use_ssl   = $ssl_mode eq 'ssl'      ? 'ssl'
-                  : $ssl_mode eq 'starttls' ? 'starttls'
-                  : 0;
+    # Use site_id from SiteName if available
+    my $site_id;
+    if ($c && ref($c) && $c->can('model') && $c->stash->{SiteName}) {
+        eval {
+            my $site = $c->model('DBEncy')->resultset('Site')->find({ name => $c->stash->{SiteName} });
+            $site_id = $site->id if $site;
+        };
+    }
 
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-        "SMTP Config: host=" . $smtp_config->{smtp_host} . 
-        ", port=" . ($smtp_config->{smtp_port} || 587) . 
-        ", ssl=" . ($use_ssl || 'none') .
-        ", username=" . ($smtp_config->{smtp_user} || 'none'));
-    
-    my $transport;
     eval {
-        my %smtp_args = (
-            host => $smtp_config->{smtp_host},
-            port => $smtp_config->{smtp_port} || 587,
-            ssl  => $use_ssl,
-        );
-        if ($smtp_config->{smtp_user} && $smtp_config->{smtp_password}) {
-            $smtp_args{sasl_username} = $smtp_config->{smtp_user};
-            $smtp_args{sasl_password} = $smtp_config->{smtp_password};
+        if ($c && ref($c) && $c->can('model')) {
+            return $c->model('Mail')->send_email($c, $to, $subject, $body, $site_id);
+        } else {
+            # Low-level fallback if Catalyst context is missing
+            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'send_email',
+                "Missing Catalyst context, using direct SMTP fallback");
+            return $self->_direct_smtp_send($email, $smtp_config);
         }
-        $transport = Email::Sender::Transport::SMTP->new(\%smtp_args);
-        
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-            "SMTP transport created successfully");
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
-            "Failed to create SMTP transport: $@");
+            "Failed to send email via Model::Mail: $@");
         return 0;
     }
+}
+
+sub _direct_smtp_send {
+    my ($self, $email, $smtp_config) = @_;
+    # Original logic for when $c is missing (e.g. during script execution)
+    # ... existing implementation of SMTP send ...
+    my $host = $smtp_config->{smtp_host} || '192.168.1.128';
+    my $port = $smtp_config->{smtp_port} || 25;
+    
+    my %transport_args = (
+        host => $host,
+        port => $port,
+        sasl_username => $smtp_config->{smtp_user},
+        sasl_password => $smtp_config->{smtp_password},
+        timeout => 5,
+    );
     
     eval {
+        my $transport = Email::Sender::Transport::SMTP->new(\%transport_args);
         Email::Sender::Simple->send($email, { transport => $transport });
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
-            "Email sent successfully to: " . $email->header('To'));
         return 1;
     };
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
-            "Failed to send email: $@");
-        return 0;
-    }
+    return 0;
 }
 
 __PACKAGE__->meta->make_immutable;
