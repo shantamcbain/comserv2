@@ -32,17 +32,19 @@
                 <div class="success">[% c.flash.success_msg %]</div>
             [% END %]
             
+            [% reg_list = registered || registered_participants %]
+            [% wl_list  = waitlist  || waitlist_participants %]
             <div class="content-section">
-                <p><strong>Total Registered:</strong> [% registered.size || 0 %] participant(s)</p>
+                <p><strong>Total Registered:</strong> [% reg_list.size || 0 %] participant(s)</p>
                 [% IF workshop.max_participants %]
-                <p><strong>Capacity:</strong> [% registered.size || 0 %] / [% workshop.max_participants %]</p>
+                <p><strong>Capacity:</strong> [% reg_list.size || 0 %] / [% workshop.max_participants %]</p>
                 [% END %]
-                <p><strong>Waitlist:</strong> [% waitlist.size || 0 %] participant(s)</p>
+                <p><strong>Waitlist:</strong> [% wl_list.size || 0 %] participant(s)</p>
             </div>
             
             <div class="form-actions">
                 <a href="/workshop/add_participant/[% workshop.id %]" class="btn btn-primary">Manually Add Participant</a>
-                [% IF registered.size > 0 || waitlist.size > 0 %]
+                [% IF reg_list.size > 0 || wl_list.size > 0 %]
                 <a href="#" onclick="window.print(); return false;" class="btn btn-secondary">Print List</a>
                 [% END %]
             </div>
@@ -50,7 +52,7 @@
             <div class="data-container">
                 <h2>Registered Participants</h2>
                 
-                [% IF registered.size > 0 %]
+                [% IF reg_list.size > 0 %]
                 <div class="table-container">
                     <table class="data-table">
                         <thead>
@@ -64,7 +66,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            [% FOREACH participant IN registered %]
+                            [% FOREACH participant IN reg_list %]
                             <tr>
                                 <td>
                                     [% IF participant.user %]
@@ -98,7 +100,7 @@
                 [% END %]
             </div>
             
-            [% IF waitlist.size > 0 %]
+            [% IF wl_list.size > 0 %]
             <div class="data-container">
                 <h2>Waitlist</h2>
                 
@@ -115,7 +117,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            [% FOREACH participant IN waitlist %]
+                            [% FOREACH participant IN wl_list %]
                             <tr>
                                 <td>
                                     [% IF participant.user %]
