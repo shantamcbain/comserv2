@@ -1,12 +1,10 @@
 package Comserv::Model::Mail;
 use Moose;
 use namespace::autoclean;
-use Email::Simple;
-use Email::Sender::Simple qw(sendmail);
-use Email::Sender::Transport::SMTP;
 use Try::Tiny;
 use LWP::UserAgent;
 use HTTP::Request;
+use Email::MIME;
 use Comserv::Util::Logging;
 use Comserv::Util::HealthLogger;
 extends 'Catalyst::Model';
@@ -39,11 +37,9 @@ sub send_email {
         return;
     }
 
-    # Use Net::SMTP for more reliable email sending
+    # Use Net::SMTP for reliable email sending
     require Net::SMTP;
-    require MIME::Lite;
-    require Authen::SASL;
-    
+
     my $system_from  = $smtp_config->{from} || 'noreply@computersystemconsulting.ca';
     my $leader_name  = $opts->{leader_name}  || '';
     my $leader_email = $opts->{reply_to}     || '';  # leader's real email
@@ -60,25 +56,39 @@ sub send_email {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
         "Email envelope: MAIL FROM=<$smtp_from> From-header='$from_header' To=<$to>");
 
-    # Create a MIME::Lite message
-    my $msg = MIME::Lite->new(
+    # Build headers for Email::MIME
+    my @headers = (
         From    => $from_header,
         To      => $to,
         Subject => $subject,
-        Type    => 'text/plain',
-        Data    => $body
     );
-    
+    push @headers, ('Reply-To' => $leader_email) if $leader_email;
+
+    # Create Email::MIME message (Email::MIME is installed; MIME::Lite is not)
+    my $msg = Email::MIME->create(
+        header_str => \@headers,
+        attributes => {
+            encoding => 'quoted-printable',
+            charset  => 'UTF-8',
+        },
+        body_str => $body,
+    );
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+        "Message built: From='$from_header' To='$to' Subject='$subject'" .
+        ($leader_email ? " Reply-To='$leader_email'" : ''));
+
     try {
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-            "SMTP settings: " . $smtp_config->{host} . ":" . $smtp_config->{port} .
-            ", SSL: " . ($smtp_config->{ssl} // 'none'));
-        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+            "Connecting to SMTP: " . $smtp_config->{host} . ":" . $smtp_config->{port} .
+            " ssl=" . ($smtp_config->{ssl} || 'none') .
+            " auth=" . ($smtp_config->{user} ? 'yes('.$smtp_config->{user}.')' : 'no'));
+
         # Connect to the SMTP server
         my $smtp = Net::SMTP->new(
             $smtp_config->{host},
             Port    => $smtp_config->{port},
-            Debug   => 0,
+            Debug   => 1,
             Timeout => 15
         );
         
@@ -99,14 +109,18 @@ sub send_email {
                 "SMTP STARTTLS OK");
         }
         
-        # Authenticate if credentials are provided
-        if ($smtp_config->{username} && $smtp_config->{password}) {
+        # Authenticate if credentials are provided (PMG relay at port 25 needs no auth)
+        if ($smtp_config->{user} && $smtp_config->{password}) {
+            require Authen::SASL;
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-                "SMTP AUTH as " . $smtp_config->{username});
-            $smtp->auth($smtp_config->{username}, $smtp_config->{password})
+                "SMTP AUTH as " . $smtp_config->{user});
+            $smtp->auth($smtp_config->{user}, $smtp_config->{password})
                 or die "AUTH failed: " . $smtp->message();
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
                 "SMTP AUTH OK");
+        } else {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+                "SMTP no-auth (PMG relay or no credentials configured)");
         }
         
         # MAIL FROM
@@ -205,58 +219,62 @@ sub get_smtp_config {
         return $self->_get_fallback_smtp_config($c, $site_id);
     }
 
-    # Retrieve SMTP configuration for the given site_id
+    # Retrieve SMTP configuration for the given site_id.
+    # DB keys: smtp_host, smtp_port, smtp_user, smtp_password, smtp_from, smtp_ssl
+    # Internal keys (in returned hashref): host, port, user, password, from, ssl
+    # NOTE: user, password, ssl are optional — PMG relay (192.168.1.128:25) needs no auth
     my %smtp_config;
-    for my $key (qw(host port username password from ssl)) {
+    for my $key (qw(host port user password from ssl)) {
+        my $db_key = "smtp_$key";
         my $config;
         eval {
-            $config = $config_rs->find({ site_id => $site_id, config_key => "smtp_$key" });
+            $config = $config_rs->find({ site_id => $site_id, config_key => $db_key });
         };
-        
+
         if ($@) {
             my $error_msg = $@;
-            
             if ($error_msg =~ /Table.*ency\.site_config.*doesn.*exist/i) {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config', 
-                    "CRITICAL: Table 'ency.site_config' doesn't exist when accessing smtp_$key for site_id $site_id. " .
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config',
+                    "CRITICAL: Table 'ency.site_config' doesn't exist when accessing $db_key for site_id $site_id. " .
                     "Mail system is incorrectly connecting to localhost instead of production database server (192.168.1.198). " .
                     "Full error: $error_msg");
             } else {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_smtp_config',
-                    "Database error accessing smtp_$key for site_id $site_id: $error_msg — using PMG fallback");
+                    "Database error accessing $db_key for site_id $site_id: $error_msg — using PMG fallback");
             }
-            
             return $self->_get_fallback_smtp_config($c, $site_id);
         }
-        
-        # Skip optional fields like ssl
-        next if !$config && $key eq 'ssl';
-        
-        # Return fallback if any required config is missing
-        unless ($config) {
+
+        # user, password, ssl are optional — skip if not configured
+        if (!$config && ($key eq 'ssl' || $key eq 'user' || $key eq 'password')) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_smtp_config',
-                "Missing SMTP config key: smtp_$key for site_id $site_id — using PMG fallback");
+                "Optional $db_key not set for site_id $site_id — skipping");
+            $smtp_config{$key} = '' if $key eq 'ssl';
+            next;
+        }
+
+        # Required fields: host, port, from — fall back to PMG if missing
+        unless ($config) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_smtp_config',
+                "Required $db_key missing for site_id $site_id — using PMG fallback");
             return $self->_get_fallback_smtp_config($c, $site_id);
         }
-        
+
         $smtp_config{$key} = $config->config_value;
-        
-        # Route all outbound mail through the PMG relay (192.168.1.128)
-        # rather than connecting directly to external SMTP servers
+
+        # Route ALL outbound mail through PMG relay (192.168.1.128)
         if ($key eq 'host') {
             my $original_host = $smtp_config{$key};
-            if ($original_host eq 'mail1.ht.home') {
-                $smtp_config{$key} = '192.168.1.128';
+            if ($original_host ne '192.168.1.128' && $original_host ne '192.168.1.129') {
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
-                    "Redirecting mail1.ht.home through PMG relay 192.168.1.128");
-            } elsif ($original_host ne '192.168.1.128' && $original_host ne '192.168.1.129') {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
-                    "Redirecting external SMTP host '$original_host' through PMG relay 192.168.1.128");
+                    "Redirecting '$original_host' → PMG relay 192.168.1.128");
                 $smtp_config{$key} = '192.168.1.128';
             }
         }
-        # PMG relay uses port 25, no SSL, no auth — override port and ssl from DB config
+        # PMG relay uses port 25, no SSL — always override
         if ($key eq 'port') {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_smtp_config',
+                "Overriding port " . $smtp_config{$key} . " → 25 for PMG relay");
             $smtp_config{$key} = 25;
         }
         if ($key eq 'ssl') {
@@ -264,9 +282,13 @@ sub get_smtp_config {
         }
     }
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config', 
-        "Successfully retrieved SMTP config for site_id $site_id");
-    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
+        "SMTP config resolved for site_id $site_id: host=" . ($smtp_config{host} // 'undef') .
+        " port=" . ($smtp_config{port} // 'undef') .
+        " from=" . ($smtp_config{from} // 'undef') .
+        " ssl=" . ($smtp_config{ssl} // 'none') .
+        " auth=" . ($smtp_config{user} ? 'yes' : 'no'));
+
     return \%smtp_config;
 }
 
@@ -281,7 +303,7 @@ sub _get_fallback_smtp_config {
     my $fallback_config = {
         host => '192.168.1.128',  # PMG (Proxmox Mail Gateway) relay
         port => 25,
-        username => '',
+        user => '',
         password => '',
         from => "noreply\@computersystemconsulting.ca",
         ssl => ''
