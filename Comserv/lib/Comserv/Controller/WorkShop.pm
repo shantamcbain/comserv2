@@ -1246,10 +1246,15 @@ sub add_participant :Local :Args(1) {
             status => $participant_status,
         });
     };
-    
-    if ($@) {
-        $c->flash->{error_msg} = 'Failed to add participant: ' . $@;
+    my $create_err = "$@" if $@;
+
+    if ($create_err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_participant',
+            "Failed to create participant for workshop_id=$id email=$email: $create_err");
+        $c->flash->{error_msg} = "Failed to add participant: $create_err";
     } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_participant',
+            "Participant added: workshop_id=$id name=$name email=$email status=$participant_status");
         if ($participant_status eq 'registered') {
             $c->flash->{success_msg} = "Participant added successfully.";
         } else {
