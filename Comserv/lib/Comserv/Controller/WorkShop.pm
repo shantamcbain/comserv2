@@ -3379,6 +3379,13 @@ sub compose_email :Local :Args(1) {
         status => 'registered'
     })->count;
 
+    # Get leader email to pre-fill reply-to field
+    my $leader_email_default = '';
+    if ($workshop->created_by) {
+        my $lu = $c->model('DBEncy::User')->find($workshop->created_by);
+        $leader_email_default = $lu->email || '' if $lu;
+    }
+
     my @workshop_templates = $c->model('DBEncy::WorkshopMailTemplate')->search(
         { workshop_id => $id, is_active => 1 },
         { order_by => { -asc => 'name' } }
@@ -3449,14 +3456,15 @@ sub compose_email :Local :Args(1) {
         "compose_email for workshop_id=$id: primary=$registered_count unique_total=$unique_total");
 
     $c->stash(
-        workshop           => $workshop,
-        recipient_count    => $registered_count,
-        unique_total       => $unique_total,
-        all_recipients     => \@all_recipients,
-        workshop_templates => \@workshop_templates,
-        global_templates   => \@global_templates,
-        leader_workshops   => \@leader_workshops,
-        template           => 'WorkShops/ComposeEmail.tt',
+        workshop              => $workshop,
+        recipient_count       => $registered_count,
+        unique_total          => $unique_total,
+        all_recipients        => \@all_recipients,
+        workshop_templates    => \@workshop_templates,
+        global_templates      => \@global_templates,
+        leader_workshops      => \@leader_workshops,
+        leader_email_default  => $leader_email_default,
+        template              => 'WorkShops/ComposeEmail.tt',
     );
 }
 
@@ -3677,7 +3685,7 @@ sub send_email :Local :Args(1) {
     eval {
         $email_record = $c->model('DBEncy::WorkshopEmail')->create({
             workshop_id     => $id,
-            subject         => $subject,
+            subject         => $processed_subject,
             body            => $body,
             sent_by         => $c->session->{user_id},
             sent_at         => DateTime->now,
