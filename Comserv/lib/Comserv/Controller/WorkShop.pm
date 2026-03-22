@@ -3370,11 +3370,29 @@ sub compose_email :Local :Args(1) {
         { order_by => { -asc => 'name' } }
     )->all;
 
+    # Fetch all other workshops this leader owns (or all workshops for CSC admin)
+    my $user_id    = $c->session->{user_id};
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my @leader_workshops;
+    if ($admin_type eq 'CSC') {
+        @leader_workshops = $c->model('DBEncy::WorkShop')->search(
+            { id => { '!=' => $id } },
+            { order_by => { -asc => 'title' } }
+        )->all;
+    } elsif ($user_id) {
+        @leader_workshops = $c->model('DBEncy::WorkShop')->search(
+            { created_by => $user_id, id => { '!=' => $id } },
+            { order_by => { -asc => 'title' } }
+        )->all;
+    }
+
     $c->stash(
         workshop           => $workshop,
         recipient_count    => $registered_count,
         workshop_templates => \@workshop_templates,
         global_templates   => \@global_templates,
+        leader_workshops   => \@leader_workshops,
         template           => 'WorkShops/ComposeEmail.tt',
     );
 }
@@ -3399,6 +3417,15 @@ sub send_email :Local :Args(1) {
     my $params = $c->request->body_parameters;
     my $subject = $params->{subject};
     my $body = $params->{body};
+
+    # Collect all workshop IDs to include (primary + any extras checked)
+    my @extra_ids;
+    if (ref $params->{extra_workshop_ids} eq 'ARRAY') {
+        @extra_ids = @{ $params->{extra_workshop_ids} };
+    } elsif ($params->{extra_workshop_ids}) {
+        @extra_ids = ($params->{extra_workshop_ids});
+    }
+    my @all_workshop_ids = ($id, @extra_ids);
     
     unless ($subject && $body) {
         $c->stash->{error_msg} = 'Subject and body are required.';
@@ -3417,7 +3444,7 @@ sub send_email :Local :Args(1) {
     
     my @registered_participants = $c->model('DBEncy::Participant')->search(
         {
-            workshop_id => $id,
+            workshop_id => \@all_workshop_ids,
             'me.status' => 'registered'
         },
         { prefetch => 'user' }
@@ -3430,10 +3457,12 @@ sub send_email :Local :Args(1) {
     }
     
     my @recipient_emails;
+    my %seen_emails;
     for my $participant (@registered_participants) {
-        if ($participant->email && $participant->email =~ /\@/) {
-            push @recipient_emails, $participant->email;
-        }
+        my $email = $participant->email;
+        next unless $email && $email =~ /\@/;
+        next if $seen_emails{lc $email}++;
+        push @recipient_emails, $email;
     }
     
     unless (@recipient_emails) {
@@ -3462,10 +3491,12 @@ sub send_email :Local :Args(1) {
     my $sent_count = 0;
     my $failed_count = 0;
     my @failed_emails;
-    
+    my %sent_to;
+
     for my $participant (@registered_participants) {
         my $email = $participant->email;
         next unless $email && $email =~ /\@/;
+        next if $sent_to{lc $email}++;
         
         my $user_name = '';
         if ($participant->user) {
