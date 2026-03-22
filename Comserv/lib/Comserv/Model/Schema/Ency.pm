@@ -37,6 +37,7 @@ __PACKAGE__->register_class('WorkshopEmail', 'Comserv::Model::Schema::Ency::Resu
 __PACKAGE__->register_class('WorkshopRole', 'Comserv::Model::Schema::Ency::Result::WorkshopRole');
 __PACKAGE__->register_class('SiteWorkshop', 'Comserv::Model::Schema::Ency::Result::SiteWorkshop');
 __PACKAGE__->register_class('WorkshopResource', 'Comserv::Model::Schema::Ency::Result::WorkshopResource');
+__PACKAGE__->register_class('WorkshopMailTemplate', 'Comserv::Model::Schema::Ency::Result::WorkshopMailTemplate');
 
 # Register Membership system classes
 __PACKAGE__->register_class('MembershipPlan', 'Comserv::Model::Schema::Ency::Result::MembershipPlan');
