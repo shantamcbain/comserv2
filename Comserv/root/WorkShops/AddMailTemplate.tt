@@ -86,11 +86,12 @@
                             <div class="form-field">
                                 <label for="body_text">Body (Plain Text) <span class="required">*</span></label>
                                 <small><strong>Available placeholders:</strong>
+                                [% '[[message_body]]' %] &mdash; replaced by the leader's typed message at send time<br>
                                 [% '[[participant.name]]' %] [% '[[participant.first_name]]' %]
                                 [% '[[workshop.title]]' %] [% '[[workshop.date]]' %] [% '[[workshop.time]]' %]
                                 [% '[[workshop.location]]' %] [% '[[workshop.instructor]]' %]
-                                [% '[[leader.name]]' %] [% '[[workshop.url]]' %]
-                                (also work in Subject field: [% '[[workshop.title]]' %] [% '[[leader.name]]' %])
+                                [% '[[leader.name]]' %] [% '[[workshop.url]]' %]<br>
+                                (Subject also supports: [% '[[workshop.title]]' %] [% '[[leader.name]]' %])
                                 </small>
                                 <textarea id="body_text" name="body_text" class="form-input" rows="12" required>[% mail_template.body_text || form_data.body_text || '' | html %]</textarea>
                             </div>
