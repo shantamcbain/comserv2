@@ -1051,7 +1051,7 @@ sub register :Local :Args(1) {
                 },
             };
             
-            $c->forward($c->view('Email::Template'));
+            $c->forward($c->view('Email::Template'), []);
         };
         
         if ($@) {
@@ -3589,7 +3589,7 @@ sub send_email :Local :Args(1) {
                 },
             };
             
-            $c->forward($c->view('Email::Template'));
+            $c->forward($c->view('Email::Template'), []);
             $sent_count++;
         };
         
