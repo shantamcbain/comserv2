@@ -435,19 +435,31 @@ sub get_smtp_config {
     my ($self, $c, $sitename) = @_;
     
     my %config = ();
-    my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
-    
-    if ($site) {
-        my $configs = $c->model('DBEncy')->resultset('SiteConfig')->search({
-            site_id => $site->id,
-            config_key => { -like => 'smtp_%' }
-        });
-        
-        while (my $cfg = $configs->next) {
-            $config{$cfg->config_key} = $cfg->config_value;
+    eval {
+        my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
+        if ($site) {
+            my $configs = $c->model('DBEncy')->resultset('SiteConfig')->search({
+                site_id => $site->id,
+                config_key => { -like => 'smtp_%' }
+            });
+            while (my $cfg = $configs->next) {
+                $config{$cfg->config_key} = $cfg->config_value;
+            }
         }
+    };
+
+    unless ($config{smtp_host}) {
+        my $fallback = $c->config->{FallbackSMTP} // {};
+        %config = (
+            smtp_host     => $fallback->{host}     // 'harper.whc.ca',
+            smtp_port     => $fallback->{port}     // 465,
+            smtp_ssl      => $fallback->{ssl}      // 'ssl',
+            smtp_user     => $fallback->{username} // '',
+            smtp_password => $fallback->{password} // '',
+            smtp_from     => $fallback->{from}     // '',
+        );
     }
-    
+
     return \%config;
 }
 
@@ -458,23 +470,29 @@ sub send_email {
         "Attempting to send email to: " . $email->header('To') . 
         " via SMTP: " . $smtp_config->{smtp_host} . ":" . ($smtp_config->{smtp_port} || 587));
     
-    my $use_ssl = ($smtp_config->{smtp_ssl} && $smtp_config->{smtp_ssl} ne '0') ? 1 : 0;
-    
+    my $ssl_mode  = lc($smtp_config->{smtp_ssl} // '');
+    my $use_ssl   = $ssl_mode eq 'ssl'      ? 'ssl'
+                  : $ssl_mode eq 'starttls' ? 'starttls'
+                  : 0;
+
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
         "SMTP Config: host=" . $smtp_config->{smtp_host} . 
         ", port=" . ($smtp_config->{smtp_port} || 587) . 
-        ", ssl=" . ($use_ssl ? 'yes' : 'no') .
-        ", username=" . ($smtp_config->{smtp_username} || 'none'));
+        ", ssl=" . ($use_ssl || 'none') .
+        ", username=" . ($smtp_config->{smtp_user} || 'none'));
     
     my $transport;
     eval {
-        $transport = Email::Sender::Transport::SMTP->new({
+        my %smtp_args = (
             host => $smtp_config->{smtp_host},
             port => $smtp_config->{smtp_port} || 587,
-            ssl => $use_ssl,
-            sasl_username => $smtp_config->{smtp_username},
-            sasl_password => $smtp_config->{smtp_password},
-        });
+            ssl  => $use_ssl,
+        );
+        if ($smtp_config->{smtp_user} && $smtp_config->{smtp_password}) {
+            $smtp_args{sasl_username} = $smtp_config->{smtp_user};
+            $smtp_args{sasl_password} = $smtp_config->{smtp_password};
+        }
+        $transport = Email::Sender::Transport::SMTP->new(\%smtp_args);
         
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
             "SMTP transport created successfully");
