@@ -5,6 +5,7 @@ use Try::Tiny;
 use LWP::UserAgent;
 use HTTP::Request;
 use Email::MIME;
+use Encode qw(encode);
 use Comserv::Util::Logging;
 use Comserv::Util::HealthLogger;
 extends 'Catalyst::Model';
@@ -145,7 +146,8 @@ sub send_email {
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
             "SMTP DATA begin for <$to>");
         $smtp->data() or die "DATA cmd failed: " . $smtp->message();
-        $smtp->datasend($msg->as_string()) or die "DATASEND failed: " . $smtp->message();
+        # Encode to UTF-8 bytes — Net::SMTP::datasend cannot handle wide-character Perl strings
+        $smtp->datasend(encode('UTF-8', $msg->as_string())) or die "DATASEND failed: " . $smtp->message();
         $smtp->dataend() or die "DATAEND failed: " . $smtp->message();
         $smtp->quit();
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
@@ -245,7 +247,17 @@ sub get_smtp_config {
             return $self->_get_fallback_smtp_config($c, $site_id);
         }
 
-        # user, password, ssl are optional — skip if not configured
+        # user, password, ssl are optional — skip if not configured.
+        # Also check legacy key 'smtp_username' for backwards compatibility with old DB data.
+        if (!$config && $key eq 'user') {
+            eval {
+                $config = $config_rs->find({ site_id => $site_id, config_key => 'smtp_username' });
+            };
+            if ($config) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
+                    "Found legacy key 'smtp_username' for site_id $site_id (should be 'smtp_user')");
+            }
+        }
         if (!$config && ($key eq 'ssl' || $key eq 'user' || $key eq 'password')) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_smtp_config',
                 "Optional $db_key not set for site_id $site_id — skipping");
