@@ -367,12 +367,12 @@ sub edit_smtp_config :Local {
             # Update SMTP configuration
             my $updated_count = 0;
             for my $config_key (qw(smtp_host smtp_port smtp_user smtp_password smtp_from smtp_ssl)) {
-                # Handle checkbox: smtp_ssl will be '1' if checked, undefined if not
+                # Handle checkbox: smtp_ssl will be 'ssl' if checked, undefined if not
                 my $value = $params->{$config_key};
                 
-                # For smtp_ssl, default to 0 if not checked
+                # For smtp_ssl, default to '' if not checked (empty = no SSL)
                 if ($config_key eq 'smtp_ssl' && !defined $value) {
-                    $value = 0;
+                    $value = '';
                 }
                 
                 next unless defined $value;
