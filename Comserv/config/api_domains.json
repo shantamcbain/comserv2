@@ -1,0 +1,23 @@
+{
+  "environments": {
+    "production": {
+      "external_domain": "api.computersystemconsulting.ca",
+      "local_domains": [],
+      "require_https": true,
+      "local_bypass_enabled": false
+    },
+    "staging": {
+      "external_domain": "api.staging.computersystemconsulting.ca",
+      "local_domains": ["*.local"],
+      "require_https": true,
+      "local_bypass_enabled": true
+    },
+    "development": {
+      "external_domain": "api.workstation.local",
+      "local_domains": ["*.local", "localhost", "127.0.0.1"],
+      "require_https": false,
+      "local_bypass_enabled": true
+    }
+  },
+  "current_environment": "development"
+}

@@ -122,6 +122,51 @@ fi
 # Generate supervisor config with dynamic port
 bash ${CATALYST_HOME}/create-supervisor-config.sh
 
+# Start cron for logrotate (prevents disk space exhaustion)
+if command -v cron &> /dev/null; then
+  echo "Starting cron for log rotation..."
+  service cron start || /usr/sbin/cron
+  echo "✓ Cron started for logrotate"
+else
+  echo "⚠ Warning: cron not available - log rotation disabled"
+fi
+
+# Create workshop files directory on shared volume
+WORKSHOP_DIR="/data/nfs/workshop_files"
+if [ -d "/data/nfs" ]; then
+  echo "Creating workshop files directory: $WORKSHOP_DIR"
+  mkdir -p "$WORKSHOP_DIR"
+  chmod 755 "$WORKSHOP_DIR"
+  chown comserv:comserv "$WORKSHOP_DIR" 2>/dev/null || true
+  echo "✓ Workshop files directory ready at $WORKSHOP_DIR"
+else
+  echo "⚠ Warning: Workshop volume /data/nfs not available - workshop file uploads will use fallback directory"
+fi
+
+# Configure log rotation to prevent disk space issues
+echo "Configuring log rotation..."
+cat > /etc/logrotate.d/catalyst <<'LOGROTATE_EOF'
+/opt/comserv/root/log/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    maxsize 100M
+}
+
+/opt/comserv/root/Documentation/session_history/*.log {
+    weekly
+    rotate 4
+    compress
+    delaycompress
+    missingok
+    notifempty
+}
+LOGROTATE_EOF
+echo "✓ Log rotation configured"
+
 # Log the port configuration
 PORT=${WEB_PORT:-3000}
 echo "Starting Comserv with WEB_PORT=$PORT, CATALYST_ENV=${CATALYST_ENV:-production}, DEBUG=${CATALYST_DEBUG:-0}"

@@ -1,0 +1,115 @@
+services:
+  web-prod:
+    build:
+      context: ./Comserv
+      dockerfile: Dockerfile
+    container_name: comserv-web-prod
+    restart: always
+    labels:
+      - "description=Production web server with Starman workers and monitoring"
+    environment:
+      CATALYST_ENV: production
+      CATALYST_DEBUG: 0
+      WEB_PORT: 5000
+      TZ: UTC
+      ENABLE_MONITORING: 1
+      ENABLE_LOGGING: 1
+      WORKSHOP_RESOURCES_PATH: "/data/nfs"
+      COMSERV_DB_PRODUCTION_SERVER_HOST: "${COMSERV_DB_PRODUCTION_SERVER_HOST:?REQUIRED: Set COMSERV_DB_PRODUCTION_SERVER_HOST environment variable}"
+      COMSERV_DB_PRODUCTION_SERVER_PORT: "${COMSERV_DB_PRODUCTION_SERVER_PORT:-3306}"
+      COMSERV_DB_PRODUCTION_SERVER_USERNAME: "${COMSERV_DB_PRODUCTION_SERVER_USERNAME:?REQUIRED: Set COMSERV_DB_PRODUCTION_SERVER_USERNAME environment variable}"
+      COMSERV_DB_PRODUCTION_SERVER_PASSWORD: "${COMSERV_DB_PRODUCTION_SERVER_PASSWORD:?REQUIRED: Set COMSERV_DB_PRODUCTION_SERVER_PASSWORD environment variable (use K8s Secret or secure env source)}"
+      COMSERV_DB_PRODUCTION_SERVER_DATABASE: "${COMSERV_DB_PRODUCTION_SERVER_DATABASE:-ency}"
+      COMSERV_DB_PRODUCTION_FORAGER_HOST: "${COMSERV_DB_PRODUCTION_FORAGER_HOST:?REQUIRED: Set COMSERV_DB_PRODUCTION_FORAGER_HOST environment variable}"
+      COMSERV_DB_PRODUCTION_FORAGER_PORT: "${COMSERV_DB_PRODUCTION_FORAGER_PORT:-3306}"
+      COMSERV_DB_PRODUCTION_FORAGER_USERNAME: "${COMSERV_DB_PRODUCTION_FORAGER_USERNAME:?REQUIRED: Set COMSERV_DB_PRODUCTION_FORAGER_USERNAME environment variable}"
+      COMSERV_DB_PRODUCTION_FORAGER_PASSWORD: "${COMSERV_DB_PRODUCTION_FORAGER_PASSWORD:?REQUIRED: Set COMSERV_DB_PRODUCTION_FORAGER_PASSWORD environment variable (use K8s Secret or secure env source)}"
+      COMSERV_DB_PRODUCTION_FORAGER_DATABASE: "${COMSERV_DB_PRODUCTION_FORAGER_DATABASE:-shanta_forager}"
+    ports:
+      - "5000:5000"
+    networks:
+      comserv-prod-network:
+        ipv4_address: 172.22.0.2
+    volumes:
+      # Code is read-only in production
+      - ./lib:/opt/comserv/lib:ro
+      - ./script:/opt/comserv/script:ro
+      - ./root/static:/opt/comserv/root/static:ro
+      - ./root/Documentation:/opt/comserv/root/Documentation:ro
+      - ./config:/opt/comserv/config:ro
+      - ./t:/opt/comserv/t:ro
+      # Note: db_config.json NOT mounted in production
+      # Use K8s Secrets mounted to /var/run/secrets/comserv/dbi/ instead
+      # Or provide all configuration via environment variables (COMSERV_DB_*)
+      # Persistent volumes for critical data (NOT nested inside bind mounts)
+      - comserv-prod-logs:/opt/comserv/root/log
+      - comserv-prod-sessions:/opt/comserv/root/session
+      - comserv-prod-backups:/opt/comserv/backups
+      # NFS root mount for workshop files (shared storage)
+      - workshop-files-nfs:/data/nfs:rw
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
+    # Production resource allocation
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 2G
+
+  # Optional: Nginx reverse proxy for production
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: comserv-nginx-prod
+  #   restart: always
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
+  #     - ./ssl:/etc/nginx/ssl:ro
+  #   depends_on:
+  #     - web-prod
+  #   networks:
+  #     - comserv-bridge
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "20m"
+  #       max-file: "5"
+
+volumes:
+  comserv-prod-logs:
+    driver: local
+  comserv-prod-sessions:
+    driver: local
+  comserv-prod-backups:
+    driver: local
+  workshop-files-nfs:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=192.168.1.175,rw,nfsvers=4
+      device: ":/"
+
+networks:
+  comserv-prod-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-comserv-prod
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16
+          gateway: 172.22.0.1

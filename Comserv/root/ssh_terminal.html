@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSH Terminal - Interactive Session</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #1e1e1e;
+            color: #00ff00;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background-color: #2d2d2d;
+            padding: 15px 20px;
+            border-radius: 8px 8px 0 0;
+            border-bottom: 2px solid #00ff00;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 18px;
+            color: #00ff00;
+        }
+        .header .status {
+            background-color: #00ff00;
+            color: #1e1e1e;
+            padding: 5px 15px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .info-box {
+            background-color: #2d2d2d;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #ffc107;
+        }
+        .info-box p {
+            margin: 5px 0;
+            color: #ccc;
+        }
+        .terminal-container {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            border-radius: 0 0 8px 8px;
+            padding: 20px;
+            min-height: 500px;
+        }
+        .command-list {
+            margin-top: 20px;
+            background-color: #2d2d2d;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .command-list h3 {
+            color: #00ff00;
+            margin-bottom: 10px;
+        }
+        .command {
+            background-color: #1e1e1e;
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 3px solid #0066cc;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .command:hover {
+            background-color: #3d3d3d;
+        }
+        .command code {
+            color: #ff0;
+            font-size: 14px;
+        }
+        .button {
+            background-color: #0066cc;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        .button:hover {
+            background-color: #0052a3;
+        }
+        .button.danger {
+            background-color: #dc3545;
+        }
+        .button.danger:hover {
+            background-color: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🖥️ SSH Terminal - Interactive Session</h1>
+            <div class="status">PORT 3001</div>
+        </div>
+
+        <div class="info-box">
+            <p><strong>⚠️ IMPORTANT:</strong> This is a placeholder for the SSH terminal interface.</p>
+            <p><strong>📋 To enable interactive SSH terminal:</strong></p>
+            <p style="margin-left: 20px;">1. Install <code>wetty</code> or <code>ttyd</code> on workstation.local</p>
+            <p style="margin-left: 20px;">2. Run: <code>wetty --port 3001 --host 0.0.0.0</code></p>
+            <p style="margin-left: 20px;">3. Or use: <code>ttyd -p 3001 ssh ubuntu@192.168.1.126</code></p>
+            <p style="margin-top: 10px;"><strong>Current Workaround:</strong> Use the commands below and paste into your local terminal</p>
+        </div>
+
+        <div class="terminal-container">
+            <div style="margin-bottom: 20px;">
+                <p style="color: #00ff00; margin-bottom: 10px;"><strong>METHOD 1: Open Local Terminal</strong></p>
+                <p style="color: #ccc;">Open your PyCharm terminal or local terminal and run:</p>
+                <div style="background-color: #2d2d2d; padding: 15px; margin-top: 10px; border-radius: 4px;">
+                    <code style="color: #ff0; font-size: 14px;">ssh ubuntu@192.168.1.126</code>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px;">
+                <p style="color: #00ff00; margin-bottom: 10px;"><strong>METHOD 2: PyCharm Built-in SSH</strong></p>
+                <p style="color: #ccc;">1. PyCharm → Tools → Start SSH Session</p>
+                <p style="color: #ccc;">2. Enter: ubuntu@192.168.1.126</p>
+                <p style="color: #ccc;">3. Enter password when prompted</p>
+            </div>
+
+            <div style="margin-top: 30px;">
+                <p style="color: #00ff00; margin-bottom: 10px;"><strong>METHOD 3: Setup Web-Based Terminal (One-time setup)</strong></p>
+                <div style="background-color: #2d2d2d; padding: 15px; margin-top: 10px; border-radius: 4px;">
+                    <p style="color: #ccc; margin-bottom: 10px;">On workstation.local, run:</p>
+                    <code style="color: #ff0; display: block; margin: 5px 0;">npm install -g wetty</code>
+                    <code style="color: #ff0; display: block; margin: 5px 0;">wetty --port 3001 --host 0.0.0.0 --ssh-host 192.168.1.126 --ssh-user ubuntu</code>
+                    <p style="color: #ccc; margin-top: 10px;">Then refresh this page</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="command-list">
+            <h3>📋 Quick Commands (Click to Copy)</h3>
+            <div class="command" onclick="copyCommand('ssh ubuntu@192.168.1.126')">
+                <code>ssh ubuntu@192.168.1.126</code>
+                <span style="float: right; color: #666;">→ Connect to production</span>
+            </div>
+            <div class="command" onclick="copyCommand('docker save comserv2-web-prod | ssh ubuntu@192.168.1.126 \"docker load\"')">
+                <code>docker save comserv2-web-prod | ssh ubuntu@192.168.1.126 "docker load"</code>
+                <span style="float: right; color: #666;">→ Transfer image</span>
+            </div>
+            <div class="command" onclick="copyCommand('ssh ubuntu@192.168.1.126 \"cd ~/PycharmProjects/comserv2 && docker compose stop web-prod\"')">
+                <code>ssh ubuntu@192.168.1.126 "cd ~/PycharmProjects/comserv2 && docker compose stop web-prod"</code>
+                <span style="float: right; color: #666;">→ Stop container</span>
+            </div>
+            <div class="command" onclick="copyCommand('ssh ubuntu@192.168.1.126 \"cd ~/PycharmProjects/comserv2 && docker compose up -d --force-recreate web-prod\"')">
+                <code>ssh ubuntu@192.168.1.126 "cd ~/PycharmProjects/comserv2 && docker compose up -d --force-recreate web-prod"</code>
+                <span style="float: right; color: #666;">→ Start new container</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function copyCommand(cmd) {
+            navigator.clipboard.writeText(cmd).then(() => {
+                alert('Command copied to clipboard!\n\nPaste it in your terminal.');
+            });
+        }
+
+        // Get parameters from URL
+        const params = new URLSearchParams(window.location.search);
+        const hostname = params.get('hostname') || '192.168.1.126';
+        const username = params.get('username') || 'ubuntu';
+
+        console.log('SSH Target:', username + '@' + hostname);
+    </script>
+</body>
+</html>

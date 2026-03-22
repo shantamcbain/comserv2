@@ -88,6 +88,7 @@
     opacity: 0.9;
 }
 
+
 .css-edit-mode * {
     outline: 2px solid rgba(52, 152, 219, 0.3) !important;
     position: relative;
@@ -129,14 +130,15 @@ header h1 {
     <div style="text-align: right;">
         Domain: <strong>[% c.req.uri.host %]</strong> | 
         Client IP: <strong>[% c.req.address %]</strong> | 
-        Catalyst Server: <strong>[% app_workflow %] ([% server_hostname || 'Unknown' %])</strong> |
-        Server IP: <strong>[% c.forward('/get_server_ip') %]</strong> |
+        Server: <strong>[% app_workflow %] ([% c.forward('/get_server_ip') %])</strong> |
         Databases: [% IF db_connections && db_connections.size > 0 %][% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% ELSE %]<em>none configured</em>[% END %] |
         DB Env: <span class="db-env-indicator db-env-[% active_db_environment || 'production' %]">[% SET env = active_db_environment || 'production' %][% env.upper %]</span>
         [% IF c.session.debug_mode == 1 %] | [% END %] |
         [% IF is_admin %]
-        <button id="css-edit-toggle">
-            <i class="fas fa-paint-brush"></i> Toggle CSS Edit
+        <button id="css-edit-toggle"
+                data-theme-name="[% theme_name || 'default' %]"
+                title="Click any page element to edit its styles and save to the [% theme_name || 'default' %] theme">
+            <i class="fas fa-paint-brush"></i> Theme Editor
         </button>
         [% END %]
     </div>
@@ -177,19 +179,28 @@ header h1 {
 document.addEventListener('DOMContentLoaded', function() {
     const toggleBtn = document.getElementById('css-edit-toggle');
     if (toggleBtn) {
-        toggleBtn.addEventListener('click', function() {
-            document.body.classList.toggle('css-edit-mode');
-            const isEditMode = document.body.classList.contains('css-edit-mode');
-            this.innerHTML = isEditMode ? '<i class="fas fa-times"></i> Exit Edit Mode' : '<i class="fas fa-paint-brush"></i> Toggle CSS Edit';
-            this.classList.toggle('edit-mode', isEditMode);
-            
-            // Initialize theme editor if entering edit mode
-            if (isEditMode && typeof ThemeEditor !== 'undefined') {
-                if (!window.themeEditor) {
-                    window.themeEditor = new ThemeEditor();
-                    window.themeEditor.init();
-                }
+        toggleBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (typeof ThemeEditor === 'undefined') {
+                alert('Theme Editor script failed to load. Please reload the page.');
+                return;
             }
+
+            if (!window.themeEditor) {
+                window.themeEditor = new ThemeEditor();
+                window.themeEditor.init();
+            }
+
+            window.themeEditor.toggleInspector();
+
+            const isActive = window.themeEditor.isInspectorActive;
+            document.body.classList.toggle('css-edit-mode', isActive);
+            this.innerHTML = isActive
+                ? '<i class="fas fa-times"></i> Close Editor'
+                : '<i class="fas fa-paint-brush"></i> Theme Editor';
+            this.classList.toggle('edit-mode', isActive);
         });
     }
 });
@@ -203,7 +214,7 @@ document.addEventListener('DOMContentLoaded', function() {
  [% c.session.first_name %] [% c.session.last_name %] User
 [% ELSE %]
  Guest
-[% END %] to [% c.stash.site_display_name %]!
+[% END %] to [% site_display_name || SiteDisplayName || c.stash.site_display_name || c.stash.SiteDisplayName || c.session.site_display_name || SiteName || c.session.SiteName || 'this site' %]!
     </h1>
 
 
@@ -230,6 +241,7 @@ document.addEventListener('DOMContentLoaded', function() {
             [% INCLUDE 'Navigation/admintopmenu.tt' %]
         [% END %]
         [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
+        [% INCLUDE 'Navigation/TopDropListWorkshop.tt' %]
         </ul>
     </nav>
 

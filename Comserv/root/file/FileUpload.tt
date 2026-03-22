@@ -1,0 +1,106 @@
+[% META
+   title = "Upload File"
+   description = "Upload a file to an NFS directory allocation"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "FileManagement"
+   page_version = "0.01"
+   last_updated = "2026-02-28"
+%]
+[% PageVersion = 'file/FileUpload.tt,v 0.01 2026/02/28 AI Exp AI ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+
+  <div class="page-header">
+    <h1>Upload File</h1>
+  </div>
+
+  [% IF error_msg %]
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c"><strong>Error:</strong> [% error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.error_msg %]
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c"><strong>Error:</strong> [% c.flash.error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.success_msg %]
+  <div style="background:#e8f5e9;border:1px solid #81c784;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#1b5e20"><strong>Done:</strong> [% c.flash.success_msg | html %]</div>
+  [% END %]
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        [% IF allocated_dirs && allocated_dirs.size > 0 %]
+        <form method="post" action="[% c.uri_for('/file/upload_file') %]"
+              enctype="multipart/form-data" class="app-form">
+
+          <div class="form-section">
+            <div class="form-row">
+              <div class="form-field">
+                <label for="nfs_dir_id">Target Directory:</label>
+                <select id="nfs_dir_id" name="nfs_dir_id" class="form-input">
+                  [% FOREACH dir IN allocated_dirs %]
+                  <option value="[% dir.id | html %]">
+                    [% IF is_csc %][% dir.sitename | html %] — [% END %][% dir.nfs_path | html %]
+                    [% IF dir.description %]([% dir.description | html %])[% END %]
+                  </option>
+                  [% END %]
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-field">
+                <label for="file">File to Upload:</label>
+                <input type="file" id="file" name="file" class="form-input">
+              </div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Upload</button>
+            <a href="[% c.uri_for('/file/list') %]" class="btn btn-secondary">Cancel</a>
+          </div>
+
+        </form>
+
+        [% ELSIF is_csc %]
+        <p style="margin-bottom:12px">No NFS directory allocations exist yet. As CSC admin you can upload directly to a server path:</p>
+        <form method="post" action="[% c.uri_for('/file/upload_file') %]"
+              enctype="multipart/form-data" class="app-form">
+          <div class="form-section">
+            <div class="form-row">
+              <div class="form-field">
+                <label for="dir_path">Target Directory Path:</label>
+                <input type="text" id="dir_path" name="dir_path"
+                       value="[% dir_path | html %]"
+                       placeholder="/data/apis/sitename"
+                       class="form-input" style="font-family:monospace">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-field">
+                <label for="file">File to Upload:</label>
+                <input type="file" id="file" name="file" class="form-input">
+              </div>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Upload</button>
+            <a href="[% c.uri_for('/file/admin_browser') %]" class="btn btn-secondary">Cancel</a>
+          </div>
+        </form>
+
+        [% ELSE %]
+        <p class="empty-state">No NFS directories are allocated. Please ask a CSC admin to allocate storage for your site.</p>
+        <div class="form-actions">
+          <a href="[% c.uri_for('/file/list') %]" class="btn btn-secondary">Back to File List</a>
+        </div>
+        [% END %]
+      </div>
+
+    </div>
+  </div>
+</div>

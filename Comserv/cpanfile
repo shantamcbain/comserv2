@@ -65,6 +65,11 @@ requires 'File::Slurp';
 requires 'Archive::Tar';
 
 # Network related
+requires 'Protocol::WebSocket';
+requires 'AnyEvent';
+requires 'AnyEvent::Handle';
+requires 'Twiggy';
+requires 'IO::Pty';
 
 # Cryptography and Security
 requires 'Crypt::CBC';
@@ -76,11 +81,15 @@ requires 'Digest::SHA';
 # Email handling
 requires 'Email::Simple';
 requires 'Email::Simple::Creator';
+requires 'Email::MIME';
 requires 'Email::Sender::Simple';
 requires 'Net::SMTP';
 requires 'MIME::Lite';
 requires 'Authen::SASL';
 requires 'IO::Socket::SSL';
+requires 'Email::Sender::Transport::SMTP';
+requires 'Catalyst::View::Email';
+requires 'Catalyst::View::Email::Template';
 
 # Utility modules
 requires 'URI::Escape';
@@ -88,12 +97,14 @@ requires 'Data::FormValidator';
 requires 'LWP::UserAgent';
 requires 'LWP::Protocol::https';
 requires 'HTTP::Request';
+requires 'HTTP::Parser::XS';
 requires 'WWW::Form::UrlEncoded';
 requires 'HTTP::Entity::Parser';
 requires 'Try::Tiny';
 requires 'Text::Markdown';
 requires 'YAML::Tiny';
 requires 'IPC::Run';
+requires 'IPC::Run3';
 
 # Development and testing
 requires 'Term::ReadPassword';

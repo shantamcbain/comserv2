@@ -1,0 +1,19 @@
+# Branch-specific settings for Zenflow tasks
+# Updated: 2026-02-10
+
+branches:
+  new-task-9cf1:
+    name: "Infrastructure HA Implementation"
+    application_url: "http://workstation.local:4003"
+    api_url: "http://api.workstation.local:4003"
+    description: "Infrastructure Resilience & High Availability Architecture"
+    
+  main:
+    name: "Production"
+    application_url: "http://workstation.local:4000"
+    api_url: "http://api.workstation.local:4000"
+    
+  # Add other branches as needed
+  # branch-name:
+  #   application_url: "http://workstation.local:PORT"
+  #   api_url: "http://api.workstation.local:PORT"

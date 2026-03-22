@@ -755,7 +755,9 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
         // Add detailed field debugging
         if (comparison.fields) {
             html += '<strong>Field Details:</strong><br>';
-            for (const [fieldName, fieldData] of Object.entries(comparison.fields)) {
+            // Sort fields alphabetically for consistent display
+            const sortedDebugFields = Object.entries(comparison.fields).sort((a, b) => a[0].localeCompare(b[0]));
+            for (const [fieldName, fieldData] of sortedDebugFields) {
                 html += '&nbsp;&nbsp;Field: ' + fieldName + '<br>';
                 html += '&nbsp;&nbsp;&nbsp;&nbsp;Has Table Data: ' + (fieldData.table ? 'YES' : 'NO') + '<br>';
                 html += '&nbsp;&nbsp;&nbsp;&nbsp;Has Result Data: ' + (fieldData.result ? 'YES' : 'NO') + '<br>';
@@ -801,7 +803,10 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
         html += '</thead>';
         html += '<tbody>';
         
-        for (const [fieldName, fieldData] of Object.entries(comparison.fields)) {
+        // Sort fields alphabetically for consistent display
+        const sortedFields = Object.entries(comparison.fields).sort((a, b) => a[0].localeCompare(b[0]));
+        
+        for (const [fieldName, fieldData] of sortedFields) {
             const tableField = fieldData.table;
             const resultField = fieldData.result;
             const tableMissing = !tableField;
@@ -1559,7 +1564,7 @@ function syncTableToResult(tableName, database, fieldName, event) {
         button.disabled = true;
     }
     
-    fetch('[% c.uri_for("/schema-comparison/sync_table_to_result") %]', {
+    fetch('[% c.uri_for("/admin/sync_table_to_result") %]', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1579,8 +1584,8 @@ function syncTableToResult(tableName, database, fieldName, event) {
         
         if (data.success) {
             alert('Field synchronized successfully from table to result!');
-            // Refresh the field comparison
-            refreshFieldComparison(tableName, database);
+            // Reload the entire page to show updated schema
+            location.reload();
         } else {
             alert('Error synchronizing field: ' + (data.error || 'Unknown error'));
         }
@@ -1609,7 +1614,7 @@ function syncResultToTable(tableName, database, fieldName, event) {
         button.disabled = true;
     }
     
-    fetch('[% c.uri_for("/schema-comparison/sync_result_to_table") %]', {
+    fetch('[% c.uri_for("/admin/sync_result_to_table") %]', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1629,8 +1634,8 @@ function syncResultToTable(tableName, database, fieldName, event) {
         
         if (data.success) {
             alert('Field synchronized successfully from result to table!');
-            // Refresh the field comparison
-            refreshFieldComparison(tableName, database);
+            // Reload the entire page to show updated schema
+            location.reload();
         } else {
             alert('Error synchronizing field: ' + (data.error || 'Unknown error'));
         }

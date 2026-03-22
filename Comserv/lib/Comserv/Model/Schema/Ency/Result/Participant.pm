@@ -12,15 +12,48 @@ __PACKAGE__->add_columns(
     workshop_id => {
         data_type => 'integer',
     },
+    user_id => {
+        data_type => 'integer',
+        is_nullable => 1,
+    },
     name => {
         data_type => 'varchar',
         size => 255,
     },
+    email => {
+        data_type => 'varchar',
+        size => 255,
+        is_nullable => 1,
+    },
+    site_affiliation => {
+        data_type => 'varchar',
+        size => 255,
+        is_nullable => 1,
+    },
+    registered_at => {
+        data_type => 'timestamp',
+        default_value => \'CURRENT_TIMESTAMP',
+    },
+    status => {
+        data_type => 'enum',
+        default_value => 'registered',
+        extra => {
+            list => ['registered', 'waitlist', 'attended', 'cancelled']
+        },
+    },
 );
+
+__PACKAGE__->set_primary_key('id');
 
 __PACKAGE__->belongs_to(
     workshop => 'Comserv::Model::Schema::Ency::Result::WorkShop',
     { 'foreign.id' => 'self.workshop_id' },
+);
+
+__PACKAGE__->belongs_to(
+    user => 'Comserv::Model::Schema::Ency::Result::User',
+    { 'foreign.id' => 'self.user_id' },
+    { join_type => 'left' },
 );
 
 1;

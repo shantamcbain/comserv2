@@ -14,6 +14,10 @@ services:
       TZ: UTC
       ENABLE_MONITORING: 1
       ENABLE_LOGGING: 1
+      # Set in .env file: CATALYST_SERVER_IP=192.168.1.126  (host LAN IP, shown in admin bar)
+      CATALYST_SERVER_IP: "${CATALYST_SERVER_IP}"
+      # NFS resource library path inside container (NFS root mounted at /data/nfs)
+      WORKSHOP_RESOURCES_PATH: "/data/nfs"
       COMSERV_DB_PRODUCTION_SERVER_HOST: "${COMSERV_DB_PRODUCTION_SERVER_HOST:?REQUIRED: Set COMSERV_DB_PRODUCTION_SERVER_HOST environment variable}"
       COMSERV_DB_PRODUCTION_SERVER_PORT: "${COMSERV_DB_PRODUCTION_SERVER_PORT:-3306}"
       COMSERV_DB_PRODUCTION_SERVER_USERNAME: "${COMSERV_DB_PRODUCTION_SERVER_USERNAME:?REQUIRED: Set COMSERV_DB_PRODUCTION_SERVER_USERNAME environment variable}"
@@ -44,6 +48,8 @@ services:
       - comserv-prod-logs:/opt/comserv/root/log
       - comserv-prod-sessions:/opt/comserv/root/session
       - comserv-prod-backups:/opt/comserv/backups
+      # NFS root mount for workshop files (shared storage)
+      - workshop-files-nfs:/data/nfs:rw
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
@@ -94,6 +100,12 @@ volumes:
     driver: local
   comserv-prod-backups:
     driver: local
+  workshop-files-nfs:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=192.168.1.175,rw,nfsvers=4
+      device: ":/"
 
 networks:
   comserv-prod-network:
