@@ -3404,7 +3404,12 @@ sub compose_email :Local :Args(1) {
         { workshop => $ws, count => $cnt }
     } @leader_workshops_raw;
 
-    leader_workshops   => \@leader_workshops,
+    $c->stash(
+        workshop           => $workshop,
+        recipient_count    => $registered_count,
+        workshop_templates => \@workshop_templates,
+        global_templates   => \@global_templates,
+        leader_workshops   => \@leader_workshops,
         template           => 'WorkShops/ComposeEmail.tt',
     );
 }
