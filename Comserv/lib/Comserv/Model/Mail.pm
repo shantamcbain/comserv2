@@ -47,23 +47,25 @@ sub send_email {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
         "Using Net::SMTP for email sending");
     
-    # Build From display name: "Leader Name (via Workshops)" <system@domain>
-    my $system_from = $smtp_config->{from} || 'noreply@computersystemconsulting.ca';
-    my $leader_name = $opts->{leader_name} || '';
-    my $display_from = $leader_name
-        ? qq{"$leader_name (via Workshops)" <$system_from>}
-        : $system_from;
-    my $reply_to = $opts->{reply_to} || $system_from;
+    my $system_from  = $smtp_config->{from} || 'noreply@computersystemconsulting.ca';
+    my $leader_name  = $opts->{leader_name}  || '';
+    my $leader_email = $opts->{reply_to}     || '';  # leader's real email
+
+    # From: header — what recipients see.
+    # Use leader's real email if available; fall back to system address.
+    # SMTP envelope MAIL FROM stays as system address (avoids SPF failure for external domains).
+    my $from_header = $leader_email
+        ? ($leader_name ? qq{"$leader_name" <$leader_email>} : $leader_email)
+        : ($leader_name ? qq{"$leader_name" <$system_from>}  : $system_from);
 
     # Create a MIME::Lite message
     my $msg = MIME::Lite->new(
-        From    => $display_from,
+        From    => $from_header,
         To      => $to,
         Subject => $subject,
         Type    => 'text/plain',
         Data    => $body
     );
-    $msg->add('Reply-To' => $reply_to) if $reply_to ne $system_from;
     
     try {
         # Log SMTP settings for debugging
