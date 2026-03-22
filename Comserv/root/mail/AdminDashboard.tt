@@ -49,7 +49,7 @@
                     </td>
                     <td>[% server.smtp_host || 'Not set' %]</td>
                     <td>[% server.smtp_port || 'Not set' %]</td>
-                    <td>[% server.smtp_username || 'Not set' %]</td>
+                    <td>[% server.smtp_user || server.smtp_username || 'Not set' %]</td>
                     <td>[% server.smtp_from || 'Not set' %]</td>
                     <td>[% server.smtp_ssl ? 'Yes' : 'No' %]</td>
                     <td>
