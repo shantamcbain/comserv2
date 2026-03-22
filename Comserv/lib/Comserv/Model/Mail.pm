@@ -77,7 +77,7 @@ sub send_email {
         my $smtp = Net::SMTP->new(
             $smtp_config->{host},
             Port    => $smtp_config->{port},
-            Debug   => 0,
+            Debug   => 1,
             Timeout => 15
         );
         
@@ -104,9 +104,17 @@ sub send_email {
                 or die "Authentication failed: " . $smtp->message();
         }
         
-        # Send the email
+        # Send the email — log each SMTP step
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+            "SMTP MAIL FROM: <" . $smtp_config->{from} . ">");
         $smtp->mail($smtp_config->{from}) or die "FROM failed: " . $smtp->message();
+
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+            "SMTP RCPT TO: <$to>");
         $smtp->to($to) or die "TO failed: " . $smtp->message();
+
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+            "SMTP DATA begin");
         $smtp->data() or die "DATA failed: " . $smtp->message();
         $smtp->datasend($msg->as_string()) or die "DATASEND failed: " . $smtp->message();
         $smtp->dataend() or die "DATAEND failed: " . $smtp->message();
