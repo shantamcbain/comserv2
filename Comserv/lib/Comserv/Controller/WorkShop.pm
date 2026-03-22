@@ -1032,26 +1032,33 @@ sub register :Local :Args(1) {
                 }
             }
             
-            $c->stash->{email} = {
-                to       => $email,
-                from     => $from_address,
-                reply_to => $reply_to,
-                subject  => 'Workshop Registration Confirmation - ' . $workshop->title,
-                template => 'email/workshop/registration_confirmation.tt',
-                template_vars => {
-                    name => $user_name,
-                    workshop_title => $workshop->title,
-                    workshop_instructor => $workshop->instructor,
-                    workshop_date => $formatted_date,
-                    workshop_time => $formatted_time,
-                    workshop_end_time => $formatted_end_time,
-                    workshop_location => $workshop->location,
-                    workshop_url => $full_url,
-                    status => $participant_status,
-                },
-            };
-            
-            $c->forward($c->view('Email::Template'), []);
+            my $status_line = $participant_status eq 'registered'
+                ? "Your registration is confirmed! We look forward to seeing you."
+                : "You are on the waitlist. We will notify you if a spot becomes available.";
+            my $time_range = $formatted_time;
+            $time_range .= " - $formatted_end_time" if $formatted_end_time;
+            my $reg_body = "Hello $user_name,\n\n"
+                . "Thank you for registering for the following workshop:\n\n"
+                . "  " . $workshop->title . "\n"
+                . "  Instructor: " . ($workshop->instructor || '') . "\n"
+                . "  Date:       $formatted_date\n"
+                . "  Time:       $time_range\n"
+                . "  Location:   " . ($workshop->location || '') . "\n\n"
+                . "$status_line\n\n"
+                . "Workshop details: $full_url\n\n"
+                . "Best regards,\nThe Workshop Team\n";
+
+            my $reg_result = $c->model('Mail')->send_email(
+                $c,
+                $email,
+                'Workshop Registration Confirmation - ' . $workshop->title,
+                $reg_body,
+                undef,
+            );
+            unless ($reg_result) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'workshop',
+                    "Registration confirmation email not delivered to $email (Model::Mail returned failure)");
+            }
         };
         
         if ($@) {
@@ -3568,33 +3575,23 @@ sub send_email :Local :Args(1) {
         $processed_body =~ s/\[\[leader\.name\]\]/$leader_name/g;
         $processed_body =~ s/\[\[workshop\.url\]\]/$full_url/g;
 
+        my $send_result;
         my $send_err;
         eval {
-            $c->stash->{email} = {
-                to       => $email,
-                from     => $from_address,
-                reply_to => $reply_to,
-                subject  => $processed_subject,
-                template => 'email/workshop/workshop_announcement.tt',
-                template_vars => {
-                    name => $user_name,
-                    workshop_title => $workshop->title,
-                    workshop_instructor => $workshop->instructor,
-                    workshop_date => $formatted_date,
-                    workshop_time => $formatted_time,
-                    workshop_end_time => $formatted_end_time,
-                    workshop_location => $workshop->location,
-                    workshop_url => $full_url,
-                    message_body => $processed_body,
-                },
-            };
-            $c->forward($c->view('Email::Template'), []);
+            $send_result = $c->model('Mail')->send_email(
+                $c,
+                $email,
+                $processed_subject,
+                $processed_body,
+                undef,
+            );
         };
         $send_err = "$@" if $@;
 
-        if ($send_err) {
+        if ($send_err || !$send_result) {
+            my $reason = $send_err || 'Model::Mail returned failure';
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
-                "SEND FAILED to=$email subject='$processed_subject' error=$send_err");
+                "SEND FAILED to=$email subject='$processed_subject' error=$reason");
             $failed_count++;
             push @failed_emails, $email;
         } else {
@@ -3718,21 +3715,25 @@ sub _send_error_notification {
         }
     }
     
-    # Send email notification
+    # Send email notification via Model::Mail (routes through PMG)
     eval {
-        $c->stash->{email} = {
-            to       => $admin_email,
-            from     => $c->config->{system_email} || 'noreply@comserv.ca',
-            subject  => '[Workshop System Error] ' . $error_details->{error_type},
-            body     => $error_report,
-        };
-        
-        $c->forward($c->view('Email'));
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "Error notification sent to admin: $admin_email");
+        my $result = $c->model('Mail')->send_email(
+            $c,
+            $admin_email,
+            '[Workshop System Error] ' . $error_details->{error_type},
+            $error_report,
+            undef,
+        );
+        if ($result) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "Error notification sent to admin: $admin_email");
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Error notification delivery failed to: $admin_email");
+        }
     };
     
     if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to send error notification email: $@");
+        my $err = "$@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to send error notification email: $err");
     }
 }
 
