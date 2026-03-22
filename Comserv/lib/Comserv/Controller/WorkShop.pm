@@ -1118,7 +1118,7 @@ sub participants :Local :Args(1) {
     my @registered = $c->model('DBEncy::Participant')->search(
         {
             workshop_id => $id,
-            status => 'registered'
+            'me.status' => 'registered'
         },
         {
             order_by => { -asc => 'registered_at' },
@@ -1129,7 +1129,7 @@ sub participants :Local :Args(1) {
     my @waitlist = $c->model('DBEncy::Participant')->search(
         {
             workshop_id => $id,
-            status => 'waitlist'
+            'me.status' => 'waitlist'
         },
         {
             order_by => { -asc => 'registered_at' },
@@ -3399,7 +3399,7 @@ sub send_email :Local :Args(1) {
     my @registered_participants = $c->model('DBEncy::Participant')->search(
         {
             workshop_id => $id,
-            status => 'registered'
+            'me.status' => 'registered'
         },
         { prefetch => 'user' }
     )->all;
