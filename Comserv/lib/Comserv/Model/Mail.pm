@@ -85,24 +85,34 @@ sub send_email {
             " ssl=" . ($smtp_config->{ssl} || 'none') .
             " auth=" . ($smtp_config->{user} ? 'yes('.$smtp_config->{user}.')' : 'no'));
 
+        # Determine SSL mode:
+        #   ssl='ssl' or port 465 → SSL at connect time (implicit TLS)
+        #   ssl='starttls' or port 587 → plain connect then STARTTLS
+        #   anything else → plain (port 25, no encryption — LAN relay only)
+        my $ssl_setting = lc($smtp_config->{ssl} // '');
+        my $port        = $smtp_config->{port} || 25;
+        my $use_ssl     = ($ssl_setting eq 'ssl' || $port == 465) ? 1 : 0;
+        my $use_starttls = ($ssl_setting eq 'starttls' || $port == 587) ? 1 : 0;
+
         # Connect to the SMTP server
         my $smtp = Net::SMTP->new(
             $smtp_config->{host},
-            Port    => $smtp_config->{port},
+            Port    => $port,
+            SSL     => $use_ssl,
             Debug   => 1,
             Timeout => 15
         );
         
         unless ($smtp) {
-            die "CONNECT failed: Could not connect to " . $smtp_config->{host} . ":" . $smtp_config->{port} . ": $!";
+            die "CONNECT failed: Could not connect to " . $smtp_config->{host} . ":$port"
+              . ($use_ssl ? " (SSL)" : "") . ": $!";
         }
         
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-            "SMTP CONNECT OK: " . $smtp_config->{host} . ":" . $smtp_config->{port});
+            "SMTP CONNECT OK: " . $smtp_config->{host} . ":$port" . ($use_ssl ? " (SSL)" : ""));
         
-        # Start TLS if needed
-        my $ssl_setting = $smtp_config->{ssl} // '';
-        if ($ssl_setting eq 'starttls' || $ssl_setting eq '1') {
+        # STARTTLS upgrade if needed (port 587 / explicit TLS)
+        if ($use_starttls) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
                 "SMTP STARTTLS begin");
             $smtp->starttls() or die "STARTTLS failed: " . $smtp->message();
@@ -273,25 +283,6 @@ sub get_smtp_config {
         }
 
         $smtp_config{$key} = $config->config_value;
-
-        # Route ALL outbound mail through PMG relay (192.168.1.128)
-        if ($key eq 'host') {
-            my $original_host = $smtp_config{$key};
-            if ($original_host ne '192.168.1.128' && $original_host ne '192.168.1.129') {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
-                    "Redirecting '$original_host' → PMG relay 192.168.1.128");
-                $smtp_config{$key} = '192.168.1.128';
-            }
-        }
-        # PMG relay uses port 25, no SSL — always override
-        if ($key eq 'port') {
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_smtp_config',
-                "Overriding port " . $smtp_config{$key} . " → 25 for PMG relay");
-            $smtp_config{$key} = 25;
-        }
-        if ($key eq 'ssl') {
-            $smtp_config{$key} = '';
-        }
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
@@ -313,12 +304,12 @@ sub _get_fallback_smtp_config {
     
     # Provide default mail server configuration - relay through PMG
     my $fallback_config = {
-        host => '192.168.1.128',  # PMG (Proxmox Mail Gateway) relay
-        port => 25,
+        host => 'harper.whc.ca',  # outbound SMTP server
+        port => 465,
+        ssl  => 'ssl',
         user => '',
         password => '',
         from => "noreply\@computersystemconsulting.ca",
-        ssl => ''
     };
     
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_fallback_smtp_config', 

@@ -459,26 +459,16 @@ sub get_smtp_config {
     }
 
     if ($config{smtp_host}) {
-        # Force all outbound through PMG relay — never connect to external SMTP servers directly
-        if ($config{smtp_host} !~ /^192\.168\.1\.(128|129)$/) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
-                "Redirecting smtp_host '$config{smtp_host}' through PMG relay 192.168.1.128");
-            $config{smtp_host}     = '192.168.1.128';
-            $config{smtp_port}     = 25;
-            $config{smtp_ssl}      = 0;
-            $config{smtp_user}     = '';
-            $config{smtp_password} = '';
-        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
+            "Using configured smtp_host '$config{smtp_host}' for site '$sitename'");
     } else {
-        # No DB config found — use PMG relay as default
+        # No DB config — fall back to harper for outbound delivery
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_smtp_config',
-            "No smtp_host in DB for site '$sitename' — using PMG relay fallback 192.168.1.128:25");
-        $config{smtp_host}     = '192.168.1.128';
-        $config{smtp_port}     = 25;
-        $config{smtp_ssl}      = 0;
-        $config{smtp_user}     = '';
-        $config{smtp_password} = '';
-        $config{smtp_from}     = $config{smtp_from} || 'noreply@computersystemconsulting.ca';
+            "No smtp_host in DB for site '$sitename' — using harper fallback");
+        $config{smtp_host} = 'harper.whc.ca';
+        $config{smtp_port} = 465;
+        $config{smtp_ssl}  = 'ssl';
+        $config{smtp_from} = $config{smtp_from} || 'noreply@computersystemconsulting.ca';
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
