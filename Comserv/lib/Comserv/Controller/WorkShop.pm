@@ -3,7 +3,13 @@ use Moose;
 use namespace::autoclean;
 use Data::FormValidator;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::Logging;
 BEGIN { extends 'Catalyst::Controller'; }
+
+has 'logging' => (
+    is      => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
 
 # In Workshop Controller
 sub index :Path :Args(0) {
@@ -148,13 +154,13 @@ sub dashboard :Local {
     my $admin_type = $admin_auth->get_admin_type($c);
     my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
 
-    $c->log->debug("Dashboard: user_id=$user_id, sitename=$sitename, admin_type=$admin_type, is_csc_admin=$is_csc_admin");
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'workshop', "Dashboard: user_id=$user_id, sitename=$sitename, admin_type=$admin_type, is_csc_admin=$is_csc_admin");
 
     my $search_filter;
 
     if ($is_csc_admin) {
         $search_filter = {};
-        $c->log->debug("Dashboard: CSC admin - showing ALL workshops");
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'workshop', "Dashboard: CSC admin - showing ALL workshops");
     } else {
         $search_filter = {
             -or => [
@@ -164,7 +170,7 @@ sub dashboard :Local {
         if ($sitename) {
             push @{$search_filter->{-or}}, { sitename => $sitename, created_by => undef };
         }
-        $c->log->debug("Dashboard: Regular admin filter applied");
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'workshop', "Dashboard: Regular admin filter applied");
     }
 
     my @my_workshops = $schema->resultset('WorkShop')->search(
@@ -175,7 +181,7 @@ sub dashboard :Local {
         }
     )->all;
 
-    $c->log->debug("Dashboard: Found " . scalar(@my_workshops) . " workshops from main search");
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'workshop', "Dashboard: Found " . scalar(@my_workshops) . " workshops from main search");
 
     my @workshop_leader_ids = $schema->resultset('WorkshopRole')->search(
         {
@@ -316,7 +322,7 @@ sub addworkshop :Local {
     if ($@) {
         # Log error with details and send email to site admin
         my $error_msg = "Failed to create workshop: $@";
-        $c->log->error($error_msg);
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', $error_msg);
         
         # Send error notification to site admin
         $self->_send_error_notification($c, {
@@ -406,7 +412,7 @@ sub details :Path('/workshop/details') :Args(0) {
     };
 
     if ($@ || !$workshop) {
-        $c->log->error("Failed to find workshop with ID $id: " . ($@ || 'Workshop not found'));
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to find workshop with ID $id: " . ($@ || 'Workshop not found'));
         $c->flash->{error_msg} = 'Failed to find workshop: ' . ($@ || 'Workshop not found');
         $c->response->redirect($c->uri_for($self->action_for('index')));
         return;
@@ -426,7 +432,7 @@ sub details :Path('/workshop/details') :Args(0) {
             }
         };
         if ($@) {
-            $c->log->error("Error formatting workshop date: $@");
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Error formatting workshop date: $@");
             $formatted_date = $workshop->date || '';
         }
     }
@@ -468,7 +474,7 @@ sub details :Path('/workshop/details') :Args(0) {
             };
         }
     };
-    $c->log->error("details: file query error: $@") if $@;
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "details: file query error: $@") if $@;
 
     eval {
         my @resources = $schema->resultset('WorkshopResource')->search(
@@ -487,7 +493,7 @@ sub details :Path('/workshop/details') :Args(0) {
             };
         }
     };
-    $c->log->error("details: resource query error: $@") if $@;
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "details: resource query error: $@") if $@;
 
     # Get workshop content
     my @workshop_content = $schema->resultset('WorkshopContent')->search(
@@ -532,13 +538,13 @@ sub edit :Path('/workshop/edit') :Args(1) {
     my $is_leader = $self->_is_workshop_leader($c, $workshop);
     my $can_edit = $self->_can_edit_workshop($c, $workshop);
     
-    $c->log->info("Edit Workshop Authorization Debug:");
-    $c->log->info("  Workshop ID: " . $workshop->id);
-    $c->log->info("  Workshop created_by: " . ($workshop->created_by || 'NULL'));
-    $c->log->info("  Session user_id: " . ($user_id || 'NULL'));
-    $c->log->info("  Admin type: " . ($admin_type || 'NONE'));
-    $c->log->info("  Is workshop leader: " . ($is_leader ? 'YES' : 'NO'));
-    $c->log->info("  Can edit workshop: " . ($can_edit ? 'YES' : 'NO'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "Edit Workshop Authorization Debug:");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  Workshop ID: " . $workshop->id);
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  Workshop created_by: " . ($workshop->created_by || 'NULL'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  Session user_id: " . ($user_id || 'NULL'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  Admin type: " . ($admin_type || 'NONE'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  Is workshop leader: " . ($is_leader ? 'YES' : 'NO'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  Can edit workshop: " . ($can_edit ? 'YES' : 'NO'));
 
     # Authorization check using helper method
     unless ($can_edit) {
@@ -618,7 +624,7 @@ sub edit :Path('/workshop/edit') :Args(1) {
         $err = "$@" if $@;
 
         if ($err) {
-            $c->log->error("Failed to update workshop " . $workshop->id . ": $err");
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to update workshop " . $workshop->id . ": $err");
             $c->stash(
                 workshop       => $workshop,
                 formatted_date => $formatted_date,
@@ -630,7 +636,7 @@ sub edit :Path('/workshop/edit') :Args(1) {
             return;
         }
 
-        $c->log->info("Workshop " . $workshop->id . " updated by user " . ($c->session->{user_id} || 'unknown'));
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "Workshop " . $workshop->id . " updated by user " . ($c->session->{user_id} || 'unknown'));
         $c->flash->{success_msg} = 'Workshop updated successfully.';
         $c->res->redirect($c->uri_for($self->action_for('index')));
         return;
@@ -692,24 +698,24 @@ sub _check_workshop_access {
     if ($required_level eq 'leader' || $required_level eq 'edit') {
         # Site admin can edit workshops from their site
         if ($admin_type eq 'standard' && $sitename && $sitename eq $workshop->sitename) {
-            $c->log->info("_check_workshop_access: GRANTED (site admin for " . $sitename . ")");
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "_check_workshop_access: GRANTED (site admin for " . $sitename . ")");
             return 1;
         }
         
         # Workshop leader (creator or workshop_roles)
         if ($self->_is_workshop_leader($c, $workshop)) {
-            $c->log->info("_check_workshop_access: GRANTED (workshop leader)");
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "_check_workshop_access: GRANTED (workshop leader)");
             return 1;
         }
         
         # Fallback: If created_by is NULL and user is admin, allow edit
         if (!$workshop->created_by && ($admin_type eq 'standard' || $admin_type eq 'csc' || $admin_type eq 'special')) {
-            $c->log->info("_check_workshop_access: GRANTED (created_by is NULL and user is admin)");
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "_check_workshop_access: GRANTED (created_by is NULL and user is admin)");
             return 1;
         }
     }
     
-    $c->log->info("_check_workshop_access: DENIED (no matching authorization criteria)");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "_check_workshop_access: DENIED (no matching authorization criteria)");
     return 0;
 }
 
@@ -719,12 +725,12 @@ sub _is_workshop_leader {
     my $user_id = $c->session->{user_id};
     return 0 unless $user_id;
     
-    $c->log->info("_is_workshop_leader check:");
-    $c->log->info("  user_id: " . ($user_id || 'NULL'));
-    $c->log->info("  workshop.created_by: " . ($workshop->created_by || 'NULL'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "_is_workshop_leader check:");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  user_id: " . ($user_id || 'NULL'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  workshop.created_by: " . ($workshop->created_by || 'NULL'));
     
     if ($workshop->created_by && $user_id && $workshop->created_by == $user_id) {
-        $c->log->info("  Result: TRUE (created_by matches)");
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  Result: TRUE (created_by matches)");
         return 1;
     }
     
@@ -734,8 +740,8 @@ sub _is_workshop_leader {
         role => 'workshop_leader'
     })->count > 0;
     
-    $c->log->info("  has_leader_role from workshop_roles: " . ($has_leader_role ? 'YES' : 'NO'));
-    $c->log->info("  Result: " . ($has_leader_role ? 'TRUE' : 'FALSE'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  has_leader_role from workshop_roles: " . ($has_leader_role ? 'YES' : 'NO'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  Result: " . ($has_leader_role ? 'TRUE' : 'FALSE'));
     
     return $has_leader_role;
 }
@@ -925,7 +931,7 @@ sub delete :Local :Args(1) {
     };
     
     if ($@) {
-        $c->log->error("Failed to delete workshop: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to delete workshop: $@");
         $c->flash->{error_msg} = 'Failed to delete workshop: ' . $@;
         $c->response->redirect($c->uri_for($self->action_for('dashboard')));
     } else {
@@ -1049,7 +1055,7 @@ sub register :Local :Args(1) {
         };
         
         if ($@) {
-            $c->log->warn("Failed to send registration confirmation email: $@");
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'workshop', "Failed to send registration confirmation email: $@");
         }
     }
     
@@ -1376,7 +1382,7 @@ sub upload :Local :Args(1) {
     
     unless (-d $upload_dir) {
         mkdir $upload_dir or do {
-            $c->log->error("Failed to create upload directory: $!");
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to create upload directory: $!");
             $c->flash->{error_msg} = 'Failed to create upload directory.';
             $c->response->redirect($c->uri_for($self->action_for('files'), [$id]));
             return;
@@ -1411,7 +1417,7 @@ sub upload :Local :Args(1) {
     };
     
     if ($@) {
-        $c->log->error("File upload failed: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "File upload failed: $@");
         $c->flash->{error_msg} = "Failed to upload file: $@";
     } else {
         $c->flash->{success_msg} = 'File uploaded successfully.';
@@ -1479,7 +1485,7 @@ sub download :Local :Args(1) {
             close $fh;
         };
         if ($@) {
-            $c->log->error("download read error: $@");
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "download read error: $@");
             $c->flash->{error_msg} = 'Failed to read file.';
             $c->response->redirect($back_url);
             return;
@@ -1727,7 +1733,7 @@ sub resources :Path('/workshop/resources') :Args(0) {
     };
     if ($@) {
         $db_error = $@;
-        $c->log->error("Resource library DB error: $db_error");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Resource library DB error: $db_error");
     }
     my $matches_filter = sub {
         my ($row, $filter_name, $search_text) = @_;
@@ -1860,7 +1866,7 @@ sub resources :Path('/workshop/resources') :Args(0) {
     };
     if ($@) {
         $lib_error = $@;
-        $c->log->error("File library DB error: $lib_error");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "File library DB error: $lib_error");
     }
     if ($lib_filter ne 'all') {
         @file_library = grep { $matches_filter->($_, $lib_filter, '') } @file_library;
@@ -1993,7 +1999,7 @@ sub resource_fs_list :Path('/workshop/resource_fs_list') :Args(0) {
         closedir($dh);
     };
     eval { $scan->($nfs_root, '') };
-    $c->log->error("NFS scan error: $@") if $@;
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "NFS scan error: $@") if $@;
 
     @files = sort { lc($a->{file_name}) cmp lc($b->{file_name}) } @files;
 
@@ -2095,7 +2101,7 @@ sub resource_upload :Path('/workshop/resource_upload') :Args(0) {
         });
     };
     if ($@) {
-        $c->log->error("resource_upload DB error: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_upload DB error: $@");
         $c->flash->{error_msg} = "File saved to storage but database record failed: $@. Please contact the administrator.";
     } else {
         $c->flash->{success_msg} = "File '$filename' uploaded successfully.";
@@ -2160,7 +2166,7 @@ sub resource_add_url :Path('/workshop/resource_add_url') :Args(0) {
         });
     };
     if ($@) {
-        $c->log->error("resource_add_url DB error: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_add_url DB error: $@");
         $c->flash->{error_msg} = "Failed to save link: $@";
     } else {
         $c->flash->{success_msg} = "Link '$title' added successfully.";
@@ -2184,7 +2190,7 @@ sub resource_download :Path('/workshop/resource_download') :Args(1) {
     $find_err = $@;
 
     if ($find_err || !$resource) {
-        $c->log->error("resource_download find error: " . ($find_err || 'not found'));
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_download find error: " . ($find_err || 'not found'));
         $c->flash->{error_msg} = 'File not found.';
         $c->response->redirect($c->uri_for($self->action_for('index')));
         return;
@@ -2247,7 +2253,7 @@ sub resource_download :Path('/workshop/resource_download') :Args(1) {
         close $fh;
     };
     if ($@) {
-        $c->log->error("resource_download read error: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_download read error: $@");
         $c->flash->{error_msg} = "Could not read file.";
         $c->response->redirect($back_url);
         return;
@@ -2304,7 +2310,7 @@ sub resource_view :Path('/workshop/resource_view') :Args(1) {
             $c->response->body($data);
         };
         if ($@) {
-            $c->log->error("resource_view serve error: $@");
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_view serve error: $@");
             return $json_error->(500, "Cannot read file: $@");
         }
         return;
@@ -2350,7 +2356,7 @@ sub resource_view :Path('/workshop/resource_view') :Args(1) {
         );
     };
     if ($@) {
-        $c->log->error("resource_view metadata error: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_view metadata error: $@");
         return $json_error->(500, "Error building metadata: $@");
     }
 }
@@ -2380,13 +2386,13 @@ sub resource_delete :Path('/workshop/resource_delete') :Args(1) {
 
     my $full_path = $self->_resolve_storage_path($c, $resource->file_path // '');
     if (-f $full_path) {
-        unlink($full_path) or $c->log->warn("Could not delete NFS file '$full_path': $!");
+        unlink($full_path) or $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'workshop', "Could not delete NFS file '$full_path': $!");
     }
 
     my $name = $resource->file_name;
     eval { $resource->delete };
     if ($@) {
-        $c->log->error("resource_delete DB error: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_delete DB error: $@");
         $c->flash->{error_msg} = "Failed to remove database record: $@";
     } else {
         $c->flash->{success_msg} = "File '$name' deleted.";
@@ -2429,7 +2435,7 @@ sub resource_fs_download :Path('/workshop/resource_fs_download') :Args(0) {
         close $fh;
     };
     if ($@) {
-        $c->log->error("resource_fs_download read error: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_fs_download read error: $@");
         $c->flash->{error_msg} = "Could not read file: $@";
         $c->response->redirect($c->uri_for('/workshop/resources'));
         return;
@@ -2765,7 +2771,7 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
                             $existing_files{$full} = $rec;
                         };
                         if ($@) {
-                            $c->log->error("resource_scan_nfs files insert error for $full: $@");
+                            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_scan_nfs files insert error for $full: $@");
                             $errors++;
                         }
                     }
@@ -2791,7 +2797,7 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
                         $inserted++ if $target_table eq 'workshop_resource';
                     };
                     if ($@) {
-                        $c->log->error("resource_scan_nfs workshop_resource insert error for $full: $@");
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_scan_nfs workshop_resource insert error for $full: $@");
                         $errors++ if $target_table eq 'workshop_resource';
                     }
                 }
@@ -2801,7 +2807,7 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
     };
 
     eval { $scan->($scan_root) };
-    $c->log->error("NFS scan failed: $@") if $@;
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "NFS scan failed: $@") if $@;
 
     my $target_label = $target_table eq 'both' ? 'files + workshop_resource' : $target_table;
     my $msg = "NFS scan of '$scan_root' → $target_label: $inserted new, $skipped already in DB, $duplicates duplicates, $errors errors.";
@@ -2875,7 +2881,7 @@ sub file_view :Path('/workshop/file_view') :Args(1) {
         $c->response->body($data);
     };
     if ($@) {
-        $c->log->error("file_view read error: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "file_view read error: $@");
         $c->response->status(500);
         $c->response->body('Could not read file');
     }
@@ -2954,7 +2960,7 @@ sub resource_attach :Path('/workshop/resource_attach') :Args(0) {
         });
     };
     if ($@) {
-        $c->log->error("resource_attach error: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_attach error: $@");
         $c->flash->{error_msg} = 'Failed to attach file: ' . (split /\n/, $@)[0];
     } else {
         my $ws_label = ($workshop_id && $workshop_id =~ /^\d+$/) ? " to workshop #$workshop_id" : '';
@@ -3093,7 +3099,7 @@ sub file_update :Path('/workshop/file_update') :Args(0) {
 
     if (!$ok || $@) {
         my $err = $@ || 'unknown error';
-        $c->log->error("file_update failed for file_id=$file_id: $err");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "file_update failed for file_id=$file_id: $err");
         $c->flash->{error_msg} = 'Failed to update file record.';
     } else {
         $c->flash->{success_msg} = "Updated file '$new_name'.";
@@ -3187,7 +3193,7 @@ sub add_content :Local :Args(1) {
     };
     
     if ($@) {
-        $c->log->error("Failed to create content: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to create content: $@");
         $c->flash->{error_msg} = "Failed to create content: $@";
     } else {
         $c->flash->{success_msg} = 'Content added successfully.';
@@ -3250,7 +3256,7 @@ sub edit_content :Local :Args(1) {
     };
     
     if ($@) {
-        $c->log->error("Failed to update content: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to update content: $@");
         $c->flash->{error_msg} = "Failed to update content: $@";
     } else {
         $c->flash->{success_msg} = 'Content updated successfully.';
@@ -3284,7 +3290,7 @@ sub delete_content :Local :Args(1) {
     };
     
     if ($@) {
-        $c->log->error("Failed to delete content: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to delete content: $@");
         $c->flash->{error_msg} = "Failed to delete content: $@";
     } else {
         $c->flash->{success_msg} = 'Content deleted successfully.';
@@ -3329,7 +3335,7 @@ sub reorder_content :Local :Args(1) {
                 $content_record->update({ sort_order => $sort_order });
             };
             if ($@) {
-                $c->log->error("Failed to update sort_order for content $content_id: $@");
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to update sort_order for content $content_id: $@");
             }
             $sort_order++;
         }
@@ -3370,22 +3376,33 @@ sub compose_email :Local :Args(1) {
         { order_by => { -asc => 'name' } }
     )->all;
 
+    
     # Fetch all other workshops this leader owns (or all workshops for CSC admin)
     my $user_id    = $c->session->{user_id};
     my $admin_auth = Comserv::Util::AdminAuth->new();
     my $admin_type = $admin_auth->get_admin_type($c);
-    my @leader_workshops;
+    my @leader_workshops_raw;
     if ($admin_type eq 'CSC') {
-        @leader_workshops = $c->model('DBEncy::WorkShop')->search(
+        @leader_workshops_raw = $c->model('DBEncy::WorkShop')->search(
             { id => { '!=' => $id } },
             { order_by => { -asc => 'title' } }
         )->all;
     } elsif ($user_id) {
-        @leader_workshops = $c->model('DBEncy::WorkShop')->search(
+        @leader_workshops_raw = $c->model('DBEncy::WorkShop')->search(
             { created_by => $user_id, id => { '!=' => $id } },
             { order_by => { -asc => 'title' } }
         )->all;
     }
+
+    # Pre-compute participant counts — TT cannot call .search({}) on DBIC relationships
+    my @leader_workshops = map {
+        my $ws = $_;
+        my $cnt = $c->model('DBEncy::Participant')->search({
+            workshop_id => $ws->id,
+            status      => 'registered',
+        })->count;
+        { workshop => $ws, count => $cnt }
+    } @leader_workshops_raw;
 
     $c->stash(
         workshop           => $workshop,
@@ -3415,8 +3432,9 @@ sub send_email :Local :Args(1) {
     }
     
     my $params = $c->request->body_parameters;
-    my $subject = $params->{subject};
-    my $body = $params->{body};
+    my $subject      = $params->{subject};
+    my $message_body = $params->{message_body} || '';
+    my $body = $params->{body} || $message_body;
 
     # Collect all workshop IDs to include (primary + any extras checked)
     my @extra_ids;
@@ -3530,6 +3548,7 @@ sub send_email :Local :Args(1) {
 
         # Process per-participant [[placeholders]] in body
         my $processed_body = $body;
+        $processed_body =~ s/\[\[message_body\]\]/$message_body/g;
         $processed_body =~ s/\[\[participant\.name\]\]/$user_name/g;
         $processed_body =~ s/\[\[participant\.first_name\]\]/$first_name/g;
         $processed_body =~ s/\[\[workshop\.title\]\]/${\($workshop->title || '')}/g;
@@ -3565,7 +3584,7 @@ sub send_email :Local :Args(1) {
         };
         
         if ($@) {
-            $c->log->warn("Failed to send email to $email: $@");
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'workshop', "Failed to send email to $email: $@");
             $failed_count++;
             push @failed_emails, $email;
         }
@@ -3592,7 +3611,7 @@ sub send_email :Local :Args(1) {
     };
     
     if ($@) {
-        $c->log->error("Failed to record email in database: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to record email in database: $@");
     }
     
     if ($failed_count > 0) {
@@ -3682,11 +3701,11 @@ sub _send_error_notification {
         };
         
         $c->forward($c->view('Email'));
-        $c->log->info("Error notification sent to admin: $admin_email");
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "Error notification sent to admin: $admin_email");
     };
     
     if ($@) {
-        $c->log->error("Failed to send error notification email: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to send error notification email: $@");
     }
 }
 
