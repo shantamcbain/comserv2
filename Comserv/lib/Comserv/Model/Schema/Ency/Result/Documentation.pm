@@ -50,12 +50,12 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key('id');
 
 __PACKAGE__->belongs_to(
-    'creator' => 'Comserv::Model::Schema::Ency::Result::User::User',
+    'creator' => 'Comserv::Model::Schema::Ency::Result::User',
     'created_by'
 );
 
 __PACKAGE__->belongs_to(
-    'updater' => 'Comserv::Model::Schema::Ency::Result::User::User',
+    'updater' => 'Comserv::Model::Schema::Ency::Result::User',
     'updated_by'
 );
 

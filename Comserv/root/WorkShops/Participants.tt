@@ -1,0 +1,159 @@
+[% META 
+   title = "Workshop Participants"
+   description = "Manage workshop participants"
+   roles = "admin,workshop_leader"
+   TemplateType = "Application"
+   category = "WorkShops"
+   page_version = "0.01"
+   last_updated = "2026-02-16"
+%]
+
+[% PageVersion = 'WorkShops/Participants.tt,v 0.01 2026/02/16 shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    
+    <div class="page-header">
+        <h1>Workshop Participants</h1>
+        <h2 class="page-subtitle">[% workshop.title | html %]</h2>
+    </div>
+    
+    <div class="content-container">
+        
+        <div class="content-primary">
+            
+            [% IF c.flash.error_msg %]
+                <div class="error">[% c.flash.error_msg %]</div>
+            [% END %]
+            
+            [% IF c.flash.success_msg %]
+                <div class="success">[% c.flash.success_msg %]</div>
+            [% END %]
+            
+            <div class="content-section">
+                <p><strong>Total Registered:</strong> [% registered.size || 0 %] participant(s)</p>
+                [% IF workshop.max_participants %]
+                <p><strong>Capacity:</strong> [% registered.size || 0 %] / [% workshop.max_participants %]</p>
+                [% END %]
+                <p><strong>Waitlist:</strong> [% waitlist.size || 0 %] participant(s)</p>
+            </div>
+            
+            <div class="form-actions">
+                <a href="/workshop/add_participant/[% workshop.id %]" class="btn btn-primary">Manually Add Participant</a>
+                [% IF registered.size > 0 || waitlist.size > 0 %]
+                <a href="#" onclick="window.print(); return false;" class="btn btn-secondary">Print List</a>
+                [% END %]
+            </div>
+            
+            <div class="data-container">
+                <h2>Registered Participants</h2>
+                
+                [% IF registered.size > 0 %]
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Site</th>
+                                <th>Registered At</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% FOREACH participant IN registered %]
+                            <tr>
+                                <td>
+                                    [% IF participant.user %]
+                                        <a href="/user/edit_user/[% participant.user_id %]">
+                                            [% participant.user.first_name %] [% participant.user.last_name %]
+                                        </a>
+                                    [% ELSE %]
+                                        [% participant.name || 'N/A' | html %]
+                                    [% END %]
+                                </td>
+                                <td>[% participant.email | html %]</td>
+                                <td>[% participant.site_affiliation || 'N/A' | html %]</td>
+                                <td>[% participant.registered_at || 'N/A' | html %]</td>
+                                <td>
+                                    <span class="badge badge-success">Registered</span>
+                                </td>
+                                <td class="action-cell">
+                                    <form action="/workshop/remove_participant/[% participant.id %]" method="POST" style="display:inline;">
+                                        <button type="submit" class="btn btn-sm btn-delete" onclick="return confirm('Are you sure you want to remove this participant?');">Remove</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+                [% ELSE %]
+                <div class="empty-state">
+                    <p>No registered participants yet.</p>
+                </div>
+                [% END %]
+            </div>
+            
+            [% IF waitlist.size > 0 %]
+            <div class="data-container">
+                <h2>Waitlist</h2>
+                
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Site</th>
+                                <th>Registered At</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% FOREACH participant IN waitlist %]
+                            <tr>
+                                <td>
+                                    [% IF participant.user %]
+                                        <a href="/user/edit_user/[% participant.user_id %]">
+                                            [% participant.user.first_name %] [% participant.user.last_name %]
+                                        </a>
+                                    [% ELSE %]
+                                        [% participant.name || 'N/A' | html %]
+                                    [% END %]
+                                </td>
+                                <td>[% participant.email | html %]</td>
+                                <td>[% participant.site_affiliation || 'N/A' | html %]</td>
+                                <td>[% participant.registered_at || 'N/A' | html %]</td>
+                                <td>
+                                    <span class="badge badge-warning">Waitlist</span>
+                                </td>
+                                <td class="action-cell">
+                                    <form action="/workshop/remove_participant/[% participant.id %]" method="POST" style="display:inline;">
+                                        <button type="submit" class="btn btn-sm btn-delete" onclick="return confirm('Are you sure you want to remove this participant?');">Remove</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            [% END %]
+            
+            <div class="page-footer">
+                <div class="footer-actions">
+                    <a href="/workshop/details?id=[% workshop.id %]" class="btn btn-secondary">Back to Workshop</a>
+                    <a href="/workshop/compose_email/[% workshop.id %]" class="btn btn-secondary">Email Participants</a>
+                </div>
+            </div>
+            
+        </div>
+        
+    </div>
+    
+</div>

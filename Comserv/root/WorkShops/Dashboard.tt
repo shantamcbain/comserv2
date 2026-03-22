@@ -1,0 +1,175 @@
+[% META 
+   title = "Workshop Leader Dashboard"
+   description = "Dashboard for workshop leaders to manage their workshops"
+   roles = "admin,workshop_leader"
+   TemplateType = "Application"
+   category = "WorkShops"
+   page_version = "0.03"
+   last_updated = "2026-02-26"
+%]
+
+[% PageVersion = 'WorkShops/Dashboard.tt,v 0.02 2026/02/16 shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    
+    <div class="page-header">
+        <h1>Workshop Leader Dashboard</h1>
+    </div>
+    
+    <div class="content-container">
+        
+        <div class="content-primary">
+            
+            [% IF c.flash.error_msg %]
+                <div class="error">[% c.flash.error_msg %]</div>
+            [% END %]
+            
+            [% IF c.flash.success_msg %]
+                <div class="success">[% c.flash.success_msg %]</div>
+            [% END %]
+            
+            <div class="form-actions">
+                <a href="/workshop" class="btn btn-secondary">Back to Workshops</a>
+                <a href="/workshop/add" class="btn btn-primary">Create New Workshop</a>
+                <a href="/workshop/resources" class="btn btn-secondary">📁 Resource Library</a>
+                [% IF is_csc_admin %]
+                <a href="/workshop/dashboard?scope=all" class="btn [% dashboard_scope != 'mine' ? 'btn-primary' : 'btn-secondary' %]">CSC: All Workshops</a>
+                <a href="/workshop/dashboard?scope=mine" class="btn [% dashboard_scope == 'mine' ? 'btn-primary' : 'btn-secondary' %]">CSC: Just Mine</a>
+                [% END %]
+            </div>
+            
+            <div class="data-container">
+                <h2>My Workshops</h2>
+                
+                [% IF workshops.size > 0 %]
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Date</th>
+                                <th>Leader</th>
+                                <th>Status</th>
+                                <th>Participants</th>
+                                <th>Emails</th>
+                                <th>Files</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% FOREACH item IN workshops %]
+                            [% workshop = item.workshop %]
+                            <tr>
+                                <td>
+                                    <strong>[% workshop.title | html %]</strong><br>
+                                    <small>[% workshop.sitename | html %]</small>
+                                </td>
+                                <td>
+                                    [% IF workshop.date %]
+                                        [% SET date_parts = workshop.date.split('-') %]
+                                        [% SET month_names = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] %]
+                                        [% month_names.${date_parts.1} %] [% date_parts.2 %], [% date_parts.0 %]<br>
+                                    [% ELSE %]
+                                        <em>No date set</em><br>
+                                    [% END %]
+                                    <small>
+                                        [% IF workshop.time %]
+                                            [% 
+                                                SET t_parts = workshop.time.split(':');
+                                                SET hour = t_parts.0 + 0;
+                                                SET min  = t_parts.1;
+                                                IF hour >= 12;
+                                                    SET ampm = 'PM';
+                                                    SET display_hour = (hour == 12) ? 12 : hour - 12;
+                                                ELSE;
+                                                    SET ampm = 'AM';
+                                                    SET display_hour = (hour == 0) ? 12 : hour;
+                                                END;
+                                            %]
+                                            [% display_hour %]:[% min %] [% ampm %]
+                                        [% ELSE %]
+                                            N/A
+                                        [% END %]
+                                        [% IF workshop.end_time %]
+                                            - 
+                                            [% 
+                                                SET et_parts = workshop.end_time.split(':');
+                                                SET hour_end = et_parts.0 + 0;
+                                                SET min_end  = et_parts.1;
+                                                IF hour_end >= 12;
+                                                    SET ampm_end = 'PM';
+                                                    SET display_hour_end = (hour_end == 12) ? 12 : hour_end - 12;
+                                                ELSE;
+                                                    SET ampm_end = 'AM';
+                                                    SET display_hour_end = (hour_end == 0) ? 12 : hour_end;
+                                                END;
+                                            %]
+                                            [% display_hour_end %]:[% min_end %] [% ampm_end %]
+                                        [% END %]
+                                    </small>
+                                </td>
+                                <td>
+                                    [% IF workshop.creator && workshop.created_by %]
+                                        <a href="/user/edit_user/[% workshop.created_by %]">
+                                            [% workshop.creator.first_name %] [% workshop.creator.last_name %]
+                                        </a><br>
+                                        <small>[% workshop.creator.username %]</small>
+                                    [% ELSIF workshop.created_by %]
+                                        <a href="/user/edit_user/[% workshop.created_by %]">User ID: [% workshop.created_by %]</a>
+                                    [% ELSE %]
+                                        [% workshop.instructor || 'N/A' | html %]
+                                    [% END %]
+                                </td>
+                                <td>
+                                    [% IF workshop.status == 'published' %]
+                                        <span class="badge badge-success">Published</span>
+                                    [% ELSIF workshop.status == 'draft' %]
+                                        <span class="badge badge-secondary">Draft</span>
+                                    [% ELSIF workshop.status == 'completed' %]
+                                        <span class="badge badge-info">Completed</span>
+                                    [% ELSIF workshop.status == 'cancelled' %]
+                                        <span class="badge badge-danger">Cancelled</span>
+                                    [% ELSE %]
+                                        <span class="badge badge-secondary">[% workshop.status %]</span>
+                                    [% END %]
+                                </td>
+                                <td>[% item.participant_count %] / [% workshop.max_participants || 'N/A' %]</td>
+                                <td>[% item.email_count %]</td>
+                                <td>[% item.file_count %]</td>
+                                <td class="action-cell">
+                                    <a href="/workshop/details?id=[% workshop.id %]" class="btn btn-sm">View</a>
+                                    <a href="/workshop/edit/[% workshop.id %]" class="btn btn-sm btn-edit">Edit</a>
+                                    <a href="/workshop/files/[% workshop.id %]" class="btn btn-sm" title="Files">📎 Files</a>
+                                    <a href="/workshop/participants/[% workshop.id %]" class="btn btn-sm" title="Participants">👥 People</a>
+                                    <a href="/workshop/compose_email/[% workshop.id %]" class="btn btn-sm" title="Email">✉️ Email</a>
+                                    <form method="POST" action="/workshop/delete/[% workshop.id %]" style="display:inline;" onsubmit="return confirm('Delete this workshop? This cannot be undone.');">
+                                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="content-section">
+                    <h3>Quick Stats</h3>
+                    <p><strong>Total Workshops:</strong> [% workshops.size %]</p>
+                </div>
+                
+                [% ELSE %]
+                <div class="empty-state">
+                    <p><strong>No workshops found.</strong></p>
+                    <p>You haven't created any workshops yet. <a href="/workshop/add">Create your first workshop</a> to get started!</p>
+                </div>
+                [% END %]
+            </div>
+            
+        </div>
+        
+    </div>
+    
+</div>

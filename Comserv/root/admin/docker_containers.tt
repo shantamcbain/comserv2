@@ -9,12 +9,37 @@
 %]
 [% PageVersion = 'docker_containers.tt,v 1.0 2025/12/14 ai_assistant Exp ai_assistant ' %]
 
-<div class="container" style="margin: 20px auto; max-width: 1200px;">
-    <div class="row">
-        <div class="col-md-12">
-            <h1><i class="icon-docker"></i> Docker Container Management</h1>
-            <hr>
-        </div>
+<!-- xterm.js for SSH Terminal -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+
+<style>
+.collapsible-header {
+    cursor: pointer;
+    user-select: none;
+}
+.collapsible-header:hover {
+    background-color: #e9ecef !important;
+}
+.collapsible-content {
+    display: none;
+}
+.collapsible-content.expanded {
+    display: block;
+}
+.chevron-icon {
+    transition: transform 0.2s ease;
+}
+.chevron-icon.expanded {
+    transform: rotate(90deg);
+}
+</style>
+
+<div class="app-container" style="margin: 20px auto; max-width: 1200px;">
+    <div class="page-header">
+        <h1><i class="icon-docker"></i> Docker Container Management</h1>
+        <hr>
     </div>
 
     [% IF !docker_available %]
@@ -24,39 +49,63 @@
     </div>
     [% ELSE %]
     
-    <div class="row" style="margin-bottom: 30px;">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header" style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">
-                    <h3 style="margin: 0; display: flex; align-items: center; justify-content: space-between;">
-                        <span>
-                            <i class="icon-list" style="margin-right: 10px;"></i>
-                            Container Status Overview
-                        </span>
-                        <button onclick="refreshContainers()" style="padding: 6px 12px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                            <i class="icon-refresh"></i> Refresh
-                        </button>
-                    </h3>
-                </div>
-                <div class="card-body" style="padding: 20px;">
-                    <div id="containers-list" style="display: flex; flex-direction: column; gap: 10px;">
-                        <p style="color: #666; text-align: center;">Loading container information...</p>
-                    </div>
+    <div class="content-section" style="margin-bottom: 20px;">
+        <div class="card">
+            <div class="card-header collapsible-header" onclick="toggleSection('container-status')" 
+                 style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">
+                <h3 style="margin: 0; display: flex; align-items: center; justify-content: space-between;">
+                    <span>
+                        <i class="fas fa-chevron-right chevron-icon" id="chevron-container-status" style="margin-right: 10px; font-size: 0.8em;"></i>
+                        <i class="icon-list" style="margin-right: 10px;"></i>
+                        Container Status Overview
+                    </span>
+                    <button onclick="event.stopPropagation(); refreshContainers();" style="padding: 6px 12px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        <i class="icon-refresh"></i> Refresh
+                    </button>
+                </h3>
+            </div>
+            <div id="container-status" class="card-body collapsible-content" style="padding: 20px;">
+                <div id="containers-list" style="display: flex; flex-direction: column; gap: 10px;">
+                    <p style="color: #666; text-align: center;">Loading container information...</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="row" style="margin-bottom: 30px;">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header" style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">
-                    <h3 style="margin: 0; display: flex; align-items: center;">
-                        <i class="icon-tools" style="margin-right: 10px;"></i>
-                        Container Controls
-                    </h3>
+    <div class="content-section" style="margin-bottom: 20px;">
+        <div class="card">
+            <div class="card-header collapsible-header" onclick="toggleSection('volumes-status')"
+                 style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">
+                <h3 style="margin: 0; display: flex; align-items: center; justify-content: space-between;">
+                    <span>
+                        <i class="fas fa-chevron-right chevron-icon" id="chevron-volumes-status" style="margin-right: 10px; font-size: 0.8em;"></i>
+                        <i class="icon-storage" style="margin-right: 10px;"></i>
+                        Volume Status Overview
+                    </span>
+                    <button onclick="event.stopPropagation(); refreshVolumes();" style="padding: 6px 12px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        <i class="icon-refresh"></i> Refresh
+                    </button>
+                </h3>
+            </div>
+            <div id="volumes-status" class="card-body collapsible-content" style="padding: 20px;">
+                <div id="volumes-list" style="display: flex; flex-direction: column; gap: 10px;">
+                    <p style="color: #666; text-align: center;">Loading volume information...</p>
                 </div>
-                <div class="card-body" style="padding: 20px;">
+            </div>
+        </div>
+    </div>
+
+    <div class="content-section" style="margin-bottom: 20px;">
+        <div class="card">
+            <div class="card-header collapsible-header" onclick="toggleSection('container-controls')" 
+                 style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">
+                <h3 style="margin: 0; display: flex; align-items: center;">
+                    <i class="fas fa-chevron-right chevron-icon" id="chevron-container-controls" style="margin-right: 10px; font-size: 0.8em;"></i>
+                    <i class="icon-tools" style="margin-right: 10px;"></i>
+                    Container Controls
+                </h3>
+            </div>
+            <div id="container-controls" class="card-body collapsible-content" style="padding: 20px;">
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
                         <div>
                             <label for="service-select" style="display: block; margin-bottom: 8px; font-weight: bold;">
@@ -77,13 +126,29 @@
                                     style="padding: 8px 16px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer;">
                                     <i class="icon-refresh"></i> Restart
                                 </button>
-                                <button id="status-btn" onclick="checkStatus()" 
-                                    style="padding: 8px 16px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                                    <i class="icon-status"></i> Check Status
+                                <button id="rebuild-btn" onclick="rebuildContainer()" 
+                                    style="padding: 8px 16px; background-color: #ffc107; color: #333; border: none; border-radius: 4px; cursor: pointer;">
+                                    🔨 Rebuild
                                 </button>
                                 <button id="logs-btn" onclick="viewLogs()" 
                                     style="padding: 8px 16px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer;">
                                     <i class="icon-log"></i> View Logs
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label style="display: block; margin-bottom: 8px; font-weight: bold;">
+                                Cleanup:
+                            </label>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button id="prune-btn" onclick="pruneDockerSystem()" 
+                                    style="padding: 8px 16px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    🗑️ Prune Unused
+                                </button>
+                                <button id="disk-usage-btn" onclick="showDiskUsage()" 
+                                    style="padding: 8px 16px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    💾 Disk Usage
                                 </button>
                             </div>
                         </div>
@@ -98,27 +163,356 @@
                 </div>
             </div>
         </div>
+
+    <div class="content-section" style="margin-bottom: 20px;">
+        <div class="card">
+            <div class="card-header collapsible-header" onclick="toggleSection('production-deployment')" 
+                 style="background-color: #fff3cd; padding: 15px; border: 2px solid #ffc107; border-bottom: 1px solid #ddd;">
+                <h3 style="margin: 0; display: flex; align-items: center;">
+                    <i class="fas fa-chevron-right chevron-icon" id="chevron-production-deployment" style="margin-right: 10px; font-size: 0.8em;"></i>
+                    <i class="fas fa-rocket" style="margin-right: 10px; color: #dc3545;"></i>
+                    Production Deployment
+                    <span style="margin-left: 10px; background-color: #dc3545; color: white; padding: 2px 8px; border-radius: 3px; font-size: 0.8em;">CAUTION</span>
+                </h3>
+            </div>
+            <div id="production-deployment" class="card-body collapsible-content" style="padding: 20px;">
+                <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 15px; margin-bottom: 20px;">
+                    <h4 style="margin: 0 0 10px 0; color: #856404;">
+                        <i class="fas fa-exclamation-triangle"></i> Production Deployment Workflow
+                    </h4>
+                    <p style="margin: 0; color: #856404;">
+                        This will export the Docker container, copy it to production server via SSH, stop the running container,
+                        load the new image, and start it. Automatic rollback on failure.
+                    </p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <div>
+                        <label for="deploy-service-select" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                            Service to Deploy:
+                        </label>
+                        <select id="deploy-service-select" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                            <option value="web-prod">web-prod (Production)</option>
+                            <option value="web-dev">web-dev (Development)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="ssh-target-select" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                            SSH Target:
+                        </label>
+                        <select id="ssh-target-select" onchange="updateSSHTarget()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                            <option value="custom">Custom...</option>
+                            <option value="ubuntu@192.168.1.126" selected>ubuntu@192.168.1.126 (Production)</option>
+                            <option value="shanta@workstation.local">shanta@workstation.local</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="production-host" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                            Production Server:
+                        </label>
+                        <input type="text" id="production-host" value="ubuntu@192.168.1.126" 
+                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <small style="color: #666;">Format: user@hostname or user@IP</small>
+                    </div>
+
+                    <div>
+                        <label for="ssh-port" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                            SSH Port:
+                        </label>
+                        <input type="number" id="ssh-port" value="22" min="1" max="65535"
+                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+
+                    <div>
+                        <label for="ssh-password" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                            SSH Password:
+                        </label>
+                        <div style="position: relative;">
+                            <input type="password" id="ssh-password" placeholder="Enter SSH password" 
+                                   style="width: 100%; padding: 8px 40px 8px 8px; border: 1px solid #ddd; border-radius: 4px;">
+                            <button onclick="togglePasswordVisibility()" type="button"
+                                    style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #666;">
+                                <i id="password-eye-icon" class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <small style="color: #666;">Stored securely in ~/.comserv/secrets/ssh_credentials.json</small>
+                    </div>
+
+                    <div>
+                        <label for="production-directory" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                            Production Directory:
+                        </label>
+                        <input type="text" id="production-directory" value="~/PycharmProjects/comserv2" 
+                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <small style="color: #666;">Path where docker-compose.yml is located on production server</small>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                    <button onclick="openSSHTerminal()" 
+                        style="padding: 10px 20px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        <i class="fas fa-terminal"></i> Open SSH Terminal
+                    </button>
+
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <button onclick="testSSHConnection()" 
+                            style="padding: 10px 20px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                            <i class="fas fa-network-wired"></i> Test Connection
+                        </button>
+                        <div id="ssh-status-indicator" style="width: 16px; height: 16px; border-radius: 50%; background-color: #ccc; border: 2px solid #999;" 
+                             title="Not tested"></div>
+                    </div>
+
+                    <button onclick="saveDockerImage()" 
+                        style="padding: 10px 20px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        <i class="fas fa-save"></i> Save Image
+                    </button>
+                    
+                    <button onclick="deployToProduction()" 
+                        style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        <i class="fas fa-rocket"></i> Auto Deploy
+                    </button>
+
+                    <button onclick="showDeploymentCommands()" 
+                        style="padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        <i class="fas fa-code"></i> Show Commands
+                    </button>
+                </div>
+
+                <div style="margin-top: 15px; padding: 10px; background-color: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 4px;">
+                    <h5 style="margin: 0 0 8px 0;">
+                        <i class="fas fa-info-circle"></i> Manual Deployment Commands (Copy to SSH Terminal):
+                    </h5>
+                    <div id="quick-commands" style="font-size: 13px; font-family: monospace; background-color: #2d2d2d; color: #00ff00; padding: 12px; border-radius: 4px; margin-top: 10px;">
+
+                        <div style="margin-bottom: 8px; color: #fff; font-weight: bold;">→ Step 1: On Production - Check Disk Space</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('df -h /')" title="Click to copy">
+                            df -h /
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker system df')" title="Click to copy">
+                            sudo docker system df
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker system df -v')" title="Click to copy">
+                            sudo docker system df -v  # Verbose: shows container sizes
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 2: Cleanup Old Containers and Images</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker ps -a | grep comserv')" title="Click to copy">
+                            sudo docker ps -a | grep comserv  # List all comserv containers
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rm comserv2-web-prod-old 2>/dev/null || echo &quot;No old container to remove&quot;')" title="Click to copy">
+                            sudo docker rm comserv2-web-prod-old 2>/dev/null || echo "No old container to remove"
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker image prune -f')" title="Click to copy">
+                            sudo docker image prune -f  # Remove dangling images only (safe)
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 10px; color: #ffaa00; font-size: 11px;">
+                            ⚠ Do NOT run docker system prune -v — it removes named volumes (logs/workshop data)
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 3: Transfer Image via SSH Pipe (Run from Workstation Terminal)</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker save comserv2-web-prod | ssh ubuntu@192.168.1.126 &quot;docker load&quot;')" title="Click to copy">
+                            docker save comserv2-web-prod | ssh ubuntu@192.168.1.126 "docker load"
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 10px; color: #ffaa00; font-size: 11px;">
+                            ⚠ Run from WORKSTATION terminal — not on production server. No sudo needed for docker load.
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 4: Backup Current Container (Creates Rollback Tag)</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker commit comserv2-web-prod comserv2-web-prod:backup-$(date +%s)')" title="Click to copy">
+                            sudo docker commit comserv2-web-prod comserv2-web-prod:backup-$(date +%s)
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 5: Rename Old Container</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rename comserv2-web-prod comserv2-web-prod-old')" title="Click to copy">
+                            sudo docker rename comserv2-web-prod comserv2-web-prod-old
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 6: Stop Old Container</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker stop comserv2-web-prod-old')" title="Click to copy">
+                            sudo docker stop comserv2-web-prod-old
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 6b: Test NFS Reachability (Optional)</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('showmount -e 192.168.1.175 2>/dev/null &amp;&amp; echo &quot;NFS OK&quot; || echo &quot;NFS NOT REACHABLE - use local bind mount instead&quot;')" title="Click to copy">
+                            showmount -e 192.168.1.175 2>/dev/null &amp;&amp; echo "NFS OK" || echo "NFS NOT REACHABLE - use local bind mount instead"
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; color: #ffaa00; font-size: 11px;">
+                            If NFS OK → use Step 7a. If NFS NOT REACHABLE → use Step 7b.
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 7a: Start New Container WITH NFS Volumes</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker volume create --driver local --opt type=nfs --opt o=addr=192.168.1.175,rw,nfsvers=3,soft --opt device=:/mnt/data/comserv/logs comserv-logs 2>/dev/null || true')" title="Click to copy">
+                            sudo docker volume create --driver local --opt type=nfs --opt o=addr=192.168.1.175,rw,nfsvers=3,soft --opt device=:/mnt/data/comserv/logs comserv-logs 2>/dev/null || true
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker volume create --driver local --opt type=nfs --opt o=addr=192.168.1.175,rw,nfsvers=3,soft --opt device=:/mnt/data/comserv/workshop_files comserv-workshop 2>/dev/null || true')" title="Click to copy">
+                            sudo docker volume create --driver local --opt type=nfs --opt o=addr=192.168.1.175,rw,nfsvers=3,soft --opt device=:/mnt/data/comserv/workshop_files comserv-workshop 2>/dev/null || true
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 --log-opt max-size=50m --log-opt max-file=5 -e WORKSHOP_RESOURCES_PATH=/data/nfs -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v comserv-logs:/opt/comserv/root/log -v comserv-workshop:/data/nfs comserv2-web-prod:latest')" title="Click to copy">
+                            sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 --log-opt max-size=50m --log-opt max-file=5 -e WORKSHOP_RESOURCES_PATH=/data/nfs -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v comserv-logs:/opt/comserv/root/log -v comserv-workshop:/data/nfs comserv2-web-prod:latest
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 7b: Start New Container WITHOUT NFS (Local Bind Mount Fallback)</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('mkdir -p /home/ubuntu/comserv-logs /home/ubuntu/comserv-workshop')" title="Click to copy">
+                            mkdir -p /home/ubuntu/comserv-logs /home/ubuntu/comserv-workshop
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 --log-opt max-size=50m --log-opt max-file=5 -e WORKSHOP_RESOURCES_PATH=/data/nfs -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v /home/ubuntu/comserv-logs:/opt/comserv/root/log -v /home/ubuntu/comserv-workshop:/data/nfs comserv2-web-prod:latest')" title="Click to copy">
+                            sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 --log-opt max-size=50m --log-opt max-file=5 -e WORKSHOP_RESOURCES_PATH=/data/nfs -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v /home/ubuntu/comserv-logs:/opt/comserv/root/log -v /home/ubuntu/comserv-workshop:/data/nfs comserv2-web-prod:latest
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 10px; color: #ffaa00; font-size: 11px;">
+                            ⚠ --log-opt limits Docker's own log files. Logs also written to bind-mounted /home/ubuntu/comserv-logs/
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 8: Verify New Container is Healthy</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker ps')" title="Click to copy">
+                            sudo docker ps
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker inspect --format=&quot;{{.State.Health.Status}}&quot; comserv2-web-prod')" title="Click to copy">
+                            sudo docker inspect --format="{{.State.Health.Status}}" comserv2-web-prod
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('curl -s -o /dev/null -w &quot;%{http_code}&quot; http://localhost:3000/')" title="Click to copy">
+                            curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 9: If Successful - Remove Old Container &amp; Cleanup</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rm comserv2-web-prod-old 2>/dev/null || echo &quot;No old container to remove&quot;')" title="Click to copy">
+                            sudo docker rm comserv2-web-prod-old 2>/dev/null || echo "No old container to remove"
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker image prune -f')" title="Click to copy">
+                            sudo docker image prune -f  # Remove dangling images
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker images | grep comserv2-web-prod')" title="Click to copy">
+                            sudo docker images | grep comserv2-web-prod  # List remaining images
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rmi $(sudo docker images -q --filter &quot;reference=comserv2-web-prod&quot; --filter &quot;dangling=false&quot; | tail -n +2) 2>/dev/null || true')" title="Click to copy">
+                            sudo docker rmi $(sudo docker images -q --filter "reference=comserv2-web-prod" --filter "dangling=false" | tail -n +2) 2>/dev/null || true  # Remove old backup tags (keep latest)
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #ff5555; font-weight: bold;">→ ROLLBACK (If New Container Fails):</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker stop comserv2-web-prod 2>/dev/null; sudo docker rm comserv2-web-prod 2>/dev/null; sudo docker rename comserv2-web-prod-old comserv2-web-prod; sudo docker start comserv2-web-prod')" title="Click to copy">
+                            sudo docker stop comserv2-web-prod 2>/dev/null; sudo docker rm comserv2-web-prod 2>/dev/null; sudo docker rename comserv2-web-prod-old comserv2-web-prod; sudo docker start comserv2-web-prod
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Quick Commands:</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker restart comserv2-web-prod')" title="Click to copy">
+                            sudo docker restart comserv2-web-prod  # Restart without rebuild
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker logs --tail 100 comserv2-web-prod')" title="Click to copy">
+                            sudo docker logs --tail 100 comserv2-web-prod  # Last 100 log lines
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker system prune -f')" title="Click to copy">
+                            sudo docker system prune -f  # Cleanup dangling images/stopped containers
+                        </div>
+
+                        <div style="margin-top: 10px; color: #ffc107; font-size: 12px;">
+                            💡 Click any command to copy it to clipboard, then paste in SSH terminal
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div class="row">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header" style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">
-                    <h3 style="margin: 0; display: flex; align-items: center;">
-                        <i class="icon-log" style="margin-right: 10px;"></i>
-                        Output/Logs
-                    </h3>
+    <div class="content-section" style="margin-bottom: 20px;">
+        <div class="card">
+            <div class="card-header collapsible-header" onclick="toggleSection('ssh-terminal-section')" 
+                 style="background-color: #1e1e1e; padding: 15px; border-bottom: 1px solid #444; color: #00ff00;">
+                <h3 style="margin: 0; display: flex; align-items: center; justify-content: space-between;">
+                    <span>
+                        <i class="fas fa-chevron-right chevron-icon" id="chevron-ssh-terminal-section" style="margin-right: 10px; font-size: 0.8em;"></i>
+                        <i class="fas fa-terminal" style="margin-right: 10px;"></i>
+                        SSH Terminal (Embedded)
+                    </span>
+                    <span style="font-size: 14px; background-color: #00ff00; color: #1e1e1e; padding: 4px 10px; border-radius: 3px;">
+                        INTERACTIVE
+                    </span>
+                </h3>
+            </div>
+            <div id="ssh-terminal-section" class="card-body collapsible-content" style="padding: 20px; background-color: #1e1e1e;">
+                <div id="ssh-terminal-info" style="background-color: #17a2b8; border: 1px solid #138496; border-radius: 4px; padding: 15px; margin-bottom: 15px; color: white;">
+                    <p style="margin: 0; font-size: 14px; font-weight: bold;">
+                        ℹ️ Interactive SSH Terminal
+                    </p>
+                    <p style="margin: 10px 0 0 0; font-size: 13px;">
+                        Enter SSH credentials below or use saved credentials from "Test Connection" above.
+                    </p>
                 </div>
-                <div class="card-body" style="padding: 20px;">
-                    <div id="output-box" style="background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; padding: 15px; 
-                        font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;">
-                        Ready for commands...
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #00ff00;">
+                            SSH Target:
+                        </label>
+                        <input type="text" id="ssh-terminal-target" value="ubuntu@192.168.1.126" 
+                               style="width: 100%; padding: 8px; border: 1px solid #00ff00; border-radius: 4px; background-color: #000; color: #00ff00;">
                     </div>
-                    <div style="margin-top: 10px;">
-                        <button onclick="clearOutput()" style="padding: 6px 12px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                            Clear Output
-                        </button>
+                    <div>
+                        <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #00ff00;">
+                            SSH Password:
+                        </label>
+                        <div style="position: relative;">
+                            <input type="password" id="ssh-terminal-password" placeholder="Enter password" 
+                                   style="width: 100%; padding: 8px 40px 8px 8px; border: 1px solid #00ff00; border-radius: 4px; background-color: #000; color: #00ff00;">
+                            <button onclick="toggleSSHTerminalPassword()" type="button"
+                                    style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #00ff00;">
+                                <i id="ssh-terminal-password-eye" class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <small style="color: #ccc;">Leave blank to use saved credentials</small>
                     </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center;">
+                    <button id="ssh-connect-btn" onclick="connectSSHTerminal()" 
+                        style="padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        <i class="fas fa-play"></i> Connect
+                    </button>
+                    <button id="ssh-disconnect-btn" onclick="disconnectSSHTerminal()" disabled
+                        style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: not-allowed; font-weight: bold; opacity: 0.5;">
+                        <i class="fas fa-stop"></i> Disconnect
+                    </button>
+                    <div id="ssh-connection-status" style="margin-left: 10px; color: #ccc; font-size: 14px;">
+                        <i class="fas fa-circle" style="color: #6c757d;"></i> Disconnected
+                    </div>
+                </div>
+
+                <div id="ssh-terminal-container" style="background-color: #000; border: 2px solid #00ff00; border-radius: 4px; height: 500px; padding: 10px;">
+                    <div id="ssh-xterm-terminal"></div>
+                </div>
+
+                <div style="margin-top: 15px; padding: 12px; background-color: #2d2d2d; border-radius: 4px; color: #ccc; font-family: monospace; font-size: 13px;">
+                    <div style="margin-bottom: 10px; color: #00ff00;"><strong>Alternative - Use PyCharm Terminal:</strong></div>
+                    <div>1. PyCharm → Tools → Start SSH Session</div>
+                    <div>2. Enter: <code style="color: #ff0;">ubuntu@192.168.1.126</code></div>
+                    <div>3. Enter password when prompted</div>
+                    <div>4. Copy commands from "Manual Deployment Commands" section above</div>
+                    <div style="margin-top: 10px; color: #ff0;">Or click "Auto Deploy" for fully automated deployment</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-section" style="margin-bottom: 20px;">
+        <div class="card">
+            <div class="card-header collapsible-header" onclick="toggleSection('output-console-section')" 
+                 style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">
+                <h3 style="margin: 0; display: flex; align-items: center;">
+                    <i class="fas fa-chevron-right chevron-icon" id="chevron-output-console-section" style="margin-right: 10px; font-size: 0.8em;"></i>
+                    <i class="icon-log" style="margin-right: 10px;"></i>
+                    Output/Logs
+                </h3>
+            </div>
+            <div id="output-console-section" class="card-body collapsible-content" style="padding: 20px;">
+                <div id="output-box" style="background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; padding: 15px; 
+                    font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;">
+                    Ready for commands...
+                </div>
+                <div style="margin-top: 10px;">
+                    <button onclick="clearOutput()" style="padding: 6px 12px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Clear Output
+                    </button>
                 </div>
             </div>
         </div>
@@ -126,6 +520,35 @@
 
     [% END %]
 </div>
+
+<script>
+    // Toggle collapsible sections
+    function toggleSection(sectionId) {
+        const content = document.getElementById(sectionId);
+        const chevron = document.getElementById('chevron-' + sectionId);
+        
+        if (content && chevron) {
+            content.classList.toggle('expanded');
+            chevron.classList.toggle('expanded');
+        }
+    }
+
+    // Auto-expand Container Status and Volume Status on page load
+    window.addEventListener('DOMContentLoaded', function() {
+        const statusSection = document.getElementById('container-status');
+        const statusChevron = document.getElementById('chevron-container-status');
+        if (statusSection && statusChevron) {
+            statusSection.classList.add('expanded');
+            statusChevron.classList.add('expanded');
+        }
+        const volSection = document.getElementById('volumes-status');
+        const volChevron = document.getElementById('chevron-volumes-status');
+        if (volSection && volChevron) {
+            volSection.classList.add('expanded');
+            volChevron.classList.add('expanded');
+        }
+    });
+</script>
 
 <script>
     const outputBox = document.getElementById('output-box');
@@ -202,6 +625,70 @@
             });
     }
 
+    function refreshVolumes() {
+        const volumesList = document.getElementById('volumes-list');
+        volumesList.innerHTML = '<p style="color: #666; text-align: center;">Loading volume information...</p>';
+
+        fetch('/admin/docker-volumes')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    volumesList.innerHTML = `<p style="color: #dc3545; text-align: center;">Error: ${data.error}</p>`;
+                    return;
+                }
+                displayVolumes(data.volumes);
+            })
+            .catch(error => {
+                volumesList.innerHTML = `<p style="color: #dc3545; text-align: center;">Error loading volumes: ${error.message}</p>`;
+            });
+    }
+
+    function displayVolumes(volumes) {
+        const volumesList = document.getElementById('volumes-list');
+        if (!volumes || volumes.length === 0) {
+            volumesList.innerHTML = '<p style="color: #666; text-align: center;">No volumes found</p>';
+            return;
+        }
+
+        let html = '';
+        volumes.forEach(vol => {
+            const isNfs    = vol.is_nfs === true || vol.is_nfs == 1;
+            const typeLabel = isNfs ? 'NFS' : (vol.driver || 'local');
+            const typeColor = isNfs ? '#17a2b8' : '#6c757d';
+            const typeIcon  = isNfs ? '🌐' : '💾';
+
+            const mountDisplay = vol.mountpoint
+                ? `<div style="font-size: 12px; color: #666; margin-bottom: 4px;"><strong>Mountpoint:</strong> <code style="font-size: 11px;">${vol.mountpoint}</code></div>`
+                : '';
+
+            const nfsDetail = isNfs
+                ? `<div style="font-size: 12px; color: #17a2b8; margin-bottom: 4px;">
+                       <strong>NFS Server:</strong> ${vol.nfs_server || 'unknown'}
+                       &nbsp;|&nbsp;
+                       <strong>Export:</strong> ${vol.nfs_device || 'unknown'}
+                   </div>`
+                : '';
+
+            const labelsDisplay = vol.labels
+                ? `<div style="font-size: 11px; color: #999; margin-bottom: 4px;"><strong>Labels:</strong> ${vol.labels}</div>`
+                : '';
+
+            html += `
+                <div style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; background-color: #fff;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <strong style="font-size: 14px;">${typeIcon} ${vol.name}</strong>
+                        <span style="background-color: ${typeColor}; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px;">${typeLabel}</span>
+                    </div>
+                    ${nfsDetail}
+                    ${mountDisplay}
+                    ${labelsDisplay}
+                    <div style="font-size: 11px; color: #999;"><strong>Scope:</strong> ${vol.scope || 'local'}</div>
+                </div>`;
+        });
+
+        volumesList.innerHTML = html;
+    }
+
     function displayContainers(containers) {
         if (!containers || containers.length === 0) {
             containersList.innerHTML = '<p style="color: #666; text-align: center;">No containers found</p>';
@@ -262,6 +749,10 @@
                                     style="padding: 6px 12px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     ↻ Restart
                                 </button>
+                                <button onclick="rebuildContainerDirect('${container.service}')"
+                                    style="padding: 6px 12px; background-color: #ffc107; color: #333; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    🔨 Rebuild
+                                </button>
                                 <button onclick="viewLogsDirect('${container.service}')"
                                     style="padding: 6px 12px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     📋 Logs
@@ -271,9 +762,9 @@
                                     style="padding: 6px 12px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     ▶ Start
                                 </button>
-                                <button onclick="restartContainerDirect('${container.service}')"
-                                    style="padding: 6px 12px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                                    ↻ Restart
+                                <button onclick="rebuildContainerDirect('${container.service}')"
+                                    style="padding: 6px 12px; background-color: #ffc107; color: #333; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    🔨 Rebuild
                                 </button>
                                 <button onclick="viewLogsDirect('${container.service}')"
                                     style="padding: 6px 12px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
@@ -406,6 +897,155 @@
             });
     }
 
+    function rebuildContainerDirect(service) {
+        if (!confirm(`Are you sure you want to rebuild ${service}? This will take 2-5 minutes and stop the container.`)) {
+            return;
+        }
+
+        appendOutput(`⏳ Rebuilding ${service}... This may take several minutes.\n`);
+        appendOutput(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+        
+        // Disable rebuild buttons during rebuild
+        disableRebuildButtons();
+
+        fetch(`/admin/docker-rebuild/${service}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                    appendOutput(`✓ ${service} rebuilt successfully!\n`);
+                    appendOutput(`\nBuild output (last 50 lines):\n`);
+                    const lines = (data.stdout || '').split('\n');
+                    appendOutput(lines.slice(-50).join('\n'));
+                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                    appendOutput(`⏳ Starting ${service}...\n`);
+                    // Auto-start after rebuild
+                    return fetch(`/admin/docker-up/${service}`);
+                } else {
+                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                    appendOutput(`✗ Failed to rebuild ${service}:\n`);
+                    appendOutput((data.stderr || data.error || 'Unknown error') + '\n');
+                    enableRebuildButtons();
+                    throw new Error('Rebuild failed');
+                }
+            })
+            .then(response => response ? response.json() : null)
+            .then(data => {
+                if (data && data.success) {
+                    appendOutput(`✓ ${service} started successfully!\n`);
+                    setTimeout(() => {
+                        refreshContainers();
+                        enableRebuildButtons();
+                    }, 2000);
+                } else if (data) {
+                    appendOutput(`✗ Failed to start ${service} after rebuild\n`);
+                    enableRebuildButtons();
+                }
+            })
+            .catch(error => {
+                if (error.message !== 'Rebuild failed') {
+                    appendOutput(`Error: ${error.message}\n`);
+                }
+                enableRebuildButtons();
+            });
+    }
+
+    function disableRebuildButtons() {
+        document.querySelectorAll('button[onclick*="rebuild"]').forEach(btn => {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+        });
+    }
+
+    function enableRebuildButtons() {
+        document.querySelectorAll('button[onclick*="rebuild"]').forEach(btn => {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        });
+    }
+
+    function rebuildContainer() {
+        const service = getSelectedService();
+        if (!service) return;
+
+        if (!confirm(`Are you sure you want to rebuild ${service}? This will take 2-5 minutes.`)) {
+            return;
+        }
+
+        appendOutput(`⏳ Rebuilding ${service}... This may take several minutes.\n`);
+        appendOutput(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+        
+        disableRebuildButtons();
+
+        fetch(`/admin/docker-rebuild/${service}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                    appendOutput(`✓ Rebuild successful!\n`);
+                    appendOutput(`\nBuild output (last 50 lines):\n`);
+                    const lines = (data.stdout || '').split('\n');
+                    appendOutput(lines.slice(-50).join('\n'));
+                    setTimeout(() => {
+                        refreshContainers();
+                        enableRebuildButtons();
+                    }, 2000);
+                } else {
+                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                    appendOutput(`✗ Rebuild failed:\n`);
+                    appendOutput((data.stderr || data.error || 'Unknown error') + '\n');
+                    enableRebuildButtons();
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}\n`);
+                enableRebuildButtons();
+            });
+    }
+
+    function pruneDockerSystem() {
+        if (!confirm('Remove all stopped containers, dangling images, and unused networks? This will free up disk space.')) {
+            return;
+        }
+
+        appendOutput(`⏳ Cleaning up Docker system...\n`);
+
+        fetch('/admin/docker-prune')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success || data.output) {
+                    appendOutput(`✓ Cleanup complete!\n\n`);
+                    appendOutput(data.output || 'No output\n');
+                    setTimeout(refreshContainers, 1000);
+                } else {
+                    appendOutput(`✗ Cleanup failed:\n${data.error || 'Unknown error'}\n`);
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}\n`);
+            });
+    }
+
+    function showDiskUsage() {
+        appendOutput(`⏳ Fetching Docker disk usage...\n`);
+
+        fetch('/admin/docker-system-df')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success || data.output) {
+                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                    appendOutput(`💾 Docker Disk Usage:\n\n`);
+                    appendOutput(data.output || 'No data available\n');
+                    appendOutput(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                } else {
+                    appendOutput(`✗ Failed to get disk usage:\n${data.error || 'Unknown error'}\n`);
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}\n`);
+            });
+    }
+
     function checkStatus() {
         const service = getSelectedService();
         if (!service) return;
@@ -484,9 +1124,568 @@
             });
     }
 
+    function saveDockerImage() {
+        const service = document.getElementById('deploy-service-select').value;
+        
+        if (!confirm(`Save ${service} Docker image to local tar file?`)) {
+            return;
+        }
+
+        appendOutput(`⏳ Saving Docker image: ${service}...\n`);
+
+        fetch(`/admin/docker-save-image/${service}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    appendOutput(`✓ Image saved successfully!\n`);
+                    appendOutput(`Location: ${data.tar_file}\n`);
+                    appendOutput(data.output || '');
+                } else {
+                    appendOutput(`✗ Failed to save image:\n${data.error || data.output || 'Unknown error'}\n`);
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}\n`);
+            });
+    }
+
+    function updateSSHTarget() {
+        const select = document.getElementById('ssh-target-select');
+        const input = document.getElementById('production-host');
+        
+        if (select.value !== 'custom') {
+            input.value = select.value;
+        }
+    }
+
+    function togglePasswordVisibility() {
+        const passwordField = document.getElementById('ssh-password');
+        const eyeIcon = document.getElementById('password-eye-icon');
+        
+        if (passwordField.type === 'password') {
+            passwordField.type = 'text';
+            eyeIcon.className = 'fas fa-eye-slash';
+        } else {
+            passwordField.type = 'password';
+            eyeIcon.className = 'fas fa-eye';
+        }
+    }
+
+    function updateSSHStatusIndicator(status) {
+        const indicator = document.getElementById('ssh-status-indicator');
+        if (!indicator) return;
+        
+        if (status === 'success') {
+            indicator.style.backgroundColor = '#28a745';
+            indicator.style.borderColor = '#1e7e34';
+            indicator.title = 'SSH connection successful';
+        } else if (status === 'failed') {
+            indicator.style.backgroundColor = '#dc3545';
+            indicator.style.borderColor = '#c82333';
+            indicator.title = 'SSH connection failed';
+        } else if (status === 'testing') {
+            indicator.style.backgroundColor = '#ffc107';
+            indicator.style.borderColor = '#e0a800';
+            indicator.title = 'Testing connection...';
+        } else {
+            indicator.style.backgroundColor = '#ccc';
+            indicator.style.borderColor = '#999';
+            indicator.title = 'Not tested';
+        }
+    }
+
+    function testSSHConnection(event) {
+        // Prevent any default form submission behavior
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        const sshTarget = document.getElementById('production-host').value.trim();
+        const sshPort = document.getElementById('ssh-port').value;
+        const sshPassword = document.getElementById('ssh-password').value;
+
+        if (!sshTarget) {
+            alert('Please enter SSH target (user@host)');
+            return false;
+        }
+
+        if (!sshPassword) {
+            alert('Please enter SSH password to test connection');
+            return false;
+        }
+
+        // Update indicator to testing state
+        updateSSHStatusIndicator('testing');
+
+        // Expand output console if collapsed
+        const outputSection = document.getElementById('output-console-section');
+        const outputChevron = document.getElementById('chevron-output-console-section');
+        if (outputSection && !outputSection.classList.contains('expanded')) {
+            outputSection.classList.add('expanded');
+            if (outputChevron) outputChevron.classList.add('expanded');
+        }
+
+        appendOutput(`\n${'='.repeat(80)}\n`);
+        appendOutput(`🔌 Testing SSH connection to ${sshTarget}:${sshPort}...\n`);
+        appendOutput(`${'='.repeat(80)}\n`);
+        
+        const formData = new FormData();
+        formData.append('ssh_target', sshTarget);
+        formData.append('ssh_port', sshPort);
+        formData.append('ssh_password', sshPassword);
+        formData.append('save_credentials', 'yes');
+
+        fetch('/admin/docker-test-ssh', {
+            method: 'POST',
+            body: new URLSearchParams(formData)
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                appendOutput(`\n`);
+                if (data.success) {
+                    appendOutput(`✅ SSH CONNECTION SUCCESSFUL\n`);
+                    appendOutput(`${'='.repeat(80)}\n`);
+                    appendOutput(data.output || 'Connection OK\n');
+                    if (data.credentials_saved) {
+                        appendOutput(`\n✓ Credentials saved to ${data.credentials_path}\n`);
+                    }
+                    updateSSHStatusIndicator('success');
+                } else {
+                    appendOutput(`❌ SSH CONNECTION FAILED\n`);
+                    appendOutput(`${'='.repeat(80)}\n`);
+                    appendOutput((data.output || data.error || 'Unknown error') + '\n');
+                    updateSSHStatusIndicator('failed');
+                }
+                appendOutput(`${'='.repeat(80)}\n\n`);
+            })
+            .catch(error => {
+                appendOutput(`\n❌ CONNECTION TEST ERROR\n`);
+                appendOutput(`${'='.repeat(80)}\n`);
+                appendOutput(`Error: ${error.message}\n`);
+                appendOutput(`${'='.repeat(80)}\n\n`);
+                updateSSHStatusIndicator('failed');
+            });
+
+        return false; // Prevent any form submission
+    }
+
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            // Show temporary success message
+            const msg = document.createElement('div');
+            msg.textContent = '✓ Copied to clipboard!';
+            msg.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #28a745; color: white; padding: 12px 24px; border-radius: 4px; z-index: 10000; font-weight: bold;';
+            document.body.appendChild(msg);
+            setTimeout(() => msg.remove(), 2000);
+        }).catch(err => {
+            alert('Failed to copy: ' + err);
+        });
+    }
+
+    // SSH Terminal WebSocket connection
+    let sshTerminal = null;
+    let sshWebSocket = null;
+    let sshFitAddon = null;
+
+    function updateSSHConnectionStatus(status, message) {
+        const statusDiv = document.getElementById('ssh-connection-status');
+        const connectBtn = document.getElementById('ssh-connect-btn');
+        const disconnectBtn = document.getElementById('ssh-disconnect-btn');
+        
+        if (status === 'connected') {
+            statusDiv.innerHTML = '<i class="fas fa-circle" style="color: #28a745;"></i> ' + message;
+            connectBtn.disabled = true;
+            connectBtn.style.opacity = '0.5';
+            connectBtn.style.cursor = 'not-allowed';
+            disconnectBtn.disabled = false;
+            disconnectBtn.style.opacity = '1';
+            disconnectBtn.style.cursor = 'pointer';
+        } else if (status === 'connecting') {
+            statusDiv.innerHTML = '<i class="fas fa-circle" style="color: #ffc107;"></i> ' + message;
+            connectBtn.disabled = true;
+            connectBtn.style.opacity = '0.5';
+            connectBtn.style.cursor = 'not-allowed';
+        } else if (status === 'error') {
+            statusDiv.innerHTML = '<i class="fas fa-circle" style="color: #dc3545;"></i> ' + message;
+            connectBtn.disabled = false;
+            connectBtn.style.opacity = '1';
+            connectBtn.style.cursor = 'pointer';
+            disconnectBtn.disabled = true;
+            disconnectBtn.style.opacity = '0.5';
+            disconnectBtn.style.cursor = 'not-allowed';
+        } else {
+            statusDiv.innerHTML = '<i class="fas fa-circle" style="color: #6c757d;"></i> Disconnected';
+            connectBtn.disabled = false;
+            connectBtn.style.opacity = '1';
+            connectBtn.style.cursor = 'pointer';
+            disconnectBtn.disabled = true;
+            disconnectBtn.style.opacity = '0.5';
+            disconnectBtn.style.cursor = 'not-allowed';
+        }
+    }
+
+    function toggleSSHTerminalPassword() {
+        const passwordField = document.getElementById('ssh-terminal-password');
+        const eyeIcon = document.getElementById('ssh-terminal-password-eye');
+        
+        if (passwordField.type === 'password') {
+            passwordField.type = 'text';
+            eyeIcon.className = 'fas fa-eye-slash';
+        } else {
+            passwordField.type = 'password';
+            eyeIcon.className = 'fas fa-eye';
+        }
+    }
+
+    function connectSSHTerminal() {
+        // Try terminal section fields first, fallback to production deployment fields
+        let sshTarget = document.getElementById('ssh-terminal-target').value.trim();
+        let sshPassword = document.getElementById('ssh-terminal-password').value;
+        
+        // If terminal fields are empty, use production deployment fields
+        if (!sshTarget) {
+            sshTarget = document.getElementById('production-host').value.trim();
+        }
+        if (!sshPassword) {
+            sshPassword = document.getElementById('ssh-password').value;
+        }
+        
+        const sshPort = document.getElementById('ssh-port').value || 22;
+
+        if (!sshTarget) {
+            alert('Please enter SSH target (user@host) in either SSH Terminal section or Production Deployment section above');
+            return;
+        }
+
+        if (!sshPassword) {
+            alert('Please enter SSH password in the field above, or use "Test Connection" in Production Deployment section to save credentials');
+            return;
+        }
+
+        updateSSHConnectionStatus('connecting', 'Connecting...');
+
+        // Initialize xterm.js terminal
+        if (!sshTerminal) {
+            sshTerminal = new Terminal({
+                cursorBlink: true,
+                fontSize: 14,
+                fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+                theme: {
+                    background: '#000000',
+                    foreground: '#00ff00'
+                },
+                rows: 30,
+                cols: 100
+            });
+
+            sshFitAddon = new FitAddon.FitAddon();
+            sshTerminal.loadAddon(sshFitAddon);
+
+            const terminalContainer = document.getElementById('ssh-xterm-terminal');
+            sshTerminal.open(terminalContainer);
+            sshFitAddon.fit();
+
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                if (sshFitAddon) {
+                    sshFitAddon.fit();
+                }
+            });
+        }
+
+        // Build WebSocket URL
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/admin/docker-ssh-terminal?ssh_target=${encodeURIComponent(sshTarget)}&ssh_port=${sshPort}&ssh_password=${encodeURIComponent(sshPassword)}`;
+
+        // Create WebSocket connection
+        sshWebSocket = new WebSocket(wsUrl);
+
+        sshWebSocket.onopen = function() {
+            updateSSHConnectionStatus('connected', 'Connected');
+            sshTerminal.writeln('\r\n\x1b[32m✓ Connected to ' + sshTarget + '\x1b[0m\r\n');
+        };
+
+        sshWebSocket.onmessage = function(event) {
+            if (event.data instanceof Blob) {
+                event.data.arrayBuffer().then(buffer => {
+                    const text = new TextDecoder().decode(buffer);
+                    sshTerminal.write(text);
+                });
+            } else {
+                sshTerminal.write(event.data);
+            }
+        };
+
+        sshWebSocket.onerror = function(error) {
+            updateSSHConnectionStatus('error', 'Connection Error');
+            sshTerminal.writeln('\r\n\x1b[31m✗ Connection error\x1b[0m\r\n');
+        };
+
+        sshWebSocket.onclose = function() {
+            updateSSHConnectionStatus('disconnected', 'Disconnected');
+            sshTerminal.writeln('\r\n\x1b[33m✓ Connection closed\x1b[0m\r\n');
+            sshWebSocket = null;
+        };
+
+        // Send keyboard input to WebSocket
+        sshTerminal.onData(data => {
+            if (sshWebSocket && sshWebSocket.readyState === WebSocket.OPEN) {
+                sshWebSocket.send(data);
+            }
+        });
+    }
+
+    function disconnectSSHTerminal() {
+        if (sshWebSocket) {
+            sshWebSocket.close();
+            sshWebSocket = null;
+        }
+        updateSSHConnectionStatus('disconnected', 'Disconnected');
+    }
+
+    function showDeploymentCommands() {
+        const service = document.getElementById('deploy-service-select').value;
+        const sshTarget = document.getElementById('production-host').value.trim();
+        const imageName = `comserv2-${service}`;
+
+        appendOutput(`\n${'='.repeat(80)}\n`);
+        appendOutput(`📋 MANUAL DEPLOYMENT COMMANDS\n`);
+        appendOutput(`${'='.repeat(80)}\n`);
+        appendOutput(`Service: ${service}\n`);
+        appendOutput(`Target: ${sshTarget}\n`);
+        appendOutput(`Image: ${imageName}\n`);
+        appendOutput(`${'='.repeat(80)}\n\n`);
+
+        appendOutput(`═══════════════════════════════════════════════════════════════════\n`);
+        appendOutput(`OPTION 1: Direct Copy via SSH Pipe (Recommended - No temp files)\n`);
+        appendOutput(`═══════════════════════════════════════════════════════════════════\n\n`);
+
+        appendOutput(`# Step 1: Verify image exists locally\n`);
+        appendOutput(`docker images | grep ${imageName}\n\n`);
+
+        appendOutput(`# Step 2: Transfer image directly via SSH pipe\n`);
+        appendOutput(`docker save ${imageName} | ssh ${sshTarget} "docker load"\n\n`);
+
+        appendOutput(`# Step 3: SSH to production and run container\n`);
+        appendOutput(`ssh ${sshTarget}\n\n`);
+
+        appendOutput(`# On production server:\n`);
+        appendOutput(`cd ~/PycharmProjects/comserv2\n\n`);
+
+        appendOutput(`# Stop old container\n`);
+        appendOutput(`docker compose stop ${service}\n\n`);
+
+        appendOutput(`# Start new container (force recreate)\n`);
+        appendOutput(`docker compose up -d --force-recreate ${service}\n\n`);
+
+        appendOutput(`# Verify it's running\n`);
+        appendOutput(`docker compose ps\n`);
+        appendOutput(`docker logs comserv-${service} --tail=50 --follow\n\n`);
+
+        appendOutput(`═══════════════════════════════════════════════════════════════════\n`);
+        appendOutput(`OPTION 2: File Transfer Method (If SSH pipe fails)\n`);
+        appendOutput(`═══════════════════════════════════════════════════════════════════\n\n`);
+
+        appendOutput(`# Step 1: Save image to tar file\n`);
+        appendOutput(`docker save -o /tmp/${imageName}.tar ${imageName}\n\n`);
+
+        appendOutput(`# Step 2: Copy to production server\n`);
+        appendOutput(`scp /tmp/${imageName}.tar ${sshTarget}:/tmp/\n\n`);
+
+        appendOutput(`# Step 3: SSH to production\n`);
+        appendOutput(`ssh ${sshTarget}\n\n`);
+
+        appendOutput(`# On production server:\n`);
+        appendOutput(`docker load -i /tmp/${imageName}.tar\n`);
+        appendOutput(`cd ~/PycharmProjects/comserv2\n`);
+        appendOutput(`docker compose stop ${service}\n`);
+        appendOutput(`docker compose up -d --force-recreate ${service}\n`);
+        appendOutput(`docker compose ps\n\n`);
+
+        appendOutput(`# Cleanup\n`);
+        appendOutput(`rm /tmp/${imageName}.tar\n\n`);
+
+        appendOutput(`═══════════════════════════════════════════════════════════════════\n`);
+        appendOutput(`BACKUP & ROLLBACK\n`);
+        appendOutput(`═══════════════════════════════════════════════════════════════════\n\n`);
+
+        appendOutput(`# Before deployment, create backup:\n`);
+        appendOutput(`ssh ${sshTarget} "docker commit comserv-${service} ${imageName}:backup-$(date +%s)"\n\n`);
+
+        appendOutput(`# If deployment fails, rollback:\n`);
+        appendOutput(`ssh ${sshTarget}\n`);
+        appendOutput(`cd ~/PycharmProjects/comserv2\n`);
+        appendOutput(`docker compose stop ${service}\n`);
+        appendOutput(`docker tag ${imageName}:backup-TIMESTAMP ${imageName}:latest\n`);
+        appendOutput(`docker compose up -d ${service}\n\n`);
+
+        appendOutput(`${'='.repeat(80)}\n`);
+        appendOutput(`NOTE: Use 'docker compose' (space), not 'docker-compose' (hyphen)\n`);
+        appendOutput(`${'='.repeat(80)}\n\n`);
+    }
+
+    function deployToProduction() {
+        const sshTarget = document.getElementById('production-host').value.trim();
+        const sshPort = document.getElementById('ssh-port').value;
+        const sshPassword = document.getElementById('ssh-password').value;
+        const productionDir = document.getElementById('production-directory').value.trim();
+        const service = document.getElementById('deploy-service-select').value;
+
+        if (!sshTarget) {
+            alert('Please enter SSH target (user@host)');
+            return;
+        }
+
+        if (!sshPassword) {
+            alert('Please enter SSH password for deployment');
+            return;
+        }
+
+        if (!productionDir) {
+            alert('Please enter production directory path');
+            return;
+        }
+
+        const confirmMsg = `⚠️ PRODUCTION DEPLOYMENT\n\n` +
+                          `Service: ${service}\n` +
+                          `Target: ${sshTarget}:${sshPort}\n` +
+                          `Directory: ${productionDir}\n\n` +
+                          `This will:\n` +
+                          `1. Export Docker image\n` +
+                          `2. Copy to production server via SSH\n` +
+                          `3. Backup existing container\n` +
+                          `4. Stop production container\n` +
+                          `5. Load and start new container\n` +
+                          `6. Rollback automatically if health check fails\n\n` +
+                          `Continue?`;
+
+        if (!confirm(confirmMsg)) {
+            return;
+        }
+
+        appendOutput(`\n${'='.repeat(80)}\n`);
+        appendOutput(`🚀 PRODUCTION DEPLOYMENT STARTED\n`);
+        appendOutput(`${'='.repeat(80)}\n`);
+        appendOutput(`Service: ${service}\n`);
+        appendOutput(`Target: ${sshTarget}:${sshPort}\n`);
+        appendOutput(`Time: ${new Date().toLocaleString()}\n`);
+        appendOutput(`${'='.repeat(80)}\n\n`);
+
+        const formData = new FormData();
+        formData.append('ssh_target', sshTarget);
+        formData.append('ssh_port', sshPort);
+        formData.append('ssh_password', sshPassword);
+        formData.append('production_directory', productionDir);
+        formData.append('service', service);
+
+        fetch('/admin/docker-deploy-to-production', {
+            method: 'POST',
+            body: new URLSearchParams(formData)
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    appendOutput(`\n${'='.repeat(80)}\n`);
+                    appendOutput(`✅ DEPLOYMENT SUCCESSFUL\n`);
+                    appendOutput(`${'='.repeat(80)}\n`);
+                    appendOutput(data.output || '');
+                } else {
+                    appendOutput(`\n${'='.repeat(80)}\n`);
+                    appendOutput(`❌ DEPLOYMENT FAILED\n`);
+                    appendOutput(`${'='.repeat(80)}\n`);
+                    appendOutput(data.output || data.error || 'Unknown error');
+                }
+                appendOutput(`\n${'='.repeat(80)}\n`);
+            })
+            .catch(error => {
+                appendOutput(`\n${'='.repeat(80)}\n`);
+                appendOutput(`❌ DEPLOYMENT ERROR\n`);
+                appendOutput(`${'='.repeat(80)}\n`);
+                appendOutput(`Error: ${error.message}\n`);
+                appendOutput(`${'='.repeat(80)}\n`);
+            });
+    }
+
+    function openSSHTerminal() {
+        const sshTarget = document.getElementById('production-host').value.trim();
+        
+        if (!sshTarget) {
+            alert('Please enter SSH target (user@host)');
+            return;
+        }
+
+        // Open SSH terminal in new window on port 3001
+        const terminalUrl = `http://workstation.local:3001/?ssh=${encodeURIComponent(sshTarget)}`;
+        const terminalWindow = window.open(
+            terminalUrl,
+            'SSH Terminal - ' + sshTarget,
+            'width=1000,height=600,menubar=no,toolbar=no,location=no,status=no'
+        );
+
+        if (terminalWindow) {
+            appendOutput(`\n🖥️ SSH Terminal opened in new window: ${sshTarget}\n`);
+            appendOutput(`URL: ${terminalUrl}\n`);
+            appendOutput(`If window was blocked, allow popups and try again.\n\n`);
+        } else {
+            alert('Popup blocked! Please allow popups for this site.\n\nAlternatively, manually open: ' + terminalUrl);
+        }
+    }
+
+    function openSSHTerminalWindow() {
+        const terminalUrl = 'http://workstation.local:3001/';
+        
+        const termWin = window.open(
+            terminalUrl,
+            'SSH Terminal - ubuntu@192.168.1.126',
+            'width=1200,height=700,menubar=no,toolbar=no,location=no,scrollbars=yes'
+        );
+
+        if (termWin) {
+            appendOutput(`\n🖥️ SSH Terminal opened in new window\n`);
+            appendOutput(`URL: ${terminalUrl}\n`);
+            appendOutput(`Target: ubuntu@192.168.1.126\n\n`);
+        } else {
+            alert('Popup blocked! Please allow popups for this site.\n\nAlternatively, open manually: ' + terminalUrl);
+        }
+    }
+
+    function embedSSHTerminal() {
+        const embedDiv = document.getElementById('ssh-terminal-embed');
+        const iframe = document.getElementById('ssh-terminal-iframe');
+        const sshTarget = document.getElementById('production-host').value.trim() || 'ubuntu@192.168.1.126';
+        
+        const parts = sshTarget.split('@');
+        const username = parts[0] || 'ubuntu';
+        const hostname = parts[1] || '192.168.1.126';
+        
+        iframe.src = `http://workstation.local:3001/?hostname=${encodeURIComponent(hostname)}&username=${encodeURIComponent(username)}`;
+        embedDiv.style.display = 'block';
+
+        // Expand SSH terminal section
+        const sshSection = document.getElementById('ssh-terminal-section');
+        const sshChevron = document.getElementById('chevron-ssh-terminal-section');
+        if (sshSection && !sshSection.classList.contains('expanded')) {
+            sshSection.classList.add('expanded');
+            if (sshChevron) sshChevron.classList.add('expanded');
+        }
+
+        appendOutput(`\n🖥️ SSH Terminal embedded below\n`);
+        appendOutput(`Target: ${sshTarget}\n\n`);
+    }
+
     // Initialize - load containers on page load
     document.addEventListener('DOMContentLoaded', function() {
         refreshContainers();
+        refreshVolumes();
+
+        // Auto-check SSH terminal service status
+        checkSSHTerminalService();
     });
 </script>
 

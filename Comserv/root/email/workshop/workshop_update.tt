@@ -1,0 +1,39 @@
+<h2>Workshop Update: [% workshop_title %]</h2>
+
+<p>Hello [% name || 'Participant' %],</p>
+
+<p>There has been an update to the workshop you're registered for:</p>
+
+<div style="background-color: #f5f5f5; padding: 15px; margin: 10px 0; border-left: 4px solid #17a2b8;">
+    <h3 style="margin-top: 0;">[% workshop_title %]</h3>
+    <ul style="list-style: none; padding: 0;">
+        <li><strong>Instructor:</strong> [% workshop_instructor %]</li>
+        <li><strong>Date:</strong> [% workshop_date %]</li>
+        <li><strong>Time:</strong> [% workshop_time %][% IF workshop_end_time %] - [% workshop_end_time %][% END %]</li>
+        <li><strong>Location:</strong> [% workshop_location %]</li>
+    </ul>
+</div>
+
+<div style="background-color: #d1ecf1; padding: 15px; margin: 10px 0; border-left: 4px solid #17a2b8;">
+    <h4 style="margin-top: 0;">Update Details:</h4>
+    [% update_message %]
+</div>
+
+[% IF changes %]
+<div style="background-color: #fff3cd; padding: 15px; margin: 10px 0;">
+    <p style="margin-top: 0;"><strong>What's Changed:</strong></p>
+    <ul>
+    [% FOREACH change IN changes %]
+        <li>[% change %]</li>
+    [% END %]
+    </ul>
+</div>
+[% END %]
+
+<p>To view the latest workshop details and materials, please visit:</p>
+<p><a href="[% workshop_url %]">[% workshop_url %]</a></p>
+
+<p>If you have any questions or concerns about these changes, please don't hesitate to contact us.</p>
+
+<p>Best regards,<br>
+The Workshop Team</p>

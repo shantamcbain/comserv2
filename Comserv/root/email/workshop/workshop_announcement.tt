@@ -1,0 +1,27 @@
+<h2>Workshop Announcement: [% workshop_title %]</h2>
+
+<p>Hello [% name || 'Participant' %],</p>
+
+<p>This is an announcement regarding the workshop you're registered for:</p>
+
+<div style="background-color: #f5f5f5; padding: 15px; margin: 10px 0; border-left: 4px solid #007bff;">
+    <h3 style="margin-top: 0;">[% workshop_title %]</h3>
+    <ul style="list-style: none; padding: 0;">
+        <li><strong>Instructor:</strong> [% workshop_instructor %]</li>
+        <li><strong>Date:</strong> [% workshop_date %]</li>
+        <li><strong>Time:</strong> [% workshop_time %][% IF workshop_end_time %] - [% workshop_end_time %][% END %]</li>
+        <li><strong>Location:</strong> [% workshop_location %]</li>
+    </ul>
+</div>
+
+<div style="background-color: #ffffff; padding: 15px; margin: 10px 0; border: 1px solid #ddd;">
+    [% message_body %]
+</div>
+
+<p>To view workshop details and materials, please visit:</p>
+<p><a href="[% workshop_url %]">[% workshop_url %]</a></p>
+
+<p>If you have any questions, please don't hesitate to contact us.</p>
+
+<p>Best regards,<br>
+The Workshop Team</p>

@@ -3,6 +3,7 @@
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
  [% END %]
+[% INCLUDE 'ENCY/ImageHelper.tt' %]
 
 
 [% IF error_message %]
@@ -36,8 +37,8 @@
     <label for="ident_character">Identifying Character:</label><br>
     <textarea id="ident_character" name="ident_character" required></textarea><br>
 
-    <label for="image">Image URL:</label><br>
-    <input type="url" id="image" name="image" maxlength="200" required><br>
+    <label for="image">Image:</label><br>
+    [% ency_img_picker('image', '') %]<br>
 
     <label for="stem">Stem:</label><br>
     <textarea id="stem" name="stem"></textarea><br>

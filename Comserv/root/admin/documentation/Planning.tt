@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.61' %]
-[% date_iso = '2026/02/09' %]
-[% formatted_date = 'February 09, 2026' %]
-[% time = '16:36:00' %]
-[% change_log = 'Fixed Quick Jump menu visibility and theming: Reduced top to 50px (below nav only, not welcome banner). All backgrounds now use theme variables (--background-color, --secondary-color, --table-header-bg, --border-color, --nav-hover-bg). Adjusted scroll-margin-top to 180px.' %]
+[% version = '0.74' %]
+[% date_iso = '2026/02/21' %]
+[% formatted_date = 'February 21, 2026' %]
+[% time = '16:30:00' %]
+[% change_log = 'Users: 3-Step Self-Registration COMPLETE - Refactored existing register.tt and do_create_account, created VerifyEmail.tt and CompleteProfile.tt (PascalCase). Clean URLs (/register, /verify_email, /complete_profile). Reused existing code, deleted duplicates. Phase 2 in progress. Next: Enhanced login (email/username support).' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -149,7 +149,17 @@ last_updated = '2026/02/08'
                 <summary>🎯 Quick Jump to Priority (Click to Toggle)</summary>
                 <div class="jump-links-container">
                     <div class="jump-line">
+                        <strong><a href="#group-docker-k8s" class="jump-link">🐳 Docker and K8s Management</a></strong>:
+                        <a href="#anchor-project-config-test" class="jump-link">ProjectConfig</a>
+                    </div>
+                    <div class="jump-line">
+                        <strong><a href="#group-docker-k8s" class="jump-link">✅ Docker Bug (COMPLETED)</a></strong>:
+                        <a href="#anchor-dockerbug-completed" class="jump-link">DockerBugFix</a> |
+                        <a href="#anchor-env-vars-admin" class="jump-link">EnvVarsAdmin</a>
+                    </div>
+                    <div class="jump-line">
                         <strong><a href="#group-arch" class="jump-link">🏗️ Architecture & Infrastructure</a></strong>:
+                        <a href="#anchor-api-bc05" class="jump-link">ApiSystemBC05</a> |
                         <a href="#anchor-priority-11" class="jump-link">ArchMigrationPhase2</a> |
                         <a href="#anchor-priority-4" class="jump-link">MasterPlanRefactor</a> |
                         <a href="#anchor-priority-schema" class="jump-link">SchemaManagement</a> |
@@ -179,6 +189,20 @@ last_updated = '2026/02/08'
                         <a href="#anchor-priority-9" class="jump-link">AutomatedSync</a>
                     </div>
                     <div class="jump-line">
+                        <strong><a href="#group-file-mgmt" class="jump-link">📁 File Management System</a></strong>:
+                        <a href="#group-file-mgmt" class="jump-link">Overview</a> |
+                        Phase: <a href="#group-file-mgmt" class="jump-link">0✓</a>
+                        1 2 3 4 5 6 (Pending)
+                    </div>
+                    <div class="jump-line">
+                        <strong><a href="#group-workshops" class="jump-link">🎓 WorkShops System</a></strong>:
+                        <a href="#anchor-workshops-project" class="jump-link">WorkShopsProject</a>
+                    </div>
+                    <div class="jump-line">
+                        <strong><a href="#group-users" class="jump-link">👥 Users System</a></strong>:
+                        <a href="#anchor-users-project" class="jump-link">UsersProject</a>
+                    </div>
+                    <div class="jump-line">
                         <strong><a href="#group-ai" class="jump-link">🤖 AI Systems</a></strong>:
                         <a href="#anchor-aichat-system" class="jump-link">AIChatSystem</a>
                     </div>
@@ -193,6 +217,10 @@ last_updated = '2026/02/08'
                     <div class="jump-line">
                         <strong><a href="#group-todo" class="jump-link">✅ Todo System</a></strong>:
                         <a href="#anchor-todo-plan" class="jump-link">TodoSystemUpdate</a>
+                    </div>
+                    <div class="jump-line">
+                        <strong><a href="#css-themes-workflow" class="jump-link">🎨 CSS Themes</a></strong>:
+                        <a href="#css-themes-workflow" class="jump-link">ThemeWorkflow</a>
                     </div>
                 </div>
             </details>
@@ -216,6 +244,10 @@ last_updated = '2026/02/08'
                 <li><strong>AIChatSystem:</strong> <a href="[% base_url %]4001/Documentation/DailyPlan" target="_blank">aichatsystem-ef4e</a> <em>(port 4001)</em> - AI Chat System with Agent Architecture</li>
                 <li><strong>SchemaManagement:</strong> <a href="[% base_url %]4002/Documentation/DailyPlan" target="_blank">schema-management-system-7eb3</a> <em>(port 4002)</em> - Database Schema Management</li>
                 <li><strong>InfrastructureHA:</strong> <a href="[% base_url %]4003/Documentation/DailyPlan" target="_blank">new-task-9cf1</a> <em>(port 4003)</em> - High Availability & Disaster Recovery</li>
+                <li><strong>WorkShops:</strong> <a href="[% base_url %]4004/workshop" target="_blank">workshops-7d21</a> <em>(port 4004)</em> - Workshop Advertising System with Multi-Site Support</li>
+                <li><strong>Users:</strong> <a href="[% base_url %]4005/user/dashboard" target="_blank">users-e5b8</a> <em>(port 4005)</em> - User & Admin Management System with Email Verification and Role Management</li>
+                <li><strong>ProjectConfig:</strong> <a href="[% base_url %]3000/Documentation/DailyPlan" target="_blank">set-up-project-config-d327</a> <em>(ports 3000, 5000)</em> - Zenflow Project Configuration & Docker Container Testing</li>
+                <li><strong>FileManagement:</strong> <a href="[% base_url %]4006/admin/planning" target="_blank">new-task-bb05</a> <em>(port 4006)</em> - NFS-backed File Management System with multi-tier access control, duplicate detection, and workshop file sharing across SiteNames</li>
             </ul>
             
             <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 10px; margin-top: 10px;">
@@ -235,81 +267,277 @@ last_updated = '2026/02/08'
     <div id="planning" class="doc-section">
         <h2>Planning lists</h2>
 
-        <!-- Group 0: Infrastructure Resilience & HA Project (NEW - PRIORITY 1) -->
-        <div id="group-infrastructure-ha" class="priority-group-container">
-            <h3 class="group-header">🏗️ Infrastructure Resilience & High Availability</h3>
+        <!-- All Projects List from Database -->
+        <div id="anchor-all-projects-list" class="nav-anchor"></div>
+        <details class="sub-container" style="margin: 15px 0; border: 1px solid #2196F3; padding: 10px; background: #e3f2fd;">
+            <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em; margin-bottom: 10px;">
+                📦 All Projects from Database (Reference - Future State Preview)
+            </summary>
+            <div style="margin-top: 10px;">
+                <p><em>This shows all projects with their hierarchy. Eventually, all planning will be driven from the project database structure shown here.</em></p>
+                [% SET all_db_projects = c.model('DBEncy').resultset('Project').search({}, { order_by => 'id' }) %]
+                [% IF all_db_projects.count > 0 %]
+                    [% FOREACH proj IN all_db_projects.all %]
+                        [% UNLESS proj.parent_id %]
+                        <details style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                            <summary style="cursor: pointer; font-weight: bold;">
+                                📁 [% proj.name %] (ID: [% proj.id %])
+                            </summary>
+                            <div style="margin: 10px 0 0 20px;">
+                                <p><strong>Status:</strong> [% proj.status || 'Unknown' %] | <strong>Code:</strong> [% proj.project_code || 'N/A' %]</p>
+                                <p><a href="/project/details?project_id=[% proj.id %]" target="_blank">View Full Details</a></p>
 
-            <div id="anchor-infrastructure-ha-project" class="nav-anchor"></div>
-            <details id="infrastructure-ha-project" class="priority-container" open>
-                <summary class="priority-summary">🚨 Infrastructure Resilience & HA Project (ACTIVE)</summary>
-                <div class="priority-content">
-                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Priority:</strong> CRITICAL</p>
-                    <p><strong>Goal:</strong> Eliminate single points of failure, implement automated failover, establish disaster recovery with external service backup.</p>
-                    <p><strong>Timeline:</strong> 10-14 weeks | <strong>Budget:</strong> ~$10-40/month for external services</p>
+                                [% SET proj_subs = [] %]
+                                [% FOREACH check_sub IN all_db_projects.all %]
+                                    [% IF check_sub.parent_id == proj.id %]
+                                        [% proj_subs.push(check_sub) %]
+                                    [% END %]
+                                [% END %]
 
-                    <h4>Phase 0: Plan Management System (Week 1-3) - <span class="status-in-progress">IN PROGRESS</span></h4>
-                    <ul>
-                        <li>✅ Create PRD (requirements.md)</li>
-                        <li>⏳ Create Technical Specification</li>
-                        <li>⏳ Design API endpoints for project/step/todo CRUD</li>
-                        <li>⏳ Build .tt templates for plan visualization</li>
-                        <li>⏳ Integrate with project table structure</li>
-                        <li>⏳ Populate Infrastructure HA project as first use case</li>
-                    </ul>
-                    <p><strong>Deliverable:</strong> Plan management system tracking infrastructure project in Comserv app</p>
+                                [% IF proj_subs.size > 0 %]
+                                    <details style="margin-top: 8px;">
+                                        <summary style="cursor: pointer; font-weight: bold; color: #555;">
+                                            📂 Sub-projects ([% proj_subs.size %])
+                                        </summary>
+                                        <div style="margin-left: 15px; font-size: 0.95em;">
+                                            [% FOREACH sub IN proj_subs %]
+                                                <div style="margin: 5px 0; padding: 5px; border-left: 2px solid #4CAF50; background: #f9f9f9;">
+                                                    📄 [% sub.name %] (ID: [% sub.id %]) - [% sub.status || 'Unknown' %]
+                                                </div>
+                                            [% END %]
+                                        </div>
+                                    </details>
+                                [% END %]
+                            </div>
+                        </details>
+                        [% END %]
+                    [% END %]
+                [% ELSE %]
+                    <p><em>No projects found.</em></p>
+                [% END %]
+            </div>
+        </details>
+        <!-- Group -1: Docker and K8s Management (ACTIVE) -->
+        <div id="group-docker-k8s" class="nav-anchor"></div>
+        <details id="group-docker-k8s-main" class="priority-group-container" open>
+            <summary class="group-header">🐳 Docker and K8s Management</summary>
+            <div class="priority-content">
+                <h3>🐳 Docker and K8s Management</h3>
+                <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Priority:</strong> <span class="status-pending">HIGH</span></p>
+                <p><strong>Zenflow Task:</strong> <code>set-up-project-config-d327</code> (ports 3000, 5000) | <strong>Branch:</strong> <code>set-up-project-config-d327</code></p>
+                
+                <p><strong>Objective:</strong> Reorganize and enhance Docker and Kubernetes related planning and documentation. Automate deployment process and setup High Availability in the server room.</p>
 
-                    <h4>Phase 1: Database Creation & Service Discovery (Week 4-6) - <span class="status-pending">PENDING</span></h4>
-                    <ul>
-                        <li>Create separate production and development databases</li>
-                        <li>Implement service discovery (DNS/ProxySQL/failover pool)</li>
-                        <li>Set up MySQL replication (master-slave or master-master)</li>
-                        <li>Configure connection pooling and retry logic</li>
-                        <li>Document VM vs managed service vs containerized pros/cons</li>
-                        <li>Implement backup automation to cloud storage (~$5-10/month)</li>
-                    </ul>
-                    <p><strong>Deliverable:</strong> Production + dev databases with automated failover</p>
+                <h4>📊 Docker and K8s Project from Database</h4>
+                [% TRY %]
+                    [% SET schema = c.model('DBEncy').schema %]
+                    [% SET k8s_project = schema.resultset('Project').find(137) %]
+                    
+                    [% IF k8s_project %]
+                        <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                                <h3>[% k8s_project.name %] (Project ID: 137)</h3>
+                                <ul>
+                                    <li><strong>Description:</strong> [% k8s_project.description || 'Our Kurbuntes setup' %]</li>
+                                    <li><strong>Start Date:</strong> [% k8s_project.start_date || '2026-02-06' %]</li>
+                                    <li><strong>Status:</strong> [% k8s_project.status || 'In-Process' %]</li>
+                                    <li><strong>Project Code:</strong> [% k8s_project.project_code || 'k8s' %]</li>
+                                    <li><strong>Developer:</strong> [% k8s_project.developer_name || 'Shanta' %]</li>
+                                </ul>
 
-                    <h4>Phase 2: Gateway, Mail, Catalyst Resilience (Week 7-9) - <span class="status-pending">PENDING</span></h4>
-                    <ul>
-                        <li>OPNsense: Second VM with CARP failover OR low-cost external service ($10/month)</li>
-                        <li>Mail: Implement redundancy or external failover</li>
-                        <li>Catalyst: Deploy multiple instances with load balancing</li>
-                        <li>Redis: Configure cluster for session persistence</li>
-                    </ul>
-                    <p><strong>Deliverable:</strong> Resilient gateway, mail, and application tier</p>
+                                <p>
+                                    <a href="/project/details?project_id=137" target="_blank" style="color: #007bff;">View Details</a> |
+                                    <a href="/project/editproject?project_id=137" target="_blank" style="color: #007bff;">Edit Project</a>
+                                </p>
 
-                    <h4>Phase 3: Orchestration Platform & App HA (Week 9-11) - <span class="status-pending">PENDING</span></h4>
-                    <ul>
-                        <li>Decide: Kubernetes vs Docker Swarm (detailed pros/cons in Tech Spec)</li>
-                        <li>Deploy chosen orchestration platform</li>
-                        <li>Migrate Catalyst to orchestrated containers</li>
-                        <li>Implement health checks and auto-healing</li>
-                    </ul>
-                    <p><strong>Deliverable:</strong> Container orchestration with HA features</p>
+                                [% SET k8s_todos = k8s_project.todos.search({}, { order_by => 'sort_order' }) %]
+                                [% IF k8s_todos.count > 0 %]
+                                    <h4>📋 Todos for [% k8s_project.name %] ([% k8s_todos.count %])</h4>
+                                    <ul style="list-style-type: none; padding-left: 0;">
+                                        [% FOREACH todo IN k8s_todos.all %]
+                                            <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
+                                                [% IF todo.status == 'In-Process' %]⏳[% ELSIF todo.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                                [% todo.subject %]
+                                                <br><small style="color: #666;">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
+                                            </li>
+                                        [% END %]
+                                    </ul>
+                                [% END %]
+                        </div>
+                    [% ELSE %]
+                        <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px; margin: 10px 0;">
+                            <strong>Note:</strong> Project ID 137 not found in database.
+                        </div>
+                    [% END %]
+                [% CATCH %]
+                    <div style="background: #f8d7da; border: 1px solid #dc3545; padding: 10px; margin: 10px 0;">
+                        <strong>Error loading project:</strong> [% error.info %]
+                    </div>
+                [% END %]
 
-                    <h4>Phase 4: Monitoring & DR (Week 11-13) - <span class="status-pending">PENDING</span></h4>
-                    <ul>
-                        <li>Deploy monitoring stack (Prometheus/Grafana)</li>
-                        <li>Configure alerting (within budget)</li>
-                        <li>Implement external service failover ($10-15/month)</li>
-                        <li>Document DR plan and conduct first drill</li>
-                    </ul>
-                    <p><strong>Deliverable:</strong> Monitoring operational, DR plan tested</p>
+                <h4>📁 Documentation & Resources</h4>
+                <ul>
+                    <li>API Access: <a href="http://api.workstation.local:3000" target="_blank">api.workstation.local:3000</a> (Dev)</li>
+                    <li>API Access: <a href="http://api.workstation.local:5000" target="_blank">api.workstation.local:5000</a> (Prod)</li>
+                    <li><strong>Deployment Guide:</strong> <a href="/Documentation/ProductionDeployment">Production Deployment Guide</a></li>
+                    <li><strong>Docker Guide:</strong> <code>DOCKER_QUICKSTART.txt</code></li>
+                    <li><strong>Dockerfile:</strong> <code>Comserv/Dockerfile</code></li>
+                </ul>
 
-                    <h4>Phase 5: Testing & Validation (Week 13-14) - <span class="status-pending">PENDING</span></h4>
-                    <ul>
-                        <li>Fault injection testing for all services</li>
-                        <li>Performance benchmarking</li>
-                        <li>Verify RTO < 5 min, RPO < 5 min</li>
-                        <li>Final production cutover</li>
-                    </ul>
-                    <p><strong>Deliverable:</strong> Fully resilient infrastructure validated</p>
+                <!-- Sub-project 1: Configuration & Testing -->
+                <div id="anchor-project-config-test" class="nav-anchor"></div>
+                <details id="project-config-test" class="priority-container" open>
+                    <summary class="priority-summary">🔧 Project Configuration & Docker Container Rebuild Testing (ACTIVE)</summary>
+                    <div class="priority-content">
+                        <p><strong>Goal:</strong> Configure Zenflow automation settings and validate Docker container build with updated Perl dependencies.</p>
+                        
+                        <h4>🎯 Next Steps</h4>
+                        <ol>
+                            <li><strong>Rebuild Docker Container:</strong> <code>docker build -t comserv-test:latest .</code></li>
+                            <li><strong>Test Application Access:</strong> Verify ports 3000 and 5000 respond correctly.</li>
+                            <li><strong>Validate Zenflow Settings:</strong> Check <code>.zenflow/settings.json</code>.</li>
+                        </ol>
 
-                    <p><strong>Documentation:</strong> <a href="/Documentation/project/details?project_id=INFRA_HA_2026" style="color: var(--link-color);">View Full Project Details</a></p>
-                    <p><strong>PRD:</strong> <code>.zenflow/tasks/new-task-9cf1/requirements.md</code> (765 lines)</p>
-                </div>
-            </details>
-        </div>
+                        <h4>📝 Completed Tasks</h4>
+                        <ul>
+                            <li>✅ Analyzed repository structure and dependencies</li>
+                            <li>✅ Created <code>.zenflow/settings.json</code></li>
+                            <li>✅ Added required modules to <code>Comserv/cpanfile</code></li>
+                        </ul>
+                    </div>
+                </details>
+
+                <!-- Sub-project 2: Docker Bug Fix (COMPLETED) -->
+                <div id="anchor-dockerbug-completed" class="nav-anchor"></div>
+                <details id="dockerbug-completed" class="priority-container">
+                    <summary class="priority-summary">✅ Docker Container Startup Bug - COMPLETED (Feb 14-16, 2026)</summary>
+                    <div class="priority-content">
+                        <div style="background: #d4edda; border: 1px solid #28a745; border-radius: 4px; padding: 10px; margin: 10px 0;">
+                            <p><strong>✅ RESOLVED:</strong> Docker containers now start successfully on both development (port 3000) and production (port 5000).</p>
+                        </div>
+                        <p><strong>Lessons Learned:</strong> Explicit dependencies in cpanfile, correct secrets mount paths, and using <code>DBD::MariaDB</code> instead of <code>DBD::mysql</code>.</p>
+                    </div>
+                </details>
+
+                <!-- Sub-project: Environment Variables Admin UI (DELIVERED) -->
+                <div id="anchor-env-vars-admin" class="nav-anchor"></div>
+                <details id="env-vars-admin" class="priority-container">
+                    <summary class="priority-summary">✅ Environment Variables Admin UI - DELIVERED (Feb 2026)</summary>
+                    <div class="priority-content">
+                        <div style="background: #d4edda; border: 1px solid #28a745; border-radius: 4px; padding: 10px; margin: 10px 0;">
+                            <p><strong>✅ DELIVERED:</strong> Administrators can now manage the <code>.env</code> file via the web UI at
+                            <a href="/admin/environment_variables">/admin/environment_variables</a> without needing SSH or direct file access.</p>
+                        </div>
+                        <p><strong>Features delivered:</strong></p>
+                        <ul>
+                            <li>List all <code>.env</code> variables with secret masking (PASSWORD, SECRET, TOKEN, KEY, PASS patterns)</li>
+                            <li>Create, edit, and delete variables through the browser</li>
+                            <li>Export the full <code>.env</code> file for backup or transfer</li>
+                            <li>Automatic backup before each write operation</li>
+                            <li>All actions logged at INFO level with admin identity</li>
+                            <li><code>CATALYST_SERVER_IP</code> override — fixes Docker containers showing internal IP (e.g. <code>172.20.0.2</code>) in the admin debug bar instead of the host LAN IP</li>
+                        </ul>
+                        <p><strong>Related fixes:</strong> Admin debug bar now shows a single <strong>"Server: &lt;workflow&gt; (&lt;ip&gt;)"</strong> field instead of the duplicate "Catalyst Server" + "Server IP" that were both showing the DB host IP.</p>
+                        <p><strong>Documentation:</strong> <a href="/Documentation/EnvironmentVariablesManagement" target="_blank">Environment Variables Management Tutorial</a></p>
+                        <p><strong>Controller:</strong> <code>Comserv/lib/Comserv/Controller/Admin/EnvironmentVariables.pm</code><br>
+                           <strong>Utility:</strong> <code>Comserv/lib/Comserv/Util/EnvFileManager.pm</code></p>
+                    </div>
+                </details>
+
+                <!-- Sub-project 3: Infrastructure Resilience & HA Architecture (ACTIVE) -->
+                <div id="anchor-priority-ha" class="nav-anchor"></div>
+                <details id="priority-ha-infrastructure" class="priority-container" open>
+                    <summary class="priority-summary">🛡️ Infrastructure Resilience & High Availability Architecture</summary>
+                    <div class="priority-content">
+                        <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
+                        <p><strong>Goal:</strong> Eliminate single points of failure, implement automated failover, and establish HA/DR using Docker and K8s.</p>
+                        <p><strong>Context:</strong> Recent 3-day outage from single editing mistake exposed critical infrastructure vulnerabilities. Need comprehensive HA/DR strategy.</p>
+
+                        <h4>🚨 URGENT NEXT STEPS - <span class="status-pending">IMMEDIATE ACTION REQUIRED</span></h4>
+                        <ul>
+                            <li><strong>🔴 PRIORITY 1: K8s Management & Monitoring System (192.168.1.50)</strong>
+                                <ul>
+                                    <li><strong>Need:</strong> Management and monitoring system for Kubernetes cluster at 192.168.1.50</li>
+                                    <li><strong>Requirements:</strong> Dashboard for cluster status, resource monitoring, log aggregation, and secure kubectl access via web UI.</li>
+                                    <li><strong>Recommended Tools:</strong> Kubernetes Dashboard + Prometheus + Grafana, Rancher, Lens Desktop, or K9s.</li>
+                                    <li><strong>Status:</strong> <span class="status-pending">NOT STARTED</span> | <strong>Urgency:</strong> CRITICAL</li>
+                                </ul>
+                            </li>
+                            <li><strong>🔴 PRIORITY 2: Debug Mail Server in K8s Pod (192.168.1.175)</strong>
+                                <ul>
+                                    <li><strong>Context:</strong> New mail server deployed as K8s pod on 192.168.1.175, experiencing issues</li>
+                                    <li><strong>Debugging Tasks:</strong> Verify pod status/logs, inspect events, verify service configuration, test network connectivity (Ports 25, 587, 993, 995), verify DNS (MX, SPF, DKIM, DMARC), check PVCs, and review mail server config inside pod.</li>
+                                    <li><strong>Status:</strong> <span class="status-pending">DEBUGGING NEEDED</span> | <strong>Urgency:</strong> CRITICAL</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                        <h4>🏗️ HA Implementation Roadmap</h4>
+                        
+                        <h5>Phase 0: Plan Management System (Week 1-3) - <span class="status-in-progress">IN PROGRESS</span></h5>
+                        <ul>
+                            <li>✅ Create PRD (requirements.md)</li>
+                            <li>⏳ Create Technical Specification</li>
+                            <li>⏳ Design API endpoints for project/step/todo CRUD</li>
+                            <li>⏳ Build .tt templates for plan visualization</li>
+                            <li>⏳ Integrate with project table structure</li>
+                        </ul>
+
+                        <h5>Phase 1: Database HA & Service Discovery (Week 4-6) - <span class="status-pending">PENDING</span></h5>
+                        <ul>
+                            <li>Create separate production and development databases</li>
+                            <li>Implement service discovery (DNS/ProxySQL/failover pool)</li>
+                            <li>Set up MySQL replication (master-slave or master-master)</li>
+                            <li>Configure connection pooling and retry logic</li>
+                        </ul>
+
+                        <h5>Phase 2: Gateway, Mail, Catalyst Resilience (Week 7-9) - <span class="status-pending">PENDING</span></h5>
+                        <ul>
+                            <li>OPNsense: Second VM with CARP failover OR low-cost external service</li>
+                            <li>Mail: Implement redundancy or external failover</li>
+                            <li>Catalyst: Deploy multiple instances with load balancing</li>
+                            <li>Redis: Configure cluster for session persistence</li>
+                        </ul>
+
+                        <h5>Phase 3: Orchestration Platform Deployment (Week 9-11) - <span class="status-pending">PENDING</span></h5>
+                        <ul>
+                            <li>Decide: Kubernetes vs Docker Swarm</li>
+                            <li>Deploy chosen orchestration platform</li>
+                            <li>Migrate Catalyst to orchestrated containers</li>
+                            <li>Implement health checks and auto-healing</li>
+                        </ul>
+
+                        <h5>Phase 4: Monitoring & Disaster Recovery (Week 11-13) - <span class="status-pending">PENDING</span></h5>
+                        <ul>
+                            <li>Deploy monitoring stack (Prometheus/Grafana)</li>
+                            <li>Configure alerting and implement external service failover</li>
+                            <li>Document DR plan and conduct first drill</li>
+                        </ul>
+
+                        <h5>Phase 5: Testing & Validation (Week 13-14) - <span class="status-pending">PENDING</span></h5>
+                        <ul>
+                            <li>Fault injection testing and performance benchmarking</li>
+                            <li>Verify RTO < 5 min, RPO < 5 min</li>
+                            <li>Final production cutover</li>
+                        </ul>
+
+                        <h4>🏗️ Infrastructure Components</h4>
+                        <ul>
+                            <li><strong>Dell 710 Server</strong>: Hardware ready, integration planning phase. Role: Additional compute/storage capacity for HA.</li>
+                            <li><strong>Kubernetes Control Plane (VM 101)</strong>: Installed, ready for configuration. Purpose: Container orchestration for application HA.</li>
+                        </ul>
+
+                        <h4>📊 Success Metrics</h4>
+                        <ul>
+                            <li>RTO < 1 hour for Tier 1, < 4 hours for Tier 2/3</li>
+                            <li>RPO < 1 hour for all database data</li>
+                            <li>Zero single points of failure for critical services</li>
+                            <li>Automated failover for database and application layers</li>
+                        </ul>
+                    </div>
+                </details>
+            </div>
+        </details>
+
 
         <!-- Group 1: Architecture & Infrastructure -->
         <details id="group-arch" class="priority-group-container" open>
@@ -343,114 +571,201 @@ last_updated = '2026/02/08'
                 </div>
             </details>
 
-            <div id="anchor-priority-ha" class="nav-anchor"></div>
-            <details id="priority-ha-infrastructure" class="priority-container">
-                <summary class="priority-summary">🛡️ Infrastructure Resilience & High Availability Architecture</summary>
+
+            <div id="anchor-api-bc05" class="nav-anchor"></div>
+            <details id="api-bc05-project" class="priority-container" open>
+                <summary class="priority-summary">🚀 API System Setup & Domain Migration (api-bc05)</summary>
                 <div class="priority-content">
-                    [%# TODO: Link to project database record when available %]
-                    [%# TRY %]
-                    [%#     SET schema = c.model('DBEncy').schema %]
-                    [%#     SET project = schema.resultset('Project').find(XXX) %] [% # Replace XXX with project ID %]
-                    [%# END %]
-                    
-                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
-                    <p><strong>Zenflow Task:</strong> <code>new-task-9cf1</code> | <strong>Branch:</strong> <code>new-task-9cf1</code></p>
-                    <p><strong>Context:</strong> Recent 3-day outage from single editing mistake exposed critical infrastructure vulnerabilities. Need comprehensive HA/DR strategy.</p>
-                    
-                    <h4>✅ Recent Progress</h4>
+                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0 COMPLETE</span> | <strong>Priority:</strong> HIGH</p>
+                    <p><strong>Project ID:</strong> 157 | <strong>Parent:</strong> Server Room (ID 78) | <strong>Code:</strong> api-bc05</p>
+                    <p><strong>Timeline:</strong> 2026-02-10 to 2026-03-31 (7 weeks) | <strong>Estimated Hours:</strong> 160</p>
+
+                    <h4>📋 Overview</h4>
+                    <p>Setup API system for domain-based authentication replacing IP-based access. Migrate from <code>api.workstation.local</code> (IP-based bypass) to <code>api.domain.name</code> (token-based authentication) with Cloudflare DNS, OPNsense port forwarding, middleware implementation, CLI tool, and comprehensive documentation.</p>
+
+                    <h4>📊 API Project from Database</h4>
+                    [% TRY %]
+                        [% SET schema = c.model('DBEncy').schema %]
+                        [% SET api_project = schema.resultset('Project').find(157) %]
+                        
+                        [% IF api_project %]
+                            <details class="sub-container" style="margin: 15px 0; border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
+                                <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em; margin-bottom: 10px;">
+                                    📦 API System Project (ID 157) - [% api_project.sub_projects.count %] Sub-projects
+                                </summary>
+                                <div style="margin-top: 10px;">
+                                    <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                                        <p><strong>Name:</strong> [% api_project.name %]</p>
+                                        <p><strong>Status:</strong> [% api_project.status || 'Unknown' %]</p>
+                                        <p><strong>Developer:</strong> [% api_project.developer_name || 'Not assigned' %]</p>
+                                        <p><strong>Timeline:</strong> [% api_project.start_date || 'Not set' %] → [% api_project.end_date || 'Not set' %]</p>
+                                        <p><strong>Estimated Hours:</strong> [% api_project.estimated_man_hours || 'Not set' %]</p>
+                                        <p>
+                                            <a href="/project/details?project_id=157" target="_blank" style="color: #007bff;">View Details</a> |
+                                            <a href="/project/editproject?project_id=157" target="_blank" style="color: #007bff;">Edit Project</a>
+                                        </p>
+
+                                        [% SET sub_projects = api_project.sub_projects.search({}, { order_by => 'id' }) %]
+                                        [% IF sub_projects.count > 0 %]
+                                            <details style="margin-top: 10px;" open>
+                                                <summary style="cursor: pointer; font-weight: bold; color: #555;">
+                                                    📂 Implementation Phases ([% sub_projects.count %] sub-projects)
+                                                </summary>
+                                                <div style="margin-left: 20px;">
+                                                    [% FOREACH phase IN sub_projects.all %]
+                                                        <details class="subproject-item" style="margin: 8px 0; padding: 8px; border-left: 3px solid #4CAF50; background: #f5f5f5;">
+                                                            <summary style="cursor: pointer;">
+                                                                [% IF phase.status == 'In-Process' %]⏳[% ELSIF phase.status == 'Completed' %]✅[% ELSE %]📄[% END %]
+                                                                [% phase.name %] (ID: [% phase.id %]) - <span style="color: #666;">[% phase.status %]</span>
+                                                            </summary>
+                                                            <div style="margin: 8px 0 0 15px; font-size: 0.9em;">
+                                                                <p><strong>Description:</strong> [% phase.description || 'No description' %]</p>
+                                                                <p><strong>Timeline:</strong> [% phase.start_date %] → [% phase.end_date %]</p>
+                                                                <p><strong>Estimated Hours:</strong> [% phase.estimated_man_hours || 0 %]</p>
+                                                                <p>
+                                                                    <a href="/project/details?project_id=[% phase.id %]" target="_blank">View Phase</a> |
+                                                                    <a href="/project/editproject?project_id=[% phase.id %]" target="_blank">Edit Phase</a>
+                                                                </p>
+
+                                                                [% SET todos = phase.todos.search({}, { order_by => 'sort_order' }) %]
+                                                                [% IF todos.count > 0 %]
+                                                                    <details style="margin-top: 8px;">
+                                                                        <summary style="cursor: pointer; font-size: 0.9em;">
+                                                                            📋 Tasks ([% todos.count %])
+                                                                        </summary>
+                                                                        <div style="margin-left: 15px; font-size: 0.85em;">
+                                                                            <ul style="list-style-type: none; padding-left: 0;">
+                                                                                [% FOREACH task IN todos.all %]
+                                                                                    <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
+                                                                                        [% IF task.status == 'In-Process' %]⏳[% ELSIF task.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                                                                        [% task.subject %]
+                                                                                        <br><small style="color: #666;">Status: [% task.status %] | Due: [% task.due_date %]</small>
+                                                                                        <br><a href="/todo/showtodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
+                                                                                        <a href="/todo/edittodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
+                                                                                    </li>
+                                                                                [% END %]
+                                                                            </ul>
+                                                                        </div>
+                                                                    </details>
+                                                                [% ELSE %]
+                                                                    <p><em>No tasks assigned to this phase yet.</em></p>
+                                                                [% END %]
+                                                            </div>
+                                                        </details>
+                                                    [% END %]
+                                                </div>
+                                            </details>
+                                        [% ELSE %]
+                                            <p><em>No sub-projects found.</em></p>
+                                        [% END %]
+                                    </div>
+                                </div>
+                            </details>
+                        [% ELSE %]
+                            <p><em>Project ID 157 not found in database. Create project via <a href="/project/addproject?parent_id=78" target="_blank">Add Project form</a>.</em></p>
+                        [% END %]
+                    [% CATCH %]
+                        <p style="color: #d9534f;"><strong>Error:</strong> Unable to fetch API project from database. [% error.info %]</p>
+                    [% END %]
+
+                    <h4>🎯 Key Deliverables</h4>
                     <ul>
-                        <li>✅ <strong>Dell 710 Server Sub-Project Added</strong>: New sub-project created under Infrastructure HA plan</li>
-                        <li>✅ <strong>Kubernetes Control Plane Installed</strong>: Deployed on VM 101, ready for configuration</li>
-                        <li>✅ <strong>Plan Management System Created</strong>: REST API controller and database integration complete</li>
-                        <li>⏳ <strong>Project Table Integration</strong>: Placeholder for comparing existing project structure to improve server room organization</li>
-                    </ul>
-                    
-                    <h4>📋 Objectives</h4>
-                    <ul>
-                        <li>Eliminate single points of failure for Tier 1 services (OPNsense, Mail Gateway, Production DB)</li>
-                        <li>Reduce RTO from 3 days to &lt;1 hour for critical services</li>
-                        <li>Implement automated database failover and multi-environment access strategy</li>
-                        <li>Establish off-site DR capabilities with tested recovery procedures</li>
-                        <li>Define clear VM vs Docker/K8s architecture strategy</li>
+                        <li>Domain detection middleware (<code>ApiDomainDetector.pm</code>)</li>
+                        <li>Environment-specific domain configuration (<code>config/api_domains.json</code>)</li>
+                        <li>Refactored API controller (domain-based auth instead of IP-based)</li>
+                        <li>Cloudflare DNS + OPNsense port forwarding configuration</li>
+                        <li>CLI tool for API operations (<code>script/comserv-api-cli</code>)</li>
+                        <li>Comprehensive documentation (PascalCase .tt files)</li>
                     </ul>
 
-                    <h4>🔑 Critical Services in Scope</h4>
-                    <ul>
-                        <li><strong>Tier 1 (Network/Security):</strong> OPNsense Gateway, Proxmox Mail Gateway</li>
-                        <li><strong>Tier 2 (Data):</strong> Production/Staging/Dev MySQL Databases</li>
-                        <li><strong>Tier 3 (Application):</strong> Catalyst Application Server, Mail Server</li>
-                        <li><strong>Tier 4 (Infrastructure):</strong> Dell 710 Server, Kubernetes Cluster (VM 101 Control Plane)</li>
-                    </ul>
-
-                    <h4>🏗️ Infrastructure Components</h4>
-                    <ul>
-                        <li><strong>Dell 710 Server</strong>:
-                            <ul>
-                                <li>Sub-project created under Infrastructure HA plan</li>
-                                <li>Role: Additional compute/storage capacity for HA architecture</li>
-                                <li>Status: Hardware ready, integration planning phase</li>
-                            </ul>
-                        </li>
-                        <li><strong>Kubernetes Control Plane (VM 101)</strong>:
-                            <ul>
-                                <li>Status: <span class="status-in-progress">Installed, ready for configuration</span></li>
-                                <li>Next Steps: Configure worker nodes, network policies, storage classes</li>
-                                <li>Purpose: Container orchestration for application HA</li>
-                            </ul>
-                        </li>
-                        <li><strong>Project Structure Comparison (Placeholder)</strong>:
-                            <ul>
-                                <li>📊 <strong>Integration Point</strong>: Connect with existing Project table to analyze server room layout</li>
-                                <li>🎯 <strong>Purpose</strong>: Compare current infrastructure projects with planned HA architecture</li>
-                                <li>💡 <strong>Suggestion</strong>: Consider creating "Server Room Infrastructure" as parent project with sub-projects for each Proxmox host</li>
-                                <li>📝 <strong>Next Step</strong>: Query Project table for infrastructure-related projects, create mapping to HA plan phases</li>
-                            </ul>
-                        </li>
-                    </ul>
-
-                    <h4>❓ Key Technical Decisions</h4>
-                    <ul>
-                        <li><strong>VM vs Container Strategy:</strong> When to use Proxmox VMs vs Docker vs K8s (hybrid approach recommended)</li>
-                        <li><strong>Database Access:</strong> DNS-based routing (mysql-prod.local) vs port-based vs IP-based separation</li>
-                        <li><strong>Database Failover:</strong> ProxySQL + MySQL replication vs Galera Cluster vs managed service</li>
-                        <li><strong>Off-site DR:</strong> Cloud replicas, backup location, frequency, retention policies</li>
-                        <li><strong>Migration Path:</strong> Phased rollout strategy, testing approach, rollback procedures</li>
-                        <li><strong>Server Room Organization:</strong> How to integrate Dell 710 into existing infrastructure hierarchy</li>
-                    </ul>
-
-                    <h4>📊 Success Metrics</h4>
-                    <ul>
-                        <li>RTO &lt; 1 hour for Tier 1, &lt; 4 hours for Tier 2/3</li>
-                        <li>RPO &lt; 1 hour for all database data</li>
-                        <li>Successful DR drill (simulate host failure) with documented recovery</li>
-                        <li>Zero single points of failure for critical services</li>
-                        <li>Automated failover for database and application layers</li>
-                        <li>K8s control plane (VM 101) configured and managing worker nodes</li>
-                    </ul>
-
-                    <h4>📁 Documentation</h4>
-                    <ul>
-                        <li>Full feature specification: <a href="/static/INFRASTRUCTURE_HA_FEATURE.md" target="_blank">INFRASTRUCTURE_HA_FEATURE.md</a></li>
-                        <li>Implementation plan: <code>.zenflow/tasks/new-task-9cf1/plan.md</code></li>
-                        <li>Technical spec: <code>.zenflow/tasks/new-task-9cf1/spec.md</code></li>
-                    </ul>
-                    
-                    <h4>🚀 Current Phase: Phase 0 - Plan Management System</h4>
+                    <h4>📊 Implementation Phases (7 Phases, 30 Tasks)</h4>
                     <ol>
-                        <li>✅ <strong>Step 0.1</strong>: Create Plan Management Controller (COMPLETED)</li>
-                        <li>⏳ <strong>Step 0.2</strong>: Create Plan Management Template (NEXT)</li>
-                        <li>📋 <strong>Step 0.3</strong>: Populate Infrastructure HA Project in database</li>
-                        <li>🧪 <strong>Step 0.4</strong>: Write Integration Tests for Plan Management</li>
+                        <li><strong>Phase 0: Project Setup & Tracking</strong> (ID 158) - ✅ <span class="status-completed">COMPLETE</span>
+                            <ul>
+                                <li>✅ Create database entries for project/sub-projects/todos</li>
+                                <li>✅ Update Planning.tt with api-bc05 section</li>
+                                <li>⏳ Verify database entries and Planning.tt rendering</li>
+                            </ul>
+                        </li>
+                        <li><strong>Phase 1: Domain Detection Middleware</strong> (ID 159) - <span class="status-pending">PENDING</span>
+                            <ul>
+                                <li>Create domain configuration file</li>
+                                <li>Implement ApiDomainDetector middleware</li>
+                                <li>Register middleware in Catalyst</li>
+                                <li>Write unit tests</li>
+                            </ul>
+                        </li>
+                        <li><strong>Phase 2: Controller Refactoring</strong> (ID 160) - <span class="status-pending">PENDING</span>
+                            <ul>
+                                <li>Refactor Api.pm to use domain detection</li>
+                                <li>Remove old IP-based code</li>
+                                <li>Test controller changes</li>
+                            </ul>
+                        </li>
+                        <li><strong>Phase 3: Network & DNS Configuration</strong> (ID 161) - <span class="status-pending">PENDING</span>
+                            <ul>
+                                <li>Configure Cloudflare DNS (A record, SSL)</li>
+                                <li>Configure OPNsense port forwarding</li>
+                                <li>Verify Docker configuration</li>
+                                <li>Test external access</li>
+                            </ul>
+                        </li>
+                        <li><strong>Phase 4: CLI Tool Development</strong> (ID 162) - <span class="status-pending">PENDING</span>
+                            <ul>
+                                <li>Create CLI script structure</li>
+                                <li>Implement CLI commands</li>
+                                <li>Add authentication support</li>
+                                <li>Implement output formatting and error handling</li>
+                                <li>Test all CLI commands</li>
+                            </ul>
+                        </li>
+                        <li><strong>Phase 5: Documentation</strong> (ID 163) - <span class="status-pending">PENDING</span>
+                            <ul>
+                                <li>Create ApiDomainConfiguration.tt</li>
+                                <li>Create ApiCliUsageGuide.tt</li>
+                                <li>Create ApiDomainMigrationGuide.tt</li>
+                                <li>Update ApiTokenReferenceGuide.tt</li>
+                                <li>Verify documentation URLs and theme compatibility</li>
+                            </ul>
+                        </li>
+                        <li><strong>Phase 6: Testing & Deployment</strong> (ID 164) - <span class="status-pending">PENDING</span>
+                            <ul>
+                                <li>Run comprehensive tests</li>
+                                <li>End-to-end testing</li>
+                                <li>Security review</li>
+                                <li>Performance testing</li>
+                                <li>Deploy to production</li>
+                                <li>Update project tracking</li>
+                            </ul>
+                        </li>
                     </ol>
-                    
-                    <h4>🔜 Upcoming Phases</h4>
-                    <ol>
-                        <li><strong>Phase 1</strong>: Database HA & Service Discovery (Weeks 4-6)</li>
-                        <li><strong>Phase 2</strong>: Gateway, Mail, Catalyst Resilience (Weeks 7-9)</li>
-                        <li><strong>Phase 3</strong>: Orchestration Platform Deployment - Configure K8s cluster (Weeks 9-11)</li>
-                        <li><strong>Phase 4</strong>: Monitoring & Disaster Recovery (Weeks 11-13)</li>
-                        <li><strong>Phase 5</strong>: Testing & Validation (Weeks 13-14)</li>
-                    </ol>
+
+                    <h4>📁 Documentation & Resources</h4>
+                    <ul>
+                        <li>Zenflow Task: <code>api-bc05</code></li>
+                        <li>Requirements: <code>.zenflow/tasks/api-bc05/requirements.md</code></li>
+                        <li>Technical Spec: <code>.zenflow/tasks/api-bc05/spec.md</code></li>
+                        <li>Implementation Plan: <code>.zenflow/tasks/api-bc05/plan.md</code></li>
+                    </ul>
+
+                    <h4>✅ Success Criteria</h4>
+                    <ul>
+                        <li>Local domain (<code>*.local</code>) bypasses token authentication</li>
+                        <li>External domain requires valid bearer token</li>
+                        <li>Middleware adds <code>is_local_domain</code> flag to request context</li>
+                        <li>Cloudflare SSL/TLS proxy configured and working</li>
+                        <li>OPNsense port forwarding (WAN:443 → SERVER:5000) functional</li>
+                        <li>CLI tool successfully performs all operations</li>
+                        <li>All documentation follows PascalCase naming and theme compatibility</li>
+                        <li>All tests passing (unit, integration, end-to-end)</li>
+                        <li>Production deployment successful with monitoring</li>
+                    </ul>
+
+                    <h4>🔗 Related Projects</h4>
+                    <ul>
+                        <li><a href="/project/details?project_id=78">Server Room Infrastructure (ID 78)</a></li>
+                        <li><a href="/project/details?project_id=157">API System Setup & Domain Migration (ID 157)</a></li>
+                    </ul>
                 </div>
             </details>
 
@@ -495,90 +810,137 @@ last_updated = '2026/02/08'
                 <li>Dynamic daily, weekly, and monthly views</li>
             </ul>
 
-            <h4>📊 All Projects in Database</h4>
+            <h4>📊 Planning System Project from Database</h4>
             [% TRY %]
                 [% SET schema = c.model('DBEncy').schema %]
-                [% SET project_controller = c.controller('Project') %]
-                [% SET all_projects = project_controller.fetch_projects_with_subprojects(c) %]
+                [% SET planning_project_search = schema.resultset('Project').search({ project_code => 'Planning' }).first %]
+                [% SET planning_project = schema.resultset('Project').find(planning_project_search.id) IF planning_project_search %]
 
-                [% IF all_projects AND all_projects.size > 0 %]
-                    <details class="sub-container" style="margin: 15px 0; border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
-                        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em; margin-bottom: 10px;">
-                            📦 Existing Projects ([% all_projects.size %] top-level projects)
-                        </summary>
-                        <div style="margin-top: 10px;">
-                            <p><em>All projects from database with hierarchical structure (projects → sub-projects → sub-sub-projects)</em></p>
-                            [% FOREACH project IN all_projects %]
-                                <details class="project-item" style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
-                                    <summary style="cursor: pointer; font-weight: bold;">
-                                        📁 [% project.name %]
-                                        <span style="font-size: 0.9em; color: #666;">
-                                            (ID: [% project.id %], Status: [% project.status || 'Unknown' %])
-                                        </span>
+                [% IF planning_project %]
+                    <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                            <h3>[% planning_project.name %]</h3>
+                            <ul>
+                                <li><strong>Description:</strong> [% planning_project.description || 'No description' %]</li>
+                                <li><strong>Start Date:</strong> [% planning_project.start_date %]</li>
+                                <li><strong>End Date:</strong> [% planning_project.end_date %]</li>
+                                <li><strong>Status:</strong> [% planning_project.status %]</li>
+                                <li><strong>Project Code:</strong> [% planning_project.project_code %]</li>
+                                <li><strong>Project Size:</strong> [% planning_project.project_size %]</li>
+                                <li><strong>Estimated Man Hours:</strong> [% planning_project.estimated_man_hours %]</li>
+                                <li><strong>Developer Name:</strong> [% planning_project.developer_name %]</li>
+                                <li><strong>Client Name:</strong> [% planning_project.client_name %]</li>
+                                <li><strong>Comments:</strong> [% planning_project.comments || 'No comments' %]</li>
+                            </ul>
+
+                            <p>
+                                <a href="/project/details?project_id=[% planning_project.id %]" target="_blank" style="color: #007bff;">View Details</a> |
+                                <a href="/project/editproject?project_id=[% planning_project.id %]" target="_blank" style="color: #007bff;">Edit Project</a>
+                            </p>
+
+                            [% SET planning_todos = planning_project.todos.search({}, { order_by => 'sort_order' }) %]
+                            [% IF planning_todos.count > 0 %]
+                                <h4>📋 Todos for [% planning_project.name %] ([% planning_todos.count %])</h4>
+                                <ul style="list-style-type: none; padding-left: 0;">
+                                    [% FOREACH todo IN planning_todos.all %]
+                                        <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
+                                            [% IF todo.status == 'In-Process' %]⏳[% ELSIF todo.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                            [% todo.subject %]
+                                            <br><small style="color: #666;">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
+                                            <br><a href="/todo/showtodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
+                                            <a href="/todo/edittodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
+                                        </li>
+                                    [% END %]
+                                </ul>
+                            [% ELSE %]
+                                <p>No todos found for this project. <a href="/todo/addtodo?project_id=[% planning_project.id %]">Add a todo</a></p>
+                            [% END %]
+
+                            [% SET planning_subs = [] %]
+                            [% SET all_projs_for_planning = c.model('DBEncy').resultset('Project').search({}, { order_by => 'id' }) %]
+                            [% FOREACH check_sub IN all_projs_for_planning.all %]
+                                [% IF check_sub.parent_id == planning_project.id %]
+                                    [% planning_subs.push(check_sub) %]
+                                [% END %]
+                            [% END %]
+
+                            [% IF planning_subs.size > 0 %]
+                                <details style="margin-top: 10px;" open>
+                                    <summary style="cursor: pointer; font-weight: bold; color: #555;">
+                                        📂 Sub-Projects ([% planning_subs.size %])
                                     </summary>
-                                    <div style="margin: 10px 0 0 20px;">
-                                        <p><strong>Developer:</strong> [% project.developer_name || 'Not assigned' %]</p>
-                                        <p><strong>Client:</strong> [% project.client_name || 'N/A' %]</p>
-                                        <p><strong>Timeline:</strong> [% project.start_date || 'Not set' %] → [% project.end_date || 'Not set' %]</p>
-                                        <p>
-                                            <a href="/project/details?project_id=[% project.id %]" target="_blank" style="color: #007bff;">View Details</a> |
-                                            <a href="/project/editproject?project_id=[% project.id %]" target="_blank" style="color: #007bff;">Edit</a>
-                                        </p>
-
-                                        [% IF project.sub_projects AND project.sub_projects.size > 0 %]
-                                            <details style="margin-top: 10px;">
-                                                <summary style="cursor: pointer; font-weight: bold; color: #555;">
-                                                    📂 Sub-projects ([% project.sub_projects.size %])
+                                    <div style="margin-left: 20px;">
+                                        [% FOREACH subproject IN planning_subs %]
+                                            <details class="subproject-item" style="margin: 8px 0; padding: 8px; border-left: 3px solid #4CAF50; background: #f5f5f5;">
+                                                <summary style="cursor: pointer;">
+                                                    [% IF subproject.status == 'In-Process' %]⏳[% ELSIF subproject.status == 'Completed' %]✅[% ELSE %]📄[% END %]
+                                                    Sub-Project: [% subproject.name %] (ID: [% subproject.id %]) - <span style="color: #666;">[% subproject.status %]</span>
                                                 </summary>
-                                                <div style="margin-left: 20px;">
-                                                    [% FOREACH subproject IN project.sub_projects %]
-                                                        <details class="subproject-item" style="margin: 8px 0; padding: 8px; border-left: 3px solid #4CAF50; background: #f5f5f5;">
-                                                            <summary style="cursor: pointer;">
-                                                                📄 [% subproject.name %] (ID: [% subproject.id %])
-                                                            </summary>
-                                                            <div style="margin: 8px 0 0 15px; font-size: 0.9em;">
-                                                                <p><strong>Developer:</strong> [% subproject.developer_name || 'Not assigned' %]</p>
-                                                                <p><strong>Status:</strong> [% subproject.status || 'Unknown' %]</p>
-                                                                <p>
-                                                                    <a href="/project/details?project_id=[% subproject.id %]" target="_blank">View</a> |
-                                                                    <a href="/project/editproject?project_id=[% subproject.id %]" target="_blank">Edit</a>
-                                                                </p>
+                                                <div style="margin: 8px 0 0 15px; font-size: 0.9em;">
+                                                    <ul>
+                                                        <li><strong>Description:</strong> [% subproject.description || 'No description' %]</li>
+                                                        <li><strong>Timeline:</strong> [% subproject.start_date %] → [% subproject.end_date %]</li>
+                                                        <li><strong>Status:</strong> [% subproject.status %]</li>
+                                                        <li><strong>Project Code:</strong> [% subproject.project_code %]</li>
+                                                        <li><strong>Estimated Hours:</strong> [% subproject.estimated_man_hours || 0 %]</li>
+                                                        <li><strong>Developer:</strong> [% subproject.developer_name || 'Not assigned' %]</li>
+                                                        <li><strong>Client:</strong> [% subproject.client_name || 'N/A' %]</li>
+                                                    </ul>
+                                                    <p>
+                                                        <a href="/project/details?project_id=[% subproject.id %]" target="_blank">View Details</a> |
+                                                        <a href="/project/editproject?project_id=[% subproject.id %]" target="_blank">Edit</a>
+                                                    </p>
 
-                                                                [% IF subproject.sub_projects AND subproject.sub_projects.size > 0 %]
-                                                                    <details style="margin-top: 8px;">
-                                                                        <summary style="cursor: pointer; font-size: 0.9em;">
-                                                                            📂 Sub-sub-projects ([% subproject.sub_projects.size %])
-                                                                        </summary>
-                                                                        <div style="margin-left: 15px; font-size: 0.85em;">
-                                                                            [% FOREACH subsubproject IN subproject.sub_projects %]
-                                                                                <div style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
-                                                                                    📌 [% subsubproject.name %] (ID: [% subsubproject.id %])
-                                                                                    <a href="/project/details?project_id=[% subsubproject.id %]" target="_blank" style="font-size: 0.9em;">View</a>
-                                                                                </div>
-                                                                            [% END %]
-                                                                        </div>
-                                                                    </details>
-                                                                [% END %]
+                                                    [% SET sub_todos = subproject.todos.search({}, { order_by => 'sort_order' }) %]
+                                                    [% IF sub_todos.count > 0 %]
+                                                        <details style="margin-top: 8px;">
+                                                            <summary style="cursor: pointer; font-size: 0.9em;">
+                                                                📋 Todos ([% sub_todos.count %])
+                                                            </summary>
+                                                            <div style="margin-left: 15px; font-size: 0.85em;">
+                                                                <ul style="list-style-type: none; padding-left: 0;">
+                                                                    [% FOREACH task IN sub_todos.all %]
+                                                                        <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
+                                                                            [% IF task.status == 'In-Process' %]⏳[% ELSIF task.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                                                            [% task.subject %]
+                                                                            <br><small style="color: #666;">Status: [% task.status %] | Due: [% task.due_date %]</small>
+                                                                            <br><a href="/todo/showtodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
+                                                                            <a href="/todo/edittodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
+                                                                        </li>
+                                                                    [% END %]
+                                                                </ul>
                                                             </div>
                                                         </details>
+                                                    [% ELSE %]
+                                                        <p><em>No todos for this sub-project. <a href="/todo/addtodo?project_id=[% subproject.id %]">Add a todo</a></em></p>
                                                     [% END %]
                                                 </div>
                                             </details>
                                         [% END %]
                                     </div>
                                 </details>
+                            [% ELSE %]
+                                <p>No sub-projects found. <a href="/project/addproject?parent_id=[% planning_project.id %]">Add a sub-project</a></p>
                             [% END %]
-                        </div>
-                    </details>
+                    </div>
                 [% ELSE %]
-                    <p><em>No projects found in database or unable to fetch projects.</em></p>
+                    <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 15px; margin: 15px 0;">
+                        <p><strong>⚠️ Project Not Found:</strong> Planning System project with code "Planning" not found in database.</p>
+                        <p><strong>Action Required:</strong> Create the Planning project via <a href="/project/addproject" target="_blank" style="color: #007bff;">Add Project form</a> with project_code "Planning".</p>
+                        <p><strong>Next Steps:</strong></p>
+                        <ol>
+                            <li>Create main project: "Planning System Migration"</li>
+                            <li>Create 15 sub-projects for Phases 0-14 (P0 already complete)</li>
+                            <li>Link todos to each phase sub-project</li>
+                        </ol>
+                        <p><strong>For reference:</strong> See <a href="/project/details?project_id=157" target="_blank" style="color: #007bff;">API System Project (ID 157)</a> for example structure.</p>
+                    </div>
                 [% END %]
             [% CATCH %]
-                <p style="color: #d9534f;"><strong>Error:</strong> Unable to fetch projects from database. [% error.info %]</p>
+                <p style="color: #d9534f;"><strong>Error:</strong> Unable to fetch Planning System project from database. [% error.info %]</p>
             [% END %]
 
-            <h4>🚀 Implementation Workflow: Phases P0-P14</h4>
-            <p>Complete 15-phase workflow covering database environment management, schema design, RBAC implementation, UI development, and deployment. Each phase is a sub-project with detailed tasks and todos.</p>
+            <h4>🚀 Implementation Workflow: Phases P0-P14 (Text-Based Detail View)</h4>
+            <p><em>Note: These text-based phase details are maintained for reference. Once Planning System project is created in database, the container above will show the database-driven version alongside these details.</em></p>
 
             <div id="anchor-phase0-complete" class="nav-anchor"></div>
             <!-- Phase 0: Planning System Analysis & Integration Mapping -->
@@ -1072,6 +1434,770 @@ last_updated = '2026/02/08'
             </div>
         </details>
 
+        <!-- Group 3.5: WorkShops System -->
+        <div id="anchor-workshops-system" class="nav-anchor"></div>
+        <details id="group-workshops" class="priority-group-container" open>
+            <summary class="group-header">🎓 WorkShops Advertising System</summary>
+            <div class="priority-content">
+
+            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0 COMPLETE</span> | <strong>Priority:</strong> <span class="status-pending">HIGH</span></p>
+            <p><strong>Zenflow Task:</strong> <code>workshops-7d21</code> (port 4004) | <strong>Branch:</strong> <code>workshops-7d21</code></p>
+
+            <p><strong>Objective:</strong> Comprehensive platform for managing and advertising educational workshops across multiple sites with role-based access control, participant management, PowerPoint integration, mailing lists, and content development tools.</p>
+
+            <h4>📋 Overview</h4>
+            <p>Transform basic workshop CRUD operations into a full-featured workshop advertising and management system:</p>
+            <ul>
+                <li>Multi-site workshop advertising with public/private visibility</li>
+                <li>Workshop leader role management and permissions</li>
+                <li>Online registration workflow with capacity limits and waitlists</li>
+                <li>PowerPoint presentation upload/download for participants</li>
+                <li>Online content development with rich text editor</li>
+                <li>Workshop mailing lists with email history tracking</li>
+                <li>File upload/download system for workshop materials</li>
+                <li>Comprehensive authorization (CSC admin god-level, site-scoped admins/leaders)</li>
+            </ul>
+
+            <h4>📊 WorkShops Project from Database</h4>
+            [% TRY %]
+                [% SET schema = c.model('DBEncy').schema %]
+                [% SET workshop_project = schema.resultset('Project').find(73) %]
+                
+                [% IF workshop_project %]
+                    <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                            <h3>[% workshop_project.name %] (Project ID: 73)</h3>
+                            <ul>
+                                <li><strong>Description:</strong> [% workshop_project.description || 'Workshop module for managing and advertising educational workshops across multiple sites' %]</li>
+                                <li><strong>Start Date:</strong> [% workshop_project.start_date || '2024-01-01' %]</li>
+                                <li><strong>End Date:</strong> [% workshop_project.end_date || 'TBD' %]</li>
+                                <li><strong>Status:</strong> [% workshop_project.status || 'In-Process' %]</li>
+                                <li><strong>Project Code:</strong> [% workshop_project.project_code || 'WORKSHOP' %]</li>
+                                <li><strong>Project Size:</strong> [% workshop_project.project_size || 'Large' %]</li>
+                                <li><strong>Estimated Man Hours:</strong> [% workshop_project.estimated_man_hours || '120' %]</li>
+                                <li><strong>Developer Name:</strong> [% workshop_project.developer_name || 'Development Team' %]</li>
+                                <li><strong>Client Name:</strong> [% workshop_project.client_name || 'Internal' %]</li>
+                                <li><strong>Comments:</strong> [% workshop_project.comments || 'Multi-site workshop advertising system with participant management and PowerPoint integration' %]</li>
+                            </ul>
+
+                            <p>
+                                <a href="/project/details?project_id=8" target="_blank" style="color: #007bff;">View Details</a> |
+                                <a href="/project/editproject?project_id=8" target="_blank" style="color: #007bff;">Edit Project</a>
+                            </p>
+
+                            [% SET workshop_todos = workshop_project.todos.search({}, { order_by => 'sort_order' }) %]
+                            [% IF workshop_todos.count > 0 %]
+                                <h4>📋 Todos for [% workshop_project.name %] ([% workshop_todos.count %])</h4>
+                                <ul style="list-style-type: none; padding-left: 0;">
+                                    [% FOREACH todo IN workshop_todos.all %]
+                                        <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
+                                            [% IF todo.status == 'In-Process' %]⏳[% ELSIF todo.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                            [% todo.subject %]
+                                            <br><small style="color: #666;">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
+                                            <br><a href="/todo/showtodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
+                                            <a href="/todo/edittodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
+                                        </li>
+                                    [% END %]
+                                </ul>
+                            [% ELSE %]
+                                <p>No todos found for this project. <a href="/todo/addtodo?project_id=8">Add a todo</a></p>
+                            [% END %]
+                    </div>
+                [% ELSE %]
+                    <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px; margin: 10px 0;">
+                        <strong>Note:</strong> Project ID 8 not found in database. Please ensure the project record exists.
+                        <a href="/project/addproject" style="color: #007bff;">Create Project</a>
+                    </div>
+                [% END %]
+            [% CATCH %]
+                <div style="background: #f8d7da; border: 1px solid #dc3545; padding: 10px; margin: 10px 0;">
+                    <strong>Error loading project:</strong> [% error.info %]
+                </div>
+            [% END %]
+
+            [% INCLUDE admin/documentation/_workshops_phases.tt %]
+
+            <h4>📁 Documentation & Resources</h4>
+            <ul>
+                <li>Zenflow Task: <code>workshops-7d21</code></li>
+                <li>Requirements: <code>.zenflow/tasks/workshops-7d21/requirements.md</code></li>
+                <li>Technical Spec: <code>.zenflow/tasks/workshops-7d21/spec.md</code></li>
+                <li>Implementation Plan: <code>.zenflow/tasks/workshops-7d21/plan.md</code></li>
+                <li>API Access: <a href="http://api.workstation.local:4004/workshop" target="_blank">api.workstation.local:4004</a></li>
+            </ul>
+
+            <h4>🔌 API Endpoints</h4>
+            <details open>
+                <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>Workshop Management Endpoints</strong></summary>
+                <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                    <ul style="list-style: none; padding-left: 0;">
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop</strong> - List all workshops with filtering
+                            <br><small style="color: #666;">Query params: site_filter (all|public|mysite), status_filter (all|draft|published|registration_closed|in_progress|completed|cancelled), date_from, date_to</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/add</strong> - Display workshop creation form
+                            <br><small style="color: #666;">Auth: Authenticated users only</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/addworkshop</strong> - Create new workshop
+                            <br><small style="color: #666;">Auth: Authenticated users | Fields: title, description, start_date, max_participants, status, share (public/private), registration_deadline</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/details</strong> - View workshop details
+                            <br><small style="color: #666;">Query params: workshop_id | Auth: Public for published workshops, registered participants for materials</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/edit</strong> - Display workshop edit form
+                            <br><small style="color: #666;">Query params: workshop_id | Auth: Workshop leader or admin</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/edit</strong> - Update workshop
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Updates all workshop fields including status and share settings</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/dashboard</strong> - Workshop leader dashboard
+                            <br><small style="color: #666;">Auth: Authenticated users | Shows workshops created by user with stats</small>
+                        </li>
+                    </ul>
+                </div>
+            </details>
+
+            <details open>
+                <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>Lifecycle Management Endpoints</strong></summary>
+                <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                    <ul style="list-style: none; padding-left: 0;">
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/publish</strong> - Publish workshop (draft → published)
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/close_registration</strong> - Close registration (published → registration_closed)
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/start</strong> - Start workshop (any → in_progress)
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/complete</strong> - Complete workshop (any → completed)
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/cancel</strong> - Cancel workshop (any → cancelled)
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                        </li>
+                    </ul>
+                </div>
+            </details>
+
+            <details open>
+                <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>Registration & Participant Management Endpoints</strong></summary>
+                <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                    <ul style="list-style: none; padding-left: 0;">
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/register</strong> - Register for workshop
+                            <br><small style="color: #666;">Auth: Authenticated users | Params: workshop_id | Auto-handles capacity limits and waitlist</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/unregister</strong> - Cancel registration
+                            <br><small style="color: #666;">Auth: Authenticated users | Params: workshop_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/participants</strong> - View participant list
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id | Shows registered and waitlist separately</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/add_participant</strong> - Manually add participant
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id, email, name, site_affiliation</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/remove_participant</strong> - Remove participant
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id, participant_id</small>
+                        </li>
+                    </ul>
+                </div>
+            </details>
+
+            <details open>
+                <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>File Management Endpoints</strong></summary>
+                <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                    <ul style="list-style: none; padding-left: 0;">
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/files</strong> - List workshop files
+                            <br><small style="color: #666;">Auth: View access (registered participants, leader, admin) | Params: workshop_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/upload</strong> - Upload workshop file
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id, file | Max size: 50MB | Allowed types: ppt, pptx, pdf, doc, docx, txt</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/download</strong> - Download workshop file
+                            <br><small style="color: #666;">Auth: Registered participants, leader, or admin | Params: file_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/delete_file</strong> - Delete workshop file
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: file_id</small>
+                        </li>
+                    </ul>
+                </div>
+            </details>
+
+            <details open>
+                <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>Content Management Endpoints</strong></summary>
+                <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                    <ul style="list-style: none; padding-left: 0;">
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/content</strong> - List content sections
+                            <br><small style="color: #666;">Auth: View access | Params: workshop_id | Ordered by sort_order</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/add_content</strong> - Display content creation form
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/add_content</strong> - Create content section
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id, title, content, content_type, sort_order</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/edit_content</strong> - Display content edit form
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: content_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/edit_content</strong> - Update content section
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: content_id, title, content, content_type, sort_order</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/delete_content</strong> - Delete content section
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: content_id</small>
+                        </li>
+                    </ul>
+                </div>
+            </details>
+
+            <details open>
+                <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>Email Communication Endpoints</strong></summary>
+                <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                    <ul style="list-style: none; padding-left: 0;">
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/compose_email</strong> - Display email composition form
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/send_email</strong> - Send email to participants
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id, subject, body | Sends to all registered participants</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/email_history</strong> - View email history
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id | Shows all sent emails with status</small>
+                        </li>
+                    </ul>
+                </div>
+            </details>
+
+            <h4>✅ Success Criteria</h4>
+            <ul>
+                <li>Workshop leaders can create and manage workshops</li>
+                <li>Multi-site filtering works correctly (public vs. private workshops)</li>
+                <li>Registration workflow enforces capacity limits and waitlist</li>
+                <li>PowerPoint files upload/download restricted to registered participants</li>
+                <li>Email system sends to all registered participants</li>
+                <li>Authorization checks enforce CSC admin god-level and site-scoped access</li>
+                <li>All CRUD operations follow existing Catalyst/DBIx::Class patterns</li>
+                <li>Mobile-responsive design maintained</li>
+                <li>All tests passing (unit, integration)</li>
+                <li>Production deployment successful with < 2 second page loads</li>
+            </ul>
+
+            <h4>🔑 Key Features</h4>
+            <ul>
+                <li><strong>Role-Based Access:</strong> CSC admin (god-level), Site admin (site-scoped), Workshop leader (own workshops), User (register/view), Guest (public view only)</li>
+                <li><strong>Workshop Lifecycle:</strong> Draft → Published → Registration Closed → In Progress → Completed/Cancelled</li>
+                <li><strong>Multi-Site Support:</strong> Public workshops visible across all sites, private workshops site-filtered</li>
+                <li><strong>Participant Management:</strong> Registration, capacity limits, waitlist, manual add/remove</li>
+                <li><strong>Content Development:</strong> PowerPoint upload/download, online rich text editor, content sections with sort order</li>
+                <li><strong>Communication:</strong> Workshop mailing lists, email templates, email history tracking</li>
+                <li><strong>File Management:</strong> Reuse existing files table, whitelist file types (PPT, PPTX, PDF), restrict downloads to registered participants</li>
+            </ul>
+
+            <h4>🔗 Related Projects</h4>
+            <ul>
+                <li><a href="/project/details?project_id=8">WorkShops Module (ID 8)</a></li>
+                <li><a href="/Documentation/project/details?project_id=157">API System Setup & Domain Migration (ID 157)</a></li>
+            </ul>
+            </div>
+        </details>
+
+        <!-- Group 3.7: Users System -->
+        <div id="anchor-users-system" class="nav-anchor"></div>
+        <details id="group-users" class="priority-group-container" open>
+            <summary class="group-header">👥 User & Admin Management System</summary>
+            <div class="priority-content">
+
+            <div id="anchor-users-project" class="nav-anchor"></div>
+            <details id="users-project" class="priority-container" open>
+                <summary class="priority-summary">👥 User & Admin Management System</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 1 Complete, Phase 2 Started</span> | <strong>Priority:</strong> <span class="status-in-progress">HIGH</span></p>
+                    <p><strong>Zenflow Task:</strong> <code>users-e5b8</code> (port 4005) | <strong>Branch:</strong> <code>users-e5b8</code></p>
+
+                    <p><strong>Objective:</strong> Comprehensive user and admin management system with email verification, password reset, role management, and site-based access control.</p>
+
+                    <h4>📋 Overview</h4>
+                    <p>Enhance existing user management with complete self-service and administrative capabilities:</p>
+                    <ul>
+                        <li>Self-registration with email verification (3-step process)</li>
+                        <li>Admin-created accounts with invitation workflow</li>
+                        <li>Password management (change, reset via email)</li>
+                        <li>Enhanced login (email OR username, password OR verification code)</li>
+                        <li>User dashboard (profile view/edit, site roles)</li>
+                        <li>Admin dashboard (user list, filters, search)</li>
+                        <li>Role management (assign/remove roles per site)</li>
+                        <li>Account suspension/activation</li>
+                        <li>Site-based access control (CSC admin vs site admin)</li>
+                        <li>Audit logging for all user/admin actions</li>
+                    </ul>
+
+                    <h4>📊 Users Project from Database</h4>
+                    [% TRY %]
+                        [% SET schema = c.model('DBEncy').schema %]
+                        [% SET users_project = schema.resultset('Project').find(184) %]
+
+                        [% IF users_project %]
+                            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                                    <h3>[% users_project.name %] (Project ID: [% users_project.id %])</h3>
+                                    <ul>
+                                        <li><strong>Description:</strong> [% users_project.description || 'User and Admin Management System with email verification and role management' %]</li>
+                                        <li><strong>Start Date:</strong> [% users_project.start_date || '2026-02-18' %]</li>
+                                        <li><strong>End Date:</strong> [% users_project.end_date || 'TBD' %]</li>
+                                        <li><strong>Status:</strong> [% users_project.status || 'In-Process' %]</li>
+                                        <li><strong>Project Code:</strong> [% users_project.project_code || 'USERS' %]</li>
+                                        <li><strong>Project Size:</strong> [% users_project.project_size || 'Medium' %]</li>
+                                        <li><strong>Estimated Man Hours:</strong> [% users_project.estimated_man_hours || '80' %]</li>
+                                        <li><strong>Developer Name:</strong> [% users_project.developer_name || 'Development Team' %]</li>
+                                        <li><strong>Client Name:</strong> [% users_project.client_name || 'Internal' %]</li>
+                                        <li><strong>Comments:</strong> [% users_project.comments || 'User management system with email verification, role management, and site-based access control' %]</li>
+                                    </ul>
+
+                                    <p>
+                                        <a href="/project/details?project_id=[% users_project.id %]" target="_blank" style="color: #007bff;">View Details</a> |
+                                        <a href="/project/editproject?project_id=[% users_project.id %]" target="_blank" style="color: #007bff;">Edit Project</a>
+                                    </p>
+
+                                    [% SET users_todos = users_project.todos.search({}, { order_by => 'sort_order' }) %]
+                                    [% IF users_todos.count > 0 %]
+                                        <h4>📋 Todos for [% users_project.name %] ([% users_todos.count %])</h4>
+                                        <ul style="list-style-type: none; padding-left: 0;">
+                                            [% FOREACH todo IN users_todos.all %]
+                                                <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #007bff; background: #fafafa;">
+                                                    [% IF todo.status == 'In-Process' %]⏳[% ELSIF todo.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                                    [% todo.subject %]
+                                                    <br><small style="color: #666;">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
+                                                    <br><a href="/todo/showtodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
+                                                    <a href="/todo/edittodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
+                                                </li>
+                                            [% END %]
+                                        </ul>
+                                    [% ELSE %]
+                                        <p>No todos found for this project. <a href="/todo/addtodo?project_id=[% users_project.id %]">Add a todo</a></p>
+                                    [% END %]
+                            </div>
+                        [% ELSE %]
+                            <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px; margin: 10px 0;">
+                                <strong>Note:</strong> Project ID 184 not found in database. Please ensure the project record exists.
+                                <a href="/project/addproject" style="color: #007bff;">Create Project</a>
+                            </div>
+                        [% END %]
+                    [% CATCH %]
+                        <div style="background: #f8d7da; border: 1px solid #dc3545; padding: 10px; margin: 10px 0;">
+                            <strong>Error loading project:</strong> [% error.info %]
+                        </div>
+                    [% END %]
+
+                    <h4>🎯 Current Phase: Phase 2 - User Self-Service Features</h4>
+                    <ul>
+                        <li>✅ Requirements document created</li>
+                        <li>✅ Technical specification complete</li>
+                        <li>✅ Implementation plan created (23 steps across 5 phases)</li>
+                        <li>✅ EmailVerificationCode Result file created</li>
+                        <li>✅ PasswordResetToken Result file created</li>
+                        <li>✅ User Result file modified (8 new columns, 4 relationships)</li>
+                        <li>✅ Fixed schema_compare bugs (CURRENT_TIMESTAMP, JSON serialization)</li>
+                        <li>✅ Database schema changes verified (all 3 tables created/modified, DBIx::Class relationships active)</li>
+                        <li>✅ UserVerification utility module created (SHA256 hashing, code/token generation, 24h expiry)</li>
+                        <li>✅ 3-step self-registration workflow implemented (refactored existing code, PascalCase templates)</li>
+                        <li>⏳ **NEXT**: Enhance login with email/username support</li>
+                    </ul>
+
+                    <h4>🔧 Issues Resolved</h4>
+                    <ul>
+                        <li>✅ Fixed duplicate User.pm files (<code>User.pm</code> vs <code>User/User.pm</code>)</li>
+                        <li>✅ Updated package references in Documentation.pm and Content.pm</li>
+                        <li>✅ Added <code>check_password()</code> and <code>display_name()</code> methods to User.pm</li>
+                        <li>✅ Fixed schema_compare CURRENT_TIMESTAMP handling (was generating <code>SCALAR(0x...)</code>)</li>
+                        <li>✅ Fixed schema_compare JSON serialization (scalar reference dereferencing)</li>
+                        <li>✅ Fixed regex in <code>parse_result_file_columns()</code> to capture last column</li>
+                    </ul>
+
+                    <h4>🔨 Latest Implementation: 3-Step Self-Registration Workflow</h4>
+                    <div style="padding: 10px; background: #d4edda; border: 1px solid #28a745; border-radius: 4px; margin: 10px 0;">
+                        <p><strong>Status:</strong> ✅ COMPLETE - Ready for testing</p>
+                        <p><strong>Access:</strong> <a href="http://workstation.local:4005/user/register" target="_blank">http://workstation.local:4005/user/register</a></p>
+
+                        <p><strong>Implementation Approach:</strong></p>
+                        <ul style="margin-top: 5px;">
+                            <li><strong>Reused Existing Code:</strong> Refactored <code>register</code> action and <code>register.tt</code> template instead of creating duplicates</li>
+                            <li><strong>Followed PascalCase:</strong> New templates named <code>VerifyEmail.tt</code> and <code>CompleteProfile.tt</code></li>
+                            <li><strong>Clean URLs:</strong> <code>/user/register</code> (not /register_step1), <code>/user/verify_email</code>, <code>/user/complete_profile</code></li>
+                            <li><strong>Deleted Orphans:</strong> Removed duplicate templates (<code>create_account.tt</code>, <code>register_step1.tt</code>) and orphaned actions</li>
+                            <li><strong>Backward Compatible:</strong> <code>/user/create_account</code> redirects to <code>/user/register</code></li>
+                        </ul>
+
+                        <p><strong>Workflow (3 Steps):</strong></p>
+                        <ol style="margin-top: 5px;">
+                            <li><strong>Step 1 - Register (<code>/user/register</code>):</strong>
+                                <ul style="font-size: 0.9em; margin-top: 3px;">
+                                    <li>User enters username + email</li>
+                                    <li>Validates uniqueness (username & email)</li>
+                                    <li>Creates user with <code>status='pending_verification'</code></li>
+                                    <li>Generates 6-digit code (SHA256 hashed)</li>
+                                    <li>Stores in <code>email_verification_codes</code> table</li>
+                                    <li>Displays code in session for testing (placeholder for email)</li>
+                                    <li>Redirects to Step 2</li>
+                                </ul>
+                            </li>
+                            <li><strong>Step 2 - Verify Email (<code>/user/verify_email</code>):</strong>
+                                <ul style="font-size: 0.9em; margin-top: 3px;">
+                                    <li>User enters 6-digit code</li>
+                                    <li>Validates against hashed value</li>
+                                    <li>Checks 24-hour expiry via <code>UserVerification::is_expired()</code></li>
+                                    <li>Marks <code>verified_at</code> timestamp</li>
+                                    <li>Redirects to Step 3</li>
+                                </ul>
+                            </li>
+                            <li><strong>Step 3 - Complete Profile (<code>/user/complete_profile</code>):</strong>
+                                <ul style="font-size: 0.9em; margin-top: 3px;">
+                                    <li>User enters first name, last name, password (2x)</li>
+                                    <li>Validates password length (≥8 chars) and match</li>
+                                    <li>Hashes password with SHA256</li>
+                                    <li>Updates user: <code>status='active'</code>, <code>email_verified_at</code>, name, password</li>
+                                    <li>Clears session verification data</li>
+                                    <li>Redirects to login with success message</li>
+                                </ul>
+                            </li>
+                        </ol>
+
+                        <p><strong>Files Modified/Created:</strong></p>
+                        <ul style="margin-top: 5px;">
+                            <li>✅ <code>User.pm</code> - Refactored <code>do_create_account</code> for Step 1, added <code>verify_email</code> and <code>complete_profile</code> actions</li>
+                            <li>✅ <code>register.tt</code> - Refactored to show only username + email (removed password, name fields)</li>
+                            <li>✅ <code>VerifyEmail.tt</code> - Created (PascalCase) with code entry form and testing helper</li>
+                            <li>✅ <code>CompleteProfile.tt</code> - Created (PascalCase) with name + password form</li>
+                            <li>❌ Deleted: <code>create_account.tt</code>, <code>register_step1.tt</code> (duplicates)</li>
+                        </ul>
+
+                        <p><strong>Security Features:</strong></p>
+                        <ul style="margin-top: 5px;">
+                            <li>✅ SHA256 hashing for verification codes (never stored plain text)</li>
+                            <li>✅ SHA256 hashing for passwords</li>
+                            <li>✅ 24-hour expiry on verification codes</li>
+                            <li>✅ Server-side validation (username uniqueness, email format, password strength)</li>
+                            <li>✅ Session-based workflow (prevents skipping steps)</li>
+                        </ul>
+
+                        <p><strong>Testing Notes:</strong></p>
+                        <ul style="margin-top: 5px;">
+                            <li>⚠️ <strong>Database schema must be applied</strong> via schema_compare before testing</li>
+                            <li>📧 Email sending is placeholder (code displayed on screen for testing)</li>
+                            <li>🔧 Syntax verified with <code>perl -Ilib -c</code></li>
+                            <li>🔄 Server restart required after schema changes</li>
+                        </ul>
+
+                        <p><strong>Next Step:</strong> Enhance login to accept email OR username (currently username only)</p>
+                    </div>
+
+                    <h4>🚀 Implementation Phases (6 weeks)</h4>
+                    <p><strong>Phase 1: Database Schema (Week 1) - ✅ COMPLETE</strong></p>
+                    <ul>
+                        <li>✅ Create EmailVerificationCode Result file</li>
+                        <li>✅ Create PasswordResetToken Result file</li>
+                        <li>✅ Modify User Result file (add 8 columns: email_notifications, status, email_verified_at, created_by, creation_context, created_at, updated_at; add relationships)</li>
+                        <li>✅ Database schema changes verified
+                            <ul>
+                                <li>✅ <code>email_verification_codes</code> table created (6 columns)</li>
+                                <li>✅ <code>password_reset_tokens</code> table created (6 columns)</li>
+                                <li>✅ <code>users</code> table modified (7 new columns added)</li>
+                                <li>✅ All DBIx::Class relationships active and functional</li>
+                                <li>✅ Schema validation confirmed via DBIx::Class queries</li>
+                            </ul>
+                        </li>
+                    </ul>
+
+                    <p><strong>Phase 2: User Self-Service (Week 2-3) - ⏳ IN PROGRESS</strong></p>
+                    <ul>
+                        <li>✅ UserVerification utility (code/token generation and validation)
+                            <ul style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                                <li>Moose-based utility class with SHA256 hashing</li>
+                                <li>6-digit verification codes & 32-char hex reset tokens</li>
+                                <li>24-hour expiry for all codes/tokens</li>
+                                <li>Methods: generate_verification_code(), create_verification_code(), verify_code(), generate_reset_token(), create_reset_token(), verify_reset_token(), is_expired()</li>
+                                <li>Full integration with DBIx::Class relationships (EmailVerificationCode, PasswordResetToken)</li>
+                            </ul>
+                        </li>
+                        <li>✅ 3-step registration (email → verify code → complete profile)
+                            <ul style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                                <li>Refactored existing register.tt and do_create_account (reuse over new)</li>
+                                <li>Created VerifyEmail.tt and CompleteProfile.tt (PascalCase naming)</li>
+                                <li>Clean URLs: /user/register, /user/verify_email, /user/complete_profile</li>
+                                <li>Session-based workflow prevents step skipping</li>
+                                <li>Full validation: username/email uniqueness, password strength, code expiry</li>
+                                <li>Deleted orphaned duplicates: create_account.tt, register_step1.tt</li>
+                            </ul>
+                        </li>
+                        <li>⏳ **NEXT**: Enhanced login (email/username, password/code)</li>
+                        <li>Password management (change, reset)</li>
+                        <li>Profile view/edit</li>
+                        <li>Email templates (verification, reset, welcome)</li>
+                    </ul>
+
+                    <p><strong>Phase 3: Admin Features (Week 4-5)</strong></p>
+                    <ul>
+                        <li>Admin dashboard (user list, filters, search)</li>
+                        <li>Admin user creation (with invitation email)</li>
+                        <li>User edit/suspend/activate</li>
+                        <li>Role management (assign/remove UserSiteRole)</li>
+                        <li>Site role management (SiteRole CRUD)</li>
+                    </ul>
+
+                    <p><strong>Phase 4: Integration & Polish (Week 6)</strong></p>
+                    <ul>
+                        <li>Project registration via API</li>
+                        <li>Comprehensive audit logging</li>
+                        <li>Manual testing of all workflows</li>
+                        <li>Production deployment</li>
+                    </ul>
+
+                    <h4>📁 Documentation & Resources</h4>
+                    <ul>
+                        <li>Zenflow Task: <code>users-e5b8</code></li>
+                        <li>Requirements: <a href="/.zenflow/tasks/users-e5b8/requirements.md" target="_blank">requirements.md</a></li>
+                        <li>Technical Spec: <a href="/.zenflow/tasks/users-e5b8/spec.md" target="_blank">spec.md</a></li>
+                        <li>Implementation Plan: <a href="/.zenflow/tasks/users-e5b8/plan.md" target="_blank">plan.md</a></li>
+                        <li>API Access: <a href="http://api.workstation.local:4005/user/dashboard" target="_blank">api.workstation.local:4005</a></li>
+                    </ul>
+
+                    <h4>🗄️ Database Schema Changes</h4>
+                    <details open>
+                        <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>New Tables & Modifications</strong></summary>
+                        <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                            <p><strong>User Table Modifications:</strong></p>
+                            <ul>
+                                <li><code>username</code> - Change to nullable (admin-created accounts)</li>
+                                <li><code>status</code> - New field (pending_verification, pending_setup, active, suspended)</li>
+                                <li><code>email_verified_at</code> - Timestamp</li>
+                                <li><code>created_by</code> - User ID of creator (for admin-created accounts)</li>
+                                <li><code>creation_context</code> - self_registration, workshop_invitation, admin_created</li>
+                            </ul>
+                            <p><strong>New Tables:</strong></p>
+                            <ul>
+                                <li><code>email_verification_codes</code> - Email verification workflow</li>
+                                <li><code>password_reset_tokens</code> - Password reset workflow</li>
+                            </ul>
+                            <p><strong>Existing Tables (No Changes):</strong></p>
+                            <ul>
+                                <li><code>user_site_roles</code> - Links users to roles and sites</li>
+                                <li><code>site_roles</code> - Defines available roles per site</li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <h4>🔌 Key Features</h4>
+                    <details open>
+                        <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>User Self-Service</strong></summary>
+                        <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                            <ul style="list-style: none; padding-left: 0;">
+                                <li style="margin-bottom: 8px;">
+                                    <strong>Self-Registration</strong>
+                                    <br><small style="color: #666;">3-step process: Enter username+email → Verify 6-digit code → Complete profile with password</small>
+                                </li>
+                                <li style="margin-bottom: 8px;">
+                                    <strong>Enhanced Login</strong>
+                                    <br><small style="color: #666;">Accepts email OR username, password OR verification code (for admin-created accounts)</small>
+                                </li>
+                                <li style="margin-bottom: 8px;">
+                                    <strong>Password Management</strong>
+                                    <br><small style="color: #666;">Change password (while logged in) | Reset via email link with 24-hour token</small>
+                                </li>
+                                <li style="margin-bottom: 8px;">
+                                    <strong>Profile Management</strong>
+                                    <br><small style="color: #666;">View profile with site roles | Edit name and email | Username read-only</small>
+                                </li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <details open>
+                        <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>Admin Features</strong></summary>
+                        <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                            <ul style="list-style: none; padding-left: 0;">
+                                <li style="margin-bottom: 8px;">
+                                    <strong>User Dashboard</strong>
+                                    <br><small style="color: #666;">List all users | Filter by site, role, status | Search by username, email | CSC admins see all, site admins see their site only</small>
+                                </li>
+                                <li style="margin-bottom: 8px;">
+                                    <strong>User Creation</strong>
+                                    <br><small style="color: #666;">Admin creates account with email only | Sends invitation email with verification code | User sets own username and password</small>
+                                </li>
+                                <li style="margin-bottom: 8px;">
+                                    <strong>User Management</strong>
+                                    <br><small style="color: #666;">Edit user details | Suspend/activate accounts | View audit logs</small>
+                                </li>
+                                <li style="margin-bottom: 8px;">
+                                    <strong>Role Management</strong>
+                                    <br><small style="color: #666;">Assign/remove roles per site | Manage site-specific role list | Standard roles: normal, editor, developer, WorkshopLeader, admin</small>
+                                </li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <h4>🔒 Security Features</h4>
+                    <ul>
+                        <li>All passwords hashed with SHA256 (existing pattern)</li>
+                        <li>Verification codes and reset tokens hashed before storage</li>
+                        <li>24-hour expiry enforced on all tokens</li>
+                        <li>Single-use tokens for password reset</li>
+                        <li>Site-based access control (AdminAuth utility)</li>
+                        <li>Comprehensive audit logging (Logging utility)</li>
+                    </ul>
+
+                    <h4>🔗 Related Systems</h4>
+                    <ul>
+                        <li><a href="/user/login" target="_blank">Login Page</a></li>
+                        <li><a href="/user/profile" target="_blank">User Profile</a></li>
+                        <li><a href="/user/dashboard" target="_blank">Admin Dashboard (Admin Only)</a></li>
+                        <li><a href="/user/create_account" target="_blank">Create Account</a></li>
+                        <li><a href="/user/forgot_password" target="_blank">Password Reset</a></li>
+                    </ul>
+                </div>
+            </details>
+            </div>
+        </details>
+
+        <!-- Group: File Management System -->
+        <details id="group-file-mgmt" class="priority-group-container" open>
+            <summary class="group-header">📁 File Management System</summary>
+            <div class="priority-content">
+
+            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0 COMPLETE</span> | <strong>Priority:</strong> <span class="status-pending">HIGH</span></p>
+            <p><strong>Zenflow Task:</strong> <code>new-task-bb05</code> | <strong>Branch:</strong> <code>new-task-bb05</code></p>
+
+            <p><strong>Objective:</strong> Production-ready NFS-backed file management system with multi-tier access control, duplicate detection, file renaming, and workshop file sharing across SiteNames.</p>
+
+            <h4>📋 Overview</h4>
+            <ul>
+                <li>CSC Admin manages NFS directory allocations per SiteName (<code>nfs_directory</code> table)</li>
+                <li>SiteName Admins browse and manage files scoped to their allocated directories</li>
+                <li>All files tracked in the <code>files</code> DB table (already exists)</li>
+                <li>Duplicate detection by file name + size on upload and NFS sync</li>
+                <li>Atomic file rename: filesystem + DB updated together, DB rolled back on FS failure</li>
+                <li>Workshop file sharing across SiteNames via <code>WorkshopResource.access_level</code></li>
+                <li>Server-room services (Proxmox etc.) tracked read-only via NFS sync</li>
+            </ul>
+
+            <h4>🗺️ Delivery Phases</h4>
+
+            <details class="priority-container" open>
+                <summary><strong>Phase 0 — Navigation &amp; Admin Dashboard</strong> <span class="status-completed">COMPLETE</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li>File Management dropdown expanded in admin top menu (<code>admintopmenu.tt</code>)</li>
+                        <li>File Management section added to <a href="/admin">/admin</a> dashboard</li>
+                        <li>This Planning entry added to <code>admin/documentation/Planning.tt</code></li>
+                        <li><code>/admin/planning</code> route added to <code>Controller/Admin.pm</code></li>
+                    </ul>
+                    <p><strong>New nav links:</strong>
+                        <a href="/file/admin_browser">Admin Browser</a> |
+                        <a href="/file/list">File List</a> |
+                        <a href="/file/duplicates">Duplicates</a> |
+                        <a href="/file/nfs_allocations">NFS Allocations (CSC)</a>
+                    </p>
+                </div>
+            </details>
+
+            <details class="priority-container">
+                <summary><strong>Phase 1 — Fixes &amp; Foundation</strong> <span class="status-pending">PENDING</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li>Fix bare <code>some_criteria</code> syntax error in <code>Model/File.pm</code> <code>get_top_files</code></li>
+                        <li>Remove debug <code>sleep()</code> / <code>print</code> calls from <code>Controller/File.pm</code></li>
+                        <li>Create <code>Result/NfsDirectory.pm</code> (DBIx::Class Result class only — table created by DBA, no .sql files)</li>
+                        <li>Add <code>_resolve_roles</code> helper to controller</li>
+                        <li>Add <code>get_files_filtered</code>, <code>get_file_by_id</code>, <code>check_duplicate</code> to model</li>
+                    </ul>
+                </div>
+            </details>
+
+            <details class="priority-container">
+                <summary><strong>Phase 2 — Admin Browser &amp; File List</strong> <span class="status-pending">PENDING</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li><a href="/file/admin_browser">Admin Browser</a> — NFS directory tree scoped by role + <code>AdminBrowser.tt</code></li>
+                        <li><a href="/file/list">File List</a> — filterable DB file table + <code>FileList.tt</code></li>
+                        <li>Update <code>index</code> action redirect</li>
+                    </ul>
+                </div>
+            </details>
+
+            <details class="priority-container">
+                <summary><strong>Phase 3 — View, Edit &amp; Rename</strong> <span class="status-pending">PENDING</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li>File detail view <code>/file/view/:id</code> + <code>FileView.tt</code></li>
+                        <li>Metadata edit <code>/file/edit/:id</code> (description, status, access_level) + <code>FileEdit.tt</code></li>
+                        <li>Atomic rename: <code>rename()</code> on NFS + DB update, rollback on FS failure</li>
+                    </ul>
+                </div>
+            </details>
+
+            <details class="priority-container">
+                <summary><strong>Phase 4 — Upload &amp; Download</strong> <span class="status-pending">PENDING</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li><a href="/file/upload_file">Upload</a> — writes to NFS dir, duplicate-checks, creates <code>files</code> record</li>
+                        <li>Download <code>/file/download/:id</code> — streams file with correct Content-Type header</li>
+                    </ul>
+                </div>
+            </details>
+
+            <details class="priority-container">
+                <summary><strong>Phase 5 — NFS Allocation Management (CSC Admin)</strong> <span class="status-pending">PENDING</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li><a href="/file/nfs_allocations">NFS Allocations</a> — create/edit/deactivate per-SiteName NFS paths</li>
+                        <li>Admin Browser scoped to allocated dirs for SiteName admins</li>
+                    </ul>
+                </div>
+            </details>
+
+            <details class="priority-container">
+                <summary><strong>Phase 6 — Duplicate Management</strong> <span class="status-pending">PENDING</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li><a href="/file/duplicates">Duplicate Files</a> — view pairs, resolve (keep/delete/unmark)</li>
+                        <li>Duplicate check wired into upload and NFS sync</li>
+                    </ul>
+                </div>
+            </details>
+
+            <h4>📚 Reference</h4>
+            <ul>
+                <li>Spec: <code>.zenflow/tasks/new-task-bb05/spec.md</code></li>
+                <li>PRD: <code>.zenflow/tasks/new-task-bb05/requirements.md</code></li>
+                <li>Key files: <code>Controller/File.pm</code>, <code>Model/File.pm</code>, <code>Result/File.pm</code></li>
+            </ul>
+
+            </div>
+        </details>
+
         <!-- Group 4: Maintenance & Improvements -->
         <details id="group-maint" class="priority-group-container" open>
             <summary class="group-header">🛠️ Maintenance & Improvements</summary>
@@ -1495,10 +2621,107 @@ last_updated = '2026/02/08'
         <p><strong>API returns 401:</strong> Check token validity.</p>
     </div>
 
+    <!-- ============================================================
+         CSS THEMES WORKFLOW
+         ============================================================ -->
+    <div id="css-themes-workflow" class="doc-section">
+        <h2>CSS Themes System — Workflow &amp; Planning</h2>
+        <p>
+            This section records the planning and implementation workflow for the CSS Theme Management system.
+            For the end-user admin guide see
+            <a href="[% c.uri_for('/Documentation/CssThemes') %]">CssThemes documentation</a>
+            or click <em>View Documentation</em> from the Theme Management page.
+        </p>
+
+        <details class="priority-item" open>
+            <summary class="priority-summary">CSS Theme System — Feature Overview &amp; Goals</summary>
+            <div class="priority-content">
+                <h4>Objective</h4>
+                <p>Allow the SiteName admin to manage the visual appearance of their site entirely from within the browser — no SSH, no file editing, no deployment required.</p>
+
+                <h4>Key Capabilities</h4>
+                <ul>
+                    <li><strong>Choose</strong> — Pick any of the pre-installed themes (default, CSC, APIS, USBM, MCoop, dark, ve7tit) and apply it with one click.</li>
+                    <li><strong>Modify</strong> — Edit the CSS variables or raw CSS of an existing theme using the interactive editor or the raw CSS textarea, with a live preview.</li>
+                    <li><strong>Create</strong> — Build a brand-new theme via the Theme Creator form (full variable control + live preview) or the Quick Custom Theme colour-picker shortcut.</li>
+                    <li><strong>Document</strong> — In-system admin guide (<code>admin/documentation/CssThemes.tt</code>) accessible directly from the Theme Management page.</li>
+                </ul>
+
+                <h4>Implementation Summary</h4>
+                <table class="table table-sm table-bordered">
+                    <thead class="table-light">
+                        <tr><th>Component</th><th>File</th><th>Change</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Theme Config Model</td>
+                            <td><code>Comserv/lib/Comserv/Model/ThemeConfig.pm</code></td>
+                            <td>Added <code>set_site_theme</code>, <code>create_theme</code>, <code>generate_all_theme_css</code>, <code>_write_theme_css</code>, <code>update_theme</code> methods.</td>
+                        </tr>
+                        <tr>
+                            <td>Admin Theme Controller</td>
+                            <td><code>Comserv/lib/Comserv/Controller/Admin/Theme.pm</code></td>
+                            <td>Added <code>create_theme</code> (GET/POST) and <code>details</code> routes. Fixed <code>create_custom_theme</code> call signature.</td>
+                        </tr>
+                        <tr>
+                            <td>Theme Index Template</td>
+                            <td><code>Comserv/root/admin/theme/index.tt</code></td>
+                            <td>Replaced with a 4-step workflow UI: Choose → Modify → Create → Apply.</td>
+                        </tr>
+                        <tr>
+                            <td>Create Theme Template</td>
+                            <td><code>Comserv/root/admin/theme/create_theme.tt</code></td>
+                            <td>New full-featured theme creation form with live colour preview.</td>
+                        </tr>
+                        <tr>
+                            <td>Admin Documentation</td>
+                            <td><code>Comserv/root/admin/documentation/CssThemes.tt</code></td>
+                            <td>New in-system admin guide covering all four workflow steps, variable reference, and FAQ.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h4>URL Map</h4>
+                <table class="table table-sm table-bordered table-striped">
+                    <thead class="table-light">
+                        <tr><th>URL</th><th>Method</th><th>Purpose</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>/admin/theme</code></td><td>GET</td><td>Theme Management dashboard</td></tr>
+                        <tr><td><code>/admin/theme/update</code></td><td>POST</td><td>Apply existing theme to current site</td></tr>
+                        <tr><td><code>/admin/theme/create</code></td><td>GET / POST</td><td>Create brand-new theme</td></tr>
+                        <tr><td><code>/admin/theme/create_custom</code></td><td>POST</td><td>Quick custom theme (colour pickers)</td></tr>
+                        <tr><td><code>/admin/theme/edit/$theme</code></td><td>GET / POST</td><td>Raw CSS editor</td></tr>
+                        <tr><td><code>/admin/theme/edit_css_interactive/$theme</code></td><td>GET / POST</td><td>Interactive CSS editor with live preview</td></tr>
+                        <tr><td><code>/admin/theme/update_css/$theme</code></td><td>POST</td><td>Save raw CSS changes</td></tr>
+                        <tr><td><code>/admin/theme/details/$theme</code></td><td>GET</td><td>View theme details &amp; metadata</td></tr>
+                    </tbody>
+                </table>
+
+                <h4>Data Storage</h4>
+                <ul>
+                    <li><strong>Theme definitions</strong> — <code>Comserv/root/static/config/theme_definitions.json</code> (JSON; contains <code>themes</code> map and <code>site_themes</code> map).</li>
+                    <li><strong>Compiled CSS</strong> — <code>Comserv/root/static/css/themes/&lt;theme-name&gt;.css</code> (auto-regenerated on save).</li>
+                </ul>
+
+                <h4>Future Improvements</h4>
+                <ul>
+                    <li>Per-site theme isolation so modifying a shared theme cannot affect other sites (copy-on-write approach).</li>
+                    <li>Theme versioning / rollback history.</li>
+                    <li>Import / export theme as a JSON file.</li>
+                    <li>Preview theme on the actual live site in an iframe before applying.</li>
+                    <li>Role-based theme restrictions (e.g. developer can edit, admin can only choose).</li>
+                </ul>
+            </div>
+        </details>
+    </div>
+
     <div id="see-also" class="doc-section">
         <h2>See Also</h2>
         <ul>
             <li><a href="/Documentation/TodoSystemComprehensive">Todo System Documentation</a></li>
+            <li><a href="[% c.uri_for('/Documentation/CssThemes') %]">CSS Theme System — Admin Guide</a></li>
+            <li><a href="[% c.uri_for('/admin/theme') %]">Theme Management</a></li>
         </ul>
     </div>
 
