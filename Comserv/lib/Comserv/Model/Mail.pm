@@ -20,8 +20,12 @@ sub send_email {
     my ($self, $c, $to, $subject, $body, $site_id, $opts) = @_;
     $opts ||= {};
     
-    # Use site_id from parameter or session
-    $site_id //= $c->session->{site_id};
+    # Use site_id from parameter or session — use || not // so empty string falls through
+    $site_id ||= $c->session->{site_id};
+    $site_id ||= $c->stash->{site_id};
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+        "Resolved site_id=" . ($site_id // 'undef') . " (will look up SMTP config from DB)");
     
     # Log the email attempt
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email', 
@@ -130,8 +134,10 @@ sub send_email {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
                 "SMTP AUTH OK");
         } else {
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-                "SMTP no-auth (PMG relay or no credentials configured)");
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_email',
+                "SMTP no-auth: user='" . ($smtp_config->{user} // '') . "' password=" .
+                ($smtp_config->{password} ? '(set)' : '(NOT SET)') .
+                " — harper will reject if auth required");
         }
         
         # MAIL FROM
@@ -147,7 +153,7 @@ sub send_email {
         $smtp->to($to) or do {
             my $msg_detail = $smtp->message() || 'no response';
             $smtp->quit();
-            die "RCPT TO failed for <$to>: $msg_detail";
+            die "RCPT TO failed for [$to]: $msg_detail";
         };
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
             "SMTP RCPT TO accepted for <$to>");
