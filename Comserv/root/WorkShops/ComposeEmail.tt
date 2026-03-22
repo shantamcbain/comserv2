@@ -114,6 +114,15 @@
                     <div class="form-section">
                         <div class="form-row">
                             <div class="form-field">
+                                <label for="reply_to_override">From / Reply-To address:</label>
+                                <input type="email" id="reply_to_override" name="reply_to_override"
+                                       class="form-input" style="width:320px;"
+                                       placeholder="Leave blank to use your account email">
+                                <small>Replies from recipients go to this address. Defaults to your account email.</small>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-field">
                                 <label for="subject">Subject:</label>
                                 <input type="text" id="subject" name="subject" class="form-input" size="80" 
                                        value="[% form_data.subject || '' | html %]" required>

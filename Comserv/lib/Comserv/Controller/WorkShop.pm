@@ -3566,8 +3566,20 @@ sub send_email :Local :Args(1) {
         }
     }
     $leader_name ||= $workshop->instructor || '';
-    # Reply-To is leader's real email (may be gmail etc.); SMTP FROM stays as system address
+
+    # Allow leader to override reply-to from the form (e.g. use a different address)
+    my $reply_to_override = $params->{reply_to_override} || '';
+    $reply_to_override =~ s/^\s+|\s+$//g;
+    if ($reply_to_override && $reply_to_override =~ /\@/) {
+        $leader_email = $reply_to_override;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+            "reply_to overridden to '$reply_to_override' by form input");
+    }
+
+    # From/Reply-To: leader's real email; SMTP envelope stays as system address (avoids SPF issues)
     my $reply_to = $leader_email || $default_replyto || $from_address;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+        "send_email From header will use: leader_name='$leader_name' leader_email='$leader_email' reply_to='$reply_to'");
 
     # Process workshop-level [[placeholders]] in subject (same for all recipients)
     (my $processed_subject = $subject) =~ s/\[\[workshop\.title\]\]/${\($workshop->title || '')}/g;
