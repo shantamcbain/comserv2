@@ -3413,8 +3413,13 @@ sub compose_email :Local :Args(1) {
     )->get_column('email')->all;
     my $unique_total = scalar grep { $_ && $_ =~ /@/ } @all_emails;
 
-    leader_workshops   => \@leader_workshops,
+    $c->stash(
+        workshop           => $workshop,
+        recipient_count    => $registered_count,
         unique_total       => $unique_total,
+        workshop_templates => \@workshop_templates,
+        global_templates   => \@global_templates,
+        leader_workshops   => \@leader_workshops,
         template           => 'WorkShops/ComposeEmail.tt',
     );
 }
