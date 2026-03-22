@@ -1,0 +1,503 @@
+[% META title = 'Weather Configuration' %]
+
+<div class="weather-container">
+    <!-- Header Section -->
+    <header class="weather-header">
+        <h1><i class="fas fa-cog"></i> Weather Configuration</h1>
+        <div class="weather-context">
+            <span class="context-item"><strong>User:</strong> [% c.session.username || 'Guest' %]</span>
+            <span class="context-item"><strong>Status:</strong> Configuration Mode</span>
+        </div>
+        <div class="setup-guide">
+            <p><i class="fas fa-info-circle"></i> <strong>Setup Order:</strong> 
+            1. Select Weather Service & Enter API Key → 
+            2. Configure Location → 
+            3. Set Update Preferences → 
+            4. Test Configuration → 
+            5. Save Settings</p>
+        </div>
+    </header>
+
+    <form id="weather-config-form" method="POST" action="[% c.uri_for('/Weather/save_configuration') %]">
+        
+        <div class="feature-grid">
+            
+            <!-- API Service Configuration -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <h3><i class="fas fa-cloud feature-icon"></i>Weather Service Provider</h3>
+                </div>
+                <div class="feature-content">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="api_service">Weather Service *</label>
+                            <select class="form-input" id="api_service" name="api_service" required>
+                                <option value="">Select Weather Service</option>
+                                <option value="openweathermap" [% IF current_config.api_service == 'openweathermap' %]selected[% END %]>
+                                    OpenWeatherMap (Recommended)
+                                </option>
+                                <option value="weatherapi" [% IF current_config.api_service == 'weatherapi' %]selected[% END %]>
+                                    WeatherAPI
+                                </option>
+                                <option value="accuweather" [% IF current_config.api_service == 'accuweather' %]selected[% END %]>
+                                    AccuWeather
+                                </option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="api_key">API Key *</label>
+                            <input type="password" class="form-input" id="api_key" name="api_key" 
+                                   value="[% current_config.api_key %]" required
+                                   placeholder="Enter your weather service API key">
+                            <small class="form-help">
+                                <i class="fas fa-info-circle"></i> 
+                                Get your API key from your weather service provider's dashboard
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Location Configuration -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <h3><i class="fas fa-map-marker-alt feature-icon"></i>Location Settings</h3>
+                </div>
+                <div class="feature-content">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="location_method">Location Method</label>
+                            <select class="form-input" id="location_method" name="location_method">
+                                <option value="city" [% IF current_config.location_method == 'city' %]selected[% END %]>City Name</option>
+                                <option value="coordinates" [% IF current_config.location_method == 'coordinates' %]selected[% END %]>GPS Coordinates</option>
+                                <option value="zip" [% IF current_config.location_method == 'zip' || !current_config.location_method %]selected[% END %]>ZIP/Postal Code</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="city_input" style="display: none;">
+                            <label for="city_name">City Name</label>
+                            <input type="text" class="form-input" id="city_name" name="city_name" 
+                                   value="[% IF current_config.location_method == 'city' %][% current_config.location_value %][% END %]"
+                                   placeholder="e.g., Vancouver, BC, Canada">
+                        </div>
+                        <div class="form-group" id="coordinates_input" style="display: none;">
+                            <label for="latitude">Latitude</label>
+                            <input type="number" class="form-input" id="latitude" name="latitude" 
+                                   step="0.000001" min="-90" max="90"
+                                   value="[% IF current_config.location_method == 'coordinates' %][% current_config.location_value.split(',').0 %][% END %]"
+                                   placeholder="e.g., 49.2827">
+                            <small class="form-help">
+                                <i class="fas fa-info-circle"></i> 
+                                Valid range: -90 to 90 degrees
+                            </small>
+                        </div>
+                        <div class="form-group" id="longitude_input" style="display: none;">
+                            <label for="longitude">Longitude</label>
+                            <input type="number" class="form-input" id="longitude" name="longitude" 
+                                   step="0.000001" min="-180" max="180"
+                                   value="[% IF current_config.location_method == 'coordinates' %][% current_config.location_value.split(',').1 %][% END %]"
+                                   placeholder="e.g., -123.1207">
+                            <small class="form-help">
+                                <i class="fas fa-info-circle"></i> 
+                                Valid range: -180 to 180 degrees
+                            </small>
+                        </div>
+                        <div class="form-group" id="zip_input">
+                            <label for="zip">ZIP/Postal Code</label>
+                            <input type="text" class="form-input" id="zip" name="zip" 
+                                   value="[% IF current_config.location_method == 'zip' || !current_config.location_method %][% current_config.location_value || '90210' %][% ELSE %]90210[% END %]"
+                                   placeholder="e.g., V6B 1A1 or 90210">
+                            <small class="form-help">
+                                <i class="fas fa-info-circle"></i> 
+                                Enter your postal/ZIP code - city name will be auto-populated
+                            </small>
+                        </div>
+                        <!-- Hidden field to store the consolidated location value -->
+                        <input type="hidden" id="location_value" name="location_value" value="[% current_config.location_value %]">
+                        <div class="form-group">
+                            <label for="country_code">Country Code</label>
+                            <select class="form-input" id="country_code" name="country_code">
+                                <option value="US" [% IF current_config.country_code == 'US' || !current_config.country_code %]selected[% END %]>United States (US)</option>
+                                <option value="CA" [% IF current_config.country_code == 'CA' %]selected[% END %]>Canada (CA)</option>
+                                <option value="GB" [% IF current_config.country_code == 'GB' %]selected[% END %]>United Kingdom (GB)</option>
+                                <option value="AU" [% IF current_config.country_code == 'AU' %]selected[% END %]>Australia (AU)</option>
+                                <option value="DE" [% IF current_config.country_code == 'DE' %]selected[% END %]>Germany (DE)</option>
+                                <option value="FR" [% IF current_config.country_code == 'FR' %]selected[% END %]>France (FR)</option>
+                                <option value="IT" [% IF current_config.country_code == 'IT' %]selected[% END %]>Italy (IT)</option>
+                                <option value="ES" [% IF current_config.country_code == 'ES' %]selected[% END %]>Spain (ES)</option>
+                                <option value="NL" [% IF current_config.country_code == 'NL' %]selected[% END %]>Netherlands (NL)</option>
+                                <option value="BE" [% IF current_config.country_code == 'BE' %]selected[% END %]>Belgium (BE)</option>
+                                <option value="CH" [% IF current_config.country_code == 'CH' %]selected[% END %]>Switzerland (CH)</option>
+                                <option value="AT" [% IF current_config.country_code == 'AT' %]selected[% END %]>Austria (AT)</option>
+                                <option value="SE" [% IF current_config.country_code == 'SE' %]selected[% END %]>Sweden (SE)</option>
+                                <option value="NO" [% IF current_config.country_code == 'NO' %]selected[% END %]>Norway (NO)</option>
+                                <option value="DK" [% IF current_config.country_code == 'DK' %]selected[% END %]>Denmark (DK)</option>
+                                <option value="FI" [% IF current_config.country_code == 'FI' %]selected[% END %]>Finland (FI)</option>
+                                <option value="JP" [% IF current_config.country_code == 'JP' %]selected[% END %]>Japan (JP)</option>
+                                <option value="KR" [% IF current_config.country_code == 'KR' %]selected[% END %]>South Korea (KR)</option>
+                                <option value="CN" [% IF current_config.country_code == 'CN' %]selected[% END %]>China (CN)</option>
+                                <option value="IN" [% IF current_config.country_code == 'IN' %]selected[% END %]>India (IN)</option>
+                                <option value="BR" [% IF current_config.country_code == 'BR' %]selected[% END %]>Brazil (BR)</option>
+                                <option value="MX" [% IF current_config.country_code == 'MX' %]selected[% END %]>Mexico (MX)</option>
+                                <option value="AR" [% IF current_config.country_code == 'AR' %]selected[% END %]>Argentina (AR)</option>
+                                <option value="ZA" [% IF current_config.country_code == 'ZA' %]selected[% END %]>South Africa (ZA)</option>
+                                <option value="RU" [% IF current_config.country_code == 'RU' %]selected[% END %]>Russia (RU)</option>
+                            </select>
+                            <small class="form-help">
+                                <i class="fas fa-info-circle"></i> 
+                                Select your country for accurate location lookup
+                            </small>
+                        </div>
+                    </div>
+                    <div class="location-actions">
+                        <button type="button" class="btn btn-info" id="detect-location-btn">
+                            <i class="fas fa-crosshairs"></i> Detect My Location
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="test-location-btn">
+                            <i class="fas fa-map-pin"></i> Test Location (Requires API Key)
+                        </button>
+                    </div>
+                    <div id="location-test-results" class="test-results" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- Update & Display Settings -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <h3><i class="fas fa-clock feature-icon"></i>Update & Display Settings</h3>
+                </div>
+                <div class="feature-content">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="update_interval">Update Interval (minutes)</label>
+                            <select class="form-input" id="update_interval" name="update_interval">
+                                <option value="15" [% IF current_config.update_interval == 15 %]selected[% END %]>15 minutes</option>
+                                <option value="30" [% IF current_config.update_interval == 30 %]selected[% END %]>30 minutes</option>
+                                <option value="60" [% IF current_config.update_interval == 60 %]selected[% END %]>1 hour</option>
+                                <option value="120" [% IF current_config.update_interval == 120 %]selected[% END %]>2 hours</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="temperature_units">Temperature Units</label>
+                            <select class="form-input" id="temperature_units" name="temperature_units">
+                                <option value="metric" [% IF current_config.temperature_units == 'metric' %]selected[% END %]>Celsius (°C)</option>
+                                <option value="imperial" [% IF current_config.temperature_units == 'imperial' %]selected[% END %]>Fahrenheit (°F)</option>
+                                <option value="kelvin" [% IF current_config.temperature_units == 'kelvin' %]selected[% END %]>Kelvin (K)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="language">Language</label>
+                            <select class="form-input" id="language" name="language">
+                                <option value="en" [% IF current_config.language == 'en' %]selected[% END %]>English</option>
+                                <option value="fr" [% IF current_config.language == 'fr' %]selected[% END %]>French</option>
+                                <option value="es" [% IF current_config.language == 'es' %]selected[% END %]>Spanish</option>
+                                <option value="de" [% IF current_config.language == 'de' %]selected[% END %]>German</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test Configuration -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <h3><i class="fas fa-flask feature-icon"></i>Test Configuration</h3>
+                </div>
+                <div class="feature-content">
+                    <p>Test your weather configuration before saving:</p>
+                    <div class="test-actions">
+                        <button type="button" class="btn btn-info" id="test-config-btn">
+                            <i class="fas fa-flask"></i> Test Weather API
+                        </button>
+                    </div>
+                    <div id="config-test-results" class="test-results" style="display: none;"></div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Form Actions -->
+        <div class="feature-actions">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Save Configuration
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="window.history.back()">
+                <i class="fas fa-arrow-left"></i> Cancel
+            </button>
+            <a href="[% c.uri_for('/Weather') %]" class="btn btn-info">
+                <i class="fas fa-home"></i> Weather Home
+            </a>
+        </div>
+
+    </form>
+</div>
+
+<!-- JavaScript for configuration functionality -->
+<script type="text/javascript">
+(function() {
+    'use strict';
+    
+    function initWeatherConfig() {
+        // Get elements
+        var locationTypeSelect = document.getElementById('location_method');
+        var detectLocationBtn = document.getElementById('detect-location-btn');
+        var testLocationBtn = document.getElementById('test-location-btn');
+        var testConfigBtn = document.getElementById('test-config-btn');
+        
+        // Location type change handler
+        if (locationTypeSelect) {
+            locationTypeSelect.addEventListener('change', function() {
+                var locationType = this.value;
+                var cityInput = document.getElementById('city_input');
+                var coordinatesInputLat = document.getElementById('coordinates_input');
+                var coordinatesInputLon = document.getElementById('longitude_input');
+                var zipInput = document.getElementById('zip_input');
+                
+                // Hide all inputs
+                if (cityInput) cityInput.style.display = 'none';
+                if (coordinatesInputLat) coordinatesInputLat.style.display = 'none';
+                if (coordinatesInputLon) coordinatesInputLon.style.display = 'none';
+                if (zipInput) zipInput.style.display = 'none';
+                
+                // Show selected input
+                switch(locationType) {
+                    case 'city':
+                        if (cityInput) cityInput.style.display = 'block';
+                        break;
+                    case 'coordinates':
+                        if (coordinatesInputLat) coordinatesInputLat.style.display = 'block';
+                        if (coordinatesInputLon) coordinatesInputLon.style.display = 'block';
+                        break;
+                    case 'zip':
+                        if (zipInput) zipInput.style.display = 'block';
+                        break;
+                }
+            });
+            
+            // Initialize display
+            locationTypeSelect.dispatchEvent(new Event('change'));
+        }
+        
+        // Function to update the hidden location_value field
+        function updateLocationValue() {
+            var locationType = document.getElementById('location_method').value;
+            var locationValue = '';
+            
+            switch(locationType) {
+                case 'city':
+                    locationValue = document.getElementById('city_name').value;
+                    break;
+                case 'coordinates':
+                    var lat = document.getElementById('latitude').value;
+                    var lon = document.getElementById('longitude').value;
+                    if (lat && lon) {
+                        locationValue = lat + ',' + lon;
+                    }
+                    break;
+                case 'zip':
+                    locationValue = document.getElementById('zip').value;
+                    break;
+            }
+            
+            document.getElementById('location_value').value = locationValue;
+        }
+        
+        // Add event listeners to update location_value when inputs change
+        var cityInput = document.getElementById('city_name');
+        var latInput = document.getElementById('latitude');
+        var lonInput = document.getElementById('longitude');
+        var zipInput = document.getElementById('zip');
+        
+        if (cityInput) cityInput.addEventListener('input', updateLocationValue);
+        if (latInput) latInput.addEventListener('input', updateLocationValue);
+        if (lonInput) lonInput.addEventListener('input', updateLocationValue);
+        if (zipInput) zipInput.addEventListener('input', updateLocationValue);
+        if (locationTypeSelect) locationTypeSelect.addEventListener('change', updateLocationValue);
+        
+        // Initialize location value
+        updateLocationValue();
+        
+        // Detect location button
+        if (detectLocationBtn) {
+            detectLocationBtn.addEventListener('click', function() {
+                if (navigator.geolocation) {
+                    this.disabled = true;
+                    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Detecting...';
+                    
+                    var btn = this;
+                    navigator.geolocation.getCurrentPosition(
+                        function(position) {
+                            var lat = position.coords.latitude.toFixed(6);
+                            var lon = position.coords.longitude.toFixed(6);
+                            
+                            var latInput = document.getElementById('latitude');
+                            var lonInput = document.getElementById('longitude');
+                            var locationSelect = document.getElementById('location_method');
+                            
+                            if (latInput) latInput.value = lat;
+                            if (lonInput) lonInput.value = lon;
+                            if (locationSelect) {
+                                locationSelect.value = 'coordinates';
+                                locationSelect.dispatchEvent(new Event('change'));
+                            }
+                            
+                            // Update the location value
+                            updateLocationValue();
+                            
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fas fa-crosshairs"></i> Detect My Location';
+                            
+                            var locationResults = document.getElementById('location-test-results');
+                            if (locationResults) {
+                                locationResults.style.display = 'block';
+                                locationResults.innerHTML = '<div class="alert alert-success"><strong>Location detected:</strong> ' + lat + ', ' + lon + '</div>';
+                            }
+                        },
+                        function(error) {
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fas fa-crosshairs"></i> Detect My Location';
+                            
+                            var locationResults = document.getElementById('location-test-results');
+                            if (locationResults) {
+                                locationResults.style.display = 'block';
+                                locationResults.innerHTML = '<div class="alert alert-danger"><strong>Location detection failed:</strong> ' + error.message + '</div>';
+                            }
+                        }
+                    );
+                } else {
+                    var locationResults = document.getElementById('location-test-results');
+                    if (locationResults) {
+                        locationResults.style.display = 'block';
+                        locationResults.innerHTML = '<div class="alert alert-warning">Geolocation is not supported by this browser.</div>';
+                    }
+                }
+            });
+        }
+        
+        // Test location button
+        if (testLocationBtn) {
+            testLocationBtn.addEventListener('click', function() {
+                var testResults = document.getElementById('location-test-results');
+                var originalText = this.innerHTML;
+                var btn = this;
+                
+                this.disabled = true;
+                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+                if (testResults) {
+                    testResults.style.display = 'block';
+                    testResults.innerHTML = '<div class="alert alert-info">Testing location configuration...</div>';
+                }
+                
+                // Update location value before testing
+                updateLocationValue();
+                
+                var formData = new FormData();
+                var locationType = document.getElementById('location_method').value;
+                var locationValue = document.getElementById('location_value').value;
+                
+                formData.append('location_method', locationType);
+                
+                if (!locationValue.trim()) {
+                    if (testResults) {
+                        testResults.innerHTML = '<div class="alert alert-warning">Please enter location information first.</div>';
+                    }
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                    return;
+                }
+                
+                formData.append('location_value', locationValue);
+                formData.append('country_code', document.getElementById('country_code').value || 'US');
+                formData.append('api_key', document.getElementById('api_key').value);
+                formData.append('api_service', document.getElementById('api_service').value);
+                
+                fetch('[% c.uri_for("/Weather/test_location") %]', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (testResults) {
+                        if (data.success) {
+                            testResults.innerHTML = '<div class="alert alert-success"><strong>Location test successful!</strong><br>' + data.message + '</div>';
+                        } else {
+                            testResults.innerHTML = '<div class="alert alert-danger"><strong>Location test failed:</strong><br>' + data.message + '</div>';
+                        }
+                    }
+                })
+                .catch(function(error) {
+                    if (testResults) {
+                        testResults.innerHTML = '<div class="alert alert-danger"><strong>Test request failed:</strong> ' + error.message + '</div>';
+                    }
+                })
+                .finally(function() {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                });
+            });
+        }
+        
+        // Test config button
+        if (testConfigBtn) {
+            testConfigBtn.addEventListener('click', function() {
+                var testResults = document.getElementById('config-test-results');
+                var originalText = this.innerHTML;
+                var btn = this;
+                
+                this.disabled = true;
+                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+                if (testResults) {
+                    testResults.style.display = 'block';
+                    testResults.innerHTML = '<div class="alert alert-info">Testing weather API configuration...</div>';
+                }
+                
+                // Update location value before testing
+                updateLocationValue();
+                
+                var formData = new FormData();
+                formData.append('api_service', document.getElementById('api_service').value);
+                formData.append('api_key', document.getElementById('api_key').value);
+                
+                var locationType = document.getElementById('location_method').value;
+                var locationValue = document.getElementById('location_value').value;
+                
+                formData.append('location_method', locationType);
+                formData.append('location_value', locationValue);
+                formData.append('country_code', document.getElementById('country_code').value || 'US');
+                formData.append('temperature_units', document.getElementById('units').value);
+                formData.append('language', document.getElementById('language').value);
+                
+                fetch('[% c.uri_for("/Weather/test_config") %]', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (testResults) {
+                        if (data.success) {
+                            testResults.innerHTML = '<div class="alert alert-success"><strong>Configuration test successful!</strong><br>' + data.message + '</div>';
+                        } else {
+                            testResults.innerHTML = '<div class="alert alert-danger"><strong>Configuration test failed:</strong><br>' + data.message + '</div>';
+                        }
+                    }
+                })
+                .catch(function(error) {
+                    if (testResults) {
+                        testResults.innerHTML = '<div class="alert alert-danger"><strong>Test request failed:</strong> ' + error.message + '</div>';
+                    }
+                })
+                .finally(function() {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                });
+            });
+        }
+    }
+    
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initWeatherConfig);
+    } else {
+        initWeatherConfig();
+    }
+})();
+</script>

@@ -1,0 +1,147 @@
+ [% META title = 'Git Status & Documentation Synchronization Analysis' %]
+[% PageVersion = 'Comserv/root/Documentation/documentation_sync_analysis.tt,v 0.01 2025/01/16 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="documentation-content">
+    <h1><i class="fas fa-sync-alt"></i> Git Status & Documentation Synchronization Analysis</h1>
+    
+    <div class="alert alert-warning">
+        <strong>Analysis Date:</strong> 2025-01-16<br>
+        <strong>Total Files in Git Status:</strong> 438<br>
+        <strong>Modified Files:</strong> 108<br>
+        <strong>Untracked Files:</strong> 329
+    </div>
+
+    <h2><i class="fas fa-file-sync"></i> Untracked Files Analysis</h2>
+
+    <div class="row">
+        <div class="col-md-6">
+            <h3><i class="fas fa-plus-circle"></i> Files to Commit (293 files)</h3>
+            <p><strong>Category:</strong> Documentation Template Files (.tt)</p>
+            <p><strong>Location:</strong> Comserv/root/Documentation/ and Comserv/docs/</p>
+            <div class="alert alert-info">
+                <strong>Action Required:</strong> These are legitimate documentation files that should be tracked:
+                <ul>
+                    <li>293 Template Toolkit (.tt) documentation files</li>
+                    <li>Changelog entries and system documentation</li>
+                    <li>User guides, admin guides, developer documentation</li>
+                    <li>Role-based documentation structure</li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <h4><i class="fas fa-times-circle"></i> Files to Leave Untracked (11 files)</h4>
+            <p><strong>Category:</strong> Utility Scripts (.pl) and Schema Files (.sql)</p>
+            <div class="alert alert-warning">
+                <strong>Analysis Result:</strong> Per coding standards, .pl and .sql files remain untracked:
+                <ul>
+                    <li>9 Perl utility scripts - not referenced by application code</li>
+                    <li>2 SQL schema files - standalone database scripts</li>
+                    <li>These files exist for maintenance but aren't called by tracked code</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <h3><i class="fas fa-question-circle"></i> Other Untracked Files (25 files)</h3>
+    <div class="row">
+        <div class="col-md-4">
+            <h4><i class="fas fa-check"></i> Application Files</h4>
+            <ul class="small">
+                <li>README.tt files</li>
+                <li>CHANGELOG.tt files</li>
+                <li>AI_ASSISTANT_GUIDELINES.tt</li>
+                <li>Static assets and templates</li>
+            </ul>
+        </div>
+        <div class="col-md-4">
+            <h4><i class="fas fa-folder"></i> Directories</h4>
+            <ul class="small">
+                <li>.codebuddy/ - Development tools</li>
+                <li>Upload directories</li>
+                <li>Static asset directories</li>
+            </ul>
+        </div>
+        <div class="col-md-4">
+            <h4><i class="fas fa-file-alt"></i> Build/Config Files</h4>
+            <ul class="small">
+                <li>Shell scripts for file processing</li>
+                <li>Build configuration files</li>
+                <li>Backup files (.backup extension)</li>
+            </ul>
+        </div>
+    </div>
+
+    <h2><i class="fas fa-code"></i> Current Implementation State vs Documentation Plans</h2>
+
+    <h3><i class="fas fa-check-circle"></i> What Currently Works</h3>
+    <ul>
+        <li><strong>Documentation System:</strong> Template Toolkit-based documentation is functional</li>
+        <li><strong>Role-based Access:</strong> Documentation categorization by user roles works</li>
+        <li><strong>File Structure:</strong> Proper directory organization exists</li>
+        <li><strong>Configuration Management:</strong> documentation_config.json provides overrides</li>
+    </ul>
+
+    <h3><i class="fas fa-exclamation-triangle"></i> Implementation Gaps Identified</h3>
+    <ul>
+        <li><strong>Documentation Tracking:</strong> 293 documentation files untracked in git</li>
+        <li><strong>Content Synchronization:</strong> Documentation may not reflect actual code state</li>
+        <li><strong>File Organization:</strong> Some files in Comserv/docs/ should be in Comserv/root/Documentation/</li>
+        <li><strong>Version Control:</strong> PageVersion headers need systematic updating</li>
+    </ul>
+
+    <h3><i class="fas fa-project-diagram"></i> Planned vs Actual State Analysis</h3>
+    <div class="alert alert-info">
+        <h4>Documentation Config Analysis:</h4>
+        <p><strong>Configuration File:</strong> /Comserv/root/Documentation/config/documentation_config.json</p>
+        <p><strong>Current State:</strong> Contains 5 specific page overrides and 12 categories</p>
+        <p><strong>Auto-discovery:</strong> Most files automatically discovered by directory scanning</p>
+        <p><strong>Gap:</strong> Many untracked files won't be discovered until committed</p>
+    </div>
+
+    <h2><i class="fas fa-tasks"></i> Recommended Actions</h2>
+
+    <h3><i class="fas fa-first-step"></i> Phase 1: Git Tracking</h3>
+    <ol>
+        <li><strong>Add Documentation Files:</strong> git add all 293 .tt files</li>
+        <li><strong>Add Application Files:</strong> git add README.tt, CHANGELOG.tt, and other application-critical files</li>
+        <li><strong>Organize File Locations:</strong> Move misplaced files to standard locations</li>
+    </ol>
+
+    <h3><i class="fas fa-second-step"></i> Phase 2: Documentation Synchronization</h3>
+    <ol>
+        <li><strong>Review Modified Files:</strong> Check 108 modified files for documentation updates needed</li>
+        <li><strong>Update PageVersion Headers:</strong> Increment version numbers systematically</li>
+        <li><strong>Validate Content:</strong> Ensure documentation matches actual code functionality</li>
+    </ol>
+
+    <h3><i class="fas fa-globe"></i> Site Impact Assessment</h3>
+    <p><strong>Sites Affected:</strong> All sites - documentation system is application-wide</p>
+    <p><strong>Deployment Risk:</strong> Low - Adding documentation files to version control doesn't affect runtime</p>
+    <p><strong>Rollback Plan:</strong> git reset HEAD^ if needed to revert commits</p>
+
+    <h3><i class="fas fa-clipboard-check"></i> Implementation Checklist</h3>
+    <div class="row">
+        <div class="col-md-6">
+            <ul class="list-unstyled">
+                <li><i class="fas fa-square"></i> Categorize 329 untracked files</li>
+                <li><i class="fas fa-square"></i> Add 293 .tt documentation files to git</li>
+                <li><i class="fas fa-square"></i> Add application-critical files (README, CHANGELOG)</li>
+                <li><i class="fas fa-square"></i> Leave .pl/.sql files untracked (per coding standards)</li>
+                <li><i class="fas fa-square"></i> Review file location standardization</li>
+            </ul>
+        </div>
+        <div class="col-md-6">
+            <ul class="list-unstyled">
+                <li><i class="fas fa-square"></i> Update PageVersion headers in modified files</li>
+                <li><i class="fas fa-square"></i> Validate documentation-code synchronization</li>
+                <li><i class="fas fa-square"></i> Update documentation_config.json if needed</li>
+                <li><i class="fas fa-square"></i> Test documentation system functionality</li>
+                <li><i class="fas fa-square"></i> Prepare comprehensive commit message</li>
+            </ul>
+        </div>
+    </div>
+
+</div>

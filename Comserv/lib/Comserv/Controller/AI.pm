@@ -21,10 +21,12 @@ use Moose;
 use namespace::autoclean;
 use Try::Tiny;
 use JSON;
+use DateTime;
 use Comserv::Util::Logging;
 use Comserv::Model::Ollama;
 use Comserv::Model::Grok;
 use Comserv::Util::SystemInfo;
+use Comserv::Util::AdminAuth;
 
 BEGIN { extends 'Catalyst::Controller' }
 
@@ -178,13 +180,18 @@ sub generate :Local :Args(0) {
     $c->response->content_type('application/json');
     
     # Determine if user is authenticated or guest
-    my $username = $c->session->{username};
-    my $user_id = $c->session->{user_id};
+    my $username = $c->session->{username} || '';
+    my $user_id  = $c->session->{user_id}  || 0;
     my $is_guest = 0;
     my $guest_session_id = $c->session->{guest_session_id};
-    
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'generate', "SESSION STATE: username='" . ($username||'EMPTY') . "' user_id=" . ($user_id||'0') .
+        " SiteName=" . ($c->session->{SiteName}||'?') . " session_id=" . ($c->sessionid||'?'));
+
     # If not logged in, create guest session
-    if (!$username) {
+    # Use user_id as primary auth check (consistent with get_user_providers)
+    if (!$username && (!$user_id || $user_id == 199)) {
         $is_guest = 1;
         
         # Create a unique guest session ID if not already present
@@ -201,6 +208,19 @@ sub generate :Local :Args(0) {
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
             'generate', "Guest user session created: $username (session: $guest_session_id)");
+    } elsif (!$username && $user_id && $user_id != 199) {
+        # user_id is set but username is missing — recover username from DB
+        eval {
+            my $user_rec = $c->model('DBEncy::User')->find($user_id);
+            if ($user_rec && $user_rec->username) {
+                $username = $user_rec->username;
+                $c->session->{username} = $username;
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'generate', "Recovered missing username='$username' from DB for user_id=$user_id");
+            }
+        };
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+            'generate', "Authenticated user (recovered): username='$username' user_id=$user_id");
     } else {
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
             'generate', "Authenticated user: $username");
@@ -381,7 +401,7 @@ sub generate :Local :Args(0) {
     }
 
     # Role-based capability injection into system prompt
-    my $role_prompt = $self->_build_role_system_prompt($c, $user_roles_gen, $provider);
+    my $role_prompt = $self->_build_role_system_prompt($c, $user_roles_gen, $provider, $page_path, $page_title);
     if ($role_prompt && $system) {
         $system .= "\n\n" . $role_prompt;
     } elsif ($role_prompt) {
@@ -512,10 +532,10 @@ sub generate :Local :Args(0) {
             unless ($fast_check && $fast_check->check_connection()) {
                 die "Ollama is not reachable at $current_host. Please select an external AI model (Grok) or try again later.";
             }
-            $ollama->timeout(90);
+            $ollama->timeout(150);
             
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-                'generate', "Querying Ollama host=$current_host model=$current_model timeout=90s prompt_len=" . length($prompt));
+                'generate', "Querying Ollama host=$current_host model=$current_model timeout=150s prompt_len=" . length($prompt));
             
             my $query_start = time();
             # Query the API
@@ -1155,6 +1175,10 @@ sub chat :Local :Args(0) {
     my $history = $json_data->{history} || [];
     my $conversation_id = $json_data->{conversation_id} || $c->request->params->{conversation_id};
     my $use_search_chat = $json_data->{use_search} ? 1 : 0;
+    my $chat_page_path  = $json_data->{page_path}  || $c->request->params->{page_path}  || '';
+    my $chat_page_title = $json_data->{page_title} || $c->request->params->{page_title} || '';
+    my $chat_agent_id   = $json_data->{agent_id}   || $c->request->params->{agent_id}   || '';
+    my $chat_agent_system = $json_data->{system}   || $c->request->params->{system}     || '';
     
     # Validate prompt
     unless ($prompt && length($prompt) > 0) {
@@ -1212,7 +1236,18 @@ sub chat :Local :Args(0) {
     my $is_grok_model = ($model && $model =~ /^grok/i) ? 1 : 0;
 
     # Role-based capability injection into messages (insert as system message)
-    my $role_prompt_chat = $self->_build_role_system_prompt($c, $user_roles_chat, $is_grok_model ? 'grok' : 'ollama');
+    my $role_prompt_chat = $self->_build_role_system_prompt($c, $user_roles_chat, $is_grok_model ? 'grok' : 'ollama', $chat_page_path, $chat_page_title);
+
+    # Build combined system prompt: agent-specific prompt + role prompt + live module data
+    my @system_parts;
+    push @system_parts, $chat_agent_system if $chat_agent_system;
+    push @system_parts, $role_prompt_chat  if $role_prompt_chat;
+
+    # Fetch live module data (workshops, ENCY, etc.) when the prompt contains relevant keywords
+    my $module_data = $self->_get_module_data($c, $prompt, $chat_agent_id);
+    push @system_parts, $module_data if $module_data;
+
+    my $combined_system_prompt = join("\n\n", @system_parts);
 
     # Only admins/editors may use web search
     $use_search_chat = 0 unless $can_select_model_perm;
@@ -1285,10 +1320,10 @@ sub chat :Local :Args(0) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
                 'chat', "Calling Grok API with model: " . $grok->model . " web_search=$use_search_chat");
 
-            # Prepend role-based system prompt if available
+            # Prepend combined system prompt if available
             my @final_messages = @messages;
-            if ($role_prompt_chat) {
-                unshift @final_messages, { role => 'system', content => $role_prompt_chat };
+            if ($combined_system_prompt) {
+                unshift @final_messages, { role => 'system', content => $combined_system_prompt };
             }
 
             my $response = $grok->chat(messages => \@final_messages, use_search => $use_search_chat);
@@ -1324,7 +1359,7 @@ sub chat :Local :Args(0) {
             }
 
             $ollama->set_host($current_host);
-            $ollama->timeout(90);
+            $ollama->timeout(150);
             $ollama->port($current_port) if $current_port;
             $ollama->model($current_model) if $current_model;
 
@@ -1332,11 +1367,17 @@ sub chat :Local :Args(0) {
                 $ollama->model($model);
             }
 
+            # Prepend combined system prompt for Ollama (role + agent + live data)
+            my @ollama_messages = @messages;
+            if ($combined_system_prompt) {
+                unshift @ollama_messages, { role => 'system', content => $combined_system_prompt };
+            }
+
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                'chat', "Querying Ollama host=$current_host model=" . $ollama->model . " timeout=90s messages=" . scalar(@messages));
+                'chat', "Querying Ollama host=$current_host model=" . $ollama->model . " timeout=150s messages=" . scalar(@ollama_messages));
 
             my $chat_start = time();
-            my $response = $ollama->chat(messages => \@messages);
+            my $response = $ollama->chat(messages => \@ollama_messages);
             my $chat_elapsed = time() - $chat_start;
 
             unless ($response) {
@@ -1654,13 +1695,27 @@ sub models :Local :Args(0) {
                             'models', "Failed to get installed models from $config->{host}:$config->{port}: " . ($ollama->last_error || 'unknown error'));
                     }
                     
-                    # Get available models (this returns static list)
+                    # Get available models (static catalog), then exclude already-installed ones
                     my $available = $ollama->list_available_models();
                     if ($available && ref($available) eq 'ARRAY') {
-                        $server_info->{available_models} = $available;
-                        
-                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                            'models', "Retrieved " . scalar(@$available) . " available models from catalog");
+                        # Build a set of installed base names (strip tag) for fast lookup
+                        my %installed_names;
+                        for my $m (@{ $server_info->{installed_models} || [] }) {
+                            my $n = ref($m) ? ($m->{name} || '') : ($m || '');
+                            $n =~ s/:.*$//;   # strip tag (e.g. "llama3.1:latest" → "llama3.1")
+                            $installed_names{$n} = 1;
+                            $installed_names{$m->{name} || $m} = 1 if ref($m);  # also full name
+                        }
+                        my @not_installed = grep {
+                            my $aname = ref($_) ? ($_->{name} || '') : ($_ || '');
+                            (my $abase = $aname) =~ s/:.*$//;
+                            !$installed_names{$aname} && !$installed_names{$abase};
+                        } @$available;
+                        $server_info->{available_models} = \@not_installed;
+
+                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                            'models', "Catalog: " . scalar(@$available) . " total, "
+                                . scalar(@not_installed) . " not yet installed");
                     }
                 } else {
                     $server_info->{error} = "Connection test failed: " . ($ollama->last_error || 'unknown error');
@@ -2487,22 +2542,89 @@ sub start_server :Local :Args(0) {
     $c->response->body($json_response);
 }
 
+=head2 _get_module_data
+
+Fetch live application data relevant to the user's prompt and return it as a
+context string to append to the system prompt.  The fetch uses the Catalyst
+context so it automatically respects the current user's session / role.
+
+  $c        - Catalyst context
+  $prompt   - the user's raw query text
+  $agent_id - agent id string (e.g. 'bmaster', 'csc')
+
+Returns a string of data context, or empty string when nothing relevant found.
+
+=cut
+
+sub _get_module_data {
+    my ($self, $c, $prompt, $agent_id) = @_;
+    $prompt   //= '';
+    $agent_id //= '';
+
+    my @sections;
+
+    # --- Workshop data ---
+    if ($prompt =~ /workshop|class|course|session|seminar|event|beekeep/i) {
+        eval {
+            my ($workshops, $err) = $c->model('WorkShop')->get_active_workshops($c);
+            if ($workshops && @$workshops) {
+                my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+                my $today = DateTime->today->ymd;
+
+                my @visible;
+                for my $ws (@$workshops) {
+                    next unless !$ws->date || $ws->date ge $today;
+                    my $share    = $ws->share    // '';
+                    my $sitename = $ws->sitename // '';
+                    next unless $share eq 'public' || lc($sitename) eq lc($site_name);
+
+                    my $title    = $ws->title        // 'Untitled';
+                    my $date     = $ws->date         // 'TBA';
+                    my $location = $ws->location     // '';
+                    my $desc     = $ws->description  // '';
+                    $desc = substr($desc, 0, 120) . '…' if length($desc) > 120;
+
+                    push @visible, "- $title | Date: $date"
+                        . ($location ? " | Location: $location" : '')
+                        . ($desc     ? " | $desc" : '');
+                }
+
+                if (@visible) {
+                    push @sections,
+                        "LIVE WORKSHOP DATA (current as of query time):\n"
+                        . join("\n", @visible)
+                        . "\nUsers can browse all workshops at /workshop";
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_get_module_data', "Workshop fetch error: $@") if $@;
+    }
+
+    return join("\n\n", @sections);
+}
+
 =head2 _build_role_system_prompt
 
 Build a role-aware addition to the system prompt granting or restricting
-capabilities based on the user's session roles.
+capabilities based on the user's session roles and current page context.
 
   admin/developer/editor  → full internal API access (workshop, ency, todo, project)
-  normal user             → general help
-  guest                   → HelpDesk, navigation, documentation only
+                            + page-specific navigation guidance with edit permissions
+  normal user             → general help + page-specific read/interact guidance
+  guest                   → HelpDesk, navigation, documentation only (read-only)
+
+Optional page_path and page_title parameters provide context-aware navigation hints.
 
 =cut
 
 sub _build_role_system_prompt {
-    my ($self, $c, $roles, $provider) = @_;
+    my ($self, $c, $roles, $provider, $page_path, $page_title) = @_;
 
-    $roles   //= [];
-    $provider //= 'ollama';
+    $roles     //= [];
+    $provider  //= 'ollama';
+    $page_path //= '';
+    $page_title //= '';
 
     my $base_url = '';
     eval { $base_url = $c->uri_for('/') . ''; $base_url =~ s{/$}{}; };
@@ -2511,9 +2633,12 @@ sub _build_role_system_prompt {
     my $is_admin = grep { /^(admin|developer|editor)$/i } @role_list;
     my $is_guest = !@role_list || (grep { /guest/i } @role_list);
 
+    my $role_tier  = $is_admin ? 'admin' : ($is_guest ? 'guest' : 'user');
+    my $page_nav   = $self->_build_page_navigation_hint($base_url, $page_path, $page_title, $role_tier);
+    my $nav_guide  = $self->_build_navigation_command_guide($base_url, $role_tier);
+
     if ($is_admin) {
         if ($provider eq 'grok') {
-            # Grok can describe what APIs exist; web search may supplement
             return "You are assisting an admin user. "
                  . "The application has these internal data sources (you cannot call them directly, but can tell the user how to access them):\n"
                  . "- Active workshops: $base_url/workshop/list_active\n"
@@ -2521,14 +2646,17 @@ sub _build_role_system_prompt {
                  . "- Project todos: $base_url/todo/list?project_id=ID\n"
                  . "- Projects: $base_url/project/list\n"
                  . "If asked about live application data (workshops, projects, tasks), tell the user to visit those URLs or enable web search. "
-                 . "Do NOT invent data. Web search may be available if the user has enabled it above.\n";
+                 . "Do NOT invent data. Web search may be available if the user has enabled it above.\n"
+                 . $page_nav
+                 . $nav_guide;
         } else {
-            # Ollama has NO network access — never pretend to call APIs
             return "You are assisting an admin user. "
                  . "You have NO ability to call external URLs or databases. "
                  . "If the user asks about live data such as workshops, projects, or tasks, "
                  . "tell them: 'I can't look that up directly — please check the application pages or switch to Grok with web search enabled.' "
-                 . "Never invent or simulate API results.";
+                 . "Never invent or simulate API results."
+                 . $page_nav
+                 . $nav_guide;
         }
     }
 
@@ -2542,7 +2670,9 @@ sub _build_role_system_prompt {
              . "and information from public documentation only. "
              . "Do NOT access private data or APIs. "
              . "If the user needs account-specific help, ask them to log in."
-             . $guest_no_internet;
+             . $guest_no_internet
+             . $page_nav
+             . $nav_guide;
     }
 
     my $no_internet = ($provider ne 'grok')
@@ -2553,8 +2683,239 @@ sub _build_role_system_prompt {
 
     return "You are a helpful assistant for logged-in users of this application. "
          . "Answer based on the page content and documentation provided. "
-         . "Do not invent data; if you don't know something, say so."
-         . $no_internet;
+         . "Do not invent data; if you don't know something, say so. "
+         . "NAVIGATION: When the user says 'take me to', 'open', 'go to', 'navigate to', or 'show me' a page, "
+         . "respond with the URL from the navigation guide so the application can automatically navigate there. "
+         . "Use the exact URL from the list — the application will redirect the browser for you."
+         . $no_internet
+         . $page_nav
+         . $nav_guide;
+}
+
+=head2 _build_navigation_command_guide
+
+Build a role-filtered navigation command guide appended to every system prompt.
+When a user says "take me to X" or asks how to navigate to a section, the AI
+uses this map to reply with the correct URL instead of inventing one.
+
+  $base_url - application base URL (no trailing slash)
+  $role     - 'admin', 'user', or 'guest'
+
+=cut
+
+sub _build_navigation_command_guide {
+    my ($self, $base_url, $role) = @_;
+
+    # Each section: [ section_name, min_role, [ [label, path], ... ] ]
+    # min_role: 'guest' | 'user' | 'admin'
+    my @sections = (
+        [ 'Home', 'guest', [
+            [ 'Main menu / home',           '/'                         ],
+        ]],
+        [ 'Workshops', 'guest', [
+            [ 'Workshops home',             '/workshop'                 ],
+            [ 'Add a workshop',             '/workshop/add'             ],
+        ]],
+        [ 'Workshops (logged in)', 'user', [
+            [ 'My workshop dashboard',      '/workshop/dashboard'       ],
+        ]],
+        [ 'Workshops (admin/leader)', 'admin', [
+            [ 'Workshop resources',         '/workshop/resources'       ],
+        ]],
+        [ 'Documentation', 'guest', [
+            [ 'Documentation home',         '/Documentation'            ],
+            [ 'Daily plan',                 '/Documentation/DailyPlan'  ],
+        ]],
+        [ 'Encyclopedia (ENCY)', 'guest', [
+            [ 'Encyclopedia home',          '/ENCY'                     ],
+            [ 'Encyclopedia search',        '/ENCY/search'              ],
+            [ 'Bee pasture / plant forage', '/ENCY/BeePastureView'      ],
+        ]],
+        [ 'HelpDesk', 'guest', [
+            [ 'HelpDesk home',              '/HelpDesk'                 ],
+            [ 'Submit a ticket',            '/HelpDesk/ticket/new'      ],
+            [ 'Check ticket status',        '/HelpDesk/ticket/status'   ],
+            [ 'Knowledge base',             '/HelpDesk/kb'              ],
+            [ 'Contact',                    '/HelpDesk/contact'         ],
+        ]],
+        [ 'AI Assistant', 'guest', [
+            [ 'AI chat',                    '/ai'                       ],
+            [ 'AI query form',              '/ai/query_form'            ],
+        ]],
+        [ 'AI Assistant (logged in)', 'user', [
+            [ 'Manage API keys',            '/ai/manage_api_keys'       ],
+        ]],
+        [ 'AI Assistant (admin)', 'admin', [
+            [ 'Manage AI models',           '/ai/models'                ],
+            [ 'AI server status',           '/ai/check_status'          ],
+        ]],
+        [ 'Tasks / Todos', 'user', [
+            [ 'Todo list',                  '/todo'                     ],
+            [ 'Todos by day',               '/todo?filter=day'          ],
+            [ 'Todos by week',              '/todo?filter=week'         ],
+            [ 'Todos by month',             '/todo?filter=month'        ],
+            [ 'Add a todo',                 '/todo/addtodo'             ],
+        ]],
+        [ 'Projects', 'user', [
+            [ 'Projects home',              '/project'                  ],
+            [ 'Add a project',              '/project/addproject'       ],
+        ]],
+        [ 'User account', 'guest', [
+            [ 'Login',                      '/user/login'               ],
+            [ 'Create account',             '/user/create_account'      ],
+            [ 'Forgot password',            '/user/forgot_password'     ],
+        ]],
+        [ 'User account (logged in)', 'user', [
+            [ 'My profile',                 '/user/profile'             ],
+            [ 'Account settings',           '/user/settings'            ],
+            [ 'Logout',                     '/user/logout'              ],
+        ]],
+        [ 'Admin', 'admin', [
+            [ 'Admin panel',                '/admin'                    ],
+            [ 'User management',            '/admin/users'              ],
+            [ 'Application logs',           '/admin/logs'               ],
+            [ 'Git pull',                   '/admin/git_pull'           ],
+            [ 'Docker containers',          '/admin/docker-containers'  ],
+            [ 'Theme management',           '/themeadmin'               ],
+            [ 'Planning',                   '/admin/planning'           ],
+            [ 'System info',                '/admin/system_info'        ],
+            [ 'Admin settings',             '/admin/settings'           ],
+            [ 'Log viewer',                 '/log'                      ],
+            [ 'File management',            '/file/list'                ],
+            [ 'Duplicate files',            '/file/duplicates'          ],
+        ]],
+        [ 'Site management (admin)', 'admin', [
+            [ 'Site list / setup',          '/site'                     ],
+            [ 'Add a new site',             '/site/add_site'            ],
+            [ 'Add a domain to a site',     '/site/add_domain'          ],
+            [ 'Site details',               '/site/details'             ],
+            [ 'Modify site',                '/site/modify'              ],
+        ]],
+    );
+
+    my %role_rank = ( guest => 0, user => 1, admin => 2 );
+    my $user_rank = $role_rank{$role} // 0;
+
+    my $guide = '';
+    for my $section (@sections) {
+        my ($name, $min_role, $links) = @$section;
+        next if ($role_rank{$min_role} // 0) > $user_rank;
+        $guide .= "[$name]\n";
+        for my $link (@$links) {
+            $guide .= "  - $link->[0]: $base_url$link->[1]\n";
+        }
+    }
+
+    return "\n\nApplication sections and navigation guide:\n"
+         . "Use this map for THREE purposes:\n"
+         . "1. Navigation: when the user asks to go to a page or says 'take me to [page]', "
+         . "reply with the matching URL(s). List ALL links in the section when multiple apply.\n"
+         . "2. Content suggestions: when answering a question, proactively mention relevant "
+         . "application sections the user can visit for more information. "
+         . "For example, if asked about plants or pollinators, point to the Encyclopedia (ENCY) section. "
+         . "If asked about workshops, point to the Workshops section.\n"
+         . "3. Link validation: when asked to check, audit, or review links on the current page, "
+         . "compare EVERY link shown in the page content against this navigation guide. "
+         . "Report ALL links that have no matching entry — not just the first one. "
+         . "Present the full list as a numbered or bulleted list so nothing is missed.\n"
+         . "Only use URLs from this list; do not invent others. "
+         . "If no match exists for a navigation request, say: 'I don't know that page — visit $base_url to browse available options.'\n"
+         . $guide;
+}
+
+=head2 _build_page_navigation_hint
+
+Build a page-specific navigation hint to append to the system prompt.
+Returns an empty string when no relevant context can be determined.
+
+  $base_url  - application base URL (no trailing slash)
+  $page_path - URL path of the page the user is currently on
+  $page_title - display title of the current page
+  $role      - 'admin', 'user', or 'guest'
+
+=cut
+
+sub _build_page_navigation_hint {
+    my ($self, $base_url, $page_path, $page_title, $role) = @_;
+
+    return '' unless $page_path;
+
+    my $context_label = $page_title ? "\"$page_title\" ($page_path)" : $page_path;
+    my $hint = "\n\nThe user is currently viewing: $context_label.\n";
+
+    if ($page_path =~ m{/Documentation}i) {
+        if ($role eq 'admin') {
+            $hint .= "Navigation context — Documentation section (admin):\n"
+                   . "- You may edit or create documentation pages.\n"
+                   . "- Related sections: Daily Plans, Master Plan, Architecture docs.\n"
+                   . "- To manage plans: $base_url/Documentation/DailyPlan\n"
+                   . "- To view all docs: $base_url/Documentation\n";
+        } elsif ($role eq 'user') {
+            $hint .= "Navigation context — Documentation section:\n"
+                   . "- You can read documentation pages and follow internal links.\n"
+                   . "- To search the encyclopedia: $base_url/ency/search?q=TERM\n"
+                   . "- To view all docs: $base_url/Documentation\n";
+        } else {
+            $hint .= "Navigation context — Documentation section (guest):\n"
+                   . "- Public documentation is available for reading.\n"
+                   . "- Log in for full access and editing capabilities.\n";
+        }
+    } elsif ($page_path =~ m{/workshop}i) {
+        if ($role eq 'admin') {
+            $hint .= "Navigation context — Workshops (admin):\n"
+                   . "- You can create, edit, and manage workshop entries.\n"
+                   . "- Active workshops: $base_url/workshop/list_active\n"
+                   . "- All workshops: $base_url/workshop/list\n";
+        } elsif ($role eq 'user') {
+            $hint .= "Navigation context — Workshops:\n"
+                   . "- You can view and participate in workshops.\n"
+                   . "- Active workshops: $base_url/workshop/list_active\n";
+        } else {
+            $hint .= "Navigation context — Workshops (guest):\n"
+                   . "- Public workshop information is available for viewing.\n"
+                   . "- Log in to participate or manage workshops.\n";
+        }
+    } elsif ($page_path =~ m{/todo}i) {
+        if ($role eq 'admin') {
+            $hint .= "Navigation context — Todo / Task Management (admin):\n"
+                   . "- You can view, create, assign, and close tasks across all projects.\n"
+                   . "- All tasks: $base_url/todo/list\n"
+                   . "- Project-specific: $base_url/todo/list?project_id=ID\n";
+        } elsif ($role eq 'user') {
+            $hint .= "Navigation context — Todo / Task Management:\n"
+                   . "- You can view tasks assigned to you and update their status.\n"
+                   . "- Your tasks: $base_url/todo/list\n";
+        } else {
+            $hint .= "Navigation context — Tasks (guest):\n"
+                   . "- Log in to view and manage tasks.\n";
+        }
+    } elsif ($page_path =~ m{/project}i) {
+        if ($role eq 'admin') {
+            $hint .= "Navigation context — Projects (admin):\n"
+                   . "- You can create, edit, and archive projects.\n"
+                   . "- All projects: $base_url/project/list\n";
+        } elsif ($role eq 'user') {
+            $hint .= "Navigation context — Projects:\n"
+                   . "- You can view projects you are a member of.\n"
+                   . "- Projects: $base_url/project/list\n";
+        } else {
+            $hint .= "Navigation context — Projects (guest):\n"
+                   . "- Log in to view project information.\n";
+        }
+    } elsif ($page_path =~ m{/ency}i) {
+        $hint .= "Navigation context — Encyclopedia:\n"
+                . "- Search for information: $base_url/ency/search?q=TERM\n";
+        $hint .= "- As an admin you can add and edit encyclopedia entries.\n" if $role eq 'admin';
+    } elsif ($page_path =~ m{/ai}i) {
+        $hint .= "Navigation context — AI Assistant:\n"
+               . "- You are currently in the AI chat interface.\n";
+        if ($role eq 'admin') {
+            $hint .= "- Admin: manage AI models at $base_url/ai/models\n"
+                   . "- Manage API keys at $base_url/ai/manage_api_keys\n";
+        }
+    }
+
+    return $hint;
 }
 
 =head2 _select_model_for_context
@@ -2574,11 +2935,18 @@ sub _select_model_for_context {
     $page_context //= 'general';
     $installed_models //= [];
 
-    # Build a quick lookup: short name → full model name
+    # Filter out non-chat models (embeddings, rerankers, etc.) to avoid 400 errors
+    my $is_chat_model = sub {
+        my ($n) = @_;
+        return $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
+    };
+
+    # Build a quick lookup: short name → full model name (chat models only)
     my %installed;
     for my $m (@$installed_models) {
         my $name = ref($m) ? ($m->{name} || '') : ($m || '');
         next unless $name;
+        next unless $is_chat_model->($name);
         $installed{$name} = $name;
         (my $short = $name) =~ s/:.*$//;
         $installed{$short} = $name;
@@ -2586,22 +2954,27 @@ sub _select_model_for_context {
 
     # Preferred models per context (ordered: first match wins)
     my %context_prefs = (
-        chat      => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
-        helpdesk  => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
-        ency      => ['llama3.1', 'llama3', 'mistral', 'tinyllama'],
-        bmaster   => ['llama3.1', 'llama3', 'mistral', 'tinyllama'],
-        general   => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
-        code      => ['starcoder2', 'qwen2.5-coder', 'qwen-coder', 'codellama', 'llama3.1'],
-        developer => ['starcoder2', 'qwen2.5-coder', 'codellama', 'llama3.1'],
-        docker    => ['starcoder2', 'qwen2.5-coder', 'llama3.1'],
+        chat        => ['llama3.1', 'llama3', 'deepseek-r1', 'tinyllama', 'mistral'],
+        helpdesk    => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
+        ency        => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral', 'tinyllama'],
+        bmaster     => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral', 'tinyllama'],
+        csc         => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
+        general     => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
+        navigation  => ['tinyllama', 'llama3.1', 'llama3'],
+        simple      => ['tinyllama', 'llama3.1', 'llama3'],
+        code        => ['starcoder2', 'qwen2.5-coder', 'qwen-coder', 'codellama', 'llama3.1'],
+        developer   => ['starcoder2', 'qwen2.5-coder', 'codellama', 'llama3.1'],
+        docker      => ['starcoder2', 'qwen2.5-coder', 'llama3.1'],
     );
 
     my $ctx = lc($agent_id);
-    $ctx = 'helpdesk' if $ctx =~ /helpdesk/;
-    $ctx = 'code'     if $ctx =~ /code|developer/;
-    $ctx = 'ency'     if $ctx =~ /ency|beekeeping|bmast/;
-    $ctx = 'docker'   if $ctx =~ /docker/;
-    $ctx = 'general'  unless exists $context_prefs{$ctx};
+    $ctx = 'helpdesk'   if $ctx =~ /helpdesk/;
+    $ctx = 'code'       if $ctx =~ /code|developer|starcoder/;
+    $ctx = 'bmaster'    if $ctx =~ /bmast|beekeep|apiar/;
+    $ctx = 'csc'        if $ctx =~ /^csc$/;
+    $ctx = 'ency'       if $ctx =~ /^ency$/;
+    $ctx = 'docker'     if $ctx =~ /docker/;
+    $ctx = 'general'    unless exists $context_prefs{$ctx};
 
     my $prefs = $context_prefs{$ctx} || $context_prefs{general};
 
@@ -2613,9 +2986,12 @@ sub _select_model_for_context {
         }
     }
 
-    # Fall back: default_model if installed, else first available, else hardcoded
-    return $default_model if $default_model && ($installed{$default_model} || grep { $_ eq $default_model } values %installed);
-    return (values %installed)[0] if %installed;
+    # Fall back: default_model if installed and is chat-capable, else first available chat model, else hardcoded
+    if ($default_model && $is_chat_model->($default_model)) {
+        return $default_model if $installed{$default_model} || grep { $_ eq $default_model } values %installed;
+    }
+    my @chat_values = values %installed;
+    return $chat_values[0] if @chat_values;
     return 'llama3.1:latest';
 }
 
@@ -3527,88 +3903,125 @@ Get list of user's configured AI providers for chat widget
 
 sub get_user_providers :Local :Args(0) {
     my ($self, $c) = @_;
-    
-    $c->response->content_type('application/json');
-    
-    my $user_id = $c->session->{user_id};
-    my @providers;
-    
-    # Map service names to display names
-    my %service_display = (
-        grok => 'Grok (xAI)',
-        openai => 'OpenAI',
-        claude => 'Claude',
-        gemini => 'Gemini',
-        anthropic => 'Anthropic',
-        cohere => 'Cohere'
-    );
-    
-    my $user_roles_prov = $c->session->{roles} || [];
-    if (!ref($user_roles_prov)) {
-        $user_roles_prov = [split(/\s*,\s*/, $user_roles_prov)] if $user_roles_prov;
-    }
-    my $is_admin = ref($user_roles_prov) eq 'ARRAY'
-        ? grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_prov
-        : 0;
 
-    if ($user_id) {
+    $c->response->content_type('application/json');
+
+    my $username    = $c->session->{username} || '';
+    my $user_id     = $c->session->{user_id};
+    my $user_roles  = $c->session->{roles} || [];
+    if (!ref($user_roles)) {
+        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
+    }
+
+    my $can_select_model = ref($user_roles) eq 'ARRAY'
+        ? (grep { /^(admin|developer|editor)$/i } @$user_roles) ? 1 : 0
+        : 0;
+    my $is_csc_admin = Comserv::Util::AdminAuth->new()->is_csc_admin($c);
+    my $is_admin     = $can_select_model || $is_csc_admin;
+    my $is_guest     = (!$user_id || $user_id == 199) ? 1 : 0;
+
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+        'get_user_providers',
+        "User $username (id=" . ($user_id||'none') . ") can_select=$can_select_model is_admin=$is_admin is_guest=$is_guest");
+
+    my @providers;
+
+    # 1. Ollama (Local) — always present, include installed models
+    try {
+        my $ollama_cfg   = $c->config->{Ollama} || {};
+        my $primary_host = $ollama_cfg->{host}          || '192.168.1.199';
+        my $cfg_port     = $ollama_cfg->{port}          || 11434;
+        my $ollama       = $c->model('Ollama');
+        if ($ollama) {
+            $ollama->host($primary_host);
+            $ollama->port($cfg_port);
+            my $installed = $ollama->list_models() || [];
+            push @providers, {
+                service  => 'ollama',
+                name     => 'Ollama (Local)',
+                is_local => JSON::true,
+                models   => [ map { { id => $_->{name} } } @$installed ],
+            };
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'get_user_providers', "Ollama list failed: $_");
+        push @providers, { service => 'ollama', name => 'Ollama (Local)', is_local => JSON::true, models => [] };
+    };
+
+    # 2. External API keys — authenticated users only
+    if ($user_id && !$is_guest) {
         try {
             my $schema = $c->model('DBEncy')->schema;
-            my %seen_services;
+            my %seen;
 
-            my %synced_models_by_service;
-
-            # User's own keys
+            # User's own keys first
             my $own_keys = $schema->resultset('UserApiKeys')->search(
                 { user_id => $user_id, is_active => '1' },
                 { order_by => { -asc => 'service' } }
             );
             foreach my $key ($own_keys->all) {
-                next if $seen_services{$key->service}++;
-                my $meta = $key->get_metadata() || {};
-                if ($meta->{available_models} && ref($meta->{available_models}) eq 'ARRAY') {
-                    $synced_models_by_service{$key->service} = $meta->{available_models};
+                next if $seen{$key->service}++;
+                my $meta   = $key->get_metadata() || {};
+                my $models = $meta->{available_models} || [];
+
+                # Fallback to hardcoded Grok models if none stored in metadata
+                if (!@$models && $key->service eq 'grok') {
+                    $models = [
+                        { id => 'grok-3-mini' },
+                        { id => 'grok-3' },
+                        { id => 'grok-4-0709' },
+                        { id => 'grok-4-fast-non-reasoning' },
+                        { id => 'grok-code-fast-1' },
+                    ];
                 }
+
+                # Filter image/video models for non-admins
+                my @filtered = grep {
+                    $is_admin || !$_->{id} || $_->{id} !~ /imagine|video/i
+                } @$models;
+
                 push @providers, {
-                    service      => $key->service,
-                    display_name => $service_display{$key->service} || ucfirst($key->service),
-                    models       => $synced_models_by_service{$key->service} || undef
+                    service  => $key->service,
+                    name     => $key->service eq 'grok' ? 'xAI (Grok)' : ucfirst($key->service),
+                    models   => \@filtered,
                 };
             }
 
-            # Admins: also pick up any active keys not owned by this user
+            # Admins: fall back to any active key not owned by this user
             if ($is_admin) {
                 my $any_keys = $schema->resultset('UserApiKeys')->search(
                     { is_active => '1' },
                     { order_by => { -asc => 'service' } }
                 );
                 foreach my $key ($any_keys->all) {
-                    next if $seen_services{$key->service}++;
-                    my $meta = $key->get_metadata() || {};
-                    if ($meta->{available_models} && ref($meta->{available_models}) eq 'ARRAY') {
-                        $synced_models_by_service{$key->service} = $meta->{available_models};
-                    }
+                    next if $seen{$key->service}++;
+                    my $meta   = $key->get_metadata() || {};
+                    my $models = $meta->{available_models} || [];
                     push @providers, {
-                        service      => $key->service,
-                        display_name => $service_display{$key->service} || ucfirst($key->service),
-                        models       => $synced_models_by_service{$key->service} || undef
+                        service => $key->service,
+                        name    => $key->service eq 'grok' ? 'xAI (Grok)' : ucfirst($key->service),
+                        models  => $models,
                     };
                 }
             }
-            
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'get_user_providers', "Found " . scalar(@providers) . " providers for user $user_id (is_admin: $is_admin)");
+
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                'get_user_providers', "Total providers for user $username: " . scalar(@providers));
         } catch {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-                'get_user_providers', "Failed to fetch providers: $_");
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'get_user_providers', "Failed to fetch external providers: $_");
         };
     }
-    
+
     $c->response->body(encode_json({
-        success  => JSON::true,
-        providers => \@providers,
-        username  => $c->session->{username} || 'You',
-        user_id   => $user_id || 0,
+        success            => JSON::true,
+        providers          => \@providers,
+        username           => $username || 'You',
+        user_id            => $user_id  || 0,
+        is_guest           => $is_guest  ? JSON::true : JSON::false,
+        is_admin           => $is_admin  ? JSON::true : JSON::false,
+        can_access_history => (!$is_guest) ? JSON::true : JSON::false,
     }));
 }
 
@@ -3927,6 +4340,47 @@ sub _doc_candidates {
     # De-duplicate while preserving order
     my %seen;
     return grep { !$seen{$_}++ } @cands;
+}
+
+=head2 preload_model
+
+Send a minimal prompt to Ollama to pre-warm the selected model so subsequent
+user queries don't hit cold-start delays.  Called automatically when the chat
+widget opens.  Always returns JSON; never blocks longer than 30 s.
+
+=cut
+
+sub preload_model :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $provider = $c->req->param('provider') || 'ollama';
+    unless ($provider eq 'ollama') {
+        $c->response->body('{"success":true,"message":"non-ollama provider, no preload needed"}');
+        return;
+    }
+
+    eval {
+        my ($host, $port, $default_model, $installed) = $self->_get_current_ollama_config($c, 0);
+        unless ($host) {
+            $c->response->body('{"success":false,"message":"no ollama config"}');
+            return;
+        }
+
+        my $site_name = $c->stash->{SiteName} || 'CSC';
+        my $agent_id  = $c->req->param('agent_id') || lc($site_name);
+        my $model = $self->_select_model_for_context($agent_id, $agent_id, $installed, $default_model);
+
+        my $ollama = Comserv::Model::Ollama->new(
+            host    => $host,
+            port    => $port || 11434,
+            model   => $model,
+            timeout => 120,
+        );
+        $ollama->chat([{ role => 'user', content => 'hi' }]);
+    };
+
+    $c->response->body('{"success":true,"message":"model preloaded"}');
 }
 
 __PACKAGE__->meta->make_immutable;

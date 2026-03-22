@@ -6,7 +6,6 @@ use Try::Tiny;
 use File::Spec;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
-use Comserv::Util::CSRF;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -110,13 +109,7 @@ sub update :Path('update') :Args(0) {
         return;
     }
     
-    # CSRF validation
-    unless (Comserv::Util::CSRF::validate_token($c)) {
-        $c->flash->{error_message} = "CSRF validation failed. Please try again.";
-        $c->response->redirect($c->uri_for('/ApiCredentials'));
-        $c->detach();
-        return;
-    }
+    
     
     # Load current credentials
     my $credentials = $self->_load_credentials($c);

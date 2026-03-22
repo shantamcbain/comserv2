@@ -7,7 +7,7 @@
    page_version = "1.01"
    last_updated = "Sun Jan 05 2026 21:50:00 UTC"
 %]
-[% PageVersion = 'root/Documentation/SECURITY_REMEDIATION_PLAN.tt,v 1.01 2026/01/05 21:50:00 zencoder Exp - G.1 SQL Injection Fixes COMPLETED (8 vulns fixed)'
+[% PageVersion = 'root/Documentation/SECURITY_REMEDIATION_PLAN.tt,v 1.01 2026/01/05 21:50:00 zencoder Exp - G.1 SQL Injection Fixes COMPLETED (8 vulns fixed)' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]

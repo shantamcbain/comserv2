@@ -460,7 +460,9 @@ function deployMonitoring(clusterName) {
     logDiv.innerHTML = '<strong>Starting deployment...</strong><br>';
     
     fetch('/admin/infrastructure/deploy/monitoring/' + clusterName, {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+        }
     })
     .then(response => response.json())
     .then(result => {
@@ -570,7 +572,11 @@ function refreshContainers() {
 function dockerAction(action, service) {
     if (!confirm(`Are you sure you want to ${action} ${service}?`)) return;
     
-    fetch(`/admin/docker/${action}/${service}`, { method: 'POST' })
+    fetch(`/admin/docker/${action}/${service}`, { 
+        method: 'POST',
+        headers: {
+        }
+    })
     .then(response => response.json())
     .then(result => {
         if (result.success) {

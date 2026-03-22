@@ -8,7 +8,6 @@ use Try::Tiny;
 use JSON qw(decode_json encode_json);
 use Comserv::Util::Logging;
 use Comserv::Util::DatabaseEnv;
-use Comserv::Util::CSRF;
 use IPC::Open3;
 use Symbol 'gensym';
 use File::Spec;
@@ -78,12 +77,7 @@ sub trigger_sync :Path('/admin/database-sync/trigger') :Args(0) {
         return;
     }
     
-    unless (Comserv::Util::CSRF::validate_token($c)) {
-        $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'CSRF validation failed' });
-        $c->forward('View::JSON');
-        return;
-    }
+    
     
     my $json_data;
     try {
@@ -189,12 +183,7 @@ sub sync_config :Path('/admin/database-sync/config') :Args(0) {
     }
     
     if ($c->req->method eq 'POST') {
-        unless (Comserv::Util::CSRF::validate_token($c)) {
-            $c->response->status(403);
-            $c->stash(json => { success => 0, error => 'CSRF validation failed' });
-            $c->forward('View::JSON');
-            return;
-        }
+        
         
         my $json_data;
         try {
