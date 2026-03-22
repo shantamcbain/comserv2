@@ -3394,6 +3394,7 @@ sub compose_email :Local :Args(1) {
         )->all;
     }
 
+    
     # Pre-compute participant counts — TT cannot call .search({}) on DBIC relationships
     my @leader_workshops = map {
         my $ws = $_;
@@ -3404,12 +3405,16 @@ sub compose_email :Local :Args(1) {
         { workshop => $ws, count => $cnt }
     } @leader_workshops_raw;
 
-    $c->stash(
-        workshop           => $workshop,
-        recipient_count    => $registered_count,
-        workshop_templates => \@workshop_templates,
-        global_templates   => \@global_templates,
-        leader_workshops   => \@leader_workshops,
+    # Compute unique email count across ALL leader workshops + primary (server-side dedup)
+    my @all_ids = ($id, map { $_->{workshop}->id } @leader_workshops);
+    my @all_emails = $c->model('DBEncy::Participant')->search(
+        { workshop_id => \@all_ids, status => 'registered' },
+        { columns => ['email'], distinct => 1 }
+    )->get_column('email')->all;
+    my $unique_total = scalar grep { $_ && $_ =~ /@/ } @all_emails;
+
+    leader_workshops   => \@leader_workshops,
+        unique_total       => $unique_total,
         template           => 'WorkShops/ComposeEmail.tt',
     );
 }

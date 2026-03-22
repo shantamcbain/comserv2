@@ -98,12 +98,18 @@
                         [% FOR item IN leader_workshops %]
                         <label style="display:block;margin-bottom:4px;">
                             <input type="checkbox" name="extra_workshop_ids" value="[% item.workshop.id %]"
-                                   class="extra-ws-check" data-count="[% item.count %]">
+                                   class="extra-ws-check" data-count="[% item.count %]" checked>
                             [% item.workshop.title | html %]
                             <small>([% item.count %] registered)</small>
                         </label>
                         [% END %]
-                        <p style="margin-top:8px;"><strong>Approximate total:</strong> <span id="total-count">[% recipient_count %]</span> recipients (duplicates removed at send time)</p>
+                        <p style="margin-top:8px;">
+                            <strong>Unique recipients (all workshops, duplicates removed):</strong>
+                            <span id="unique-total">[% unique_total %]</span>
+                            &nbsp;&mdash;&nbsp;
+                            <em>Unchecking workshops above adjusts the approximate count below.</em>
+                        </p>
+                        <p><strong>Approximate selected total:</strong> <span id="total-count">[% recipient_count %]</span></p>
                     </div>
                     [% END %]
 
@@ -167,6 +173,7 @@
                 if (el) el.textContent = total;
             }
             document.addEventListener('DOMContentLoaded', function() {
+                updateTotal();  // initialise with all pre-checked boxes counted
                 document.querySelectorAll('.extra-ws-check').forEach(function(cb) {
                     cb.addEventListener('change', updateTotal);
                 });
