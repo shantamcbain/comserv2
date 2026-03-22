@@ -1,0 +1,181 @@
+[% PageVersion = 'Comserv/root/Documentation/deployment/SERVER_DEPLOYMENT.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Comserv Server Deployment Guide' %]
+
+<!-- Documentation page for SERVER_DEPLOYMENT -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+This guide explains how to deploy the Comserv application on a server.
+
+
+
+<h2>Prerequisites</h2>
+
+
+
+<ul><li>Perl 5.10 or higher</li></ul>
+
+<ul><li>MySQL or MariaDB</li></ul>
+
+<ul><li>Basic system utilities (curl, bash)</li></ul>
+
+
+
+<h2>Deployment Steps</h2>
+
+
+
+<ol><li>**Copy the application files to the server**</li></ol>
+
+
+
+   Copy the entire Comserv directory to your server.
+
+
+
+<ol><li>**Make the startup script executable**</li></ol>
+
+
+
+   <code></code>`bash
+
+   chmod +x /path/to/Comserv/script/start_server.sh
+
+   <code></code>`
+
+
+
+<ol><li>**Start the application**</li></ol>
+
+
+
+   <code></code>`bash
+
+   cd /path/to/Comserv
+
+   ./script/start_server.sh
+
+   <code></code>`
+
+
+
+   The startup script will:
+
+   - Check for and install missing dependencies
+
+   - Configure the application for the server environment
+
+   - Start the application server
+
+
+
+<ol><li>**For production deployment**</li></ol>
+
+
+
+   For a production environment, you may want to use a process manager like Supervisor:
+
+
+
+   <code></code>`bash
+
+   # Example supervisor configuration
+
+   [program:comserv]
+
+   command=/path/to/Comserv/script/start_server.sh
+
+   directory=/path/to/Comserv
+
+   user=www-data
+
+   autostart=true
+
+   autorestart=true
+
+   redirect_stderr=true
+
+   stdout_logfile=/var/log/comserv.log
+
+   <code></code>`
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+If you encounter issues:
+
+
+
+<ol><li>**Check the application logs**</li></ol>
+
+
+
+   <code></code>`bash
+
+   tail -f /path/to/Comserv/logs/application.log
+
+   <code></code>`
+
+
+
+<ol><li>**Verify dependencies**</li></ol>
+
+
+
+   <code></code>`bash
+
+   cd /path/to/Comserv
+
+   perl -MModule::Find -e 'print join("\n", findallmod Catalyst)'
+
+   <code></code>`
+
+
+
+<ol><li>**Manual dependency installation**</li></ol>
+
+
+
+   <code></code>`bash
+
+   cd /path/to/Comserv
+
+   cpanm --local-lib=local --installdeps .
+
+   <code></code>`
+
+
+
+<h2>Application Resilience</h2>
+
+
+
+The application has been designed to be resilient to missing dependencies:
+
+
+
+<ul><li>Email functionality will work if email modules are available, or gracefully degrade if they're not</li></ul>
+
+<ul><li>Session storage will use the best available option, falling back to simpler mechanisms if needed</li></ul>
+
+<ul><li>The application will start even if some non-critical modules are missing</li></ul>
+
+
+
+This ensures that the application will run in various server environments, even if not all dependencies can be installed.
+
+</div>

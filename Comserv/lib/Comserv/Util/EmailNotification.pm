@@ -501,7 +501,7 @@ sub send_email {
             return $c->model('Mail')->send_email($c, $to, $subject, $body, $site_id);
         } else {
             # Low-level fallback if Catalyst context is missing
-            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'send_email',
+            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'send_email',
                 "Missing Catalyst context, using direct SMTP fallback");
             return $self->_direct_smtp_send($email, $smtp_config);
         }
@@ -525,7 +525,7 @@ sub _direct_smtp_send {
         port => $port,
         sasl_username => $smtp_config->{smtp_username},
         sasl_password => $smtp_config->{smtp_password},
-        timeout => 30,
+        timeout => 5,
     );
     
     eval {

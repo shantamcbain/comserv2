@@ -33,6 +33,7 @@
    <li><a href="https://beemaster.ca/cgi-bin/index.cgi?site=SMO" target="_blank">Saddle Mountain organics</a></li>
 	<li><a href="https://ulc.usbm.ca/cgi-bin/index.cgi?site=ULC" target="_blank">ULC</a></li>
 	<li><a href="/cgi-bin/index.cgi?site=ShantaWorkShop">Shanta's work shop</a></li>
+    <li><a href="/workshop">Workshops</a></li>
 	<li><a href="https://usbm.ca/cgi-bin/index.cgi?site=USBM" target="_blank">USBM</a></li>
 	<li><a href="https://telmark.usbm.ca/cgi-bin/index.cgi?site=TelMark" target="_blank">TelMark</a> Our Adventure
     <li><a href="https://ve7tit.weaverbeck.ca/cgi-bin/index.cgi?site=VE7TIT" target="_blank">VE7TIT</a> Our Ham Shank
@@ -99,4 +100,3 @@
 
 
 [%# embed(data.page_bottom_view) %]
-

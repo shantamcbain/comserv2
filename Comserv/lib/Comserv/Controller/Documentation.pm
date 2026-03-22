@@ -2153,6 +2153,24 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     my ($self, $c, @args) = @_;
     my $requested_date = $args[0] if @args;
 
+    # DailyPlan is accessible to all sites — non-CSC sites see only DB-driven sections.
+    # CSC sees text-based planning tabs in addition to the DB-driven sections.
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $is_csc   = (uc($sitename) eq 'CSC') ? 1 : 0;
+
+    # Role check: all roles above member (admin, developer, devops, editor, user, normal)
+    # Also accept stash is_admin set by Root::auto (catches site-specific admins)
+    my $user_roles = $c->stash->{user_roles} || $c->session->{roles} || [];
+    $user_roles = [$user_roles] unless ref $user_roles eq 'ARRAY';
+    my $has_access = $c->stash->{is_admin}
+        || grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal)$/ } @$user_roles;
+    unless ($has_access) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Access denied to DailyPlan for user: " . ($c->session->{username} || 'Guest'));
+        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
+        $c->detach;
+    }
+
     # Get current date in YYYY-MM-DD format
     my $now = Time::Piece->new();
     my $current_date_str = $now->strftime('%Y-%m-%d');
@@ -2281,8 +2299,96 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     # Set proper charset for UTF-8 content
     $c->response->content_type('text/html; charset=utf-8');
 
+    # Fetch DB plans for this site (used in PLANNING tab for all sites)
+    my @db_plans;
+    eval {
+        my %search_cond = $is_csc ? () : (sitename => $sitename);
+        my $rs = $c->model('DBEncy')->resultset('DailyPlan');
+        my @plan_rows = $rs->search(\%search_cond, { order_by => { -asc => 'priority' } });
+        for my $plan (@plan_rows) {
+            my %h = $plan->get_columns;
+            $h{progress_percentage}     = $plan->get_progress_percentage;
+            $h{todo_count}              = $plan->get_todo_count;
+            $h{completed_todo_count}    = $plan->get_completed_todo_count;
+            $h{is_overdue}              = $plan->is_overdue;
+            push @db_plans, \%h;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Could not fetch DB plans: $@");
+    }
+
+    # Fetch projects from DB for PLANNING tab (with their linked plans)
+    # CSC sees all sites; others see only their own sitename
+    my @planning_projects;
+    my @orphan_plans;       # plans not linked to any project
+    my @plan_sitenames;     # distinct sitenames for filter toggle (CSC only)
+    eval {
+        my %proj_cond = $is_csc ? () : (sitename => $sitename);
+        my @proj_rows = $c->model('DBEncy')->resultset('Project')->search(
+            \%proj_cond,
+            { order_by => ['sitename', 'name'] }
+        )->all;
+
+        for my $proj (@proj_rows) {
+            next if $proj->parent_id;   # top-level projects only
+            my %p = $proj->get_columns;
+
+            # Linked plans
+            my @linked_plans;
+            eval {
+                for my $pln ($proj->dailyplans->all) {
+                    my %ph = $pln->get_columns;
+                    push @linked_plans, \%ph;
+                }
+            };
+            $p{linked_plans} = \@linked_plans;
+            push @planning_projects, \%p;
+
+            # Collect sitenames for filter toggle
+            push @plan_sitenames, $proj->sitename if $proj->sitename;
+        }
+
+        # Deduplicate sitenames
+        my %seen_site;
+        @plan_sitenames = grep { !$seen_site{$_}++ } sort @plan_sitenames;
+
+        # Standalone plans (not linked to any project)
+        my %plan_cond = $is_csc ? () : (sitename => $sitename);
+        for my $pln ($c->model('DBEncy')->resultset('DailyPlan')->search(
+            \%plan_cond, { order_by => { -desc => 'created_at' } }
+        )->all) {
+            eval {
+                push @orphan_plans, { $pln->get_columns }
+                    if $pln->dailyplan_projects->count == 0;
+            };
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Could not fetch planning projects: $@");
+    }
+
+    # Filter projects by filter_site param (CSC admin only)
+    my $filter_site = $c->req->param('filter_site') || '';
+    if ($is_csc && $filter_site) {
+        @planning_projects = grep { ($_->{sitename} || '') eq $filter_site } @planning_projects;
+        @orphan_plans      = grep { ($_->{sitename} || '') eq $filter_site } @orphan_plans;
+    }
+
     # Pass all date information and todos to template
     $c->stash(
+        # Site context
+        is_csc         => $is_csc,
+        plan_sitename  => $sitename,
+        db_plans       => \@db_plans,
+        planning_projects => \@planning_projects,
+        orphan_plans   => \@orphan_plans,
+        plan_sitenames => \@plan_sitenames,
+        filter_site    => $filter_site,
+        is_admin       => $c->stash->{is_admin},
+
         # Date strings
         current_date_str => $current_date_str,
         current_display => $current_display,

@@ -10,7 +10,6 @@ use File::Path qw(make_path);
 use IPC::Run3;
 use DateTime;
 use Comserv::Util::Logging;
-use Comserv::Util::CSRF;
 
 BEGIN { extends 'Comserv::Controller::Base'; }
 
@@ -101,11 +100,7 @@ sub cluster_add :Path('/admin/infrastructure/cluster/add') :Args(0) {
         return;
     }
     
-    unless (Comserv::Util::CSRF::validate_token($c)) {
-        $c->stash->{json} = { success => 0, error => 'CSRF validation failed' };
-        $c->forward('View::JSON');
-        return;
-    }
+    
     
     my $params = $c->req->body_parameters;
     my $cluster_name = $params->{name};
@@ -154,11 +149,7 @@ sub deploy_monitoring :Path('/admin/infrastructure/deploy/monitoring') :Args(1) 
         return;
     }
     
-    unless (Comserv::Util::CSRF::validate_token($c)) {
-        $c->stash->{json} = { success => 0, error => 'CSRF validation failed' };
-        $c->forward('View::JSON');
-        return;
-    }
+    
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'deploy_monitoring', 
         "Deploying monitoring stack to cluster: $cluster_name");
@@ -256,11 +247,7 @@ sub exec_kubectl :Path('/admin/infrastructure/kubectl') :Args(0) {
         return;
     }
     
-    unless (Comserv::Util::CSRF::validate_token($c)) {
-        $c->stash->{json} = { success => 0, error => 'CSRF validation failed' };
-        $c->forward('View::JSON');
-        return;
-    }
+    
     
     my $params = $c->req->body_parameters;
     my $cluster_name = $params->{cluster};

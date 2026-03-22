@@ -28,6 +28,7 @@ __PACKAGE__->register_class('ProjectDocumentationMapping', 'Comserv::Model::Sche
 __PACKAGE__->register_class('ApiToken', 'Comserv::Model::Schema::Ency::Result::ApiToken');
 __PACKAGE__->register_class('UserApiKeys', 'Comserv::Model::Schema::Ency::Result::UserApiKeys');
 __PACKAGE__->register_class('SystemLog', 'Comserv::Model::Schema::Ency::Result::SystemLog');
+__PACKAGE__->register_class('HealthAlert', 'Comserv::Model::Schema::Ency::Result::HealthAlert');
 __PACKAGE__->register_class('SiteConfig', 'Comserv::Model::Schema::Ency::Result::SiteConfig');
 
 # Register Workshop system classes
@@ -36,6 +37,21 @@ __PACKAGE__->register_class('WorkshopEmail', 'Comserv::Model::Schema::Ency::Resu
 __PACKAGE__->register_class('WorkshopRole', 'Comserv::Model::Schema::Ency::Result::WorkshopRole');
 __PACKAGE__->register_class('SiteWorkshop', 'Comserv::Model::Schema::Ency::Result::SiteWorkshop');
 __PACKAGE__->register_class('WorkshopResource', 'Comserv::Model::Schema::Ency::Result::WorkshopResource');
+
+# Register Membership system classes
+__PACKAGE__->register_class('MembershipPlan', 'Comserv::Model::Schema::Ency::Result::MembershipPlan');
+__PACKAGE__->register_class('MembershipPlanPricing', 'Comserv::Model::Schema::Ency::Result::MembershipPlanPricing');
+__PACKAGE__->register_class('UserMembership', 'Comserv::Model::Schema::Ency::Result::UserMembership');
+__PACKAGE__->register_class('MembershipServiceAccess', 'Comserv::Model::Schema::Ency::Result::MembershipServiceAccess');
+__PACKAGE__->register_class('MembershipTransaction', 'Comserv::Model::Schema::Ency::Result::PaymentTransaction');
+__PACKAGE__->register_class('SystemCostTracking', 'Comserv::Model::Schema::Ency::Result::SystemCostTracking');
+
+__PACKAGE__->register_class('MembershipPromoCode', 'Comserv::Model::Schema::Ency::Result::MembershipPromoCode');
+
+# Register unified Payment and Currency classes
+__PACKAGE__->register_class('PaymentTransaction', 'Comserv::Model::Schema::Ency::Result::PaymentTransaction');
+__PACKAGE__->register_class('InternalCurrencyAccount', 'Comserv::Model::Schema::Ency::Result::InternalCurrencyAccount');
+__PACKAGE__->register_class('InternalCurrencyTransaction', 'Comserv::Model::Schema::Ency::Result::InternalCurrencyTransaction');
 
 __PACKAGE__->meta->make_immutable(inline_constructor => 0);
 1;

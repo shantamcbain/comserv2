@@ -42,7 +42,6 @@
 
             <div class="form-container">
                 <form method="POST" action="[% c.uri_for('/user/admin_manage_roles', user.id) %]" class="app-form">
-                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
 
                     <div class="form-section">
                         <h3>Roles</h3>

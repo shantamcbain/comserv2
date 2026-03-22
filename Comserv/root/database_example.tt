@@ -91,10 +91,10 @@
 [% SET results = db_helper.execute_query(c, 'database_name', "SELECT * FROM table_name", []) %]</code></pre>
 
             <h3>3. Use the Macros from DefaultDBI.tt</h3>
-            <pre><code>[% INCLUDE setup/DefaultDBI.tt %]
+            <pre><code>&#91;% INCLUDE setup/DefaultDBI.tt %&#93;
 
-[% SET results = INCLUDE execute_query('database_name', 'SELECT * FROM table_name') %]
-[% SET data = INCLUDE get_data('ModelName', 'method_name', {param1 => 'value1'}) %]</code></pre>
+&#91;% SET results = INCLUDE execute_query('database_name', 'SELECT * FROM table_name') %&#93;
+&#91;% SET data = INCLUDE get_data('ModelName', 'method_name', {param1 =&gt; 'value1'}) %&#93;</code></pre>
         </div>
     </div>
 </div>

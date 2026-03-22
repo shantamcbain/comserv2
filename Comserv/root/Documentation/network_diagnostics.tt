@@ -1,0 +1,295 @@
+[% PageVersion = 'Comserv/root/Documentation/network_diagnostics.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Network Diagnostics Tool' %]
+
+<!-- Documentation page for network_diagnostics -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+The Network Diagnostics Tool provides administrators with a comprehensive view of the server environment, including network connectivity, system information, and virtualization details. This tool is designed to help administrators manage servers and VMs in the server room, ensuring new VMs can be created without interfering with existing systems.
+
+
+
+<h2>Features</h2>
+
+
+
+<ol><li>**Network Map Integration**: View and manage network devices and networks</li></ol>
+
+<ol><li>**Ping Test**: Verify basic connectivity to remote hosts</li></ol>
+
+<ol><li>**DNS Lookup**: Check DNS resolution for hostnames</li></ol>
+
+<ol><li>**Hosts File Management**: Add entries to the local hosts file with network validation</li></ol>
+
+<ol><li>**Basic System Information**: View local network configuration</li></ol>
+
+<ol><li>**Detailed System Information**: View comprehensive system and network details</li></ol>
+
+<ol><li>**VM & Container Information**: View details about virtual machines, Docker containers, and Kubernetes resources</li></ol>
+
+
+
+<h2>Access</h2>
+
+
+
+The Network Diagnostics Tool is available to administrators through:
+
+
+
+<ol><li>The Admin Dashboard: <code>/admin</code> → Network Diagnostics</li></ol>
+
+<ol><li>Direct URL: <code>/admin/network_diagnostics</code></li></ol>
+
+<ol><li>From the Restart Starman page: <code>/admin/restart_starman</code></li></ol>
+
+
+
+<h2>Common Use Cases</h2>
+
+
+
+<h3>Troubleshooting Production Server Connectivity</h3>
+
+
+
+If you're unable to connect to a production server (e.g., comservproduction1), you can:
+
+
+
+<ol><li>Ping the server to check basic connectivity</li></ol>
+
+<ol><li>Perform a DNS lookup to verify name resolution</li></ol>
+
+<ol><li>Add an entry to your hosts file if DNS resolution fails</li></ol>
+
+
+
+<h3>Adding a Hosts File Entry</h3>
+
+
+
+To add an entry to your hosts file:
+
+
+
+<ol><li>Navigate to <code>/admin/network_diagnostics</code></li></ol>
+
+<ol><li>Scroll to the "Add Hosts File Entry" section</li></ol>
+
+<ol><li>Enter the IP address (e.g., 192.168.1.126)</li></ol>
+
+<ol><li>Enter the hostname (e.g., comservproduction1)</li></ol>
+
+<ol><li>Enter your sudo password</li></ol>
+
+<ol><li>Click "Add Hosts Entry"</li></ol>
+
+
+
+<h3>Verifying DNS Resolution</h3>
+
+
+
+To check if a hostname resolves correctly:
+
+
+
+<ol><li>Navigate to <code>/admin/network_diagnostics</code></li></ol>
+
+<ol><li>Use the "DNS Lookup (dig)" tool</li></ol>
+
+<ol><li>Enter the hostname to check</li></ol>
+
+<ol><li>Review the results in the "ANSWER SECTION"</li></ol>
+
+
+
+<h3>Viewing Detailed System Information</h3>
+
+
+
+To view comprehensive system information:
+
+
+
+<ol><li>Navigate to <code>/admin/network_diagnostics</code></li></ol>
+
+<ol><li>Click the "Detailed System Info" button in the quick navigation bar</li></ol>
+
+<ol><li>Review the various sections including:</li></ol>
+
+   - Basic System Information (hostname, kernel, OS)
+
+   - Resource Usage (disk, memory)
+
+   - Network Configuration (IP, routing, DNS)
+
+   - Network Status (connections, hosts file)
+
+
+
+<h3>Viewing VM and Container Information</h3>
+
+
+
+To view information about virtual machines and containers:
+
+
+
+<ol><li>Navigate to <code>/admin/network_diagnostics</code></li></ol>
+
+<ol><li>Click the "VM & Container Info" button in the quick navigation bar</li></ol>
+
+<ol><li>Review the various sections including:</li></ol>
+
+   - Network Map Overview (networks and devices)
+
+   - Virtual Machine Status (KVM/QEMU VMs)
+
+   - Docker Containers and Images
+
+   - Kubernetes Nodes, Pods, and Services
+
+
+
+<h3>Working with Network Map Data</h3>
+
+
+
+The Network Diagnostics Tool integrates with the NetworkMap JSON storage:
+
+
+
+<ol><li>View networks and devices in the Network Map section</li></ol>
+
+<ol><li>When adding hosts file entries, select the appropriate network</li></ol>
+
+<ol><li>The system will warn you if an IP or hostname already exists in the network map</li></ol>
+
+
+
+<h2>Implementation Details</h2>
+
+
+
+<h3>Templates</h3>
+
+
+
+The Network Diagnostics Tool uses the following templates:
+
+
+
+<ul><li><code>admin/network_diagnostics.tt</code> - Main diagnostics dashboard</li></ul>
+
+<ul><li><code>admin/network_diagnostics_system_info.tt</code> - Detailed system information</li></ul>
+
+<ul><li><code>admin/network_diagnostics_vm_info.tt</code> - VM and container information</li></ul>
+
+<ul><li><code>admin/error.tt</code> - Error display for unauthorized access</li></ul>
+
+
+
+<h3>CSS</h3>
+
+
+
+Styles for the Network Diagnostics Tool are defined in:
+
+
+
+<ul><li><code>/static/css/themes/admin.css</code> - Admin-specific styles including network diagnostics (moved to themes system)</li></ul>
+
+
+
+<h3>Controller</h3>
+
+
+
+The main controller is <code>Comserv::Controller::Admin::NetworkDiagnostics</code> with these key methods:
+
+
+
+<ul><li><code>index</code> - Main dashboard display</li></ul>
+
+<ul><li><code>ping_host</code> - Ping a remote host</li></ul>
+
+<ul><li><code>dig_host</code> - Perform DNS lookup</li></ul>
+
+<ul><li><code>add_hosts_entry</code> - Add entry to hosts file</li></ul>
+
+<ul><li><code>system_info</code> - Display detailed system information</li></ul>
+
+<ul><li><code>vm_info</code> - Display VM and container information</li></ul>
+
+<ul><li><code>_load_network_map</code> - Helper to load network map data from JSON</li></ul>
+
+
+
+<h2>Logging</h2>
+
+
+
+The Network Diagnostics Tool uses comprehensive logging to track all operations:
+
+
+
+<code></code>`perl
+
+$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name',
+
+    "Detailed message with relevant information");
+
+<code></code>`
+
+
+
+All network diagnostic operations are logged to the application log with appropriate context.
+
+
+
+<h2>Security Considerations</h2>
+
+
+
+<ul><li>Only administrators can access the Network Diagnostics Tool</li></ul>
+
+<ul><li>Sudo password is required for operations that modify system files</li></ul>
+
+<ul><li>Input validation is performed to prevent command injection</li></ul>
+
+<ul><li>Passwords are never logged or stored</li></ul>
+
+<ul><li>Command execution is done safely to prevent shell injection</li></ul>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/Documentation/logging_best_practices">Logging Best Practices</a></li></ul>
+
+<ul><li><a href="/Documentation/restart_starman">Restart Starman Server</a></li></ul>
+
+<ul><li><a href="/Documentation/server_configuration">Server Configuration</a></li></ul>
+
+<ul><li><a href="/Documentation/troubleshooting_guide">Troubleshooting Guide</a></li></ul>
+
+</div>

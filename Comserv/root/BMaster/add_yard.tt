@@ -1,49 +1,100 @@
-<style>
-    .field-name {
-        /* Add your CSS properties here */
-    }
-    .field-input {
-        /* Add your CSS properties here */
-    }
-    .field-description {
-        /* Add your CSS properties here */
-    }
-</style>
-[% IF c.stash.error_messages.size %]
-    <ul class="error-messages">
-        [% FOREACH error_msg IN c.stash.error_messages %]
-            <li>[% error_msg %]</li>
-        [% END %]
-    </ul>
+[% META title = "Add a Yard" %]
+[% PageVersion = 'BMaster/add_yard.tt,v 0.02 2026/03/17 shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
 [% END %]
-<form method="POST" action="[% c.uri_for(c.controller.action_for('add_yard')) %]">
-    <label for="yard_code" class="field-name"><b>Yard Code:</b></label>
 
-   <input type="text" id="yard_code" name="yard_code" value="[% c.stash.yard_code %]" class="field-input" required>
-    <p class="field-description">This is the unique identifier for the yard.</p>
+<div class="app-container">
 
-    <label for="yard_name" class="field-name"><b>Yard Name:</b></label>
-    <input type="text" id="yard_name" name="yard_name" value="[% c.stash.yard_name %]" class="field-input" required>
-    <p class="field-description">This is the name of the yard.</p>
+    <div class="page-header">
+        <h1>Add a New Yard</h1>
+    </div>
 
- <input type="text" id="sitename" name="sitename" value="[% c.session.SiteName %]" class="field-input" readonly>
-    <p class="field-description">The owner of the yard. Should be filled for you.</p>
+    <div class="content-container">
+        <div class="content-primary">
 
-    <label for="total_yard_size" class="field-name"><b>Total Yard Size:</b></label>
-    <input type="number" id="total_yard_size" name="total_yard_size" value="[% c.stash.total_yard_size %]" class="field-input" required>
-    <p class="field-description">This is the total size of the yard in hives it can support.</p>
+            [% IF c.stash.error_messages.size %]
+            <div class="error">
+                <ul>
+                    [% FOREACH error_msg IN c.stash.error_messages %]
+                        <li>[% error_msg | html %]</li>
+                    [% END %]
+                </ul>
+            </div>
+            [% END %]
 
-    <label for="date_established" class="field-name"><b>Date Established:</b></label>
-    <input type="date" id="date_established" name="date_established" value="[% c.stash.date_established %]" class="field-input" required>
-    <p class="field-description">This is the date when the yard was established.</p>
+            <div class="form-container">
+                <form method="POST" action="[% c.uri_for(c.controller.action_for('add_yard')) %]" class="app-form">
 
-    <label for="notes" class="field-name"><b>Notes:</b></label>
-  <textarea id="notes" name="notes" class="field-input">[% c.stash.notes %]</textarea>
-    <p class="field-description">Any additional notes or comments about the yard.</p>
+                    <div class="form-section">
 
-    <label for="image" class="field-name"><b>Image:</b></label>
-    <input type="file" id="image" value="yard_image" name="image" class="field-input">
-    <p class="field-description">An image of the yard.</p>
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="yard_code"><strong>Yard Code:</strong></label>
+                                <input type="text" id="yard_code" name="yard_code" value="[% c.stash.yard_code | html %]" class="form-input" required>
+                                <p>Unique identifier for this yard.</p>
+                            </div>
+                        </div>
 
-    <input type="submit" value="Submit">
-</form>
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="yard_name"><strong>Yard Name:</strong></label>
+                                <input type="text" id="yard_name" name="yard_name" value="[% c.stash.yard_name | html %]" class="form-input" required>
+                                <p>Descriptive name for this yard.</p>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="sitename"><strong>Site (Owner):</strong></label>
+                                <input type="text" id="sitename" name="sitename" value="[% c.session.SiteName | html %]" class="form-input" readonly>
+                                <p>The site this yard belongs to. Pre-filled from your session.</p>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="total_yard_size"><strong>Total Yard Size (hives):</strong></label>
+                                <input type="number" id="total_yard_size" name="total_yard_size" value="[% c.stash.total_yard_size | html %]" class="form-input" required>
+                                <p>Maximum number of hives this yard can support.</p>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="date_established"><strong>Date Established:</strong></label>
+                                <input type="date" id="date_established" name="date_established" value="[% c.stash.date_established | html %]" class="form-input" required>
+                                <p>The date this yard was established.</p>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="notes"><strong>Notes:</strong></label>
+                                <textarea id="notes" name="notes" class="form-input">[% c.stash.notes | html %]</textarea>
+                                <p>Any additional notes or comments about the yard.</p>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="image"><strong>Yard Image:</strong></label>
+                                <input type="file" id="image" name="image" class="form-input">
+                                <p>Upload a photo of the yard.</p>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Add Yard</button>
+                        <a href="/BMaster/yards" class="btn btn-secondary">Cancel</a>
+                    </div>
+
+                </form>
+            </div>
+
+        </div>
+    </div>
+
+</div>

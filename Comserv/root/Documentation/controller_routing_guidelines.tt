@@ -1,0 +1,193 @@
+[% PageVersion = 'Comserv/root/Documentation/controller_routing_guidelines.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Controller Routing Guidelines' %]
+
+<!-- Documentation page for controller_routing_guidelines -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+This document provides guidelines for setting up controllers in the Comserv application to ensure proper routing and prevent common issues like the "all sites returning the USBM home page" problem.
+
+
+
+<h2>Common Issues</h2>
+
+
+
+One recurring issue in our application has been that all sites sometimes return the USBM home page. This happens when a controller incorrectly captures the root path (<code>/</code>) for all domains.
+
+
+
+<h2>Proper Controller Setup</h2>
+
+
+
+<h3>1. Always Set a Namespace</h3>
+
+
+
+Every controller should explicitly set its namespace to match the controller name:
+
+
+
+<code></code>`perl
+
+<h1>In Comserv::Controller::MySite</h1>
+
+__PACKAGE__->config(namespace => 'MySite');
+
+<code></code>`
+
+
+
+This ensures that the controller only responds to paths that start with <code>/MySite</code>.
+
+
+
+<h3>2. Use Appropriate Action Attributes</h3>
+
+
+
+<ul><li>**:Path** - Use with caution. If used without arguments, it captures the controller's namespace.</li></ul>
+
+<ul><li style="margin-left: 20px"><code>:Path('/')</code> - Captures the root path for ALL domains (avoid this in site-specific controllers)</li></ul>
+
+<ul><li style="margin-left: 20px"><code>:Path('/specific')</code> - Captures a specific absolute path</li></ul>
+
+<ul><li style="margin-left: 20px"><code>:Path</code> - Captures the controller's namespace path</li></ul>
+
+
+
+<ul><li>**:Local** - Safer option. Appends the method name to the controller's namespace.</li></ul>
+
+<ul><li style="margin-left: 20px"><code>sub method :Local</code> - Captures <code>/Namespace/method</code></li></ul>
+
+
+
+<ul><li>**:Chained** - Best for complex applications. Creates a chain of actions.</li></ul>
+
+
+
+<h3>3. Include Proper Logging</h3>
+
+
+
+Always include logging in your controllers:
+
+
+
+<code></code>`perl
+
+use Comserv::Util::Logging;
+
+
+
+has 'logging' => (
+
+    is => 'ro',
+
+    default => sub { Comserv::Util::Logging->instance }
+
+);
+
+
+
+sub auto :Private {
+
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
+
+        "Controller auto method called");
+
+    return 1;
+
+}
+
+<code></code>`
+
+
+
+<h3>4. Forward to View</h3>
+
+
+
+Always explicitly forward to the view in your action methods:
+
+
+
+<code></code>`perl
+
+$c->stash(template => 'MyTemplate.tt');
+
+$c->forward($c->view('TT'));
+
+<code></code>`
+
+
+
+<h2>Site-Specific Controllers</h2>
+
+
+
+For site-specific controllers:
+
+
+
+<ol><li>Name the controller after the site (e.g., <code>Comserv::Controller::USBM</code> for USBM site)</li></ol>
+
+<ol><li>Set the namespace to match the site name</li></ol>
+
+<ol><li>Use <code>:Path</code> without arguments or <code>:Local</code> for the index method</li></ol>
+
+<ol><li>Do NOT use <code>:Path('/')</code> in site-specific controllers</li></ol>
+
+
+
+<h2>Root Controller</h2>
+
+
+
+Only the <code>Comserv::Controller::Root</code> should handle the root path (<code>/</code>). It determines which site to display based on the domain and other factors.
+
+
+
+<h2>Testing</h2>
+
+
+
+After creating or modifying a controller, test it with multiple domains to ensure it doesn't capture routes it shouldn't.
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+If all sites start showing the same content:
+
+
+
+<ol><li>Check for controllers using <code>:Path('/')</code> incorrectly</li></ol>
+
+<ol><li>Verify the <code>sitedomain</code> table has correct entries</li></ol>
+
+<ol><li>Check the logging for routing issues</li></ol>
+
+<ol><li>Ensure the <code>Root</code> controller's <code>auto</code> and <code>index</code> methods are working correctly</li></ol>
+
+</div>

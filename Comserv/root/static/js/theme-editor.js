@@ -6,6 +6,7 @@
 class ThemeEditor {
     constructor() {
         this.themeVariables = {};
+        this.changedVariables = {};
         this.editableElements = [];
         this.activeElement = null;
         this.activeElementType = null;
@@ -15,6 +16,7 @@ class ThemeEditor {
         this.originalStyles = new Map();
         this.isInspectorActive = false;
         this.highlightedElement = null;
+        this.themeName = document.getElementById('css-edit-toggle')?.dataset.themeName || 'default';
     }
     
     init() {
@@ -316,7 +318,7 @@ class ThemeEditor {
             background: #4a90e2;
             color: white;
             border: none;
-            font-size: 14px;
+            font-size: 12px;
             font-weight: bold;
             cursor: pointer;
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
@@ -324,7 +326,7 @@ class ThemeEditor {
             align-items: center;
             justify-content: center;
         `;
-        
+        this.floatingBtn = toggleBtn;
         toggleBtn.onclick = () => this.toggleInspector();
         document.body.appendChild(toggleBtn);
     }
@@ -539,6 +541,24 @@ class ThemeEditor {
         }
     }
     
+    _syncPagetopToggle(isActive) {
+        const btn = document.getElementById('css-edit-toggle');
+        if (btn) {
+            if (isActive) {
+                btn.innerHTML = '<i class="fas fa-times"></i> Close Editor';
+                btn.classList.add('edit-mode');
+            } else {
+                btn.innerHTML = '<i class="fas fa-paint-brush"></i> Theme Editor';
+                btn.classList.remove('edit-mode');
+            }
+        }
+        if (this.floatingBtn) {
+            this.floatingBtn.textContent = isActive ? '✕' : 'Theme';
+            this.floatingBtn.style.background = isActive ? '#dc3545' : '#4a90e2';
+        }
+        document.body.classList.toggle('css-edit-mode', isActive);
+    }
+
     closeInspector() {
         console.log('closeInspector called, container exists:', !!this.inspectorContainer);
         if (!this.inspectorContainer) return;
@@ -549,6 +569,9 @@ class ThemeEditor {
         if (this.toggleBtn) this.toggleBtn.textContent = 'Close';
         document.body.style.cursor = '';
         
+        // Sync the pagetop toggle button
+        this._syncPagetopToggle(false);
+
         // Remove highlights
         if (this.highlightedElement) {
             this.highlightedElement.classList.remove('highlighted');
@@ -569,6 +592,9 @@ class ThemeEditor {
         
         this.isInspectorActive = false;
         document.body.style.cursor = '';
+
+        // Sync the pagetop toggle button
+        this._syncPagetopToggle(false);
         
         // Remove all highlights
         document.querySelectorAll('.highlighted').forEach(el => {
@@ -593,6 +619,9 @@ class ThemeEditor {
         this.inspectorContainer.style.display = 'flex';
         if (this.toggleBtn) this.toggleBtn.textContent = 'Close';
         document.body.style.cursor = 'crosshair';
+
+        // Sync the pagetop toggle button
+        this._syncPagetopToggle(true);
         
         // Update theme variables in the dropdown
         if (typeof this.updateThemeVarSelect === 'function') {
@@ -638,17 +667,24 @@ class ThemeEditor {
     
     handleElementClick(e) {
         if (!this.isInspectorActive) return;
-        
-        e.preventDefault();
-        e.stopPropagation();
-        
+
         const element = e.target;
-        if (element === this.inspectorContainer || this.inspectorContainer.contains(element)) {
+
+        // Never intercept the inspector panel itself or its children
+        if (this.inspectorContainer && (element === this.inspectorContainer || this.inspectorContainer.contains(element))) {
             return;
         }
-        
+
+        // Never intercept the pagetop toggle or the floating button
+        if (element.closest('#css-edit-toggle') || element.closest('#theme-inspector-toggle')) {
+            return;
+        }
+
+        // Only now prevent the click from activating links/buttons on the page
+        e.preventDefault();
+        e.stopPropagation();
+
         this.selectElement(element);
-        return false;
     }
     
     selectElement(element) {
@@ -667,11 +703,121 @@ class ThemeEditor {
     }
     
     displayElementStyles(element) {
-        const styles = window.getComputedStyle(element);
         const styleProperties = document.getElementById('style-properties');
         styleProperties.innerHTML = '';
-        
-        // Common CSS properties to display
+
+        const rootStyle = getComputedStyle(document.documentElement);
+        const varsForElement = this.getVariablesForElement(element);
+
+        // ── CSS Variable pickers (main WYSIWYG controls) ────────────────
+        const varSection = document.createElement('div');
+        varSection.style.cssText = 'margin-bottom:12px;';
+        varSection.innerHTML = '<h5 style="margin:0 0 6px;font-size:13px;color:#555;">Theme Variables</h5>';
+
+        varsForElement.forEach(varName => {
+            if (varName === '_background-image') return; // handled separately below
+
+            const currentVal = rootStyle.getPropertyValue('--' + varName).trim()
+                            || this.changedVariables[varName] || '';
+
+            const row = document.createElement('div');
+            row.className = 'style-property';
+            row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:5px;';
+
+            const lbl = document.createElement('label');
+            lbl.textContent = '--' + varName;
+            lbl.style.cssText = 'flex:1;font-size:11px;color:#444;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+            lbl.title = '--' + varName;
+
+            const isColor = varName.includes('color') || varName.includes('bg') || varName.includes('background');
+
+            if (isColor) {
+                const picker = document.createElement('input');
+                picker.type = 'color';
+                picker.style.cssText = 'width:36px;height:28px;padding:0;border:none;cursor:pointer;';
+                picker.value = this.rgbToHex(currentVal) || '#ffffff';
+                picker.title = 'Current: ' + (currentVal || 'default');
+
+                const txt = document.createElement('input');
+                txt.type = 'text';
+                txt.value = currentVal;
+                txt.style.cssText = 'width:80px;font-size:11px;padding:2px 4px;border:1px solid #ccc;border-radius:3px;';
+
+                picker.addEventListener('input', () => {
+                    txt.value = picker.value;
+                    this.updateCSSVariable(varName, picker.value);
+                });
+                txt.addEventListener('change', () => {
+                    if (/^#[0-9a-fA-F]{6}$/.test(txt.value)) picker.value = txt.value;
+                    this.updateCSSVariable(varName, txt.value);
+                });
+
+                row.appendChild(lbl);
+                row.appendChild(picker);
+                row.appendChild(txt);
+            } else {
+                const txt = document.createElement('input');
+                txt.type = 'text';
+                txt.value = currentVal;
+                txt.style.cssText = 'flex:1;font-size:11px;padding:2px 4px;border:1px solid #ccc;border-radius:3px;';
+                txt.placeholder = varName.includes('font') ? 'e.g. Arial, sans-serif' : 'value';
+                txt.addEventListener('change', () => {
+                    this.updateCSSVariable(varName, txt.value);
+                });
+
+                row.appendChild(lbl);
+                row.appendChild(txt);
+            }
+
+            varSection.appendChild(row);
+        });
+        styleProperties.appendChild(varSection);
+
+        // ── Background Image picker ────────────────────────────────────
+        const bgSection = document.createElement('div');
+        bgSection.style.cssText = 'border-top:1px solid #eee;padding-top:10px;margin-top:4px;';
+        bgSection.innerHTML = `
+            <h5 style="margin:0 0 6px;font-size:13px;color:#555;">Background Image</h5>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                <input id="bg-image-url" type="text" placeholder="/static/images/…"
+                    style="flex:1;min-width:120px;font-size:11px;padding:3px 6px;border:1px solid #ccc;border-radius:3px;">
+                <button id="bg-image-apply" class="btn btn-sm btn-outline-secondary" style="font-size:11px;padding:2px 8px;">Apply</button>
+                <button id="bg-image-clear" class="btn btn-sm btn-outline-danger"  style="font-size:11px;padding:2px 8px;">Clear</button>
+            </div>
+            <div id="bg-image-thumbs" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;max-height:140px;overflow-y:auto;"></div>`;
+        styleProperties.appendChild(bgSection);
+
+        // Fetch available images from a known set of folders
+        const thumbsDiv = bgSection.querySelector('#bg-image-thumbs');
+        const imgDirs = ['BMaster','apis','csc','usbm'];
+        imgDirs.forEach(dir => {
+            // We can't list directories from JS, but we can try known extensions
+            // Instead, expose common images as thumbnails via a small scan endpoint
+        });
+        // Load thumbnails asynchronously
+        this._loadBgThumbs(thumbsDiv, bgSection.querySelector('#bg-image-url'));
+
+        bgSection.querySelector('#bg-image-apply').onclick = () => {
+            const url = bgSection.querySelector('#bg-image-url').value.trim();
+            if (url) {
+                const val = `url("${url}")`;
+                element.style.backgroundImage = val;
+                // Save as a custom CSS rule, not a standard variable – store in changedVariables with special prefix
+                this.changedVariables['_bg_image_' + this.getCssSelector(element).replace(/[^a-zA-Z0-9]/g,'_')] = `${this.getCssSelector(element)} { background-image: url("${url}"); }`;
+            }
+        };
+        bgSection.querySelector('#bg-image-clear').onclick = () => {
+            element.style.backgroundImage = '';
+            bgSection.querySelector('#bg-image-url').value = '';
+        };
+
+        // ── Keep the legacy computed-styles section below ───────────────
+        const sep = document.createElement('div');
+        sep.style.cssText = 'border-top:1px solid #eee;padding-top:8px;margin-top:10px;';
+        sep.innerHTML = '<h5 style="margin:0 0 6px;font-size:12px;color:#999;">Computed Styles (read-only)</h5>';
+        styleProperties.appendChild(sep);
+
+        const styles = window.getComputedStyle(element);
         const commonProperties = [
             'color', 'background-color', 'font-size', 'font-family',
             'width', 'height', 'margin', 'padding', 'border', 'display',
@@ -808,37 +954,99 @@ class ThemeEditor {
         this.displayElementStyles(this.activeElement);
     }
     
-    saveToTheme() {
-        if (!this.activeElement) {
-            alert('Please select an element first');
+    async saveToTheme() {
+        const vars = this.changedVariables;
+        if (Object.keys(vars).length === 0) {
+            alert('No changes to save yet. Click an element and modify its colours or styles first.');
             return;
         }
-        
-        const varName = document.getElementById('theme-var-select').value;
-        if (!varName) {
-            alert('Please select or create a theme variable first');
-            return;
+
+        const body = new URLSearchParams();
+        for (const [k, v] of Object.entries(vars)) {
+            if (k.startsWith('_bg_image_')) continue; // background images handled separately
+            body.append('var-' + k, v);
         }
-        
-        // Get all modified styles for the active element
-        if (!this.originalStyles.has(this.activeElement)) {
-            alert('No styles have been modified for this element');
-            return;
+
+        const saveBtn = document.querySelector('#theme-inspector button.btn-primary');
+        const origText = saveBtn ? saveBtn.textContent : '';
+        if (saveBtn) saveBtn.textContent = 'Saving…';
+
+        try {
+            const response = await fetch('/admin/theme/save_variables/' + encodeURIComponent(this.themeName), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString(),
+            });
+            const data = await response.json();
+            if (data.success) {
+                this.changedVariables = {};
+                alert('✓ ' + data.message);
+            } else {
+                alert('Error: ' + data.message);
+            }
+        } catch (err) {
+            console.error('saveToTheme error:', err);
+            alert('Network error saving theme: ' + err.message);
+        } finally {
+            if (saveBtn) saveBtn.textContent = origText;
         }
-        
-        const elementStyles = this.originalStyles.get(this.activeElement);
-        const selector = this.getCssSelector(this.activeElement);
-        
-        // In a real implementation, this would save to your theme system
-        console.log(`Saving styles for ${selector} to theme variable ${varName}:`, elementStyles);
-        
-        // Add to theme variables
-        this.themeVariables[varName] = elementStyles;
-        
-        // Update the theme variable dropdown
-        this.updateThemeVarSelect();
-        
-        alert(`Styles saved to theme variable: ${varName}`);
+    }
+
+    // Map element types to CSS variable names
+    getVariablesForElement(element) {
+        const tag = (element.tagName || '').toLowerCase();
+        const cls = (element.className || '').toLowerCase();
+        const id  = (element.id || '').toLowerCase();
+
+        // Helper – check if element or ancestor matches
+        const closest = (sel) => { try { return element.closest(sel); } catch(e) { return null; } };
+
+        const vars = [];
+
+        // Background / body
+        if (tag === 'body' || tag === 'main' || tag === 'html') {
+            vars.push('background-color', 'text-color', 'body-font', 'font-size-base');
+        }
+
+        // Navigation
+        if (tag === 'nav' || closest('nav') || cls.includes('nav') || cls.includes('menu')) {
+            vars.push('nav-bg', 'nav-text', 'nav-hover-bg');
+        }
+
+        // Buttons
+        if (tag === 'button' || tag === 'input' || cls.includes('btn')) {
+            vars.push('button-bg', 'button-text', 'button-border', 'button-hover-bg');
+        }
+
+        // Links
+        if (tag === 'a') {
+            vars.push('link-color', 'link-hover-color');
+        }
+
+        // Headings
+        if (['h1','h2','h3','h4','h5','h6'].includes(tag)) {
+            vars.push('text-color', 'header-font', 'font-size-large');
+        }
+
+        // Tables
+        if (tag === 'table' || tag === 'th' || tag === 'thead' || closest('table')) {
+            vars.push('table-header-bg', 'border-color');
+        }
+
+        // General: always offer background + text colour
+        if (!vars.includes('background-color')) vars.push('background-color');
+        if (!vars.includes('text-color')) vars.push('text-color');
+
+        // Background image always available
+        vars.push('_background-image');
+
+        return [...new Set(vars)];
+    }
+
+    // Update a CSS variable live on :root
+    updateCSSVariable(varName, value) {
+        document.documentElement.style.setProperty('--' + varName, value);
+        this.changedVariables[varName] = value;
     }
     
     createNewThemeVar() {
@@ -941,6 +1149,33 @@ class ThemeEditor {
         return parts.join(' > ');
     }
     
+    async _loadBgThumbs(container, urlInput) {
+        try {
+            const res = await fetch('/admin/theme/list_images');
+            if (!res.ok) return;
+            const data = await res.json();
+            const images = data.images || [];
+            if (!images.length) {
+                container.innerHTML = '<span style="font-size:11px;color:#999;">No images found in /static/images/</span>';
+                return;
+            }
+            images.forEach(url => {
+                const thumb = document.createElement('img');
+                thumb.src = url;
+                thumb.title = url;
+                thumb.style.cssText = 'width:48px;height:48px;object-fit:cover;cursor:pointer;border:2px solid transparent;border-radius:3px;';
+                thumb.onclick = () => {
+                    urlInput.value = url;
+                    container.querySelectorAll('img').forEach(i => i.style.borderColor = 'transparent');
+                    thumb.style.borderColor = '#007bff';
+                };
+                container.appendChild(thumb);
+            });
+        } catch(e) {
+            container.innerHTML = '<span style="font-size:11px;color:#999;">Image picker unavailable.</span>';
+        }
+    }
+
     initModal() {
         // Create modal if it doesn't exist
         let modalElement = document.getElementById('propertyEditorModal');

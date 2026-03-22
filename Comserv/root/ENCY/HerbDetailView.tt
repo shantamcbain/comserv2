@@ -1,15 +1,13 @@
 
 
-[% IF c.session.roles == 'admin' %]
-    <a href="[% c.uri_for('/ENCY/edit_herb', herb.record_id) %]">Edit Herb</a>
-[% END %]
-[% IF c.session.roles == 'admin' %]
-    <a href="[% c.uri_for('/ENCY/edit_herb', herb.record_id) %]">Edit Herb</a>
+[% IF is_admin %]
+    <a href="/ENCY/edit_herb">Edit Herb</a>
 [% END %]
 
+[% PROCESS 'ENCY/ImageHelper.tt' %]
 <h1>[% herb.botanical_name %]</h1>
 <p>Common Names: [% herb.common_names %]</p>
-<img src="[% herb.image %]" WIDTH="300" HEIGHT="325" />
+[% ency_img_tag(herb.image, 300, 325) %]
 <p>Pollinator Forage [% herb.apis %]
 <p>Nectar [% herb.nectar %]</p>
 <p>Pollen [% herb.pollen %]</p>
@@ -38,8 +36,8 @@
 <p>History [% herb.history %] </p>
 <p>Reference [% herb.reference %]</p>
 <!-- Display the Add Herb button only for admin users -->
-[% IF user.role == 'admin' %]
-    <button onclick="window.location.href='/ENCY/add_herb';">Add Herb</button>
+[% IF is_admin %]
+    <a href="/ENCY/add_herb" class="btn btn-primary">Add Herb</a>
 [% END %]
 <table>
     <tr>
@@ -107,7 +105,7 @@
     </tr>
     <tr>
         <td>Image URL:</td>
-        <td><img src="[% herb.image %]" width="300" height="325" /></td>
+        <td>[% ency_img_tag(herb.image, 300, 325) %]</td>
     </tr>
 
     <tr>

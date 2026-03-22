@@ -1,0 +1,943 @@
+[% META title = 'Logging Administration' %]
+[% PageVersion = 'Comserv/root/admin/logging/index.tt,v 0.01 2025/07/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="admin-card">
+    <div class="feature-header">
+        <h2>Logging Administration</h2>
+        <p>Manage system logging levels and debug settings</p>
+    </div>
+
+    <div class="feature-content">
+        <!-- Browser Debug Mode Control -->
+        <div class="admin-section">
+            <h3>Browser Debug Mode Control</h3>
+            <div class="debug-mode-status">
+                <p><strong>Current Status:</strong> 
+                    <span id="debug-status" class="[% debug_mode ? 'status-enabled' : 'status-disabled' %]">
+                        [% debug_mode ? 'ENABLED' : 'DISABLED' %]
+                    </span>
+                </p>
+                <p><strong>Site:</strong> [% site_name %]</p>
+            </div>
+            
+            <div class="feature-actions">
+                <button id="toggle-debug-btn" class="btn [% debug_mode ? 'btn-warning' : 'btn-success' %]">
+                    [% debug_mode ? 'Disable Debug Mode' : 'Enable Debug Mode' %]
+                </button>
+            </div>
+            
+            <div class="debug-info">
+                <h4>Browser Debug Mode Information:</h4>
+                <ul>
+                    <li><strong>Enabled:</strong> Shows all debug messages in browser (on-page debug display)</li>
+                    <li><strong>Disabled:</strong> No debug messages shown in browser interface</li>
+                    <li><strong>Impact:</strong> Only affects browser display, NOT log file content</li>
+                    <li><strong>Scope:</strong> Setting applies to current user session only</li>
+                    <li><strong>Use Case:</strong> Enable to see debug info while browsing, disable for clean interface</li>
+                    <li><strong>Note:</strong> This is separate from Application Log Level below</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- PHASE 3: Application Log Level Control (separate from browser debug_mode) -->
+        <div class="admin-section">
+            <h3>Application Log Level Control</h3>
+            <div class="log-level-status">
+                <p><strong>Current Application Log Level:</strong> 
+                    <span id="app-log-level" class="status-info">[% app_log_level %]</span>
+                </p>
+                <p><strong>Effect:</strong> Controls what gets written to <code>logs/application.log</code></p>
+            </div>
+            
+            <div class="feature-actions">
+                <label for="app-log-level-select"><strong>Set Application Log Level:</strong></label>
+                <select id="app-log-level-select" class="form-control" style="width: auto; display: inline-block; margin-left: 10px;">
+                    [% FOREACH level IN available_log_levels %]
+                        <option value="[% level %]" [% IF level == app_log_level %]selected[% END %]>[% level %]</option>
+                    [% END %]
+                </select>
+                <button id="set-app-log-level-btn" class="btn btn-primary" style="margin-left: 10px;">
+                    Apply Log Level
+                </button>
+            </div>
+            
+            <div class="log-level-info">
+                <h4>Application Log Level Information:</h4>
+                <ul>
+                    <li><strong>DEBUG:</strong> All messages (most verbose) - Use for development only</li>
+                    <li><strong>INFO:</strong> Informational messages + warnings/errors - Good for troubleshooting</li>
+                    <li><strong>WARN:</strong> Warnings + errors only - Recommended for production</li>
+                    <li><strong>ERROR:</strong> Errors + critical only - Minimal logging</li>
+                    <li><strong>CRITICAL:</strong> Only critical system errors - Emergency mode</li>
+                </ul>
+                <p><strong>Note:</strong> This setting is separate from browser debug mode and affects the actual log file size.</p>
+            </div>
+        </div>
+
+        <!-- Log Management -->
+        <div class="admin-section">
+            <h3>Log Management</h3>
+            <div class="feature-actions">
+                <button id="rotate-logs-btn" class="btn btn-primary">
+                    Force Log Rotation
+                </button>
+            </div>
+            
+            <div class="log-info">
+                <h4>Log Rotation Information:</h4>
+                <ul>
+                    <li><strong>Automatic:</strong> Logs rotate when they exceed 80KB</li>
+                    <li><strong>Manual:</strong> Use the button above to force rotation</li>
+                    <li><strong>Archive:</strong> Old logs are stored in the logs/archive directory</li>
+                    <li><strong>Retention:</strong> Maximum 20 archived log files are kept</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- PHASE 2: Enhanced Error Reporting - Error Summary Dashboard -->
+        <div class="admin-section">
+            <h3>Error Summary Dashboard</h3>
+            
+            [% IF has_critical_errors %]
+            <div class="critical-alert">
+                <h4>⚠️ Critical Errors Detected!</h4>
+                <p>There are [% critical_errors.size %] critical error(s) that require immediate attention.</p>
+                <button id="dismiss-critical-btn" class="btn btn-warning">
+                    Dismiss Critical Notifications
+                </button>
+            </div>
+            [% END %]
+            
+            <div class="error-stats">
+                <div class="error-stat critical">
+                    <div class="stat-number">[% error_summary.critical_count %]</div>
+                    <div class="stat-label">Critical</div>
+                </div>
+                <div class="error-stat error">
+                    <div class="stat-number">[% error_summary.error_count %]</div>
+                    <div class="stat-label">Errors</div>
+                </div>
+                <div class="error-stat warn">
+                    <div class="stat-number">[% error_summary.warn_count %]</div>
+                    <div class="stat-label">Warnings</div>
+                </div>
+                <div class="error-stat total">
+                    <div class="stat-number">[% error_summary.total_errors %]</div>
+                    <div class="stat-label">Total</div>
+                </div>
+            </div>
+            
+            <div class="error-actions">
+                <button id="view-errors-btn" class="btn btn-primary">View All Errors</button>
+                <button id="clear-all-errors-btn" class="btn btn-danger">Clear All Errors</button>
+                <button id="refresh-errors-btn" class="btn btn-secondary">Refresh</button>
+            </div>
+        </div>
+
+        <!-- PHASE 2: Enhanced Error Reporting - Recent Errors -->
+        <div class="admin-section">
+            <h3>Recent Errors</h3>
+            <div id="recent-errors-container">
+                [% IF recent_errors.size > 0 %]
+                    <div class="recent-errors-list">
+                        [% FOREACH error IN recent_errors.slice(0, 4) %]
+                        <div class="error-item [% error.level.lower %]">
+                            <div class="error-header">
+                                <span class="error-level">[% error.level %]</span>
+                                <span class="error-timestamp">[% error.timestamp %]</span>
+                            </div>
+                            <div class="error-message">[% error.message | html %]</div>
+                            <div class="error-location">[% error.file %]:[% error.line %] in [% error.subroutine %]</div>
+                        </div>
+                        [% END %]
+                    </div>
+                [% ELSE %]
+                    <p class="no-errors">No recent errors found.</p>
+                [% END %]
+            </div>
+        </div>
+
+        <!-- Log Level Hierarchy -->
+        <div class="admin-section">
+            <h3>Log Level Hierarchy</h3>
+            <div class="log-levels">
+                <div class="log-level critical">
+                    <strong>CRITICAL:</strong> System-threatening errors requiring immediate action (Always logged + Admin notification)
+                </div>
+                <div class="log-level error">
+                    <strong>ERROR:</strong> Critical errors that require attention (Always logged)
+                </div>
+                <div class="log-level warn">
+                    <strong>WARN:</strong> Warning messages about potential issues (Always logged)
+                </div>
+                <div class="log-level info">
+                    <strong>INFO:</strong> General information messages (Always logged)
+                </div>
+                <div class="log-level debug">
+                    <strong>DEBUG:</strong> Detailed debugging information (Only when debug_mode is enabled)
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PHASE 2: Enhanced Error Reporting - Error Details Modal -->
+<div id="error-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Error Details</h3>
+            <span class="modal-close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="error-filters">
+                <label>Filter by level:</label>
+                <select id="error-level-filter">
+                    <option value="">All Levels</option>
+                    <option value="CRITICAL">Critical</option>
+                    <option value="ERROR">Error</option>
+                    <option value="WARN">Warning</option>
+                </select>
+                <button id="apply-filter-btn" class="btn btn-sm btn-primary">Apply Filter</button>
+            </div>
+            <div id="error-details-container">
+                <!-- Error details will be loaded here -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="clear-filtered-errors-btn" class="btn btn-danger">Clear Filtered Errors</button>
+            <button class="btn btn-secondary modal-close">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Status Messages -->
+<div id="status-message" class="status-message" style="display: none;"></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleBtn = document.getElementById('toggle-debug-btn');
+    const rotateBtn = document.getElementById('rotate-logs-btn');
+    const statusMessage = document.getElementById('status-message');
+    const debugStatus = document.getElementById('debug-status');
+    
+    // PHASE 2: Enhanced Error Reporting - New elements
+    const viewErrorsBtn = document.getElementById('view-errors-btn');
+    const clearAllErrorsBtn = document.getElementById('clear-all-errors-btn');
+    const refreshErrorsBtn = document.getElementById('refresh-errors-btn');
+    const dismissCriticalBtn = document.getElementById('dismiss-critical-btn');
+    const errorModal = document.getElementById('error-modal');
+    const errorLevelFilter = document.getElementById('error-level-filter');
+    const applyFilterBtn = document.getElementById('apply-filter-btn');
+    const clearFilteredErrorsBtn = document.getElementById('clear-filtered-errors-btn');
+    
+    // PHASE 3: Application Log Level Control - New elements
+    const setAppLogLevelBtn = document.getElementById('set-app-log-level-btn');
+    const appLogLevelSelect = document.getElementById('app-log-level-select');
+    const appLogLevelDisplay = document.getElementById('app-log-level');
+
+    function showMessage(message, type) {
+        statusMessage.textContent = message;
+        statusMessage.className = 'status-message status-' + type;
+        statusMessage.style.display = 'block';
+        setTimeout(() => {
+            statusMessage.style.display = 'none';
+        }, 5000);
+    }
+
+    // Toggle debug mode
+    toggleBtn.addEventListener('click', function() {
+        toggleBtn.disabled = true;
+        
+        fetch('/admin/logging/toggle_debug', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update UI
+                const isEnabled = data.debug_mode;
+                debugStatus.textContent = isEnabled ? 'ENABLED' : 'DISABLED';
+                debugStatus.className = isEnabled ? 'status-enabled' : 'status-disabled';
+                
+                toggleBtn.textContent = isEnabled ? 'Disable Debug Mode' : 'Enable Debug Mode';
+                toggleBtn.className = 'btn ' + (isEnabled ? 'btn-warning' : 'btn-success');
+                
+                showMessage(data.message, 'success');
+            } else {
+                showMessage('Failed to toggle debug mode', 'error');
+            }
+        })
+        .catch(error => {
+            showMessage('Error: ' + error.message, 'error');
+        })
+        .finally(() => {
+            toggleBtn.disabled = false;
+        });
+    });
+
+    // Rotate logs
+    rotateBtn.addEventListener('click', function() {
+        rotateBtn.disabled = true;
+        rotateBtn.textContent = 'Rotating...';
+        
+        fetch('/admin/logging/rotate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showMessage(data.message, 'success');
+            } else {
+                showMessage('Failed to rotate logs: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            showMessage('Error: ' + error.message, 'error');
+        })
+        .finally(() => {
+            rotateBtn.disabled = false;
+            rotateBtn.textContent = 'Force Log Rotation';
+        });
+    });
+
+    // PHASE 3: Application Log Level Control - Set application log level
+    if (setAppLogLevelBtn) {
+        setAppLogLevelBtn.addEventListener('click', function() {
+            const selectedLevel = appLogLevelSelect.value;
+            
+            setAppLogLevelBtn.disabled = true;
+            setAppLogLevelBtn.textContent = 'Applying...';
+            
+            fetch('/admin/logging/set_app_log_level', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'level=' + encodeURIComponent(selectedLevel)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    appLogLevelDisplay.textContent = data.new_level;
+                    showMessage(data.message, 'success');
+                } else {
+                    showMessage('Failed to set log level: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('Error: ' + error.message, 'error');
+            })
+            .finally(() => {
+                setAppLogLevelBtn.disabled = false;
+                setAppLogLevelBtn.textContent = 'Apply Log Level';
+            });
+        });
+    }
+
+    // PHASE 2: Enhanced Error Reporting - View errors modal
+    if (viewErrorsBtn) {
+        viewErrorsBtn.addEventListener('click', function() {
+            loadErrors();
+            errorModal.style.display = 'block';
+        });
+    }
+
+    // PHASE 2: Enhanced Error Reporting - Clear all errors
+    if (clearAllErrorsBtn) {
+        clearAllErrorsBtn.addEventListener('click', function() {
+            if (confirm('Are you sure you want to clear all stored errors?')) {
+                clearErrors();
+            }
+        });
+    }
+
+    // PHASE 2: Enhanced Error Reporting - Refresh errors
+    if (refreshErrorsBtn) {
+        refreshErrorsBtn.addEventListener('click', function() {
+            location.reload();
+        });
+    }
+
+    // PHASE 2: Enhanced Error Reporting - Dismiss critical errors
+    if (dismissCriticalBtn) {
+        dismissCriticalBtn.addEventListener('click', function() {
+            fetch('/admin/logging/dismiss_critical', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    // Hide critical alert
+                    const criticalAlert = document.querySelector('.critical-alert');
+                    if (criticalAlert) {
+                        criticalAlert.style.display = 'none';
+                    }
+                } else {
+                    showMessage('Failed to dismiss critical errors', 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('Error: ' + error.message, 'error');
+            });
+        });
+    }
+
+    // PHASE 2: Enhanced Error Reporting - Apply error filter
+    if (applyFilterBtn) {
+        applyFilterBtn.addEventListener('click', function() {
+            const level = errorLevelFilter.value;
+            loadErrors(level);
+        });
+    }
+
+    // PHASE 2: Enhanced Error Reporting - Clear filtered errors
+    if (clearFilteredErrorsBtn) {
+        clearFilteredErrorsBtn.addEventListener('click', function() {
+            const level = errorLevelFilter.value;
+            const confirmMsg = level ? 
+                `Are you sure you want to clear all ${level} errors?` : 
+                'Are you sure you want to clear all errors?';
+            
+            if (confirm(confirmMsg)) {
+                clearErrors(level);
+            }
+        });
+    }
+
+    // PHASE 2: Enhanced Error Reporting - Modal close functionality
+    const modalCloseElements = document.querySelectorAll('.modal-close');
+    modalCloseElements.forEach(element => {
+        element.addEventListener('click', function() {
+            errorModal.style.display = 'none';
+        });
+    });
+
+    // Close modal when clicking outside
+    window.addEventListener('click', function(event) {
+        if (event.target === errorModal) {
+            errorModal.style.display = 'none';
+        }
+    });
+
+    // PHASE 2: Enhanced Error Reporting - Load errors function
+    function loadErrors(level) {
+        const container = document.getElementById('error-details-container');
+        container.innerHTML = '<div class="loading">Loading errors...</div>';
+
+        const url = '/admin/logging/errors' + (level ? `?level=${level}` : '');
+        
+        fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayErrors(data.errors, data.filter);
+            } else {
+                container.innerHTML = '<div class="error">Failed to load errors</div>';
+            }
+        })
+        .catch(error => {
+            container.innerHTML = '<div class="error">Error loading errors: ' + error.message + '</div>';
+        });
+    }
+
+    // PHASE 2: Enhanced Error Reporting - Display errors function
+    function displayErrors(errors, filter) {
+        const container = document.getElementById('error-details-container');
+        
+        if (errors.length === 0) {
+            container.innerHTML = `<div class="no-errors">No ${filter !== 'all' ? filter.toLowerCase() + ' ' : ''}errors found.</div>`;
+            return;
+        }
+
+        let html = `<div class="error-count">Showing ${errors.length} ${filter !== 'all' ? filter.toLowerCase() + ' ' : ''}error(s)</div>`;
+        html += '<div class="error-list">';
+
+        errors.forEach(error => {
+            html += `
+                <div class="error-detail-item ${error.level.toLowerCase()}">
+                    <div class="error-detail-header">
+                        <span class="error-detail-level">${error.level}</span>
+                        <span class="error-detail-timestamp">${error.timestamp}</span>
+                    </div>
+                    <div class="error-detail-message">${escapeHtml(error.message)}</div>
+                    <div class="error-detail-location">${error.file}:${error.line} in ${error.subroutine}</div>
+                    <div class="error-detail-context">
+                        <span>User: ${error.user_id}</span> | 
+                        <span>Site: ${error.site_name}</span> | 
+                        <span>URI: ${error.request_uri}</span>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    // PHASE 2: Enhanced Error Reporting - Clear errors function
+    function clearErrors(level) {
+        const url = '/admin/logging/clear_errors' + (level ? `?level=${level}` : '');
+        
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showMessage(data.message, 'success');
+                // Refresh the page to update error counts
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
+            } else {
+                showMessage('Failed to clear errors: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            showMessage('Error: ' + error.message, 'error');
+        });
+    }
+
+    // Utility function to escape HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+});
+</script>
+
+<style>
+.admin-section {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.debug-mode-status {
+    margin: 1rem 0;
+}
+
+.status-enabled {
+    color: var(--success-color);
+    font-weight: bold;
+}
+
+.status-disabled {
+    color: var(--danger-color);
+    font-weight: bold;
+}
+
+.debug-info, .log-info {
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: var(--card-bg);
+    border-radius: 4px;
+}
+
+.log-levels {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.log-level {
+    padding: 0.5rem;
+    border-radius: 4px;
+    border-left: 4px solid;
+}
+
+.log-level.error {
+    border-left-color: var(--danger-color);
+    background-color: rgba(220, 53, 69, 0.1);
+}
+
+.log-level.warn {
+    border-left-color: var(--warning-color);
+    background-color: rgba(255, 193, 7, 0.1);
+}
+
+.log-level.info {
+    border-left-color: var(--primary-color);
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+.log-level.debug {
+    border-left-color: var(--secondary-color);
+    background-color: rgba(108, 117, 125, 0.1);
+}
+
+.log-level.critical {
+    border-left-color: #dc3545;
+    background-color: rgba(220, 53, 69, 0.15);
+    font-weight: bold;
+}
+
+/* PHASE 2: Enhanced Error Reporting - New styles */
+.critical-alert {
+    background-color: rgba(220, 53, 69, 0.1);
+    border: 2px solid var(--danger-color);
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.critical-alert h4 {
+    color: var(--danger-color);
+    margin: 0 0 0.5rem 0;
+}
+
+.error-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.error-stat {
+    text-align: center;
+    padding: 1rem;
+    border-radius: 4px;
+    border: 2px solid;
+}
+
+.error-stat.critical {
+    border-color: #dc3545;
+    background-color: rgba(220, 53, 69, 0.1);
+}
+
+.error-stat.error {
+    border-color: var(--danger-color);
+    background-color: rgba(220, 53, 69, 0.05);
+}
+
+.error-stat.warn {
+    border-color: var(--warning-color);
+    background-color: rgba(255, 193, 7, 0.1);
+}
+
+.error-stat.total {
+    border-color: var(--primary-color);
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.error-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+.recent-errors-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.error-item {
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    border-left: 4px solid;
+}
+
+.error-item.critical {
+    border-left-color: #dc3545;
+    background-color: rgba(220, 53, 69, 0.05);
+}
+
+.error-item.error {
+    border-left-color: var(--danger-color);
+    background-color: rgba(220, 53, 69, 0.03);
+}
+
+.error-item.warn {
+    border-left-color: var(--warning-color);
+    background-color: rgba(255, 193, 7, 0.05);
+}
+
+.error-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.error-level {
+    font-weight: bold;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.8rem;
+}
+
+.error-item.critical .error-level {
+    background-color: #dc3545;
+    color: white;
+}
+
+.error-item.error .error-level {
+    background-color: var(--danger-color);
+    color: white;
+}
+
+.error-item.warn .error-level {
+    background-color: var(--warning-color);
+    color: black;
+}
+
+.error-timestamp {
+    font-size: 0.9rem;
+    color: var(--text-color);
+    opacity: 0.7;
+}
+
+.error-message {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    word-break: break-word;
+}
+
+.error-location {
+    font-size: 0.8rem;
+    color: var(--text-color);
+    opacity: 0.6;
+    font-family: monospace;
+}
+
+.no-errors {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-color);
+    opacity: 0.6;
+    font-style: italic;
+}
+
+/* Modal styles */
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    background-color: var(--bg-color);
+    margin: 5% auto;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.modal-close {
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-color);
+}
+
+.modal-close:hover {
+    color: var(--danger-color);
+}
+
+.modal-body {
+    padding: 1rem;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.modal-footer {
+    padding: 1rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.error-filters {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background-color: var(--card-bg);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.error-filters label {
+    font-weight: 500;
+}
+
+.error-filters select {
+    padding: 0.3rem;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
+.error-count {
+    font-weight: 500;
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    background-color: var(--card-bg);
+    border-radius: 4px;
+}
+
+.error-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.error-detail-item {
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    border-left: 4px solid;
+}
+
+.error-detail-item.critical {
+    border-left-color: #dc3545;
+    background-color: rgba(220, 53, 69, 0.05);
+}
+
+.error-detail-item.error {
+    border-left-color: var(--danger-color);
+    background-color: rgba(220, 53, 69, 0.03);
+}
+
+.error-detail-item.warn {
+    border-left-color: var(--warning-color);
+    background-color: rgba(255, 193, 7, 0.05);
+}
+
+.error-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.error-detail-level {
+    font-weight: bold;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.8rem;
+}
+
+.error-detail-item.critical .error-detail-level {
+    background-color: #dc3545;
+    color: white;
+}
+
+.error-detail-item.error .error-detail-level {
+    background-color: var(--danger-color);
+    color: white;
+}
+
+.error-detail-item.warn .error-detail-level {
+    background-color: var(--warning-color);
+    color: black;
+}
+
+.error-detail-timestamp {
+    font-size: 0.9rem;
+    color: var(--text-color);
+    opacity: 0.7;
+}
+
+.error-detail-message {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    word-break: break-word;
+}
+
+.error-detail-location {
+    font-size: 0.8rem;
+    color: var(--text-color);
+    opacity: 0.6;
+    font-family: monospace;
+    margin-bottom: 0.5rem;
+}
+
+.error-detail-context {
+    font-size: 0.8rem;
+    color: var(--text-color);
+    opacity: 0.5;
+}
+
+.loading {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-color);
+    opacity: 0.6;
+}
+
+.status-message {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 1rem;
+    border-radius: 4px;
+    z-index: 1000;
+    max-width: 300px;
+}
+
+.status-success {
+    background-color: var(--success-color);
+    color: white;
+}
+
+.status-error {
+    background-color: var(--danger-color);
+    color: white;
+}
+</style>

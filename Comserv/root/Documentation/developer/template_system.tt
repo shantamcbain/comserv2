@@ -350,7 +350,7 @@ Break complex templates into smaller, reusable components:
 ### Debugging Templates
 
 1. Enable debug mode to see template versions and paths
-2. Use `[% DUMP variable %]` to inspect variable contents
+2. Use `&#91;% DUMP variable %&#93;` to inspect variable contents
 3. Check the Catalyst debug output for template processing information
 4. Review the application log for template-related errors
 

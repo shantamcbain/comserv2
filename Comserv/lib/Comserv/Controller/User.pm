@@ -10,7 +10,6 @@ use Email::Sender::Transport::SMTP;
 use Comserv::Util::UserVerification;
 use Comserv::Util::EmailNotification;
 use Comserv::Util::AdminAuth;
-use Comserv::Util::CSRF;
 use DateTime;
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -64,15 +63,13 @@ sub login :Local {
     # Log login page access
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', 'Accessing login page');
 
-    # Store the referer URL if it hasn't been stored already
-    my $referer = $c->req->referer || $c->uri_for('/');
-    
-    # Get the return_to parameter if it exists (for explicit redirects)
-    my $return_to = $c->req->param('return_to');
-    if ($return_to) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Found return_to parameter: $return_to");
-        $referer = $return_to;
-    }
+    # Determine the page to return to after login.
+    # Priority: return_to param > destination param (used by Admin.pm) > HTTP Referer
+    my $return_to = $c->req->param('return_to')
+                 || $c->req->param('destination')
+                 || $c->req->referer
+                 || $c->uri_for('/');
+    my $referer = $return_to;
 
     # Don't store the login or registration pages as the referer
     if ($referer !~ m{/user/login} && $referer !~ m{/login} && $referer !~ m{/do_login} &&
@@ -169,9 +166,6 @@ sub do_login :Local {
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
-
-    return unless $self->_validate_csrf($c, 'do_login', '/user/login');
-
     # Get user input — password field also accepts a 6-digit verification code
     my $username   = $c->req->body_parameters->{username} || $c->req->param('username') || '';
     my $credential = $c->req->body_parameters->{password} || $c->req->param('password') || '';
@@ -323,19 +317,6 @@ sub do_login :Local {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', 
             "AUDIT: Login success user_id=" . $user->id . " username='$username' ip=$client_ip");
 
-        # CRITICAL: Also authenticate with Catalyst to set $c->user and $c->user_exists
-        # This prevents session loss and makes $c->user available in all controllers
-        eval {
-            $c->authenticate({ 
-                username => $user->username, 
-                password => $password 
-            });
-        };
-        if ($@) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
-                "Catalyst authentication failed (expected if using manual hashing): $@");
-        }
-
         # Auto-activate pre-existing accounts that lack a status (created before the status column)
         # or accounts stuck in pending_verification that somehow still have a correct password
         my $acct_status = $user->status || '';
@@ -354,12 +335,6 @@ sub do_login :Local {
                     "Could not auto-activate account: $@");
             }
         }
-
-        # Rotate the session ID on successful login to discard any stale/corrupted
-        # pre-login session data and prevent session fixation attacks.
-        eval { $c->change_session_id() };
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
-            "Session rotated for user '$username'" . ($@ ? " (change_session_id not available: $@)" : ''));
 
         # Store additional session data for backward compatibility
         $c->session->{username} = $user->username;
@@ -404,8 +379,43 @@ sub do_login :Local {
             "Setting roles in session: $roles_debug"
         );
         
+        # Merge site-specific roles from UserSiteRole table.
+        # A user may be a site admin without having 'admin' in the global roles column.
+        my $login_sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+        eval {
+            my $site_obj = $c->model('DBEncy')->resultset('Site')->search({ name => $login_sitename })->single;
+            if ($site_obj) {
+                my @site_role_rows = $c->model('DBEncy')->resultset('UserSiteRole')->search({
+                    user_id   => $user->id,
+                    site_id   => $site_obj->id,
+                    is_active => 1,
+                })->all;
+                if (@site_role_rows) {
+                    my %existing = map { lc($_) => 1 } @$roles;
+                    my @added;
+                    for my $sr (@site_role_rows) {
+                        my $r = lc($sr->role);
+                        unless ($existing{$r}) {
+                            push @$roles, $r;
+                            $existing{$r} = 1;
+                            push @added, $r;
+                        }
+                    }
+                    if (@added) {
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                            "Merged site roles for '$login_sitename': " . join(', ', @added));
+                    }
+                }
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                "Could not merge UserSiteRole for '$login_sitename': $@");
+        }
+
         # Assign roles to session (no hard-coded username-based tweaks)
-        $c->session->{roles} = $roles;
+        $c->session->{roles}    = $roles;
+        $c->session->{is_admin} = (grep { lc($_) eq 'admin' } @$roles) ? 1 : 0;
 
         # NEW: Check if we need to auto-assign WorkshopLeader role based on return_to
         if ($return_to && $return_to =~ m{/workshop/add}) {
@@ -553,35 +563,6 @@ sub hash_password {
     return sha256_hex($password);
 }
 
-sub _validate_csrf {
-    my ($self, $c, $action_name, $redirect_to, $template) = @_;
-    $redirect_to //= '/user/login';
-    my ($valid, $reason) = Comserv::Util::CSRF::validate_token($c);
-    unless ($valid) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $action_name // '_validate_csrf',
-            "CSRF token validation failed: $reason");
-
-        my $msg;
-        if ($reason eq 'session_expired') {
-            $msg = 'Your session has expired. Please log in again.';
-            Comserv::Util::CSRF::ensure_token($c);
-        } elsif ($reason eq 'token_missing') {
-            $msg = 'Form submission is missing a security token. Please reload the page and try again.';
-        } else {
-            $msg = 'Security token mismatch. Please reload the page and try again.';
-        }
-
-        if ($template) {
-            $c->stash(error_msg => $msg, template => $template);
-            $c->forward($c->view('TT'));
-        } else {
-            $c->flash->{error_msg} = $msg;
-            $c->response->redirect($c->uri_for($redirect_to));
-        }
-        return 0;
-    }
-    return 1;
-}
 
 sub logout :Local {
     my ($self, $c) = @_;
@@ -838,9 +819,6 @@ sub settings :Local {
 
 sub update_settings :Local {
     my ($self, $c) = @_;
-
-    return unless $self->_validate_csrf($c, 'update_settings', '/user/settings');
-
     # Check if user is logged in
     unless ($c->session->{username}) {
         $c->flash->{error_msg} = "You must be logged in to update settings.";
@@ -943,9 +921,6 @@ sub change_password :Local {
 
 sub do_change_password :Local {
     my ($self, $c) = @_;
-
-    return unless $self->_validate_csrf($c, 'do_change_password', '/user/change_password');
-
     # Check if user is logged in
     unless ($c->session->{username}) {
         $c->flash->{error_msg} = "You must be logged in to change your password.";
@@ -1056,9 +1031,6 @@ sub create_account :Local {
 }
 sub do_create_account :Local {
     my ($self, $c) = @_;
-
-    return unless $self->_validate_csrf($c, 'do_create_account', undef, 'user/register.tt');
-
     my $username = $c->request->params->{username} // '';
     my $email    = $c->request->params->{email}    // '';
 
@@ -1138,6 +1110,37 @@ sub do_create_account :Local {
                 "Could not create UserSiteRole (table may not exist): $@");
         }
         
+        eval {
+            my $acct = $c->model('DBEncy')->resultset('InternalCurrencyAccount')->find_or_create(
+                { user_id => $new_user->id },
+                { key => 'primary' }
+            );
+            my $welcome_coins = 100;
+            $acct->update({
+                balance        => ($acct->balance || 0) + $welcome_coins,
+                lifetime_earned => ($acct->lifetime_earned || 0) + $welcome_coins,
+            });
+            $c->model('DBEncy')->resultset('InternalCurrencyTransaction')->create({
+                to_user_id       => $new_user->id,
+                from_user_id     => undef,
+                amount           => $welcome_coins,
+                transaction_type => 'earn',
+                balance_after    => ($acct->balance || 0),
+                description      => 'Welcome bonus — new account',
+                reference_type   => 'signup',
+            });
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+                "Granted $welcome_coins welcome coins to user_id=" . $new_user->id);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+                "Could not grant welcome coins (table may not exist yet): $@");
+        }
+
+        delete $c->session->{$_} for qw(
+            username user_id roles first_name last_name email
+            group_membership group_name SiteName theme_name debug_mode
+        );
         $c->session->{verification_user_id} = $new_user->id;
         $c->session->{verification_code_display} = $verification_code;
         
@@ -1210,7 +1213,6 @@ sub verify_email :Local {
     }
     
     if ($c->request->method eq 'POST') {
-        return unless $self->_validate_csrf($c, 'verify_email', undef, 'user/VerifyEmail.tt');
         my $code = $c->request->params->{code};
         my $user_id = $c->session->{verification_user_id};
         
@@ -1263,7 +1265,6 @@ sub complete_profile :Local {
     }
     
     if ($c->request->method eq 'POST') {
-        return unless $self->_validate_csrf($c, 'complete_profile', undef, 'user/CompleteProfile.tt');
         my $first_name = $c->request->params->{first_name};
         my $last_name = $c->request->params->{last_name};
         my $password = $c->request->params->{password};
@@ -1383,7 +1384,6 @@ sub admin_create_user :Local {
     my $available_roles = $self->_load_available_roles($c, $is_csc_admin, $sitename);
 
     if ($c->req->method eq 'POST') {
-        return unless $self->_validate_csrf($c, 'admin_create_user', '/admin/users');
         my $first_name     = $c->req->params->{first_name};
         my $last_name      = $c->req->params->{last_name};
         my $email          = $c->req->params->{email};
@@ -1586,7 +1586,6 @@ sub complete_username_setup :Local {
     }
     
     if ($c->req->method eq 'POST') {
-        return unless $self->_validate_csrf($c, 'complete_username_setup', undef, 'user/complete_username_setup.tt');
         my $input_code = $c->req->params->{code};
         my $username = $c->req->params->{username};
         my $first_name = $c->req->params->{first_name};
@@ -1700,7 +1699,6 @@ sub complete_password_setup :Local {
     }
     
     if ($c->req->method eq 'POST') {
-        return unless $self->_validate_csrf($c, 'complete_password_setup', undef, 'user/complete_password_setup.tt');
         my $input_code = $c->req->params->{code};
         my $password = $c->req->params->{password};
         my $password_confirm = $c->req->params->{password_confirm};
@@ -1860,9 +1858,6 @@ sub edit_user :Local :Args(1) {
 
 sub do_edit_user :Local :Args(1) {
     my ($self, $c) = @_;
-
-    return unless $self->_validate_csrf($c, 'do_edit_user', '/admin/users');
-
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'do_edit_user')) {
         $c->flash->{error_msg} = 'Access denied. Admin access required.';
@@ -2063,9 +2058,6 @@ sub do_edit_user :Local :Args(1) {
 
 sub admin_suspend_user :Local :Args(1) {
     my ($self, $c, $user_id) = @_;
-
-    return unless $self->_validate_csrf($c, 'admin_suspend_user', '/admin/users');
-
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'admin_suspend_user')) {
         $c->flash->{error_msg} = 'Access denied. Admin access required.';
@@ -2134,9 +2126,6 @@ sub admin_suspend_user :Local :Args(1) {
 
 sub admin_activate_user :Local :Args(1) {
     my ($self, $c, $user_id) = @_;
-
-    return unless $self->_validate_csrf($c, 'admin_activate_user', '/admin/users');
-
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'admin_activate_user')) {
         $c->flash->{error_msg} = 'Access denied. Admin access required.';
@@ -2278,9 +2267,6 @@ sub admin_delete_user :Local :Args(1) {
 
 sub do_admin_delete_user :Local :Args(1) {
     my ($self, $c, $user_id) = @_;
-
-    return unless $self->_validate_csrf($c, 'do_admin_delete_user', '/admin/users');
-
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'do_admin_delete_user')) {
         $c->flash->{error_msg} = 'Access denied. Admin access required.';
@@ -2463,7 +2449,6 @@ sub forgot_password :Local {
     my $prefill = $c->req->param('email') || '';
 
     if ($c->req->method eq 'POST') {
-        return unless $self->_validate_csrf($c, 'forgot_password', undef, 'user/forgot_password.tt');
         my $input = $c->req->params->{email} || '';
         $input =~ s/^\s+|\s+$//g;
 
@@ -2590,7 +2575,6 @@ sub reset_password :Local {
     }
 
     # ── POST ─────────────────────────────────────────────────────────────────
-    return unless $self->_validate_csrf($c, 'reset_password', undef, 'user/reset_password.tt');
     my $new_password    = $c->req->param('new_password')    || '';
     my $password_confirm = $c->req->param('password_confirm') || '';
 
@@ -2733,7 +2717,6 @@ sub admin_manage_roles :Local :Args(1) {
     }
 
     if ($c->req->method eq 'POST') {
-        return unless $self->_validate_csrf($c, 'admin_manage_roles', '/admin/users');
         my @roles_arr      = $c->req->param('roles');
         my @new_site_names = $c->req->param('sitenames');
         my $roles_str      = join(',', @roles_arr);
@@ -2857,7 +2840,6 @@ sub admin_role_list :Local :Args(0) {
     my $sitename     = $c->session->{SiteName};
 
     if ($c->req->method eq 'POST') {
-        return unless $self->_validate_csrf($c, 'admin_role_list', '/user/admin_role_list');
         my $action      = $c->req->params->{action} || 'create';
         my $role_name   = $c->req->params->{role_name};
         my $description = $c->req->params->{description} || '';
@@ -2951,9 +2933,6 @@ sub admin_role_list :Local :Args(0) {
 
 sub admin_delete_site_role :Local :Args(1) {
     my ($self, $c, $role_id) = @_;
-
-    return unless $self->_validate_csrf($c, 'admin_delete_site_role', '/user/admin_role_list');
-
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'admin_delete_site_role')) {
         $c->flash->{error_msg} = 'Access denied. Admin access required.';

@@ -1,0 +1,470 @@
+[% META
+   title = "Duplicate Files"
+   description = "Compare and resolve duplicate files in the file management system"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "FileManagement"
+   page_version = "0.02"
+   last_updated = "2026-02-28"
+%]
+[% PageVersion = 'file/Duplicates.tt,v 0.02 2026/02/28 AI Exp AI ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<style>
+.dup-filter-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-bottom:18px; }
+.dup-filter-bar .form-field { margin:0; }
+.dup-card-pair { display:grid; grid-template-columns:1fr 1fr; gap:0; border:1px solid #ccc; border-radius:6px; margin-bottom:22px; overflow:hidden; }
+.dup-card { padding:14px 16px; }
+.dup-card.is-original { background:#f0f9f0; border-right:1px solid #ccc; }
+.dup-card.is-duplicate { background:#fff8f0; }
+.dup-card h4 { margin:0 0 10px; font-size:1rem; display:flex; align-items:center; gap:8px; }
+.badge { display:inline-block; padding:2px 8px; border-radius:3px; font-size:0.75rem; font-weight:bold; }
+.badge-original { background:#2a7a2a; color:#fff; }
+.badge-duplicate { background:#c0720a; color:#fff; }
+.badge-missing { background:#c0392b; color:#fff; }
+.badge-present { background:#27ae60; color:#fff; }
+.dup-field { display:flex; gap:6px; margin-bottom:5px; font-size:0.875rem; }
+.dup-field label { font-weight:600; min-width:90px; flex-shrink:0; color:#555; }
+.dup-field span { word-break:break-all; }
+.dup-diff { background:#fff3cd; }
+.dup-actions { grid-column:1/-1; background:#f5f5f5; border-top:1px solid #ccc; padding:10px 16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.dup-actions .dup-links { margin-left:auto; display:flex; gap:8px; }
+.warning-same-path { color:#c0392b; font-size:0.8rem; font-weight:bold; }
+</style>
+
+<div class="app-container">
+
+  <div class="page-header">
+    <h1>Duplicate Files</h1>
+  </div>
+
+  [% IF error_msg %]
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c"><strong>Error:</strong> [% error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.error_msg %]
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c"><strong>Error:</strong> [% c.flash.error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.success_msg %]
+  <div style="background:#e8f5e9;border:1px solid #81c784;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#1b5e20"><strong>Done:</strong> [% c.flash.success_msg | html %]</div>
+  [% END %]
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <form method="get" action="[% c.uri_for('/file/duplicates') %]" class="app-form">
+          <div class="dup-filter-bar">
+
+            [% IF is_csc %]
+            <div class="form-field">
+              <label for="sitename_filter">SiteName:</label>
+              <select id="sitename_filter" name="sitename_filter" class="form-input">
+                <option value="">— All Sites —</option>
+                [% FOREACH site IN sites %]
+                <option value="[% site.name | html %]"
+                  [% 'selected' IF filters.sitename == site.name %]>
+                  [% site.name | html %]
+                </option>
+                [% END %]
+              </select>
+            </div>
+            [% END %]
+
+            <div class="form-field">
+              <label for="type_filter">File Type:</label>
+              <input type="text" id="type_filter" name="type_filter"
+                     value="[% filters.file_type | html %]"
+                     placeholder="e.g. .pdf" class="form-input" style="width:90px">
+            </div>
+
+            <div class="form-field">
+              <label for="sort_by">Sort By:</label>
+              <select id="sort_by" name="sort_by" class="form-input">
+                <option value="upload_date" [% 'selected' IF filters.sort_by == 'upload_date' %]>Upload Date</option>
+                <option value="file_name"   [% 'selected' IF filters.sort_by == 'file_name'   %]>File Name</option>
+                <option value="file_size"   [% 'selected' IF filters.sort_by == 'file_size'   %]>File Size</option>
+                [% IF is_csc %]
+                <option value="sitename"    [% 'selected' IF filters.sort_by == 'sitename'    %]>SiteName</option>
+                [% END %]
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="sort_dir">Order:</label>
+              <select id="sort_dir" name="sort_dir" class="form-input">
+                <option value="desc" [% 'selected' IF filters.sort_dir == 'desc' %]>Newest First</option>
+                <option value="asc"  [% 'selected' IF filters.sort_dir == 'asc'  %]>Oldest First</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="page_size">Per page:</label>
+              <select id="page_size" name="page_size" class="form-input">
+                [% FOR ps IN [10, 25, 50, 100] %]
+                <option value="[% ps %]" [% 'selected' IF filters.page_size_param == ps %]>[% ps %]</option>
+                [% END %]
+              </select>
+            </div>
+
+            <div class="form-field" style="align-self:flex-end">
+              <button type="submit" class="btn btn-primary">Filter</button>
+              <a href="[% c.uri_for('/file/duplicates') %]" class="btn btn-secondary">Clear</a>
+            </div>
+
+          </div>
+        </form>
+      </div>
+
+      <div class="content-section">
+        [% IF duplicate_pairs.size %]
+
+        [%# ── Shared filter params for pagination links ── %]
+        [% SET pf = {sitename_filter => filters.sitename, type_filter => filters.file_type,
+                     sort_by => filters.sort_by, sort_dir => filters.sort_dir,
+                     page_size => filters.page_size_param} %]
+
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+          <p style="margin:0;color:#555;flex:1">
+            <strong>[% total_count %]</strong> total duplicate
+            [% total_count == 1 ? 'file' : 'files' %].
+            Page <strong>[% page %]</strong> of <strong>[% total_pages %]</strong>
+            &mdash; [% duplicate_pairs.size %] shown.
+          </p>
+          [% IF total_pages > 1 %]
+          [% SET pf_first = pf.merge({page => 1}) %]
+          [% SET pf_prev  = pf.merge({page => page - 1}) %]
+          [% SET pf_next  = pf.merge({page => page + 1}) %]
+          [% SET pf_last  = pf.merge({page => total_pages}) %]
+          <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
+            <a href="[% c.uri_for('/file/duplicates', pf_first) %]"
+               class="btn btn-sm btn-secondary" [% 'style="opacity:.4;pointer-events:none"' IF page == 1 %]>&#8676; First</a>
+            <a href="[% c.uri_for('/file/duplicates', pf_prev) %]"
+               class="btn btn-sm btn-secondary" [% 'style="opacity:.4;pointer-events:none"' IF page == 1 %]>&laquo; Prev</a>
+            [%# Show up to 7 page numbers centered on current %]
+            [% SET pg_start = (page - 3) > 1 ? (page - 3) : 1 %]
+            [% SET pg_end   = (page + 3) < total_pages ? (page + 3) : total_pages %]
+            [% FOREACH pg IN [pg_start..pg_end] %]
+            <a href="[% c.uri_for('/file/duplicates', pf.merge({page => pg})) %]"
+               class="btn btn-sm [% pg == page ? 'btn-primary' : 'btn-secondary' %]">[% pg %]</a>
+            [% END %]
+            <a href="[% c.uri_for('/file/duplicates', pf_next) %]"
+               class="btn btn-sm btn-secondary" [% 'style="opacity:.4;pointer-events:none"' IF page == total_pages %]>Next &raquo;</a>
+            <a href="[% c.uri_for('/file/duplicates', pf_last) %]"
+               class="btn btn-sm btn-secondary" [% 'style="opacity:.4;pointer-events:none"' IF page == total_pages %]>Last &#8677;</a>
+          </div>
+          [% END %]
+        </div>
+
+        [%# ── Batch action toolbar ── %]
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+                    padding:8px 12px;background:#f8f0e8;border:1px solid #e0c090;border-radius:4px;
+                    margin-bottom:14px;font-size:.85rem">
+          <strong style="white-space:nowrap">Bulk select:</strong>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="dupSelectAll(true)">&#9745; Select All</button>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="dupSelectAll(false)">&#9744; Clear</button>
+          <span style="color:#888">|</span>
+          <span class="dup-sel-count-display" style="color:#555;white-space:nowrap">0 selected</span>
+          <span style="color:#888">|</span>
+          <button type="button" class="btn btn-sm" style="background:#c0720a;color:#fff"
+                  onclick="dupBatchAction('delete_db')"
+                  title="Remove selected DB records only (files stay on disk)">
+            &#128465; Delete Selected (DB Only)
+          </button>
+          <button type="button" class="btn btn-sm btn-delete"
+                  onclick="dupBatchAction('delete_both')"
+                  title="Delete selected files from disk AND database">
+            &#128465; Delete Selected (Disk+DB)
+          </button>
+        </div>
+
+        [%# Hidden batch form — JS populates and submits this %]
+        <form id="dup-batch-form" method="post"
+              action="[% c.uri_for('/file/batch_resolve_duplicates') %]"
+              style="display:none">
+          <input type="hidden" name="batch_action" id="dup-batch-action" value="">
+          <input type="hidden" name="back_page"      value="[% page %]">
+          <input type="hidden" name="back_page_size" value="[% filters.page_size_param %]">
+          <div id="dup-batch-ids"></div>
+        </form>
+
+        <p style="margin-bottom:12px;font-size:.85rem;color:#666">
+          Each card compares the <strong>original</strong> (left, green) against its <strong>duplicate</strong> (right, amber).
+          Fields highlighted in amber differ between the two.
+        </p>
+
+        [% FOREACH pair IN duplicate_pairs %]
+        [% SET dup  = pair.duplicate %]
+        [% SET orig = pair.original  %]
+
+        <div class="dup-card-pair">
+
+          [%# ── MACRO: render one side of the pair ─────────────── %]
+          [% MACRO dup_side(rec, fs_info, role, other_rec) BLOCK %]
+          [% SET is_img  = rec && (rec.file_type == 'image/jpeg' || rec.file_type == 'image/png' || rec.file_type == 'image/gif' || rec.file_type == 'image/webp' || rec.file_name.match('\.(jpe?g|png|gif|webp)$')) %]
+          [% SET fp      = rec ? (rec.nfs_path || rec.file_path || '') : '' %]
+          [% SET is_text = rec && rec.file_name.match('\.(txt|md|pl|pm|py|js|sh|css|html?|rst|conf|yaml|yml|json)$') %]
+          [% SET is_pdf  = rec && rec.file_name.match('\.pdf$') %]
+          [% SET card_class = (role == 'original') ? 'is-original' : 'is-duplicate' %]
+          <div class="dup-card [% card_class %]">
+            <h4>
+              [% IF rec %]
+              <input type="checkbox" class="dup-sel-cb" data-file-id="[% rec.id | html %]"
+                     title="Select this file for batch delete"
+                     onchange="dupUpdateCount()"
+                     style="width:16px;height:16px;cursor:pointer;flex-shrink:0">
+              [% END %]
+              [% IF role == 'original' %]
+              <span class="badge badge-original">ORIGINAL</span>
+              [% ELSE %]
+              <span class="badge badge-duplicate">DUPLICATE</span>
+              [% END %]
+              [% IF rec %]#[% rec.id | html %][% ELSE %]<em>Not found</em>[% END %]
+              [% IF fs_info.fs_exists %]
+                <span class="badge badge-present">On Disk</span>
+              [% ELSE %]
+                <span class="badge badge-missing">Missing</span>
+              [% END %]
+            </h4>
+
+            [%# ── Preview ── %]
+            [% IF rec && fs_info.fs_exists %]
+            <div style="text-align:center;margin-bottom:8px;min-height:60px">
+              [% IF is_img %]
+              <img src="[% c.uri_for('/file/fs_preview', {path => fp}) %]"
+                   alt="[% rec.file_name | html %]"
+                   style="max-width:100%;max-height:160px;border-radius:3px;cursor:pointer"
+                   onclick="window.open(this.src,'_blank')">
+              [% ELSIF is_pdf %]
+              <a href="[% c.uri_for('/file/fs_preview', {path => fp}) %]" target="_blank"
+                 style="font-size:2rem;text-decoration:none" title="Open PDF">&#128196;</a>
+              <div style="font-size:.75rem;color:#888">PDF — click to view</div>
+              [% ELSIF is_text %]
+              <a href="[% c.uri_for('/file/fs_preview', {path => fp}) %]" target="_blank"
+                 style="font-size:2rem;text-decoration:none" title="Open text file">&#128196;</a>
+              <div style="font-size:.75rem;color:#888">Text — click to view</div>
+              [% ELSE %]
+              <span style="font-size:2rem">&#128196;</span>
+              <div style="font-size:.75rem;color:#888">[% rec.file_type || rec.file_name.match('\.(\w+)$') || '?' | html %]</div>
+              [% END %]
+            </div>
+            [% END %]
+
+            [%# ── Fields ── %]
+            [% IF rec %]
+            [% SET diff = other_rec %]
+            <div class="dup-field [% 'dup-diff' IF diff && diff.file_name != rec.file_name %]">
+              <label>Name:</label><span>[% rec.file_name | html %]</span>
+            </div>
+            <div class="dup-field [% 'dup-diff' IF diff && diff.sitename != rec.sitename %]">
+              <label>SiteName:</label><span>[% rec.sitename | html %]</span>
+            </div>
+            <div class="dup-field [% 'dup-diff' IF diff && diff.file_size != rec.file_size %]">
+              <label>Size:</label>
+              <span>[% rec.file_size | html %] bytes
+                [% IF fs_info.fs_exists %](disk: [% fs_info.fs_size | html %])[% END %]
+              </span>
+            </div>
+            <div class="dup-field [% 'dup-diff' IF diff && diff.upload_date != rec.upload_date %]">
+              <label>Uploaded:</label><span>[% rec.upload_date | html %]</span>
+            </div>
+            <div class="dup-field [% 'dup-diff' IF diff && (diff.nfs_path || diff.file_path) != (rec.nfs_path || rec.file_path) %]">
+              <label>Path:</label><span style="word-break:break-all;font-size:.78rem">[% rec.nfs_path || rec.file_path || '—' | html %]</span>
+            </div>
+            [% IF rec.description %]
+            <div class="dup-field"><label>Desc:</label><span>[% rec.description | html %]</span></div>
+            [% END %]
+
+            [%# ── Per-side actions ── %]
+            <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:5px">
+              [%# Swap %]
+              [% IF other_rec %]
+              <form method="post" action="[% c.uri_for('/file/resolve_duplicate', dup.id) %]" style="display:inline">
+                <input type="hidden" name="action" value="swap">
+                <input type="hidden" name="target_id" value="[% rec.id | html %]">
+                <input type="hidden" name="back_page" value="[% page %]">
+                <input type="hidden" name="back_page_size" value="[% filters.page_size_param %]">
+                <button type="submit" class="btn btn-sm btn-edit"
+                        title="Make this file the original; the other becomes the duplicate"
+                        onclick="return confirm('Make #[% rec.id %] the ORIGINAL?\n\n#[% other_rec.id %] will become the duplicate.')">
+                  &#8644; Make Original
+                </button>
+              </form>
+              [% END %]
+              [%# Rename %]
+              <button type="button" class="btn btn-sm btn-secondary"
+                      onclick="dupToggleRename('[% rec.id | html %]')"
+                      title="Rename this file">&#9998; Rename</button>
+              [%# Delete DB only %]
+              <form method="post" action="[% c.uri_for('/file/resolve_duplicate', dup.id) %]" style="display:inline">
+                <input type="hidden" name="action" value="delete_db">
+                <input type="hidden" name="target_id" value="[% rec.id | html %]">
+                <input type="hidden" name="back_page" value="[% page %]">
+                <input type="hidden" name="back_page_size" value="[% filters.page_size_param %]">
+                <button type="submit" class="btn btn-sm"
+                        title="Remove this DB record only (file stays on disk)"
+                        onclick="return confirm('Remove #[% rec.id %] from database only?\nFile on disk will NOT be deleted.[% IF role == 'original' %]\n\nNote: if deleted, the duplicate will be promoted to original.[% END %]')">
+                  &#128465; DB Only
+                </button>
+              </form>
+              [%# Delete disk + DB %]
+              [% IF fs_info.fs_exists %]
+              <form method="post" action="[% c.uri_for('/file/resolve_duplicate', dup.id) %]" style="display:inline">
+                <input type="hidden" name="action" value="delete_both">
+                <input type="hidden" name="target_id" value="[% rec.id | html %]">
+                <input type="hidden" name="back_page" value="[% page %]">
+                <input type="hidden" name="back_page_size" value="[% filters.page_size_param %]">
+                <button type="submit" class="btn btn-sm btn-delete"
+                        title="Delete from disk AND remove DB record"
+                        onclick="return confirm('DELETE #[% rec.id %] from disk AND database?\nThis cannot be undone.[% IF role == 'original' %]\n\nNote: the duplicate will be promoted to original.[% END %]')">
+                  &#128465; Disk+DB
+                </button>
+              </form>
+              [% END %]
+            </div>
+
+            [%# ── Inline rename form ── %]
+            <div id="dup-rename-[% rec.id | html %]" style="display:none;margin-top:8px">
+              <form method="post" action="[% c.uri_for('/file/resolve_duplicate', dup.id) %]"
+                    style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
+                <input type="hidden" name="action" value="rename">
+                <input type="hidden" name="target_id" value="[% rec.id | html %]">
+                <input type="hidden" name="back_page" value="[% page %]">
+                <input type="hidden" name="back_page_size" value="[% filters.page_size_param %]">
+                <input type="text" name="new_name" value="[% rec.file_name | html %]"
+                       class="form-input" style="flex:1;min-width:140px;font-size:.82rem">
+                <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                <button type="button" class="btn btn-sm btn-secondary"
+                        onclick="dupToggleRename('[% rec.id | html %]')">Cancel</button>
+              </form>
+            </div>
+
+            [% ELSE %]
+            <p><em>Record not found in database.</em></p>
+            [% END %]
+          </div>
+          [% END %]
+
+          [%# ── Render both sides ── %]
+          [% dup_side(orig, pair.orig_fs, 'original', dup) %]
+          [% dup_side(dup,  pair.dup_fs,  'duplicate', orig) %]
+
+          [%# ── Footer: checkbox + warnings + links ─────────────── %]
+          <div class="dup-actions" style="font-size:.8rem">
+            [% IF pair.same_path || pair.same_nfs %]
+            <span class="warning-same-path">&#9888; Both records point to same file on disk — deleting one won't remove the physical file.</span>
+            [% END %]
+            [% IF !pair.dup_fs.fs_exists && !pair.orig_fs.fs_exists %]
+            <span class="warning-same-path">&#9888; Neither file exists on disk — safe to delete DB records.</span>
+            [% END %]
+            <span style="margin-left:auto">
+              <a href="[% c.uri_for('/file/view', dup.id) %]" class="btn btn-sm">View Dup</a>
+              [% IF orig %]
+              <a href="[% c.uri_for('/file/view', orig.id) %]" class="btn btn-sm">View Orig</a>
+              [% END %]
+            </span>
+          </div>
+
+        </div>
+        [% END %]
+
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+                    padding:8px 12px;background:#f8f0e8;border:1px solid #e0c090;border-radius:4px;
+                    margin-bottom:10px;font-size:.85rem">
+          <strong style="white-space:nowrap">Bulk select:</strong>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="dupSelectAll(true)">&#9745; Select All</button>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="dupSelectAll(false)">&#9744; Clear</button>
+          <span style="color:#888">|</span>
+          <span class="dup-sel-count-display" style="color:#555;white-space:nowrap">0 selected</span>
+          <span style="color:#888">|</span>
+          <button type="button" class="btn btn-sm" style="background:#c0720a;color:#fff"
+                  onclick="dupBatchAction('delete_db')"
+                  title="Remove selected DB records only (files stay on disk)">
+            &#128465; Delete Selected (DB Only)
+          </button>
+          <button type="button" class="btn btn-sm btn-delete"
+                  onclick="dupBatchAction('delete_both')"
+                  title="Delete selected files from disk AND database">
+            &#128465; Delete Selected (Disk+DB)
+          </button>
+        </div>
+
+        [% IF total_pages > 1 %]
+        <div style="display:flex;gap:5px;align-items:center;justify-content:center;padding:10px 0;flex-wrap:wrap">
+          <a href="[% c.uri_for('/file/duplicates', pf_first) %]"
+             class="btn btn-secondary" [% 'style="opacity:.4;pointer-events:none"' IF page == 1 %]>&#8676; First</a>
+          <a href="[% c.uri_for('/file/duplicates', pf_prev) %]"
+             class="btn btn-secondary" [% 'style="opacity:.4;pointer-events:none"' IF page == 1 %]>&laquo; Prev</a>
+          [% SET pg_start = (page - 3) > 1 ? (page - 3) : 1 %]
+          [% SET pg_end   = (page + 3) < total_pages ? (page + 3) : total_pages %]
+          [% FOREACH pg IN [pg_start..pg_end] %]
+          <a href="[% c.uri_for('/file/duplicates', pf.merge({page => pg})) %]"
+             class="btn btn-sm [% pg == page ? 'btn-primary' : 'btn-secondary' %]">[% pg %]</a>
+          [% END %]
+          <a href="[% c.uri_for('/file/duplicates', pf_next) %]"
+             class="btn btn-secondary" [% 'style="opacity:.4;pointer-events:none"' IF page == total_pages %]>Next &raquo;</a>
+          <a href="[% c.uri_for('/file/duplicates', pf_last) %]"
+             class="btn btn-secondary" [% 'style="opacity:.4;pointer-events:none"' IF page == total_pages %]>Last &#8677;</a>
+        </div>
+        [% END %]
+
+        [% ELSE %]
+        <p class="empty-state">No duplicate files found matching the selected filters.</p>
+        [% END %]
+      </div>
+
+      <div class="content-section">
+        <div class="form-actions">
+          <a href="[% c.uri_for('/file/list') %]" class="btn btn-secondary">Back to File List</a>
+          <a href="[% c.uri_for('/file/admin_browser') %]" class="btn btn-secondary">Admin Browser</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+function dupToggleRename(id) {
+    var el = document.getElementById('dup-rename-' + id);
+    if (el) el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
+}
+
+function dupUpdateCount() {
+    var checked = document.querySelectorAll('.dup-sel-cb:checked').length;
+    document.querySelectorAll('.dup-sel-count-display').forEach(function(el) {
+        el.textContent = checked + ' selected';
+    });
+}
+
+function dupSelectAll(state) {
+    document.querySelectorAll('.dup-sel-cb').forEach(function(cb) { cb.checked = state; });
+    dupUpdateCount();
+}
+
+function dupBatchAction(action) {
+    var cbs = document.querySelectorAll('.dup-sel-cb:checked');
+    if (!cbs.length) { alert('No pairs selected.'); return; }
+
+    var msg = action === 'delete_both'
+        ? 'Delete ' + cbs.length + ' selected file(s) from DISK and DATABASE?\nThis cannot be undone.'
+        : 'Remove ' + cbs.length + ' selected DB record(s) only?\n(Files on disk will NOT be deleted.)';
+    if (!confirm(msg)) return;
+
+    document.getElementById('dup-batch-action').value = action;
+    var container = document.getElementById('dup-batch-ids');
+    container.innerHTML = '';
+    cbs.forEach(function(cb) {
+        var fileId = cb.getAttribute('data-file-id');
+        if (fileId) {
+            var inp = document.createElement('input');
+            inp.type  = 'hidden';
+            inp.name  = 'selected_ids';
+            inp.value = fileId;
+            container.appendChild(inp);
+        }
+    });
+    document.getElementById('dup-batch-form').submit();
+}
+</script>

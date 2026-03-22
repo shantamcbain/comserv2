@@ -175,6 +175,12 @@ nav {
   display: block;
 }
 
+a.submenu-header {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
 /* Documentation submenu enhancements */
 .documentation-categories {
   display: grid;

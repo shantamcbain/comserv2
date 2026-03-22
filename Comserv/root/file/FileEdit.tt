@@ -1,0 +1,95 @@
+[% META
+   title = "Edit File"
+   description = "Edit file metadata and rename file"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "FileManagement"
+   page_version = "0.01"
+   last_updated = "2026-02-28"
+%]
+[% PageVersion = 'file/FileEdit.tt,v 0.01 2026/02/28 AI Exp AI ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+
+  <div class="page-header">
+    <h1>Edit File</h1>
+  </div>
+
+  [% IF error_msg %]
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c"><strong>Error:</strong> [% error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.error_msg %]
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c"><strong>Error:</strong> [% c.flash.error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.success_msg %]
+  <div style="background:#e8f5e9;border:1px solid #81c784;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#1b5e20"><strong>Done:</strong> [% c.flash.success_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.info_msg %]
+  <div style="background:#e3f2fd;border:1px solid #64b5f6;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#0d47a1"><strong>Info:</strong> [% c.flash.info_msg | html %]</div>
+  [% END %]
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <h3>File: [% file.file_name | html %] (ID: [% file.id | html %])</h3>
+        <form method="post" action="[% c.uri_for('/file/edit', file.id) %]" class="app-form">
+          <div class="form-section">
+
+            <div class="form-row">
+              <div class="form-field">
+                <label for="file_name">File Name:</label>
+                <input type="text" id="file_name" name="file_name"
+                       value="[% file.file_name | html %]" class="form-input" required>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-field">
+                <label for="description">Description:</label>
+                <textarea id="description" name="description" class="form-input" rows="4">[% file.description | html %]</textarea>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-field">
+                <label for="file_status">Status:</label>
+                <select id="file_status" name="file_status" class="form-input">
+                  <option value="active"   [% 'selected' IF file.file_status == 'active'   %]>Active</option>
+                  <option value="inactive" [% 'selected' IF file.file_status == 'inactive' %]>Inactive</option>
+                  <option value="archived" [% 'selected' IF file.file_status == 'archived' %]>Archived</option>
+                </select>
+              </div>
+
+              <div class="form-field">
+                <label for="access_level">Access Level:</label>
+                <select id="access_level" name="access_level" class="form-input">
+                  <option value="site_only" [% 'selected' IF file.access_level == 'site_only' %]>Site Only</option>
+                  <option value="public"    [% 'selected' IF file.access_level == 'public'    %]>Public</option>
+                  <option value="private"   [% 'selected' IF file.access_level == 'private'   %]>Private</option>
+                  <option value="admin"     [% 'selected' IF file.access_level == 'admin'     %]>Admin</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Save Changes</button>
+              <a href="[% c.uri_for('/file/view', file.id) %]" class="btn btn-secondary">Cancel</a>
+            </div>
+
+          </div>
+        </form>
+      </div>
+
+      <div class="content-section">
+        <div class="form-actions">
+          <a href="[% c.uri_for('/file/list') %]" class="btn btn-secondary">Back to List</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>

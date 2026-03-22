@@ -32,7 +32,7 @@ __PACKAGE__->add_columns(
     },
     status => {
         data_type => 'enum',
-        extra => { list => ['draft', 'sent', 'failed'] },
+        extra => { list => ['draft', 'sent', 'partial', 'failed'] },
         is_nullable => 0,
         default_value => 'draft',
     },
