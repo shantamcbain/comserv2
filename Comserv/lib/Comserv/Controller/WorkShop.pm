@@ -618,8 +618,7 @@ sub edit :Path('/workshop/edit') :Args(1) {
         $err = "$@" if $@;
 
         if ($err) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit',
-                "Failed to update workshop " . $workshop->id . ": $err");
+            $c->log->error("Failed to update workshop " . $workshop->id . ": $err");
             $c->stash(
                 workshop       => $workshop,
                 formatted_date => $formatted_date,
@@ -631,8 +630,7 @@ sub edit :Path('/workshop/edit') :Args(1) {
             return;
         }
 
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit',
-            "Workshop " . $workshop->id . " updated by user " . ($c->session->{user_id} || 'unknown'));
+        $c->log->info("Workshop " . $workshop->id . " updated by user " . ($c->session->{user_id} || 'unknown'));
         $c->flash->{success_msg} = 'Workshop updated successfully.';
         $c->res->redirect($c->uri_for($self->action_for('index')));
         return;
