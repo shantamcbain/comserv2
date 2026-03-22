@@ -103,10 +103,11 @@ COPY logrotate-catalyst.conf /etc/logrotate.d/catalyst
 RUN chmod 644 /etc/logrotate.d/catalyst && \
     echo "0 0 * * * /usr/sbin/logrotate /etc/logrotate.conf" | crontab -
 
-# Health check - will check dynamic port using /health endpoint
-# /health endpoint bypasses database queries and returns immediately
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:${WEB_PORT:-3000}/health || exit 1
+# Health check - /health/detail returns DB status, memory, and worker count.
+# Returns 503 if DB unreachable or session dir missing; logs reason to system_log.
+# /health (liveness) is fast; /health/detail (readiness) is used here.
+HEALTHCHECK --interval=30s --timeout=12s --start-period=120s --retries=5 \
+    CMD curl -sf http://localhost:${WEB_PORT:-3000}/health/detail | grep -q '"status":"ok"' || exit 1
 
 EXPOSE 3000 5000
 
