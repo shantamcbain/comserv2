@@ -95,13 +95,12 @@
                             <strong>[% workshop.title | html %]</strong>
                             <small>([% recipient_count %] registered) &mdash; always included</small>
                         </label>
-                        [% FOR ws IN leader_workshops %]
-                        [% ws_count = ws.participants.search({ status => 'registered' }).count %]
+                        [% FOR item IN leader_workshops %]
                         <label style="display:block;margin-bottom:4px;">
-                            <input type="checkbox" name="extra_workshop_ids" value="[% ws.id %]"
-                                   class="extra-ws-check" data-count="[% ws_count %]">
-                            [% ws.title | html %]
-                            <small>([% ws_count %] registered)</small>
+                            <input type="checkbox" name="extra_workshop_ids" value="[% item.workshop.id %]"
+                                   class="extra-ws-check" data-count="[% item.count %]">
+                            [% item.workshop.title | html %]
+                            <small>([% item.count %] registered)</small>
                         </label>
                         [% END %]
                         <p style="margin-top:8px;"><strong>Approximate total:</strong> <span id="total-count">[% recipient_count %]</span> recipients (duplicates removed at send time)</p>

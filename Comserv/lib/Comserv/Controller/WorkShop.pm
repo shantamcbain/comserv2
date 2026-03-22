@@ -3376,29 +3376,35 @@ sub compose_email :Local :Args(1) {
         { order_by => { -asc => 'name' } }
     )->all;
 
+    
     # Fetch all other workshops this leader owns (or all workshops for CSC admin)
     my $user_id    = $c->session->{user_id};
     my $admin_auth = Comserv::Util::AdminAuth->new();
     my $admin_type = $admin_auth->get_admin_type($c);
-    my @leader_workshops;
+    my @leader_workshops_raw;
     if ($admin_type eq 'CSC') {
-        @leader_workshops = $c->model('DBEncy::WorkShop')->search(
+        @leader_workshops_raw = $c->model('DBEncy::WorkShop')->search(
             { id => { '!=' => $id } },
             { order_by => { -asc => 'title' } }
         )->all;
     } elsif ($user_id) {
-        @leader_workshops = $c->model('DBEncy::WorkShop')->search(
+        @leader_workshops_raw = $c->model('DBEncy::WorkShop')->search(
             { created_by => $user_id, id => { '!=' => $id } },
             { order_by => { -asc => 'title' } }
         )->all;
     }
 
-    $c->stash(
-        workshop           => $workshop,
-        recipient_count    => $registered_count,
-        workshop_templates => \@workshop_templates,
-        global_templates   => \@global_templates,
-        leader_workshops   => \@leader_workshops,
+    # Pre-compute participant counts — TT cannot call .search({}) on DBIC relationships
+    my @leader_workshops = map {
+        my $ws = $_;
+        my $cnt = $c->model('DBEncy::Participant')->search({
+            workshop_id => $ws->id,
+            status      => 'registered',
+        })->count;
+        { workshop => $ws, count => $cnt }
+    } @leader_workshops_raw;
+
+    leader_workshops   => \@leader_workshops,
         template           => 'WorkShops/ComposeEmail.tt',
     );
 }
