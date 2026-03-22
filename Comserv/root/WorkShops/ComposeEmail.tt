@@ -87,29 +87,27 @@
             <div class="form-container">
                 <form method="POST" action="/workshop/send_email/[% workshop.id %]" class="app-form" id="compose-form">
 
-                    [% IF leader_workshops.size > 0 %]
+                    [% IF all_recipients.size > 0 %]
                     <div class="form-section">
                         <h3>Send To</h3>
+                        <p>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="setAll(true)">Select All</button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="setAll(false)">Deselect All</button>
+                            &nbsp;&nbsp;
+                            <strong>Selected: <span id="sel-count">[% all_recipients.size %]</span> of [% all_recipients.size %]</strong>
+                        </p>
+                        <div style="max-height:300px;overflow-y:auto;border:1px solid #ddd;padding:8px;border-radius:4px;">
+                        [% FOREACH r IN all_recipients %]
                         <label style="display:block;margin-bottom:4px;">
-                            <input type="checkbox" checked disabled>
-                            <strong>[% workshop.title | html %]</strong>
-                            <small>([% recipient_count %] registered) &mdash; always included</small>
-                        </label>
-                        [% FOR item IN leader_workshops %]
-                        <label style="display:block;margin-bottom:4px;">
-                            <input type="checkbox" name="extra_workshop_ids" value="[% item.workshop.id %]"
-                                   class="extra-ws-check" data-count="[% item.count %]" checked>
-                            [% item.workshop.title | html %]
-                            <small>([% item.count %] registered)</small>
+                            <input type="checkbox" name="selected_recipient"
+                                   value="[% r.email | html %]"
+                                   data-name="[% r.name | html %]"
+                                   class="recip-check" checked
+                                   onchange="updateSelCount()">
+                            [% r.display | html %]
                         </label>
                         [% END %]
-                        <p style="margin-top:8px;">
-                            <strong>Unique recipients (all workshops, duplicates removed):</strong>
-                            <span id="unique-total">[% unique_total %]</span>
-                            &nbsp;&mdash;&nbsp;
-                            <em>Unchecking workshops above adjusts the approximate count below.</em>
-                        </p>
-                        <p><strong>Approximate selected total:</strong> <span id="total-count">[% recipient_count %]</span></p>
+                        </div>
                     </div>
                     [% END %]
 
@@ -159,25 +157,22 @@
                 var sel = document.getElementById('load_template');
                 var opt = sel.options[sel.selectedIndex];
                 if (!opt.value) return;
-                document.getElementById('subject').value = opt.getAttribute('data-subject');
-                document.getElementById('body').value    = opt.getAttribute('data-body');
+                document.getElementById('subject').value       = opt.getAttribute('data-subject');
+                document.getElementById('message_body').value  = opt.getAttribute('data-body');
             }
 
-            var baseCount = [% recipient_count %];
-            function updateTotal() {
-                var total = baseCount;
-                document.querySelectorAll('.extra-ws-check').forEach(function(cb) {
-                    if (cb.checked) total += parseInt(cb.getAttribute('data-count') || 0, 10);
-                });
-                var el = document.getElementById('total-count');
+            function updateSelCount() {
+                var total = document.querySelectorAll('.recip-check:checked').length;
+                var el = document.getElementById('sel-count');
                 if (el) el.textContent = total;
             }
-            document.addEventListener('DOMContentLoaded', function() {
-                updateTotal();  // initialise with all pre-checked boxes counted
-                document.querySelectorAll('.extra-ws-check').forEach(function(cb) {
-                    cb.addEventListener('change', updateTotal);
+
+            function setAll(checked) {
+                document.querySelectorAll('.recip-check').forEach(function(cb) {
+                    cb.checked = checked;
                 });
-            });
+                updateSelCount();
+            }
             </script>
             
             [% END %]
