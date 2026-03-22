@@ -3487,7 +3487,25 @@ sub send_email :Local :Args(1) {
         $t ? (ref($t) && $t->can('strftime') ? $t->strftime('%H:%M') : substr("$t", 0, 5)) : 'TBD';
     };
     my $formatted_end_time = $workshop->end_time || '';
-    
+
+    # Build leader name for [[leader.name]] placeholder
+    my $leader_name = '';
+    if ($workshop->created_by) {
+        my $leader_user = $c->model('DBEncy::User')->find($workshop->created_by);
+        if ($leader_user) {
+            $leader_name = $leader_user->first_name || $leader_user->username || '';
+            $leader_name .= ' ' . $leader_user->last_name if $leader_user->last_name;
+            $leader_name =~ s/^\s+|\s+$//g;
+        }
+    }
+    $leader_name ||= $workshop->instructor || '';
+
+    # Process workshop-level [[placeholders]] in subject (same for all recipients)
+    (my $processed_subject = $subject) =~ s/\[\[workshop\.title\]\]/${\($workshop->title || '')}/g;
+    $processed_subject =~ s/\[\[workshop\.date\]\]/$formatted_date/g;
+    $processed_subject =~ s/\[\[workshop\.location\]\]/${\($workshop->location || '')}/g;
+    $processed_subject =~ s/\[\[leader\.name\]\]/$leader_name/g;
+
     my $sent_count = 0;
     my $failed_count = 0;
     my @failed_emails;
@@ -3507,13 +3525,27 @@ sub send_email :Local :Args(1) {
         } elsif ($participant->name) {
             $user_name = $participant->name;
         }
-        
+        $user_name =~ s/^\s+|\s+$//g if $user_name;
+        my $first_name = (split /\s+/, $user_name)[0] || $user_name;
+
+        # Process per-participant [[placeholders]] in body
+        my $processed_body = $body;
+        $processed_body =~ s/\[\[participant\.name\]\]/$user_name/g;
+        $processed_body =~ s/\[\[participant\.first_name\]\]/$first_name/g;
+        $processed_body =~ s/\[\[workshop\.title\]\]/${\($workshop->title || '')}/g;
+        $processed_body =~ s/\[\[workshop\.date\]\]/$formatted_date/g;
+        $processed_body =~ s/\[\[workshop\.time\]\]/$formatted_time/g;
+        $processed_body =~ s/\[\[workshop\.location\]\]/${\($workshop->location || '')}/g;
+        $processed_body =~ s/\[\[workshop\.instructor\]\]/${\($workshop->instructor || '')}/g;
+        $processed_body =~ s/\[\[leader\.name\]\]/$leader_name/g;
+        $processed_body =~ s/\[\[workshop\.url\]\]/$full_url/g;
+
         eval {
             $c->stash->{email} = {
                 to       => $email,
                 from     => $from_address,
                 reply_to => $reply_to,
-                subject  => $subject,
+                subject  => $processed_subject,
                 template => 'email/workshop/workshop_announcement.tt',
                 template_vars => {
                     name => $user_name,
@@ -3524,7 +3556,7 @@ sub send_email :Local :Args(1) {
                     workshop_end_time => $formatted_end_time,
                     workshop_location => $workshop->location,
                     workshop_url => $full_url,
-                    message_body => $body,
+                    message_body => $processed_body,
                 },
             };
             
