@@ -1,0 +1,361 @@
+[% META title = 'Documentation Auto-Discovery' %]
+[% PageVersion = 'Documentation/AutoDiscovery/index.tt,v 0.01 2025/01/02 system Exp system ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-search"></i>
+                        Documentation Auto-Discovery
+                    </h3>
+                    <div class="card-tools">
+                        <span class="badge badge-info">Admin Tool</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Auto-Discovery System</strong><br>
+                        This tool scans the Documentation directory for files that are not yet configured in the documentation system.
+                        You can review and add them to the configuration with appropriate metadata.
+                    </div>
+
+                    [% IF configured_count %]
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="info-box">
+                                <span class="info-box-icon bg-success">
+                                    <i class="fas fa-check"></i>
+                                </span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Configured Files</span>
+                                    <span class="info-box-number">[% configured_count %]</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-box">
+                                <span class="info-box-icon bg-warning">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                </span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Unconfigured Files</span>
+                                    <span class="info-box-number">[% unconfigured_files.size %]</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    [% END %]
+
+                    [% IF unconfigured_files.size > 0 %]
+                    <div class="card">
+                        <div class="card-header">
+                            <h4 class="card-title">Unconfigured Files Found</h4>
+                            <div class="card-tools">
+                                <span class="badge badge-warning">[% unconfigured_files.size %] files need configuration</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>File Path</th>
+                                            <th>Suggested Title</th>
+                                            <th>Category</th>
+                                            <th>Roles</th>
+                                            <th>Description</th>
+                                            <th width="100">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        [% FOREACH file IN unconfigured_files %]
+                                        [% SET index = loop.index %]
+                                        <tr id="file-row-[% index %]">
+                                            <td>
+                                                <code><a href="#" onclick="previewFile('[% file.path %]', event)" class="text-primary">[% file.path %]</a></code>
+                                            </td>
+                                            <td>
+                                                <input type="text" class="form-control form-control-sm" 
+                                                       id="title_[% index %]" value="[% file.title %]">
+                                            </td>
+                                            <td>
+                                                <select class="form-control form-control-sm" id="category_[% index %]">
+                                                    [% FOREACH cat_key IN categories.keys.sort %]
+                                                    <option value="[% cat_key %]" 
+                                                            [% IF cat_key == file.suggested_category %]selected[% END %]>
+                                                        [% categories.$cat_key.name || cat_key.replace('_', ' ') | ucfirst %]
+                                                    </option>
+                                                    [% END %]
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <select class="form-control form-control-sm" id="roles_[% index %]" multiple>
+                                                    <option value="normal" [% IF file.suggested_roles.grep('normal').size %]selected[% END %]>Normal</option>
+                                                    <option value="editor" [% IF file.suggested_roles.grep('editor').size %]selected[% END %]>Editor</option>
+                                                    <option value="admin" [% IF file.suggested_roles.grep('admin').size %]selected[% END %]>Admin</option>
+                                                    <option value="developer" [% IF file.suggested_roles.grep('developer').size %]selected[% END %]>Developer</option>
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <textarea class="form-control form-control-sm" id="description_[% index %]" 
+                                                          rows="2">[% file.description %]</textarea>
+                                            </td>
+                                            <td>
+                                                <button type="button" class="btn btn-sm btn-success" 
+                                                        onclick="addSingleFile('[% file.path %]', [% index %])"
+                                                        id="add-btn-[% index %]">
+                                                    <i class="fas fa-plus"></i>
+                                                    Add
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        [% END %]
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <a href="[% c.uri_for('/Documentation') %]" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i>
+                                Back to Documentation
+                            </a>
+                        </div>
+                    </div>
+                    [% ELSE %]
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i>
+                        <strong>All files are configured!</strong><br>
+                        No unconfigured documentation files were found. All files in the Documentation directory 
+                        are properly configured in the documentation system.
+                    </div>
+                    <div class="text-center">
+                        <a href="[% c.uri_for('/Documentation') %]" class="btn btn-primary">
+                            <i class="fas fa-arrow-left"></i>
+                            Back to Documentation
+                        </a>
+                    </div>
+                    [% END %]
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- File Preview Modal -->
+<div class="modal fade" id="filePreviewModal" tabindex="-1" role="dialog" aria-labelledby="filePreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="filePreviewModalLabel">File Preview</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close" onclick="closeFilePreviewModal()">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="filePreviewContent" style="max-height: 500px; overflow-y: auto; background-color: #f8f9fa; padding: 15px; border-radius: 5px;">
+                    <div class="text-center">
+                        <i class="fas fa-spinner fa-spin"></i> Loading file content...
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" onclick="closeFilePreviewModal()">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function previewFile(filePath, event) {
+    event.preventDefault();
+    
+    console.log('previewFile called with:', filePath);
+    
+    // Set modal title
+    document.getElementById('filePreviewModalLabel').textContent = 'File Preview: ' + filePath;
+    
+    // Show loading state
+    document.getElementById('filePreviewContent').innerHTML = 
+        '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading file content...</div>';
+    
+    // Show modal with comprehensive compatibility check
+    const modal = document.getElementById('filePreviewModal');
+    console.log('Modal element found:', modal);
+    console.log('jQuery available:', typeof $ !== 'undefined');
+    console.log('Bootstrap modal available:', typeof $ !== 'undefined' && $.fn && $.fn.modal);
+    
+    if (typeof $ !== 'undefined' && $.fn && $.fn.modal) {
+        // Use jQuery/Bootstrap if available
+        console.log('Using jQuery/Bootstrap modal');
+        $('#filePreviewModal').modal('show');
+    } else {
+        // Fallback to vanilla JavaScript
+        console.log('Using vanilla JavaScript modal fallback');
+        modal.style.display = 'block';
+        modal.classList.add('show');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('modal-open');
+        
+        // Add backdrop
+        const backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop fade show';
+        backdrop.id = 'modal-backdrop-fallback';
+        document.body.appendChild(backdrop);
+    }
+    
+    // Fetch file content
+    fetch('[% c.uri_for("/Documentation/AutoDiscovery/preview_file") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'path=' + encodeURIComponent(filePath)
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.text();
+        } else {
+            throw new Error('Server error: ' + response.status);
+        }
+    })
+    .then(content => {
+        // Display file content with proper formatting
+        const previewDiv = document.getElementById('filePreviewContent');
+        previewDiv.innerHTML = '<pre style="white-space: pre-wrap; word-wrap: break-word; margin: 0;">' + 
+                              escapeHtml(content) + '</pre>';
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        document.getElementById('filePreviewContent').innerHTML = 
+            '<div class="alert alert-danger"><i class="fas fa-exclamation-triangle"></i> Error loading file: ' + 
+            error.message + '</div>';
+    });
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function closeFilePreviewModal() {
+    const modal = document.getElementById('filePreviewModal');
+    const backdrop = document.getElementById('modal-backdrop-fallback');
+    
+    if (typeof $ !== 'undefined' && $.fn && $.fn.modal) {
+        $('#filePreviewModal').modal('hide');
+    } else {
+        // Vanilla JavaScript fallback
+        modal.style.display = 'none';
+        modal.classList.remove('show');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('modal-open');
+        
+        // Remove backdrop
+        if (backdrop) {
+            backdrop.remove();
+        }
+    }
+}
+
+function addSingleFile(filePath, index) {
+    // Get form data for this specific file
+    const title = document.getElementById('title_' + index).value;
+    const category = document.getElementById('category_' + index).value;
+    const description = document.getElementById('description_' + index).value;
+    
+    // Get selected roles (multiple select)
+    const rolesSelect = document.getElementById('roles_' + index);
+    const selectedRoles = Array.from(rolesSelect.selectedOptions).map(option => option.value);
+    
+    // Validate required fields
+    if (!title.trim()) {
+        alert('Title is required');
+        return;
+    }
+    
+    if (!category) {
+        alert('Category is required');
+        return;
+    }
+    
+    if (selectedRoles.length === 0) {
+        alert('At least one role must be selected');
+        return;
+    }
+    
+    // Disable the button and show loading state
+    const button = document.getElementById('add-btn-' + index);
+    const originalText = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+    
+    // Prepare form data
+    const formData = new FormData();
+    formData.append('path', filePath);
+    formData.append('title', title);
+    formData.append('category', category);
+    formData.append('description', description);
+    formData.append('roles', selectedRoles.join(','));
+    
+    // Make AJAX request
+    fetch('[% c.uri_for("/Documentation/AutoDiscovery/add_single") %]', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.text();
+        } else {
+            throw new Error('Server error: ' + response.status);
+        }
+    })
+    .then(data => {
+        // Parse JSON response
+        const response = JSON.parse(data);
+        
+        if (response.success) {
+            // Success - remove the row from the table
+            const row = document.getElementById('file-row-' + index);
+            row.style.backgroundColor = '#d4edda';
+            row.innerHTML = '<td colspan="6" class="text-center text-success"><i class="fas fa-check-circle"></i> ' + response.message + '</td>';
+        } else {
+            throw new Error(response.message || 'Unknown error');
+        }
+        
+        // Update the unconfigured count badge
+        const badge = document.querySelector('.badge-warning');
+        if (badge) {
+            const currentCount = parseInt(badge.textContent);
+            const newCount = currentCount - 1;
+            if (newCount > 0) {
+                badge.textContent = newCount + ' files need configuration';
+            } else {
+                // Reload page to show "all configured" message
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            }
+        }
+        
+        // Remove the row after a short delay
+        setTimeout(() => {
+            row.remove();
+        }, 3000);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error adding file: ' + error.message);
+        
+        // Restore button state
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
+</script>

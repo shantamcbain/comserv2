@@ -1,0 +1,204 @@
+[% META title = 'Weather Forecast' %]
+
+<div class="weather-container">
+    <!-- Header Section -->
+    <header class="weather-header">
+        <h1><i class="fas fa-calendar-week"></i> Weather Forecast</h1>
+        <div class="weather-context">
+            <span class="context-item"><strong>Location:</strong> Default Location</span>
+            <span class="context-item"><strong>Updated:</strong> [% USE date; date.format(date.now, '%Y-%m-%d %H:%M') %]</span>
+            <span class="context-item"><strong>Source:</strong> [% forecast_data.data_source || 'Weather API' %]</span>
+        </div>
+    </header>
+
+    <div class="feature-grid">
+        
+        <!-- 5-Day Forecast -->
+        <div class="feature-card forecast-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-calendar-alt feature-icon"></i>5-Day Weather Forecast</h3>
+            </div>
+            <div class="feature-content">
+                <div class="forecast-grid">
+                    [% FOREACH day IN forecast_data.forecast %]
+                    <div class="forecast-day">
+                        <div class="forecast-date">
+                            [% USE date; date.format(day.date, '%a, %b %d') %]
+                        </div>
+                        <div class="forecast-icon">
+                            <i class="fas fa-[% 
+                                day.icon == 'sunny' ? 'sun' :
+                                day.icon == 'partly-cloudy' ? 'cloud-sun' :
+                                day.icon == 'cloudy' ? 'cloud' :
+                                day.icon == 'light-rain' ? 'cloud-rain' :
+                                'cloud'
+                            %]"></i>
+                        </div>
+                        <div class="forecast-condition">[% day.condition %]</div>
+                        <div class="forecast-temps">
+                            <span class="temp-high">[% day.high_temp %]°</span>
+                            <span class="temp-low">[% day.low_temp %]°</span>
+                        </div>
+                        <div class="forecast-precipitation">
+                            <i class="fas fa-tint"></i> [% day.precipitation %]%
+                        </div>
+                    </div>
+                    [% END %]
+                </div>
+                [% IF forecast_data.data_source == 'MOCK_DATA' %]
+                <div class="forecast-note">
+                    <small><i class="fas fa-info-circle"></i> This is sample forecast data. Configure weather service for real forecasts.</small>
+                </div>
+                [% END %]
+            </div>
+        </div>
+
+        <!-- Current Conditions -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-thermometer-half feature-icon"></i>Current Conditions</h3>
+            </div>
+            <div class="feature-content">
+                <div id="current-weather-display">
+                    <div class="loading-weather">
+                        <i class="fas fa-spinner fa-spin"></i> Loading current conditions...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weather Alerts -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-exclamation-triangle feature-icon"></i>Weather Alerts</h3>
+            </div>
+            <div class="feature-content">
+                <div class="weather-alerts">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        No weather alerts at this time.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weather Details -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-list feature-icon"></i>Detailed Information</h3>
+            </div>
+            <div class="feature-content">
+                <div class="weather-details-grid">
+                    <div class="detail-item">
+                        <div class="detail-label">
+                            <i class="fas fa-eye"></i> Visibility
+                        </div>
+                        <div class="detail-value">10 km</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">
+                            <i class="fas fa-compress-arrows-alt"></i> Pressure
+                        </div>
+                        <div class="detail-value">1013 hPa</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">
+                            <i class="fas fa-sun"></i> UV Index
+                        </div>
+                        <div class="detail-value">5 (Moderate)</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">
+                            <i class="fas fa-cloud"></i> Cloud Cover
+                        </div>
+                        <div class="detail-value">40%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="feature-actions">
+        <button class="btn btn-primary" onclick="location.reload()">
+            <i class="fas fa-sync-alt"></i> Refresh Forecast
+        </button>
+        <a href="[% c.uri_for('/Weather') %]" class="btn btn-secondary">
+            <i class="fas fa-home"></i> Weather Home
+        </a>
+        <button class="btn btn-info" onclick="window.history.back()">
+            <i class="fas fa-arrow-left"></i> Back
+        </button>
+    </div>
+</div>
+
+<!-- JavaScript for current weather loading -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadCurrentWeather();
+    
+    function loadCurrentWeather() {
+        const currentWeatherDiv = document.getElementById('current-weather-display');
+        
+        fetch('[% c.uri_for("/Weather/current") %]')
+            .then(response => response.json())
+            .then(data => {
+                const weatherIcon = getWeatherIcon(data.icon);
+                const mockIndicator = data.data_source === 'MOCK_DATA' ? 
+                    ' <small style="opacity: 0.6;">(Mock)</small>' : '';
+                
+                currentWeatherDiv.innerHTML = `
+                    <div class="current-weather-display">
+                        <div class="current-weather-main">
+                            <div class="current-icon">
+                                <i class="${weatherIcon}"></i>
+                            </div>
+                            <div class="current-info">
+                                <div class="current-temp">${data.temperature}&deg;C${mockIndicator}</div>
+                                <div class="current-condition">${data.condition}</div>
+                                <div class="current-description">${data.description}</div>
+                            </div>
+                        </div>
+                        <div class="current-weather-details">
+                            <div class="detail-row">
+                                <span><i class="fas fa-tint"></i> Humidity:</span>
+                                <span>${data.humidity}%</span>
+                            </div>
+                            <div class="detail-row">
+                                <span><i class="fas fa-wind"></i> Wind:</span>
+                                <span>${data.wind_speed} km/h ${data.wind_direction}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span><i class="fas fa-clock"></i> Updated:</span>
+                                <span>${new Date(data.timestamp * 1000).toLocaleTimeString()}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            })
+            .catch(error => {
+                currentWeatherDiv.innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Unable to load current weather conditions.
+                    </div>
+                `;
+            });
+    }
+    
+    function getWeatherIcon(iconCode) {
+        const iconMap = {
+            'sunny': 'fas fa-sun',
+            'partly-cloudy': 'fas fa-cloud-sun',
+            'cloudy': 'fas fa-cloud',
+            'light-rain': 'fas fa-cloud-rain',
+            'heavy-rain': 'fas fa-cloud-showers-heavy',
+            'windy': 'fas fa-wind',
+            'cold': 'fas fa-snowflake',
+            'hot': 'fas fa-thermometer-full'
+        };
+        return iconMap[iconCode] || 'fas fa-cloud';
+    }
+});
+</script>

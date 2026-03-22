@@ -1,0 +1,97 @@
+[% META
+   title = "Subscribe via Patreon"
+   description = "Activate your membership by becoming a Patreon supporter"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "Payment"
+   page_version = "0.01"
+   last_updated = "2026-03-19"
+%]
+<div class="app-container">
+  <div class="page-header">
+    <h1>Subscribe via Patreon</h1>
+    <p>Support <strong>[% site_name | html %]</strong> through Patreon and receive your membership benefits.</p>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <h2>How it works</h2>
+        <ol style="line-height:2">
+          <li>
+            Click <strong>"Go to Patreon"</strong> below — you will be taken to the [% site_name | html %] Patreon page.
+          </li>
+          <li>
+            Choose a membership tier on Patreon that matches the plan you selected
+            [% IF plan_id %](Plan #[% plan_id | html %])[% END %].
+          </li>
+          <li>
+            Complete your Patreon pledge. Patreon accepts credit cards and PayPal.
+          </li>
+          <li>
+            Once your payment is confirmed, <strong>send an email</strong> to
+            <a href="mailto:[% patreon_email | html %]">[% patreon_email | html %]</a>
+            with:
+            <ul style="margin-top:0.4rem">
+              <li>Your <strong>username</strong> on this site: <code>[% c.session.username | html %]</code></li>
+              <li>Your <strong>Patreon email address</strong> (the one you used to pledge)</li>
+            </ul>
+          </li>
+          <li>
+            Your membership will be activated within <strong>24 hours</strong> of receiving your email.
+          </li>
+        </ol>
+      </div>
+
+      <div class="content-section">
+        <div class="form-actions" style="gap:1rem;display:flex;flex-wrap:wrap;align-items:center">
+          [% IF patreon_url %]
+          <a href="[% patreon_url | html %]" target="_blank" rel="noopener"
+             class="btn"
+             style="background:#f96854;color:#fff;border:none;font-size:1.05em;padding:0.65rem 1.4rem">
+            Go to Patreon →
+          </a>
+          [% ELSE %]
+          <div class="error" style="padding:0.75rem 1rem">
+            Patreon is not yet configured for this site. Please contact the administrator.
+          </div>
+          [% END %]
+          <a href="[% c.uri_for('/membership/subscribe', { plan_id => plan_id }) %]"
+             class="btn btn-secondary">← Choose a different payment method</a>
+        </div>
+      </div>
+
+      [% IF patreon_email %]
+      <div class="content-section" style="background:rgba(249,104,84,0.07);border-color:#f96854">
+        <h2>Contact for Patreon support</h2>
+        <p>
+          Questions about your Patreon membership? Email:
+          <a href="mailto:[% patreon_email | html %]">[% patreon_email | html %]</a>
+        </p>
+      </div>
+      [% END %]
+
+    </div>
+
+    <div class="content-secondary">
+      <div class="content-section">
+        <h2>Why Patreon?</h2>
+        <p>Patreon is a recurring support platform that lets you back creators and communities you care about.</p>
+        <ul>
+          <li>Secure billing managed by Patreon</li>
+          <li>Cancel anytime from your Patreon account</li>
+          <li>Your support helps keep [% site_name | html %] running</li>
+        </ul>
+      </div>
+
+      <div class="content-section">
+        <h2>Prefer instant access?</h2>
+        <p>Use <strong>Site Coins</strong> or <strong>PayPal</strong> for immediate membership activation.</p>
+        <a href="[% c.uri_for('/membership/subscribe', { plan_id => plan_id }) %]"
+           class="btn btn-secondary" style="width:100%;text-align:center">← Back to payment options</a>
+      </div>
+    </div>
+
+  </div>
+</div>

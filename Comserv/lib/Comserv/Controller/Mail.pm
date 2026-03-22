@@ -10,6 +10,11 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
+sub auto :Private {
+    my ($self, $c) = @_;
+    return 1;
+}
+
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
     
@@ -153,6 +158,8 @@ sub add_mail_config_form :Local {
 
 sub add_mail_config :Local {
     my ($self, $c) = @_;
+    
+    
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
         "add_mail_config action called - Method: " . $c->req->method);
@@ -347,6 +354,7 @@ sub edit_smtp_config :Local {
     
     # If this is a POST request, update the configuration
     if ($c->req->method eq 'POST') {
+        
         my $params = $c->req->params;
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_smtp_config', 

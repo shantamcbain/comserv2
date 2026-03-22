@@ -1,0 +1,81 @@
+[% META
+   title = "Membership Administration"
+   description = "Manage membership plans, subscribers, and costs"
+   roles = "admin,site_admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-03-18"
+%]
+[% PageVersion = 'membership/admin/Index.tt,v 0.01 2026/03/18' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Membership Administration</h1>
+    [% IF site %]<p>Managing: <strong>[% site.name | html %]</strong></p>[% END %]
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <h2>Quick Stats</h2>
+        <div class="form-row">
+          <div class="form-field">
+            <strong>Active Plans</strong>
+            <div class="stat-value">[% plan_count %]</div>
+          </div>
+          <div class="form-field">
+            <strong>Active Members</strong>
+            <div class="stat-value">[% member_count %]</div>
+          </div>
+          <div class="form-field">
+            <strong>Est. Monthly Revenue</strong>
+            <div class="stat-value">[% revenue_month %] USD</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="content-section">
+        <h2>Management Tools</h2>
+        <div class="form-row">
+          <div class="form-field">
+            <a href="[% c.uri_for('/membership/admin/manage_plans') %]" class="btn btn-primary">Manage Plans</a>
+            <p>Create, edit, and deactivate membership plans for this site.</p>
+          </div>
+          <div class="form-field">
+            <a href="[% c.uri_for('/membership/admin/subscribers') %]" class="btn btn-primary">View Subscribers</a>
+            <p>Browse all members and their subscription details.</p>
+          </div>
+          <div class="form-field">
+            <a href="[% c.uri_for('/membership/admin/cost_tracking') %]" class="btn btn-primary">Cost Tracking</a>
+            <p>Record and review operational costs vs membership revenue.</p>
+          </div>
+          <div class="form-field">
+            <a href="[% c.uri_for('/membership/admin/paypal_settings') %]" class="btn btn-secondary">PayPal Settings</a>
+            <p>Configure PayPal business email, sandbox mode, and API credentials.</p>
+          </div>
+          <div class="form-field">
+            <a href="[% c.uri_for('/membership/admin/patreon_settings') %]" class="btn btn-secondary" style="background:#f96854;color:#fff;border:none">Patreon Settings</a>
+            <p>Enable and configure Patreon as a payment option for this site.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="content-section">
+        <h2>Quick Links</h2>
+        <ul>
+          <li><a href="[% c.uri_for('/membership') %]">View Public Membership Page</a></li>
+          <li><a href="[% c.uri_for('/membership/admin/subscribers', { status => 'active' }) %]">Active Subscribers</a></li>
+          <li><a href="[% c.uri_for('/membership/admin/subscribers', { status => 'grace' }) %]">In Grace Period</a></li>
+          <li><a href="[% c.uri_for('/membership/admin/create_plan') %]">Create New Plan</a></li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</div>

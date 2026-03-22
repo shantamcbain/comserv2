@@ -1,0 +1,276 @@
+/* membership.css — layout and component styles for membership pages
+   All colours use theme CSS variables so every site theme works correctly.
+   Containers are semi-transparent so the body background image shows through. */
+
+/* ── Layout ─────────────────────────────────────────────────────────── */
+
+.app-container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem 2rem;
+}
+
+.page-header {
+    padding: 1.25rem 0 1rem;
+    border-bottom: 2px solid var(--primary-color, #ccffff);
+    margin-bottom: 1.25rem;
+}
+
+.page-header h1 {
+    margin: 0 0 0.25rem;
+    color: var(--text-color, #000);
+    font-size: var(--font-size-xlarge, 1.6rem);
+}
+
+.page-header p {
+    margin: 0.25rem 0 0;
+    color: var(--text-muted-color, #555);
+    font-size: var(--font-size-small, 0.9rem);
+}
+
+.content-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    align-items: flex-start;
+}
+
+.content-primary {
+    flex: 1 1 640px;
+    min-width: 0;
+}
+
+.content-secondary {
+    flex: 0 1 280px;
+    min-width: 220px;
+}
+
+.content-section {
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 6px;
+    padding: 1rem 1.1rem;
+    margin-bottom: 1.1rem;
+}
+
+.content-section h2 {
+    margin: 0 0 0.75rem;
+    font-size: var(--font-size-large, 1.15rem);
+    color: var(--text-color, #000);
+    border-bottom: 1px solid var(--border-color, #ddd);
+    padding-bottom: 0.4rem;
+}
+
+.content-section h3 {
+    margin: 0 0 0.6rem;
+    font-size: 1rem;
+    color: var(--text-color, #000);
+}
+
+/* ── Tables ──────────────────────────────────────────────────────────── */
+
+.table-container {
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-small, 0.9rem);
+}
+
+.data-table th,
+.data-table td {
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--border-color, #ddd);
+    text-align: left;
+    vertical-align: top;
+}
+
+.data-table th {
+    background-color: var(--primary-color, #ccffff);
+    color: var(--text-color, #000);
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.data-table tr:nth-child(even) td {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+.data-table tr:hover td {
+    background-color: rgba(0, 0, 0, 0.06);
+}
+
+.data-table .action-cell {
+    white-space: nowrap;
+    text-align: center;
+}
+
+.featured-plan td {
+    background-color: rgba(255, 230, 180, 0.55) !important;
+    font-weight: 500;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────── */
+
+.btn {
+    display: inline-block;
+    padding: 0.4rem 0.9rem;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #ccc);
+    background: var(--button-bg, #f2f2f2);
+    color: var(--button-text, #000);
+    text-decoration: none;
+    cursor: pointer;
+    font-size: var(--font-size-small, 0.9rem);
+    line-height: 1.4;
+    transition: background 0.15s, opacity 0.15s;
+}
+
+.btn:hover {
+    opacity: 0.85;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: var(--primary-color, #0066cc);
+    color: var(--text-color, #fff);
+    border-color: var(--primary-color, #0055aa);
+    font-weight: bold;
+}
+
+.btn-secondary {
+    background: var(--secondary-color, #f2f2f2);
+    color: var(--text-color, #333);
+    border-color: var(--border-color, #ccc);
+}
+
+.btn-sm {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.8rem;
+}
+
+.admin-actions .btn {
+    margin-right: 0.4rem;
+    margin-top: 0.2rem;
+}
+
+/* ── Forms ───────────────────────────────────────────────────────────── */
+
+.form-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    align-items: flex-start;
+}
+
+.form-field {
+    flex: 1 1 180px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.form-field label {
+    font-size: var(--font-size-small, 0.875rem);
+    font-weight: 600;
+    color: var(--text-color, #333);
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 4px;
+    font-size: var(--font-size-small, 0.9rem);
+    background: rgba(255,255,255,0.9);
+    color: var(--text-color, #000);
+}
+
+.form-field small {
+    font-size: 0.78rem;
+    color: var(--text-muted-color, #666);
+}
+
+.form-actions {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+/* ── Badges & Status ─────────────────────────────────────────────────── */
+
+.badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    background: var(--accent-color, #FF9900);
+    color: #fff;
+    margin-left: 0.3rem;
+    vertical-align: middle;
+}
+
+.badge-active   { background: #28a745; color: #fff; }
+.badge-grace    { background: #ffc107; color: #333; }
+.badge-suspended,
+.badge-cancelled,
+.badge-expired  { background: #dc3545; color: #fff; }
+
+/* ── Stats / Utility ─────────────────────────────────────────────────── */
+
+.stat-value {
+    font-size: 1.3rem;
+    font-weight: bold;
+    margin-top: 0.2rem;
+}
+
+.text-success { color: var(--success-color, #28a745); }
+.text-danger  { color: var(--warning-color, #dc3545); }
+.text-muted   { color: var(--text-muted-color, #666); }
+
+.empty-state {
+    color: var(--text-muted-color, #888);
+    font-style: italic;
+    padding: 0.75rem 0;
+}
+
+/* ── Dark theme overrides ────────────────────────────────────────────── */
+
+.theme-dark .content-section {
+    background: rgba(30, 30, 30, 0.85);
+    border-color: #444;
+}
+
+.theme-dark .data-table th {
+    background-color: var(--primary-color, #333);
+}
+
+.theme-dark .form-field input,
+.theme-dark .form-field select,
+.theme-dark .form-field textarea {
+    background: rgba(40, 40, 40, 0.9);
+    border-color: #555;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────── */
+
+@media (max-width: 680px) {
+    .content-container {
+        flex-direction: column;
+    }
+    .content-secondary {
+        flex: 1 1 100%;
+    }
+    .data-table th,
+    .data-table td {
+        font-size: 0.8rem;
+        padding: 0.35rem 0.4rem;
+    }
+}

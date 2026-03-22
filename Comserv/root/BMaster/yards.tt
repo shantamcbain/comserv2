@@ -1,21 +1,63 @@
-<head>
-    [% PageVersion = 'BMaster/yards.tt,v 0.01 2023/11/03 shanta Exp shanta ' %]
-    <meta charset="utf-8">
-    [% IF debug_mode == 1 %]
-        [% PageVersion %]
-    [% END %]
-
-</head>
-<h2>Yards</h2>
-
-[% IF yards.size %]
-    <p>Here is a list of yards in the operation:</p>
-
-    [% FOREACH yard IN yards %]
-        <h3><a href="/yards/[% yard.id %]">[% yard.name %]</a></h3>
-        <p><a href="/yards/[% yard.id %]/edit">Modify yard</a></p>
-        <p><a href="/yards/[% yard.id %]/delete">Delete yard</a></p>
-    [% END %]
-[% ELSE %]
-    <p>No yards found. <a href="/BMaster/add_yard">Add a new yard</a></p>
+[% META title = "Bee Yards" %]
+[% PageVersion = 'BMaster/yards.tt,v 0.02 2026/03/17 shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
 [% END %]
+
+<div class="app-container">
+
+    <div class="page-header">
+        <h1>Bee Yards</h1>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+
+            <div class="app-section">
+                [% IF yards.size %]
+                    <p>Here is a list of yards in the operation:</p>
+
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Yard Name</th>
+                                    <th>Code</th>
+                                    <th>Size</th>
+                                    <th>Established</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% FOREACH yard IN yards %]
+                                <tr>
+                                    <td>[% yard.yard_name | html %]</td>
+                                    <td>[% yard.yard_code | html %]</td>
+                                    <td>[% yard.total_yard_size | html %]</td>
+                                    <td>[% yard.date_established | html %]</td>
+                                    <td class="action-cell">
+                                        <a href="/Apiary/hives_for_yard/[% yard.id %]" class="btn btn-sm btn-edit">View Hives</a>
+                                    </td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                [% ELSE %]
+                    <div class="empty-state">
+                        <p>No yards found. <a href="/BMaster/add_yard" class="btn btn-primary">Add a new yard</a></p>
+                    </div>
+                [% END %]
+            </div>
+
+            <div class="page-footer">
+                <div class="footer-actions">
+                    <a href="/BMaster/add_yard" class="btn btn-primary">Add New Yard</a>
+                    <a href="/BMaster" class="btn btn-secondary">Back to BMaster Home</a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>

@@ -1,0 +1,141 @@
+[% PageVersion = 'Comserv/root/Documentation/documentation_filename_issue.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation Controller Filename Issue' %]
+
+<!-- Documentation page for documentation_filename_issue -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Issue Description</h2>
+
+
+
+There was a critical issue with the Documentation controller in the Comserv system where the filename and package name did not match:
+
+
+
+<ul><li>The controller file was named <code>Documantation.pm</code> (with an 'a')</li></ul>
+
+<ul><li>But the package inside was declared as <code>Comserv::Controller::Documentation</code> (with an 'o')</li></ul>
+
+
+
+This mismatch caused both the <code>/documentation</code> and <code>/Documentation</code> routes to fail, as shown in the application logs:
+
+
+
+<code></code>`
+
+warn: [2025-04-24 09:19:25] Page not found: /documentation
+
+warn: [2025-04-24 09:19:34] Page not found: /Documentation
+
+<code></code>`
+
+
+
+<h2>Resolution</h2>
+
+
+
+The issue was resolved by ensuring the filename matches the package name:
+
+
+
+<ol><li>The file <code>/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Documantation.pm</code> was renamed to <code>/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Documentation.pm</code></li></ol>
+
+
+
+<ol><li>No code changes were needed since the package was already correctly declared as <code>Comserv::Controller::Documentation</code></li></ol>
+
+
+
+<h2>Importance of Filename/Package Consistency</h2>
+
+
+
+In Perl, especially with frameworks like Catalyst, it's crucial that filenames match their package declarations:
+
+
+
+<ul><li>Catalyst uses the package name to determine the controller's namespace</li></ul>
+
+<ul><li>The filesystem path is used to locate the controller file</li></ul>
+
+<ul><li>When these don't match, the framework can't properly load the controller</li></ul>
+
+
+
+<h2>Logging Best Practices</h2>
+
+
+
+When troubleshooting routing issues, always check:
+
+
+
+<ol><li>Application logs for "Page not found" errors</li></ol>
+
+<ol><li>Controller filenames and package declarations</li></ol>
+
+<ol><li>Route definitions in the controller</li></ol>
+
+
+
+Always use the <code>log_with_details</code> method for comprehensive logging:
+
+
+
+<code></code>`perl
+
+$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name',
+
+    "Detailed message with relevant information");
+
+<code></code>`
+
+
+
+<h2>Warning for AI Assistants</h2>
+
+
+
+**⚠️ IMPORTANT: Never replace or modify existing files without explicit permission from the user. Always ask for confirmation before making changes to the codebase.**
+
+
+
+When suggesting fixes for similar issues:
+
+
+
+<ol><li>Identify the mismatch between filename and package</li></ol>
+
+<ol><li>Recommend renaming the file to match the package (not vice versa)</li></ol>
+
+<ol><li>Explain the impact of the change</li></ol>
+
+<ol><li>Ask for permission before implementing the change</li></ol>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/Documentation/ai_guidelines">AI Guidelines</a></li></ul>
+
+<ul><li><a href="/Documentation/controllers">Controller Documentation</a></li></ul>
+
+<ul><li><a href="/Documentation/Logging">Logging System</a></li></ul>
+
+</div>

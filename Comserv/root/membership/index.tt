@@ -1,0 +1,185 @@
+[% PageVersion = 'membership/index.tt,v 1.0 2025/01/17 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <header class="header">
+        <h1>Membership - [% site_domain || site_name %]</h1>
+        <div class="context">
+            <span class="context-item"><strong>Site:</strong> [% site_domain || site_name %]</span>
+            [% IF is_member %]
+            <span class="context-item"><strong>Status:</strong> <span class="member-badge">Member</span></span>
+            [% END %]
+        </div>
+    </header>
+    
+    [% IF is_member %]
+    <!-- Current Member Section -->
+    <section class="section member-section">
+        <h2 class="section-header">Welcome Back, Member!</h2>
+        <div class="member-info">
+            <div class="membership-card">
+                <h3>Your Membership Details</h3>
+                <div class="membership-details">
+                    <p><strong>Membership Type:</strong> [% user_membership.type || 'Standard' %]</p>
+                    <p><strong>Status:</strong> <span class="status [% user_membership.status.lower || 'active' %]">[% user_membership.status || 'Active' %]</span></p>
+                    [% IF user_membership.expires %]
+                    <p><strong>Expires:</strong> [% user_membership.expires %]</p>
+                    [% END %]
+                </div>
+                <div class="member-actions">
+                    <a href="/member/profile" class="btn btn-primary">Update Profile</a>
+                    <a href="/member/benefits" class="btn btn-secondary">View Benefits</a>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Member Benefits -->
+    <section class="section">
+        <h2 class="section-header">Your Member Benefits</h2>
+        <div class="benefits-grid">
+            <div class="benefit-card active">
+                <h3>Priority Support</h3>
+                <p>Get faster response times for technical support and customer service inquiries.</p>
+                <span class="benefit-status">✓ Active</span>
+            </div>
+            <div class="benefit-card active">
+                <h3>Exclusive Resources</h3>
+                <p>Access to member-only documentation, tutorials, and knowledge base articles.</p>
+                <span class="benefit-status">✓ Active</span>
+            </div>
+            <div class="benefit-card active">
+                <h3>Community Forums</h3>
+                <p>Participate in member discussions and connect with other community members.</p>
+                <span class="benefit-status">✓ Active</span>
+            </div>
+            <div class="benefit-card active">
+                <h3>Monthly Newsletter</h3>
+                <p>Stay updated with the latest news, updates, and exclusive member content.</p>
+                <span class="benefit-status">✓ Active</span>
+            </div>
+        </div>
+    </section>
+    
+    [% ELSE %]
+    <!-- Non-Member Section -->
+    <section class="section">
+        <h2 class="section-header">Join Our Community</h2>
+        <div class="intro-section">
+            <p class="intro">Become a member of [% site_domain || site_name %] and unlock exclusive benefits, resources, and community access.</p>
+        </div>
+    </section>
+
+    <!-- Membership Benefits -->
+    <section class="section">
+        <h2 class="section-header">Membership Benefits</h2>
+        <div class="benefits-grid">
+            <div class="benefit-card">
+                <h3>Priority Support</h3>
+                <p>Get faster response times for technical support and customer service inquiries.</p>
+                <div class="benefit-features">
+                    <ul>
+                        <li>24/7 priority queue</li>
+                        <li>Direct access to senior support staff</li>
+                        <li>Guaranteed response within 4 hours</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="benefit-card">
+                <h3>Exclusive Resources</h3>
+                <p>Access to member-only documentation, tutorials, and knowledge base articles.</p>
+                <div class="benefit-features">
+                    <ul>
+                        <li>Advanced tutorials and guides</li>
+                        <li>Member-only documentation</li>
+                        <li>Early access to new features</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="benefit-card">
+                <h3>Community Forums</h3>
+                <p>Participate in member discussions and connect with other community members.</p>
+                <div class="benefit-features">
+                    <ul>
+                        <li>Private member forums</li>
+                        <li>Expert Q&A sessions</li>
+                        <li>Networking opportunities</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="benefit-card">
+                <h3>Monthly Newsletter</h3>
+                <p>Stay updated with the latest news, updates, and exclusive member content.</p>
+                <div class="benefit-features">
+                    <ul>
+                        <li>Exclusive member content</li>
+                        <li>Industry insights and trends</li>
+                        <li>Early announcements</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Membership Tiers -->
+    <section class="section">
+        <h2 class="section-header">Membership Options</h2>
+        <div class="membership-tiers">
+            <div class="tier-card">
+                <h3>Basic Membership</h3>
+                <div class="tier-price">Free</div>
+                <ul class="tier-features">
+                    <li>Community forum access</li>
+                    <li>Basic support</li>
+                    <li>Monthly newsletter</li>
+                    <li>Public documentation</li>
+                </ul>
+                <a href="/applymembership?type=basic" class="btn btn-secondary">Join Free</a>
+            </div>
+            
+            <div class="tier-card featured">
+                <h3>Premium Membership</h3>
+                <div class="tier-price">$19/month</div>
+                <ul class="tier-features">
+                    <li>All Basic features</li>
+                    <li>Priority support</li>
+                    <li>Exclusive resources</li>
+                    <li>Advanced tutorials</li>
+                    <li>Direct expert access</li>
+                </ul>
+                <a href="/applymembership?type=premium" class="btn btn-primary">Upgrade Now</a>
+            </div>
+            
+            <div class="tier-card">
+                <h3>Enterprise Membership</h3>
+                <div class="tier-price">Contact Us</div>
+                <ul class="tier-features">
+                    <li>All Premium features</li>
+                    <li>Custom solutions</li>
+                    <li>Dedicated support</li>
+                    <li>Training sessions</li>
+                    <li>SLA guarantees</li>
+                </ul>
+                <a href="/contact?subject=enterprise" class="btn btn-secondary">Contact Sales</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Call to Action -->
+    <section class="section highlight-section">
+        <h2>Ready to Join?</h2>
+        <p>Start your membership journey today and become part of our growing community!</p>
+        <div class="cta-buttons">
+            <a href="/applymembership" class="btn btn-primary">Apply for Membership</a>
+            <a href="/contact" class="btn btn-secondary">Have Questions?</a>
+        </div>
+    </section>
+    [% END %]
+</div>
+
+<!-- CSS moved to /static/css/themes/hosted-membership.css for theme consistency -->

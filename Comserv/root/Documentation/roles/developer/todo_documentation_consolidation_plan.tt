@@ -1,0 +1,50 @@
+[% PageVersion = 'Comserv/root/Documentation/roles/developer/todo_documentation_consolidation_plan.tt,v 0.01 2025/08/25 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Todo Documentation Consolidation Plan' %]
+
+<!-- Todo Documentation Consolidation Plan (Phase 1 TT) -->
+<div class="documentation-content">
+
+<div class="markdown-content">
+
+# Todo Documentation Consolidation Plan
+
+## Executive Summary
+
+The Todo system currently has 15 scattered documentation files across multiple directories, creating duplication and maintenance overhead. This TT version outlines the strategy to consolidate into 4 properly configured files integrated with the documentation system.
+
+## Phase 1: Scope
+### Objective
+
+### Deliverables
+
+## Current State Analysis
+
+## Migration Strategy (High-Level)
+1. Create/ensure the 4 TT files exist and contain the consolidated content
+2. Maintain cross-references to related Todo docs
+3. Update documentation_config.json with the new TT file entries if necessary
+4. Introduce a small debug banner showing PageVersion when in debug mode
+
+## Phase 2 (Preview)
+
+## Risks & Mitigations
+ - Risk: Content drift during consolidation
+   Mitigation: maintain a changelog and backups
+ - Risk: Broken links during transition
+   Mitigation: use cross-references; validate in UI
+
+## Next Steps
+ - Populate Phase 1 TT files with content
+ - Validate rendering in UI with debug banners
+ - Update documentation_config.json with new TT paths
+
+<div class="note-box" style="margin-top: 10px;">
+  <strong>Note:</strong> This Phase 1 TT conversion includes a small PageVersion banner for IDE visibility in debug mode.
+</div>
+
+</div>
+</div>

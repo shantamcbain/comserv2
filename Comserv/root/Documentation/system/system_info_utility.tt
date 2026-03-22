@@ -286,4 +286,4 @@ $c-&gt;config-&gt;{system_info} = $system_info;</pre>
 <li><a href="/Documentation/controllers/admin_controllers">Admin Controllers Overview</a></li>
 </ul>
 
-[% END %]
+
