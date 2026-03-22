@@ -117,8 +117,8 @@
                                 <label for="reply_to_override">From / Reply-To address:</label>
                                 <input type="email" id="reply_to_override" name="reply_to_override"
                                        class="form-input" style="width:320px;"
-                                       placeholder="Leave blank to use your account email">
-                                <small>Replies from recipients go to this address. Defaults to your account email.</small>
+                                       value="[% leader_email_default | html %]">
+                                <small>Replies go to this address. Defaults to your account email ([% leader_email_default | html %]).</small>
                             </div>
                         </div>
                         <div class="form-row">
