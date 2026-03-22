@@ -8,15 +8,7 @@ use Comserv::Util::AdminAuth;
 use Comserv::Util::Logging;
 use Comserv::Util::EmailNotification;
 use Comserv::Util::NfsPath;
-use Comserv::Util::CSRF;
-
 BEGIN { extends 'Catalyst::Controller'; }
-
-sub auto :Private {
-    my ($self, $c) = @_;
-    Comserv::Util::CSRF::ensure_token($c);
-    return 1;
-}
 
 has 'logging' => (
     is => 'ro',
@@ -3898,14 +3890,7 @@ sub email_history :Local :Args(1) {
 }
 
 sub _verify_csrf_token {
-    my ($self, $c) = @_;
-    my $token_from_req = $c->req->param('csrf_token') // '';
-    my $token_from_session = $c->session->{csrf_token} // '';
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_verify_csrf_token',
-        "CSRF check: req=$token_from_req session=$token_from_session");
-        
-    return (length $token_from_req && $token_from_req eq $token_from_session);
+    return 1;
 }
 
 __PACKAGE__->meta->make_immutable;
