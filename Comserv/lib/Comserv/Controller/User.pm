@@ -1,12 +1,8 @@
 package Comserv::Controller::User;
 use Moose;
 use namespace::autoclean;
-use Digest::SHA qw(sha256_hex);  # For hashing passwords
+use Digest::SHA qw(sha256_hex);
 use Data::Dumper;
-use Email::Sender::Simple qw(sendmail);
-use Email::Simple;
-use Email::Simple::Creator;
-use Email::Sender::Transport::SMTP;
 
 BEGIN { extends 'Catalyst::Controller'; }
 # Apply restrictions to the entire controller
@@ -675,109 +671,74 @@ sub do_create_account :Local {
         return;
     }
 
-    # Get email configuration from the stash (set by site_setup in Root.pm)
-    # These variables are set in Root.pm's site_setup method for each site
-    my $mail_from = $c->stash->{mail_from}; 
-    my $mail_replyto = $c->stash->{mail_replyto};
-    
-    # Log the email configuration for debugging
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-        "Email configuration - From: " . ($mail_from || 'undefined') . 
-        ", Reply-To: " . ($mail_replyto || 'undefined'));
-    
-    # Send email notification to the user if we have a valid email address
+    my $site_name    = $c->session->{SiteName};
+    my $mail_to_admin = $c->stash->{mail_to_admin};
+    my $display_name  = $c->stash->{ScriptDisplayName} || 'Comserv';
+
     if ($email && $email =~ /\@/) {
-        eval {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-                "Sending welcome email to new user: $email");
-                
-            # Use default values if site configuration is missing
-            my $from_address = $mail_from || 'noreply@computersystemconsulting.ca';
-            my $reply_to = $mail_replyto || 'helpdesk@computersystemconsulting.ca';
-            
-            $c->stash->{email} = {
-                to       => $email,
-                from     => $from_address,
-                reply_to => $reply_to,
-                subject  => 'Welcome to Comserv - Account Created',
-                template => 'email/account_created.tt',
-                template_vars => {
-                    username   => $username,
-                    first_name => $first_name,
-                    last_name  => $last_name,
-                    email      => $email,
-                    site_name  => $c->stash->{ScriptDisplayName} || 'Comserv',
-                },
-            };
-            
-            # Send the email
-            $c->forward($c->view('Email::Template'));
-            
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-                "Welcome email sent successfully to: $email");
-        };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+            "Sending welcome email to new user: $email");
+
+        my $welcome_body = <<"END_BODY";
+Hello $first_name,
+
+Your account at $display_name has been created successfully.
+
+Username: $username
+
+You can now log in at the site.
+
+Thank you,
+The $display_name Team
+END_BODY
+
+        my $result = $c->model('Mail')->send_email(
+            $c,
+            $email,
+            "Welcome to $display_name - Account Created",
+            $welcome_body,
+            $site_name,
+        );
+
+        unless ($result) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+                "Welcome email could not be sent to: $email");
+        }
     } else {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
             "Cannot send welcome email: Invalid or missing user email address");
     }
-    
-    if ($@) {
-        # Log email error but continue (don't block account creation if email fails)
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
-            "Error sending welcome email: $@");
-    }
-    
-    # Get the admin email from the stash (set by site_setup in Root.pm)
-    # This variable is set in Root.pm's site_setup method for each site
-    my $mail_to_admin = $c->stash->{mail_to_admin};
-    
-    # Log the admin email for debugging
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-        "Admin email: " . ($mail_to_admin || 'undefined'));
-    
-    # Send notification to admin if we have a valid admin email
+
     if ($mail_to_admin && $mail_to_admin =~ /\@/) {
-        eval {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-                "Sending admin notification about new user to: $mail_to_admin");
-                
-            # Format the current timestamp
-            my $timestamp = scalar localtime;
-            
-            # Use default values if site configuration is missing
-            my $from_address = $mail_from || 'noreply@computersystemconsulting.ca';
-                
-            $c->stash->{email} = {
-                to       => $mail_to_admin,
-                from     => $from_address,
-                subject  => 'Comserv - New User Account Created',
-                template => 'email/admin_account_notification.tt',
-                template_vars => {
-                    username   => $username,
-                    first_name => $first_name,
-                    last_name  => $last_name,
-                    email      => $email,
-                    roles      => $roles,
-                    created_at => $timestamp,
-                    site_name  => $c->stash->{ScriptDisplayName} || 'Comserv',
-                },
-            };
-            
-            # Send the email
-            $c->forward($c->view('Email::Template'));
-            
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-                "Admin notification email sent successfully to: $mail_to_admin");
-        };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+            "Sending admin notification about new user to: $mail_to_admin");
+
+        my $timestamp   = scalar localtime;
+        my $admin_body  = <<"END_BODY";
+New user account created at $display_name:
+
+Username:  $username
+Name:      $first_name $last_name
+Email:     $email
+Role:      $roles
+Created:   $timestamp
+END_BODY
+
+        my $result = $c->model('Mail')->send_email(
+            $c,
+            $mail_to_admin,
+            "$display_name - New User Account Created",
+            $admin_body,
+            $site_name,
+        );
+
+        unless ($result) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+                "Admin notification email could not be sent to: $mail_to_admin");
+        }
     } else {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
             "Cannot send admin notification: Invalid or missing admin email address");
-    }
-    
-    if ($@) {
-        # Log email error but continue
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
-            "Error sending admin notification email: $@");
     }
 
     # Set success message and redirect to the login page

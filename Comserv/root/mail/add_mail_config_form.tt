@@ -1,21 +1,53 @@
+[% META title = 'Add Mail Configuration' %]
 
-[% PageVersion = '/mail/add_mail_config_form.tt,v 0.01 2024/11/24 shanta Exp shanta ' %]
-[% META title = 'Edit User' %]
-[% IF debug_mode == 1 %]
+<h1>Add Mail Configuration</h1>
+
+[% IF status_msg %]
+  <div class="alert alert-success">[% status_msg | html %]</div>
 [% END %]
-  [% PageVersion %]
-    [% INCLUDE 'debug.tt' %]
-[% END %]    <h1>Add Mail Configuration</h1>
+[% IF debug_msg %]
+  <div class="alert alert-warning">[% debug_msg | html %]</div>
+[% END %]
+
+<p>Prefer using the <a href="/mail/smtp_settings">SMTP Settings</a> page for managing existing site credentials.</p>
+
 <form method="POST" action="/mail/add_mail_config">
-    <label for="site_id">Site ID:</label>
-    <input type="text" id="site_id" name="site_id" required><br>
-    <label for="smtp_host">SMTP Host:</label>
-    <input type="text" id="smtp_host" name="smtp_host" required><br>
-    <label for="smtp_port">SMTP Port:</label>
-    <input type="text" id="smtp_port" name="smtp_port" required><br>
-    <label for="smtp_username">SMTP Username:</label>
-    <input type="text" id="smtp_username" name="smtp_username" required><br>
-    <label for="smtp_password">SMTP Password:</label>
-    <input type="password" id="smtp_password" name="smtp_password" required><br>
-    <input type="submit" value="Add Configuration">
+  <table class="table table-bordered" style="max-width:600px;">
+    <tr>
+      <th>Site Name</th>
+      <td><input type="text" name="site_name" class="form-control" placeholder="CSC" required></td>
+    </tr>
+    <tr>
+      <th>SMTP Host</th>
+      <td><input type="text" name="smtp_host" class="form-control" placeholder="harper.whc.ca" required></td>
+    </tr>
+    <tr>
+      <th>SMTP Port</th>
+      <td><input type="number" name="smtp_port" class="form-control" placeholder="465" required></td>
+    </tr>
+    <tr>
+      <th>SSL Mode</th>
+      <td>
+        <select name="smtp_ssl" class="form-control">
+          <option value="">None (plain)</option>
+          <option value="ssl">SSL (implicit, port 465)</option>
+          <option value="starttls">STARTTLS (port 587)</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th>SMTP User</th>
+      <td><input type="text" name="smtp_user" class="form-control" placeholder="user@example.com"></td>
+    </tr>
+    <tr>
+      <th>SMTP Password</th>
+      <td><input type="password" name="smtp_password" class="form-control" autocomplete="new-password"></td>
+    </tr>
+    <tr>
+      <th>From Address</th>
+      <td><input type="email" name="smtp_from" class="form-control" placeholder="noreply@example.com"></td>
+    </tr>
+  </table>
+
+  <button type="submit" class="btn btn-primary">Save Configuration</button>
 </form>
