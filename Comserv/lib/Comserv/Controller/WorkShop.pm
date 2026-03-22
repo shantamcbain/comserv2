@@ -3549,6 +3549,8 @@ sub send_email :Local :Args(1) {
     my $failed_count = 0;
     my @failed_emails;
     my %sent_to;
+    my @sent_log;    # { email, name, status, error }
+    my @failed_log;
 
     for my $participant (@registered_participants) {
         my $email = $participant->email;
@@ -3594,22 +3596,41 @@ sub send_email :Local :Args(1) {
         $send_err = "$@" if $@;
 
         if ($send_err || !$send_result) {
-            my $reason = $send_err || 'Model::Mail returned failure';
+            my $reason = $send_err || 'Mail server returned failure';
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
-                "SEND FAILED to=$email subject='$processed_subject' error=$reason");
+                "SEND FAILED to=$email name='$user_name' subject='$processed_subject' error=$reason");
             $failed_count++;
             push @failed_emails, $email;
+            push @failed_log, { email => $email, name => $user_name, error => $reason };
         } else {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
-                "SEND OK to=$email subject='$processed_subject' workshop_id=$id");
+                "SEND OK to=$email name='$user_name' subject='$processed_subject' workshop_id=$id");
             $sent_count++;
+            push @sent_log, { email => $email, name => $user_name };
         }
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
         "Email send summary: workshop_id=$id sent=$sent_count failed=$failed_count" .
         ($failed_count ? " failed_addresses=" . join(',', @failed_emails) : ''));
-    
+
+    # Build JSON recipients log for the DB record
+    my $recipients_json = do {
+        my @parts;
+        push @parts, '"sent":[' . join(',', map {
+            my $e = $_->{email}; $e =~ s/"/\\"/g;
+            my $n = $_->{name};  $n =~ s/"/\\"/g;
+            qq|{"email":"$e","name":"$n"}|
+        } @sent_log) . ']';
+        push @parts, '"failed":[' . join(',', map {
+            my $e = $_->{email}; $e =~ s/"/\\"/g;
+            my $n = $_->{name};  $n =~ s/"/\\"/g;
+            my $r = $_->{error}; $r =~ s/"/\\"/g; $r =~ s/\n/ /g;
+            qq|{"email":"$e","name":"$n","error":"$r"}|
+        } @failed_log) . ']';
+        '{' . join(',', @parts) . '}';
+    };
+
     my $email_status = 'sent';
     if ($failed_count > 0 && $sent_count == 0) {
         $email_status = 'failed';
@@ -3620,18 +3641,21 @@ sub send_email :Local :Args(1) {
     my $email_record;
     eval {
         $email_record = $c->model('DBEncy::WorkshopEmail')->create({
-            workshop_id => $id,
-            subject => $subject,
-            body => $body,
-            sent_by => $c->session->{user_id},
-            sent_at => DateTime->now,
+            workshop_id     => $id,
+            subject         => $subject,
+            body            => $body,
+            sent_by         => $c->session->{user_id},
+            sent_at         => DateTime->now,
             recipient_count => $sent_count,
-            status => $email_status,
+            status          => $email_status,
+            recipients_log  => $recipients_json,
         });
     };
-    
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to record email in database: $@");
+    my $db_err = "$@" if $@;
+
+    if ($db_err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
+            "Failed to record email in database: $db_err");
     }
     
     # Detect if running in log-only mode (no real SMTP)
@@ -3682,6 +3706,58 @@ sub email_history :Local :Args(1) {
         workshop => $workshop,
         emails => \@emails,
         template => 'WorkShops/EmailHistory.tt',
+    );
+}
+
+sub email_detail :Local :Args(1) {
+    my ($self, $c, $email_id) = @_;
+
+    my $email_record = $c->model('DBEncy::WorkshopEmail')->find(
+        $email_id,
+        { prefetch => ['sender', 'workshop'] }
+    );
+
+    unless ($email_record) {
+        $c->flash->{error_msg} = 'Email record not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    unless ($self->_check_workshop_access($c, $email_record->workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    # Parse recipients_log JSON into sent/failed arrays
+    my (@sent_recipients, @failed_recipients);
+    my $raw_log = $email_record->recipients_log || '';
+    if ($raw_log) {
+        # Simple JSON parsing for our controlled format - no external module needed
+        if ($raw_log =~ /"sent":\[([^\]]*)\]/) {
+            my $sent_json = $1;
+            while ($sent_json =~ /\{"email":"([^"]*?)","name":"([^"]*?)"\}/g) {
+                push @sent_recipients, { email => $1, name => $2 };
+            }
+        }
+        if ($raw_log =~ /"failed":\[([^\]]*)\]/) {
+            my $failed_json = $1;
+            while ($failed_json =~ /\{"email":"([^"]*?)","name":"([^"]*?)","error":"([^"]*?)"\}/g) {
+                push @failed_recipients, { email => $1, name => $2, error => $3 };
+            }
+        }
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'email_detail',
+        "Viewing email detail id=$email_id sent=" . scalar(@sent_recipients) .
+        " failed=" . scalar(@failed_recipients));
+
+    $c->stash(
+        email_record      => $email_record,
+        workshop          => $email_record->workshop,
+        sent_recipients   => \@sent_recipients,
+        failed_recipients => \@failed_recipients,
+        template          => 'WorkShops/EmailDetail.tt',
     );
 }
 
