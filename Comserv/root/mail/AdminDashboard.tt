@@ -77,7 +77,7 @@
     <div class="function-section" style="background:#f0f8ff;border:1px solid #4a90d9;border-radius:6px;padding:16px;margin-bottom:18px;">
         <h4 style="margin-top:0;">🧪 Send Test Email</h4>
         <p style="margin:0 0 10px;font-size:0.92em;color:#555;">
-            Sends a real test message through the <strong>full unified mail path</strong> (PMG relay 192.168.1.128:25).
+            Sends a real test message through the <strong>full unified mail path</strong> using the site SMTP config (harper.whc.ca:465).
             Check the <a href="/health/recent_errors">application log</a> for the SMTP transcript if it fails.
         </p>
         <form method="get" action="[% c.uri_for('/mail/send_test_email') %]" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
