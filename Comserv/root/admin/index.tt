@@ -238,6 +238,14 @@
             </div>
             <div class="section-content">
                 <div class="admin-links">
+                    <a href="[% c.uri_for('/admin/infrastructure') %]" class="admin-link">
+                        <i class="fas fa-dharmachakra"></i>
+                        <span>Kubernetes Clusters</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/docker-containers') %]" class="admin-link">
+                        <i class="fas fa-docker"></i>
+                        <span>Docker Containers</span>
+                    </a>
                     <a href="[% c.uri_for('/proxmox') %]" class="admin-link">
                         <i class="fas fa-server"></i>
                         <span>Proxmox VM Management</span>
@@ -245,6 +253,42 @@
                     <a href="[% c.uri_for('/proxmox_servers') %]" class="admin-link">
                         <i class="fas fa-hdd"></i>
                         <span>Proxmox Server Management</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-section theme-section">
+            <div class="section-header">
+                <h3><i class="fas fa-folder-open"></i> File Management</h3>
+            </div>
+            <div class="section-content">
+                <div class="admin-links">
+                    <a href="[% c.uri_for('/file/admin_browser') %]" class="admin-link">
+                        <i class="fas fa-sitemap"></i>
+                        <span>Admin Browser</span>
+                    </a>
+                    <a href="[% c.uri_for('/file/list') %]" class="admin-link">
+                        <i class="fas fa-list"></i>
+                        <span>File List</span>
+                    </a>
+                    <a href="[% c.uri_for('/file/upload_file') %]" class="admin-link">
+                        <i class="fas fa-upload"></i>
+                        <span>Upload File</span>
+                    </a>
+                    <a href="[% c.uri_for('/file/duplicates') %]" class="admin-link">
+                        <i class="fas fa-copy"></i>
+                        <span>Duplicate Files</span>
+                    </a>
+                    [% IF c.session.SiteName == 'CSC' %]
+                    <a href="[% c.uri_for('/file/nfs_allocations') %]" class="admin-link">
+                        <i class="fas fa-network-wired"></i>
+                        <span>NFS Allocations</span>
+                    </a>
+                    [% END %]
+                    <a href="[% c.uri_for('/admin/planning') %]" class="admin-link">
+                        <i class="fas fa-tasks"></i>
+                        <span>Implementation Plan</span>
                     </a>
                 </div>
             </div>

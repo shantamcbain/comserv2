@@ -1,0 +1,100 @@
+[% META
+   title = "File Details"
+   description = "View details of a file record in the database"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "FileManagement"
+   page_version = "0.01"
+   last_updated = "2026-02-28"
+%]
+[% PageVersion = 'file/FileView.tt,v 0.01 2026/02/28 AI Exp AI ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+
+  <div class="page-header">
+    <h1>File Details</h1>
+  </div>
+
+  [% IF error_msg %]
+  <div class="error">[% error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.error_msg %]
+  <div class="error">[% c.flash.error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.success_msg %]
+  <div class="success">[% c.flash.success_msg | html %]</div>
+  [% END %]
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      [% IF file.is_duplicate %]
+      <div class="content-section">
+        <p class="badge-duplicate">This file is a duplicate.</p>
+        [% IF original_file %]
+        <p>Original file: <a href="[% c.uri_for('/file/view', original_file.id) %]">[% original_file.file_name | html %]</a> (ID: [% original_file.id | html %])</p>
+        [% ELSE %]
+        <p>Original file ID: [% file.duplicate_of | html %] (not accessible or deleted)</p>
+        [% END %]
+      </div>
+      [% END %]
+
+      <div class="content-section">
+        <h3>File Information</h3>
+        <div class="table-container">
+          <table class="data-table">
+            <tbody>
+              <tr><th>ID</th><td>[% file.id | html %]</td></tr>
+              <tr><th>File Name</th><td>[% file.file_name | html %]</td></tr>
+              <tr><th>File Type</th><td>[% file.file_type | html %]</td></tr>
+              <tr><th>File Format</th><td>[% file.file_format | html %]</td></tr>
+              <tr><th>File Size</th><td>[% file.file_size | html %] bytes</td></tr>
+              <tr><th>Status</th><td>[% file.file_status | html %]</td></tr>
+              <tr><th>Access Level</th><td>[% file.access_level | html %]</td></tr>
+              <tr><th>Source Type</th><td>[% file.source_type | html %]</td></tr>
+              <tr><th>SiteName</th><td>[% file.sitename | html %]</td></tr>
+              <tr><th>Description</th><td>[% file.description | html %]</td></tr>
+              <tr><th>File Path</th><td>[% file.file_path | html %]</td></tr>
+              <tr><th>NFS Path</th><td>[% file.nfs_path | html %]</td></tr>
+              <tr><th>File URL</th><td>[% file.file_url | html %]</td></tr>
+              <tr><th>External URL</th><td>[% file.external_url | html %]</td></tr>
+              <tr><th>Upload Date</th><td>[% file.upload_date | html %]</td></tr>
+              <tr><th>User ID</th><td>[% file.user_id | html %]</td></tr>
+              <tr><th>Site ID</th><td>[% file.site_id | html %]</td></tr>
+              <tr><th>Workshop ID</th><td>[% file.workshop_id | html %]</td></tr>
+              <tr><th>Duplicate</th><td>[% IF file.is_duplicate %]Yes (of ID [% file.duplicate_of | html %])[% ELSE %]No[% END %]</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="content-section">
+        <div class="form-actions">
+          <a href="[% c.uri_for('/file/edit', file.id) %]" class="btn btn-primary">Edit</a>
+          <a href="[% c.uri_for('/file/download', file.id) %]" class="btn btn-secondary">Download</a>
+          <a href="[% c.uri_for('/file/list') %]" class="btn btn-secondary">Back to List</a>
+        </div>
+      </div>
+
+      <div class="content-section">
+        <h3>Rename File</h3>
+        <form method="post" action="[% c.uri_for('/file/rename', file.id) %]" class="app-form">
+          <div class="form-row">
+            <div class="form-field">
+              <label for="new_name">New Name:</label>
+              <input type="text" id="new_name" name="new_name"
+                     value="[% file.file_name | html %]" class="form-input">
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Rename</button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</div>

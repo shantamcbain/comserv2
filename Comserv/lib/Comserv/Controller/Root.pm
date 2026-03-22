@@ -9,6 +9,7 @@ use URI;
 use Time::HiRes qw(gettimeofday);
 use Comserv::Util::Logging;
 use Comserv::Util::SystemInfo;
+use Comserv::Util::CSRF;
 
 # Configure static file serving
 __PACKAGE__->config(
@@ -186,6 +187,8 @@ sub get_server_ip :Private {
 sub auto :Private {
     my ($self, $c) = @_;
 
+    Comserv::Util::CSRF::ensure_token($c);
+
     # LAYER 1: Auto Method Protection - wrap entire method in error handling
     eval {
         # Skip database queries for health checks and monitoring endpoints
@@ -281,6 +284,8 @@ sub auto :Private {
             alarm(3);  # 3 second timeout for theme fetch
             my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $SiteName);
             $c->stash->{theme_name} = $theme_name;
+            my $site_favicon = $c->model('ThemeConfig')->get_site_favicon($c, $SiteName);
+            $c->stash->{site_favicon} = $site_favicon if $site_favicon;
             alarm(0);
         };
         alarm(0);  # Make sure alarm is cancelled
@@ -677,9 +682,11 @@ sub auto :Private {
             "system_info->{ip}='" . (defined $system_info->{ip} ? $system_info->{ip} : 'UNDEF') . "', " .
             "db_host='$db_host'");
         
-        # Set server_hostname to the actual database host (primary server)
-        # CRITICAL: Always ensure a non-empty value to prevent blank display in templates
-        my $display_hostname = $db_host ne 'Unknown' ? $db_host : $system_info->{hostname};
+        # Set server_hostname to the Catalyst web server's IP (NOT the database host).
+        # The database host is already shown separately in the Databases section.
+        # system_info->{ip} returns the actual IP of the machine running Catalyst.
+        my $display_hostname = ($system_info->{ip} && $system_info->{ip} ne 'Unknown')
+            ? $system_info->{ip} : $system_info->{hostname};
         # Final safety check - ensure it's never empty or undef
         $display_hostname = 'Unknown' if !$display_hostname || $display_hostname eq '';
         
@@ -1774,7 +1781,21 @@ sub begin :Private {
 
 sub end : ActionClass('RenderView') {
     my ($self, $c) = @_;
-    
+
+    # Never try to render a template for redirect or no-content responses
+    my $status = $c->response->status || 0;
+    if ($status >= 300 && $status < 400) {
+        return;
+    }
+    if ($status == 204) {
+        return;
+    }
+    # Also skip if a JSON/non-HTML body has already been set
+    if ($c->response->body && $c->response->content_type &&
+        $c->response->content_type !~ m{^text/html}i) {
+        return;
+    }
+
     if ($c->res->content_type && $c->res->content_type =~ m{^text/html}i) {
         $c->res->headers->header(
             'Content-Security-Policy' => 

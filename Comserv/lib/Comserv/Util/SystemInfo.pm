@@ -48,6 +48,13 @@ Returns the IP address of the server
 sub get_server_ip {
     my $ip;
     
+    # Method 0: Operator-supplied override via env var.
+    # Used in Docker where the container IP is internal and meaningless to admins.
+    # Set CATALYST_SERVER_IP=192.168.1.x in the .env file alongside docker-compose.
+    if ($ENV{CATALYST_SERVER_IP} && $ENV{CATALYST_SERVER_IP} ne '') {
+        return $ENV{CATALYST_SERVER_IP};
+    }
+    
     # Try multiple methods to get the server IP
     
     # Method 1: Check for Docker environment and get container IP
@@ -176,18 +183,19 @@ Returns the name of the application directory (workflow)
 sub get_app_workflow {
     my ($class, $app_home) = @_;
     
-    # CRITICAL: Ensure we have a valid app_home
     return 'Unknown' if !$app_home;
     
     my $workflow = 'Unknown';
     eval {
-        require File::Spec;
         require File::Basename;
+        require Cwd;
         
-        # If app_home is /home/shanta/PycharmProjects/comserv2/Comserv
-        # catdir(.., '..') gives /home/shanta/PycharmProjects/comserv2
-        # basename gives 'comserv2'
-        $workflow = File::Basename::basename(File::Spec->catdir($app_home, '..'));
+        # Use dirname + abs_path to properly resolve the parent directory
+        # e.g. /home/user/.zenflow/worktrees/workshops-7d21/Comserv -> workshops-7d21
+        # e.g. /opt/comserv -> opt (production Docker)
+        my $parent = File::Basename::dirname($app_home);
+        my $resolved = Cwd::abs_path($parent) || $parent;
+        $workflow = File::Basename::basename($resolved);
     };
     
     return $workflow || 'Unknown';

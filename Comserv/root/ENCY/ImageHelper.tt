@@ -1,0 +1,94 @@
+[%#
+  ENCY/ImageHelper.tt — smart image URL resolution macro + file picker widget.
+
+  INCLUDE ONCE at the top of any ENCY template that displays or edits herb images:
+    [% INCLUDE 'ENCY/ImageHelper.tt' %]
+
+  MACROS PROVIDED:
+    ency_img_src(val)          — returns the display URL for the image column value
+    ency_img_tag(val, w, h)    — renders <img> tag with resolved src
+    ency_img_picker(field, val) — renders edit widget: text field + file picker dropdown
+
+  RESOLUTION ORDER for ency_img_src(val):
+    1. Empty/null        → empty string (no image)
+    2. http:// https://  → use directly (external URL)
+    3. Starts with /     → stream via /file/fs_preview (NFS or server filesystem path)
+    4. Anything else     → treat as relative static path under /static/
+%]
+
+[% MACRO ency_img_src(val) BLOCK %]
+[%- IF val && val.length -%]
+  [%- IF val.match('^https?://') -%]
+[% val %]
+  [%- ELSIF val.match('^/') -%]
+[% c.uri_for('/file/fs_preview', {path => val}) %]
+  [%- ELSE -%]
+[% c.uri_for('/static', [val]) %]
+  [%- END -%]
+[%- END -%]
+[% END %]
+
+[% MACRO ency_img_tag(val, w, h) BLOCK %]
+[% SET src = ency_img_src(val) %]
+[% IF src %]
+<img src="[% src %]"
+     [% IF w %]width="[% w %]"[% END %]
+     [% IF h %]height="[% h %]"[% END %]
+     style="max-width:100%;object-fit:contain"
+     onerror="this.style.display='none'">
+[% ELSE %]
+<span style="color:#aaa;font-size:.85rem">(no image)</span>
+[% END %]
+[% END %]
+
+[% MACRO ency_img_picker(field_name, current_val) BLOCK %]
+<div style="display:flex;flex-direction:column;gap:6px">
+
+  [%# Current value text field — accepts external URL or NFS path %]
+  <input type="text" id="[% field_name %]" name="[% field_name %]"
+         value="[% current_val | html %]"
+         placeholder="https://... or /home/shanta/nfs/..."
+         style="width:100%;max-width:480px;font-size:.88rem"
+         class="form-input"
+         oninput="encyClearPicker('[% field_name %]')">
+  <div style="font-size:.76rem;color:#666">
+    Paste an external URL, an NFS path, or pick a file below.
+  </div>
+
+  [%# File picker — populated from ency_image_files stash var %]
+  [% IF ency_image_files && ency_image_files.size %]
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <label style="font-size:.82rem;font-weight:normal;white-space:nowrap">Pick from files:</label>
+    <select id="[% field_name %]_picker" class="form-input" style="max-width:360px;font-size:.82rem"
+            onchange="encyPickFile('[% field_name %]', this.value)">
+      <option value="">— choose a file —</option>
+      [% FOREACH f IN ency_image_files %]
+      <option value="[% f.nfs_path || f.file_path | html %]">[% f.file_name | html %] ([% f.sitename | html %])</option>
+      [% END %]
+    </select>
+  </div>
+  [% END %]
+
+  [%# Live preview of current value %]
+  [% IF current_val %]
+  <div style="margin-top:4px">
+    [% ency_img_tag(current_val, 120, '') %]
+  </div>
+  [% END %]
+
+</div>
+[% END %]
+
+<script>
+function encyPickFile(fieldName, path) {
+    if (!path) return;
+    var el = document.getElementById(fieldName);
+    if (el) el.value = path;
+    var picker = document.getElementById(fieldName + '_picker');
+    if (picker) picker.value = '';
+}
+function encyClearPicker(fieldName) {
+    var picker = document.getElementById(fieldName + '_picker');
+    if (picker) picker.value = '';
+}
+</script>

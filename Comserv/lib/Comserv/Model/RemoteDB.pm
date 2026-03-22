@@ -116,6 +116,7 @@ sub _load_from_k8s_secrets {
     
     my $home = $ENV{HOME} || '/tmp';
     my @secret_paths = (
+        '/home/comserv/.comserv/secrets',  # Docker mount point (comserv user home)
         "$home/.comserv/secrets",
         "$FindBin::Bin/../secrets",
         '/var/run/secrets/comserv/',
@@ -308,7 +309,8 @@ sub test_connection {
         my $host = $conn_config->{host} // 'localhost';
         my $port = $conn_config->{port} // 3306;
         my $database = $conn_config->{database} // '';
-        $dsn = "dbi:mysql:database=$database;host=$host;port=$port";
+        # Use MariaDB driver (compatible with MySQL)
+        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port";
     }
     
     try {
@@ -573,7 +575,8 @@ sub get_connection {
         my $host = $conn_config->{host} // 'localhost';
         my $port = $conn_config->{port} // 3306;
         my $database = $conn_config->{database} // '';
-        $dsn = "dbi:mysql:database=$database;host=$host;port=$port";
+        # Use MariaDB driver (compatible with MySQL)
+        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port";
     }
     
     try {

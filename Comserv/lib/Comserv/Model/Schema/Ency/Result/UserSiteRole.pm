@@ -1,8 +1,20 @@
 package Comserv::Model::Schema::Ency::Result::UserSiteRole;
 use base 'DBIx::Class::Core';
-use warnings FATAL => 'all';
+
+=head1 NAME
+
+Comserv::Model::Schema::Ency::Result::UserSiteRole - Site-specific user roles
+
+=head1 DESCRIPTION
+
+This table manages site-specific user roles, allowing fine-grained access control
+where users can have different roles on different sites while maintaining
+CSC-level administrative access.
+
+=cut
 
 __PACKAGE__->table('user_site_roles');
+
 __PACKAGE__->add_columns(
     id => {
         data_type => 'integer',
@@ -10,47 +22,57 @@ __PACKAGE__->add_columns(
     },
     user_id => {
         data_type => 'integer',
-        is_nullable => 0,
+        is_foreign_key => 1,
     },
-    role_id => {
+    site_id => {
         data_type => 'integer',
-        is_nullable => 0,
+        is_foreign_key => 1,
+        is_nullable => 1,
     },
-    sitename => {
+    role => {
         data_type => 'varchar',
-        size => 255,
-        is_nullable => 0,
+        size => 50,
     },
-    assigned_at => {
+    granted_by => {
+        data_type => 'integer',
+        is_foreign_key => 1,
+        is_nullable => 1,
+    },
+    granted_at => {
         data_type => 'timestamp',
         default_value => \'CURRENT_TIMESTAMP',
-        is_nullable => 0,
     },
-    assigned_by => {
-        data_type => 'integer',
+    expires_at => {
+        data_type => 'timestamp',
         is_nullable => 1,
+    },
+    is_active => {
+        data_type => 'boolean',
+        default_value => 1,
     },
 );
 
 __PACKAGE__->set_primary_key('id');
-__PACKAGE__->add_unique_constraint(['user_id', 'role_id', 'sitename']);
 
-__PACKAGE__->belongs_to(
-    'user' => 'Comserv::Model::Schema::Ency::Result::User',
-    'user_id',
-    { on_delete => 'cascade' }
+__PACKAGE__->add_unique_constraint(
+    'user_site_role_unique' => ['user_id', 'site_id', 'role']
 );
 
 __PACKAGE__->belongs_to(
-    'role' => 'Comserv::Model::Schema::Ency::Result::SiteRole',
-    'role_id',
-    { on_delete => 'cascade' }
+    user => 'Comserv::Model::Schema::Ency::Result::User',
+    'user_id'
 );
 
 __PACKAGE__->belongs_to(
-    'assigner' => 'Comserv::Model::Schema::Ency::Result::User',
-    'assigned_by',
-    { join_type => 'left', on_delete => 'set null' }
+    site => 'Comserv::Model::Schema::Ency::Result::Site',
+    'site_id',
+    { join_type => 'left' }
+);
+
+__PACKAGE__->belongs_to(
+    granted_by_user => 'Comserv::Model::Schema::Ency::Result::User',
+    'granted_by',
+    { join_type => 'left' }
 );
 
 1;

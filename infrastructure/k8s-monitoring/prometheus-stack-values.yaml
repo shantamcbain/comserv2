@@ -1,0 +1,286 @@
+# Helm values for kube-prometheus-stack
+# Chart: prometheus-community/kube-prometheus-stack
+# Version: 56.0+ (latest as of Feb 2026)
+#
+# Deploy with:
+# helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+# helm repo update
+# helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+#   --namespace monitoring --create-namespace \
+#   --values prometheus-stack-values.yaml
+
+# Global settings
+fullnameOverride: "kube-prometheus-stack"
+
+# Prometheus Operator configuration
+prometheusOperator:
+  enabled: true
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Prometheus server configuration
+prometheus:
+  enabled: true
+  prometheusSpec:
+    # Retention period for metrics
+    retention: 30d
+    retentionSize: "9GB"
+    
+    # Storage configuration - use persistent volume
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+    
+    # Resource limits
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+    
+    # Enable service monitors for automatic metric discovery
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    
+    # External labels (useful for multi-cluster federation)
+    externalLabels:
+      cluster: "comserv-k8s-cluster"
+      environment: "production"
+      location: "192.168.1.50"
+  
+  # Service configuration - expose via NodePort
+  service:
+    type: NodePort
+    nodePort: 30090
+    port: 9090
+
+# Grafana configuration
+grafana:
+  enabled: true
+  
+  # Admin credentials (CHANGE THESE AFTER FIRST LOGIN)
+  adminPassword: "change-me-immediately"
+  
+  # Persistence for dashboards and settings
+  persistence:
+    enabled: true
+    size: 1Gi
+  
+  # Resource limits
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  
+  # Service configuration - expose via NodePort
+  service:
+    type: NodePort
+    nodePort: 30300
+    port: 80
+  
+  # Pre-installed datasources
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          url: http://kube-prometheus-stack-prometheus:9090
+          access: proxy
+          isDefault: true
+          jsonData:
+            timeInterval: 30s
+  
+  # Pre-installed dashboards
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+  
+  # Import community dashboards automatically
+  dashboards:
+    default:
+      # Kubernetes cluster monitoring dashboard
+      kubernetes-cluster:
+        gnetId: 7249
+        revision: 1
+        datasource: Prometheus
+      
+      # Node exporter dashboard
+      node-exporter:
+        gnetId: 1860
+        revision: 31
+        datasource: Prometheus
+      
+      # Pod metrics dashboard
+      kubernetes-pod-monitoring:
+        gnetId: 6417
+        revision: 1
+        datasource: Prometheus
+      
+      # Persistent volumes dashboard
+      kubernetes-persistent-volumes:
+        gnetId: 13646
+        revision: 2
+        datasource: Prometheus
+
+# Alertmanager configuration
+alertmanager:
+  enabled: true
+  
+  alertmanagerSpec:
+    # Storage for alert history
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi
+    
+    # Resource limits
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  
+  # Alertmanager configuration
+  config:
+    global:
+      resolve_timeout: 5m
+    
+    route:
+      group_by: ['alertname', 'cluster', 'service']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 12h
+      receiver: 'default'
+      routes:
+        - match:
+            alertname: Watchdog
+          receiver: 'null'
+        - match:
+            severity: critical
+          receiver: 'critical'
+    
+    receivers:
+      - name: 'null'
+      - name: 'default'
+        # TODO: Configure email/Slack/webhook here
+        # email_configs:
+        #   - to: 'alerts@example.com'
+        #     from: 'alertmanager@example.com'
+        #     smarthost: 'smtp.example.com:587'
+        #     auth_username: 'alertmanager@example.com'
+        #     auth_password: 'password'
+      - name: 'critical'
+        # TODO: Configure pager/SMS for critical alerts
+
+# Node exporter - collects node-level metrics
+nodeExporter:
+  enabled: true
+  resources:
+    limits:
+      cpu: 100m
+      memory: 64Mi
+    requests:
+      cpu: 50m
+      memory: 32Mi
+
+# Kube-state-metrics - collects K8s object metrics
+kubeStateMetrics:
+  enabled: true
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+# Prometheus adapter for custom metrics API (optional, for HPA)
+prometheusAdapter:
+  enabled: false
+
+# Default rules and alerts
+defaultRules:
+  create: true
+  rules:
+    alertmanager: true
+    etcd: true
+    configReloaders: true
+    general: true
+    k8s: true
+    kubeApiserver: true
+    kubeApiserverAvailability: true
+    kubeApiserverBurnrate: true
+    kubeApiserverHistogram: true
+    kubeApiserverSlos: true
+    kubelet: true
+    kubeProxy: true
+    kubePrometheusGeneral: true
+    kubePrometheusNodeRecording: true
+    kubernetesApps: true
+    kubernetesResources: true
+    kubernetesStorage: true
+    kubernetesSystem: true
+    kubeScheduler: true
+    kubeStateMetrics: true
+    network: true
+    node: true
+    nodeExporterAlerting: true
+    nodeExporterRecording: true
+    prometheus: true
+    prometheusOperator: true
+
+# Additional scrape configs (optional - for non-K8s services)
+prometheus:
+  prometheusSpec:
+    additionalScrapeConfigs:
+      # Example: Scrape ProxySQL metrics (Phase 1)
+      - job_name: 'proxysql'
+        static_configs:
+          - targets: ['192.168.1.210:42004']
+        metrics_path: '/metrics'
+      
+      # Example: Scrape MySQL metrics (Phase 1)
+      - job_name: 'mysql-master'
+        static_configs:
+          - targets: ['192.168.1.199:9104']
+        metrics_path: '/metrics'
+      
+      - job_name: 'mysql-replica'
+        static_configs:
+          - targets: ['192.168.1.200:9104']
+        metrics_path: '/metrics'
+      
+      # Example: Scrape Redis metrics (Phase 2)
+      - job_name: 'redis'
+        static_configs:
+          - targets: ['192.168.1.220:9121', '192.168.1.221:9121', '192.168.1.222:9121']
+        metrics_path: '/metrics'

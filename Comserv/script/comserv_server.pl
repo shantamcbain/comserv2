@@ -157,6 +157,44 @@ if ($ENV{CATALYST_DEBUG}) {
     }
 }
 
+# Prevent dev auto-restart loops caused by log file writes.
+# If -r/--restart is used without an explicit restart regex, enforce one that
+# excludes any path under log/logs directories.
+sub _apply_safe_restart_defaults {
+    my @args = @_;
+
+    my $has_restart = 0;
+    my $has_restart_regex = 0;
+
+    for (my $i = 0; $i < @args; $i++) {
+        my $arg = $args[$i];
+
+        if ($arg eq '-r' || $arg eq '--restart') {
+            $has_restart = 1;
+        }
+
+        if ($arg eq '-rr' || $arg eq '--restart_regex') {
+            $has_restart_regex = 1;
+            $i++ if $i + 1 < @args;
+            next;
+        }
+
+        if ($arg =~ /^-rr=/ || $arg =~ /^--restart_regex=/) {
+            $has_restart_regex = 1;
+        }
+    }
+
+    if ($has_restart && !$has_restart_regex) {
+        my $safe_restart_regex =
+            '^(?!.*(?:^|[\\/])logs?(?:[\\/]|$)).*\\.(?:pm|pl|psgi|tt|tt2|tmpl|yml|yaml|conf|css|js)$';
+        push @args, ('--restart_regex', $safe_restart_regex);
+    }
+
+    return @args;
+}
+
+@ARGV = _apply_safe_restart_defaults(@ARGV);
+
 Catalyst::ScriptRunner->run('Comserv', 'Server');
 
 1;
@@ -209,4 +247,3 @@ This library is free software. You can redistribute it and/or modify
 it under the same terms as Perl itself.
 
 =cut
-

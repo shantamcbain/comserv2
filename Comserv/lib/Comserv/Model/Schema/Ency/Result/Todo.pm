@@ -139,6 +139,34 @@ __PACKAGE__->add_columns(
         data_type => 'time',
         is_nullable => 1,
     },
+    "date_time_posted",
+    { data_type => "varchar", default_value => "", is_nullable => 1, size => 30 },
+    plan_id => {
+        data_type => 'integer',
+        is_nullable => 1,
+    },
+    blocked_by_todo_id => {
+        data_type => 'integer',
+        is_nullable => 1,
+    },
+    parent_id => {
+        data_type => 'integer',
+        is_nullable => 1,
+    },
+    sort_order => {
+        data_type => 'integer',
+        default_value => 0,
+        is_nullable => 0,
+    },
+    is_blocking => {
+        data_type => 'boolean',
+        default_value => 0,
+        is_nullable => 0,
+    },
+    scheduled_date => {
+        data_type => 'date',
+        is_nullable => 1,
+    },
 );
 
 __PACKAGE__->set_primary_key('record_id');
@@ -195,7 +223,7 @@ sub get_all_subtodos {
     my ($self, $depth) = @_;
     $depth ||= 0;
     return [] if $depth > 10;
-    
+
     my @result;
     my @children = $self->subtodos->all;
     foreach my $child (@children) {
@@ -210,13 +238,13 @@ sub get_blocking_chain {
     $visited ||= {};
     return [] if $visited->{$self->record_id};
     $visited->{$self->record_id} = 1;
-    
+
     my @chain;
     if ($self->blocker) {
         push @chain, $self->blocker;
         push @chain, @{$self->blocker->get_blocking_chain($visited)};
     }
-    
+
     my @deps = $self->dependent_dependencies->search({ dependency_type => 'blocks' })->all;
     foreach my $dep (@deps) {
         my $blocker = $dep->blocking_todo;
@@ -224,7 +252,7 @@ sub get_blocking_chain {
         push @chain, $blocker;
         push @chain, @{$blocker->get_blocking_chain($visited)};
     }
-    
+
     return \@chain;
 }
 

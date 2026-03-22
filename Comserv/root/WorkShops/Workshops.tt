@@ -1,0 +1,329 @@
+[% META 
+   title = "Workshops"
+   description = "Workshop listing and management page"
+   roles = "public"
+   TemplateType = "Application"
+   category = "WorkShops"
+   page_version = "0.06"
+   last_updated = "2026-02-16"
+%]
+
+[% PageVersion = 'WorkShops/Workshops.tt,v 0.06 2026/02/16 shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    
+    <div class="page-header">
+        <h1>Workshops</h1>
+    </div>
+    
+    <div class="content-container">
+        
+        <div class="content-primary">
+            
+            [% IF c.flash.success_msg %]
+                <div class="success">[% c.flash.success_msg %]</div>
+            [% END %]
+            
+            [% IF c.flash.error_msg %]
+                <div class="error">[% c.flash.error_msg %]</div>
+            [% END %]
+            
+            <div class="form-actions">
+                <a href="/workshop/add" class="btn btn-primary">Add Workshop</a>
+                [% IF can_access_dashboard %]
+                <a href="/workshop/dashboard" class="btn btn-secondary">My Dashboard</a>
+                [% END %]
+            </div>
+            
+            <details class="filter-container" style="margin-bottom: 15px; border: 1px solid #ddd; border-radius: 4px;">
+                <summary style="padding: 10px; cursor: pointer; background: #f8f9fa; font-weight: bold; user-select: none;">
+                    🔍 Filters [% IF c.request.params.site_filter || c.request.params.status_filter || c.request.params.date_from || c.request.params.date_to %](Active)[% END %]
+                </summary>
+                <form method="GET" action="/workshop" class="app-form" style="padding: 10px;">
+                    <div class="form-row" style="gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                        <div class="form-field" style="flex: 0 1 180px;">
+                            <label for="site_filter" style="font-size: 0.9em;">Site:</label>
+                            <select name="site_filter" id="site_filter" class="form-input">
+                                <option value="">All Sites</option>
+                                <option value="public" [% IF c.request.params.site_filter == 'public' %]selected[% END %]>Public</option>
+                                <option value="my_site" [% IF c.request.params.site_filter == 'my_site' %]selected[% END %]>My Site</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-field" style="flex: 0 1 180px;">
+                            <label for="status_filter" style="font-size: 0.9em;">Status:</label>
+                            <select name="status_filter" id="status_filter" class="form-input">
+                                <option value="">All Statuses</option>
+                                <option value="draft" [% IF c.request.params.status_filter == 'draft' %]selected[% END %]>Draft</option>
+                                <option value="published" [% IF c.request.params.status_filter == 'published' %]selected[% END %]>Published</option>
+                                <option value="registration_closed" [% IF c.request.params.status_filter == 'registration_closed' %]selected[% END %]>Reg. Closed</option>
+                                <option value="in_progress" [% IF c.request.params.status_filter == 'in_progress' %]selected[% END %]>In Progress</option>
+                                <option value="completed" [% IF c.request.params.status_filter == 'completed' %]selected[% END %]>Completed</option>
+                                <option value="cancelled" [% IF c.request.params.status_filter == 'cancelled' %]selected[% END %]>Cancelled</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-field" style="flex: 0 1 140px;">
+                            <label for="date_from" style="font-size: 0.9em;">From:</label>
+                            <input type="date" name="date_from" id="date_from" value="[% c.request.params.date_from || '' %]" class="form-input">
+                        </div>
+                        
+                        <div class="form-field" style="flex: 0 1 140px;">
+                            <label for="date_to" style="font-size: 0.9em;">To:</label>
+                            <input type="date" name="date_to" id="date_to" value="[% c.request.params.date_to || '' %]" class="form-input">
+                        </div>
+                        
+                        <div class="form-field" style="flex: 0 0 auto;">
+                            <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+                            <a href="/workshop" class="btn btn-secondary btn-sm">Clear</a>
+                        </div>
+                    </div>
+                </form>
+            </details>
+            
+            <div class="data-container">
+                <h2>Active Workshops</h2>
+                
+                [% IF workshops.size > 0 %]
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>SiteName</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>End Time</th>
+                                <th>Location</th>
+                                <th>Title</th>
+                                [% IF can_access_dashboard %]
+                                <th>Leader</th>
+                                [% END %]
+                                <th>Participants</th>
+                                <th>Status</th>
+                                <th>Site Sharing</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% FOREACH workshop IN workshops %]
+                            <tr>
+                                <td>[% workshop.sitename %]</td>
+                                <td>[% workshop.date.split(' ').0 %]</td>
+                                <td>[% workshop.time %]</td>
+                                <td>[% workshop.end_time %]</td>
+                                <td>[% workshop.location %]</td>
+                                <td>[% workshop.title %]</td>
+                                [% IF can_access_dashboard %]
+                                <td>
+                                    [% IF workshop.creator && workshop.created_by %]
+                                        <a href="/user/edit_user/[% workshop.created_by %]">[% workshop.creator.first_name %] [% workshop.creator.last_name %]</a>
+                                    [% ELSIF workshop.created_by %]
+                                        <a href="/user/edit_user/[% workshop.created_by %]">User ID: [% workshop.created_by %]</a>
+                                    [% ELSE %]
+                                        [% workshop.instructor || 'N/A' %]
+                                    [% END %]
+                                </td>
+                                [% END %]
+                                <td>
+                                    [% 
+                                        current = workshop.current_participants || 0;
+                                        max = workshop.max_participants || 0;
+                                        is_full = max > 0 && current >= max;
+                                    %]
+                                    [% IF max > 0 %]
+                                        [% IF is_full %]
+                                            <span class="badge badge-danger">🔴 Full ([% current %]/[% max %])</span>
+                                        [% ELSIF current >= (max * 0.8) %]
+                                            <span class="badge badge-warning">⚠️ Almost Full ([% current %]/[% max %])</span>
+                                        [% ELSE %]
+                                            <span class="badge badge-success">✓ [% current %]/[% max %]</span>
+                                        [% END %]
+                                    [% ELSE %]
+                                        [% current %] (Unlimited)
+                                    [% END %]
+                                </td>
+                                <td>
+                                    [% IF workshop.status == 'draft' %]
+                                        <span class="badge badge-secondary">Draft</span>
+                                    [% ELSIF workshop.status == 'published' %]
+                                        <span class="badge badge-success">Published</span>
+                                    [% ELSIF workshop.status == 'registration_closed' %]
+                                        <span class="badge badge-warning">Reg. Closed</span>
+                                    [% ELSIF workshop.status == 'in_progress' %]
+                                        <span class="badge badge-info">In Progress</span>
+                                    [% ELSIF workshop.status == 'completed' %]
+                                        <span class="badge badge-secondary">Completed</span>
+                                    [% ELSIF workshop.status == 'cancelled' %]
+                                        <span class="badge badge-danger">Cancelled</span>
+                                    [% ELSE %]
+                                        <span class="badge badge-secondary">[% workshop.status || 'Unknown' %]</span>
+                                    [% END %]
+                                </td>
+                                <td>
+                                    [% IF workshop.share == 'public' %]
+                                        <span class="badge badge-primary">🌐 All Sites</span>
+                                    [% ELSE %]
+                                        <span class="badge badge-secondary">🔒 My Site</span>
+                                    [% END %]
+                                </td>
+                                <td class="action-cell">
+                                    <form action="/workshop/details" method="GET" style="display:inline;">
+                                        <input type="hidden" name="id" value="[% workshop.id %]">
+                                        <button type="submit" class="btn btn-sm">Details</button>
+                                    </form>
+                                    [% IF c.user_exists && workshop.status == 'published' && !workshop.is_user_registered %]
+                                        [% IF is_full %]
+                                        <form action="/workshop/register" method="POST" style="display:inline;">
+                                            <input type="hidden" name="workshop_id" value="[% workshop.id %]">
+                                            <button type="submit" class="btn btn-sm btn-warning">Join Waitlist</button>
+                                        </form>
+                                        [% ELSE %]
+                                        <form action="/workshop/register" method="POST" style="display:inline;">
+                                            <input type="hidden" name="workshop_id" value="[% workshop.id %]">
+                                            <button type="submit" class="btn btn-sm btn-primary">Register</button>
+                                        </form>
+                                        [% END %]
+                                    [% END %]
+                                    [% IF can_access_dashboard %]
+                                    <form method="GET" action="/workshop/edit/[% workshop.id %]" style="display:inline;">
+                                        <button type="submit" class="btn btn-sm btn-edit">Edit</button>
+                                    </form>
+                                    [% END %]
+                                    [% IF is_admin %]
+                                    <form action="/workshop/delete" method="POST" style="display:inline;">
+                                        <input type="hidden" name="id" value="[% workshop.id %]">
+                                        <button type="submit" class="btn btn-sm btn-delete">Delete</button>
+                                    </form>
+                                    [% END %]
+                                </td>
+                            </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+                [% ELSE %]
+                <div class="empty-state">
+                    <p>No active workshops found.</p>
+                </div>
+                [% END %]
+                
+                [% IF error %]
+                    <div class="error">[% error %]</div>
+                [% END %]
+            </div>
+            
+            <div class="data-container">
+                <details class="priority-container">
+                    <summary class="priority-summary">Past Workshops ([% past_workshops.size || 0 %])</summary>
+                    
+                    [% IF past_workshops.size > 0 %]
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>SiteName</th>
+                                    <th>Date</th>
+                                    <th>Time</th>
+                                    <th>End Time</th>
+                                    <th>Location</th>
+                                    <th>Title</th>
+                                    [% IF can_access_dashboard %]
+                                    <th>Leader</th>
+                                    [% END %]
+                                    <th>Participants</th>
+                                    <th>Status</th>
+                                    <th>Site Sharing</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% FOREACH workshop IN past_workshops %]
+                                <tr>
+                                    <td>[% workshop.sitename %]</td>
+                                    <td>[% workshop.date.split(' ').0 %]</td>
+                                    <td>[% workshop.time %]</td>
+                                    <td>[% workshop.end_time %]</td>
+                                    <td>[% workshop.location %]</td>
+                                    <td>[% workshop.title %]</td>
+                                    [% IF can_access_dashboard %]
+                                    <td>
+                                        [% IF workshop.creator && workshop.created_by %]
+                                            <a href="/user/edit_user/[% workshop.created_by %]">[% workshop.creator.first_name %] [% workshop.creator.last_name %]</a>
+                                        [% ELSIF workshop.created_by %]
+                                            <a href="/user/edit_user/[% workshop.created_by %]">User ID: [% workshop.created_by %]</a>
+                                        [% ELSE %]
+                                            [% workshop.instructor || 'N/A' %]
+                                        [% END %]
+                                    </td>
+                                    [% END %]
+                                    <td>
+                                        [% 
+                                            current = workshop.current_participants || 0;
+                                            max = workshop.max_participants || 0;
+                                        %]
+                                        [% IF max > 0 %]
+                                            [% current %]/[% max %]
+                                        [% ELSE %]
+                                            [% current %] (Unlimited)
+                                        [% END %]
+                                    </td>
+                                    <td>
+                                        [% IF workshop.status == 'draft' %]
+                                            <span class="badge badge-secondary">Draft</span>
+                                        [% ELSIF workshop.status == 'published' %]
+                                            <span class="badge badge-success">Published</span>
+                                        [% ELSIF workshop.status == 'registration_closed' %]
+                                            <span class="badge badge-warning">Reg. Closed</span>
+                                        [% ELSIF workshop.status == 'in_progress' %]
+                                            <span class="badge badge-info">In Progress</span>
+                                        [% ELSIF workshop.status == 'completed' %]
+                                            <span class="badge badge-secondary">Completed</span>
+                                        [% ELSIF workshop.status == 'cancelled' %]
+                                            <span class="badge badge-danger">Cancelled</span>
+                                        [% ELSE %]
+                                            <span class="badge badge-secondary">[% workshop.status || 'Unknown' %]</span>
+                                        [% END %]
+                                    </td>
+                                    <td>
+                                        [% IF workshop.share == 'public' %]
+                                            <span class="badge badge-primary">🌐 Public</span>
+                                        [% ELSE %]
+                                            <span class="badge badge-secondary">🔒 Private</span>
+                                        [% END %]
+                                    </td>
+                                    <td class="action-cell">
+                                        <form action="/workshop/details" method="GET" style="display:inline;">
+                                            <input type="hidden" name="id" value="[% workshop.id %]">
+                                            <button type="submit" class="btn btn-sm">Details</button>
+                                        </form>
+                                        [% IF can_access_dashboard %]
+                                        <form method="GET" action="/workshop/edit/[% workshop.id %]" style="display:inline;">
+                                            <button type="submit" class="btn btn-sm btn-edit">Edit</button>
+                                        </form>
+                                        [% END %]
+                                    </td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                    [% ELSE %]
+                    <div class="empty-state">
+                        <p>No past workshops found.</p>
+                    </div>
+                    [% END %]
+                    
+                    [% IF past_error %]
+                        <div class="error">[% past_error %]</div>
+                    [% END %]
+                </details>
+            </div>
+            
+        </div>
+        
+    </div>
+    
+</div>

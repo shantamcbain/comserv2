@@ -1,0 +1,181 @@
+[% META
+   title = "Delete User"
+   description = "Confirm user account deletion with record disposition options"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Admin"
+   page_version = "0.02"
+   last_updated = "2026-02-24"
+%]
+[% PageVersion = 'user/AdminDeleteUser.tt,v 0.02 2026/02/24 AI Assistant Exp AI Assistant ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+
+    <div class="page-header">
+        <h1>Delete User Account</h1>
+        <h2 class="page-subtitle">
+            [% user.username | html %]
+            [% IF user.first_name || user.last_name %]
+                &mdash; [% user.first_name | html %] [% user.last_name | html %]
+            [% END %]
+            ([% user.email | html %])
+        </h2>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+
+            [% IF error_msg %]
+                <div class="error">[% error_msg | html %]</div>
+            [% END %]
+            [% IF c.flash.error_msg %]
+                <div class="error">[% c.flash.error_msg | html %]</div>
+            [% END %]
+            [% IF c.flash.success_msg %]
+                <div class="success">[% c.flash.success_msg | html %]</div>
+            [% END %]
+
+            <div class="content-section">
+                <div class="error">
+                    <strong>Warning:</strong> This action is permanent and cannot be undone.
+                    All data not reassigned below will be deleted.
+                </div>
+            </div>
+
+            <form method="post" action="[% c.uri_for('/user/do_admin_delete_user', user.id) %]" class="app-form">
+                <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
+
+                [% IF is_csc_admin %]
+
+                <div class="content-section">
+                    <h3>Todos ([% todos.size %])</h3>
+                    [% IF todos.size > 0 %]
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead><tr><th>Description</th><th>Site</th><th>Status</th></tr></thead>
+                                <tbody>
+                                [% FOREACH t IN todos %]
+                                    <tr>
+                                        <td>[% t.description.substr(0, 80) | html %][% IF t.description.length > 80 %]&hellip;[% END %]</td>
+                                        <td>[% t.sitename | html %]</td>
+                                        <td>[% t.status | html %]</td>
+                                    </tr>
+                                [% END %]
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="form-section">
+                            <div class="form-row">
+                                <div class="form-field">
+                                    <label for="todo_action_select">What to do with these todos?</label>
+                                    <select name="todo_action" class="form-input" id="todo_action_select"
+                                            onchange="toggleAssignee('todo_assignee_field', this.value)">
+                                        <option value="delete">Delete all</option>
+                                        <option value="reassign">Reassign to another user</option>
+                                        <option value="flag">Flag for reassignment (assign to me)</option>
+                                    </select>
+                                </div>
+                                <div class="form-field" id="todo_assignee_field" style="display:none">
+                                    <label for="todo_assignee">Reassign todos to:</label>
+                                    <select name="todo_assignee" id="todo_assignee" class="form-input">
+                                        [% FOREACH u IN assignable_users %]
+                                            <option value="[% u.id | html %]">
+                                                [% u.username | html %]
+                                                [% IF u.first_name || u.last_name %]
+                                                    ([% u.first_name | html %] [% u.last_name | html %])
+                                                [% END %]
+                                            </option>
+                                        [% END %]
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    [% ELSE %]
+                        <p class="empty-state">No todos found.</p>
+                    [% END %]
+                </div>
+
+                <div class="content-section">
+                    <h3>AI Conversations ([% ai_convos.size %])</h3>
+                    [% IF ai_convos.size > 0 %]
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead><tr><th>Title</th><th>Created</th></tr></thead>
+                                <tbody>
+                                [% FOREACH conv IN ai_convos %]
+                                    <tr>
+                                        <td>[% conv.title || '(untitled)' | html %]</td>
+                                        <td>[% conv.created_at | html %]</td>
+                                    </tr>
+                                [% END %]
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="form-section">
+                            <div class="form-row">
+                                <div class="form-field">
+                                    <label for="aiconv_action_select">What to do with these AI conversations?</label>
+                                    <select name="aiconv_action" class="form-input" id="aiconv_action_select"
+                                            onchange="toggleAssignee('aiconv_assignee_field', this.value)">
+                                        <option value="delete">Delete all (including messages)</option>
+                                        <option value="reassign">Reassign to another user</option>
+                                        <option value="flag">Flag for reassignment (assign to me)</option>
+                                    </select>
+                                </div>
+                                <div class="form-field" id="aiconv_assignee_field" style="display:none">
+                                    <label for="aiconv_assignee">Reassign conversations to:</label>
+                                    <select name="aiconv_assignee" id="aiconv_assignee" class="form-input">
+                                        [% FOREACH u IN assignable_users %]
+                                            <option value="[% u.id | html %]">
+                                                [% u.username | html %]
+                                                [% IF u.first_name || u.last_name %]
+                                                    ([% u.first_name | html %] [% u.last_name | html %])
+                                                [% END %]
+                                            </option>
+                                        [% END %]
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    [% ELSE %]
+                        <p class="empty-state">No AI conversations found.</p>
+                    [% END %]
+                </div>
+
+                [% ELSE %]
+                    <div class="content-section">
+                        <p>All records belonging to this user (todos, conversations, site roles, tokens) will be permanently deleted.</p>
+                    </div>
+                [% END %]
+
+                <div class="content-section">
+                    <h3>Other Records (always deleted)</h3>
+                    <p>Site roles, API tokens, verification codes, password reset tokens, workshop roles, audit logs, and search history will be permanently deleted.</p>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-delete"
+                            onclick="return confirm('Permanently delete this user and apply the selected record dispositions? This cannot be undone.');">
+                        Confirm Delete
+                    </button>
+                    <a href="[% c.uri_for('/admin/users') %]" class="btn btn-secondary">Cancel</a>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+</div>
+
+<script>
+function toggleAssignee(fieldId, val) {
+    var el = document.getElementById(fieldId);
+    if (el) { el.style.display = (val === 'reassign') ? '' : 'none'; }
+}
+</script>

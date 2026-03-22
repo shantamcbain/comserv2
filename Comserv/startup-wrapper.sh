@@ -41,13 +41,22 @@ else
   exit 2
 fi
 
-# All checks passed, run Starman
-echo "[startup-wrapper] Starting Starman server..."
+# All checks passed, run Starman (Production) or Catalyst Dev Server (Development)
+echo "[startup-wrapper] Starting server in $PLACK_ENV mode..."
 echo "========================================"
 
-exec perl -S starman \
-  --env "$PLACK_ENV" \
-  --listen ":$PORT" \
-  --host 0.0.0.0 \
-  --workers "$WORKERS" \
-  "$CATALYST_HOME/script/comserv_server.psgi"
+if [ "$PLACK_ENV" = "development" ]; then
+  echo "[startup-wrapper] Using Catalyst development server with auto-restart (-r)"
+  exec perl -I"$CATALYST_HOME/lib" "$CATALYST_HOME/script/comserv_server.pl" \
+    -p "$PORT" \
+    -h 0.0.0.0 \
+    -r
+else
+  echo "[startup-wrapper] Using Starman production server"
+  exec perl -S starman \
+    --env "$PLACK_ENV" \
+    --listen ":$PORT" \
+    --host 0.0.0.0 \
+    --workers "$WORKERS" \
+    "$CATALYST_HOME/script/comserv_server.psgi"
+fi

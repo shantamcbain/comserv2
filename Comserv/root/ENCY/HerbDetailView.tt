@@ -7,9 +7,10 @@
     <a href="[% c.uri_for('/ENCY/edit_herb', herb.record_id) %]">Edit Herb</a>
 [% END %]
 
+[% INCLUDE 'ENCY/ImageHelper.tt' %]
 <h1>[% herb.botanical_name %]</h1>
 <p>Common Names: [% herb.common_names %]</p>
-<img src="[% herb.image %]" WIDTH="300" HEIGHT="325" />
+[% ency_img_tag(herb.image, 300, 325) %]
 <p>Pollinator Forage [% herb.apis %]
 <p>Nectar [% herb.nectar %]</p>
 <p>Pollen [% herb.pollen %]</p>
