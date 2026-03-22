@@ -547,85 +547,95 @@ sub edit :Path('/workshop/edit') :Args(1) {
         return;
     }
 
+    my @all_sites = $c->model('DBEncy')->resultset('Site')->search({}, { order_by => 'name' })->all;
+
+    my $raw_date = $workshop->date;
+    my $formatted_date = '';
+    if ($raw_date) {
+        if (ref($raw_date) && $raw_date->can('strftime')) {
+            $formatted_date = $raw_date->strftime('%Y-%m-%d');
+        } else {
+            ($formatted_date = "$raw_date") =~ s/ .*$//;
+        }
+    }
+
     # For GET requests, display the edit form
     if ($c->request->method eq 'GET') {
-        my $raw_date = $workshop->date;
-        my $formatted_date = '';
-        if ($raw_date) {
-            if (ref($raw_date) && $raw_date->can('strftime')) {
-                $formatted_date = $raw_date->strftime('%Y-%m-%d');
-            } else {
-                ($formatted_date = "$raw_date") =~ s/ .*$//;
-            }
-        }
-
         $c->stash(
-            workshop => $workshop,
+            workshop       => $workshop,
             formatted_date => $formatted_date,
-            template => 'WorkShops/Edit.tt'
+            all_sites      => \@all_sites,
+            template       => 'WorkShops/Edit.tt',
         );
         return;
     }
 
     # Handle POST request for updates
     if ($c->request->method eq 'POST') {
-        my $params = $c->request->body_parameters;
-        my $old_share = $workshop->share;
-        my $new_share = $params->{share};
-        
+        my $params    = $c->request->body_parameters;
+        my $old_share = $workshop->share || '';
+        my $new_share = $params->{share} || 'private';
+        my $new_sitename = $params->{sitename} || $workshop->sitename;
+
+        my $err;
         eval {
             $workshop->update({
-                title                => $params->{title},
-                description          => $params->{description},
-                date                 => $params->{date},
-                time                 => $params->{time},
-                end_time             => $params->{end_time},
-                location             => $params->{location},
-                instructor           => $params->{instructor},
-                max_participants     => $params->{max_participants},
-                share                => $new_share,
-                status               => $params->{status},
-                registration_deadline => $params->{registration_deadline},
+                title                 => $params->{title},
+                description           => $params->{description},
+                date                  => $params->{date},
+                time                  => $params->{time},
+                end_time              => $params->{end_time},
+                location              => $params->{location},
+                instructor            => $params->{instructor},
+                max_participants      => $params->{max_participants},
+                share                 => $new_share,
+                status                => $params->{status},
+                registration_deadline => $params->{registration_deadline} || undef,
+                sitename              => $new_sitename,
             });
-            
+
             # Update site_workshop records if share setting changed
             if ($old_share ne $new_share) {
                 my $schema = $c->model('DBEncy');
-                
-                # Delete existing site_workshop records
-                $schema->resultset('SiteWorkshop')->search({
-                    workshop_id => $workshop->id
-                })->delete;
-                
-                # Create new records based on new share setting
+                $schema->resultset('SiteWorkshop')->search({ workshop_id => $workshop->id })->delete;
+
                 if ($new_share eq 'public') {
-                    # Create records for all sites
-                    my @all_sites = $schema->resultset('Site')->all;
                     for my $site (@all_sites) {
                         $schema->resultset('SiteWorkshop')->create({
-                            site_id => $site->id,
-                            workshop_id => $workshop->id,
+                            site_id => $site->id, workshop_id => $workshop->id,
                         });
                     }
                 } else {
-                    # Create record only for workshop's site
-                    if ($workshop->site_id) {
+                    my $site_obj = $schema->resultset('Site')->search({ name => $new_sitename })->first;
+                    if ($site_obj) {
                         $schema->resultset('SiteWorkshop')->create({
-                            site_id => $workshop->site_id,
-                            workshop_id => $workshop->id,
+                            site_id => $site_obj->id, workshop_id => $workshop->id,
                         });
                     }
                 }
             }
         };
+        $err = "$@" if $@;
 
-        if ($@) {
-            $c->stash->{error_msg} = 'Failed to update workshop: ' . $@;
-        } else {
-            $c->flash->{success_msg} = 'Workshop updated successfully.';
-            $c->res->redirect($c->uri_for($self->action_for('index')));
+        if ($err) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit',
+                "Failed to update workshop " . $workshop->id . ": $err");
+            $c->stash(
+                workshop       => $workshop,
+                formatted_date => $formatted_date,
+                all_sites      => \@all_sites,
+                error_msg      => "Failed to update workshop: $err",
+                template       => 'WorkShops/Edit.tt',
+            );
+            $c->forward($c->view('TT'));
             return;
         }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit',
+            "Workshop " . $workshop->id . " updated by user " . ($c->session->{user_id} || 'unknown'));
+        $c->flash->{success_msg} = 'Workshop updated successfully.';
+        $c->res->redirect($c->uri_for($self->action_for('index')));
+        return;
     }
 }
 
