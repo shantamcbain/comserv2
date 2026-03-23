@@ -690,7 +690,7 @@ sub modify :Path('/todo/modify') :Args(1) {
             username_of_poster   => $c->session->{username},
             status               => $form_data->{status},
             priority             => $form_data->{priority},
-            time_of_day          => $form_data->{time_of_day},
+            time_of_day          => ($form_data->{time_of_day} && $form_data->{time_of_day} ne '') ? $form_data->{time_of_day} : undef,
             share                => $form_data->{share} || 0,
             last_mod_by          => $c->session->{username} || 'system',
             last_mod_date        => DateTime->now->ymd,
