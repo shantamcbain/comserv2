@@ -76,7 +76,7 @@ window.onload = function() {
 <label for="status">Status:</label><br>
 <select id="status" name="status">
     [% SET sel_status = status | html %]
-    <option value="1" [% IF sel_status == 1 || sel_status == 'NEW' || sel_status == '1' %]selected[% END %]>NEW</option>
+    <option value="1" [% IF sel_status == 1 || sel_status == 'NEW' || sel_status == '1' || sel_status == 'Pending' %]selected[% END %]>NEW</option>
     <option value="2" [% IF sel_status == 2 || sel_status == 'IN PROGRESS' || sel_status == 'In-Process' || sel_status == '2' %]selected[% END %]>IN PROGRESS</option>
     <option value="3" [% IF sel_status == 3 || sel_status == 'DONE' || sel_status == 'Completed' || sel_status == '3' %]selected[% END %]>DONE</option>
 </select><br>
