@@ -146,7 +146,7 @@ last_updated = '2026/02/08'
     <div style="background:#cce5ff;border:1px solid #004085;border-radius:6px;padding:10px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
         <span style="font-size:0.9em;">
             <strong>📍 YOU ARE HERE:</strong>
-            Step 2 of 7 — <em>Migrate DailyPlan.tt to DB coordinator</em> &nbsp;·&nbsp;
+            Step 2 of 7 — <em>Migrate DailyPlan.tt to DB coordinator</em> (sub-tasks in progress) &nbsp;·&nbsp;
             <a href="#anchor-planning-system-project" style="color:#004085;font-weight:bold;">View full plan status ↓</a>
         </span>
         <span style="font-size:0.82em;color:#004085;">
@@ -1020,7 +1020,15 @@ last_updated = '2026/02/08'
                         <tr style="border-bottom:1px solid var(--border-color);background:var(--bg-secondary);">
                             <td style="padding:6px 10px;font-weight:bold;">2. Migrate DailyPlan.tt to DB coordinator</td>
                             <td style="padding:6px 10px;"><span style="background:#17a2b8;color:#fff;padding:1px 6px;border-radius:3px;">⏳ IN PROGRESS</span></td>
-                            <td style="padding:6px 10px;">DailyPlan.tt now routes by SiteName; CSC-only tabs wrapped. Next: remove hardcoded weekly lists, pull priorities from DB.</td>
+                            <td style="padding:6px 10px;">
+                                ✅ SiteName routing, CSC-only tabs wrapped<br>
+                                ✅ DB active_priorities live (replaces hardcoded lists)<br>
+                                ✅ Gantt tab added (all sites)<br>
+                                ✅ Stale text tabs removed (implementation-plan, completed-tasks)<br>
+                                ⏳ Quick links auto-switch to planning tab (JS fix)<br>
+                                🔜 Move remaining CSC text groups to DB todos then delete<br>
+                                🔜 Sub-project accordion in Planning tab
+                            </td>
                         </tr>
                         <tr style="border-bottom:1px solid var(--border-color);">
                             <td style="padding:6px 10px;">3. Refactor MasterPlanCoordination</td>
@@ -1051,13 +1059,18 @@ last_updated = '2026/02/08'
                 </table>
 
                 <div style="margin-top:12px;padding:10px 14px;background:#d4edda;border:1px solid #28a745;border-radius:4px;font-size:0.9em;">
-                    <strong>▶ Next Step:</strong> <em>Migrate DailyPlan.tt to DB coordinator</em> —
-                    Remove hardcoded weekly task lists from DAILY PRIORITIES tab; replace with DB-pulled todos for the date.
-                    Depends on <code>dailyplan</code> table being populated in production.
+                    <strong>▶ Current sub-tasks (Step 2):</strong>
+                    <ol style="margin:6px 0 0;padding-left:18px;line-height:1.8;">
+                        <li>✅ JS hash fix: clicking <code>#anchor-*</code> quick links now auto-switches to the PLANNING tab</li>
+                        <li>🔜 Move CSC text groups in Planning.tt into DB todos/projects — remove text section once each group is DB-tracked</li>
+                        <li>🔜 Add sub-project accordion to PLANNING tab (todo 510)</li>
+                        <li>🔜 Add plan-project link form to PLANNING tab (todo 511)</li>
+                    </ol>
+                    <p style="margin:8px 0 0;">When all sub-tasks above are ✅, move to Step 3: Refactor MasterPlanCoordination.</p>
                 </div>
             </div>
 
-            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS — Step 2 of 7</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
+            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS — Step 2 of 7 (sub-tasks 1/4 done)</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
             <p><strong>Zenflow Task:</strong> <code>planningsystem-59ae</code> (port 4001) | <strong>Branch:</strong> <code>planningsystem-59ae</code></p>
 
             <p><strong>Objective:</strong> Migrate planning system from text-based files to database-driven dynamic system with role-based access control, audit trails, and integration with project management.</p>
