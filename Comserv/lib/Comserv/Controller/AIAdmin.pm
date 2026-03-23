@@ -17,7 +17,8 @@ sub models :Path('/ai/admin/models') :Args(0) {
     my ($self, $c) = @_;
     
     my $_roles = $c->session->{roles} || []; my $_is_admin = (ref($_roles) ? grep { lc($_) eq 'admin' } @$_roles : 0) || $c->session->{is_admin}; unless ($_is_admin) {
-        $c->response->redirect($c->uri_for('/'));
+        $c->flash->{error_msg} = 'You must be an administrator to access this area.';
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
     

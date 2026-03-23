@@ -1,0 +1,481 @@
+[% META 
+   title = "Tables without Result Files - Database Schema Comparison"
+   description = "Display database tables that do not have corresponding result files"
+   roles = "admin,developer"
+   TemplateType = "Application"
+   category = "Database Administration"
+   page_version = "1.0"
+   last_updated = "Mon Oct 20 08:47:30 PM PDT 2025 AI_Assistant Initial_Creation"
+%]
+
+[% PageVersion = 'admin/tables_without_result.tt,v 1.0 2025/10/20 AI_Assistant Initial_Creation' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    <div class="page-header">
+        <h1><i class="fas fa-table"></i> Tables without Result Files</h1>
+        <div class="page-actions">
+            <span class="context-item"><strong>Database:</strong> [% database_name || 'Unknown' %]</span>
+            <span class="context-item"><strong>Status:</strong> Active</span>
+            <button type="button" class="btn btn-secondary" onclick="history.back()">
+                <i class="fas fa-arrow-left"></i> Back to Schema Comparison
+            </button>
+        </div>
+    </div>
+    
+    <div class="content-container">
+        <div class="content-primary">
+            <p class="intro">Database tables that exist but do not have corresponding result files. These tables may need result files created or may be legacy tables that are no longer needed.</p>
+            
+            <!-- Statistics Summary -->
+            <div class="data-container">
+                <div class="stat-card">
+                    <div class="stat-icon missing"><i class="fas fa-table"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">Tables Missing Results</span>
+                        <span class="stat-number">[% tables_without_results.size || 0 %]</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon action"><i class="fas fa-tools"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">Action Required</span>
+                        <span class="stat-number">[% tables_without_results.size || 0 %]</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon records"><i class="fas fa-list-ol"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">Total Records</span>
+                        <span class="stat-number">[% total_record_count || 0 %]</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tables without Result Files Container -->
+            <div class="data-container">
+                [% IF tables_without_results.size > 0 %]
+                    <div class="bulk-actions">
+                        <div class="bulk-actions-header">
+                            <h3>Bulk Actions</h3>
+                            <div class="bulk-actions-controls">
+                                <button class="btn btn-secondary" onclick="selectAllTables()">
+                                    <i class="fas fa-check-square"></i> Select All
+                                </button>
+                                <button class="btn btn-secondary" onclick="deselectAllTables()">
+                                    <i class="fas fa-square"></i> Deselect All
+                                </button>
+                                <button class="btn btn-primary" onclick="createResultsForSelected()">
+                                    <i class="fas fa-file-plus"></i> Create Results for Selected
+                                </button>
+                                <button class="btn btn-warning" onclick="analyzeSelectedTables()">
+                                    <i class="fas fa-search"></i> Analyze Selected
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    [% FOREACH table_info IN tables_without_results %]
+                        <div class="table-info-card" data-table="[% table_info.name | html %]" data-database="[% database_key %]">
+                            <div class="table-info-header">
+                                <div class="table-selector">
+                                    <input type="checkbox" class="table-checkbox" value="[% table_info.name | html %]" id="table_[% loop.index %]">
+                                    <label for="table_[% loop.index %]" class="sr-only">Select [% table_info.name | html %]</label>
+                                </div>
+                                <div class="table-info-main">
+                                    <div class="table-title">
+                                        <i class="fas fa-table"></i>
+                                        <h3>[% table_info.name | html %]</h3>
+                                        [% IF table_info.table_type %]
+                                            <span class="table-type-badge">[% table_info.table_type | html %]</span>
+                                        [% END %]
+                                        [% IF table_info.is_system_table %]
+                                            <span class="system-table-badge">System</span>
+                                        [% END %]
+                                    </div>
+                                    <div class="table-meta">
+                                        [% IF table_info.record_count.defined %]
+                                            <span class="meta-item">
+                                                <i class="fas fa-list-ol"></i> [% table_info.record_count %] records
+                                            </span>
+                                        [% END %]
+                                        [% IF table_info.field_count %]
+                                            <span class="meta-item">
+                                                <i class="fas fa-columns"></i> [% table_info.field_count %] fields
+                                            </span>
+                                        [% END %]
+                                        [% IF table_info.created_date %]
+                                            <span class="meta-item">
+                                                <i class="fas fa-calendar-plus"></i> Created [% table_info.created_date %]
+                                            </span>
+                                        [% END %]
+                                        [% IF table_info.last_modified %]
+                                            <span class="meta-item">
+                                                <i class="fas fa-clock"></i> Modified [% table_info.last_modified %]
+                                            </span>
+                                        [% END %]
+                                    </div>
+                                </div>
+                                <div class="table-actions">
+                                    <button class="action-btn primary" onclick="createResultFile('[% table_info.name | html %]', '[% database_key %]')" title="Create result file for this table">
+                                        <i class="fas fa-file-plus"></i> Create Result
+                                    </button>
+                                    <button class="action-btn secondary" onclick="viewTableSchema('[% table_info.name | html %]', '[% database_key %]')" title="View table schema">
+                                        <i class="fas fa-eye"></i> View Schema
+                                    </button>
+                                    <button class="action-btn secondary" onclick="analyzeTableUsage('[% table_info.name | html %]', '[% database_key %]')" title="Analyze table usage">
+                                        <i class="fas fa-search"></i> Analyze
+                                    </button>
+                                    <button class="toggle-details-btn" onclick="toggleTableDetails(this)" title="Show/hide table details">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Table Details -->
+                            <div class="table-details" style="display: none;">
+                                [% IF table_info.fields %]
+                                    <div class="field-schema">
+                                        <h4>Table Schema</h4>
+                                        <div class="field-schema-grid">
+                                            <div class="field-schema-header">
+                                                <div class="field-header">Field Name</div>
+                                                <div class="field-header">Data Type</div>
+                                                <div class="field-header">Properties</div>
+                                                <div class="field-header">Default Value</div>
+                                                <div class="field-header">Comment</div>
+                                            </div>
+                                            [% FOREACH field IN table_info.fields %]
+                                                <div class="field-schema-row">
+                                                    <div class="field-name">
+                                                        <i class="fas fa-columns"></i>
+                                                        [% field.name | html %]
+                                                        [% IF field.is_primary_key %]
+                                                            <span class="key-indicator primary" title="Primary Key">PK</span>
+                                                        [% ELSIF field.is_foreign_key %]
+                                                            <span class="key-indicator foreign" title="Foreign Key">FK</span>
+                                                        [% ELSIF field.is_index %]
+                                                            <span class="key-indicator index" title="Indexed">IDX</span>
+                                                        [% END %]
+                                                    </div>
+                                                    <div class="field-type">
+                                                        [% field.data_type | html %]
+                                                        [% IF field.length %]([% field.length %])[% END %]
+                                                    </div>
+                                                    <div class="field-properties">
+                                                        [% IF field.nullable %]<span class="prop nullable">NULL</span>[% ELSE %]<span class="prop not-null">NOT NULL</span>[% END %]
+                                                        [% IF field.auto_increment %]<span class="prop auto-inc">AUTO_INCREMENT</span>[% END %]
+                                                        [% IF field.unique %]<span class="prop unique">UNIQUE</span>[% END %]
+                                                    </div>
+                                                    <div class="field-default">
+                                                        [% IF field.default_value %]
+                                                            <code>[% field.default_value | html %]</code>
+                                                        [% ELSE %]
+                                                            <span class="no-default">None</span>
+                                                        [% END %]
+                                                    </div>
+                                                    <div class="field-comment">
+                                                        [% IF field.comment %]
+                                                            [% field.comment | html %]
+                                                        [% ELSE %]
+                                                            <span class="no-comment">No comment</span>
+                                                        [% END %]
+                                                    </div>
+                                                </div>
+                                            [% END %]
+                                        </div>
+                                    </div>
+                                [% END %]
+                            </div>
+                        </div>
+                    [% END %]
+                [% ELSE %]
+                    <div class="empty-state">
+                        <i class="fas fa-table"></i>
+                        <h3>All Tables Have Result Files</h3>
+                        <p>Every table in the current database has a corresponding result file.</p>
+                    </div>
+                [% END %]
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.table-info-card {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-md);
+    background-color: var(--surface-primary);
+    transition: all 0.2s ease;
+}
+
+.table-info-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+}
+
+.table-info-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.table-title {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
+}
+
+.table-title h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: var(--text-lg);
+}
+
+.table-type-badge {
+    background-color: var(--secondary);
+    color: white;
+    padding: 2px 8px;
+    border-radius: var(--border-radius-full);
+    font-size: var(--text-xs);
+    font-weight: 600;
+}
+
+.system-table-badge {
+    background-color: var(--warning);
+    color: var(--text-primary);
+    padding: 2px 8px;
+    border-radius: var(--border-radius-full);
+    font-size: var(--text-xs);
+    font-weight: 600;
+}
+
+.table-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+}
+
+.table-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    flex-shrink: 0;
+}
+
+.action-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    background-color: var(--surface-primary);
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: var(--text-sm);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.action-btn.primary {
+    background-color: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.action-btn.secondary {
+    background-color: var(--secondary);
+    color: white;
+    border-color: var(--secondary);
+}
+
+.toggle-details-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: var(--spacing-xs);
+    transition: transform 0.2s ease;
+}
+
+.table-details {
+    border-top: 1px solid var(--border-color);
+    padding: var(--spacing-md);
+    background-color: var(--surface-secondary);
+}
+
+.field-schema-grid {
+    display: grid;
+    grid-template-columns: 2fr 1.5fr 2fr 1fr 2fr;
+    gap: 1px;
+    background-color: var(--border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.field-schema-grid > div {
+    background-color: var(--surface-primary);
+    padding: var(--spacing-sm);
+}
+
+.field-header {
+    background-color: var(--surface-secondary);
+    font-weight: 600;
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.field-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.key-indicator {
+    font-size: var(--text-xs);
+    padding: 1px 4px;
+    border-radius: var(--border-radius-sm);
+    font-weight: 700;
+    margin-left: var(--spacing-xs);
+}
+
+.key-indicator.primary {
+    background-color: var(--primary);
+    color: white;
+}
+
+.key-indicator.foreign {
+    background-color: var(--secondary);
+    color: white;
+}
+
+.key-indicator.index {
+    background-color: var(--success);
+    color: white;
+}
+
+.prop {
+    display: inline-block;
+    font-size: var(--text-xs);
+    padding: 2px 6px;
+    border-radius: var(--border-radius-sm);
+    background-color: var(--surface-secondary);
+    color: var(--text-muted);
+    margin-right: var(--spacing-xs);
+}
+
+.prop.not-null {
+    background-color: var(--success);
+    color: white;
+}
+
+.prop.nullable {
+    background-color: var(--warning);
+    color: white;
+}
+
+.prop.auto-inc {
+    background-color: var(--primary);
+    color: white;
+}
+
+.prop.unique {
+    background-color: var(--info);
+    color: white;
+}
+
+.bulk-actions {
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-md);
+    background-color: var(--surface-secondary);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+}
+
+.bulk-actions-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+}
+
+.bulk-actions-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+</style>
+
+<script>
+function toggleTableDetails(button) {
+    const card = button.closest('.table-info-card');
+    const details = card.querySelector('.table-details');
+    const isExpanded = details.style.display !== 'none';
+    
+    if (isExpanded) {
+        details.style.display = 'none';
+        button.classList.remove('expanded');
+    } else {
+        details.style.display = 'block';
+        button.classList.add('expanded');
+    }
+}
+
+function createResultFile(tableName, databaseKey) {
+    if (!confirm(`Create a result file for table "${tableName}"?`)) {
+        return;
+    }
+    
+    const button = event.target.closest('.action-btn');
+    const originalContent = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+    button.disabled = true;
+    
+    fetch('/admin/schema_comparison/create_result_file', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            table: tableName,
+            database: databaseKey
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const card = button.closest('.table-info-card');
+            card.style.opacity = '0.5';
+            card.style.pointerEvents = 'none';
+        } else {
+            button.innerHTML = originalContent;
+            button.disabled = false;
+        }
+    })
+    .catch(error => {
+        button.innerHTML = originalContent;
+        button.disabled = false;
+    });
+}
+
+function selectAllTables() {
+    document.querySelectorAll('.table-checkbox').forEach(checkbox => checkbox.checked = true);
+}
+
+function deselectAllTables() {
+    document.querySelectorAll('.table-checkbox').forEach(checkbox => checkbox.checked = false);
+}
+</script>

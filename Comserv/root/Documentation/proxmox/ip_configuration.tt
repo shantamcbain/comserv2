@@ -1,0 +1,865 @@
+[% PageVersion = 'Comserv/root/Documentation/proxmox/ip_configuration.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Proxmox IP Address Configuration Guide' %]
+
+<!-- Documentation page for ip_configuration -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+This document provides detailed instructions for configuring IP addresses in Proxmox VE environments, covering both the host system and guest virtual machines/containers.
+
+
+
+<h2>Table of Contents</h2>
+
+
+
+<ol><li><a href="#host-system-ip-configuration">Host System IP Configuration</a></li></ol>
+
+<ol><li><a href="#container-lxc-ip-configuration">Container (LXC) IP Configuration</a></li></ol>
+
+<ol><li><a href="#virtual-machine-qemukvm-ip-configuration">Virtual Machine (QEMU/KVM) IP Configuration</a></li></ol>
+
+<ol><li><a href="#network-troubleshooting">Network Troubleshooting</a></li></ol>
+
+<ol><li><a href="#advanced-network-configurations">Advanced Network Configurations</a></li></ol>
+
+
+
+<h2>Host System IP Configuration</h2>
+
+
+
+<h3>Viewing Current Network Configuration</h3>
+
+
+
+<code></code>`bash
+
+<h1>View all network interfaces</h1>
+
+ip addr show
+
+
+
+<h1>View specific interface</h1>
+
+ip addr show vmbr0
+
+
+
+<h1>View routing table</h1>
+
+ip route show
+
+
+
+<h1>View DNS configuration</h1>
+
+cat /etc/resolv.conf
+
+<code></code>`
+
+
+
+<h3>Modifying Host IP Address</h3>
+
+
+
+The primary method to configure network interfaces in Proxmox VE is by editing the <code>/etc/network/interfaces</code> file:
+
+
+
+<code></code>`bash
+
+<h1>Edit network configuration file</h1>
+
+nano /etc/network/interfaces
+
+<code></code>`
+
+
+
+<h4>Example Static IP Configuration</h4>
+
+
+
+<code></code>`
+
+auto lo
+
+iface lo inet loopback
+
+
+
+auto eno1
+
+iface eno1 inet manual
+
+
+
+auto vmbr0
+
+iface vmbr0 inet static
+
+    address 192.168.1.100/24
+
+    gateway 192.168.1.1
+
+    bridge-ports eno1
+
+    bridge-stp off
+
+    bridge-fd 0
+
+<code></code>`
+
+
+
+<h4>Example DHCP Configuration</h4>
+
+
+
+<code></code>`
+
+auto lo
+
+iface lo inet loopback
+
+
+
+auto eno1
+
+iface eno1 inet manual
+
+
+
+auto vmbr0
+
+iface vmbr0 inet dhcp
+
+    bridge-ports eno1
+
+    bridge-stp off
+
+    bridge-fd 0
+
+<code></code>`
+
+
+
+<h3>Applying Network Changes</h3>
+
+
+
+After modifying the network configuration, you need to apply the changes:
+
+
+
+<code></code>`bash
+
+<h1>Apply changes without reboot (recommended)</h1>
+
+ifreload -a
+
+
+
+<h1>Alternative: restart networking service</h1>
+
+systemctl restart networking
+
+
+
+<h1>Check if changes were applied</h1>
+
+ip addr show
+
+<code></code>`
+
+
+
+<h3>Updating Hostname and Hosts File</h3>
+
+
+
+When changing IP addresses, you should also update the hostname and hosts file:
+
+
+
+<code></code>`bash
+
+<h1>Set hostname</h1>
+
+hostnamectl set-hostname proxmox-node1
+
+
+
+<h1>Edit hosts file</h1>
+
+nano /etc/hosts
+
+<code></code>`
+
+
+
+Example <code>/etc/hosts</code> file:
+
+<code></code>`
+
+127.0.0.1 localhost
+
+192.168.1.100 proxmox-node1.example.com proxmox-node1
+
+
+
+<h1>The following lines are desirable for IPv6 capable hosts</h1>
+
+::1     localhost ip6-localhost ip6-loopback
+
+ff02::1 ip6-allnodes
+
+ff02::2 ip6-allrouters
+
+<code></code>`
+
+
+
+<h2>Container (LXC) IP Configuration</h2>
+
+
+
+<h3>Setting IP Address During Container Creation</h3>
+
+
+
+You can set the IP address when creating a new container:
+
+
+
+<code></code>`bash
+
+<h1>Create container with DHCP</h1>
+
+pct create 100 local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst \
+
+  --hostname container1 \
+
+  --memory 512 \
+
+  --net0 name=eth0,bridge=vmbr0,ip=dhcp
+
+
+
+<h1>Create container with static IP</h1>
+
+pct create 101 local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst \
+
+  --hostname container2 \
+
+  --memory 512 \
+
+  --net0 name=eth0,bridge=vmbr0,ip=192.168.1.101/24,gw=192.168.1.1
+
+<code></code>`
+
+
+
+<h3>Changing Container IP Address After Creation</h3>
+
+
+
+You can modify the IP address of an existing container:
+
+
+
+<code></code>`bash
+
+<h1>Change to DHCP</h1>
+
+pct set 100 --net0 name=eth0,bridge=vmbr0,ip=dhcp
+
+
+
+<h1>Change to static IP</h1>
+
+pct set 101 --net0 name=eth0,bridge=vmbr0,ip=192.168.1.102/24,gw=192.168.1.1
+
+
+
+<h1>Apply changes by restarting the container</h1>
+
+pct restart 101
+
+<code></code>`
+
+
+
+<h3>Adding Multiple Network Interfaces</h3>
+
+
+
+Containers can have multiple network interfaces:
+
+
+
+<code></code>`bash
+
+<h1>Add a second network interface</h1>
+
+pct set 101 --net1 name=eth1,bridge=vmbr1,ip=10.10.10.101/24
+
+
+
+<h1>Add a third network interface without IP (to be configured inside the container)</h1>
+
+pct set 101 --net2 name=eth2,bridge=vmbr0,ip=manual
+
+<code></code>`
+
+
+
+<h3>Configuring IP Inside the Container</h3>
+
+
+
+For manual IP configuration, you need to configure the network inside the container:
+
+
+
+<code></code>`bash
+
+<h1>Enter the container</h1>
+
+pct enter 101
+
+
+
+<h1>For Ubuntu/Debian containers</h1>
+
+nano /etc/netplan/01-netcfg.yaml
+
+
+
+<h1>Example netplan configuration</h1>
+
+network:
+
+  version: 2
+
+  ethernets:
+
+    eth0:
+
+      addresses: [192.168.1.101/24]
+
+      gateway4: 192.168.1.1
+
+      nameservers:
+
+        addresses: [8.8.8.8, 8.8.4.4]
+
+    eth2:
+
+      addresses: [192.168.2.101/24]
+
+
+
+<h1>Apply netplan configuration</h1>
+
+netplan apply
+
+
+
+<h1>For CentOS/RHEL containers</h1>
+
+nano /etc/sysconfig/network-scripts/ifcfg-eth0
+
+
+
+<h1>Example ifcfg configuration</h1>
+
+DEVICE=eth0
+
+BOOTPROTO=static
+
+IPADDR=192.168.1.101
+
+NETMASK=255.255.255.0
+
+GATEWAY=192.168.1.1
+
+ONBOOT=yes
+
+
+
+<h1>Restart networking</h1>
+
+systemctl restart network
+
+<code></code>`
+
+
+
+<h2>Virtual Machine (QEMU/KVM) IP Configuration</h2>
+
+
+
+<h3>Setting IP Address for VMs</h3>
+
+
+
+For QEMU/KVM virtual machines, there are two approaches to IP configuration:
+
+
+
+<ol><li>**Guest OS Configuration**: Configure the IP address within the guest operating system</li></ol>
+
+<ol><li>**QEMU Guest Agent**: Use the QEMU guest agent to set the IP address from the host</li></ol>
+
+
+
+<h4>Using QEMU Guest Agent</h4>
+
+
+
+First, ensure the QEMU guest agent is installed and enabled in the VM:
+
+
+
+<code></code>`bash
+
+<h1>Enable QEMU guest agent in VM configuration</h1>
+
+qm set 100 --agent enabled=1
+
+
+
+<h1>Inside the VM (for Debian/Ubuntu)</h1>
+
+apt update
+
+apt install qemu-guest-agent
+
+systemctl enable qemu-guest-agent
+
+systemctl start qemu-guest-agent
+
+
+
+<h1>Inside the VM (for CentOS/RHEL)</h1>
+
+dnf install qemu-guest-agent
+
+systemctl enable qemu-guest-agent
+
+systemctl start qemu-guest-agent
+
+<code></code>`
+
+
+
+Then, you can set the IP address using the <code>--ipconfig</code> option:
+
+
+
+<code></code>`bash
+
+<h1>Set static IP for the first network interface</h1>
+
+qm set 100 --ipconfig0 ip=192.168.1.100/24,gw=192.168.1.1
+
+
+
+<h1>Set static IP for the second network interface</h1>
+
+qm set 100 --ipconfig1 ip=10.10.10.100/24
+
+
+
+<h1>Set DHCP for the first network interface</h1>
+
+qm set 100 --ipconfig0 ip=dhcp
+
+<code></code>`
+
+
+
+<h3>Viewing VM IP Addresses</h3>
+
+
+
+If the QEMU guest agent is running, you can view the VM's IP addresses:
+
+
+
+<code></code>`bash
+
+<h1>Get VM agent information</h1>
+
+qm agent 100 info
+
+
+
+<h1>Get VM network interfaces</h1>
+
+qm agent 100 network-get-interfaces
+
+<code></code>`
+
+
+
+<h3>Cloud-Init Configuration</h3>
+
+
+
+For VMs created from Cloud-Init templates, you can set the IP address using Cloud-Init:
+
+
+
+<code></code>`bash
+
+<h1>Set Cloud-Init IP configuration</h1>
+
+qm set 100 --ipconfig0 ip=192.168.1.100/24,gw=192.168.1.1
+
+
+
+<h1>Set Cloud-Init DNS servers</h1>
+
+qm set 100 --nameserver 8.8.8.8
+
+
+
+<h1>Set Cloud-Init search domain</h1>
+
+qm set 100 --searchdomain example.com
+
+<code></code>`
+
+
+
+<h2>Network Troubleshooting</h2>
+
+
+
+<h3>Checking Connectivity</h3>
+
+
+
+<code></code>`bash
+
+<h1>Check if an IP address is reachable</h1>
+
+ping 192.168.1.100
+
+
+
+<h1>Trace the route to an IP address</h1>
+
+traceroute 192.168.1.100
+
+
+
+<h1>Check DNS resolution</h1>
+
+nslookup example.com
+
+
+
+<h1>Check open ports</h1>
+
+netstat -tuln
+
+<code></code>`
+
+
+
+<h3>Debugging Network Issues</h3>
+
+
+
+<code></code>`bash
+
+<h1>Check bridge status</h1>
+
+brctl show
+
+
+
+<h1>Check firewall status</h1>
+
+pve-firewall status
+
+
+
+<h1>View firewall rules</h1>
+
+iptables -L
+
+
+
+<h1>Check network interface statistics</h1>
+
+ip -s link show
+
+
+
+<h1>Monitor network traffic</h1>
+
+tcpdump -i vmbr0
+
+<code></code>`
+
+
+
+<h3>Common Network Issues and Solutions</h3>
+
+
+
+<ol><li>**VM/Container Cannot Access Internet**:</li></ol>
+
+   - Check gateway configuration
+
+   - Verify DNS settings
+
+   - Check firewall rules
+
+   - Ensure IP forwarding is enabled: <code>sysctl net.ipv4.ip_forward</code>
+
+
+
+<ol><li>**Cannot Connect to VM/Container**:</li></ol>
+
+   - Verify IP address configuration
+
+   - Check firewall rules
+
+   - Ensure bridge interface is up
+
+   - Verify network interface is attached to the correct bridge
+
+
+
+<ol><li>**DHCP Not Working**:</li></ol>
+
+   - Check DHCP server configuration
+
+   - Verify network interface is set to use DHCP
+
+   - Check DHCP client logs
+
+
+
+<h2>Advanced Network Configurations</h2>
+
+
+
+<h3>VLAN Configuration</h3>
+
+
+
+<code></code>`bash
+
+<h1>Create a VLAN interface on the host</h1>
+
+echo "auto vmbr0.10
+
+iface vmbr0.10 inet static
+
+    address 10.10.10.1/24
+
+    vlan-raw-device vmbr0" >> /etc/network/interfaces
+
+
+
+<h1>Apply changes</h1>
+
+ifreload -a
+
+
+
+<h1>Create a container with VLAN tag</h1>
+
+pct create 102 local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst \
+
+  --hostname container-vlan \
+
+  --memory 512 \
+
+  --net0 name=eth0,bridge=vmbr0,tag=10,ip=10.10.10.2/24,gw=10.10.10.1
+
+
+
+<h1>Create a VM with VLAN tag</h1>
+
+qm create 102 --memory 1024 --net0 virtio,bridge=vmbr0,tag=10
+
+<code></code>`
+
+
+
+<h3>Bond Configuration</h3>
+
+
+
+<code></code>`bash
+
+<h1>Create a bond interface</h1>
+
+echo "auto bond0
+
+iface bond0 inet manual
+
+    bond-slaves eno1 eno2
+
+    bond-miimon 100
+
+    bond-mode 802.3ad
+
+    bond-xmit-hash-policy layer2+3
+
+
+
+auto vmbr0
+
+iface vmbr0 inet static
+
+    address 192.168.1.100/24
+
+    gateway 192.168.1.1
+
+    bridge-ports bond0
+
+    bridge-stp off
+
+    bridge-fd 0" >> /etc/network/interfaces
+
+
+
+<h1>Apply changes</h1>
+
+ifreload -a
+
+<code></code>`
+
+
+
+<h3>IPv6 Configuration</h3>
+
+
+
+<code></code>`bash
+
+<h1>Configure IPv6 on the host</h1>
+
+echo "auto vmbr0
+
+iface vmbr0 inet static
+
+    address 192.168.1.100/24
+
+    gateway 192.168.1.1
+
+    bridge-ports eno1
+
+    bridge-stp off
+
+    bridge-fd 0
+
+
+
+iface vmbr0 inet6 static
+
+    address 2001:db8::100/64
+
+    gateway 2001:db8::1" >> /etc/network/interfaces
+
+
+
+<h1>Create a container with IPv6</h1>
+
+pct create 103 local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst \
+
+  --hostname container-ipv6 \
+
+  --memory 512 \
+
+  --net0 name=eth0,bridge=vmbr0,ip=192.168.1.103/24,gw=192.168.1.1,ip6=2001:db8::103/64,gw6=2001:db8::1
+
+<code></code>`
+
+
+
+<h3>NAT Configuration</h3>
+
+
+
+<code></code>`bash
+
+<h1>Create a NAT network</h1>
+
+echo "auto vmbr1
+
+iface vmbr1 inet static
+
+    address 10.10.10.1/24
+
+    bridge-ports none
+
+    bridge-stp off
+
+    bridge-fd 0
+
+    post-up echo 1 > /proc/sys/net/ipv4/ip_forward
+
+    post-up iptables -t nat -A POSTROUTING -s '10.10.10.0/24' -o vmbr0 -j MASQUERADE
+
+    post-down iptables -t nat -D POSTROUTING -s '10.10.10.0/24' -o vmbr0 -j MASQUERADE" >> /etc/network/interfaces
+
+
+
+<h1>Apply changes</h1>
+
+ifreload -a
+
+
+
+<h1>Create a container on the NAT network</h1>
+
+pct create 104 local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst \
+
+  --hostname container-nat \
+
+  --memory 512 \
+
+  --net0 name=eth0,bridge=vmbr1,ip=10.10.10.2/24,gw=10.10.10.1
+
+<code></code>`
+
+
+
+<h2>Additional Resources</h2>
+
+
+
+<ul><li><a href="https://pve.proxmox.com/wiki/Network_Configuration">Proxmox VE Network Configuration Wiki</a></li></ul>
+
+<ul><li><a href="https://pve.proxmox.com/wiki/Linux_Container">Proxmox VE Container Documentation</a></li></ul>
+
+<ul><li><a href="https://pve.proxmox.com/wiki/Qemu/KVM_Virtual_Machines">Proxmox VE QEMU/KVM Documentation</a></li></ul>
+
+<ul><li><a href="https://pve.proxmox.com/wiki/Firewall">Proxmox VE Firewall Documentation</a></li></ul>
+
+<ul><li><a href="https://pve.proxmox.com/wiki/Cloud-Init_Support">Proxmox VE Cloud-Init Support</a></li></ul>
+
+</div>

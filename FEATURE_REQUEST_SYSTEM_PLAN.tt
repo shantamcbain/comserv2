@@ -1,0 +1,559 @@
+[% META title = 'Feature Request System Implementation Plan' %]
+[% PageVersion = 'FEATURE_REQUEST_SYSTEM_PLAN.tt,v 1.0 2025/01/27 AI Development Plan' %]
+
+=head1 FEATURE REQUEST SYSTEM IMPLEMENTATION PLAN
+
+=head2 OVERVIEW
+
+This document outlines the comprehensive plan to implement a feature request/ticket system 
+in the Comserv application. The system will integrate with existing infrastructure including 
+user roles, site-based permissions, and the current Todo system.
+
+=head2 SYSTEM REQUIREMENTS
+
+=head3 Core Features
+- Feature request creation, viewing, editing, and management
+- Flexible voting system (upvote/downvote, star ratings, comments)
+- Role-based and site-based access control
+- Integration with existing Todo system
+- Configurable status workflows
+- Comment/discussion system
+- Admin management interface
+
+=head3 Data Storage Options
+- MySQL database tables (primary)
+- JSON configuration files (for flexible settings)
+- Integration with existing DBEncy schema
+
+=head3 Access Control
+- Public requests (visible to all sites)
+- Site-specific requests (filtered by user's SiteName access)
+- Role-based permissions (admin, user, developer, etc.)
+
+=head2 DATABASE SCHEMA DESIGN
+
+=head3 Core Tables
+
+=head4 feature_requests
+```sql
+CREATE TABLE feature_requests (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    category_id INT,
+    status_id INT DEFAULT 1,
+    priority INT DEFAULT 3,
+    visibility ENUM('public', 'site_specific') DEFAULT 'site_specific',
+    site_name VARCHAR(255),
+    created_by INT NOT NULL,
+    assigned_to INT NULL,
+    estimated_hours INT NULL,
+    actual_hours INT NULL,
+    due_date DATE NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id),
+    FOREIGN KEY (assigned_to) REFERENCES users(id),
+    FOREIGN KEY (category_id) REFERENCES feature_request_categories(id),
+    FOREIGN KEY (status_id) REFERENCES feature_request_statuses(id)
+);
+```
+
+=head4 feature_request_categories
+```sql
+CREATE TABLE feature_request_categories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    color VARCHAR(7) DEFAULT '#007bff',
+    icon VARCHAR(50),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+=head4 feature_request_statuses
+```sql
+CREATE TABLE feature_request_statuses (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    color VARCHAR(7) DEFAULT '#6c757d',
+    is_active BOOLEAN DEFAULT TRUE,
+    sort_order INT DEFAULT 0,
+    workflow_group VARCHAR(50) DEFAULT 'default',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+=head4 feature_request_votes
+```sql
+CREATE TABLE feature_request_votes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    feature_request_id INT NOT NULL,
+    user_id INT NOT NULL,
+    vote_type ENUM('upvote', 'downvote') NOT NULL,
+    star_rating INT NULL CHECK (star_rating >= 1 AND star_rating <= 5),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_user_vote (feature_request_id, user_id),
+    FOREIGN KEY (feature_request_id) REFERENCES feature_requests(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+```
+
+=head4 feature_request_comments
+```sql
+CREATE TABLE feature_request_comments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    feature_request_id INT NOT NULL,
+    user_id INT NOT NULL,
+    comment TEXT NOT NULL,
+    is_internal BOOLEAN DEFAULT FALSE,
+    parent_comment_id INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (feature_request_id) REFERENCES feature_requests(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (parent_comment_id) REFERENCES feature_request_comments(id)
+);
+```
+
+=head4 feature_request_attachments
+```sql
+CREATE TABLE feature_request_attachments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    feature_request_id INT NOT NULL,
+    filename VARCHAR(255) NOT NULL,
+    original_filename VARCHAR(255) NOT NULL,
+    file_path VARCHAR(500) NOT NULL,
+    file_size INT NOT NULL,
+    mime_type VARCHAR(100),
+    uploaded_by INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (feature_request_id) REFERENCES feature_requests(id) ON DELETE CASCADE,
+    FOREIGN KEY (uploaded_by) REFERENCES users(id)
+);
+```
+
+=head4 feature_request_history
+```sql
+CREATE TABLE feature_request_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    feature_request_id INT NOT NULL,
+    user_id INT NOT NULL,
+    action VARCHAR(100) NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    field_changed VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (feature_request_id) REFERENCES feature_requests(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+```
+
+=head4 feature_request_todo_links
+```sql
+CREATE TABLE feature_request_todo_links (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    feature_request_id INT NOT NULL,
+    todo_record_id INT NOT NULL,
+    link_type ENUM('converted', 'related', 'blocks', 'blocked_by') DEFAULT 'related',
+    created_by INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (feature_request_id) REFERENCES feature_requests(id) ON DELETE CASCADE,
+    FOREIGN KEY (todo_record_id) REFERENCES todo(record_id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+```
+
+=head3 Default Data Inserts
+
+=head4 Default Categories
+```sql
+INSERT INTO feature_request_categories (name, description, color, icon) VALUES
+('Enhancement', 'Improvements to existing features', '#28a745', 'fas fa-arrow-up'),
+('New Feature', 'Completely new functionality', '#007bff', 'fas fa-plus'),
+('Bug Fix', 'Fixing existing issues', '#dc3545', 'fas fa-bug'),
+('UI/UX', 'User interface and experience improvements', '#6f42c1', 'fas fa-paint-brush'),
+('Performance', 'Speed and efficiency improvements', '#fd7e14', 'fas fa-tachometer-alt'),
+('Security', 'Security-related requests', '#e83e8c', 'fas fa-shield-alt'),
+('Documentation', 'Documentation improvements', '#20c997', 'fas fa-book'),
+('Integration', 'Third-party integrations', '#6c757d', 'fas fa-plug');
+```
+
+=head4 Default Statuses
+```sql
+INSERT INTO feature_request_statuses (name, description, color, sort_order, workflow_group) VALUES
+('New', 'Newly submitted request', '#6c757d', 1, 'default'),
+('Under Review', 'Being evaluated by team', '#ffc107', 2, 'default'),
+('Approved', 'Approved for development', '#28a745', 3, 'default'),
+('In Development', 'Currently being worked on', '#007bff', 4, 'default'),
+('Testing', 'In testing phase', '#17a2b8', 5, 'default'),
+('Completed', 'Successfully implemented', '#28a745', 6, 'default'),
+('Rejected', 'Request declined', '#dc3545', 7, 'default'),
+('On Hold', 'Temporarily paused', '#fd7e14', 8, 'default');
+```
+
+=head2 APPLICATION STRUCTURE
+
+=head3 Model Layer
+
+=head4 Comserv::Model::FeatureRequest
+Location: /Comserv/lib/Comserv/Model/FeatureRequest.pm
+
+Key Methods:
+- get_requests_for_user($c, $user_id, $filters)
+- create_request($c, $request_data)
+- update_request($c, $request_id, $update_data)
+- get_request_details($c, $request_id)
+- get_voting_summary($c, $request_id)
+- add_vote($c, $request_id, $user_id, $vote_data)
+- add_comment($c, $request_id, $user_id, $comment_data)
+- convert_to_todo($c, $request_id, $todo_data)
+- get_categories($c)
+- get_statuses($c, $workflow_group)
+
+=head4 Schema Result Classes
+Location: /Comserv/lib/Comserv/Schema/Result/
+
+Files to create:
+- FeatureRequest.pm
+- FeatureRequestCategory.pm
+- FeatureRequestStatus.pm
+- FeatureRequestVote.pm
+- FeatureRequestComment.pm
+- FeatureRequestAttachment.pm
+- FeatureRequestHistory.pm
+- FeatureRequestTodoLink.pm
+
+=head3 Controller Layer
+
+=head4 Comserv::Controller::FeatureRequest
+Location: /Comserv/lib/Comserv/Controller/FeatureRequest.pm
+
+Actions:
+- index (list all requests with filtering)
+- create (show create form)
+- submit (process new request)
+- view (detailed view with comments/votes)
+- edit (edit existing request)
+- update (process updates)
+- vote (handle voting)
+- comment (add comments)
+- admin (admin management interface)
+- convert_to_todo (convert to todo item)
+- export (export requests to various formats)
+
+=head3 Template Layer
+
+=head4 Template Structure
+Location: /Comserv/root/feature_request/
+
+Templates to create:
+- index.tt (main listing page)
+- create.tt (create new request form)
+- view.tt (detailed view)
+- edit.tt (edit form)
+- admin.tt (admin management)
+- components/
+  - request_card.tt (reusable request display)
+  - voting_widget.tt (voting interface)
+  - comment_thread.tt (comment display)
+  - filter_sidebar.tt (filtering options)
+
+=head2 INTEGRATION POINTS
+
+=head3 User System Integration
+- Leverage existing user roles and permissions
+- Use current session management
+- Integrate with site-based access control
+
+=head3 Todo System Integration
+- Convert approved feature requests to todos
+- Link related todos to feature requests
+- Maintain bidirectional relationships
+
+=head3 Theme System Integration
+- Use existing theme variables and CSS framework
+- Ensure consistent styling with current application
+- Support theme customization
+
+=head3 Navigation Integration
+- Add feature request links to main navigation
+- Integrate with existing menu structure
+- Add dashboard widgets for quick access
+
+=head2 PERMISSION MATRIX
+
+=head3 User Roles and Capabilities
+
+| Action | Guest | User | Admin | Developer | Site Admin |
+|--------|-------|------|-------|-----------|------------|
+| View Public Requests | ✓ | ✓ | ✓ | ✓ | ✓ |
+| View Site Requests | ✗ | ✓* | ✓ | ✓ | ✓* |
+| Create Request | ✗ | ✓ | ✓ | ✓ | ✓ |
+| Vote on Request | ✗ | ✓ | ✓ | ✓ | ✓ |
+| Comment on Request | ✗ | ✓ | ✓ | ✓ | ✓ |
+| Edit Own Request | ✗ | ✓ | ✓ | ✓ | ✓ |
+| Edit Any Request | ✗ | ✗ | ✓ | ✓** | ✓* |
+| Change Status | ✗ | ✗ | ✓ | ✓** | ✓* |
+| Assign Requests | ✗ | ✗ | ✓ | ✓** | ✓* |
+| Convert to Todo | ✗ | ✗ | ✓ | ✓** | ✓* |
+| Delete Request | ✗ | ✗ | ✓ | ✗ | ✗ |
+| Manage Categories | ✗ | ✗ | ✓ | ✗ | ✗ |
+| Manage Statuses | ✗ | ✗ | ✓ | ✗ | ✗ |
+
+* Only for their assigned sites
+** Only for development-related requests
+
+=head2 IMPLEMENTATION PHASES
+
+=head3 Phase 1: Database Foundation (Week 1)
+1. Create database migration scripts
+2. Implement schema result classes
+3. Create default data inserts
+4. Test database connectivity and basic CRUD
+
+=head3 Phase 2: Core Model Layer (Week 2)
+1. Implement FeatureRequest model
+2. Add basic CRUD operations
+3. Implement permission checking
+4. Add voting and commenting functionality
+
+=head3 Phase 3: Controller Layer (Week 3)
+1. Create FeatureRequest controller
+2. Implement all action methods
+3. Add role-based access control
+4. Integrate with existing authentication
+
+=head3 Phase 4: Basic Templates (Week 4)
+1. Create basic template structure
+2. Implement listing and detail views
+3. Create forms for CRUD operations
+4. Add basic styling using existing theme system
+
+=head3 Phase 5: Advanced Features (Week 5)
+1. Implement voting widgets
+2. Add comment threading
+3. Create admin management interface
+4. Add file attachment support
+
+=head3 Phase 6: Integration & Polish (Week 6)
+1. Integrate with Todo system
+2. Add navigation menu items
+3. Create dashboard widgets
+4. Implement export functionality
+5. Add email notifications
+
+=head3 Phase 7: Testing & Documentation (Week 7)
+1. Comprehensive testing
+2. User documentation
+3. Admin documentation
+4. Performance optimization
+
+=head2 CONFIGURATION OPTIONS
+
+=head3 JSON Configuration Files
+Location: /Comserv/config/
+
+Files to create:
+- feature_request_config.json (main configuration)
+- voting_config.json (voting system settings)
+- notification_config.json (email notification settings)
+
+=head4 feature_request_config.json
+```json
+{
+    "default_workflow": "default",
+    "allow_anonymous_viewing": false,
+    "require_approval_for_public": true,
+    "max_attachments_per_request": 5,
+    "max_attachment_size_mb": 10,
+    "allowed_file_types": ["jpg", "jpeg", "png", "gif", "pdf", "doc", "docx", "txt"],
+    "auto_convert_approved_to_todo": false,
+    "email_notifications": {
+        "new_request": true,
+        "status_change": true,
+        "new_comment": true,
+        "new_vote": false
+    },
+    "voting_system": {
+        "allow_upvote_downvote": true,
+        "allow_star_rating": true,
+        "require_comment_with_downvote": false,
+        "allow_vote_change": true
+    }
+}
+```
+
+=head2 API ENDPOINTS
+
+=head3 RESTful API Structure
+Base URL: /api/feature-requests
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | / | List all requests (with filtering) |
+| POST | / | Create new request |
+| GET | /{id} | Get specific request |
+| PUT | /{id} | Update request |
+| DELETE | /{id} | Delete request |
+| POST | /{id}/vote | Add/update vote |
+| DELETE | /{id}/vote | Remove vote |
+| GET | /{id}/comments | Get comments |
+| POST | /{id}/comments | Add comment |
+| POST | /{id}/convert-to-todo | Convert to todo |
+| GET | /categories | Get all categories |
+| GET | /statuses | Get all statuses |
+
+=head2 TESTING STRATEGY
+
+=head3 Unit Tests
+Location: /Comserv/t/
+
+Test files to create:
+- model_FeatureRequest.t
+- controller_FeatureRequest.t
+- schema_FeatureRequest.t
+
+=head3 Integration Tests
+- Test role-based access control
+- Test site-based filtering
+- Test Todo system integration
+- Test voting and commenting
+
+=head3 User Acceptance Tests
+- Create request workflow
+- Voting and commenting workflow
+- Admin management workflow
+- Todo conversion workflow
+
+=head2 SECURITY CONSIDERATIONS
+
+=head3 Input Validation
+- Sanitize all user inputs
+- Validate file uploads
+- Check file types and sizes
+- Prevent XSS attacks
+
+=head3 Access Control
+- Verify user permissions on every action
+- Check site-based access rights
+- Validate ownership for edit operations
+- Secure admin-only functions
+
+=head3 Data Protection
+- Log all sensitive operations
+- Implement audit trails
+- Secure file storage
+- Regular security reviews
+
+=head2 PERFORMANCE CONSIDERATIONS
+
+=head3 Database Optimization
+- Add appropriate indexes
+- Implement query optimization
+- Use database connection pooling
+- Consider caching for frequently accessed data
+
+=head3 Frontend Optimization
+- Implement pagination for large lists
+- Use AJAX for voting and commenting
+- Optimize image loading
+- Minimize CSS and JavaScript
+
+=head2 MONITORING AND ANALYTICS
+
+=head3 Metrics to Track
+- Number of requests created per day/week/month
+- Most popular categories
+- Average time from creation to completion
+- User engagement (votes, comments)
+- Conversion rate to todos
+
+=head3 Logging
+- All CRUD operations
+- Permission violations
+- System errors
+- Performance metrics
+
+=head2 FUTURE ENHANCEMENTS
+
+=head3 Potential Features
+- Email integration for request creation
+- Mobile app support
+- Advanced reporting and analytics
+- Integration with external project management tools
+- Automated testing of implemented features
+- Machine learning for request categorization
+- Advanced workflow automation
+
+=head2 CONCLUSION
+
+This comprehensive plan provides a roadmap for implementing a robust feature request system 
+that integrates seamlessly with the existing Comserv application. The system will provide 
+users with an intuitive way to submit and track feature requests while giving administrators 
+powerful tools to manage and prioritize development efforts.
+
+The phased approach ensures steady progress while maintaining system stability, and the 
+flexible architecture allows for future enhancements and customizations based on user needs.
+
+=head2 APPENDIX
+
+=head3 File Structure Summary
+```
+/Comserv/
+├── lib/Comserv/
+│   ├── Model/
+│   │   └── FeatureRequest.pm
+│   ├── Controller/
+│   │   └── FeatureRequest.pm
+│   └── Schema/Result/
+│       ├── FeatureRequest.pm
+│       ├── FeatureRequestCategory.pm
+│       ├── FeatureRequestStatus.pm
+│       ├── FeatureRequestVote.pm
+│       ├── FeatureRequestComment.pm
+│       ├── FeatureRequestAttachment.pm
+│       ├── FeatureRequestHistory.pm
+│       └── FeatureRequestTodoLink.pm
+├── root/
+│   └── feature_request/
+│       ├── index.tt
+│       ├── create.tt
+│       ├── view.tt
+│       ├── edit.tt
+│       ├── admin.tt
+│       └── components/
+│           ├── request_card.tt
+│           ├── voting_widget.tt
+│           ├── comment_thread.tt
+│           └── filter_sidebar.tt
+├── config/
+│   ├── feature_request_config.json
+│   ├── voting_config.json
+│   └── notification_config.json
+├── sql/
+│   └── feature_request_schema.sql
+└── t/
+    ├── model_FeatureRequest.t
+    ├── controller_FeatureRequest.t
+    └── schema_FeatureRequest.t
+```
+
+=head3 Dependencies
+- DBIx::Class (already in use)
+- Catalyst Framework (already in use)
+- Template Toolkit (already in use)
+- JSON handling modules
+- File upload handling modules
+- Email notification modules (if not already present)
+
+=head3 Estimated Development Time
+- Total: 7 weeks (35 working days)
+- Can be accelerated with multiple developers
+- Includes testing and documentation
+- Assumes existing infrastructure knowledge
+
+[% END %]

@@ -210,11 +210,7 @@
                     </a>
                     <a href="[% c.uri_for('/admin/view_log') %]" class="admin-link">
                         <i class="fas fa-file-alt"></i>
-                        <span>View Application Log (Old)</span>
-                    </a>
-                    <a href="[% c.uri_for('/admin/logging') %]" class="admin-link">
-                        <i class="fas fa-terminal"></i>
-                        <span>Logging Administration</span>
+                        <span>View Application Log</span>
                     </a>
                     <a href="[% c.uri_for('/admin/system_info') %]" class="admin-link">
                         <i class="fas fa-info-circle"></i>
@@ -231,6 +227,10 @@
                     <a href="[% c.uri_for('/admin/backup') %]" class="admin-link backup-management">
                         <i class="fas fa-archive"></i>
                         <span>Backup Management</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/security-scan') %]" class="admin-link">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>Security Scan</span>
                     </a>
                 </div>
             </div>
