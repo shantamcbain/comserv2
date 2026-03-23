@@ -358,12 +358,24 @@ sub details :Path('/todo/details') :Args {
                 "Error fetching projects: $@");
         }
 
-        # Add the todo, accumulative_time, and projects to the stash
+        # Fetch rescheduling / interval history for this todo
+        my @intervals;
+        eval {
+            @intervals = $schema->resultset('TodoInterval')->search(
+                { todo_record_id => $record_id },
+                { order_by => { -desc => 'record_id' } }
+            )->all;
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'details',
+            "Interval fetch error: $@") if $@;
+
+        # Add the todo, accumulative_time, projects, and interval history to the stash
         $c->stash(
-            record => $todo, 
+            record            => $todo,
             accumulative_time => $accumulative_time,
-            projects => $projects,
-            return_to => $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo')),
+            projects          => $projects,
+            todo_intervals    => \@intervals,
+            return_to         => $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo')),
         );
 
         # Set the template to 'todo/details.tt'
