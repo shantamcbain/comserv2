@@ -2873,10 +2873,13 @@ Small = tinyllama or smallest by name; Large = llama3.1 or largest by name.
 sub _pick_ollama_tier {
     my ($self, $installed_models, $default_model, $agent_id, $page_context) = @_;
 
-    # Filter to chat-capable models
+    # Filter to local chat-capable models only.
+    # Exclude: embedding/reranker models, code-only models, and :cloud models
+    # (cloud-routed Ollama models need external API keys and will timeout).
     my @chat_models = grep {
         my $n = ref($_) ? ($_->{name} || '') : ($_ || '');
-        $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
+        $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i
+           && $n !~ /:cloud$/i;
     } @$installed_models;
 
     my @names = map { ref($_) ? ($_->{name} || '') : ($_ || '') } @chat_models;
@@ -4237,11 +4240,17 @@ sub get_user_providers :Local :Args(0) {
             $ollama->host($primary_host);
             $ollama->port($cfg_port);
             my $installed = $ollama->list_models() || [];
+            # Exclude embedding, reranker, and cloud-routed models from the chat list
+            my @chat_models = grep {
+                my $n = $_->{name} || '';
+                $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i
+                   && $n !~ /:cloud$/i;
+            } @$installed;
             push @providers, {
                 service  => 'ollama',
                 name     => 'Ollama (Local)',
                 is_local => JSON::true,
-                models   => [ map { { id => $_->{name} } } @$installed ],
+                models   => [ map { { id => $_->{name} } } @chat_models ],
             };
         }
     } catch {

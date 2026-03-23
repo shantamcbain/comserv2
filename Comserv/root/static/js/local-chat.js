@@ -1335,7 +1335,9 @@
     // Returns true for models that support chat/generate (excludes embeddings, rerankers, etc.)
     function isChatModel(id) {
         const s = id.toLowerCase();
+        // Exclude embedding/reranker/vision-only/cloud-routed models
         if (/embed|rerank|bge|nomic|clip|whisper|tts|vision(?!.*instruct)/.test(s)) return false;
+        if (/:cloud$/.test(s)) return false;  // Ollama cloud-routed models need external API keys
         return true;
     }
 
