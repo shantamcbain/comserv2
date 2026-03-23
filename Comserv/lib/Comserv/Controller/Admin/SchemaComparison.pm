@@ -1940,22 +1940,37 @@ sub get_result_file_schema {
 sub parse_result_file_columns {
     my ($self, $text) = @_;
     my $columns = {};
-    while ($text =~ /(\w+)\s*=>\s*\{([\s\S]*?)\}(?=\s*,\s*\w+\s*=>|\s*,\s*$|\s*\))/g) {
-        my ($name, $def) = ($1, $2);
-        my $info = {};
-        while ($def =~ /(\w+)\s*=>\s*(?:['"]([^'"]+)['"]|(\d+)|\\['"]([^'"]+)['"]|\{([\s\S]*?)\})/g) {
-            my $attr = $1;
-            my $val = $2 // $3 // $4 // $5;
-            # If the value was captured from \'...' syntax, mark it as a scalar ref
-            if (defined $4) {
-                # This was \'SOMETHING', which is a scalar reference in Perl
-                # Store the actual string value
-                $info->{$attr} = $val;
-            } else {
-                $info->{$attr} = $val;
-            }
+
+    # Use balanced-brace extraction so nested hashes (e.g. extra => { list => [...] })
+    # don't cut the column definition short.
+    while ($text =~ /\b(\w+)\s*=>\s*\{/g) {
+        my $col_name = $1;
+        my $start    = pos($text);  # character position right after the opening '{'
+
+        # Walk forward counting braces to find the matching '}'
+        my $depth = 1;
+        my $i     = $start;
+        while ($i < length($text) && $depth > 0) {
+            my $ch = substr($text, $i, 1);
+            $depth++ if $ch eq '{';
+            $depth-- if $ch eq '}';
+            $i++;
         }
-        $columns->{$name} = $info;
+
+        my $def = substr($text, $start, $i - $start - 1);  # content between { }
+
+        # Advance the /g position past the closing '}' so the next iteration
+        # starts after this column's block.
+        pos($text) = $i;
+
+        my $info = {};
+        # Parse key => value pairs inside the column definition.
+        # Handles: 'string', "string", bare number, \'scalar ref', and { nested hash }
+        while ($def =~ /(\w+)\s*=>\s*(?:\\?['"]([^'"]+)['"]|(\d+)|\{([^{}]*)\})/g) {
+            my ($attr, $str_val, $num_val, $hash_val) = ($1, $2, $3, $4);
+            $info->{$attr} = $str_val // $num_val // $hash_val;
+        }
+        $columns->{$col_name} = $info;
     }
     return $columns;
 }
