@@ -1215,12 +1215,17 @@ last_updated = '2026/02/08'
                 <p style="color: #d9534f;"><strong>Error:</strong> Unable to fetch Planning System project from database. [% error.info %]</p>
             [% END %]
 
-            <h4>🚀 Implementation Workflow: Phases P0-P14 (Text-Based Detail View)</h4>
-            <p><em>Note: These text-based phase details are maintained for reference. Once Planning System project is created in database, the container above will show the database-driven version alongside these details.</em></p>
+            <h4>🚀 Implementation Workflow: Phases P0-P14 (Text Reference — being migrated to DB)</h4>
+            <p style="background:#d4edda;border:1px solid #28a745;border-radius:4px;padding:8px 12px;font-size:0.9em;">
+                <strong>📊 DB-tracked:</strong> These phases are now tracked as DB todos 502–516 under
+                <a href="/project/details?project_id=138" style="color:#155724;">Planning System project (id=138)</a> →
+                sub-projects 186–190. View them via the <a href="/Documentation/DailyPlan#planning" style="color:#155724;">PLANNING tab</a>.
+                As each phase is completed and verified in DB, its text section below will be removed.
+            </p>
 
             <div id="anchor-phase0-complete" class="nav-anchor"></div>
             <!-- Phase 0: Planning System Analysis & Integration Mapping -->
-            <details class="phase-container" style="margin: 15px 0; border: 2px solid #4CAF50; padding: 10px; background: #e8f5e9;" open>
+            <details class="phase-container" style="margin: 15px 0; border: 2px solid #4CAF50; padding: 10px; background: #e8f5e9;">
                         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
                             ✅ Phase 0: Planning System Analysis & Integration Mapping (COMPLETE)
                         </summary>
