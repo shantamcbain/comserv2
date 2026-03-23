@@ -174,109 +174,113 @@
 <!-- TAB 1: TODAY'S WORK (Default) -->
     <div id="today-work" class="tab-content active">
         <div id="today-work-content">
-            <div class="focus-area">
-                <h3 style="margin-top: 0;">[TODAY'S FOCUS]</h3>
-                <p>Daily plan for [% display_date %] - Mark completed tasks and sync across all plan files. Review and execute master plan priorities listed below.</p>
+
+            [%# ── CURRENT ACTIVE PRIORITIES (DB-driven, role/site/user scoped) ── %]
+            <div style="margin-bottom:24px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--primary-color);">
+                    <h3 style="margin:0;font-size:1.1em;">🎯 Current Active Priorities</h3>
+                    <div style="display:flex;gap:8px;">
+                        <a href="/todo/addtodo" style="background:var(--primary-color);color:#fff;padding:4px 12px;border-radius:4px;text-decoration:none;font-size:0.82em;">+ Add Todo</a>
+                        <a href="/todo" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">All Todos</a>
+                        <a href="/log" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">Logs</a>
+                    </div>
+                </div>
+
+                [% IF active_priorities && active_priorities.size %]
+                [% SET rank = 0 %]
+                [% FOREACH ap IN active_priorities %]
+                [% SET rank = rank + 1 %]
+                [%# Determine if this todo is blocked by an incomplete blocker %]
+                [% SET is_blocked = ap.blocked_by_todo_id && !ap.blocker_done %]
+                <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;margin-bottom:6px;
+                    border-radius:6px;border:1px solid var(--border-color);
+                    background:[% IF is_blocked %]var(--bg-secondary)[% ELSIF ap.status == 2 %]color-mix(in srgb,var(--primary-color) 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];
+                    opacity:[% IF is_blocked %]0.65[% ELSE %]1[% END %];">
+
+                    [%# Rank badge %]
+                    <span style="min-width:26px;height:26px;border-radius:50%;background:var(--primary-color);color:#fff;
+                        display:flex;align-items:center;justify-content:center;font-size:0.75em;font-weight:bold;flex-shrink:0;">
+                        [% rank %]
+                    </span>
+
+                    [%# Main content %]
+                    <div style="flex:1;min-width:0;">
+                        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
+                            [%# Priority badge %]
+                            [% IF ap.priority %]
+                            <span style="font-size:0.7em;font-weight:bold;padding:1px 5px;border-radius:3px;
+                                [% IF ap.priority <= 2 %]background:#dc3545;color:#fff
+                                [% ELSIF ap.priority <= 4 %]background:#fd7e14;color:#fff
+                                [% ELSIF ap.priority <= 6 %]background:#ffc107;color:#333
+                                [% ELSE %]background:#6c757d;color:#fff[% END %]">
+                                P[% ap.priority %]
+                            </span>
+                            [% END %]
+
+                            [%# Status badge %]
+                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;
+                                [% IF ap.status == 2 %]background:#17a2b8;color:#fff
+                                [% ELSE %]background:#6c757d;color:#fff[% END %]">
+                                [% IF ap.status == 2 %]IN PROGRESS[% ELSE %]NEW[% END %]
+                            </span>
+
+                            [%# Blocking badge %]
+                            [% IF ap.is_blocking %]
+                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#dc3545;color:#fff;" title="Other tasks depend on this">🔒 BLOCKING</span>
+                            [% END %]
+
+                            [%# Blocked badge %]
+                            [% IF is_blocked %]
+                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#adb5bd;color:#333;" title="Waiting on: [% ap.blocker_subject %]">⏸ BLOCKED</span>
+                            [% END %]
+
+                            [%# Site label (CSC all-sites view) %]
+                            [% IF is_csc && ap.sitename && ap.sitename != 'CSC' %]
+                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:var(--primary-color);color:#fff;">[% ap.sitename %]</span>
+                            [% END %]
+                        </div>
+
+                        [%# Subject link %]
+                        <a href="/todo/details?record_id=[% ap.record_id %]"
+                           style="font-weight:bold;color:var(--text-color);text-decoration:none;font-size:0.95em;[% IF is_blocked %]color:var(--text-muted-color)[% END %]">
+                            [% ap.subject || '(No subject)' %]
+                        </a>
+
+                        [%# Meta line: project, due date, blocked-by %]
+                        <div style="font-size:0.78em;color:var(--text-muted-color);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap;">
+                            [% IF ap.project_name %]<span>📁 [% ap.project_name %]</span>[% END %]
+                            [% IF ap.due_date %]<span>📅 Due: [% ap.due_date %]</span>[% END %]
+                            [% IF is_blocked %]<span>⏸ Waiting on: <em>[% ap.blocker_subject %]</em></span>[% END %]
+                            [% IF ap.sitename %]<span>[% ap.sitename %]</span>[% END %]
+                        </div>
+                    </div>
+
+                    [%# Quick action %]
+                    <a href="/todo/details?record_id=[% ap.record_id %]"
+                       style="font-size:0.75em;color:var(--primary-color);text-decoration:none;flex-shrink:0;padding-top:4px;">View →</a>
+                </div>
+                [% END %]
+
+                [% ELSE %]
+                <div style="text-align:center;padding:30px;color:var(--text-muted-color);background:var(--bg-secondary);border-radius:6px;">
+                    <p style="margin:0 0 10px;">No active todos found for your role and site.</p>
+                    <a href="/todo/addtodo" style="color:var(--primary-color);">+ Create your first todo</a>
+                </div>
+                [% END %]
             </div>
 
+            [%# ── CSC LEGACY: Master Plan Priority List (being migrated to DB above) ── %]
             [% IF is_csc %]
-            <details style="background: var(--secondary-color); border: 1px solid var(--border-color); border-radius: 4px; margin-bottom: 20px;">
-                <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: var(--secondary-color); border-bottom: 1px solid var(--border-color);">
-                    📊 MASTER PLAN PRIORITY LIST (PriorityTodos.tt)
+            <details style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;margin-bottom:16px;">
+                <summary style="padding:10px 14px;cursor:pointer;font-size:0.85em;color:var(--text-muted-color);">
+                    📋 Legacy: Master Plan Priority List (text-based — being migrated to DB above)
                 </summary>
-                <div style="padding: 15px;">
+                <div style="padding:14px;">
                     [% INCLUDE "admin/documentation/PriorityTodos.tt" %]
                 </div>
             </details>
             [% END %]
-            <details style="background: var(--secondary-color); border: 1px solid var(--border-color); border-radius: 4px; margin-bottom: 20px;">
-                <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: var(--secondary-color); border-bottom: 1px solid var(--border-color);">
-                    📝 DAILY TASK LISTS (Master Plan & App Todos)
-                </summary>
-                <div style="padding: 15px;">
-                    [% IF is_csc %]
-                    <!-- Master Plan Priorities (CSC only — hardcoded, being migrated to DB) -->
-                    <div class="task-list">
-                        <div class="task-list-header master-plan-header" onclick="toggleTaskList(this)">
-                            <span>[MASTER PLAN PRIORITIES] NEXT 5 ITEMS</span>
-                            <span class="task-list-toggle">HIDE</span>
-                        </div>
-                        <div class="task-list-items" id="master-plan-items">
-                            <div class="task-item sortable" draggable="true">
-                                <input type="checkbox" id="task-mp-1">
-                                <label for="task-mp-1" class="task-label">
-                                    [1] <a href="/Documentation/system/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN" target="_blank" style="color: var(--link-color);">A.1: Production DB K8s Migration (CRITICAL)</a> - Status: Ready for VM Rebuild
-                                </label>
-                            </div>
-                            <div class="task-item sortable" draggable="true">
-                                <input type="checkbox" id="task-mp-2">
-                                <label for="task-mp-2" class="task-label">
-                                    [2] <a href="/Documentation/docker_secrets_fallback_debugging_plan" target="_blank" style="color: var(--link-color);">B.1: Docker Secrets Fallback (CRITICAL)</a> - Status: In Progress
-                                </label>
-                            </div>
-                            <div class="task-item sortable" draggable="true">
-                                <input type="checkbox" id="task-mp-3">
-                                <label for="task-mp-3" class="task-label">
-                                    [3] Planning System Migration (HIGH) - Phase 1.5 Complete ✅
-                                </label>
-                            </div>
-                            <div class="task-item sortable" draggable="true">
-                                <input type="checkbox" id="task-mp-4">
-                                <label for="task-mp-4" class="task-label">
-                                    [4] <a href="/Documentation/ai_workflows/zencoder_reset_plan" target="_blank" style="color: var(--link-color);">B.3: Theme Handling (HIGH)</a> - Status: Planning
-                                </label>
-                            </div>
-                            <div class="task-item sortable" draggable="true">
-                                <input type="checkbox" id="task-mp-5">
-                                <label for="task-mp-5" class="task-label">
-                                    [5] <a href="/Documentation/DOCUMENTATION_SYSTEM_AUDIT_PLAN" target="_blank" style="color: var(--link-color);">C.1: Documentation System Audit (HIGH)</a> - Status: In Progress (Phase 1)
-                                </label>
-                            </div>
-                        </div>
-                        <button class="task-add-button" onclick="window.open('/todo/addtodo', '_blank')">+ Add Task to Plan</button>
-                    </div>
-                    [% END %]
 
-                    <!-- App Todos for Today (All sites — DB-driven) -->
-                    <div class="task-list">
-                        <div class="task-list-header app-todos-header" onclick="toggleTaskList(this)">
-                            <span>[APP TODOS FOR TODAY] FROM TODO SYSTEM [% IF todos_for_today && todos_for_today.size %]([% todos_for_today.size %])[% END %]</span>
-                            <span class="task-list-toggle">HIDE</span>
-                        </div>
-                        <div class="task-list-items" id="app-todo-items">
-                            [% IF todos_for_today && todos_for_today.size %]
-                                [% FOREACH todo IN todos_for_today %]
-                                    <div class="task-item">
-                                        <input type="checkbox" id="todo-[% todo.record_id %]">
-                                        <label for="todo-[% todo.record_id %]" class="task-label">
-                                            <a href="javascript:void(0)" onclick="window.open('/todo/details?record_id=[% todo.record_id %]', '_blank'); return false;" style="color: var(--link-color); text-decoration: none;">
-                                                <strong>[% todo.sitename || 'CSC' %]:</strong> [% todo.subject || '(No subject)' %]
-                                            </a>
-                                        </label>
-                                    </div>
-                                [% END %]
-                            [% ELSE %]
-                                <div style="padding: 15px; text-align: center; color: #666;">
-                                    <p>No todos scheduled for today.</p>
-                                    <p>Create a new todo using the button below.</p>
-                                </div>
-                            [% END %]
-                        </div>
-                        <button class="task-add-button" onclick="window.open('/todo/addtodo', '_blank')">+ Add New Todo from Todo System</button>
-                    </div>
-                </div>
-            </details>
-
-            [% IF is_csc %]
-            <div style="background: var(--schema-missing-color); border-left: 4px solid var(--accent-color); padding: 15px; border-radius: 4px; margin: 20px 0;">
-                <h4 style="margin-top: 0;">Today's Recommendation:</h4>
-                <ol>
-                    <li><strong>Daily Plan Automation:</strong> Workflow now complete and production-ready. Run as part of daily morning routine.</li>
-                    <li><strong>Next Priority:</strong> Select a critical item from Master Plan Priorities (A.3, A.2, or B.3) for today's focus.</li>
-                    <li><strong>Infrastructure:</strong> Monitor K8s readiness planning and credentials audit scope work.</li>
-                </ol>
-            </div>
-            [% END %]
         </div>
     </div>
 
