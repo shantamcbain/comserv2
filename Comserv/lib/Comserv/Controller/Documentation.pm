@@ -2324,19 +2324,25 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     my @planning_projects;
     my @orphan_plans;       # plans not linked to any project
     my @plan_sitenames;     # distinct sitenames for filter toggle (CSC only)
+
+    # --- Fetch top-level projects (separate eval so orphan-plan failure can't block this) ---
     eval {
-        my %proj_cond = $is_csc ? () : (sitename => $sitename);
+        my %proj_cond = (parent_id => undef);   # top-level only — filter in SQL, not Perl
+        $proj_cond{sitename} = $sitename unless $is_csc;
+
         my @proj_rows = $c->model('DBEncy')->resultset('Project')->search(
             \%proj_cond,
             { order_by => ['sitename', 'name'] }
         )->all;
 
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'daily_plan',
+            "planning_projects: fetched " . scalar(@proj_rows) . " top-level projects (is_csc=$is_csc)");
+
         for my $proj (@proj_rows) {
-            next if $proj->parent_id;   # top-level projects only
             my $sn = $proj->sitename || '';
             my %p = $proj->get_columns;
 
-            # Linked plans
+            # Linked plans via many_to_many (inner eval — failure just means no linked plans shown)
             my @linked_plans;
             eval {
                 for my $pln ($proj->dailyplans->all) {
@@ -2344,6 +2350,10 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
                     push @linked_plans, \%ph;
                 }
             };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+                    "Could not fetch linked plans for project $p{id}: $@");
+            }
             $p{linked_plans} = \@linked_plans;
             push @planning_projects, \%p;
 
@@ -2354,8 +2364,14 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         # Deduplicate sitenames
         my %seen_site;
         @plan_sitenames = grep { !$seen_site{$_}++ } sort @plan_sitenames;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Could not fetch planning projects: $@");
+    }
 
-        # Standalone plans (not linked to any project)
+    # --- Standalone plans (not linked to any project) — separate eval ---
+    eval {
         my %plan_cond = $is_csc ? () : (sitename => $sitename);
         for my $pln ($c->model('DBEncy')->resultset('DailyPlan')->search(
             \%plan_cond, { order_by => { -desc => 'created_at' } }
@@ -2368,7 +2384,7 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     };
     if ($@) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
-            "Could not fetch planning projects: $@");
+            "Could not fetch orphan plans: $@");
     }
 
     # Filter projects by filter_site param (CSC admin only)
