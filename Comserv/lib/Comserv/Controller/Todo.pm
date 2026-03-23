@@ -684,13 +684,20 @@ sub modify :Path('/todo/modify') :Args(1) {
         "Updating todo item with record ID: $record_id."
     );
 
+    # Capture old due_date before update so we can log rescheduling
+    my $old_due_date   = $todo->due_date   // '';
+    my $old_start_date = $todo->start_date // '';
+    my $new_due_date   = $form_data->{due_date} || DateTime->now->add(days => 7)->ymd;
+    my $today          = DateTime->now->ymd;
+    my $current_user   = $c->session->{username} || 'system';
+
     # Attempt to update the todo record
     eval {
         $todo->update({
             sitename             => $form_data->{sitename},
             start_date           => $form_data->{start_date},
             parent_todo          => $parent_todo,
-            due_date             => $form_data->{due_date} || DateTime->now->add(days => 7)->ymd,
+            due_date             => $new_due_date,
             subject              => $form_data->{subject},
             description          => $form_data->{description},
             estimated_man_hours  => $form_data->{estimated_man_hours},
@@ -705,8 +712,8 @@ sub modify :Path('/todo/modify') :Args(1) {
             priority             => $form_data->{priority},
             time_of_day          => $form_data->{time_of_day},
             share                => $form_data->{share} || 0,
-            last_mod_by          => $c->session->{username} || 'system',
-            last_mod_date        => DateTime->now->ymd,
+            last_mod_by          => $current_user,
+            last_mod_date        => $today,
             user_id              => $form_data->{user_id} || 1,
             project_id           => $form_data->{project_id},
             date_time_posted     => $form_data->{date_time_posted},
@@ -739,6 +746,29 @@ sub modify :Path('/todo/modify') :Args(1) {
         'modify.success',
         "Todo item successfully updated for record ID: $record_id."
     );
+
+    # --- Rescheduling interval log ---
+    # If the due_date changed, create a TodoInterval record to track the move.
+    # This builds an audit trail showing how many times and how far a task was deferred.
+    if ($old_due_date && $new_due_date && $old_due_date ne $new_due_date) {
+        eval {
+            $schema->resultset('TodoInterval')->create({
+                todo_record_id => $record_id,
+                start_date     => $old_start_date || $today,
+                end_date       => $today,
+                interval_type  => 'rescheduled',
+                status         => "from:$old_due_date to:$new_due_date",
+                last_mod_by    => $current_user,
+                last_mod_date  => $today,
+            });
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'modify.reschedule',
+                "Logged reschedule for todo $record_id: $old_due_date -> $new_due_date by $current_user");
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'modify.reschedule',
+                "Could not write TodoInterval for todo $record_id: $@");
+        }
+    }
 
     # Handle successful update
     $c->flash->{success_msg} = "Todo item with ID $record_id has been successfully updated.";
