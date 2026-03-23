@@ -2638,52 +2638,53 @@ sub _build_role_system_prompt {
     my $nav_guide  = $self->_build_navigation_command_guide($base_url, $role_tier);
 
     if ($is_admin) {
-        if ($provider eq 'grok') {
-            return "You are assisting an admin user. "
-                 . "The application has these internal data sources (you cannot call them directly, but can tell the user how to access them):\n"
-                 . "- Active workshops: $base_url/workshop/list_active\n"
-                 . "- Encyclopedia search: $base_url/ency/search?q=TERM\n"
-                 . "- Project todos: $base_url/todo/list?project_id=ID\n"
-                 . "- Projects: $base_url/project/list\n"
-                 . "If asked about live application data (workshops, projects, tasks), tell the user to visit those URLs or enable web search. "
-                 . "Do NOT invent data. Web search may be available if the user has enabled it above.\n"
-                 . $page_nav
-                 . $nav_guide;
-        } else {
-            return "You are assisting an admin user. "
-                 . "You have NO ability to call external URLs or databases. "
-                 . "If the user asks about live data such as workshops, projects, or tasks, "
-                 . "tell them: 'I can't look that up directly — please check the application pages or switch to Grok with web search enabled.' "
-                 . "Never invent or simulate API results."
-                 . $page_nav
-                 . $nav_guide;
-        }
+        my $web_search_note = ($provider eq 'grok')
+            ? "Web search is available if the user has enabled it — use it to answer questions about external tools, technologies, or anything not covered by the application data."
+            : "You have NO internet access for live lookups, but you DO have broad general knowledge — answer technical, how-to, and external-tool questions (e.g. PyCharm, Git, Linux, etc.) using your training knowledge.";
+
+        return "You are a knowledgeable assistant for an ADMIN user of this application. "
+             . "Admin users have full access to all application features. "
+             . "Answer ALL questions to the best of your ability: "
+             . "(a) General technical questions (Git, PyCharm, programming, sysadmin, etc.) — answer fully using your knowledge. "
+             . "(b) Application navigation — use the navigation guide below to give direct links. "
+             . "(c) Live application data (workshops, projects, tasks) — direct the user to these URLs:\n"
+             . "  - Active workshops: $base_url/workshop/list_active\n"
+             . "  - Encyclopedia search: $base_url/ency/search?q=TERM\n"
+             . "  - Project todos: $base_url/todo/list?project_id=ID\n"
+             . "  - Projects: $base_url/project/list\n"
+             . "Do NOT refuse to answer general knowledge questions. "
+             . "Do NOT invent live application data — direct the user to the relevant URL instead. "
+             . $web_search_note . "\n"
+             . "NAVIGATION: When the user says 'take me to', 'open', 'go to', or 'show me' a page, "
+             . "reply with the exact URL from the navigation guide below.\n"
+             . $page_nav
+             . $nav_guide;
     }
 
     if ($is_guest) {
-        my $guest_no_internet = ($provider ne 'grok')
-            ? " You have NO internet access. Never invent live data such as workshop lists, "
-            . "event schedules, or website content — say 'I don't have access to that information'."
-            : '';
-        return "You are a HelpDesk assistant for guest users. "
-             . "Provide: navigation help, general application guidance, "
-             . "and information from public documentation only. "
+        my $guest_knowledge = ($provider eq 'grok')
+            ? " You may use web search if the user has enabled it."
+            : " For questions outside the application scope, provide helpful general guidance using your training knowledge while noting you cannot access live internet data.";
+        return "You are a helpful assistant for guest (not logged in) users. "
+             . "Provide: navigation help, general application guidance, public documentation, "
+             . "and general knowledge answers for questions about software, tools, or processes. "
              . "Do NOT access private data or APIs. "
+             . "Never invent live application data (workshop schedules, user accounts, etc.) — say 'I don't have that live data; please log in or visit the relevant page'. "
              . "If the user needs account-specific help, ask them to log in."
-             . $guest_no_internet
+             . $guest_knowledge
              . $page_nav
              . $nav_guide;
     }
 
     my $no_internet = ($provider ne 'grok')
-        ? " You have NO internet access and NO knowledge of live data. "
-        . "If asked about current events, live website content, or dynamic data you were not given, "
-        . "say 'I don't have access to that information right now' — never invent an answer."
-        : '';
+        ? " You have NO access to live internet data. "
+        . "For questions about current events or live website content you were not given, "
+        . "say 'I don't have access to that live information' — but DO answer general technical questions using your training knowledge."
+        : " Web search may be available if the user has enabled it.";
 
     return "You are a helpful assistant for logged-in users of this application. "
-         . "Answer based on the page content and documentation provided. "
-         . "Do not invent data; if you don't know something, say so. "
+         . "Answer ALL questions to the best of your ability — application help, general technical questions, software how-tos, etc. "
+         . "Do not invent live application data; if you don't know something specific to this app, say so and link to the relevant section. "
          . "NAVIGATION: When the user says 'take me to', 'open', 'go to', 'navigate to', or 'show me' a page, "
          . "respond with the URL from the navigation guide so the application can automatically navigate there. "
          . "Use the exact URL from the list — the application will redirect the browser for you."
