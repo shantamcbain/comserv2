@@ -2953,8 +2953,8 @@ sub _build_role_system_prompt {
              . "(c) Live application data (workshops, projects, tasks) — direct the user to these URLs:\n"
              . "  - Active workshops: $base_url/workshop/list_active\n"
              . "  - Encyclopedia search: $base_url/ency/search?q=TERM\n"
-             . "  - Project todos: $base_url/todo/list?project_id=ID\n"
-             . "  - Projects: $base_url/project/list\n"
+             . "  - Projects: $base_url/project/list (IDs shown in LIVE PROJECT DATA above)\n"
+             . "  - Project todos: $base_url/todo/list?project_id=N (use real ID from live data, never literal 'ID')\n"
              . "Do NOT refuse to answer general knowledge questions. "
              . "Do NOT invent live application data — direct the user to the relevant URL instead. "
              . $web_search_note . "\n"
@@ -3184,7 +3184,7 @@ sub _build_page_navigation_hint {
             $hint .= "Navigation context — Todo / Task Management (admin):\n"
                    . "- You can view, create, assign, and close tasks across all projects.\n"
                    . "- All tasks: $base_url/todo/list\n"
-                   . "- Project-specific: $base_url/todo/list?project_id=ID\n";
+                   . "- Project-specific: $base_url/todo/list?project_id=N (use real numeric ID from live project data — never literal 'ID')\n";
         } elsif ($role eq 'user') {
             $hint .= "Navigation context — Todo / Task Management:\n"
                    . "- You can view tasks assigned to you and update their status.\n"
