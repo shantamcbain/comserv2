@@ -451,6 +451,13 @@
                             if (!state.isGuest) {
                                 state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-3-mini';
                             }
+                            // Show web search toggle for any user who has Grok access
+                            // (toggle applies to Grok requests whether selected manually or via auto-routing)
+                            const wst = document.getElementById('web-search-toggle');
+                            if (wst) {
+                                wst.style.display = 'inline';
+                                wst.title = 'Enable web search for Grok requests (uses API credits)';
+                            }
                         } else if (p.service === 'ollama' && p.models && p.models.length > 0) {
                             // Filter to chat-capable models only, then sort by size
                             const chatModels = p.models.filter(function(m) { return isChatModel(m.id); });
@@ -1061,9 +1068,10 @@
             requestPayload.model = modelName;
         }
 
-        // Include web search flag (Grok only; server enforces admin-only)
+        // Include web search flag — send whenever checkbox is checked.
+        // Server enforces role-based access and only activates it for Grok requests.
         const webSearchEl = document.getElementById('enable-web-search');
-        if (webSearchEl && webSearchEl.checked && providerName === 'grok') {
+        if (webSearchEl && webSearchEl.checked) {
             requestPayload.use_search = true;
         }
 
@@ -1206,7 +1214,7 @@
                     + (isServerTimeout ? ' — Ollama may still be loading the model.' : '');
                 wrapper.appendChild(label);
                 wrapper.appendChild(errEl);
-                if (isServerTimeout) {
+                if (isServerTimeout || isOllama) {
                     const retryBtn = document.createElement('button');
                     retryBtn.className = 'chat-retry-btn';
                     retryBtn.textContent = '↺ Try Again';
