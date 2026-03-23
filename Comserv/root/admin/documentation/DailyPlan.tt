@@ -140,6 +140,9 @@
         <button class="tab-button active" onclick="switchTab(event, 'today-work')">
             DAILY PRIORITIES
         </button>
+        <button class="tab-button" onclick="switchTab(event, 'daily-schedule')">
+            🕐 DAILY SCHEDULE
+        </button>
         <button class="tab-button" onclick="switchTab(event, 'weekly-view')">
             📅 THIS WEEK
         </button>
@@ -278,6 +281,22 @@
             </details>
             [% END %]
 
+        </div>
+    </div>
+
+    <!-- TAB: DAILY SCHEDULE (hourly time-slot view) -->
+    <div id="daily-schedule" class="tab-content">
+        <div id="anchor-dynamic-daily" class="nav-anchor"></div>
+        <h2>Daily Schedule</h2>
+        <div class="dynamic-container">
+            [% TRY %]
+                [% INCLUDE 'todo/day.tt' %]
+            [% CATCH %]
+                <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 15px; margin: 15px 0;">
+                    <h4 style="margin-top: 0; color: #856404;">⚠️ Daily Schedule Not Available</h4>
+                    <p>The daily time-slot view is not currently available.</p>
+                </div>
+            [% END %]
         </div>
     </div>
 
