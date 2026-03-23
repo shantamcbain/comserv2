@@ -339,14 +339,6 @@ last_updated = '2026/02/08'
         </div>
     </details>
 
-    <div id="anchor-dynamic-daily" class="nav-anchor"></div>
-    <div id="dynamic-daily" class="doc-section">
-        <h2>Dynamic Daily Tasks</h2>
-        <div class="dynamic-container">
-            [% INCLUDE 'todo/day.tt' %]
-        </div>
-    </div>
-
     <div id="planning" class="doc-section">
         <h2>Planning lists</h2>
 
