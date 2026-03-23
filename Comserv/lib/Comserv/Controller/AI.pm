@@ -2616,14 +2616,14 @@ sub _get_module_data {
 
     my @sections;
 
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $today     = DateTime->today->ymd;
+
     # --- Workshop data ---
     if ($prompt =~ /workshop|class|course|session|seminar|event|beekeep/i) {
         eval {
             my ($workshops, $err) = $c->model('WorkShop')->get_active_workshops($c);
             if ($workshops && @$workshops) {
-                my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-                my $today = DateTime->today->ymd;
-
                 my @visible;
                 for my $ws (@$workshops) {
                     next unless !$ws->date || $ws->date ge $today;
@@ -2652,6 +2652,96 @@ sub _get_module_data {
         };
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
             '_get_module_data', "Workshop fetch error: $@") if $@;
+    }
+
+    # --- Todo / Task data ---
+    if ($prompt =~ /todo|task|overdue|due|deadline|priority|critical|reschedul|plan|backlog/i) {
+        eval {
+            my $schema = $c->model('DBEncy')->schema;
+            if ($schema) {
+                my $rs = $schema->resultset('Todo');
+
+                # Fetch all active todos for this site (status != 3 = not done)
+                # For CSC admins, show all sites
+                my %site_filter = (status => { '!=' => 3 });
+                my $roles = $c->session->{roles} || [];
+                my $is_admin = grep { /^(admin|developer)$/i } (ref $roles eq 'ARRAY' ? @$roles : ());
+                unless ($is_admin && lc($site_name) eq 'csc') {
+                    $site_filter{sitename} = $site_name;
+                }
+
+                my @todos = $rs->search(
+                    \%site_filter,
+                    { order_by => [{ -asc => 'priority' }, { -asc => 'due_date' }], rows => 30 }
+                );
+
+                if (@todos) {
+                    my (@overdue, @due_soon, @other);
+                    for my $t (@todos) {
+                        my $due  = $t->due_date   // '';
+                        my $subj = $t->subject    // 'Untitled';
+                        my $pri  = $t->priority   // 99;
+                        my $proj = $t->project_id // '';
+                        my $id   = $t->record_id  // '';
+                        my $stat = $t->status     // '';
+                        my $line = "  [#$id] Pri=$pri | $subj"
+                            . ($due  ? " | Due: $due" : " | No due date")
+                            . ($proj ? " | Project: $proj" : '')
+                            . " | Status: $stat";
+
+                        if ($due && $due lt $today) {
+                            push @overdue,  "OVERDUE $line";
+                        } elsif ($due) {
+                            push @due_soon, $line;
+                        } else {
+                            push @other, $line;
+                        }
+                    }
+
+                    my $block = "LIVE TODO DATA (current as of query time) for site '$site_name':\n";
+                    if (@overdue) {
+                        $block .= "OVERDUE ITEMS (need rescheduling or urgent action):\n"
+                               . join("\n", @overdue) . "\n";
+                    }
+                    if (@due_soon) {
+                        $block .= "UPCOMING ITEMS:\n" . join("\n", @due_soon) . "\n";
+                    }
+                    if (@other) {
+                        $block .= "OTHER ACTIVE ITEMS:\n" . join("\n", @other) . "\n";
+                    }
+                    $block .= "Browse all todos at /todo | View a specific todo at /todo/view/ID (replace ID with record_id number above)";
+                    push @sections, $block;
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_get_module_data', "Todo fetch error: $@") if $@;
+    }
+
+    # --- Project data ---
+    if ($prompt =~ /project|projects/i) {
+        eval {
+            my $schema = $c->model('DBEncy')->schema;
+            if ($schema) {
+                my $projects = $c->model('Project')->get_projects($schema, $site_name);
+                if ($projects && @$projects) {
+                    my @lines;
+                    for my $p (@$projects) {
+                        my $id   = $p->id          // '';
+                        my $name = $p->name        // 'Unnamed';
+                        my $desc = $p->description // '';
+                        $desc = substr($desc, 0, 80) . '…' if length($desc) > 80;
+                        push @lines, "  [ID=$id] $name" . ($desc ? " — $desc" : '');
+                    }
+                    push @sections,
+                        "LIVE PROJECT DATA for site '$site_name':\n"
+                        . join("\n", @lines)
+                        . "\nView project details at /project/details?project_id=ID (replace ID with the number above)";
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_get_module_data', "Project fetch error: $@") if $@;
     }
 
     return join("\n\n", @sections);
