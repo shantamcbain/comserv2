@@ -908,12 +908,9 @@ sub create :Local {
         $c->detach();
     }
 
-    # Redirect to the todo list or return_to URL with success message
+    # Redirect to /log after save (or explicit return_to if provided)
     $c->flash->{success_msg} = "Successfully created todo: " . $todo->subject;
-    my $redirect_url = $params->{return_to} || $c->uri_for($self->action_for('todo'));
-    
-    # Handle the case where the return_to URL might already have a fragment
-    # or ensure it's properly handled if coming from internal referer
+    my $redirect_url = $params->{return_to} || $c->uri_for('/log');
     $c->response->redirect($redirect_url);
 }
 
