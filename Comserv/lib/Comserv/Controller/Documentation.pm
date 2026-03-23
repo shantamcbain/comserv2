@@ -2333,11 +2333,7 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
 
         for my $proj (@proj_rows) {
             next if $proj->parent_id;   # top-level projects only
-
-            # Skip projects with numeric-only sitename — legacy FK artifacts stored as site_id integer
             my $sn = $proj->sitename || '';
-            next if $sn =~ /^\d+$/;
-
             my %p = $proj->get_columns;
 
             # Linked plans
@@ -2351,7 +2347,7 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
             $p{linked_plans} = \@linked_plans;
             push @planning_projects, \%p;
 
-            # Collect sitenames for filter toggle
+            # Collect sitenames for filter toggle (skip blank)
             push @plan_sitenames, $sn if $sn;
         }
 
