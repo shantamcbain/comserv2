@@ -260,10 +260,11 @@ sub query {
     
     # Build the request payload
     my $payload = {
-        model => $self->model,
-        prompt => $prompt,
-        stream => $self->stream ? JSON::true : JSON::false,
-        options => {
+        model      => $self->model,
+        prompt     => $prompt,
+        stream     => $self->stream ? JSON::true : JSON::false,
+        keep_alive => '30m',
+        options    => {
             temperature => $self->temperature,
             num_predict => $self->max_tokens,
             num_ctx     => 8192,
@@ -399,10 +400,11 @@ sub chat {
     
     # Build the request payload
     my $payload = {
-        model => $self->model,
-        messages => $messages,
-        stream => $self->stream ? JSON::true : JSON::false,
-        options => {
+        model      => $self->model,
+        messages   => $messages,
+        stream     => $self->stream ? JSON::true : JSON::false,
+        keep_alive => '30m',
+        options    => {
             temperature => $self->temperature,
             num_predict => $self->max_tokens,
             num_ctx     => 8192,
