@@ -447,6 +447,7 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
         start_date      => $c->request->params->{start_date} || DateTime->now->strftime('%Y-%m-%d'),
         time_of_day     => $c->request->params->{time_of_day},
         user_id         => $c->session->{user_id},  # Pre-select logged-in user
+        default_status  => $c->request->params->{status} || 1,  # Default NEW; allow override via param
         template        => 'todo/addtodo.tt' # Template for rendering
     );
 
