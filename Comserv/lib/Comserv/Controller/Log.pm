@@ -6,6 +6,7 @@ use DateTime::TimeZone;
 use DateTime::Format::Strptime;
 use Data::Dumper;
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -39,6 +40,14 @@ sub BUILD {
 
 sub index :Path('/log') :Args(0) {
     my ( $self, $c ) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'log_index')) {
+        $c->flash->{error_msg} = 'You must be an administrator to view logs.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Accessed log index");
     $c->stash->{debug_errors} //= [];
     $c->stash(debug_errors => []);
@@ -73,6 +82,13 @@ sub index :Path('/log') :Args(0) {
 sub details :Path('/log/details') :Args(0) {
     my ($self, $c) = @_;
 
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'log_details')) {
+        $c->flash->{error_msg} = 'You must be an administrator to view log details.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     my $record_id = $c->request->body_parameters->{record_id};
     my $log = $c->model('DBEncy')->resultset('Log')->find($record_id);
 
@@ -95,6 +111,13 @@ sub details :Path('/log/details') :Args(0) {
 }
 sub update :Path('/log/update') :Args(0) {
     my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'log_update')) {
+        $c->flash->{error_msg} = 'You must be an administrator to update log entries.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
 
     # Get the record_id from the form data
     my $record_id = $c->request->body_parameters->{record_id};
@@ -443,15 +466,10 @@ sub create_log :Path('/log/create_log') :Args() {
     # Log the success event
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_log', "Log entry created successfully: ID " . $logEntry->id);
 
-    # Redirect to the referring page and retain necessary parameters
-    my $referer = $c->request->referer || '/';
-    my $redirect_url = $referer;
-    $redirect_url .= "?record_id=" . $logEntry->id if $logEntry->id;
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_log', "Redirecting to: $redirect_url");
     $c->flash->{success_msg} = 'Log entry created successfully';
 
-    # Redirect back to the todo details page
-    $c->response->redirect($c->uri_for('/todo/details', { record_id => $logEntry->todo_record_id }));
+    # Redirect to /log after save
+    $c->response->redirect($c->uri_for('/log'));
 }
 
 __PACKAGE__->meta->make_immutable;

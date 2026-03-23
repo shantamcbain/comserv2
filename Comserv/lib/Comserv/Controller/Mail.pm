@@ -191,7 +191,7 @@ sub add_mail_config :Local {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'add_mail_config', 
         "Params: smtp_host=" . ($params->{smtp_host} || 'undef') . 
         ", smtp_port=" . ($params->{smtp_port} || 'undef') .
-        ", smtp_username=" . ($params->{smtp_username} || 'undef'));
+        ", smtp_user=" . ($params->{smtp_user} || 'undef'));
     
     # Validate required fields
     unless ($site_input) {
@@ -287,7 +287,7 @@ sub add_mail_config :Local {
         
         # Create or update SMTP configuration
         my $saved_count = 0;
-        for my $config_key (qw(smtp_host smtp_port smtp_username smtp_password smtp_from smtp_ssl)) {
+        for my $config_key (qw(smtp_host smtp_port smtp_user smtp_password smtp_from smtp_ssl)) {
             # Handle checkbox: smtp_ssl will be '1' if checked, undefined if not
             my $value = $params->{$config_key};
             
@@ -366,13 +366,13 @@ sub edit_smtp_config :Local {
             
             # Update SMTP configuration
             my $updated_count = 0;
-            for my $config_key (qw(smtp_host smtp_port smtp_username smtp_password smtp_from smtp_ssl)) {
-                # Handle checkbox: smtp_ssl will be '1' if checked, undefined if not
+            for my $config_key (qw(smtp_host smtp_port smtp_user smtp_password smtp_from smtp_ssl)) {
+                # Handle checkbox: smtp_ssl will be 'ssl' if checked, undefined if not
                 my $value = $params->{$config_key};
                 
-                # For smtp_ssl, default to 0 if not checked
+                # For smtp_ssl, default to '' if not checked (empty = no SSL)
                 if ($config_key eq 'smtp_ssl' && !defined $value) {
-                    $value = 0;
+                    $value = '';
                 }
                 
                 next unless defined $value;
@@ -544,17 +544,26 @@ sub test_smtp_config :Local {
         );
         
         if ($smtp) {
-            # Try to authenticate if credentials are provided
-            if ($config{smtp_username} && $config{smtp_password}) {
-                if ($smtp->auth($config{smtp_username}, $config{smtp_password})) {
+            # Check both smtp_user and legacy smtp_username key
+            my $smtp_user = $config{smtp_user} || $config{smtp_username} || '';
+            my $smtp_pass = $config{smtp_password} || '';
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test_smtp_config',
+                "Auth check: user='" . ($smtp_user ? $smtp_user : '(none)') . "' password=" . ($smtp_pass ? '(set)' : '(not set)'));
+
+            if ($smtp_user && $smtp_pass) {
+                require Authen::SASL;
+                if ($smtp->auth($smtp_user, $smtp_pass)) {
                     $test_result->{success} = 1;
-                    $test_result->{message} = "Successfully connected and authenticated to SMTP server";
+                    $test_result->{message} = "Connected and authenticated as $smtp_user on $config{smtp_host}:$config{smtp_port}";
                 } else {
-                    $test_result->{message} = "Connected but authentication failed: " . $smtp->message();
+                    $test_result->{message} = "Connected to $config{smtp_host}:$config{smtp_port} but AUTH failed for $smtp_user: " . $smtp->message();
                 }
+            } elsif ($smtp_user && !$smtp_pass) {
+                $test_result->{message} = "Connected to $config{smtp_host}:$config{smtp_port} but password not set for $smtp_user — save the password first";
             } else {
                 $test_result->{success} = 1;
-                $test_result->{message} = "Successfully connected to SMTP server (authentication not configured)";
+                $test_result->{message} = "Connected to $config{smtp_host}:$config{smtp_port} (no credentials configured — OK for PMG relay)";
             }
             $smtp->quit();
         } else {
@@ -702,6 +711,17 @@ sub mail_admin_dashboard :Local {
             
             @smtp_servers = sort { $a->{site_id} <=> $b->{site_id} } values %servers_by_site;
             $mail_stats->{active_servers} = scalar @smtp_servers;
+
+            # Auto-migrate legacy 'smtp_username' key → 'smtp_user' in DB
+            eval {
+                my $migrated = $dbh->do(
+                    "UPDATE site_config SET config_key='smtp_user' WHERE config_key='smtp_username'"
+                );
+                if ($migrated && $migrated > 0) {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'mail_admin_dashboard',
+                        "Migrated $migrated row(s): smtp_username → smtp_user in site_config");
+                }
+            };
             
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'mail_admin_dashboard',
                 "Loaded $row_count SMTP config rows, " . scalar(@smtp_servers) . " servers total");
@@ -724,6 +744,79 @@ sub mail_admin_dashboard :Local {
     );
     
     $c->forward($c->view('TT'));
+}
+
+sub send_test_email :Local {
+    my ($self, $c) = @_;
+
+    my $roles = $c->session->{roles} || [];
+    $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
+    unless (grep { $_ eq 'admin' } @$roles) {
+        $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
+        $c->res->redirect($c->uri_for('/mail'));
+        return;
+    }
+
+    my $site_id = $c->req->param('site_id') || $c->session->{site_id} || $c->stash->{site_id};
+
+    # If still no site_id, resolve from SiteName in stash
+    if (!$site_id && $c->stash->{SiteName}) {
+        eval {
+            my $site = $c->model('DBEncy')->resultset('Site')->find({ name => $c->stash->{SiteName} });
+            $site_id = $site->id if $site;
+        };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_test_email',
+            "Resolved site_id=" . ($site_id // 'undef') . " from SiteName=" . $c->stash->{SiteName});
+    }
+
+    my $to = $c->req->param('to') || '';
+
+    unless ($to) {
+        $c->flash->{error_msg} = 'Please provide a recipient email address.';
+        $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_test_email',
+        "Admin test-send requested: to=$to site_id=" . ($site_id // 'undef'));
+
+    my $smtp_config = $c->model('Mail')->get_smtp_config($c, $site_id);
+    my $via = $smtp_config
+        ? ($smtp_config->{host} . ':' . $smtp_config->{port} . ' (' . ($smtp_config->{user} || 'no-auth') . ')')
+        : 'fallback (no DB config)';
+
+    my $body = "This is a test email from the Comserv Unified Mail System.\n\n"
+             . "Sent via: $via\n"
+             . "Site ID: " . ($site_id // 'none — used fallback') . "\n"
+             . "Time: " . scalar(localtime()) . "\n\n"
+             . "If you received this, the mail path is working correctly.";
+
+    my $result = eval {
+        $c->model('Mail')->send_email(
+            $c, $to,
+            'Comserv Mail System Test',
+            $body,
+            $site_id,
+        );
+    };
+    my $err = $@;
+
+    if ($err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_test_email',
+            "send_test_email threw exception: $err");
+        $c->flash->{error_msg} = "Test email failed (exception): $err";
+    } elsif ($result) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_test_email',
+            "Test email sent successfully to $to");
+        $c->flash->{success_msg} = "Test email sent to $to — check your inbox and the application log for SMTP transcript.";
+    } else {
+        my $debug = $c->stash->{debug_msg} || 'see application log for SMTP transcript';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_test_email',
+            "Test email send returned failure for $to");
+        $c->flash->{error_msg} = "Test email failed to $to — $debug";
+    }
+
+    $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
 }
 
 __PACKAGE__->meta->make_immutable;

@@ -59,7 +59,7 @@ __PACKAGE__->add_columns(
 );
 
 __PACKAGE__->set_primary_key('id');
-__PACKAGE__->add_unique_constraint(['sitename', 'plan_name']);
+__PACKAGE__->add_unique_constraint('dailyplan_sitename_plan_name' => ['sitename', 'plan_name']);
 
 __PACKAGE__->has_many(
     'dailyplan_projects' => 'Comserv::Model::Schema::Ency::Result::DailyPlanProject',

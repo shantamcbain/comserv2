@@ -1,0 +1,1245 @@
+[% PageVersion = 'Documentation/admin/schema-compare-guide.tt,v 1.0 2025/01/27 shanta Exp shanta' %]
+[% WRAPPER layout.tt %]
+
+<div class="documentation-container">
+    <header class="doc-header">
+        <h1><i class="fas fa-database"></i> Schema Compare Tool - Complete Guide</h1>
+        <div class="doc-meta">
+            <span class="doc-version"><i class="fas fa-tag"></i> Version 1.0</span>
+            <span class="doc-date"><i class="fas fa-calendar"></i> January 27, 2025</span>
+            <span class="doc-author"><i class="fas fa-user"></i> shanta</span>
+        </div>
+    </header>
+
+    <nav class="doc-toc">
+        <h2><i class="fas fa-list"></i> Table of Contents</h2>
+        <ul>
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#getting-started">Getting Started</a></li>
+            <li><a href="#interface-guide">Interface Guide</a></li>
+            <li><a href="#data-type-normalization">Data Type Normalization</a></li>
+            <li><a href="#debug-mode">Debug Mode</a></li>
+            <li><a href="#troubleshooting">Troubleshooting</a></li>
+            <li><a href="#best-practices">Best Practices</a></li>
+            <li><a href="#technical-reference">Technical Reference</a></li>
+        </ul>
+    </nav>
+
+    <section id="overview" class="doc-section">
+        <h2><i class="fas fa-info-circle"></i> Overview</h2>
+        
+        <div class="overview-card">
+            <h3>What is Schema Compare?</h3>
+            <p>The Schema Compare tool is a powerful utility that compares database table schemas with their corresponding DBIx::Class Result files. It helps developers ensure synchronization between database structure and ORM definitions during development and maintenance.</p>
+        </div>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3><i class="fas fa-search"></i> Schema Analysis</h3>
+                <p>Automatically detects differences between database tables and Result files, including field types, sizes, constraints, and relationships.</p>
+            </div>
+            <div class="feature-card">
+                <h3><i class="fas fa-sync"></i> Synchronization</h3>
+                <p>Provides tools to sync differences between database and Result files in both directions with safety checks.</p>
+            </div>
+            <div class="feature-card">
+                <h3><i class="fas fa-database"></i> Multi-Database</h3>
+                <p>Supports multiple databases (Ency, Forager) with intelligent type mapping and cross-database compatibility.</p>
+            </div>
+            <div class="feature-card">
+                <h3><i class="fas fa-bug"></i> Debug Mode</h3>
+                <p>Advanced debugging capabilities for developers to troubleshoot schema comparison issues and data type normalization.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="getting-started" class="doc-section">
+        <h2><i class="fas fa-play"></i> Getting Started</h2>
+        
+        <div class="getting-started-steps">
+            <div class="step-card">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <h3>Access the Tool</h3>
+                    <p>Navigate to <code>/admin/schema_compare</code> or use the admin menu:</p>
+                    <div class="code-block">
+                        <code>Admin Menu → Schema Comparison</code>
+                    </div>
+                </div>
+            </div>
+
+            <div class="step-card">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <h3>View Database Overview</h3>
+                    <p>The main page shows a summary of all connected databases with statistics:</p>
+                    <ul>
+                        <li>Total databases and connection status</li>
+                        <li>Number of tables per database</li>
+                        <li>Tables with/without Result files</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="step-card">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <h3>Explore Table Comparisons</h3>
+                    <p>Click on database sections to expand and view table groups:</p>
+                    <ul>
+                        <li><strong>Tables with Result Files</strong> - Ready for comparison</li>
+                        <li><strong>Result Files without Tables</strong> - Orphaned Result files</li>
+                        <li><strong>Tables without Result Files</strong> - Missing Result files</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="step-card">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                    <h3>Analyze Field Differences</h3>
+                    <p>Click on individual table cards to load detailed field comparisons showing:</p>
+                    <ul>
+                        <li>Side-by-side field comparison</li>
+                        <li>Data type differences</li>
+                        <li>Size and constraint variations</li>
+                        <li>Missing fields in either source</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="interface-guide" class="doc-section">
+        <h2><i class="fas fa-desktop"></i> Interface Guide</h2>
+        
+        <div class="interface-section">
+            <h3><i class="fas fa-chart-bar"></i> Summary Statistics</h3>
+            <p>The top section displays key metrics:</p>
+            <div class="stats-explanation">
+                <div class="stat-item">
+                    <strong>Total Databases:</strong> Number of configured databases
+                </div>
+                <div class="stat-item">
+                    <strong>Connected:</strong> Successfully connected databases
+                </div>
+                <div class="stat-item">
+                    <strong>Total Tables:</strong> Sum of all tables across databases
+                </div>
+                <div class="stat-item">
+                    <strong>With Results:</strong> Tables that have corresponding Result files
+                </div>
+            </div>
+        </div>
+
+        <div class="interface-section">
+            <h3><i class="fas fa-layer-group"></i> Database Sections</h3>
+            <p>Each database is displayed in its own expandable section:</p>
+            
+            <div class="section-types">
+                <div class="section-type">
+                    <h4><i class="fas fa-check-circle text-success"></i> Tables with Result Files</h4>
+                    <p>Tables that have corresponding Result files. These can be compared for differences.</p>
+                    <div class="status-indicators">
+                        <span class="indicator synchronized">🟢 Synchronized</span>
+                        <span class="indicator needs-sync">🟡 Needs Sync</span>
+                    </div>
+                </div>
+                
+                <div class="section-type">
+                    <h4><i class="fas fa-file-alt text-warning"></i> Result Files without Tables</h4>
+                    <p>Orphaned Result files that don't have corresponding database tables.</p>
+                    <div class="actions">
+                        <button class="btn btn-sm btn-success">Create Table</button>
+                    </div>
+                </div>
+                
+                <div class="section-type">
+                    <h4><i class="fas fa-plus-square text-info"></i> Tables without Result Files</h4>
+                    <p>Database tables that don't have corresponding Result files.</p>
+                    <div class="actions">
+                        <button class="btn btn-sm btn-primary">Create Result</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="interface-section">
+            <h3><i class="fas fa-table"></i> Field Comparison Table</h3>
+            <p>When you click on a table card, a detailed comparison loads showing:</p>
+            
+            <div class="table-explanation">
+                <table class="example-table">
+                    <thead>
+                        <tr>
+                            <th>Source</th>
+                            <th>Field Name</th>
+                            <th>Data Type</th>
+                            <th>Size</th>
+                            <th>Nullable</th>
+                            <th>Auto Inc</th>
+                            <th>Default</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="table-row">
+                            <td class="source-table">Table</td>
+                            <td>user_id</td>
+                            <td>int</td>
+                            <td>11</td>
+                            <td>No</td>
+                            <td>Yes</td>
+                            <td>NULL</td>
+                            <td><button class="btn btn-xs">To Result</button></td>
+                        </tr>
+                        <tr class="result-row">
+                            <td class="source-result">Result</td>
+                            <td>user_id</td>
+                            <td>integer</td>
+                            <td>-</td>
+                            <td>No</td>
+                            <td>Yes</td>
+                            <td>NULL</td>
+                            <td><button class="btn btn-xs">To Table</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="legend">
+                <h4>Color Legend:</h4>
+                <div class="legend-items">
+                    <div class="legend-item">
+                        <div class="color-box table-color"></div>
+                        <span>Table Data (Blue)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="color-box result-color"></div>
+                        <span>Result File Data (Purple)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="color-box different-color"></div>
+                        <span>Different Values (Yellow with ⚠)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="color-box missing-color"></div>
+                        <span>Missing Fields (Light Yellow)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="data-type-normalization" class="doc-section">
+        <h2><i class="fas fa-code"></i> Data Type Normalization</h2>
+        
+        <div class="normalization-intro">
+            <p>The Schema Compare tool uses advanced data type normalization to accurately compare database types with Result file types, eliminating false positives from equivalent type definitions.</p>
+        </div>
+
+        <div class="normalization-features">
+            <div class="feature-detail">
+                <h3><i class="fas fa-scissors"></i> Size Specification Removal</h3>
+                <p>Removes size specifications that don't affect type compatibility:</p>
+                <div class="code-examples">
+                    <div class="code-example">
+                        <code>varchar(255) → varchar</code>
+                    </div>
+                    <div class="code-example">
+                        <code>int(11) → int</code>
+                    </div>
+                    <div class="code-example">
+                        <code>decimal(10,2) → decimal</code>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-detail">
+                <h3><i class="fas fa-text-height"></i> Case Normalization</h3>
+                <p>Handles case variations between database and Result file definitions:</p>
+                <div class="code-examples">
+                    <div class="code-example">
+                        <code>INT → integer</code>
+                    </div>
+                    <div class="code-example">
+                        <code>VARCHAR → varchar</code>
+                    </div>
+                    <div class="code-example">
+                        <code>BIGINT → bigint</code>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-detail">
+                <h3><i class="fas fa-filter"></i> Modifier Handling</h3>
+                <p>Removes database-specific modifiers that don't affect ORM compatibility:</p>
+                <div class="code-examples">
+                    <div class="code-example">
+                        <code>int(11) unsigned → integer</code>
+                    </div>
+                    <div class="code-example">
+                        <code>varchar(255) binary → varchar</code>
+                    </div>
+                    <div class="code-example">
+                        <code>decimal(10,2) zerofill → decimal</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="type-mapping-reference">
+            <h3><i class="fas fa-map"></i> Comprehensive Type Mapping</h3>
+            <p>The system includes mappings for 25+ database type variations:</p>
+            
+            <div class="type-categories">
+                <div class="type-category">
+                    <h4>Integer Types</h4>
+                    <ul>
+                        <li><code>int, int4, int8</code> → <code>integer</code></li>
+                        <li><code>bigint</code> → <code>bigint</code></li>
+                        <li><code>smallint</code> → <code>smallint</code></li>
+                        <li><code>tinyint</code> → <code>tinyint</code></li>
+                        <li><code>mediumint</code> → <code>integer</code></li>
+                    </ul>
+                </div>
+
+                <div class="type-category">
+                    <h4>String Types</h4>
+                    <ul>
+                        <li><code>varchar</code> → <code>varchar</code></li>
+                        <li><code>char, character</code> → <code>char</code></li>
+                        <li><code>text, longtext, mediumtext, tinytext</code> → <code>text</code></li>
+                        <li><code>clob</code> → <code>text</code></li>
+                    </ul>
+                </div>
+
+                <div class="type-category">
+                    <h4>Boolean Types</h4>
+                    <ul>
+                        <li><code>bool, boolean</code> → <code>boolean</code></li>
+                        <li><code>bit</code> → <code>boolean</code></li>
+                    </ul>
+                </div>
+
+                <div class="type-category">
+                    <h4>Floating Point Types</h4>
+                    <ul>
+                        <li><code>float, real</code> → <code>real</code></li>
+                        <li><code>double</code> → <code>double precision</code></li>
+                        <li><code>decimal, numeric</code> → <code>decimal</code></li>
+                    </ul>
+                </div>
+
+                <div class="type-category">
+                    <h4>Date/Time Types</h4>
+                    <ul>
+                        <li><code>datetime</code> → <code>datetime</code></li>
+                        <li><code>timestamp</code> → <code>timestamp</code></li>
+                        <li><code>date</code> → <code>date</code></li>
+                        <li><code>time</code> → <code>time</code></li>
+                    </ul>
+                </div>
+
+                <div class="type-category">
+                    <h4>Modern Types</h4>
+                    <ul>
+                        <li><code>json, jsonb</code> → <code>json</code></li>
+                        <li><code>uuid</code> → <code>uuid</code></li>
+                        <li><code>enum</code> → <code>enum</code></li>
+                        <li><code>set</code> → <code>set</code></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="debug-mode" class="doc-section">
+        <h2><i class="fas fa-bug"></i> Debug Mode</h2>
+        
+        <div class="debug-intro">
+            <p>Debug mode provides detailed information about schema comparison processes, data type normalization, and troubleshooting information. It's designed for developers and system administrators.</p>
+        </div>
+
+        <div class="debug-activation">
+            <h3><i class="fas fa-toggle-on"></i> Activating Debug Mode</h3>
+            <div class="activation-methods">
+                <div class="method">
+                    <h4>URL Parameter Method</h4>
+                    <p>Add <code>?debug=1</code> to any admin URL:</p>
+                    <div class="code-block">
+                        <code>/admin/schema_compare?debug=1</code>
+                    </div>
+                </div>
+                <div class="method">
+                    <h4>Session Persistence</h4>
+                    <p>Once enabled, debug mode persists throughout your session until disabled with <code>?debug=0</code></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="debug-information">
+            <h3><i class="fas fa-info"></i> Debug Information Displayed</h3>
+            
+            <div class="debug-sections">
+                <div class="debug-section">
+                    <h4>Schema Comparison Debug</h4>
+                    <ul>
+                        <li>Result file detection and path information</li>
+                        <li>Field count and parsing details</li>
+                        <li>Database connection status</li>
+                        <li>Table mapping information</li>
+                    </ul>
+                </div>
+
+                <div class="debug-section">
+                    <h4>Data Type Normalization Debug</h4>
+                    <ul>
+                        <li>Original vs normalized type comparisons</li>
+                        <li>Type mapping application details</li>
+                        <li>Match/mismatch explanations</li>
+                        <li>Modifier removal process</li>
+                    </ul>
+                </div>
+
+                <div class="debug-section">
+                    <h4>Field Comparison Debug</h4>
+                    <ul>
+                        <li>Individual field analysis</li>
+                        <li>Table vs Result data presence</li>
+                        <li>Attribute comparison details</li>
+                        <li>Difference detection logic</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="debug-example">
+            <h3><i class="fas fa-code"></i> Debug Output Example</h3>
+            <div class="debug-output">
+                <pre><code>Debug Info:
+Has Result File: YES
+Result File Path: /path/to/Result/User.pm
+Fields Count: 5
+
+Field Details:
+  Field: user_id
+    Has Table Data: YES
+    Has Result Data: YES
+    Table Type: int(11)
+    Result Type: integer
+    Normalized Match: YES
+
+  Field: username
+    Has Table Data: YES
+    Has Result Data: YES
+    Table Type: varchar(255)
+    Result Type: varchar
+    Normalized Match: YES</code></pre>
+            </div>
+        </div>
+    </section>
+
+    <section id="troubleshooting" class="doc-section">
+        <h2><i class="fas fa-wrench"></i> Troubleshooting</h2>
+        
+        <div class="troubleshooting-guide">
+            <div class="issue-solution">
+                <h3><i class="fas fa-exclamation-triangle"></i> Common Issues</h3>
+                
+                <div class="issue-item">
+                    <h4>Database Connection Failed</h4>
+                    <div class="issue-details">
+                        <p><strong>Symptoms:</strong> Database shows as "disconnected" in summary</p>
+                        <p><strong>Solutions:</strong></p>
+                        <ul>
+                            <li>Check database configuration in config files</li>
+                            <li>Verify database server is running</li>
+                            <li>Test database credentials</li>
+                            <li>Check network connectivity</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="issue-item">
+                    <h4>Result File Not Found</h4>
+                    <div class="issue-details">
+                        <p><strong>Symptoms:</strong> "No Result file found for this table" message</p>
+                        <p><strong>Solutions:</strong></p>
+                        <ul>
+                            <li>Check if Result file exists in expected location</li>
+                            <li>Verify file naming conventions</li>
+                            <li>Use "Create Result" button to generate missing files</li>
+                            <li>Check file permissions</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="issue-item">
+                    <h4>False Positive Type Differences</h4>
+                    <div class="issue-details">
+                        <p><strong>Symptoms:</strong> Equivalent types showing as different</p>
+                        <p><strong>Solutions:</strong></p>
+                        <ul>
+                            <li>Enable debug mode to see normalization details</li>
+                            <li>Check if new type mapping is needed</li>
+                            <li>Verify Result file type definitions</li>
+                            <li>Report unmapped type combinations</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="issue-item">
+                    <h4>Field Comparison Not Loading</h4>
+                    <div class="issue-details">
+                        <p><strong>Symptoms:</strong> "Loading field comparison..." never completes</p>
+                        <p><strong>Solutions:</strong></p>
+                        <ul>
+                            <li>Check browser console for JavaScript errors</li>
+                            <li>Verify AJAX endpoints are accessible</li>
+                            <li>Check server logs for backend errors</li>
+                            <li>Try refreshing the page</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="diagnostic-tools">
+            <h3><i class="fas fa-stethoscope"></i> Diagnostic Tools</h3>
+            
+            <div class="tool-list">
+                <div class="tool-item">
+                    <h4>Debug Mode</h4>
+                    <p>Enable with <code>?debug=1</code> to see detailed processing information</p>
+                </div>
+                <div class="tool-item">
+                    <h4>Browser Console</h4>
+                    <p>Check for JavaScript errors and AJAX response details</p>
+                </div>
+                <div class="tool-item">
+                    <h4>Server Logs</h4>
+                    <p>Review application logs for backend processing errors</p>
+                </div>
+                <div class="tool-item">
+                    <h4>Database Logs</h4>
+                    <p>Check database server logs for connection and query issues</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="best-practices" class="doc-section">
+        <h2><i class="fas fa-star"></i> Best Practices</h2>
+        
+        <div class="best-practices-grid">
+            <div class="practice-card">
+                <h3><i class="fas fa-shield-alt"></i> Safety First</h3>
+                <ul>
+                    <li>Always backup databases before making structural changes</li>
+                    <li>Test schema changes in development environment first</li>
+                    <li>Review all differences before applying sync operations</li>
+                    <li>Use version control for Result file changes</li>
+                </ul>
+            </div>
+
+            <div class="practice-card">
+                <h3><i class="fas fa-clock"></i> Regular Maintenance</h3>
+                <ul>
+                    <li>Run schema comparison regularly during development</li>
+                    <li>Address schema drift promptly</li>
+                    <li>Keep Result files synchronized with database changes</li>
+                    <li>Document intentional schema differences</li>
+                </ul>
+            </div>
+
+            <div class="practice-card">
+                <h3><i class="fas fa-users"></i> Team Coordination</h3>
+                <ul>
+                    <li>Establish schema change procedures</li>
+                    <li>Communicate database modifications to team</li>
+                    <li>Use consistent naming conventions</li>
+                    <li>Review schema changes in code reviews</li>
+                </ul>
+            </div>
+
+            <div class="practice-card">
+                <h3><i class="fas fa-bug"></i> Debugging</h3>
+                <ul>
+                    <li>Use debug mode for troubleshooting</li>
+                    <li>Check logs when issues occur</li>
+                    <li>Report new type mapping requirements</li>
+                    <li>Document workarounds for known issues</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section id="technical-reference" class="doc-section">
+        <h2><i class="fas fa-cogs"></i> Technical Reference</h2>
+        
+        <div class="technical-details">
+            <div class="tech-section">
+                <h3><i class="fas fa-server"></i> Backend Components</h3>
+                <div class="component-list">
+                    <div class="component">
+                        <h4>Admin.pm Controller</h4>
+                        <ul>
+                            <li><code>schema_compare</code> - Main comparison page</li>
+                            <li><code>get_field_comparison</code> - AJAX endpoint for field details</li>
+                            <li><code>get_table_schema</code> - Table schema retrieval</li>
+                            <li><code>normalize_data_type</code> - Type normalization logic</li>
+                        </ul>
+                    </div>
+                    <div class="component">
+                        <h4>Database Models</h4>
+                        <ul>
+                            <li>DBEncy.pm - Ency database connection</li>
+                            <li>DBForager.pm - Forager database connection</li>
+                            <li>Result files - DBIx::Class schema definitions</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tech-section">
+                <h3><i class="fas fa-code"></i> Frontend Components</h3>
+                <div class="component-list">
+                    <div class="component">
+                        <h4>schema_compare.tt Template</h4>
+                        <ul>
+                            <li>Main interface layout</li>
+                            <li>JavaScript for AJAX interactions</li>
+                            <li>Dynamic content loading</li>
+                            <li>Debug information display</li>
+                        </ul>
+                    </div>
+                    <div class="component">
+                        <h4>CSS Styling</h4>
+                        <ul>
+                            <li>Responsive design</li>
+                            <li>Color-coded comparisons</li>
+                            <li>Interactive elements</li>
+                            <li>Debug mode styling</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tech-section">
+                <h3><i class="fas fa-database"></i> Data Flow</h3>
+                <div class="flow-diagram">
+                    <ol>
+                        <li>User accesses /admin/schema_compare</li>
+                        <li>Controller loads database connections and table lists</li>
+                        <li>Template renders database sections and table cards</li>
+                        <li>User clicks table card to load field comparison</li>
+                        <li>AJAX request to get_field_comparison endpoint</li>
+                        <li>Backend compares table schema with Result file</li>
+                        <li>Data type normalization applied</li>
+                        <li>Comparison results returned as JSON</li>
+                        <li>JavaScript builds comparison table HTML</li>
+                        <li>Debug information shown if debug mode enabled</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="doc-footer">
+        <div class="footer-links">
+            <a href="/admin/schema_compare" class="btn btn-primary">
+                <i class="fas fa-database"></i> Open Schema Compare
+            </a>
+            <a href="/Documentation/changelog/2025-01-27-fix-debug-display-enhance-data-type-normalization" class="btn btn-secondary">
+                <i class="fas fa-history"></i> View Recent Changes
+            </a>
+            <a href="/Documentation" class="btn btn-outline">
+                <i class="fas fa-book"></i> Documentation Home
+            </a>
+        </div>
+    </footer>
+</div>
+
+<style>
+.documentation-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.doc-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 40px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.doc-header h1 {
+    margin: 0 0 20px 0;
+    font-size: 2.5em;
+    font-weight: 300;
+}
+
+.doc-meta {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    flex-wrap: wrap;
+    font-size: 0.9em;
+}
+
+.doc-meta span {
+    background: rgba(255,255,255,0.2);
+    padding: 8px 16px;
+    border-radius: 20px;
+}
+
+.doc-toc {
+    background: #f8f9fa;
+    padding: 25px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+    border-left: 4px solid #007bff;
+}
+
+.doc-toc h2 {
+    margin-top: 0;
+    color: #495057;
+}
+
+.doc-toc ul {
+    list-style: none;
+    padding-left: 0;
+    columns: 2;
+    column-gap: 30px;
+}
+
+.doc-toc li {
+    margin: 8px 0;
+    break-inside: avoid;
+}
+
+.doc-toc a {
+    color: #007bff;
+    text-decoration: none;
+    padding: 5px 0;
+    display: block;
+}
+
+.doc-toc a:hover {
+    color: #0056b3;
+    text-decoration: underline;
+}
+
+.doc-section {
+    margin-bottom: 50px;
+    padding-bottom: 30px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.doc-section h2 {
+    color: #495057;
+    font-size: 2em;
+    margin-bottom: 25px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #007bff;
+}
+
+.overview-card {
+    background: #e3f2fd;
+    padding: 25px;
+    border-radius: 8px;
+    margin-bottom: 25px;
+    border-left: 4px solid #2196f3;
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-top: 25px;
+}
+
+.feature-card {
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.feature-card h3 {
+    color: #007bff;
+    margin-top: 0;
+}
+
+.getting-started-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.step-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.step-number {
+    background: #007bff;
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.2em;
+    flex-shrink: 0;
+}
+
+.step-content h3 {
+    margin-top: 0;
+    color: #495057;
+}
+
+.code-block {
+    background: #2d3748;
+    color: #e2e8f0;
+    padding: 12px 16px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    margin: 10px 0;
+}
+
+.interface-section {
+    margin-bottom: 30px;
+}
+
+.stats-explanation {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.stat-item {
+    background: white;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+}
+
+.section-types {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.section-type {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.section-type h4 {
+    margin-top: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.status-indicators, .actions {
+    margin-top: 15px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.indicator {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+.indicator.synchronized {
+    background: #d4edda;
+    color: #155724;
+}
+
+.indicator.needs-sync {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.example-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 0.9em;
+}
+
+.example-table th,
+.example-table td {
+    padding: 12px;
+    text-align: left;
+    border: 1px solid #dee2e6;
+}
+
+.example-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+}
+
+.table-row {
+    background: #e3f2fd;
+}
+
+.result-row {
+    background: #f3e5f5;
+}
+
+.legend {
+    margin-top: 20px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.legend-items {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.color-box {
+    width: 20px;
+    height: 15px;
+    border-radius: 3px;
+    border: 1px solid #ccc;
+}
+
+.table-color { background: #007bff; }
+.result-color { background: #6f42c1; }
+.different-color { background: #ffecb3; }
+.missing-color { background: #fff3cd; }
+
+.normalization-features {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+    margin-top: 25px;
+}
+
+.feature-detail {
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.feature-detail h3 {
+    color: #007bff;
+    margin-top: 0;
+}
+
+.code-examples {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 15px;
+}
+
+.code-example {
+    background: #2d3748;
+    color: #e2e8f0;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+}
+
+.type-categories {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.type-category {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.type-category h4 {
+    margin-top: 0;
+    color: #495057;
+}
+
+.type-category ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.type-category li {
+    padding: 5px 0;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+}
+
+.debug-sections {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.debug-section {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.debug-output {
+    background: #2d3748;
+    color: #e2e8f0;
+    padding: 20px;
+    border-radius: 8px;
+    margin-top: 15px;
+    overflow-x: auto;
+}
+
+.debug-output pre {
+    margin: 0;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+
+.troubleshooting-guide {
+    margin-top: 20px;
+}
+
+.issue-item {
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.issue-item h4 {
+    color: #dc3545;
+    margin-top: 0;
+}
+
+.issue-details p {
+    margin: 10px 0;
+}
+
+.issue-details strong {
+    color: #495057;
+}
+
+.tool-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.tool-item {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.tool-item h4 {
+    margin-top: 0;
+    color: #007bff;
+}
+
+.best-practices-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-top: 25px;
+}
+
+.practice-card {
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.practice-card h3 {
+    color: #28a745;
+    margin-top: 0;
+}
+
+.technical-details {
+    margin-top: 25px;
+}
+
+.tech-section {
+    margin-bottom: 30px;
+}
+
+.component-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.component {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.component h4 {
+    margin-top: 0;
+    color: #007bff;
+}
+
+.flow-diagram {
+    background: #f8f9fa;
+    padding: 25px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    margin-top: 20px;
+}
+
+.flow-diagram ol {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.flow-diagram li {
+    margin: 8px 0;
+    line-height: 1.5;
+}
+
+.doc-footer {
+    margin-top: 50px;
+    padding-top: 30px;
+    border-top: 2px solid #dee2e6;
+    text-align: center;
+}
+
+.footer-links {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.btn {
+    padding: 12px 24px;
+    border-radius: 6px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+    border: 2px solid #007bff;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    border: 2px solid #6c757d;
+}
+
+.btn-outline {
+    background: transparent;
+    color: #007bff;
+    border: 2px solid #007bff;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    text-decoration: none;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+    border-color: #0056b3;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+    border-color: #545b62;
+    color: white;
+}
+
+.btn-outline:hover {
+    background: #007bff;
+    color: white;
+}
+
+.text-success { color: #28a745; }
+.text-warning { color: #ffc107; }
+.text-info { color: #17a2b8; }
+
+@media (max-width: 768px) {
+    .doc-toc ul {
+        columns: 1;
+    }
+    
+    .doc-meta {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .step-card {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .legend-items {
+        flex-direction: column;
+        gap: 10px;
+    }
+}
+</style>
+
+[% END %]

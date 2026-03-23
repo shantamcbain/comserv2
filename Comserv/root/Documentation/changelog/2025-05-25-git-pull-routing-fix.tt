@@ -1,0 +1,169 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-05-25-git-pull-routing-fix.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Git Pull Routing Fix' %]
+
+<!-- Documentation page for 2025-05-25-git-pull-routing-fix -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**File:** /home/shanta/PycharmProjects/comserv/Comserv/docs/2025-05-25-git-pull-routing-fix.md  
+
+**Date:** May 25, 2025  
+
+**Author:** System Administrator  
+
+**Status:** Implemented
+
+
+
+<h2>Overview</h2>
+
+
+
+This document outlines the fix for an issue where the Git pull functionality in the admin interface was not working correctly. The problem was caused by duplicate route definitions in the Admin controller, which resulted in the Git pull page redirecting back to the main page instead of displaying the confirmation screen.
+
+
+
+<h2>Issue Description</h2>
+
+
+
+The Admin controller had two <code>git_pull</code> methods defined with different path attributes:
+
+
+
+<ol><li>First method: <code>:Path('admin/git_pull')</code> - This was a relative path</li></ol>
+
+<ol><li>Second method: <code>:Path('/admin/git_pull')</code> - This was an absolute path</li></ol>
+
+
+
+The links in the templates were pointing to <code>/admin/git_pull</code> (absolute path), but the first method was using a relative path, which caused confusion in the routing system. This resulted in the Git pull functionality being inaccessible to administrators.
+
+
+
+<h2>Changes Made</h2>
+
+
+
+<h3>1. Removed Duplicate Method</h3>
+
+
+
+The first <code>git_pull</code> method with the relative path was removed and replaced with a comment indicating that it has been moved:
+
+
+
+<code></code>`perl
+
+<h1>This method has been moved to Path('/admin/git_pull')</h1>
+
+<code></code>`
+
+
+
+<h3>2. Enhanced Remaining Method</h3>
+
+
+
+The second <code>git_pull</code> method with the absolute path was enhanced to:
+
+
+
+<ul><li>Initialize the debug messages array in the stash</li></ul>
+
+<ul><li>Add more detailed debug information</li></ul>
+
+<ul><li>Improve error handling</li></ul>
+
+<ul><li>Ensure consistent use of stash variables instead of flash variables</li></ul>
+
+<ul><li>Keep users on the Git pull page when errors occur instead of redirecting</li></ul>
+
+
+
+<h3>3. Improved Debug Information</h3>
+
+
+
+The updated method now adds more detailed debug information to the stash:
+
+
+
+<code></code>`perl
+
+<h1>Initialize debug messages array</h1>
+
+$c->stash->{debug_msg} = [] unless defined $c->stash->{debug_msg};
+
+
+
+<h1>Add debug messages to the stash</h1>
+
+push @{$c->stash->{debug_msg}}, "User: $username";
+
+push @{$c->stash->{debug_msg}}, "Roles: " . Dumper($roles);
+
+<code></code>`
+
+
+
+<h2>Benefits</h2>
+
+
+
+<ol><li>**Fixed Routing**: The Git pull functionality now works correctly for administrators</li></ol>
+
+<ol><li>**Improved Debugging**: More detailed debug information is available when issues occur</li></ol>
+
+<ol><li>**Better Error Handling**: Errors are displayed on the Git pull page instead of redirecting</li></ol>
+
+<ol><li>**Consistent User Experience**: Users stay on the Git pull page throughout the process</li></ol>
+
+
+
+<h2>Testing</h2>
+
+
+
+The fix was tested to ensure:
+
+
+
+<ol><li>Administrators can access the Git pull functionality from both the admin dashboard and the admin top menu</li></ol>
+
+<ol><li>The Git pull confirmation page displays correctly</li></ol>
+
+<ol><li>The Git pull operation works when confirmed</li></ol>
+
+<ol><li>Error messages are displayed correctly when issues occur</li></ol>
+
+<ol><li>Debug information is available when debug mode is enabled</li></ol>
+
+
+
+<h2>Affected Files</h2>
+
+
+
+<ul><li><code>/home/shanta/PycharmProjects/comserv/Comserv/lib/Comserv/Controller/Admin.pm</code></li></ul>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/home/shanta/PycharmProjects/comserv/Comserv/root/Documentation/changelog/2025-04-git-pull-functionality.md">Git Pull Functionality for Administrators</a></li></ul>
+
+</div>

@@ -47,7 +47,7 @@ window.onload = function() {
     [% SET selected_project_id = project_id %]
 [% END %]
 
-[% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=selected_project_id %]
+[% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=selected_project_id field_name='project_id' %]
 
     <label for="due_date">Due Date:</label><br>
     <input type="date" id="due_date" name="due_date" value="[% due_date %]"><br>
@@ -75,9 +75,10 @@ window.onload = function() {
 
 <label for="status">Status:</label><br>
 <select id="status" name="status">
-    [% FOREACH key IN build_status.keys.sort %]
-        <option value="[% key %]" [% 'selected' IF key == status %]>[% build_status.$key %]</option>
-    [% END %]
+    [% SET sel_status = status | html %]
+    <option value="1" [% IF sel_status == 1 || sel_status == 'NEW' || sel_status == '1' %]selected[% END %]>NEW</option>
+    <option value="2" [% IF sel_status == 2 || sel_status == 'IN PROGRESS' || sel_status == 'In-Process' || sel_status == '2' %]selected[% END %]>IN PROGRESS</option>
+    <option value="3" [% IF sel_status == 3 || sel_status == 'DONE' || sel_status == 'Completed' || sel_status == '3' %]selected[% END %]>DONE</option>
 </select><br>
     <label for="comments">Comments:</label><br>
     <textarea id="comments" name="comments" rows="4" cols="50">[% comments %]</textarea><br>
