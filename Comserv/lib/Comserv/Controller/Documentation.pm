@@ -2378,6 +2378,66 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         @orphan_plans      = grep { ($_->{sitename} || '') eq $filter_site } @orphan_plans;
     }
 
+    # --- Active Priorities: DB-driven, role/site/user scoped, dependency-ordered ---
+    my @active_priorities;
+    eval {
+        my $user_id  = $c->session->{user_id};
+        my $roles    = $c->stash->{user_roles} || [];
+        my $can_see_all = $c->stash->{is_admin}
+            || grep { lc($_) =~ /^(developer|devops|editor)$/ } @$roles;
+
+        my %ap_cond = (status => { '!=' => 3 });   # exclude DONE
+        $ap_cond{sitename} = $sitename unless $is_csc;  # non-CSC: own site only
+        $ap_cond{user_id}  = $user_id  unless $can_see_all;  # members: own todos only
+
+        my @rows = $c->model('DBEncy')->resultset('Todo')->search(
+            \%ap_cond,
+            {
+                order_by => [
+                    { -asc  => 'priority'    },
+                    { -desc => 'is_blocking' },
+                    { -asc  => 'start_date'  },
+                ],
+                rows => 20,
+            }
+        )->all;
+
+        # Pre-fetch all returned IDs for fast blocker lookup
+        my %row_by_id = map { $_->record_id => $_ } @rows;
+
+        # Cache for project names
+        my %proj_cache;
+
+        for my $todo (@rows) {
+            my %h = $todo->get_columns;
+
+            # Blocker info
+            if ($h{blocked_by_todo_id}) {
+                my $blocker = $row_by_id{$h{blocked_by_todo_id}}
+                    || eval { $c->model('DBEncy')->resultset('Todo')->find($h{blocked_by_todo_id}) };
+                if ($blocker) {
+                    $h{blocker_subject} = $blocker->subject;
+                    $h{blocker_done}    = ($blocker->status == 3) ? 1 : 0;
+                }
+            }
+
+            # Project name (cached)
+            if ($h{project_id}) {
+                unless (exists $proj_cache{$h{project_id}}) {
+                    my $p = eval { $c->model('DBEncy')->resultset('Project')->find($h{project_id}) };
+                    $proj_cache{$h{project_id}} = $p ? $p->name : '';
+                }
+                $h{project_name} = $proj_cache{$h{project_id}};
+            }
+
+            push @active_priorities, \%h;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Could not fetch active priorities: $@");
+    }
+
     # Pass all date information and todos to template
     $c->stash(
         # Site context
@@ -2416,9 +2476,10 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         today => $current_date_str,
         
         # Todos
-        todos => $all_todos_calendar, # For week.tt
-        todos_for_today => $todos_for_today, # For day view
-        
+        todos           => $all_todos_calendar,    # For week.tt
+        todos_for_today => $todos_for_today,       # For day view
+        active_priorities => \@active_priorities,  # DB-driven priority list for TODAY'S FOCUS
+
         template => 'admin/documentation/DailyPlan.tt'
     );
 }
