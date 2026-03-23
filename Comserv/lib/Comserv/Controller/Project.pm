@@ -349,7 +349,9 @@ sub fetch_projects_with_subprojects :Private {
 
     # Get the schema and SiteName
     my $schema = $c->model('DBEncy');
-    my $SiteName = $c->session->{SiteName} || '';
+    my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    my $is_admin = $c->stash->{is_admin} || 0;
+    my $is_csc_admin = $is_admin && (uc($SiteName) eq 'CSC');
 
     # Check if SiteName is defined
     if (!$SiteName) {
@@ -360,16 +362,14 @@ sub fetch_projects_with_subprojects :Private {
     }
 
     # Fetch top-level projects (those without a parent)
+    # CSC admins see all sites; all others see only their own SiteName
     my @top_projects;
     eval {
+        my %search_cond = (parent_id => undef);
+        $search_cond{sitename} = $SiteName unless $is_csc_admin;
         @top_projects = $schema->resultset('Project')->search(
-            {
-                'sitename' => $SiteName,
-                'parent_id' => undef
-            },
-            {
-                order_by => { -asc => 'name' }
-            }
+            \%search_cond,
+            { order_by => { -asc => 'name' } }
         )->all;
     };
 
