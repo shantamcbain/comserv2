@@ -444,8 +444,9 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
         build_priority  => \%priority_options, # Priority options for dropdown
         build_status    => \%status_options,   # Status options for dropdown
         return_to       => $return_to,       # URL to return to after action
-        start_date      => $c->request->params->{start_date},
+        start_date      => $c->request->params->{start_date} || DateTime->now->strftime('%Y-%m-%d'),
         time_of_day     => $c->request->params->{time_of_day},
+        user_id         => $c->session->{user_id},  # Pre-select logged-in user
         template        => 'todo/addtodo.tt' # Template for rendering
     );
 
