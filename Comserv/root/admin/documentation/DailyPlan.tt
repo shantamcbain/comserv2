@@ -491,7 +491,23 @@
                     [% ELSE %]
                     <div style="font-size:0.82em;color:var(--text-muted-color);margin:4px 0 6px;">
                         No plans linked.
-                        [% IF is_admin %]<a href="/admin/plan/create" style="color:var(--primary-color);">+ Add Plan</a>[% END %]
+                        [% IF is_admin %]
+                        <a href="/admin/plan/create?project_id=[% proj.id %]" style="color:var(--primary-color);margin-left:6px;">+ New Plan</a>
+                        [% IF all_plans && all_plans.size %]
+                        &nbsp;·&nbsp;
+                        <span style="color:var(--text-muted-color);">Link existing:</span>
+                        <select id="link-plan-[% proj.id %]" style="font-size:0.8em;padding:2px 4px;border:1px solid var(--border-color);border-radius:3px;margin:0 4px;">
+                            <option value="">— select plan —</option>
+                            [% FOREACH ap IN all_plans %]
+                            <option value="[% ap.id %]">[% ap.plan_name %] [% IF ap.sitename %]([% ap.sitename %])[% END %]</option>
+                            [% END %]
+                        </select>
+                        <button onclick="linkPlanToProject(this, [% proj.id %])"
+                            style="font-size:0.78em;padding:2px 8px;border:1px solid var(--primary-color);border-radius:3px;background:transparent;color:var(--primary-color);cursor:pointer;">
+                            Link
+                        </button>
+                        [% END %]
+                        [% END %]
                     </div>
                     [% END %]
                 </div>
@@ -955,6 +971,34 @@
         } else {
             location.hash = '#' + tabName;
         }
+    }
+
+    function linkPlanToProject(btn, projectId) {
+        var sel = document.getElementById('link-plan-' + projectId);
+        var planId = sel ? sel.value : '';
+        if (!planId) { alert('Please select a plan first.'); return; }
+        btn.disabled = true;
+        btn.textContent = '…';
+        fetch('/admin/plan/link_project', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'plan_id=' + encodeURIComponent(planId) + '&project_id=' + encodeURIComponent(projectId)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) {
+                btn.closest('div').innerHTML = '<em style="color:#28a745;">✅ Linked — <a href="">Reload page</a> to see changes</em>';
+            } else {
+                btn.disabled = false;
+                btn.textContent = 'Link';
+                alert('Error: ' + (d.error || 'Unknown error'));
+            }
+        })
+        .catch(function(e) {
+            btn.disabled = false;
+            btn.textContent = 'Link';
+            alert('Request failed: ' + e);
+        });
     }
 
     function activateHashTarget(hash) {
