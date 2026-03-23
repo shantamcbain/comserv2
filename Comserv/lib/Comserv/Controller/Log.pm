@@ -466,15 +466,10 @@ sub create_log :Path('/log/create_log') :Args() {
     # Log the success event
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_log', "Log entry created successfully: ID " . $logEntry->id);
 
-    # Redirect to the referring page and retain necessary parameters
-    my $referer = $c->request->referer || '/';
-    my $redirect_url = $referer;
-    $redirect_url .= "?record_id=" . $logEntry->id if $logEntry->id;
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_log', "Redirecting to: $redirect_url");
     $c->flash->{success_msg} = 'Log entry created successfully';
 
-    # Redirect back to the todo details page
-    $c->response->redirect($c->uri_for('/todo/details', { record_id => $logEntry->todo_record_id }));
+    # Redirect to /log after save
+    $c->response->redirect($c->uri_for('/log'));
 }
 
 __PACKAGE__->meta->make_immutable;
