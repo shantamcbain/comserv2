@@ -2346,8 +2346,9 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
             $p{linked_plans} = \@linked_plans;
             push @planning_projects, \%p;
 
-            # Collect sitenames for filter toggle
-            push @plan_sitenames, $proj->sitename if $proj->sitename;
+            # Collect sitenames for filter toggle (skip numeric-only values — legacy FK artifacts)
+            my $sn = $proj->sitename || '';
+            push @plan_sitenames, $sn if $sn && $sn !~ /^\d+$/;
         }
 
         # Deduplicate sitenames

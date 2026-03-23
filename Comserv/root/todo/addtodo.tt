@@ -94,7 +94,7 @@
     </div>
     <div>
         <label for="project_id">Select Project:</label>
-          [% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=current_project.id %]<br>
+          [% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=current_project.id field_name='project_id' %]<br>
     </div>
 
     <div>
@@ -173,9 +173,9 @@
     <div>
         <label for="status">Status:</label>
         <select id="status" name="status" class="form-select">
-            <option value="1" [% IF todo.status == 'NEW' %]selected[% END %]>NEW</option>
-            <option value="2" [% IF todo.status == 'IN PROGRESS' %]selected[% END %]>IN PROGRESS</option>
-            <option value="3" [% IF todo.status == 'DONE' %]selected[% END %]>DONE</option>
+            <option value="1" [% IF !todo || todo.status == 'NEW' || todo.status == 1 %]selected[% END %]>NEW</option>
+            <option value="2" [% IF todo.status == 'IN PROGRESS' || todo.status == 2 %]selected[% END %]>IN PROGRESS</option>
+            <option value="3" [% IF todo.status == 'DONE' || todo.status == 3 %]selected[% END %]>DONE</option>
         </select>
     </div>
     <div>
