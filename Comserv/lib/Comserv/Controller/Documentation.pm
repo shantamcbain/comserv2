@@ -2412,6 +2412,20 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         @orphan_plans      = grep { ($_->{sitename} || '') eq $filter_site } @orphan_plans;
     }
 
+    # --- All plans (for link-plan-to-project form, admin only) ---
+    my @all_plans;
+    eval {
+        my %plan_cond = $is_csc ? () : (sitename => $sitename);
+        @all_plans = map { { $_->get_columns } }
+            $c->model('DBEncy')->resultset('DailyPlan')->search(
+                \%plan_cond, { order_by => ['plan_name'] }
+            )->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Could not fetch all_plans: $@");
+    }
+
     # --- Active Priorities: DB-driven, role/site/user scoped, dependency-ordered ---
     my @active_priorities;
     eval {
@@ -2482,6 +2496,7 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         orphan_plans   => \@orphan_plans,
         plan_sitenames => \@plan_sitenames,
         filter_site    => $filter_site,
+        all_plans      => \@all_plans,
         is_admin       => $c->stash->{is_admin},
 
         # Date strings
