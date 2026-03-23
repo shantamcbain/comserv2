@@ -330,6 +330,7 @@ last_updated = '2026/02/08'
                 <li><strong>Users:</strong> <a href="[% base_url %]4005/user/dashboard" target="_blank">users-e5b8</a> <em>(port 4005)</em> - User & Admin Management System with Email Verification and Role Management</li>
                 <li><strong>ProjectConfig:</strong> <a href="[% base_url %]3000/Documentation/DailyPlan" target="_blank">set-up-project-config-d327</a> <em>(ports 3000, 5000)</em> - Zenflow Project Configuration & Docker Container Testing</li>
                 <li><strong>FileManagement:</strong> <a href="[% base_url %]4006/admin/planning" target="_blank">new-task-bb05</a> <em>(port 4006)</em> - NFS-backed File Management System with multi-tier access control, duplicate detection, and workshop file sharing across SiteNames</li>
+                <li><strong>UnifiedMailSystem:</strong> <a href="[% base_url %]4007/Documentation/DailyPlan" target="_blank">unified-mail-system-site-managed-2c53</a> <em>(port 4007)</em> - Unified Mail System — Site-Managed SMTP with PMG + Harper Integration</li>
             </ul>
             
             <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 10px; margin-top: 10px;">
@@ -646,10 +647,103 @@ last_updated = '2026/02/08'
             </details>
 
             <div id="anchor-priority-schema" class="nav-anchor"></div>
-            <details id="priority-schema-system" class="priority-container">
-                <summary class="priority-summary">📊 Schema System Plan & Enhancements</summary>
+            <details id="priority-schema-system" class="priority-container" open>
+                <summary class="priority-summary">📊 Schema Management System Enhancement</summary>
                 <div class="priority-content">
-                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span></p>
+                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Current Step:</strong> Requirements ✅ Complete</p>
+                    <p><strong>Overall Progress:</strong> 25% (1 of 4 workflow steps complete)</p>
+                    
+                    <h4>🎯 Project Overview</h4>
+                    <p>Enhance the existing database schema management system to provide comprehensive tools for managing all databases used by the Comserv application. Fix critical bugs, add missing features (API, CLI, table renaming, multi-site support, Result file editor), and improve navigation and documentation.</p>
+                    
+                    <h4>📋 Workflow Steps</h4>
+                    <ul>
+                        <li>✅ <strong>Step 1: Requirements</strong> - COMPLETED (2026-02-05)
+                            <ul>
+                                <li>Created comprehensive PRD at <code>.zenflow/tasks/schema-managment-system-7eb3/requirements.md</code></li>
+                                <li>Analyzed existing codebase (SchemaComparison.pm, RemoteDB.pm, schema_compare.tt)</li>
+                                <li>Documented 5 critical bugs to fix and 6 major features to add</li>
+                                <li>Added workflow tracking requirements (Section 3.6)</li>
+                            </ul>
+                        </li>
+                        <li>🔄 <strong>Step 2: Technical Specification</strong> - PENDING
+                            <ul>
+                                <li>Define implementation approach</li>
+                                <li>Design API endpoints and CLI tool architecture</li>
+                                <li>Plan database schema changes if needed</li>
+                                <li>Deliverable: <code>spec.md</code></li>
+                            </ul>
+                        </li>
+                        <li>⏭️ <strong>Step 3: Planning</strong> - NOT STARTED
+                            <ul>
+                                <li>Break down work into concrete implementation tasks</li>
+                                <li>Estimate time and dependencies</li>
+                                <li>Create detailed task list</li>
+                            </ul>
+                        </li>
+                        <li>⏭️ <strong>Step 4: Implementation</strong> - NOT STARTED
+                            <ul>
+                                <li>Execute planned tasks</li>
+                                <li>Run tests and validation</li>
+                                <li>Update documentation</li>
+                            </ul>
+                        </li>
+                    </ul>
+                    
+                    <h4>🔧 Problems to Fix (Critical Bugs)</h4>
+                    <ul>
+                        <li><strong>P1:</strong> Creating field in Result file shows "no result file" until manual refresh (DBIx::Class schema reload issue)</li>
+                        <li><strong>P2:</strong> System shows "Total Databases: 2" but only displays one (192.168.1.198) - missing configured servers</li>
+                        <li><strong>P3:</strong> Missing pages (Result editor, table manager, API explorer, CLI interface)</li>
+                        <li><strong>P4:</strong> Poor navigation in admin interface</li>
+                        <li><strong>P5:</strong> Insufficient documentation in /Documentation/ system</li>
+                    </ul>
+                    
+                    <h4>✨ Features to Add</h4>
+                    <ul>
+                        <li><strong>F1:</strong> REST API and CLI tool for AI/automation</li>
+                        <li><strong>F2:</strong> Table renaming with automatic relationship updates</li>
+                        <li><strong>F3:</strong> Create database tables from Result files</li>
+                        <li><strong>F4:</strong> Multi-site database isolation (private copies per site)</li>
+                        <li><strong>F5:</strong> Browser-based Result file editor with syntax highlighting</li>
+                        <li><strong>F6:</strong> Workflow tracking in DailyPlan.tt and Planning.tt (this document)</li>
+                    </ul>
+                    
+                    <h4>📁 Artifacts & Links</h4>
+                    <ul>
+                        <li><a href="/Documentation/AI_ASSISTANTS_IDE_INTEGRATION_AUDIT.md">Requirements Document (PRD)</a> - <code>.zenflow/tasks/schema-managment-system-7eb3/requirements.md</code></li>
+                        <li><a href="/admin/schema_compare">Current Schema Compare Interface</a> - Working baseline</li>
+                        <li>Source: <code>Comserv/lib/Comserv/Controller/Admin/SchemaComparison.pm</code> (1816 lines, extensive sync logic)</li>
+                        <li>Template: <code>Comserv/root/admin/schema_compare.tt</code> (1716 lines, field comparison UI)</li>
+                        <li>DB Config: <code>Comserv/db_config.template.json</code> (multi-server support)</li>
+                    </ul>
+                    
+                    <h4>🔗 Code Reuse Strategy</h4>
+                    <p>Maximum leverage of existing code from SchemaComparison.pm:</p>
+                    <ul>
+                        <li><code>sync_table_to_result</code>, <code>sync_result_to_table</code> - Bidirectional sync</li>
+                        <li><code>create_result_from_table</code>, <code>create_table_from_result</code> - Creation operations</li>
+                        <li><code>get_all_result_files</code> - Result file scanning</li>
+                        <li>RemoteDB.pm - Multi-server connection management</li>
+                    </ul>
+                    
+                    <h4>⏱️ Timeline Estimate</h4>
+                    <ul>
+                        <li>Requirements: ✅ Complete (2 hours actual)</li>
+                        <li>Technical Spec: 3-4 hours (estimated)</li>
+                        <li>Planning: 2-3 hours (estimated)</li>
+                        <li>Implementation: 20-30 hours (estimated, depends on feature prioritization)</li>
+                    </ul>
+                    
+                    <h4>🎯 Success Criteria</h4>
+                    <ul>
+                        <li>All 5 critical bugs fixed and validated</li>
+                        <li>API endpoints functional and documented (OpenAPI/Swagger)</li>
+                        <li>CLI tool working with basic commands</li>
+                        <li>Multi-site support tested with 2+ sites</li>
+                        <li>Result file editor saves without errors</li>
+                        <li>Documentation complete in /Documentation/ system</li>
+                    </ul>
                 </div>
             </details>
 

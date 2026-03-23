@@ -6,6 +6,16 @@ use Data::Dumper;
 use Comserv::Util::Logging;
 use Comserv::Controller::Site;
 BEGIN { extends 'Catalyst::Controller'; }
+
+sub _require_login {
+    my ($self, $c) = @_;
+    my $username = $c->session->{username} // '';
+    if (!$username || $username eq 'anonymous') {
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return 0;
+    }
+    return 1;
+}
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
@@ -18,6 +28,7 @@ sub index :Path :Args(0) {
 
 sub add_project :Path('addproject') :Args(0) {
     my ( $self, $c ) = @_;
+    return unless $self->_require_login($c);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_project', 'Starting add_project action' );
 
     # Store the previous URL for redirect after form submission
@@ -77,6 +88,7 @@ sub add_project :Path('addproject') :Args(0) {
 
 sub  create_project :Local :Args(0) {
     my ($self, $c) = @_;
+    return unless $self->_require_login($c);
 
     my $form_data = $c->request->body_parameters;
     my $schema = $c->model('DBEncy');
@@ -169,7 +181,8 @@ sub  create_project :Local :Args(0) {
 
 sub project :Path('project') :Args(0) {
     my ( $self, $c ) = @_;
-    
+    return unless $self->_require_login($c);
+
     # Log the start of the project action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'project', 'Starting project action');
     
@@ -214,6 +227,7 @@ sub project :Path('project') :Args(0) {
 
 sub details :Path('details') :Args(0) {
     my ( $self, $c ) = @_;
+    return unless $self->_require_login($c);
 
     # Logging: Start of the details action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'details', 'Starting details action.');
@@ -335,7 +349,9 @@ sub fetch_projects_with_subprojects :Private {
 
     # Get the schema and SiteName
     my $schema = $c->model('DBEncy');
-    my $SiteName = $c->session->{SiteName} || '';
+    my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    my $is_admin = $c->stash->{is_admin} || 0;
+    my $is_csc_admin = $is_admin && (uc($SiteName) eq 'CSC');
 
     # Check if SiteName is defined
     if (!$SiteName) {
@@ -346,16 +362,14 @@ sub fetch_projects_with_subprojects :Private {
     }
 
     # Fetch top-level projects (those without a parent)
+    # CSC admins see all sites; all others see only their own SiteName
     my @top_projects;
     eval {
+        my %search_cond = (parent_id => undef);
+        $search_cond{sitename} = $SiteName unless $is_csc_admin;
         @top_projects = $schema->resultset('Project')->search(
-            {
-                'sitename' => $SiteName,
-                'parent_id' => undef
-            },
-            {
-                order_by => { -asc => 'name' }
-            }
+            \%search_cond,
+            { order_by => { -asc => 'name' } }
         )->all;
     };
 
@@ -462,6 +476,7 @@ sub enhance_project_data :Private {
 
 sub editproject :Path('editproject') :Args(0) {
     my ( $self, $c ) = @_;
+    return unless $self->_require_login($c);
 
     # Log the start of the editproject action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'editproject', 'Starting editproject action');
@@ -680,6 +695,7 @@ sub build_project_tree :Private {
 
 sub update_project :Local :Args(0)  {
     my ( $self, $c ) = @_;
+    return unless $self->_require_login($c);
 
     # Log the start of the update_project action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_project', 'Starting update_project action');

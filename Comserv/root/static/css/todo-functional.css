@@ -1,0 +1,306 @@
+/* Todo System - Functional CSS Only */
+/* File: todo-functional.css - Contains ONLY functional CSS, NO styling */
+/* All styling comes from base-containers.css and theme system */
+
+/* JavaScript Enhancement Support */
+.todo-expand-icon.expanded {
+    transform: rotate(180deg);
+}
+
+/* Todo details container - hidden by default */
+.todo-details {
+    display: none;
+}
+
+/* Overdue toggle functionality */
+.overdue-list {
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.overdue-toggle-icon {
+    transition: transform 0.2s ease;
+}
+
+/* Form control styling - basic functionality only */
+.form-control {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 4px;
+    background: var(--card-bg, #ffffff);
+    color: var(--text-color, #333);
+}
+
+.form-control:focus {
+    border-color: var(--primary-color, #4CAF50);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: var(--text-color, #333);
+}
+
+/* Active button state for view buttons */
+.btn.active {
+    font-weight: bold;
+    opacity: 0.8;
+}
+
+/* Prevent action buttons from triggering header click */
+.feature-header .todo-actions {
+    pointer-events: none;
+}
+
+.feature-header .todo-actions > * {
+    pointer-events: auto;
+}
+
+/* Calendar integration - functional layout only */
+.calendar-item {
+    margin-bottom: 0.25rem;
+    padding: 0.25rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.calendar-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Month calendar layout */
+.month-calendar {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    table-layout: fixed;
+}
+
+.month-calendar th, .month-calendar td {
+    border: 1px solid var(--border-color, #ddd);
+    padding: 8px;
+    text-align: center;
+    vertical-align: top;
+    height: 120px;
+    width: 14.28%;
+}
+
+.month-calendar th {
+    background-color: var(--primary-color, #4CAF50);
+    color: white;
+    height: auto;
+    font-weight: bold;
+}
+
+.month-cell {
+    position: relative;
+    background-color: var(--card-bg, #ffffff);
+}
+
+.month-cell.today {
+    background-color: var(--success-color, #e6f7ff);
+    border: 2px solid var(--primary-color, #4CAF50);
+}
+
+.month-cell.empty-cell {
+    background-color: var(--bg-color, #f9f9f9);
+}
+
+.day-number {
+    font-weight: bold;
+    float: right;
+    margin-bottom: 5px;
+    color: var(--text-color, #333);
+    font-size: 0.9em;
+}
+
+.cell-content {
+    clear: both;
+    height: calc(100% - 35px);
+    overflow-y: auto;
+    padding-top: 5px;
+}
+
+/* Day view table layout */
+.day-view-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    margin-top: 20px;
+}
+
+.day-view-table th, .day-view-table td {
+    border: 1px solid var(--border-color, #ddd);
+    padding: 10px;
+    word-wrap: break-word;
+}
+
+.day-view-table th {
+    background-color: var(--table-header-bg, #f2f2f2);
+    color: var(--text-color, #000000);
+    text-align: left;
+}
+
+/* Week view table layout */
+.week-view-table {
+    width: 100%;
+}
+
+/* Hourly schedule layout - functional structure only */
+.hourly-schedule {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background-color: var(--border-color, #ddd);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.hour-slot {
+    display: flex;
+    background-color: var(--card-bg, #ffffff);
+    min-height: 80px;
+}
+
+.hour-label {
+    width: 100px;
+    background-color: var(--primary-color, #4CAF50);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9em;
+    text-align: center;
+    padding: 10px 5px;
+}
+
+.hour-content {
+    flex: 1;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background-color: var(--card-bg, #ffffff);
+}
+
+/* Responsive design for mobile */
+@media (max-width: 768px) {
+    .hour-slot {
+        flex-direction: column;
+    }
+    
+    .hour-label {
+        width: 100%;
+        padding: 8px;
+        font-size: 0.8em;
+    }
+    
+    .filter-row {
+        flex-direction: column;
+    }
+    
+    .filter-group {
+        min-width: auto !important;
+    }
+}
+
+/* Time input components - functional only */
+.time-input-container {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.time-preset, .time-manual {
+    background-color: var(--card-bg, #ffffff);
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 4px;
+    padding: 8px;
+    font-size: 0.9em;
+    color: var(--text-color, #333);
+}
+
+.time-preset:focus, .time-manual:focus {
+    border-color: var(--primary-color, #4CAF50);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+.time-manual {
+    font-family: 'Courier New', monospace;
+}
+
+/* Inline form support */
+.inline-form {
+    display: inline-block;
+    margin: 0;
+    padding: 0;
+}
+
+/* Ensure todo action forms stay inline */
+.todo-actions form {
+    display: inline-block;
+    margin: 0;
+    padding: 0;
+}
+
+.todo-actions .inline-form {
+    display: inline-block;
+    margin: 0;
+    padding: 0;
+}
+
+/* Small button variant */
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 0.875em;
+    line-height: 1.2;
+}
+
+/* Action button layout in todo cards */
+.todo-actions {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+}
+
+.todo-actions .btn {
+    font-size: 0.8em;
+    padding: 4px 8px;
+    white-space: nowrap;
+}
+
+/* Todo header layout - ensure buttons stay inline */
+.feature-header .todo-actions {
+    pointer-events: auto;
+}
+
+.feature-header .todo-actions > * {
+    pointer-events: auto;
+}
+
+/* Responsive behavior for todo actions */
+@media (max-width: 768px) {
+    .todo-actions {
+        flex-direction: column;
+        gap: 3px;
+    }
+    
+    .todo-actions .btn {
+        font-size: 0.75em;
+        padding: 3px 6px;
+    }
+}

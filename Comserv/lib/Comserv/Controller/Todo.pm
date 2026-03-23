@@ -444,8 +444,10 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
         build_priority  => \%priority_options, # Priority options for dropdown
         build_status    => \%status_options,   # Status options for dropdown
         return_to       => $return_to,       # URL to return to after action
-        start_date      => $c->request->params->{start_date},
+        start_date      => $c->request->params->{start_date} || DateTime->now->strftime('%Y-%m-%d'),
         time_of_day     => $c->request->params->{time_of_day},
+        user_id         => $c->session->{user_id},  # Pre-select logged-in user
+        default_status  => $c->request->params->{status} || 1,  # Default NEW; allow override via param
         template        => 'todo/addtodo.tt' # Template for rendering
     );
 
@@ -688,7 +690,7 @@ sub modify :Path('/todo/modify') :Args(1) {
             username_of_poster   => $c->session->{username},
             status               => $form_data->{status},
             priority             => $form_data->{priority},
-            time_of_day          => $form_data->{time_of_day},
+            time_of_day          => ($form_data->{time_of_day} && $form_data->{time_of_day} ne '') ? $form_data->{time_of_day} : undef,
             share                => $form_data->{share} || 0,
             last_mod_by          => $c->session->{username} || 'system',
             last_mod_date        => DateTime->now->ymd,
@@ -906,12 +908,9 @@ sub create :Local {
         $c->detach();
     }
 
-    # Redirect to the todo list or return_to URL with success message
+    # Redirect to /log after save (or explicit return_to if provided)
     $c->flash->{success_msg} = "Successfully created todo: " . $todo->subject;
-    my $redirect_url = $params->{return_to} || $c->uri_for($self->action_for('todo'));
-    
-    # Handle the case where the return_to URL might already have a fragment
-    # or ensure it's properly handled if coming from internal referer
+    my $redirect_url = $params->{return_to} || $c->uri_for('/log');
     $c->response->redirect($redirect_url);
 }
 

@@ -2324,18 +2324,25 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     my @planning_projects;
     my @orphan_plans;       # plans not linked to any project
     my @plan_sitenames;     # distinct sitenames for filter toggle (CSC only)
+
+    # --- Fetch top-level projects (separate eval so orphan-plan failure can't block this) ---
     eval {
-        my %proj_cond = $is_csc ? () : (sitename => $sitename);
+        my %proj_cond = (parent_id => undef);   # top-level only — filter in SQL, not Perl
+        $proj_cond{sitename} = $sitename unless $is_csc;
+
         my @proj_rows = $c->model('DBEncy')->resultset('Project')->search(
             \%proj_cond,
             { order_by => ['sitename', 'name'] }
         )->all;
 
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'daily_plan',
+            "planning_projects: fetched " . scalar(@proj_rows) . " top-level projects (is_csc=$is_csc)");
+
         for my $proj (@proj_rows) {
-            next if $proj->parent_id;   # top-level projects only
+            my $sn = $proj->sitename || '';
             my %p = $proj->get_columns;
 
-            # Linked plans
+            # Linked plans via many_to_many (inner eval — failure just means no linked plans shown)
             my @linked_plans;
             eval {
                 for my $pln ($proj->dailyplans->all) {
@@ -2343,18 +2350,28 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
                     push @linked_plans, \%ph;
                 }
             };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+                    "Could not fetch linked plans for project $p{id}: $@");
+            }
             $p{linked_plans} = \@linked_plans;
             push @planning_projects, \%p;
 
-            # Collect sitenames for filter toggle
-            push @plan_sitenames, $proj->sitename if $proj->sitename;
+            # Collect sitenames for filter toggle (skip blank)
+            push @plan_sitenames, $sn if $sn;
         }
 
         # Deduplicate sitenames
         my %seen_site;
         @plan_sitenames = grep { !$seen_site{$_}++ } sort @plan_sitenames;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Could not fetch planning projects: $@");
+    }
 
-        # Standalone plans (not linked to any project)
+    # --- Standalone plans (not linked to any project) — separate eval ---
+    eval {
         my %plan_cond = $is_csc ? () : (sitename => $sitename);
         for my $pln ($c->model('DBEncy')->resultset('DailyPlan')->search(
             \%plan_cond, { order_by => { -desc => 'created_at' } }
@@ -2367,7 +2384,7 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     };
     if ($@) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
-            "Could not fetch planning projects: $@");
+            "Could not fetch orphan plans: $@");
     }
 
     # Filter projects by filter_site param (CSC admin only)
@@ -2375,6 +2392,66 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     if ($is_csc && $filter_site) {
         @planning_projects = grep { ($_->{sitename} || '') eq $filter_site } @planning_projects;
         @orphan_plans      = grep { ($_->{sitename} || '') eq $filter_site } @orphan_plans;
+    }
+
+    # --- Active Priorities: DB-driven, role/site/user scoped, dependency-ordered ---
+    my @active_priorities;
+    eval {
+        my $user_id  = $c->session->{user_id};
+        my $roles    = $c->stash->{user_roles} || [];
+        my $can_see_all = $c->stash->{is_admin}
+            || grep { lc($_) =~ /^(developer|devops|editor)$/ } @$roles;
+
+        my %ap_cond = (status => { '!=' => 3 });   # exclude DONE
+        $ap_cond{sitename} = $sitename unless $is_csc;  # non-CSC: own site only
+        $ap_cond{user_id}  = $user_id  unless $can_see_all;  # members: own todos only
+
+        my @rows = $c->model('DBEncy')->resultset('Todo')->search(
+            \%ap_cond,
+            {
+                order_by => [
+                    { -asc  => 'priority'    },
+                    { -desc => 'is_blocking' },
+                    { -asc  => 'start_date'  },
+                ],
+                rows => 20,
+            }
+        )->all;
+
+        # Pre-fetch all returned IDs for fast blocker lookup
+        my %row_by_id = map { $_->record_id => $_ } @rows;
+
+        # Cache for project names
+        my %proj_cache;
+
+        for my $todo (@rows) {
+            my %h = $todo->get_columns;
+
+            # Blocker info
+            if ($h{blocked_by_todo_id}) {
+                my $blocker = $row_by_id{$h{blocked_by_todo_id}}
+                    || eval { $c->model('DBEncy')->resultset('Todo')->find($h{blocked_by_todo_id}) };
+                if ($blocker) {
+                    $h{blocker_subject} = $blocker->subject;
+                    $h{blocker_done}    = ($blocker->status == 3) ? 1 : 0;
+                }
+            }
+
+            # Project name (cached)
+            if ($h{project_id}) {
+                unless (exists $proj_cache{$h{project_id}}) {
+                    my $p = eval { $c->model('DBEncy')->resultset('Project')->find($h{project_id}) };
+                    $proj_cache{$h{project_id}} = $p ? $p->name : '';
+                }
+                $h{project_name} = $proj_cache{$h{project_id}};
+            }
+
+            push @active_priorities, \%h;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Could not fetch active priorities: $@");
     }
 
     # Pass all date information and todos to template
@@ -2415,9 +2492,10 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         today => $current_date_str,
         
         # Todos
-        todos => $all_todos_calendar, # For week.tt
-        todos_for_today => $todos_for_today, # For day view
-        
+        todos           => $all_todos_calendar,    # For week.tt
+        todos_for_today => $todos_for_today,       # For day view
+        active_priorities => \@active_priorities,  # DB-driven priority list for TODAY'S FOCUS
+
         template => 'admin/documentation/DailyPlan.tt'
     );
 }

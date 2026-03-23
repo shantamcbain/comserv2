@@ -1,0 +1,40 @@
+[% PageVersion = 'Comserv/root/Documentation/general/network_diagnostics.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Network Diagnostics - General Information' %]
+
+<!-- Documentation page for network_diagnostics -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+This document has been replaced by the main Network Diagnostics documentation.
+
+
+
+Please refer to <a href="/Documentation/network_diagnostics.md">Network Diagnostics Documentation</a> for the most up-to-date information.
+
+
+
+<h2>Redirect Notice</h2>
+
+
+
+This file previously contained log data that was accidentally saved as documentation.
+
+It has been cleaned up and replaced with this redirect notice.
+
+
+
+Last updated: 2025/08/31
+
+
+</div>
