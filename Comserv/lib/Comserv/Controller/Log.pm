@@ -265,9 +265,9 @@ sub log_form :Path('/log/log_form') :Args() {
     # Create form_data for project_list.tt and site_list.tt
     my $form_data = {};
 
-    # Set parent_id in form_data if todo_record has a project_id
+    # Set project_id in form_data if todo_record has a project_id
     if ($todo_record && $todo_record->project_id) {
-        $form_data->{parent_id} = $todo_record->project_id;
+        $form_data->{project_id} = $todo_record->project_id;
         $self->logging->log_with_details(
             $c, 'info', __FILE__, __LINE__, 'log_form',
             "Located project ID for form_data: " . $todo_record->project_id
@@ -332,12 +332,13 @@ sub create_log :Path('/log/create_log') :Args() {
         my $site_controller = $c->controller('Site');
         my $sites = $site_controller->fetch_available_sites($c);
 
-        # Get the parent_id from the form (used by project_list.tt)
-        my $parent_id = $c->request->body_parameters->{parent_id};
+        # Get the project_id from the form (used by project_list.tt)
+        my $parent_id = $c->request->body_parameters->{project_id}
+                     || $c->request->body_parameters->{parent_id};
 
         # Create form_data for project_list.tt and site_list.tt
         my $form_data = {
-            parent_id => $parent_id,
+            project_id => $parent_id,
             sitename => $c->request->body_parameters->{sitename}
         };
 
