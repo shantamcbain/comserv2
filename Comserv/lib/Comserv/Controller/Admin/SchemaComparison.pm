@@ -366,11 +366,23 @@ sub sync_unique_constraint_to_result :Path('/schema-comparison/sync_unique_const
             $table_schema = $self->get_forager_table_schema($c, $table_name);
         }
         
+        # Match by name first; for 'unnamed' also match by column set (MySQL auto-naming)
         my ($constraint) = grep { ($_->{name} || 'unnamed') eq $constraint_name } @{$table_schema->{unique_constraints} || []};
+        unless ($constraint && $constraint_name eq 'unnamed') {
+            # Also try column-based match when constraint_name is 'unnamed'
+            if ($constraint_name eq 'unnamed') {
+                ($constraint) = @{$table_schema->{unique_constraints} || []};
+            }
+        }
         die "Constraint '$constraint_name' not found in database" unless $constraint;
         
         my $cols_list = '[' . join(', ', map { "'$_'" } @{$constraint->{columns}}) . ']';
-        my $new_call = "__PACKAGE__->add_unique_constraint('$constraint_name' => $cols_list);";
+        # Use unnamed format (no name) when constraint_name is 'unnamed' or matches a column name
+        my $is_unnamed = ($constraint_name eq 'unnamed')
+            || (grep { $_ eq $constraint_name } @{$constraint->{columns}});
+        my $new_call = $is_unnamed
+            ? "__PACKAGE__->add_unique_constraint($cols_list);"
+            : "__PACKAGE__->add_unique_constraint('$constraint_name' => $cols_list);";
         
         my $result_table_mapping = $self->build_result_table_mapping($c, $database);
         my $table_key = lc($table_name);
@@ -378,10 +390,14 @@ sub sync_unique_constraint_to_result :Path('/schema-comparison/sync_unique_const
         
         my $content = read_file($result_file_path);
         
-        if ($content =~ /__PACKAGE__->add_unique_constraint\s*\(\s*['"]\Q$constraint_name\E['"]\s*=>\s*\[.*?\]\s*\)\s*;/s) {
-            $content =~ s/__PACKAGE__->add_unique_constraint\s*\(\s*['"]\Q$constraint_name\E['"]\s*=>\s*\[.*?\]\s*\)\s*;/ $new_call/s;
+        # Try to replace existing: named format
+        if (!$is_unnamed && $content =~ /__PACKAGE__->add_unique_constraint\s*\(\s*['"]\Q$constraint_name\E['"]\s*=>\s*\[.*?\]\s*\)\s*;/s) {
+            $content =~ s/__PACKAGE__->add_unique_constraint\s*\(\s*['"]\Q$constraint_name\E['"]\s*=>\s*\[.*?\]\s*\)\s*;/$new_call/s;
+        # Try to replace existing: unnamed format (no name argument)
+        } elsif ($is_unnamed && $content =~ /__PACKAGE__->add_unique_constraint\s*\(\s*\[.*?\]\s*\)\s*;/s) {
+            $content =~ s/__PACKAGE__->add_unique_constraint\s*\(\s*\[.*?\]\s*\)\s*;/$new_call/s;
         } else {
-            # Add after set_primary_key or add_columns
+            # Insert after set_primary_key or add_columns
             if ($content =~ /(__PACKAGE__->set_primary_key\s*\(.*?\)\s*;)/s) {
                 my $match = $1;
                 $content =~ s/\Q$match\E/$match\n$new_call/s;
@@ -1163,7 +1179,13 @@ sub generate_result_file_content {
     
     foreach my $constraint (@{$db_schema->{unique_constraints}}) {
         my $col_list = join(', ', map { "'$_'" } @{$constraint->{columns}});
-        $content .= "__PACKAGE__->add_unique_constraint('$constraint->{name}' => [$col_list]);\n";
+        # If the index name matches a column name, MySQL auto-named it - use unnamed format
+        my $is_auto_named = grep { $_ eq $constraint->{name} } @{$constraint->{columns}};
+        if ($is_auto_named || !$constraint->{name} || $constraint->{name} eq 'unnamed') {
+            $content .= "__PACKAGE__->add_unique_constraint([$col_list]);\n";
+        } else {
+            $content .= "__PACKAGE__->add_unique_constraint('$constraint->{name}' => [$col_list]);\n";
+        }
     }
     
     $content .= "\n1;\n";
@@ -1323,7 +1345,21 @@ sub get_ency_table_schema {
                 constraint_name => $row->{CONSTRAINT_NAME}
             };
         }
-        
+
+        my $idx_sth = $dbh->prepare("SHOW INDEX FROM `$table_name` WHERE Non_unique = 0 AND Key_name != 'PRIMARY'");
+        $idx_sth->execute();
+        my %unique_idx_seq;
+        while (my $row = $idx_sth->fetchrow_hashref()) {
+            $unique_idx_seq{$row->{Key_name}}{$row->{Seq_in_index}} = $row->{Column_name};
+        }
+        foreach my $idx_name (sort keys %unique_idx_seq) {
+            my @cols = map { $unique_idx_seq{$idx_name}{$_} } sort { $a <=> $b } keys %{$unique_idx_seq{$idx_name}};
+            push @{$schema_info->{unique_constraints}}, {
+                name => $idx_name,
+                columns => \@cols
+            };
+        }
+
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_ency_table_schema', 
             "Error getting ency table schema for $table_name: $_");
@@ -1394,7 +1430,21 @@ sub get_forager_table_schema {
                 constraint_name => $row->{CONSTRAINT_NAME}
             };
         }
-        
+
+        my $idx_sth = $dbh->prepare("SHOW INDEX FROM `$table_name` WHERE Non_unique = 0 AND Key_name != 'PRIMARY'");
+        $idx_sth->execute();
+        my %unique_idx_seq;
+        while (my $row = $idx_sth->fetchrow_hashref()) {
+            $unique_idx_seq{$row->{Key_name}}{$row->{Seq_in_index}} = $row->{Column_name};
+        }
+        foreach my $idx_name (sort keys %unique_idx_seq) {
+            my @cols = map { $unique_idx_seq{$idx_name}{$_} } sort { $a <=> $b } keys %{$unique_idx_seq{$idx_name}};
+            push @{$schema_info->{unique_constraints}}, {
+                name => $idx_name,
+                columns => \@cols
+            };
+        }
+
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_forager_table_schema', 
             "Error getting forager table schema for $table_name: $_");
@@ -1594,40 +1644,68 @@ sub find_schema_differences {
     }
     
     # Compare Unique Constraints
-    # This is more complex because they have names
-    my %db_uniques = map { ($_->{name} || 'unnamed') => join(',', sort @{$_->{columns}}) } @{$db_schema->{unique_constraints} || []};
+    # DB constraints use MySQL index names; Result file unnamed constraints use 'unnamed' key.
+    # We match by name first, then fall back to column-set matching for 'unnamed' Result constraints.
+    my %db_uniques     = map { ($_->{name} || 'unnamed') => join(',', sort @{$_->{columns}}) } @{$db_schema->{unique_constraints}   || []};
     my %result_uniques = map { ($_->{name} || 'unnamed') => join(',', sort @{$_->{columns}}) } @{$result_schema->{unique_constraints} || []};
-    
+
+    # Build reverse lookup: column-set => db constraint name (for unnamed matching)
+    my %db_cols_to_name = reverse %db_uniques;
+
+    my %matched_db;    # db names that have been matched
+    my %matched_result; # result names that have been matched
+
+    # First pass: exact name matches
     foreach my $name (keys %db_uniques) {
-        if (!exists $result_uniques{$name}) {
-            push @differences, {
-                type => 'unique_constraint_missing_in_result',
-                attribute => "add_unique_constraint ($name)",
-                table_value => $db_uniques{$name},
-                result_value => undef,
-                description => "Unique constraint '$name' missing in Result file"
-            };
-        } elsif ($db_uniques{$name} ne $result_uniques{$name}) {
-            push @differences, {
-                type => 'unique_constraint_mismatch',
-                attribute => "add_unique_constraint ($name)",
-                table_value => $db_uniques{$name},
-                result_value => $result_uniques{$name},
-                description => "Unique constraint '$name' column mismatch"
-            };
+        if (exists $result_uniques{$name}) {
+            $matched_db{$name} = 1;
+            $matched_result{$name} = 1;
+            if ($db_uniques{$name} ne $result_uniques{$name}) {
+                push @differences, {
+                    type => 'unique_constraint_mismatch',
+                    attribute => "add_unique_constraint ($name)",
+                    table_value => $db_uniques{$name},
+                    result_value => $result_uniques{$name},
+                    description => "Unique constraint '$name' column mismatch"
+                };
+            }
         }
     }
-    
-    foreach my $name (keys %result_uniques) {
-        if (!exists $db_uniques{$name}) {
-            push @differences, {
-                type => 'unique_constraint_missing_in_table',
-                attribute => "add_unique_constraint ($name)",
-                table_value => undef,
-                result_value => $result_uniques{$name},
-                description => "Unique constraint '$name' exists in Result file but not in database"
-            };
+
+    # Second pass: match 'unnamed' Result constraints to DB constraints by column set
+    foreach my $rname (keys %result_uniques) {
+        next if $matched_result{$rname};
+        my $rcols = $result_uniques{$rname};
+        if (exists $db_cols_to_name{$rcols}) {
+            my $db_name = $db_cols_to_name{$rcols};
+            $matched_db{$db_name} = 1;
+            $matched_result{$rname} = 1;
+            # Columns match - constraint exists in both, just named differently (OK)
         }
+    }
+
+    # Report DB constraints not matched
+    foreach my $name (keys %db_uniques) {
+        next if $matched_db{$name};
+        push @differences, {
+            type => 'unique_constraint_missing_in_result',
+            attribute => "add_unique_constraint ($name)",
+            table_value => $db_uniques{$name},
+            result_value => undef,
+            description => "Unique constraint '$name' missing in Result file"
+        };
+    }
+
+    # Report Result constraints not matched
+    foreach my $name (keys %result_uniques) {
+        next if $matched_result{$name};
+        push @differences, {
+            type => 'unique_constraint_missing_in_table',
+            attribute => "add_unique_constraint ($name)",
+            table_value => undef,
+            result_value => $result_uniques{$name},
+            description => "Unique constraint '$name' exists in Result file but not in database"
+        };
     }
     
     return \@differences;
