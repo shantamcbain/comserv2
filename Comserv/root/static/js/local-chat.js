@@ -1130,7 +1130,13 @@
             clearTimeout(abortTimer);
             clearTimeout(progressTimer1);
             clearTimeout(progressTimer2);
-            return response.json();
+            return response.text().then(function(text) {
+                try {
+                    return JSON.parse(text);
+                } catch(e) {
+                    throw new Error('Server returned non-JSON response (HTTP ' + response.status + '). The server may have crashed — check logs.');
+                }
+            });
         })
         .then(data => {
             // Remove loading message
@@ -1301,7 +1307,7 @@
                     + (isOllama ? ' Ollama may be loading a large model.' : ' The AI server may be busy.')
                 : 'Network error: ' + error.message + '. Please try again.';
 
-            // Show error with a Retry button for timeouts
+            // Show error with a Retry button (always — network errors are usually transient)
             const chatMessages = document.getElementById('chat-messages');
             const wrapper = document.createElement('div');
             wrapper.className = 'msg-wrapper msg-wrapper-ai';
@@ -1313,16 +1319,14 @@
             errEl.textContent = msg;
             wrapper.appendChild(label);
             wrapper.appendChild(errEl);
-            if (isTimeout) {
-                const retryBtn = document.createElement('button');
-                retryBtn.className = 'chat-retry-btn';
-                retryBtn.textContent = '↺ Retry';
-                retryBtn.onclick = function() {
-                    wrapper.remove();
-                    queryAI(prompt);
-                };
-                wrapper.appendChild(retryBtn);
-            }
+            const retryBtn = document.createElement('button');
+            retryBtn.className = 'chat-retry-btn';
+            retryBtn.textContent = '↺ Retry';
+            retryBtn.onclick = function() {
+                wrapper.remove();
+                queryAI(prompt);
+            };
+            wrapper.appendChild(retryBtn);
             chatMessages.appendChild(wrapper);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         });
