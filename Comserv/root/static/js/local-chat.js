@@ -1142,7 +1142,66 @@
             if (data.success) {
                 // Reset retry counter on success
                 state.retryCount = 0;
-                
+
+                // ── Web-search consent flow ───────────────────────────────────
+                // Server found no confident answer locally and is asking for
+                // permission to search the web via Grok.
+                if (data.needs_web_search) {
+                    statusIndicator.textContent = '💬 Escalation needed';
+                    statusIndicator.className = 'chat-status';
+                    const chatMessages = document.getElementById('chat-messages');
+                    const consentWrapper = document.createElement('div');
+                    consentWrapper.className = 'msg-wrapper msg-wrapper-ai';
+
+                    if (data.partial_answer) {
+                        const partialLabel = document.createElement('div');
+                        partialLabel.className = 'msg-label';
+                        partialLabel.textContent = 'AI (local)';
+                        const partialEl = document.createElement('div');
+                        partialEl.className = 'message ai-message';
+                        partialEl.textContent = data.partial_answer;
+                        consentWrapper.appendChild(partialLabel);
+                        consentWrapper.appendChild(partialEl);
+                    }
+
+                    const consentLabel = document.createElement('div');
+                    consentLabel.className = 'msg-label';
+                    consentLabel.textContent = 'System';
+                    const consentEl = document.createElement('div');
+                    consentEl.className = 'message system-message';
+                    consentEl.textContent = data.message || "I couldn't find a confident local answer. Search the web?";
+
+                    const yesBtn = document.createElement('button');
+                    yesBtn.className = 'chat-retry-btn';
+                    yesBtn.textContent = '🔍 Yes, search the web';
+                    yesBtn.style.marginRight = '6px';
+                    yesBtn.onclick = function() {
+                        consentWrapper.remove();
+                        // Re-send with Grok web search
+                        const grokModel = (state.modelTiers && state.modelTiers.grok)
+                                          ? state.modelTiers.grok
+                                          : 'grok|grok-3-mini';
+                        state.userModelOverride = grokModel;
+                        const webEl = document.getElementById('enable-web-search');
+                        if (webEl) webEl.checked = true;
+                        queryAI(prompt);
+                        state.userModelOverride = null;
+                    };
+
+                    const noBtn = document.createElement('button');
+                    noBtn.className = 'chat-retry-btn';
+                    noBtn.textContent = '✕ No thanks';
+                    noBtn.onclick = function() { consentWrapper.remove(); };
+
+                    consentWrapper.appendChild(consentLabel);
+                    consentWrapper.appendChild(consentEl);
+                    consentWrapper.appendChild(yesBtn);
+                    consentWrapper.appendChild(noBtn);
+                    chatMessages.appendChild(consentWrapper);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                    return;
+                }
+
                 // Store conversation ID ONLY if it was successfully created
                 if (data.conversation_id && data.conversation_id !== null && data.conversation_id !== undefined) {
                     state.currentConversationId = data.conversation_id;

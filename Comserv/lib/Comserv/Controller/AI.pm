@@ -1238,7 +1238,7 @@ sub chat :Local :Args(0) {
     # Role-based capability injection into messages (insert as system message)
     my $role_prompt_chat = $self->_build_role_system_prompt($c, $user_roles_chat, $is_grok_model ? 'grok' : 'ollama', $chat_page_path, $chat_page_title);
 
-    # Build combined system prompt: agent-specific prompt + role prompt + live module data
+    # Build combined system prompt: agent-specific prompt + role prompt + live module data + shared KB
     my @system_parts;
     push @system_parts, $chat_agent_system if $chat_agent_system;
     push @system_parts, $role_prompt_chat  if $role_prompt_chat;
@@ -1246,6 +1246,11 @@ sub chat :Local :Args(0) {
     # Fetch live module data (workshops, ENCY, etc.) when the prompt contains relevant keywords
     my $module_data = $self->_get_module_data($c, $prompt, $chat_agent_id);
     push @system_parts, $module_data if $module_data;
+
+    # Inject relevant past Q&A from the shared knowledge base (all users)
+    my $site_name_chat = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $shared_history = $self->_search_shared_history($c, $prompt, $site_name_chat);
+    push @system_parts, $shared_history if $shared_history;
 
     my $combined_system_prompt = join("\n\n", @system_parts);
 
@@ -1344,7 +1349,10 @@ sub chat :Local :Args(0) {
                 'chat', "Grok chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars");
 
         } else {
-            # Default: Use Ollama
+            # ── Ollama 3-Tier Escalation ──────────────────────────────────────
+            # Tier 1: small/fast model → if quality poor, Tier 2: large model
+            # → if still poor AND user has Grok, return web-search consent flag.
+
             my $ollama = $c->model('Ollama');
             unless ($ollama) {
                 die "Ollama service is not available";
@@ -1361,42 +1369,87 @@ sub chat :Local :Args(0) {
             $ollama->set_host($current_host);
             $ollama->timeout(150);
             $ollama->port($current_port) if $current_port;
-            $ollama->model($current_model) if $current_model;
 
-            if ($model && $can_select_model_perm) {
-                $ollama->model($model);
-            }
+            # Determine small and large model tiers from installed list
+            my ($tier_small, $tier_large) = $self->_pick_ollama_tier(
+                $installed_models, $current_model, $chat_agent_id, $chat_agent_id);
 
-            # Prepend combined system prompt for Ollama (role + agent + live data)
+            # If user manually picked a model (admin override), skip escalation logic
+            my $manual_model = ($model && $can_select_model_perm) ? $model : '';
+
+            # Prepend combined system prompt for Ollama
             my @ollama_messages = @messages;
             if ($combined_system_prompt) {
                 unshift @ollama_messages, { role => 'system', content => $combined_system_prompt };
             }
 
+            # ── Tier 1: Small / fast model ────────────────────────────────────
+            my $use_model = $manual_model || $tier_small;
+            $ollama->model($use_model);
+
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                'chat', "Querying Ollama host=$current_host model=" . $ollama->model . " timeout=150s messages=" . scalar(@ollama_messages));
+                'chat', "Tier-1 Ollama host=$current_host model=$use_model messages=" . scalar(@ollama_messages));
 
             my $chat_start = time();
-            my $response = $ollama->chat(messages => \@ollama_messages);
+            my $response   = $ollama->chat(messages => \@ollama_messages);
             my $chat_elapsed = time() - $chat_start;
 
             unless ($response) {
                 my $error = $ollama->last_error || 'Unknown error';
-                my $error_class = ref($error) || 'string';
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-                    'chat', "Ollama FAILED host=$current_host model=" . $ollama->model . " elapsed=${chat_elapsed}s error_class=$error_class error=$error");
+                    'chat', "Tier-1 Ollama FAILED model=$use_model elapsed=${chat_elapsed}s error=$error");
                 die "Ollama chat failed: $error";
             }
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                'chat', "Ollama SUCCESS elapsed=${chat_elapsed}s model=" . ($response->{model} || $ollama->model));
 
             if ($response->{message} && $response->{message}->{content}) {
                 $ai_response = $response->{message}->{content};
             } elsif ($response->{response}) {
                 $ai_response = $response->{response};
             }
+            $model_used = $response->{model} || $use_model;
 
-            $model_used = $response->{model} || $ollama->model;
+            # ── Tier 2: Escalate to large model if quality is poor ────────────
+            if (!$manual_model && $tier_large ne $tier_small
+                && $self->_assess_response_quality($ai_response, $prompt) eq 'poor')
+            {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                    'chat', "Tier-1 quality poor — escalating to Tier-2 model=$tier_large");
+
+                $ollama->model($tier_large);
+                my $resp2 = $ollama->chat(messages => \@ollama_messages);
+                if ($resp2) {
+                    my $text2 = ($resp2->{message} && $resp2->{message}->{content})
+                              ? $resp2->{message}->{content}
+                              : ($resp2->{response} // '');
+                    if ($text2) {
+                        $ai_response = $text2;
+                        $model_used  = $resp2->{model} || $tier_large;
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                            'chat', "Tier-2 SUCCESS model=$model_used");
+                    }
+                }
+
+                # ── Tier 3: Offer web search if still poor and Grok available ──
+                if ($self->_assess_response_quality($ai_response, $prompt) eq 'poor'
+                    && !$is_guest && $c->session->{grok_api_key})
+                {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                        'chat', "Tier-2 quality poor — offering web search consent");
+
+                    # Return a special response asking the user for web search consent.
+                    # The client will show Yes/No buttons; if Yes it re-sends with use_search=1 and provider=grok.
+                    my $partial = length($ai_response) > 20 ? $ai_response : undef;
+                    $c->response->content_type('application/json; charset=utf-8');
+                    $c->response->body(encode_json({
+                        success          => JSON::true,
+                        needs_web_search => JSON::true,
+                        partial_answer   => $partial,
+                        message          => "I couldn't find a confident answer from local knowledge. Would you like me to search the web?",
+                        model            => $model_used,
+                    }));
+                    return;
+                }
+            }
             $response_created_at = $response->{created_at} || '';
             $response_total_duration = $response->{total_duration} || 0;
             $response_eval_count = $response->{eval_count} || 0;
@@ -2602,6 +2655,163 @@ sub _get_module_data {
     }
 
     return join("\n\n", @sections);
+}
+
+=head2 _search_shared_history
+
+Search the shared ai_messages table (all users, all conversations) for past
+Q&A pairs that share keywords with the current prompt.  Returns up to 3 pairs
+formatted as a context block, or empty string when nothing useful is found.
+
+=cut
+
+sub _search_shared_history {
+    my ($self, $c, $prompt, $site_name) = @_;
+    $prompt    //= '';
+    $site_name //= '';
+
+    return '' unless length($prompt) > 5;
+
+    eval {
+        # Extract keywords: words > 4 chars, deduplicated
+        my %seen_kw;
+        my @keywords = grep { length($_) > 4 && !$seen_kw{lc $_}++ }
+                       ($prompt =~ /(\b\w{5,}\b)/g);
+        return '' unless @keywords;
+        my @kw = @keywords[0 .. ($#keywords < 7 ? $#keywords : 7)]; # max 8 keywords
+
+        my $schema = $c->model('DBEncy')->schema;
+        return '' unless $schema;
+
+        # Build LIKE conditions for each keyword
+        my @conds = map { { 'me.content' => { -like => "%$_%" } } } @kw;
+        # Need at least 2 keyword matches — use OR and post-filter
+        my $user_msgs = $schema->resultset('AiMessage')->search(
+            {
+                'me.role' => 'user',
+                -or       => \@conds,
+            },
+            {
+                order_by => { -desc => 'me.created_at' },
+                rows     => 30,
+                prefetch => 'conversation',
+            }
+        );
+
+        my @pairs;
+        my %seen_answer;
+        while (my $q_msg = $user_msgs->next) {
+            last if @pairs >= 3;
+            my $q_content = $q_msg->content // '';
+            next if length($q_content) < 5;
+
+            # Score: count how many keywords appear
+            my $score = grep { $q_content =~ /\Q$_\E/i } @kw;
+            next if $score < 2;
+
+            # Find the next assistant message in the same conversation
+            my $a_msg = $schema->resultset('AiMessage')->search(
+                {
+                    conversation_id => $q_msg->conversation_id,
+                    role            => 'assistant',
+                    id              => { '>' => $q_msg->id },
+                },
+                { order_by => { -asc => 'id' }, rows => 1 }
+            )->first;
+            next unless $a_msg;
+
+            my $answer = $a_msg->content // '';
+            next if length($answer) < 20;
+            next if $seen_answer{substr($answer, 0, 80)}++;  # deduplicate
+
+            push @pairs, "Q: $q_content\nA: " . substr($answer, 0, 400);
+        }
+
+        return '' unless @pairs;
+        return "RELEVANT PAST ANSWERS (from shared knowledge base — use as context, do not just repeat):\n"
+             . join("\n---\n", @pairs);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            '_search_shared_history', "History search error: $@");
+    }
+    return '';
+}
+
+=head2 _assess_response_quality
+
+Simple heuristic quality check on an AI response.
+Returns 'good' or 'poor'.
+
+Poor indicators:
+  - Very short (< 60 words)
+  - Contains "I don't know", "I cannot", "no information", "I'm not sure", "don't have access"
+  - Mostly repeats the question back
+
+=cut
+
+sub _assess_response_quality {
+    my ($self, $response, $prompt) = @_;
+    $response //= '';
+    $prompt   //= '';
+
+    my $word_count = scalar(split /\s+/, $response);
+    return 'poor' if $word_count < 30;
+
+    my @uncertain_phrases = (
+        "i don't know", "i do not know", "i cannot", "i can't",
+        "no information", "i'm not sure", "i am not sure",
+        "don't have access", "do not have access",
+        "unable to answer", "cannot answer", "no relevant",
+        "i don't have that", "not in my knowledge",
+    );
+    my $lc_resp = lc($response);
+    for my $phrase (@uncertain_phrases) {
+        return 'poor' if index($lc_resp, $phrase) >= 0;
+    }
+
+    return 'good';
+}
+
+=head2 _pick_ollama_tier
+
+Given the installed models list, return (small_model, large_model).
+Small = tinyllama or smallest by name; Large = llama3.1 or largest by name.
+
+=cut
+
+sub _pick_ollama_tier {
+    my ($self, $installed_models, $default_model, $agent_id, $page_context) = @_;
+
+    # Filter to chat-capable models
+    my @chat_models = grep {
+        my $n = ref($_) ? ($_->{name} || '') : ($_ || '');
+        $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
+    } @$installed_models;
+
+    my @names = map { ref($_) ? ($_->{name} || '') : ($_ || '') } @chat_models;
+
+    # Score models by parameter count (from name hints)
+    my %size_score;
+    for my $n (@names) {
+        if    ($n =~ /(\d+)b/i)        { $size_score{$n} = $1;       }
+        elsif ($n =~ /tiny/i)           { $size_score{$n} = 1;        }
+        elsif ($n =~ /small/i)          { $size_score{$n} = 3;        }
+        elsif ($n =~ /mini/i)           { $size_score{$n} = 3;        }
+        elsif ($n =~ /medium/i)         { $size_score{$n} = 7;        }
+        elsif ($n =~ /large/i)          { $size_score{$n} = 13;       }
+        else                            { $size_score{$n} = 7;        }
+    }
+
+    my @sorted = sort { ($size_score{$a} || 7) <=> ($size_score{$b} || 7) } @names;
+
+    my $small = $sorted[0]  || $default_model || 'llama3.1:latest';
+    my $large = $sorted[-1] || $default_model || 'llama3.1:latest';
+
+    # If only one model installed, both tiers use it
+    $large = $small if @sorted <= 1;
+
+    return ($small, $large);
 }
 
 =head2 _build_role_system_prompt
