@@ -2355,6 +2355,24 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
                     "Could not fetch linked plans for project $p{id}: $@");
             }
             $p{linked_plans} = \@linked_plans;
+
+            # Sub-projects (direct children of this project)
+            my @sub_projects;
+            eval {
+                my @subs = $c->model('DBEncy')->resultset('Project')->search(
+                    { parent_id => $p{id} },
+                    { order_by  => ['name'] }
+                )->all;
+                for my $sub (@subs) {
+                    push @sub_projects, { $sub->get_columns };
+                }
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+                    "Could not fetch sub-projects for project $p{id}: $@");
+            }
+            $p{sub_projects} = \@sub_projects;
+
             push @planning_projects, \%p;
 
             # Collect sitenames for filter toggle (skip blank)

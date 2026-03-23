@@ -441,6 +441,33 @@
                     <div style="font-size:0.85em;color:var(--text-color);margin:6px 0 10px;">[% proj.description %]</div>
                     [% END %]
 
+                    [%# Sub-projects (from proj.sub_projects set by controller) %]
+                    [% IF proj.sub_projects && proj.sub_projects.size %]
+                    <details style="margin-bottom:8px;">
+                        <summary style="cursor:pointer;font-size:0.82em;color:var(--text-muted-color);padding:3px 0;">
+                            📂 [% proj.sub_projects.size %] sub-project[% proj.sub_projects.size > 1 ? 's' : '' %]
+                        </summary>
+                        <div style="margin:4px 0 8px 10px;border-left:2px solid var(--border-color);padding-left:10px;">
+                            [% FOREACH sub IN proj.sub_projects %]
+                            <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+                                <span style="font-size:0.82em;">
+                                    <a href="/project/details?project_id=[% sub.id %]" style="color:var(--text-color);text-decoration:none;">[% sub.name %]</a>
+                                    [% IF sub.project_code %]<span style="color:var(--text-muted-color);font-size:0.9em;"> [% sub.project_code %]</span>[% END %]
+                                </span>
+                                [% IF sub.status %]
+                                <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;
+                                    [% IF sub.status == 'In-Process' || sub.status == 'active' %]background:#17a2b8;color:#fff
+                                    [% ELSIF sub.status == 'Completed' || sub.status == 'completed' %]background:#28a745;color:#fff
+                                    [% ELSE %]background:#6c757d;color:#fff[% END %]">
+                                    [% sub.status %]
+                                </span>
+                                [% END %]
+                            </div>
+                            [% END %]
+                        </div>
+                    </details>
+                    [% END %]
+
                     [%# Plans linked to this project (from proj.linked_plans set by controller) %]
                     [% IF proj.linked_plans && proj.linked_plans.size %]
                     <div style="margin-left:8px;border-left:2px solid var(--primary-color);padding-left:10px;">
