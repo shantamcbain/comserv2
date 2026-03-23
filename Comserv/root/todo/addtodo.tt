@@ -174,9 +174,9 @@
         <label for="status">Status:</label>
         [% SET sel_status = todo.status || default_status || 1 %]
         <select id="status" name="status" class="form-select">
-            <option value="1" [% IF sel_status == 'NEW' || sel_status == 1 %]selected[% END %]>NEW</option>
-            <option value="2" [% IF sel_status == 'IN PROGRESS' || sel_status == 2 %]selected[% END %]>IN PROGRESS</option>
-            <option value="3" [% IF sel_status == 'DONE' || sel_status == 3 %]selected[% END %]>DONE</option>
+            <option value="1" [% IF sel_status == 'NEW' || sel_status == 1 || sel_status == '1' || sel_status == 'Pending' %]selected[% END %]>NEW</option>
+            <option value="2" [% IF sel_status == 'IN PROGRESS' || sel_status == 2 || sel_status == '2' || sel_status == 'In-Process' %]selected[% END %]>IN PROGRESS</option>
+            <option value="3" [% IF sel_status == 'DONE' || sel_status == 3 || sel_status == '3' || sel_status == 'Completed' %]selected[% END %]>DONE</option>
         </select>
     </div>
     <div>
