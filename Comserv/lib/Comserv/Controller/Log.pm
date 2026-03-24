@@ -239,6 +239,12 @@ sub update :Path('/log/update') :Args(0) {
 # This method will only display the form
 sub log_form :Path('/log/log_form') :Args() {
     my ($self, $c) = @_;
+
+    unless ($c->session->{username} && $c->session->{username} ne 'anonymous') {
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     my $schema = $c->model('DBEncy');
 
     my $todo_record_id = $c->request->parameters->{todo_record_id} || '';
