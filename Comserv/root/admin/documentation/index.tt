@@ -210,24 +210,24 @@
             align-items: center;
             margin-bottom: 16px;
             padding: 12px 16px;
-            background: #f0f4ff;
+            background: var(--secondary-color, #f1f3f5);
             border-radius: 6px;
-            border: 1px solid #c7d2fe;
+            border: 1px solid var(--accent-color, #0056b3);
         }
 
         .role-filter-bar label {
             font-size: 13px;
             font-weight: 600;
-            color: #4a5568;
+            color: inherit;
             margin-right: 4px;
         }
 
         .role-filter-btn {
             padding: 5px 14px;
-            border: 2px solid #c7d2fe;
+            border: 2px solid var(--accent-color, #0056b3);
             border-radius: 20px;
-            background: white;
-            color: #4a5568;
+            background: var(--primary-color, #fff);
+            color: var(--accent-color, #0056b3);
             font-size: 12px;
             font-weight: 500;
             cursor: pointer;
@@ -235,27 +235,21 @@
         }
 
         .role-filter-btn:hover {
-            border-color: #667eea;
-            color: #667eea;
+            background: var(--accent-color, #0056b3);
+            color: var(--primary-color, #fff);
         }
 
         .role-filter-btn.active {
-            background: #667eea;
-            border-color: #667eea;
-            color: white;
+            background: var(--accent-color, #0056b3);
+            border-color: var(--accent-color, #0056b3);
+            color: var(--primary-color, #fff);
         }
-
-        .role-filter-btn.role-normal.active   { background: #1565c0; border-color: #1565c0; }
-        .role-filter-btn.role-editor.active   { background: #ef6c00; border-color: #ef6c00; }
-        .role-filter-btn.role-developer.active{ background: #2e7d32; border-color: #2e7d32; }
-        .role-filter-btn.role-admin.active    { background: #c62828; border-color: #c62828; }
-        .role-filter-btn.role-csc_admin.active{ background: #6a1a9a; border-color: #6a1a9a; }
-        .role-filter-btn.role-guest.active    { background: #546e7a; border-color: #546e7a; }
 
         .role-filter-count {
             font-size: 11px;
-            color: #667eea;
+            color: var(--accent-color, #0056b3);
             margin-left: 8px;
+            font-style: italic;
         }
 
         .file-card.role-hidden {
@@ -810,6 +804,18 @@ function filterAllFiles(role, btn) {
         countEl.textContent = role === 'all'
             ? ''
             : '— showing ' + visible + ' file' + (visible !== 1 ? 's' : '') + ' with role: ' + role;
+    }
+
+    // Recalculate container maxHeight so filtered result is visible
+    const container = grid.closest('.container-content');
+    if (container && container.classList.contains('expanded')) {
+        container.style.maxHeight = 'none';
+        const newHeight = container.scrollHeight;
+        const viewportHeight = window.innerHeight;
+        container.style.maxHeight = Math.min(newHeight, viewportHeight - 150) + 'px';
+        if (newHeight > viewportHeight - 150) {
+            container.style.overflowY = 'auto';
+        }
     }
 }
 
