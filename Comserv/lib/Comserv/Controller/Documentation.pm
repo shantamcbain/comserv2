@@ -320,10 +320,10 @@ sub _ensure_scanned {
         # Run the existing scan routines to refresh in-memory index
         _scan_directories($self, $c);
         _categorize_pages($self, $c);
-        # Update JSON config with newly scanned files
+        # Update JSON config with newly scanned files (preserves existing roles)
         $self->_update_json_config_with_scanned_files($c);
-        # Update JSON config with newly scanned files
-        $self->_update_json_config_with_scanned_files($c);
+        # Sync JSON config roles back into in-memory pages (overrides scan defaults)
+        $self->_apply_json_roles_to_memory($c);
         # Persist new fingerprint atomically
         _store_fingerprint($state_path, $current_fp) or do {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_ensure_scanned',
@@ -2037,6 +2037,24 @@ sub _update_json_config_with_scanned_files {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_update_json_config_with_scanned_files',
             "Failed to write JSON config file");
     }
+}
+
+sub _apply_json_roles_to_memory {
+    my ($self, $c) = @_;
+    my $config_file = $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json');
+    return unless -e $config_file;
+    my $config = _load_json_file($config_file) || {};
+    my $json_pages = $config->{pages} || {};
+    my $memory_pages = $self->documentation_pages;
+    my $synced = 0;
+    foreach my $page_name (keys %$json_pages) {
+        if (exists $memory_pages->{$page_name} && ref $json_pages->{$page_name}->{roles} eq 'ARRAY') {
+            $memory_pages->{$page_name}->{roles} = $json_pages->{$page_name}->{roles};
+            $synced++;
+        }
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_apply_json_roles_to_memory',
+        "Synced roles from JSON config into memory for $synced pages");
 }
 
 # Helper method to clean data structure for JSON encoding
