@@ -97,21 +97,36 @@ sub begin :Private {
     # Log the path the user is accessing
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "User accessing path: " . $c->req->uri);
 
-    # Fetch roles: prefer stash (set by Root::auto, includes site-specific admin detection)
-    my $roles = $c->stash->{user_roles} || $c->session->{roles} || [];
+    # Fetch the user's roles from the session
+    my $roles = $c->session->{roles} || [];
 
     # Ensure roles are an array reference
     if (ref $roles ne 'ARRAY') {
-        $roles = [];
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "Invalid or undefined roles in session for user: " . ($c->session->{username} || 'Guest'));
+
+        # Stash the current path so it can be used for redirection after login
+        $c->stash->{template} = $c->req->uri;
+
+        # Set error message for session problems
+        $c->stash->{error_msg} = "Session expired or invalid. Please log in again.";
+
+        # Redirect to login
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Redirecting to login page due to missing or invalid roles.");
+        $c->res->redirect($c->uri_for('/user/login'));
+        $c->detach;
     }
 
-    # Allow all roles above member: admin, developer, devops, editor, user, normal
-    # Also allow if Root::auto set is_admin (catches site-specific admins from UserSiteRole)
-    unless ($c->stash->{is_admin} || grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal)$/ } @$roles) {
+    # Check if the user has the 'admin' or 'developer' role
+    unless (grep { $_ eq 'admin' || $_ eq 'developer' } @$roles) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
 
-        # Redirect unauthorized users to the login page with the return URL
-        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
+        # Stash the current path for potential use
+        $c->stash->{redirect_to} = $c->req->uri;
+
+        # Redirect unauthorized users to the home page with an error message
+        $c->stash->{error_msg} = "Unauthorized access. You do not have permission to view this page.";
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Redirecting unauthorized user to the home page.");
+        $c->res->redirect($c->uri_for('/'));
         $c->detach;
     }
 
@@ -343,12 +358,24 @@ sub details :Path('/todo/details') :Args {
                 "Error fetching projects: $@");
         }
 
-        # Add the todo, accumulative_time, and projects to the stash
+        # Fetch rescheduling / interval history for this todo
+        my @intervals;
+        eval {
+            @intervals = $schema->resultset('TodoInterval')->search(
+                { todo_record_id => $record_id },
+                { order_by => { -desc => 'record_id' } }
+            )->all;
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'details',
+            "Interval fetch error: $@") if $@;
+
+        # Add the todo, accumulative_time, projects, and interval history to the stash
         $c->stash(
-            record => $todo, 
+            record            => $todo,
             accumulative_time => $accumulative_time,
-            projects => $projects,
-            return_to => $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo')),
+            projects          => $projects,
+            todo_intervals    => \@intervals,
+            return_to         => $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo')),
         );
 
         # Set the template to 'todo/details.tt'
@@ -444,10 +471,8 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
         build_priority  => \%priority_options, # Priority options for dropdown
         build_status    => \%status_options,   # Status options for dropdown
         return_to       => $return_to,       # URL to return to after action
-        start_date      => $c->request->params->{start_date} || DateTime->now->strftime('%Y-%m-%d'),
+        start_date      => $c->request->params->{start_date},
         time_of_day     => $c->request->params->{time_of_day},
-        user_id         => $c->session->{user_id},  # Pre-select logged-in user
-        default_status  => $c->request->params->{status} || 1,  # Default NEW; allow override via param
         template        => 'todo/addtodo.tt' # Template for rendering
     );
 
@@ -671,13 +696,20 @@ sub modify :Path('/todo/modify') :Args(1) {
         "Updating todo item with record ID: $record_id."
     );
 
+    # Capture old due_date before update so we can log rescheduling
+    my $old_due_date   = $todo->due_date   // '';
+    my $old_start_date = $todo->start_date // '';
+    my $new_due_date   = $form_data->{due_date} || DateTime->now->add(days => 7)->ymd;
+    my $today          = DateTime->now->ymd;
+    my $current_user   = $c->session->{username} || 'system';
+
     # Attempt to update the todo record
     eval {
         $todo->update({
             sitename             => $form_data->{sitename},
             start_date           => $form_data->{start_date},
             parent_todo          => $parent_todo,
-            due_date             => $form_data->{due_date} || DateTime->now->add(days => 7)->ymd,
+            due_date             => $new_due_date,
             subject              => $form_data->{subject},
             description          => $form_data->{description},
             estimated_man_hours  => $form_data->{estimated_man_hours},
@@ -692,8 +724,8 @@ sub modify :Path('/todo/modify') :Args(1) {
             priority             => $form_data->{priority},
             time_of_day          => ($form_data->{time_of_day} && $form_data->{time_of_day} ne '') ? $form_data->{time_of_day} : undef,
             share                => $form_data->{share} || 0,
-            last_mod_by          => $c->session->{username} || 'system',
-            last_mod_date        => DateTime->now->ymd,
+            last_mod_by          => $current_user,
+            last_mod_date        => $today,
             user_id              => $form_data->{user_id} || 1,
             project_id           => $form_data->{project_id},
             date_time_posted     => $form_data->{date_time_posted},
@@ -726,6 +758,29 @@ sub modify :Path('/todo/modify') :Args(1) {
         'modify.success',
         "Todo item successfully updated for record ID: $record_id."
     );
+
+    # --- Rescheduling interval log ---
+    # If the due_date changed, create a TodoInterval record to track the move.
+    # This builds an audit trail showing how many times and how far a task was deferred.
+    if ($old_due_date && $new_due_date && $old_due_date ne $new_due_date) {
+        eval {
+            $schema->resultset('TodoInterval')->create({
+                todo_record_id => $record_id,
+                start_date     => $old_start_date || $today,
+                end_date       => $today,
+                interval_type  => 'rescheduled',
+                status         => "from:$old_due_date to:$new_due_date",
+                last_mod_by    => $current_user,
+                last_mod_date  => $today,
+            });
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'modify.reschedule',
+                "Logged reschedule for todo $record_id: $old_due_date -> $new_due_date by $current_user");
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'modify.reschedule',
+                "Could not write TodoInterval for todo $record_id: $@");
+        }
+    }
 
     # Handle successful update
     $c->flash->{success_msg} = "Todo item with ID $record_id has been successfully updated.";
@@ -875,7 +930,7 @@ sub create :Local {
         username_of_poster => $current_user,
         status => $self->convert_status_to_string($params->{status}) || 'NEW',
         priority => $params->{priority} || 3, # Medium priority by default
-        time_of_day => $params->{time_of_day},
+        time_of_day => ($params->{time_of_day} && $params->{time_of_day} ne '') ? $params->{time_of_day} : undef,
         share => $params->{share} ? 1 : 0,
         last_mod_by => $current_user,
         last_mod_date => $current_date,
@@ -908,9 +963,12 @@ sub create :Local {
         $c->detach();
     }
 
-    # Redirect to /log after save (or explicit return_to if provided)
+    # Redirect to the todo list or return_to URL with success message
     $c->flash->{success_msg} = "Successfully created todo: " . $todo->subject;
-    my $redirect_url = $params->{return_to} || $c->uri_for('/log');
+    my $redirect_url = $params->{return_to} || $c->uri_for($self->action_for('todo'));
+    
+    # Handle the case where the return_to URL might already have a fragment
+    # or ensure it's properly handled if coming from internal referer
     $c->response->redirect($redirect_url);
 }
 
