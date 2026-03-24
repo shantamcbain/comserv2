@@ -1,6 +1,17 @@
 /* Documentation Component CSS - Theme-aware version */
 /* Uses CSS variables from the theme system */
 
+/* Documentation-specific variables — themes can override these */
+:root {
+    --doc-container-bg: #ffffff;
+    --doc-container-border: #dee2e6;
+    --doc-header-bg: #343a40;
+    --doc-header-color: #ffffff;
+    --doc-header-hover-bg: #23272b;
+    --doc-content-bg: #f8f9fa;
+    --doc-content-color: #212529;
+}
+
 .documentation-container {
     max-width: 1200px;
     margin: 0 auto;
@@ -398,8 +409,8 @@ h1 {
 
 /* All Files Container Styles - Theme Compatible */
 .theme-container {
-    background: #ffffff;
-    border: 1px solid #dee2e6;
+    background: var(--doc-container-bg, #ffffff);
+    border: 1px solid var(--doc-container-border, #dee2e6);
     border-radius: 8px;
     margin-bottom: 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -407,8 +418,8 @@ h1 {
 }
 
 .container-header {
-    background: #343a40;
-    color: #ffffff;
+    background: var(--doc-header-bg, #343a40);
+    color: var(--doc-header-color, #ffffff);
     padding: 15px 20px;
     cursor: pointer;
     display: flex;
@@ -420,11 +431,11 @@ h1 {
 }
 
 .container-header:hover {
-    background: #23272b;
+    background: var(--doc-header-hover-bg, #23272b);
 }
 
 .container-header.expanded {
-    background: #23272b;
+    background: var(--doc-header-hover-bg, #23272b);
 }
 
 .toggle-icon {
@@ -440,8 +451,8 @@ h1 {
     max-height: 0;
     overflow: hidden;
     transition: max-height 0.5s ease;
-    background: #f8f9fa;
-    color: #212529;
+    background: var(--doc-content-bg, #f8f9fa);
+    color: var(--doc-content-color, #212529);
 }
 
 /* Container content when expanded - with scrolling support */
@@ -565,8 +576,8 @@ h1 {
 
 /* All Files Container Styles - Theme Compatible */
 .theme-container {
-    background: #ffffff;
-    border: 1px solid #dee2e6;
+    background: var(--doc-container-bg, #ffffff);
+    border: 1px solid var(--doc-container-border, #dee2e6);
     border-radius: 8px;
     margin-bottom: 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -574,8 +585,8 @@ h1 {
 }
 
 .container-header {
-    background: #343a40;
-    color: #ffffff;
+    background: var(--doc-header-bg, #343a40);
+    color: var(--doc-header-color, #ffffff);
     padding: 15px 20px;
     cursor: pointer;
     display: flex;
@@ -587,11 +598,11 @@ h1 {
 }
 
 .container-header:hover {
-    background: #23272b;
+    background: var(--doc-header-hover-bg, #23272b);
 }
 
 .container-header.expanded {
-    background: #23272b;
+    background: var(--doc-header-hover-bg, #23272b);
 }
 
 .toggle-icon {
@@ -607,8 +618,8 @@ h1 {
     max-height: 0;
     overflow: hidden;
     transition: max-height 0.5s ease;
-    background: #f8f9fa;
-    color: #212529;
+    background: var(--doc-content-bg, #f8f9fa);
+    color: var(--doc-content-color, #212529);
 }
 
 /* Container content when expanded - with scrolling support */
