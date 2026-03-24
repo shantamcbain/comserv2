@@ -1751,10 +1751,16 @@ sub quick_close :Path('quick_close') :Args(0) {
             last_mod_date => $today,
         });
 
+        my $proj_code = '';
+        if ($todo->project_id) {
+            my $proj = eval { $c->model('DBEncy')->resultset('Project')->find($todo->project_id) };
+            $proj_code = $proj ? ($proj->project_code || '') : '';
+        }
         $c->model('DBEncy')->resultset('Log')->create({
             todo_record_id => $record_id,
             owner          => $username,
             sitename       => $todo->sitename || $c->session->{SiteName},
+            project_code   => $proj_code,
             abstract       => 'Quick-closed from Active Priorities panel',
             details        => 'Marked done via quick-close button on DailyPlan by ' . $username,
             start_date     => $today,
