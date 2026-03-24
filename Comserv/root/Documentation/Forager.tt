@@ -40,82 +40,84 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 </nav>
 
 <h3 id="overview"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/Overview.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/Overview.tt' %]
 
 <h3 id="admin_module"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/Admin.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/Admin.tt' %]
 
 <h3 id="ai"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/AI.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/AI.tt' %]
 
 <h3 id="dbi"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/DBIDocument.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/DBIDocument.tt' %]
 
 <h3 id="bmaster"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/BMaster.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/BMaster.tt' %]
 
 <h3 id="calendar"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/Calendar.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/Calendar.tt' %]
 
 <h3 id="document-management"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/DocumentManagement.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/DocumentManagement.tt' %]
 
 <h3 id="ENCY"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/ENCY.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/ENCY.tt' %]
 
 <h3 id="files"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/Files.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/Files.tt' %]
 
 <h3 id="guidelines"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/guidelines.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/Guidelines.tt' %]
 
 <h3 id="git"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/Git.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/Git.tt' %]
 
 <h3 id="installation"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/Installation.tt'; CATCH; END %]
+[% TRY %][% INCLUDE 'Documentation/Installation.tt' %][% CATCH %]<!-- Installation.tt not yet created -->[% END %]
 
 <h3 id="login"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/Login.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/Login.tt' %]
 
 <h3 id="logging"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/Logging.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/Logging.tt' %]
 
 <h3 id="mail"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/Mail.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/Mail.tt' %]
 
 <h3 id="projects"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/Projects.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/Projects.tt' %]
 
 <h3 id="root"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/Root.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/Root.tt' %]
 
 <h3 id="session-plan"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/sessionplan.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/Sessionplan.tt' %]
 
 <h3 id="schema"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/Schema.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/Schema.tt' %]
 
 <h3 id="user-management"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/User.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/User.tt' %]
 
 <h3 id="sites"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/Sites.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/Sites.tt' %]
 
 <h3 id="starman-setup"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/Starman.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/Starman.tt' %]
 
 <h3 id="todo"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/Todo.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/Todo.tt' %]
 
 <h3 id="workshop-management"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/WorkShops.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/WorkShops.tt' %]
 
 <h3 id="ve7tit"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/Ve7tit.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/Ve7tit.tt' %]
 
 <h3 id="inventory"><a href="#top">Back to top of Documentation</a></h3>
-[% TRY; INCLUDE 'Documentation/Inventory.tt'; CATCH; END %]
+[% INCLUDE 'Documentation/Inventory.tt' %]
+
+<h3 id="forager"><a href="#top">Back to top of Documentation</a></h3>
 
 <h2>Instructions for Developers</h2>
 <p>Welcome to the Comserv Application Documentation. Here are some guidelines and best practices to keep in mind while working with this project:</p>
