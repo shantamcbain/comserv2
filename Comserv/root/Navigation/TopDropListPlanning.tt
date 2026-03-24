@@ -1,0 +1,77 @@
+
+[% PageVersion = 'Navigation/TopDropListPlanning.tt,v 1.0 2026/03/24 Planning top-menu dropdown — role-gated, SiteName-aware' %]
+[% IF c.session.debug_mode == 1 %]
+    <!-- [% PageVersion %] -->
+[% END %]
+
+[%# Only visible to logged-in users — guests see nothing %]
+[% IF c.session.username %]
+
+[%# Resolve stash values set by Root.pm begin %]
+[% SET is_admin = c.stash.is_admin %]
+[% SET site     = c.stash.SiteName || c.session.SiteName || 'CSC' %]
+[% SET is_csc   = (site == 'CSC') %]
+
+[%# Planning access: admin, developer, devops, editor, user, normal (but NOT guest/anonymous) %]
+[% SET can_plan = is_admin
+    || (c.stash.user_roles && (
+           c.stash.user_roles.grep('developer').size
+        || c.stash.user_roles.grep('devops').size
+        || c.stash.user_roles.grep('editor').size
+        || c.stash.user_roles.grep('user').size
+        || c.stash.user_roles.grep('normal').size
+    ))
+%]
+
+[% IF can_plan %]
+<li class="horizontal-dropdown">
+    <a href="/Documentation/DailyPlan" class="dropbtn"><i class="icon-calendar"></i>Planning</a>
+    <div class="dropdown-content">
+
+        [%# Core planning links %]
+        <a href="/Documentation/DailyPlan"><i class="icon-calendar"></i>Daily Plan</a>
+        <a href="/todo"><i class="icon-check-square"></i>Todo System</a>
+        <a href="/log"><i class="icon-log"></i>Logs</a>
+
+        <div class="dropdown-divider"></div>
+
+        [%# Project planning %]
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-file"></i>Projects</span>
+            <div class="submenu">
+                <a href="/project" class="submenu-link"><i class="icon-list"></i>All Projects</a>
+                [% IF is_admin %]
+                <a href="/project/addproject" class="submenu-link"><i class="icon-add"></i>Add Project</a>
+                [% END %]
+            </div>
+        </div>
+
+        [%# Plans (DB-driven) %]
+        [% IF is_admin || c.stash.user_roles.grep('developer').size || c.stash.user_roles.grep('editor').size %]
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-planning"></i>Plans</span>
+            <div class="submenu">
+                <a href="/admin/plan/list" class="submenu-link"><i class="icon-list"></i>All Plans</a>
+                <a href="/admin/plan/create" class="submenu-link"><i class="icon-add"></i>New Plan</a>
+            </div>
+        </div>
+        [% END %]
+
+        [%# CSC-only text-based planning reference %]
+        [% IF is_csc && is_admin %]
+        <div class="dropdown-divider"></div>
+        <div class="submenu-item">
+            <span class="submenu-header" style="font-size:0.85em;color:var(--text-muted-color);"><i class="icon-documentation"></i>CSC Docs</span>
+            <div class="submenu">
+                <a href="/Documentation/MasterPlanCoordination" class="submenu-link"><i class="icon-planning"></i>Master Plan</a>
+                <a href="/Documentation/Planning" class="submenu-link"><i class="icon-planning"></i>Planning Docs</a>
+                <a href="/Documentation" class="submenu-link"><i class="icon-documentation"></i>All Docs</a>
+            </div>
+        </div>
+        [% END %]
+
+    </div>
+</li>
+[% END %][%# /can_plan %]
+
+[% END %][%# /logged-in %]
