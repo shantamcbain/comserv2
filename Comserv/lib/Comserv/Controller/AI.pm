@@ -4688,7 +4688,7 @@ sub preload_model :Local :Args(0) {
             model   => $model,
             timeout => 120,
         );
-        $ollama->chat([{ role => 'user', content => 'hi' }]);
+        $ollama->chat(messages => [{ role => 'user', content => 'hi' }]);
     };
 
     $c->response->body('{"success":true,"message":"model preloaded"}');
