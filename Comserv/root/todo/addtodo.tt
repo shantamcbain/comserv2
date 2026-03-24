@@ -182,9 +182,8 @@
     <div>
         <label for="priority">Priority:</label>
         <select id="priority" name="priority" class="form-select">
-        [% FOREACH key IN build_priority.keys.sort %]
-        <option value="[% key %]" [% IF key == todo.priority %]selected[% END %]>[% build_priority.$key %]</option>
-        [% END %]
+            [% SET current_priority = todo.priority %]
+            [% INCLUDE 'todo/priority_select.tt' %]
         </select>
     </div>
     <div>
