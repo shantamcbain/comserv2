@@ -175,37 +175,79 @@
                 <li><code>todo</code>: Add <code>plan_id</code> (foreign key to dailyplan) and <code>blocked_by_todo_id</code> (self-reference for dependencies)</li>
             </ul>
             
-            <h3>Permission Model</h3>
+            <h3>Permission Model (as implemented)</h3>
+            <p style="font-size:0.9em;color:#555;margin-bottom:10px;">
+                Access is controlled in <code>Root.pm::auto</code> via <code>UserSiteRole</code> detection.
+                Admins access planning via <a href="/admin">/admin</a>;
+                users see their profile/role at <a href="/user/profile">/user/profile</a>.
+            </p>
             <table class="table table-bordered">
                 <thead>
                     <tr>
                         <th>Role</th>
-                        <th>Access Level</th>
+                        <th>SiteName Scope</th>
+                        <th>DailyPlan Access</th>
+                        <th>Text Plans (CSC only)</th>
+                        <th>DB Plans</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr>
-                        <td>CSC Admin</td>
-                        <td>All plans, all sites</td>
+                    <tr style="background:#d4edda;">
+                        <td><strong>CSC Admin</strong></td>
+                        <td>All sites</td>
+                        <td>✅ Full — all tabs, all sites</td>
+                        <td>✅ Visible (CSC tab)</td>
+                        <td>✅ Create / Edit / View</td>
+                    </tr>
+                    <tr style="background:#d4edda;">
+                        <td><strong>SiteName Admin</strong></td>
+                        <td>Own site only</td>
+                        <td>✅ DB-only view (own site)</td>
+                        <td>❌ Hidden</td>
+                        <td>✅ Create / Edit / View (own site)</td>
+                    </tr>
+                    <tr style="background:#d4edda;">
+                        <td><strong>Developer</strong></td>
+                        <td>Own site</td>
+                        <td>✅ DB-only view (own site)</td>
+                        <td>❌ Hidden</td>
+                        <td>✅ View / Edit (own site)</td>
+                    </tr>
+                    <tr style="background:#d4edda;">
+                        <td><strong>Editor</strong></td>
+                        <td>Own site</td>
+                        <td>✅ DB-only view (own site)</td>
+                        <td>❌ Hidden</td>
+                        <td>✅ View (own site)</td>
                     </tr>
                     <tr>
-                        <td>SiteName Admin</td>
-                        <td>Plans for their site only</td>
+                        <td><strong>Member</strong> (granted access)</td>
+                        <td>Own site</td>
+                        <td>✅ DB-only view (own site)</td>
+                        <td>❌ Hidden</td>
+                        <td>✅ View (own site)</td>
                     </tr>
                     <tr>
-                        <td>Developer</td>
-                        <td>No access</td>
+                        <td><strong>Member</strong> (no planning grant)</td>
+                        <td>—</td>
+                        <td>❌ No access</td>
+                        <td>❌ Hidden</td>
+                        <td>❌ No access</td>
                     </tr>
-                    <tr>
-                        <td>User</td>
-                        <td>No access</td>
-                    </tr>
-                    <tr>
-                        <td>Not Logged In</td>
-                        <td>No access</td>
+                    <tr style="background:#f8d7da;">
+                        <td><strong>Not Logged In</strong></td>
+                        <td>—</td>
+                        <td>❌ Redirect to login</td>
+                        <td>❌ Hidden</td>
+                        <td>❌ No access</td>
                     </tr>
                 </tbody>
             </table>
+            <p style="font-size:0.85em;color:#666;margin-top:6px;">
+                <strong>Implementation note:</strong> CSC text-based plan tabs (DAILY PLAN GUIDE, ZENCODER PROMPT, MASTER PLAN COORDINATION)
+                are conditionally shown only when <code>is_csc = 1</code> in the session.
+                All other SiteNames see only DB-driven tabs (DAILY PRIORITIES, DAILY SCHEDULE, THIS WEEK, MONTH VIEW, PLANNING, GANTT, RESOURCES).
+            </p>
         </div>
     </div>
 
