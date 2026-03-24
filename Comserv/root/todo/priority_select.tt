@@ -1,0 +1,12 @@
+[%#
+  Shared priority <option> list — include inside any <select> element.
+  Variables consumed:
+    build_priority   — hash {1=>'Critical', 2=>'Urgent', ...} (from stash)
+    current_priority — currently selected value (set before including)
+  Example:
+    [% SET current_priority = todo.priority %]
+    [% INCLUDE 'todo/priority_select.tt' %]
+%]
+[% FOREACH key IN build_priority.keys.sort %]
+<option value="[% key %]"[% IF key == current_priority %] selected[% END %]>[% key %] — [% build_priority.$key %]</option>
+[% END %]
