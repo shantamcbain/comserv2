@@ -51,8 +51,8 @@
 
 /* ── Collapsible containers ──────────────────────────────────── */
 .theme-container {
-    background: var(--doc-container-bg, #ffffff);
-    border: 1px solid var(--doc-container-border, #dee2e6);
+    background: var(--background-color, #ffffff);
+    border: 1px solid var(--border-color, #cccccc);
     border-radius: 8px;
     margin-bottom: 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -60,8 +60,8 @@
 }
 
 .container-header {
-    background: var(--doc-header-bg, #343a40);
-    color: var(--doc-header-color, #ffffff);
+    background: var(--table-header-bg, #f2f2f2);
+    color: var(--text-color, #333);
     padding: 15px 20px;
     cursor: pointer;
     display: flex;
@@ -70,12 +70,13 @@
     font-weight: 600;
     transition: background-color 0.2s ease;
     user-select: none;
+    border-bottom: 2px solid var(--border-color, #cccccc);
 }
 
 .container-header:hover,
 .container-header.expanded {
-    background: var(--doc-header-hover-bg, #23272b);
-    color: var(--doc-header-color, #ffffff);
+    background: var(--button-hover-bg, #e0e0e0);
+    color: var(--text-color, #333);
 }
 
 .container-header h2 {
@@ -102,8 +103,8 @@
 }
 
 .badge {
-    background: rgba(255,255,255,0.2);
-    color: inherit;
+    background: var(--border-color, #cccccc);
+    color: var(--text-color, #333);
     padding: 2px 8px;
     border-radius: 12px;
     font-size: 12px;
@@ -115,8 +116,8 @@
     max-height: 0;
     overflow: hidden;
     transition: max-height 0.5s ease;
-    background: var(--doc-content-bg, #f8f9fa);
-    color: var(--doc-content-color, #212529);
+    background: var(--background-color, #ffffff);
+    color: var(--text-color, #333);
 }
 
 .container-content.expanded {
@@ -124,17 +125,17 @@
     overflow-x: hidden;
     padding: 20px;
     scrollbar-width: thin;
-    scrollbar-color: var(--border-color, #aaa) var(--doc-content-bg, #f8f9fa);
+    scrollbar-color: var(--border-color, #ccc) var(--background-color, #ffffff);
     transition: max-height 0.5s ease;
 }
 
 .container-content.expanded::-webkit-scrollbar { width: 8px; }
 .container-content.expanded::-webkit-scrollbar-track {
-    background: var(--doc-content-bg, #f8f9fa);
+    background: var(--background-color, #ffffff);
     border-radius: 4px;
 }
 .container-content.expanded::-webkit-scrollbar-thumb {
-    background: var(--border-color, #adb5bd);
+    background: var(--border-color, #ccc);
     border-radius: 4px;
 }
 
@@ -150,12 +151,12 @@
 .category-description {
     padding: 12px;
     border-radius: 6px;
-    border-left: 4px solid var(--border-color, #adb5bd);
+    border-left: 4px solid var(--border-color, #cccccc);
     margin-bottom: 20px;
     font-size: 14px;
     color: var(--text-color, #555);
     font-style: italic;
-    background: var(--doc-content-bg, #f8f9fa);
+    background: var(--secondary-color, #f9f9f9);
 }
 
 /* ── Role filter bar ─────────────────────────────────────────── */
@@ -166,9 +167,9 @@
     align-items: center;
     margin-bottom: 16px;
     padding: 10px 14px;
-    background: var(--doc-container-bg, #f1f3f5);
+    background: var(--secondary-color, #f9f9f9);
     border-radius: 6px;
-    border: 1px solid var(--doc-container-border, #ced4da);
+    border: 1px solid var(--border-color, #cccccc);
 }
 
 .role-filter-bar label {
@@ -180,10 +181,10 @@
 
 .role-filter-btn {
     padding: 4px 12px;
-    border: 2px solid var(--border-color, #adb5bd);
+    border: 2px solid var(--border-color, #cccccc);
     border-radius: 20px;
-    background: var(--doc-container-bg, #ffffff);
-    color: var(--text-color, #495057);
+    background: var(--button-bg, #f2f2f2);
+    color: var(--button-text, #333);
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
@@ -192,9 +193,10 @@
 
 .role-filter-btn:hover,
 .role-filter-btn.active {
-    background: var(--doc-header-bg, #343a40);
-    border-color: var(--doc-header-bg, #343a40);
-    color: var(--doc-header-color, #ffffff);
+    background: var(--button-hover-bg, #e0e0e0);
+    border-color: var(--border-color, #cccccc);
+    color: var(--button-text, #333);
+    font-weight: 700;
 }
 
 .role-filter-count {
@@ -214,8 +216,8 @@
 }
 
 .file-card {
-    background: var(--doc-container-bg, #ffffff);
-    border: 1px solid var(--doc-container-border, #e1e5e9);
+    background: var(--background-color, #ffffff);
+    border: 1px solid var(--border-color, #cccccc);
     border-radius: 6px;
     padding: 15px;
     transition: box-shadow 0.2s ease, border-color 0.2s ease;
@@ -225,7 +227,7 @@
 .file-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-    border-color: var(--doc-header-bg, #343a40);
+    border-color: var(--table-header-bg, #f2f2f2);
 }
 
 .file-card.role-hidden { display: none; }
@@ -259,12 +261,13 @@
     align-items: center;
     margin-top: 10px;
     padding-top: 10px;
-    border-top: 1px solid var(--doc-container-border, #e1e5e9);
+    border-top: 1px solid var(--border-color, #cccccc);
 }
 
 .edit-roles-btn {
-    background: var(--doc-header-bg, #343a40);
-    color: var(--doc-header-color, #ffffff);
+    background: var(--button-bg, #f2f2f2);
+    color: var(--button-text, #333);
+    border: 1px solid var(--button-border, #cccccc);
     padding: 4px 10px;
     border-radius: 4px;
     text-decoration: none;
@@ -274,8 +277,8 @@
 }
 
 .edit-roles-btn:hover {
-    background: var(--doc-header-hover-bg, #23272b);
-    color: var(--doc-header-color, #ffffff);
+    background: var(--button-hover-bg, #e0e0e0);
+    color: var(--button-text, #333);
     text-decoration: none;
 }
 
@@ -328,11 +331,11 @@
 /* ── Search ──────────────────────────────────────────────────── */
 .search-container {
     margin: 20px 0;
-    background: var(--doc-container-bg, #ffffff);
+    background: var(--background-color, #ffffff);
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    border: 1px solid var(--doc-container-border, #dee2e6);
+    border: 1px solid var(--border-color, #cccccc);
 }
 
 .search-form { display: flex; justify-content: center; }
@@ -347,10 +350,10 @@
 .search-input,
 .search-category {
     padding: 10px 14px;
-    border: 2px solid var(--doc-container-border, #e1e5e9);
+    border: 2px solid var(--border-color, #cccccc);
     border-radius: 6px;
     font-size: 14px;
-    background: var(--doc-container-bg, #ffffff);
+    background: var(--background-color, #ffffff);
     color: var(--text-color, #333);
     transition: border-color 0.2s ease;
 }
@@ -361,14 +364,15 @@
 .search-input:focus,
 .search-category:focus {
     outline: none;
-    border-color: var(--doc-header-bg, #343a40);
+    border-color: var(--table-header-bg, #f2f2f2);
+    box-shadow: 0 0 0 2px var(--border-color, #cccccc);
 }
 
 .search-button {
     padding: 10px 20px;
-    background: var(--doc-header-bg, #343a40);
-    color: var(--doc-header-color, #ffffff);
-    border: none;
+    background: var(--button-bg, #f2f2f2);
+    color: var(--button-text, #333);
+    border: 2px solid var(--button-border, #cccccc);
     border-radius: 6px;
     font-size: 14px;
     font-weight: 600;
@@ -377,22 +381,22 @@
 }
 
 .search-button:hover {
-    background: var(--doc-header-hover-bg, #23272b);
+    background: var(--button-hover-bg, #e0e0e0);
 }
 
 .search-results {
     margin: 20px 0;
-    background: var(--doc-container-bg, #ffffff);
+    background: var(--background-color, #ffffff);
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    border: 1px solid var(--doc-container-border, #dee2e6);
+    border: 1px solid var(--border-color, #cccccc);
 }
 
 .search-results-header {
     margin-bottom: 20px;
     padding-bottom: 15px;
-    border-bottom: 2px solid var(--doc-container-border, #e1e5e9);
+    border-bottom: 2px solid var(--border-color, #cccccc);
 }
 
 .search-results-header h3 {
@@ -408,7 +412,7 @@
 }
 
 .search-result-card {
-    border-left: 4px solid var(--doc-header-bg, #343a40);
+    border-left: 4px solid var(--table-header-bg, #f2f2f2);
 }
 
 .match-score {
@@ -421,22 +425,22 @@
 }
 
 .search-excerpt {
-    background: var(--doc-content-bg, #f8f9fa);
+    background: var(--secondary-color, #f9f9f9);
     padding: 10px;
     margin: 10px 0;
     border-radius: 4px;
     font-size: 13px;
     line-height: 1.4;
     color: var(--text-color, #555);
-    border-left: 3px solid var(--doc-header-bg, #343a40);
+    border-left: 3px solid var(--border-color, #cccccc);
 }
 
 .search-excerpt strong { background: #ffeb3b; padding: 1px 2px; border-radius: 2px; }
 
 /* ── Misc ────────────────────────────────────────────────────── */
 .no-docs-message {
-    background: var(--doc-content-bg, #fff3cd);
-    border: 1px solid var(--doc-container-border, #ffeeba);
+    background: var(--secondary-color, #fff3cd);
+    border: 1px solid var(--border-color, #cccccc);
     border-radius: 4px;
     padding: 15px;
     margin: 20px 0;
