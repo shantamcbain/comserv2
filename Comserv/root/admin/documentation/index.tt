@@ -8,7 +8,7 @@
 [% END %]
 
 <head>
-    <link rel="stylesheet" href="[% c.uri_for('/static/css/components/documentation.css') %]">
+    <link rel="stylesheet" href="[% c.uri_for('/static/css/components/documentation.css') %]?v=20260324">
     <style>
         .documentation-container {
             max-width: 1200px;
@@ -546,7 +546,7 @@
 
     <!-- All Files Container (Global Theme Compatible) -->
     <div class="theme-container">
-        <div class="container-header" onclick="toggleContainer(this)">
+        <div class="container-header" onclick="toggleContainer(this)" data-container-id="all-files">
             <h2>All Files</h2>
             <span class="toggle-icon"></span>
         </div>
@@ -663,7 +663,7 @@
         [% IF accessible_pages.size > 0 %]
             <!-- Each category gets its own collapsible container -->
             <div class="theme-container">
-                <div class="container-header" onclick="toggleContainer(this)">
+                <div class="container-header" onclick="toggleContainer(this)" data-container-id="cat-[% category_key %]">
                     <h2>
                         [% IF category.icon %]<i class="[% category.icon %]"></i> [% END %]
                         [% category.title || category_key.ucfirst %]
@@ -735,32 +735,48 @@
 </div>
 
 <script>
+const DOC_STORAGE_KEY = 'doc_container_states';
+const DOC_FILTER_KEY  = 'doc_all_files_filter';
+
+function getContainerStates() {
+    try { return JSON.parse(localStorage.getItem(DOC_STORAGE_KEY) || '{}'); }
+    catch(e) { return {}; }
+}
+
+function saveContainerState(id, open) {
+    const states = getContainerStates();
+    states[id] = open;
+    localStorage.setItem(DOC_STORAGE_KEY, JSON.stringify(states));
+}
+
+function expandContainer(header, content) {
+    content.classList.add('expanded');
+    header.classList.add('expanded');
+    const actualHeight = content.scrollHeight;
+    const maxAllowedHeight = Math.min(actualHeight, window.innerHeight - 300);
+    content.style.maxHeight = maxAllowedHeight + 'px';
+    if (actualHeight > maxAllowedHeight) {
+        content.style.overflowY = 'auto';
+        content.style.overflowX = 'hidden';
+    }
+}
+
+function collapseContainer(header, content) {
+    content.style.maxHeight = '0px';
+    content.classList.remove('expanded');
+    header.classList.remove('expanded');
+}
+
 function toggleContainer(header) {
     const content = header.nextElementSibling;
+    const id = header.getAttribute('data-container-id') || header.textContent.trim().substring(0, 30);
     const isExpanded = content.classList.contains('expanded');
-    
     if (isExpanded) {
-        // Collapse
-        content.style.maxHeight = '0px';
-        content.classList.remove('expanded');
-        header.classList.remove('expanded');
+        collapseContainer(header, content);
+        saveContainerState(id, false);
     } else {
-        // Expand - calculate actual content height
-        content.classList.add('expanded');
-        header.classList.add('expanded');
-        
-        // Get the actual scrollHeight to determine how much space is needed
-        const actualHeight = content.scrollHeight;
-        const viewportHeight = window.innerHeight;
-        const maxAllowedHeight = Math.min(actualHeight, viewportHeight - 300);
-        
-        content.style.maxHeight = maxAllowedHeight + 'px';
-        
-        // Force scrolling if content is taller than container
-        if (actualHeight > maxAllowedHeight) {
-            content.style.overflowY = 'auto';
-            content.style.overflowX = 'hidden';
-        }
+        expandContainer(header, content);
+        saveContainerState(id, true);
     }
 }
 
@@ -775,12 +791,11 @@ function filterAllFiles(role, btn) {
     const countEl = document.getElementById('all-files-count');
     if (!grid) return;
 
-    // Update active button
     const bar = document.getElementById('all-files-filter-bar');
     if (bar) {
         bar.querySelectorAll('.role-filter-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
     }
+    if (btn) btn.classList.add('active');
 
     const cards = grid.querySelectorAll('.file-card');
     let visible = 0;
@@ -807,16 +822,12 @@ function filterAllFiles(role, btn) {
             : '— showing ' + visible + ' file' + (visible !== 1 ? 's' : '') + ' with role: ' + role;
     }
 
-    // Recalculate container maxHeight so filtered result is visible
+    localStorage.setItem(DOC_FILTER_KEY, role);
+
     const container = grid.closest('.container-content');
     if (container && container.classList.contains('expanded')) {
-        container.style.maxHeight = 'none';
         const newHeight = container.scrollHeight;
-        const viewportHeight = window.innerHeight;
-        container.style.maxHeight = Math.min(newHeight, viewportHeight - 150) + 'px';
-        if (newHeight > viewportHeight - 150) {
-            container.style.overflowY = 'auto';
-        }
+        container.style.maxHeight = Math.min(newHeight, window.innerHeight - 150) + 'px';
     }
 }
 
@@ -853,12 +864,24 @@ function rescanDocumentation() {
         });
 }
 
-// Initialize container as closed
 document.addEventListener('DOMContentLoaded', function() {
-    // Ensure all containers start closed
-    const containers = document.querySelectorAll('.container-content');
-    containers.forEach(container => {
-        container.style.maxHeight = '0px';
+    const states = getContainerStates();
+
+    document.querySelectorAll('.container-header[data-container-id]').forEach(header => {
+        const id = header.getAttribute('data-container-id');
+        const content = header.nextElementSibling;
+        if (states[id] === true) {
+            expandContainer(header, content);
+        } else {
+            content.style.maxHeight = '0px';
+        }
     });
+
+    // Restore sticky filter
+    const savedFilter = localStorage.getItem(DOC_FILTER_KEY) || 'all';
+    const filterBtn = document.querySelector('.role-filter-btn[data-role="' + savedFilter + '"]');
+    if (filterBtn) {
+        filterAllFiles(savedFilter, filterBtn);
+    }
 });
 </script>
