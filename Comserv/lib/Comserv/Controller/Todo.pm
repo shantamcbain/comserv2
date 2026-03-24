@@ -1757,16 +1757,23 @@ sub quick_close :Path('quick_close') :Args(0) {
             $proj_code = $proj ? ($proj->project_code || '') : '';
         }
         $c->model('DBEncy')->resultset('Log')->create({
-            todo_record_id => $record_id,
-            owner          => $username,
-            sitename       => $todo->sitename || $c->session->{SiteName},
-            project_code   => $proj_code,
-            abstract       => 'Quick-closed from Active Priorities panel',
-            details        => 'Marked done via quick-close button on DailyPlan by ' . $username,
-            start_date     => $today,
-            status         => 3,
-            last_mod_by    => $username,
-            last_mod_date  => $today,
+            todo_record_id  => $record_id,
+            owner           => $username,
+            sitename        => $todo->sitename || $c->session->{SiteName},
+            project_code    => $proj_code,
+            abstract        => 'Quick-closed from Active Priorities panel',
+            details         => 'Marked done via quick-close button on DailyPlan by ' . $username,
+            start_date      => $today,
+            due_date        => $today,
+            start_time      => '00:00:00',
+            end_time        => '00:00:00',
+            time            => '00:00:00',
+            status          => 3,
+            priority        => $todo->priority || 5,
+            last_mod_by     => $username,
+            last_mod_date   => $today,
+            group_of_poster => $c->session->{group} || '',
+            comments        => '',
         });
     };
     if ($@) {
