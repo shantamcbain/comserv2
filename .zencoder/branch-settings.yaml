@@ -2,6 +2,14 @@
 # Updated: 2026-02-10
 
 branches:
+  documentation-9122:
+    name: "Documentation System Improvements"
+    application_url: "http://workstation.local:3001"
+    api_url: "http://api.workstation.local:3001"
+    description: "Role-based documentation visibility, meta scanning, admin UI for role assignment"
+    api_token_env: "COMSERV_API_KEY"
+    api_token_file: "~/.comserv/credentials"
+
   new-task-9cf1:
     name: "Infrastructure HA Implementation"
     application_url: "http://workstation.local:4003"
