@@ -6,6 +6,16 @@ use Data::Dumper;
 use Comserv::Util::Logging;
 use Comserv::Controller::Site;
 BEGIN { extends 'Catalyst::Controller'; }
+
+sub _require_login {
+    my ($self, $c) = @_;
+    my $username = $c->session->{username} // '';
+    if (!$username || $username eq 'anonymous') {
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return 0;
+    }
+    return 1;
+}
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
@@ -18,12 +28,8 @@ sub index :Path :Args(0) {
 
 sub add_project :Path('addproject') :Args(0) {
     my ( $self, $c ) = @_;
+    return unless $self->_require_login($c);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_project', 'Starting add_project action' );
-
-    unless ($c->session->{username}) {
-        $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri->path_query }));
-        return;
-    }
 
     # Store the previous URL for redirect after form submission
     $c->session->{previous_url} = $c->req->referer;
@@ -82,33 +88,9 @@ sub add_project :Path('addproject') :Args(0) {
 
 sub  create_project :Local :Args(0) {
     my ($self, $c) = @_;
-
-    unless ($c->session->{username}) {
-        $c->response->redirect($c->uri_for('/user/login'));
-        return;
-    }
+    return unless $self->_require_login($c);
 
     my $form_data = $c->request->body_parameters;
-
-    # Validate required fields before touching the database
-    my @missing;
-    push @missing, 'Project Name' unless $form_data->{name} && $form_data->{name} =~ /\S/;
-    push @missing, 'Client Name'  unless $form_data->{client_name} && $form_data->{client_name} =~ /\S/;
-    if (@missing) {
-        my $site_controller = $c->controller('Site');
-        my $sites = $site_controller->fetch_available_sites($c);
-        my $projects = $self->fetch_projects_with_subprojects($c);
-        $c->stash(
-            form_data     => $form_data,
-            sites         => $sites,
-            projects      => $projects,
-            error_message => "Required fields missing: " . join(', ', @missing),
-            template      => 'todo/add_project.tt'
-        );
-        $c->forward($c->view('TT'));
-        return;
-    }
-
     my $schema = $c->model('DBEncy');
     my $project_rs = $schema->resultset('Project');
     my $date_time_posted = DateTime->now;
@@ -199,11 +181,7 @@ sub  create_project :Local :Args(0) {
 
 sub project :Path('project') :Args(0) {
     my ( $self, $c ) = @_;
-
-    unless ($c->session->{username}) {
-        $c->response->redirect($c->uri_for('/user/login', { return_to => '/project/project' }));
-        return;
-    }
+    return unless $self->_require_login($c);
 
     # Log the start of the project action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'project', 'Starting project action');
@@ -249,11 +227,7 @@ sub project :Path('project') :Args(0) {
 
 sub details :Path('details') :Args(0) {
     my ( $self, $c ) = @_;
-
-    unless ($c->session->{username}) {
-        $c->response->redirect($c->uri_for('/user/login', { return_to => '/project/details' }));
-        return;
-    }
+    return unless $self->_require_login($c);
 
     # Logging: Start of the details action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'details', 'Starting details action.');
@@ -262,7 +236,7 @@ sub details :Path('details') :Args(0) {
     my $project_id = $c->request->body_parameters->{project_id} || $c->request->query_parameters->{project_id};
 
     if (!$project_id) {
-        # Logging: Parameter missing (warn not error - expected for bots hitting bare URL)
+        # Logging: Parameter missing
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'details', 'Missing parent_id or project_id parameter in request.');
 
         # Check if this was meant to be a sub-project creation
@@ -375,7 +349,9 @@ sub fetch_projects_with_subprojects :Private {
 
     # Get the schema and SiteName
     my $schema = $c->model('DBEncy');
-    my $SiteName = $c->session->{SiteName} || '';
+    my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    my $is_admin = $c->stash->{is_admin} || 0;
+    my $is_csc_admin = $is_admin && (uc($SiteName) eq 'CSC');
 
     # Check if SiteName is defined
     if (!$SiteName) {
@@ -386,16 +362,14 @@ sub fetch_projects_with_subprojects :Private {
     }
 
     # Fetch top-level projects (those without a parent)
+    # CSC admins see all sites; all others see only their own SiteName
     my @top_projects;
     eval {
+        my %search_cond = (parent_id => undef);
+        $search_cond{sitename} = $SiteName unless $is_csc_admin;
         @top_projects = $schema->resultset('Project')->search(
-            {
-                'sitename' => $SiteName,
-                'parent_id' => undef
-            },
-            {
-                order_by => { -asc => 'name' }
-            }
+            \%search_cond,
+            { order_by => { -asc => 'name' } }
         )->all;
     };
 
@@ -502,14 +476,10 @@ sub enhance_project_data :Private {
 
 sub editproject :Path('editproject') :Args(0) {
     my ( $self, $c ) = @_;
+    return unless $self->_require_login($c);
 
     # Log the start of the editproject action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'editproject', 'Starting editproject action');
-
-    unless ($c->session->{username}) {
-        $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri->path_query }));
-        return;
-    }
 
     # Get project_id from either body parameters (POST) or query parameters (GET)
     my $project_id = $c->request->body_parameters->{project_id} || $c->request->query_parameters->{project_id};
@@ -520,10 +490,11 @@ sub editproject :Path('editproject') :Args(0) {
 
     # Validate project_id
     if (!defined $project_id || $project_id eq '') {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'editproject', 'Missing project_id parameter');
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'editproject', 'Missing project_id parameter');
+        $c->response->status(400);
         $c->stash(
             error_msg => "Project ID is required to edit a project.",
-            template => 'error.tt'
+            template => 'todo/error.tt'
         );
         $c->forward($c->view('TT'));
         return;
@@ -551,7 +522,7 @@ sub editproject :Path('editproject') :Args(0) {
             "Error finding project with ID $project_id: $error_msg");
         $c->stash(
             error_msg => "Project with ID $project_id not found. Please check the application.log for more Details.",
-            template => 'error.tt'
+            template => 'todo/error.tt'
         );
         $c->forward($c->view('TT'));
         return;
@@ -725,14 +696,10 @@ sub build_project_tree :Private {
 
 sub update_project :Local :Args(0)  {
     my ( $self, $c ) = @_;
+    return unless $self->_require_login($c);
 
     # Log the start of the update_project action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_project', 'Starting update_project action');
-
-    unless ($c->session->{username}) {
-        $c->response->redirect($c->uri_for('/user/login'));
-        return;
-    }
 
     my $form_data = $c->request->body_parameters;
     my $project_id = $form_data->{project_id};
@@ -823,5 +790,56 @@ sub update_project :Local :Args(0)  {
     # Redirect to the project details page
     $c->res->redirect($c->uri_for($self->action_for('details'), { project_id => $project_id }));
 }
+sub reorder :Path('reorder') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    my $username = $c->session->{username} // '';
+    unless ($username && $username ne 'anonymous') {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Login required"}');
+        return;
+    }
+
+    my $roles      = $c->session->{roles} || [];
+    my @roles_list = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
+    my $is_admin   = grep { /^(admin|developer|editor)$/i } @roles_list;
+    unless ($is_admin) {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Admin role required"}');
+        return;
+    }
+
+    my $json_body = $c->req->content;
+    unless ($json_body) {
+        $c->response->status(400);
+        $c->response->body('{"ok":0,"error":"No body"}');
+        return;
+    }
+
+    my $data;
+    eval { require JSON; $data = JSON::decode_json($json_body); };
+    if ($@ || !$data || ref($data->{order}) ne 'ARRAY') {
+        $c->response->status(400);
+        $c->response->body('{"ok":0,"error":"Invalid JSON"}');
+        return;
+    }
+
+    my $rank = 0;
+    for my $project_id (@{ $data->{order} }) {
+        $rank++;
+        eval {
+            my $proj = $c->model('DBEncy')->resultset('Project')->find($project_id);
+            $proj->update({ sort_order => $rank }) if $proj;
+        };
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reorder',
+        "Project sort order updated by $username: " . join(',', @{ $data->{order} }));
+
+    $c->response->body('{"ok":1}');
+}
+
 __PACKAGE__->meta->make_immutable;
 1;
