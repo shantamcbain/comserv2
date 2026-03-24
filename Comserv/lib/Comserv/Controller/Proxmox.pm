@@ -100,11 +100,11 @@ sub index :Path :Args(0) {
             $c->session->{proxmox_server_id} = $server_id;
         } else {
             $auth_error = 'Failed to connect to Proxmox server. Please contact system administrator.';
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index', $auth_error);
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index', $auth_error);
 
             # Add more detailed error information if available
             if ($debug_info && $debug_info->{response_code}) {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index',
                     "API response: " . $debug_info->{response_code} . " - " .
                         ($debug_info->{response_status} || "Unknown status"));
             }
@@ -112,7 +112,7 @@ sub index :Path :Args(0) {
     };
     if ($@) {
         $auth_error = "Error connecting to Proxmox server: $@";
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index', $auth_error);
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index', $auth_error);
     }
 
     my $vms = [];
@@ -130,7 +130,7 @@ sub index :Path :Args(0) {
             $auth_success = $proxmox->check_connection();
             
             if (!$auth_success) {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index',
                     "Authentication failed again, cannot retrieve VMs");
                 
                 # Make sure debug_msg exists in the stash and is an array reference
