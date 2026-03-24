@@ -43,15 +43,24 @@
         
         /* Use global theme compatibility - remove local overrides */
         .theme-container {
-            /* Inherits from global documentation.css */
+            background: #ffffff;
+            border: 1px solid #dee2e6;
         }
-        
+
         .container-header {
-            /* Inherits from global documentation.css */
+            background: #343a40;
+            color: #ffffff;
         }
-        
-        .container-header:hover {
-            /* Inherits from global documentation.css */
+
+        .container-header:hover,
+        .container-header.expanded {
+            background: #23272b;
+            color: #ffffff;
+        }
+
+        .container-content {
+            background: #f8f9fa;
+            color: #212529;
         }
         
         .container-header h2 {
