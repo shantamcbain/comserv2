@@ -2332,7 +2332,7 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
 
         my @proj_rows = $c->model('DBEncy')->resultset('Project')->search(
             \%proj_cond,
-            { order_by => ['sitename', 'name'] }
+            { order_by => ['sort_order', 'sitename', 'name'] }
         )->all;
 
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'daily_plan',
