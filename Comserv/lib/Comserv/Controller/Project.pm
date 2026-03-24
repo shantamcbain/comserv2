@@ -237,7 +237,7 @@ sub details :Path('details') :Args(0) {
 
     if (!$project_id) {
         # Logging: Parameter missing
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details', 'Missing parent_id or project_id parameter in request.');
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'details', 'Missing parent_id or project_id parameter in request.');
 
         # Check if this was meant to be a sub-project creation
         my $parent_id = $c->request->query_parameters->{parent_id};
@@ -490,7 +490,8 @@ sub editproject :Path('editproject') :Args(0) {
 
     # Validate project_id
     if (!defined $project_id || $project_id eq '') {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'editproject', 'Missing project_id parameter');
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'editproject', 'Missing project_id parameter');
+        $c->response->status(400);
         $c->stash(
             error_msg => "Project ID is required to edit a project.",
             template => 'todo/error.tt'
