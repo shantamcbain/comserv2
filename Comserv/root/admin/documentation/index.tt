@@ -201,6 +201,61 @@
             color: #666;
             font-style: italic;
         }
+
+        /* Role Filter Bar */
+        .role-filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            background: #f1f3f5;
+            border-radius: 6px;
+            border: 1px solid #ced4da;
+        }
+
+        .role-filter-bar label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #495057;
+            margin-right: 4px;
+        }
+
+        .role-filter-btn {
+            padding: 5px 14px;
+            border: 2px solid #adb5bd;
+            border-radius: 20px;
+            background: #ffffff;
+            color: #495057;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .role-filter-btn:hover {
+            background: #2c7be5;
+            border-color: #2c7be5;
+            color: #ffffff;
+        }
+
+        .role-filter-btn.active {
+            background: #2c7be5;
+            border-color: #2c7be5;
+            color: #ffffff;
+        }
+
+        .role-filter-count {
+            font-size: 11px;
+            color: #495057;
+            margin-left: 8px;
+            font-style: italic;
+        }
+
+        .file-card.role-hidden {
+            display: none;
+        }
         
         .summary-info {
             text-align: center;
@@ -498,9 +553,21 @@
         <div class="container-content">
             <div class="summary-info">
                 Complete documentation library with [% page_count || 0 %] available files
+                <span class="role-filter-count" id="all-files-count"></span>
+            </div>
+
+            <div class="role-filter-bar" id="all-files-filter-bar">
+                <label>Filter by role:</label>
+                <button class="role-filter-btn active" data-role="all" onclick="filterAllFiles('all', this)">All</button>
+                <button class="role-filter-btn role-guest" data-role="guest" onclick="filterAllFiles('guest', this)">Guest</button>
+                <button class="role-filter-btn role-normal" data-role="normal" onclick="filterAllFiles('normal', this)">Normal</button>
+                <button class="role-filter-btn role-editor" data-role="editor" onclick="filterAllFiles('editor', this)">Editor</button>
+                <button class="role-filter-btn role-developer" data-role="developer" onclick="filterAllFiles('developer', this)">Developer</button>
+                <button class="role-filter-btn role-admin" data-role="admin" onclick="filterAllFiles('admin', this)">Admin</button>
+                <button class="role-filter-btn role-csc_admin" data-role="csc_admin" onclick="filterAllFiles('csc_admin', this)">CSC Admin</button>
             </div>
             
-            <div class="files-grid">
+            <div class="files-grid" id="all-files-grid">
                 [% FOREACH page_name IN sorted_pages %]
                     [% page = pages.$page_name %]
                     [% # Show all pages if admin, or pages without roles, or pages with matching user role %]
@@ -515,7 +582,8 @@
                         [% END %]
                     [% END %]
                     [% IF show_page %]
-                        <div class="file-card">
+                        [% roles_str = page.roles ? page.roles.join(',') : '' %]
+                        <div class="file-card" data-roles="[% roles_str %]">
                             <div class="file-title">
                                 <a href="[% page.url %]">[% page.title || page_name %]</a>
                             </div>
@@ -699,6 +767,57 @@ function toggleContainer(header) {
 // Function to handle role editing
 function editRoles(pageName) {
     window.location.href = '/Documentation/edit_roles/' + encodeURIComponent(pageName);
+}
+
+// Role filter for "All Files" grid
+function filterAllFiles(role, btn) {
+    const grid = document.getElementById('all-files-grid');
+    const countEl = document.getElementById('all-files-count');
+    if (!grid) return;
+
+    // Update active button
+    const bar = document.getElementById('all-files-filter-bar');
+    if (bar) {
+        bar.querySelectorAll('.role-filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
+    const cards = grid.querySelectorAll('.file-card');
+    let visible = 0;
+
+    cards.forEach(card => {
+        if (role === 'all') {
+            card.classList.remove('role-hidden');
+            visible++;
+        } else {
+            const rolesAttr = card.getAttribute('data-roles') || '';
+            const roles = rolesAttr ? rolesAttr.split(',').map(r => r.trim()) : [];
+            if (roles.includes(role)) {
+                card.classList.remove('role-hidden');
+                visible++;
+            } else {
+                card.classList.add('role-hidden');
+            }
+        }
+    });
+
+    if (countEl) {
+        countEl.textContent = role === 'all'
+            ? ''
+            : '— showing ' + visible + ' file' + (visible !== 1 ? 's' : '') + ' with role: ' + role;
+    }
+
+    // Recalculate container maxHeight so filtered result is visible
+    const container = grid.closest('.container-content');
+    if (container && container.classList.contains('expanded')) {
+        container.style.maxHeight = 'none';
+        const newHeight = container.scrollHeight;
+        const viewportHeight = window.innerHeight;
+        container.style.maxHeight = Math.min(newHeight, viewportHeight - 150) + 'px';
+        if (newHeight > viewportHeight - 150) {
+            container.style.overflowY = 'auto';
+        }
+    }
 }
 
 // Function to trigger manual rescan
