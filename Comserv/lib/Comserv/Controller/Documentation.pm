@@ -352,11 +352,15 @@ sub index :Path('/Documentation') :Args(0) {
     $self->_ensure_scanned($c);
 
     # Get the current user's role
-    my $user_role = 'normal';  # Default to normal user
+    my $user_role = 'guest';  # Default to guest — unauthenticated users get no access above guest
     my $is_admin = 0;  # Flag to track if user has admin role
 
+    # Only assign a real role if the user has an authenticated session (non-anonymous username)
+    my $session_username = $c->session->{username} // '';
+    my $is_authenticated = ($session_username && $session_username ne 'anonymous');
+
     # First check session roles (this works even if user is not fully authenticated)
-    if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
+    if ($is_authenticated && $c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
         # Log all roles for debugging
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
             "Session roles: " . join(", ", @{$c->session->{roles}}));
@@ -372,8 +376,8 @@ sub index :Path('/Documentation') :Args(0) {
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
             "User role determined from session: $user_role, is_admin: $is_admin");
     }
-    # If no role found in session but user exists, try to get role from user object
-    elsif ($c->controller('Root')->user_exists($c)) {
+    # If no role found in session but user is authenticated, use 'normal' as fallback
+    elsif ($is_authenticated && $c->controller('Root')->user_exists($c)) {
         $user_role = $c->session->{roles} || 'normal';
         $is_admin = 1 if lc($user_role) eq 'admin';
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
@@ -382,12 +386,13 @@ sub index :Path('/Documentation') :Args(0) {
     
     # Special case for site CSC - ensure admin role is recognized
     if ($c->stash->{SiteName} && $c->stash->{SiteName} eq 'CSC') {
-        # Check if user should have admin privileges on this site
-        if ($c->session->{username} && ($c->session->{username} eq 'Shanta' || $c->session->{username} eq 'admin')) {
+        # Check if user should have admin privileges on this site using centralized utility
+        my $admin_auth = Comserv::Util::AdminAuth->new();
+        if ($admin_auth->check_admin_access($c, 'documentation_index')) {
             $user_role = 'admin';
             $is_admin = 1;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-                "Admin role granted for CSC site user: " . $c->session->{username});
+                "Admin role granted for CSC site user (via AdminAuth)");
         }
     }
 
@@ -449,8 +454,8 @@ sub index :Path('/Documentation') :Args(0) {
                         last;
                     }
                 }
-                # Special case for normal role - any authenticated user can access normal content
-                elsif ($role eq 'normal' && $user_role) {
+                # Special case for normal role - only authenticated users (not guest) can access normal content
+                elsif ($role eq 'normal' && $is_authenticated) {
                     $has_role = 1;
                     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
                         "Normal role access granted for user with role $user_role");
@@ -605,14 +610,11 @@ sub view :Path('/Documentation') :Args(1) {
         "After scanning, found $pages_count pages in documentation_pages hash");
 
     # Get the current user's role
-    my $user_role = '';  # Empty by default - unauthenticated users have no role
-    my $is_authenticated = 0;
+    my $user_role = 'normal';  # Default to normal user
     my $is_admin = 0;  # Flag to track if user has admin role
     
     # First check if user is authenticated
     if ($c->user_exists) {
-        $is_authenticated = 1;
-        $user_role = 'normal';  # Authenticated users get at least 'normal' role
         # Check if roles are stored in session
         if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
             # Log all roles for debugging
@@ -638,19 +640,16 @@ sub view :Path('/Documentation') :Args(1) {
                 "User role determined from session: $user_role, is_admin: $is_admin");
         }
     }
-    else {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
-            "Unauthenticated request for documentation page: $page");
-    }
     
     # Special case for site CSC - ensure admin role is recognized
     if ($c->stash->{SiteName} && $c->stash->{SiteName} eq 'CSC') {
-        # Check if user should have admin privileges on this site
-        if ($c->session->{username} && ($c->session->{username} eq 'Shanta' || $c->session->{username} eq 'admin')) {
+        # Check if user should have admin privileges on this site using centralized utility
+        my $admin_auth = Comserv::Util::AdminAuth->new();
+        if ($admin_auth->check_admin_access($c, 'documentation_view')) {
             $user_role = 'admin';
             $is_admin = 1;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view', 
-                "Admin role granted for CSC site user: " . $c->session->{username});
+                "Admin role granted for CSC site user (via AdminAuth)");
         }
     }
 
@@ -680,22 +679,13 @@ sub view :Path('/Documentation') :Args(1) {
             return;
         }
 
-        # Check role access - unauthenticated users have no role and cannot access any docs
+        # Check role access
         my $has_role = $is_admin; # Admins can see everything
         unless ($has_role) {
-            if (!$is_authenticated) {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
-                    "Access denied to page $page: unauthenticated request");
-                $c->response->status(403);
-                $c->stash(
-                    error_msg => "Access denied: You must be logged in to view documentation.",
-                    template => 'Documentation/Error.tt'
-                );
-                return;
-            }
             foreach my $role (@{$metadata->{roles}}) {
                 if ($role eq $user_role || 
-                    ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && grep { $_ eq $role } @{$c->session->{roles}})) {
+                    ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && grep { $_ eq $role } @{$c->session->{roles}}) ||
+                    ($role eq 'normal' && $user_role)) {
                     $has_role = 1;
                     last;
                 }
@@ -861,18 +851,6 @@ sub view :Path('/Documentation') :Args(1) {
     my $md_full_path = $c->path_to('root', $md_path);
 
     if (-e $md_full_path) {
-        # Check admin access for unregistered markdown files
-        unless ($is_admin) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
-                "Access denied to unregistered markdown page $page: admin required");
-            $c->response->status(403);
-            $c->stash(
-                error_msg => "Access denied: Unregistered documentation requires admin privileges.",
-                template => 'Documentation/Error.tt'
-            );
-            return;
-        }
-
         # Read the markdown file
         open my $fh, '<:encoding(UTF-8)', $md_full_path or die "Cannot open $md_full_path: $!";
         my $content = do { local $/; <$fh> };
@@ -1730,11 +1708,10 @@ sub _check_admin_access {
         return 1 if grep { lc($_) eq 'admin' || lc($_) eq 'developer' } @{$c->session->{roles}};
     }
     
-    # Special case for site CSC
+    # Special case for site CSC - using centralized utility
     if ($c->stash->{SiteName} && $c->stash->{SiteName} eq 'CSC') {
-        if ($c->session->{username} && ($c->session->{username} eq 'Shanta' || $c->session->{username} eq 'admin')) {
-            return 1;
-        }
+        my $admin_auth = Comserv::Util::AdminAuth->new();
+        return 1 if $admin_auth->check_admin_access($c, '_check_admin_access');
     }
     
     return 0;
@@ -1849,9 +1826,10 @@ sub search :Path('/documentation/search') :Args(0) {
         $is_admin = 1 if lc($user_role) eq 'admin';
     }
     
-    # Special case for CSC site
+    # Special case for CSC site using centralized utility
     if ($c->stash->{SiteName} && $c->stash->{SiteName} eq 'CSC') {
-        if ($c->session->{username} && ($c->session->{username} eq 'Shanta' || $c->session->{username} eq 'admin')) {
+        my $admin_auth = Comserv::Util::AdminAuth->new();
+        if ($admin_auth->check_admin_access($c, 'documentation_search')) {
             $user_role = 'admin';
             $is_admin = 1;
         }
@@ -2175,6 +2153,24 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     my ($self, $c, @args) = @_;
     my $requested_date = $args[0] if @args;
 
+    # DailyPlan is accessible to all sites — non-CSC sites see only DB-driven sections.
+    # CSC sees text-based planning tabs in addition to the DB-driven sections.
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $is_csc   = (uc($sitename) eq 'CSC') ? 1 : 0;
+
+    # Role check: all roles above member (admin, developer, devops, editor, user, normal)
+    # Also accept stash is_admin set by Root::auto (catches site-specific admins)
+    my $user_roles = $c->stash->{user_roles} || $c->session->{roles} || [];
+    $user_roles = [$user_roles] unless ref $user_roles eq 'ARRAY';
+    my $has_access = $c->stash->{is_admin}
+        || grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal)$/ } @$user_roles;
+    unless ($has_access) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Access denied to DailyPlan for user: " . ($c->session->{username} || 'Guest'));
+        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
+        $c->detach;
+    }
+
     # Get current date in YYYY-MM-DD format
     my $now = Time::Piece->new();
     my $current_date_str = $now->strftime('%Y-%m-%d');
@@ -2303,8 +2299,206 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     # Set proper charset for UTF-8 content
     $c->response->content_type('text/html; charset=utf-8');
 
+    # Fetch DB plans for this site (used in PLANNING tab for all sites)
+    my @db_plans;
+    eval {
+        my %search_cond = $is_csc ? () : (sitename => $sitename);
+        my $rs = $c->model('DBEncy')->resultset('DailyPlan');
+        my @plan_rows = $rs->search(\%search_cond, { order_by => { -asc => 'priority' } });
+        for my $plan (@plan_rows) {
+            my %h = $plan->get_columns;
+            $h{progress_percentage}     = $plan->get_progress_percentage;
+            $h{todo_count}              = $plan->get_todo_count;
+            $h{completed_todo_count}    = $plan->get_completed_todo_count;
+            $h{is_overdue}              = $plan->is_overdue;
+            push @db_plans, \%h;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Could not fetch DB plans: $@");
+    }
+
+    # Fetch projects from DB for PLANNING tab (with their linked plans)
+    # CSC sees all sites; others see only their own sitename
+    my @planning_projects;
+    my @orphan_plans;       # plans not linked to any project
+    my @plan_sitenames;     # distinct sitenames for filter toggle (CSC only)
+
+    # --- Fetch top-level projects (separate eval so orphan-plan failure can't block this) ---
+    eval {
+        my %proj_cond = (parent_id => undef);   # top-level only — filter in SQL, not Perl
+        $proj_cond{sitename} = $sitename unless $is_csc;
+
+        my @proj_rows = $c->model('DBEncy')->resultset('Project')->search(
+            \%proj_cond,
+            { order_by => ['sort_order', 'sitename', 'name'] }
+        )->all;
+
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'daily_plan',
+            "planning_projects: fetched " . scalar(@proj_rows) . " top-level projects (is_csc=$is_csc)");
+
+        for my $proj (@proj_rows) {
+            my $sn = $proj->sitename || '';
+            my %p = $proj->get_columns;
+
+            # Linked plans via many_to_many (inner eval — failure just means no linked plans shown)
+            my @linked_plans;
+            eval {
+                for my $pln ($proj->dailyplans->all) {
+                    my %ph = $pln->get_columns;
+                    push @linked_plans, \%ph;
+                }
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+                    "Could not fetch linked plans for project $p{id}: $@");
+            }
+            $p{linked_plans} = \@linked_plans;
+
+            # Sub-projects (direct children of this project)
+            my @sub_projects;
+            eval {
+                my @subs = $c->model('DBEncy')->resultset('Project')->search(
+                    { parent_id => $p{id} },
+                    { order_by  => ['name'] }
+                )->all;
+                for my $sub (@subs) {
+                    push @sub_projects, { $sub->get_columns };
+                }
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+                    "Could not fetch sub-projects for project $p{id}: $@");
+            }
+            $p{sub_projects} = \@sub_projects;
+
+            push @planning_projects, \%p;
+
+            # Collect sitenames for filter toggle (skip blank)
+            push @plan_sitenames, $sn if $sn;
+        }
+
+        # Deduplicate sitenames
+        my %seen_site;
+        @plan_sitenames = grep { !$seen_site{$_}++ } sort @plan_sitenames;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Could not fetch planning projects: $@");
+    }
+
+    # --- Standalone plans (not linked to any project) — separate eval ---
+    eval {
+        my %plan_cond = $is_csc ? () : (sitename => $sitename);
+        for my $pln ($c->model('DBEncy')->resultset('DailyPlan')->search(
+            \%plan_cond, { order_by => { -desc => 'created_at' } }
+        )->all) {
+            eval {
+                push @orphan_plans, { $pln->get_columns }
+                    if $pln->dailyplan_projects->count == 0;
+            };
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Could not fetch orphan plans: $@");
+    }
+
+    # Filter projects by filter_site param (CSC admin only)
+    my $filter_site = $c->req->param('filter_site') || '';
+    if ($is_csc && $filter_site) {
+        @planning_projects = grep { ($_->{sitename} || '') eq $filter_site } @planning_projects;
+        @orphan_plans      = grep { ($_->{sitename} || '') eq $filter_site } @orphan_plans;
+    }
+
+    # --- All plans (for link-plan-to-project form, admin only) ---
+    my @all_plans;
+    eval {
+        my %plan_cond = $is_csc ? () : (sitename => $sitename);
+        @all_plans = map { { $_->get_columns } }
+            $c->model('DBEncy')->resultset('DailyPlan')->search(
+                \%plan_cond, { order_by => ['plan_name'] }
+            )->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Could not fetch all_plans: $@");
+    }
+
+    # --- Active Priorities: DB-driven, role/site/user scoped, dependency-ordered ---
+    my @active_priorities;
+    eval {
+        my $user_id  = $c->session->{user_id};
+        my $roles    = $c->stash->{user_roles} || [];
+        my $can_see_all = $c->stash->{is_admin}
+            || grep { lc($_) =~ /^(developer|devops|editor)$/ } @$roles;
+
+        my %ap_cond = (status => { '!=' => 3 });   # exclude DONE
+        $ap_cond{sitename} = $sitename unless $is_csc;  # non-CSC: own site only
+        $ap_cond{user_id}  = $user_id  unless $can_see_all;  # members: own todos only
+
+        my @rows = $c->model('DBEncy')->resultset('Todo')->search(
+            \%ap_cond,
+            {
+                order_by => [
+                    { -asc  => 'priority'    },
+                    { -desc => 'is_blocking' },
+                    { -asc  => 'start_date'  },
+                ],
+                rows => 20,
+            }
+        )->all;
+
+        # Pre-fetch all returned IDs for fast blocker lookup
+        my %row_by_id = map { $_->record_id => $_ } @rows;
+
+        # Cache for project names
+        my %proj_cache;
+
+        for my $todo (@rows) {
+            my %h = $todo->get_columns;
+
+            # Blocker info
+            if ($h{blocked_by_todo_id}) {
+                my $blocker = $row_by_id{$h{blocked_by_todo_id}}
+                    || eval { $c->model('DBEncy')->resultset('Todo')->find($h{blocked_by_todo_id}) };
+                if ($blocker) {
+                    $h{blocker_subject} = $blocker->subject;
+                    $h{blocker_done}    = ($blocker->status == 3) ? 1 : 0;
+                }
+            }
+
+            # Project name (cached)
+            if ($h{project_id}) {
+                unless (exists $proj_cache{$h{project_id}}) {
+                    my $p = eval { $c->model('DBEncy')->resultset('Project')->find($h{project_id}) };
+                    $proj_cache{$h{project_id}} = $p ? $p->name : '';
+                }
+                $h{project_name} = $proj_cache{$h{project_id}};
+            }
+
+            push @active_priorities, \%h;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Could not fetch active priorities: $@");
+    }
+
     # Pass all date information and todos to template
     $c->stash(
+        # Site context
+        is_csc         => $is_csc,
+        plan_sitename  => $sitename,
+        db_plans       => \@db_plans,
+        planning_projects => \@planning_projects,
+        orphan_plans   => \@orphan_plans,
+        plan_sitenames => \@plan_sitenames,
+        filter_site    => $filter_site,
+        all_plans      => \@all_plans,
+        is_admin       => $c->stash->{is_admin},
+
         # Date strings
         current_date_str => $current_date_str,
         current_display => $current_display,
@@ -2331,9 +2525,10 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         today => $current_date_str,
         
         # Todos
-        todos => $all_todos_calendar, # For week.tt
-        todos_for_today => $todos_for_today, # For day view
-        
+        todos           => $all_todos_calendar,    # For week.tt
+        todos_for_today => $todos_for_today,       # For day view
+        active_priorities => \@active_priorities,  # DB-driven priority list for TODAY'S FOCUS
+
         template => 'admin/documentation/DailyPlan.tt'
     );
 }
