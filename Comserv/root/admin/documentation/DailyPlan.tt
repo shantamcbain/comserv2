@@ -712,9 +712,92 @@
         [% INCLUDE "admin/documentation/ZencoderOpeningPrompt.tt" %]
     </div>
 
-    <!-- TAB 6: MASTER PLAN COORDINATION (CSC only) -->
+    <!-- TAB 6: MASTER PLAN COORDINATION (CSC only) — coordinator view only; detail lives in DB -->
     <div id="master-plan-coordination" class="tab-content">
-        [% INCLUDE "Documentation/MasterPlanCoordination.tt" %]
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--primary-color);">
+            <h2 style="margin:0;font-size:1.2em;">🗺️ Master Plan Coordination — CSC</h2>
+            <div style="display:flex;gap:8px;">
+                <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;"
+                   style="background:var(--primary-color);color:#fff;padding:4px 12px;border-radius:4px;text-decoration:none;font-size:0.82em;">→ DB Planning Tab</a>
+                <a href="/Documentation/MasterPlanCoordination" target="_blank"
+                   style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">Full Legacy Doc ↗</a>
+            </div>
+        </div>
+
+        <div style="background:color-mix(in srgb,#ffc107 15%,var(--bg-color));border:1px solid #ffc107;border-radius:4px;padding:12px 16px;margin-bottom:16px;font-size:0.88em;">
+            <strong>⚠️ Migration Status:</strong> This master plan is being migrated from text-based files to the DB-driven planning system.
+            All active work is tracked as <a href="/todo" style="color:var(--primary-color);">Todos</a> and
+            <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;" style="color:var(--primary-color);">Projects</a> in the database.
+            The text below is an archived reference (last updated Jan 2026).
+        </div>
+
+        [%# ── Key Dependencies (blocking items) ── %]
+        <div style="margin-bottom:20px;">
+            <h3 style="font-size:1em;margin-bottom:8px;">🔒 Known Blocking Dependencies</h3>
+            <div style="display:grid;gap:6px;">
+                <div style="background:var(--bg-secondary);border-left:4px solid #dc3545;border-radius:4px;padding:8px 12px;font-size:0.87em;">
+                    <strong>#11 Architecture Phase 2</strong> — blocks: Docker HA, K8s deployment, Catalyst multi-instance
+                    <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;" style="margin-left:8px;color:var(--primary-color);font-size:0.85em;">→ See DB project</a>
+                </div>
+                <div style="background:var(--bg-secondary);border-left:4px solid #fd7e14;border-radius:4px;padding:8px 12px;font-size:0.87em;">
+                    <strong>#4 Refactor Master Plan</strong> — blocks: all text→DB migration validation
+                    <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;" style="margin-left:8px;color:var(--primary-color);font-size:0.85em;">→ See Planning tab</a>
+                </div>
+                <div style="background:var(--bg-secondary);border-left:4px solid #ffc107;border-radius:4px;padding:8px 12px;font-size:0.87em;">
+                    <strong>Unified Mail / SMTP</strong> — blocks: Workshop mailing list feature
+                    <a href="/todo" style="margin-left:8px;color:var(--primary-color);font-size:0.85em;">→ Todo system</a>
+                </div>
+            </div>
+        </div>
+
+        [%# ── Quick links to active DB projects by area ── %]
+        <div style="margin-bottom:20px;">
+            <h3 style="font-size:1em;margin-bottom:8px;">📁 Active Work Areas (DB Projects)</h3>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;font-size:0.85em;">
+                <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;"
+                   style="display:block;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-color);text-decoration:none;">
+                    📅 Planning System
+                </a>
+                <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;"
+                   style="display:block;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-color);text-decoration:none;">
+                    🐳 Docker &amp; K8s
+                </a>
+                <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;"
+                   style="display:block;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-color);text-decoration:none;">
+                    🏗️ Architecture
+                </a>
+                <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;"
+                   style="display:block;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-color);text-decoration:none;">
+                    🤖 AI Systems
+                </a>
+                <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;"
+                   style="display:block;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-color);text-decoration:none;">
+                    👥 Users &amp; Roles
+                </a>
+                <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;"
+                   style="display:block;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-color);text-decoration:none;">
+                    🎓 Workshops
+                </a>
+                <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;"
+                   style="display:block;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-color);text-decoration:none;">
+                    ✅ Todo System
+                </a>
+                <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;"
+                   style="display:block;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-color);text-decoration:none;">
+                    📁 File Management
+                </a>
+            </div>
+        </div>
+
+        [%# ── Legacy archived content (collapsed) ── %]
+        <details style="border:1px solid var(--border-color);border-radius:4px;margin-top:20px;">
+            <summary style="padding:10px 14px;cursor:pointer;font-size:0.85em;color:var(--text-muted-color);background:var(--bg-secondary);">
+                📋 Legacy Master Plan Document (text-based — archived, Jan 2026) — click to expand
+            </summary>
+            <div style="padding:14px;max-height:600px;overflow-y:auto;">
+                [% INCLUDE "Documentation/MasterPlanCoordination.tt" %]
+            </div>
+        </details>
     </div>
 
     <div id="implementation-plan" class="tab-content" style="display:none!important;">
