@@ -561,7 +561,6 @@
                 <span class="role-filter-count" id="all-files-count"></span>
             </div>
 
-            [% IF is_admin %]
             <div class="role-filter-bar" id="all-files-filter-bar">
                 <label>Filter by role:</label>
                 <button class="role-filter-btn active" data-role="all" onclick="filterAllFiles('all', this)">All</button>
@@ -572,7 +571,6 @@
                 <button class="role-filter-btn role-admin" data-role="admin" onclick="filterAllFiles('admin', this)">Admin</button>
                 <button class="role-filter-btn role-csc_admin" data-role="csc_admin" onclick="filterAllFiles('csc_admin', this)">CSC Admin</button>
             </div>
-            [% END %]
             
             <div class="files-grid" id="all-files-grid">
                 [% FOREACH page_name IN sorted_pages %]
