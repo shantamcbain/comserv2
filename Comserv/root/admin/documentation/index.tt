@@ -210,24 +210,24 @@
             align-items: center;
             margin-bottom: 16px;
             padding: 12px 16px;
-            background: var(--secondary-color, #f1f3f5);
+            background: #f1f3f5;
             border-radius: 6px;
-            border: 1px solid var(--accent-color, #0056b3);
+            border: 1px solid #ced4da;
         }
 
         .role-filter-bar label {
             font-size: 13px;
             font-weight: 600;
-            color: inherit;
+            color: #495057;
             margin-right: 4px;
         }
 
         .role-filter-btn {
             padding: 5px 14px;
-            border: 2px solid var(--accent-color, #0056b3);
+            border: 2px solid #adb5bd;
             border-radius: 20px;
-            background: var(--primary-color, #fff);
-            color: var(--accent-color, #0056b3);
+            background: #ffffff;
+            color: #495057;
             font-size: 12px;
             font-weight: 500;
             cursor: pointer;
@@ -235,19 +235,20 @@
         }
 
         .role-filter-btn:hover {
-            background: var(--accent-color, #0056b3);
-            color: var(--primary-color, #fff);
+            background: #2c7be5;
+            border-color: #2c7be5;
+            color: #ffffff;
         }
 
         .role-filter-btn.active {
-            background: var(--accent-color, #0056b3);
-            border-color: var(--accent-color, #0056b3);
-            color: var(--primary-color, #fff);
+            background: #2c7be5;
+            border-color: #2c7be5;
+            color: #ffffff;
         }
 
         .role-filter-count {
             font-size: 11px;
-            color: var(--accent-color, #0056b3);
+            color: #495057;
             margin-left: 8px;
             font-style: italic;
         }
