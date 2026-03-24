@@ -68,9 +68,8 @@ window.onload = function() {
 
  <label for="priority">Priority:</label><br>
 <select id="priority" name="priority">
-    [% FOREACH key IN build_priority.keys.sort %]
-        <option value="[% key %]" [% 'selected' IF key == priority %]>[% build_priority.$key %]</option>
-    [% END %]
+    [% SET current_priority = priority %]
+    [% INCLUDE 'todo/priority_select.tt' %]
 </select><br>
 
 <label for="status">Status:</label><br>
