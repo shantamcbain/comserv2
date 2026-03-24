@@ -2,7 +2,6 @@ package Comserv::Controller::HelpDesk;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
-use JSON;
 use POSIX qw(strftime);
 use Try::Tiny;
 
@@ -481,119 +480,6 @@ sub ticket_list :Chained('ticket_base') :PathPart('list') :Args(0) {
         );
     };
 
-    $c->forward($c->view('TT'));
-}
-
-=head2 register_project
-
-Admin-only: Register the HelpDesk improvement project in the ProjectPlanning system.
-Idempotent - skips creation if a project named 'HelpDesk Multi-Site Support System' already exists.
-Access: GET /HelpDesk/admin/register_project
-
-=cut
-
-sub register_project :Chained('base') :PathPart('admin/register_project') :Args(0) {
-    my ($self, $c) = @_;
-
-    my $is_admin = 0;
-    if ($c->session->{roles}) {
-        my $roles = $c->session->{roles};
-        $is_admin = ref($roles) eq 'ARRAY' ? grep { $_ eq 'admin' } @$roles
-                                             : ($roles =~ /\badmin\b/i ? 1 : 0);
-    }
-
-    unless ($is_admin) {
-        $c->stash(error_msg => 'Admin access required.', template => 'CSC/HelpDesk.tt');
-        $c->forward($c->view('TT'));
-        return;
-    }
-
-    my $result_msg;
-    try {
-        my $schema    = $c->model('DBEncy')->schema;
-        my $proj_rs   = $schema->resultset('Project');
-        my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-        my $username  = $c->session->{username} || 'admin';
-
-        my $existing = $proj_rs->search({ name => 'HelpDesk Multi-Site Support System' })->first;
-        if ($existing) {
-            $result_msg = "Project already exists (id=" . $existing->id . "). No changes made.";
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register_project',
-                $result_msg);
-        } else {
-            my $now = strftime('%Y-%m-%d %H:%M:%S', localtime);
-            my $parent = $proj_rs->create({
-                name                => 'HelpDesk Multi-Site Support System',
-                description         => 'Improve the HelpDesk system to be fully functional, multi-site aware, and tightly integrated with the AI chat widget. The system should allow any SiteName to use HelpDesk for support, with AI assisting users by referencing KB articles, creating support tickets, and escalating to live agents.',
-                start_date          => strftime('%Y-%m-%d', localtime),
-                status              => '2',
-                project_code        => 'HELPDESK-MULTISITE',
-                developer_name      => $username,
-                client_name         => $site_name,
-                sitename            => $site_name,
-                username_of_poster  => $username,
-                group_of_poster     => 'admin',
-                date_time_posted    => $now,
-                record_id           => 0,
-            });
-
-            my @sub_projects = (
-                {
-                    code => 'HELPDESK-SCHEMA',
-                    name => 'SupportTicket Database Schema',
-                    desc => 'Create support_tickets table and Perl schema result class for tracking tickets.',
-                },
-                {
-                    code => 'HELPDESK-MULTISITE',
-                    name => 'Multi-Site HelpDesk Templates',
-                    desc => 'Update HelpDesk.tt and related templates to use SiteName for site-aware branding.',
-                },
-                {
-                    code => 'HELPDESK-TICKETS',
-                    name => 'Ticket Submission and Tracking',
-                    desc => 'Add submit_ticket, view_ticket, ticket_list controller actions backed by the DB.',
-                },
-                {
-                    code => 'HELPDESK-AI',
-                    name => 'AI Chat HelpDesk Integration',
-                    desc => 'When agent_type=helpdesk, inject a HelpDesk system prompt that enables KB lookup, ticket creation guidance, and live agent escalation.',
-                },
-            );
-
-            for my $sp (@sub_projects) {
-                $proj_rs->create({
-                    name               => $sp->{name},
-                    description        => $sp->{desc},
-                    start_date         => strftime('%Y-%m-%d', localtime),
-                    status             => '2',
-                    project_code       => $sp->{code},
-                    developer_name     => $username,
-                    client_name        => $site_name,
-                    sitename           => $site_name,
-                    username_of_poster => $username,
-                    group_of_poster    => 'admin',
-                    date_time_posted   => $now,
-                    parent_id          => $parent->id,
-                    record_id          => 0,
-                });
-            }
-
-            $result_msg = "Project created successfully (id=" . $parent->id . ") with " . scalar(@sub_projects) . " sub-projects.";
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register_project',
-                $result_msg);
-        }
-    } catch {
-        $result_msg = "Error registering project: $_";
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'register_project',
-            $result_msg);
-    };
-
-    $c->stash(
-        template    => 'CSC/HelpDesk/admin.tt',
-        title       => 'HelpDesk Administration',
-        success_msg => $result_msg,
-    );
-    push @{$c->stash->{debug_msg}}, $result_msg;
     $c->forward($c->view('TT'));
 }
 
