@@ -811,7 +811,8 @@ sub reorder :Path('reorder') :Args(0) {
         return;
     }
 
-    my $json_body = $c->req->content;
+    my $body_fh   = $c->req->body;
+    my $json_body = $body_fh ? do { local $/; <$body_fh> } : '';
     unless ($json_body) {
         $c->response->status(400);
         $c->response->body('{"ok":0,"error":"No body"}');

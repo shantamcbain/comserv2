@@ -1729,9 +1729,10 @@ sub quick_close :Path('quick_close') :Args(0) {
         return;
     }
 
-    my $body = $c->req->content;
+    my $body_fh = $c->req->body;
+    my $body = $body_fh ? do { local $/; <$body_fh> } : '';
     my $data;
-    eval { require JSON; $data = JSON::decode_json($body); };
+    eval { require JSON; $data = JSON::decode_json($body) if $body; };
     my $record_id = $data->{record_id} if $data;
     unless ($record_id) {
         $c->response->status(400);
