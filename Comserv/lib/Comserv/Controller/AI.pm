@@ -2953,8 +2953,8 @@ sub _build_role_system_prompt {
              . "(c) Live application data (workshops, projects, tasks) — direct the user to these URLs:\n"
              . "  - Active workshops: $base_url/workshop/list_active\n"
              . "  - Encyclopedia search: $base_url/ency/search?q=TERM\n"
-             . "  - Project todos: $base_url/todo/list?project_id=ID\n"
-             . "  - Projects: $base_url/project/list\n"
+             . "  - Projects: $base_url/project/list (IDs shown in LIVE PROJECT DATA above)\n"
+             . "  - Project todos: $base_url/todo/list?project_id=N (use real ID from live data, never literal 'ID')\n"
              . "Do NOT refuse to answer general knowledge questions. "
              . "Do NOT invent live application data — direct the user to the relevant URL instead. "
              . $web_search_note . "\n"
@@ -3048,6 +3048,7 @@ sub _build_navigation_command_guide {
         ]],
         [ 'AI Assistant (logged in)', 'user', [
             [ 'Manage API keys',            '/ai/manage_api_keys'       ],
+            [ 'AI in-app action endpoint',  '/ai/action'                ],
         ]],
         [ 'AI Assistant (admin)', 'admin', [
             [ 'Manage AI models',           '/ai/models'                ],
@@ -3184,7 +3185,7 @@ sub _build_page_navigation_hint {
             $hint .= "Navigation context — Todo / Task Management (admin):\n"
                    . "- You can view, create, assign, and close tasks across all projects.\n"
                    . "- All tasks: $base_url/todo/list\n"
-                   . "- Project-specific: $base_url/todo/list?project_id=ID\n";
+                   . "- Project-specific: $base_url/todo/list?project_id=N (use real numeric ID from live project data — never literal 'ID')\n";
         } elsif ($role eq 'user') {
             $hint .= "Navigation context — Todo / Task Management:\n"
                    . "- You can view tasks assigned to you and update their status.\n"
@@ -4687,10 +4688,235 @@ sub preload_model :Local :Args(0) {
             model   => $model,
             timeout => 120,
         );
-        $ollama->chat([{ role => 'user', content => 'hi' }]);
+        $ollama->chat(messages => [{ role => 'user', content => 'hi' }]);
     };
 
     $c->response->body('{"success":true,"message":"model preloaded"}');
+}
+
+=head2 action
+
+POST /ai/action
+
+Allows the Chat-with-AI system to take write actions inside the application on
+behalf of the authenticated user.  Guests are rejected (403).  All writes use
+the same DBEncy schema and respect the existing role system.
+
+Supported actions (passed as JSON body):
+  { "action": "update_todo_status",  "params": { "todo_id": N, "status": N } }
+  { "action": "reschedule_todo",     "params": { "todo_id": N, "due_date": "YYYY-MM-DD" } }
+  { "action": "create_log_entry",    "params": { "todo_id": N, "abstract": "...", "details": "..." } }
+  { "action": "add_todo_comment",    "params": { "todo_id": N, "comment": "..." } }
+
+Returns JSON: { success: true/false, message: "..." }
+
+=cut
+
+sub action :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json; charset=utf-8');
+
+    # Only POST accepted
+    unless ($c->request->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Method not allowed' }));
+        return;
+    }
+
+    # Guests may not write
+    my $is_guest = !$c->session->{username} || lc($c->session->{username}) eq 'guest';
+    if ($is_guest) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required to perform this action' }));
+        return;
+    }
+
+    # Parse JSON body
+    my $body_text = $c->request->content;
+    my $req;
+    eval { $req = decode_json($body_text) };
+    if ($@ || !ref $req) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Invalid JSON body' }));
+        return;
+    }
+
+    my $action_name = $req->{action} || '';
+    my $params      = $req->{params} || {};
+    my $current_user = $c->session->{username} || 'ai';
+    my $today        = DateTime->now->ymd;
+
+    my $schema = eval { $c->model('DBEncy')->schema };
+    unless ($schema) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Database not available' }));
+        return;
+    }
+
+    # ── update_todo_status ────────────────────────────────────────────────────
+    if ($action_name eq 'update_todo_status') {
+        my $todo_id = $params->{todo_id} or do {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'todo_id required' }));
+            return;
+        };
+        my $new_status = $params->{status};
+        unless (defined $new_status && $new_status =~ /^\d+$/) {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'status (numeric) required' }));
+            return;
+        }
+        my $todo = eval { $schema->resultset('Todo')->find($todo_id) };
+        unless ($todo) {
+            $c->response->status(404);
+            $c->response->body(encode_json({ success => JSON::false, error => "Todo #$todo_id not found" }));
+            return;
+        }
+        eval { $todo->update({ status => $new_status, last_mod_by => $current_user, last_mod_date => $today }) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'action', "update_todo_status failed: $@");
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Update failed' }));
+            return;
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
+            "AI action update_todo_status: todo=$todo_id status=$new_status by=$current_user");
+        $c->response->body(encode_json({ success => JSON::true, message => "Todo #$todo_id status updated to $new_status" }));
+        return;
+    }
+
+    # ── reschedule_todo ───────────────────────────────────────────────────────
+    if ($action_name eq 'reschedule_todo') {
+        my $todo_id  = $params->{todo_id}  or do {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'todo_id required' }));
+            return;
+        };
+        my $new_due = $params->{due_date};
+        unless ($new_due && $new_due =~ /^\d{4}-\d{2}-\d{2}$/) {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'due_date (YYYY-MM-DD) required' }));
+            return;
+        }
+        my $todo = eval { $schema->resultset('Todo')->find($todo_id) };
+        unless ($todo) {
+            $c->response->status(404);
+            $c->response->body(encode_json({ success => JSON::false, error => "Todo #$todo_id not found" }));
+            return;
+        }
+        my $old_due   = $todo->due_date   // '';
+        my $old_start = $todo->start_date // $today;
+        eval { $todo->update({ due_date => $new_due, last_mod_by => $current_user, last_mod_date => $today }) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'action', "reschedule_todo update failed: $@");
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Update failed' }));
+            return;
+        }
+        # Audit interval
+        if ($old_due ne $new_due) {
+            eval {
+                $schema->resultset('TodoInterval')->create({
+                    todo_record_id => $todo_id,
+                    start_date     => $old_start,
+                    end_date       => $today,
+                    interval_type  => 'rescheduled',
+                    status         => "from:$old_due to:$new_due",
+                    last_mod_by    => $current_user,
+                    last_mod_date  => $today,
+                });
+            };
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'action',
+                "reschedule interval create failed: $@") if $@;
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
+            "AI action reschedule_todo: todo=$todo_id old=$old_due new=$new_due by=$current_user");
+        $c->response->body(encode_json({ success => JSON::true, message => "Todo #$todo_id rescheduled to $new_due" }));
+        return;
+    }
+
+    # ── create_log_entry ─────────────────────────────────────────────────────
+    if ($action_name eq 'create_log_entry') {
+        my $todo_id  = $params->{todo_id}  || 0;
+        my $abstract = $params->{abstract} || 'AI-created log entry';
+        my $details  = $params->{details}  || '';
+        my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+
+        my $log_row;
+        eval {
+            $log_row = $schema->resultset('Log')->create({
+                todo_record_id => $todo_id || undef,
+                owner          => $current_user,
+                sitename       => $sitename,
+                start_date     => $today,
+                abstract       => $abstract,
+                details        => $details,
+                start_time     => '00:00',
+                end_time       => '00:00',
+                time           => 0,
+                group_of_poster => do {
+                    my $roles = $c->session->{roles} || [];
+                    ref $roles eq 'ARRAY' ? join(',', @$roles) : ($roles || 'default');
+                },
+                status        => 1,
+                priority      => 2,
+                last_mod_by   => $current_user,
+                last_mod_date => $today,
+            });
+        };
+        if ($@ || !$log_row) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'action', "create_log_entry failed: $@");
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Log creation failed' }));
+            return;
+        }
+        my $log_id = $log_row->id // $log_row->record_id // '?';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
+            "AI action create_log_entry: log=$log_id todo=$todo_id by=$current_user");
+        $c->response->body(encode_json({ success => JSON::true, message => "Log entry #$log_id created", log_id => $log_id + 0 }));
+        return;
+    }
+
+    # ── add_todo_comment ──────────────────────────────────────────────────────
+    if ($action_name eq 'add_todo_comment') {
+        my $todo_id = $params->{todo_id} or do {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'todo_id required' }));
+            return;
+        };
+        my $comment = $params->{comment} || '';
+        unless ($comment) {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'comment required' }));
+            return;
+        }
+        my $todo = eval { $schema->resultset('Todo')->find($todo_id) };
+        unless ($todo) {
+            $c->response->status(404);
+            $c->response->body(encode_json({ success => JSON::false, error => "Todo #$todo_id not found" }));
+            return;
+        }
+        my $existing = $todo->comments // '';
+        my $appended = $existing
+            ? "$existing\n[$today $current_user] $comment"
+            : "[$today $current_user] $comment";
+        eval { $todo->update({ comments => $appended, last_mod_by => $current_user, last_mod_date => $today }) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'action', "add_todo_comment failed: $@");
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Comment update failed' }));
+            return;
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
+            "AI action add_todo_comment: todo=$todo_id by=$current_user");
+        $c->response->body(encode_json({ success => JSON::true, message => "Comment added to Todo #$todo_id" }));
+        return;
+    }
+
+    # Unknown action
+    $c->response->status(400);
+    $c->response->body(encode_json({ success => JSON::false, error => "Unknown action: $action_name" }));
 }
 
 __PACKAGE__->meta->make_immutable;

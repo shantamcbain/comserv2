@@ -137,6 +137,37 @@
         <button type="submit">Edit Todo</button>
     </form>
 </div>
+
+[% IF todo_intervals && todo_intervals.size %]
+<div class="reschedule-log">
+    <h3>Rescheduling History</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Type</th>
+                <th>Change</th>
+                <th>Held From</th>
+                <th>Moved On</th>
+                <th>By</th>
+            </tr>
+        </thead>
+        <tbody>
+        [% FOREACH interval IN todo_intervals %]
+            <tr>
+                <td>[% interval.record_id %]</td>
+                <td>[% interval.interval_type %]</td>
+                <td>[% interval.status %]</td>
+                <td>[% interval.start_date || '-' %]</td>
+                <td>[% interval.end_date || '-' %]</td>
+                <td>[% interval.last_mod_by %]</td>
+            </tr>
+        [% END %]
+        </tbody>
+    </table>
+</div>
+[% END %]
+
 <!-- Return navigation buttons -->
 <div class="return-nav">
     <a href="/todo" class="return-button">Return to List View</a>

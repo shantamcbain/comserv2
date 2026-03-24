@@ -1095,10 +1095,11 @@
         
         console.debug('Sending AI request with agent:', state.pageContext.agent_id, requestPayload);
         
-        // Provider-aware client timeout: Ollama can be slow loading a large model from disk;
-        // give it 180 s (server-side is 150 s). External APIs (Grok etc.) cap at 30 s.
+        // Provider-aware client timeout:
+        //   Ollama: 180 s (server-side is 150 s — model cold-start can take ~60 s)
+        //   Grok:   90 s (server-side is 120 s — complex audit/analysis queries need time)
         const isOllama = providerName === 'ollama';
-        const clientTimeoutMs = isOllama ? 180000 : 30000;
+        const clientTimeoutMs = isOllama ? 180000 : 90000;
         const abortCtrl = new AbortController();
         const abortTimer = setTimeout(function() {
             abortCtrl.abort();

@@ -425,20 +425,31 @@
 
         [%# ── Project → Plan hierarchy (from stash planning_projects) ── %]
         [% IF planning_projects && planning_projects.size %]
+        [% IF is_admin %]
+        <div id="project-reorder-bar" style="display:none;padding:8px 12px;background:color-mix(in srgb,var(--primary-color) 12%,var(--bg-color));border:1px solid var(--primary-color);border-radius:4px;margin-bottom:10px;font-size:0.85em;align-items:center;gap:12px;">
+            <span>⇅ Drag rows to reorder projects</span>
+            <button id="save-order-btn" onclick="saveProjectOrder()" style="padding:3px 12px;background:var(--primary-color);color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:0.85em;">Save Order</button>
+            <span id="save-order-msg" style="color:green;display:none;">✓ Saved</span>
+        </div>
+        [% END %]
+        <div id="project-sortable-list">
         [% SET current_site_label = '' %]
         [% FOREACH proj IN planning_projects %]
             [%# Site group header for CSC all-sites view %]
             [% IF is_csc && !filter_site && proj.sitename != current_site_label %]
             [% SET current_site_label = proj.sitename %]
-            <div style="margin:18px 0 6px;padding:4px 10px;background:var(--primary-color);color:#fff;border-radius:4px;font-size:0.85em;font-weight:bold;">
+            <div class="site-group-header" style="margin:18px 0 6px;padding:4px 10px;background:var(--primary-color);color:#fff;border-radius:4px;font-size:0.85em;font-weight:bold;">
                 🌐 [% proj.sitename %]
             </div>
             [% END %]
 
             [%# Project card %]
-            <details style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;margin-bottom:10px;" open>
+            <details data-project-id="[% proj.id %]" draggable="[% is_admin ? 'true' : 'false' %]"
+                style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;margin-bottom:10px;"
+                class="project-card" open>
                 <summary style="padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;list-style:none;">
-                    <span>
+                    <span style="display:flex;align-items:center;gap:8px;">
+                        [% IF is_admin %]<span class="drag-handle" title="Drag to reorder" style="cursor:grab;color:var(--text-muted-color);font-size:1.1em;user-select:none;" onclick="event.stopPropagation()">⠿</span>[% END %]
                         <strong>[% proj.name %]</strong>
                         [% IF proj.project_code %]<span style="font-size:0.8em;color:var(--text-muted-color);margin-left:6px;">[% proj.project_code %]</span>[% END %]
                         [% IF proj.developer_name %]<span style="font-size:0.78em;color:var(--text-muted-color);margin-left:6px;">· [% proj.developer_name %]</span>[% END %]
@@ -514,7 +525,9 @@
                         <a href="/admin/plan/create?project_id=[% proj.id %]" style="color:var(--primary-color);margin-left:6px;">+ New Plan</a>
                         [% IF all_plans && all_plans.size %]
                         &nbsp;·&nbsp;
-                        <span style="color:var(--text-muted-color);">Link existing:</span>
+                        <span style="color:var(--text-muted-color);">Link existing plan:
+                            <span title="A Plan is a time-boxed sprint or theme (e.g. 'Q2 2026 Planning Migration'). A Project is the long-running system or feature. Linking a plan to this project associates that sprint's goals with this project. You can link multiple plans to one project." style="cursor:help;color:var(--primary-color);">ⓘ</span>
+                        </span>
                         <select id="link-plan-[% proj.id %]" style="font-size:0.8em;padding:2px 4px;border:1px solid var(--border-color);border-radius:3px;margin:0 4px;">
                             <option value="">— select plan —</option>
                             [% FOREACH ap IN all_plans %]
@@ -532,6 +545,7 @@
                 </div>
             </details>
         [% END %]
+        </div>[%# end #project-sortable-list %]
 
         [%# ── Standalone plans (not linked to any project) ── %]
         [% IF orphan_plans && orphan_plans.size %]
@@ -1065,5 +1079,86 @@
         }
     }
 
+    // ── Project drag-and-drop reordering (admin only) ──────────────────────
+    (function() {
+        var list = document.getElementById('project-sortable-list');
+        if (!list) return;
+        var cards = list.querySelectorAll('.project-card');
+        if (!cards.length) return;
+
+        var bar = document.getElementById('project-reorder-bar');
+        var dragged = null;
+
+        cards.forEach(function(card) {
+            card.addEventListener('dragstart', function(e) {
+                dragged = card;
+                setTimeout(function() { card.style.opacity = '0.4'; }, 0);
+                e.dataTransfer.effectAllowed = 'move';
+                if (bar) bar.style.display = 'flex';
+            });
+            card.addEventListener('dragend', function() {
+                card.style.opacity = '1';
+                dragged = null;
+                list.querySelectorAll('.project-card').forEach(function(c) {
+                    c.style.borderTop = '';
+                });
+            });
+            card.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (dragged && dragged !== card) {
+                    list.querySelectorAll('.project-card').forEach(function(c) { c.style.borderTop = ''; });
+                    card.style.borderTop = '2px solid var(--primary-color)';
+                }
+            });
+            card.addEventListener('drop', function(e) {
+                e.preventDefault();
+                if (dragged && dragged !== card) {
+                    card.style.borderTop = '';
+                    var allCards = Array.from(list.querySelectorAll('.project-card'));
+                    var fromIdx = allCards.indexOf(dragged);
+                    var toIdx   = allCards.indexOf(card);
+                    if (fromIdx < toIdx) {
+                        card.after(dragged);
+                    } else {
+                        card.before(dragged);
+                    }
+                }
+            });
+        });
+    })();
+
+    function saveProjectOrder() {
+        var list = document.getElementById('project-sortable-list');
+        if (!list) return;
+        var ids = Array.from(list.querySelectorAll('.project-card')).map(function(c) {
+            return parseInt(c.getAttribute('data-project-id'), 10);
+        }).filter(Boolean);
+
+        var btn = document.getElementById('save-order-btn');
+        var msg = document.getElementById('save-order-msg');
+        if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+        if (msg) msg.style.display = 'none';
+
+        fetch('/project/reorder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order: ids })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (btn) { btn.disabled = false; btn.textContent = 'Save Order'; }
+            if (d.ok) {
+                if (msg) { msg.style.display = 'inline'; }
+                setTimeout(function() { if (msg) msg.style.display = 'none'; }, 3000);
+            } else {
+                alert('Save failed: ' + (d.error || 'Unknown error'));
+            }
+        })
+        .catch(function(e) {
+            if (btn) { btn.disabled = false; btn.textContent = 'Save Order'; }
+            alert('Request failed: ' + e);
+        });
+    }
 
 </script>
