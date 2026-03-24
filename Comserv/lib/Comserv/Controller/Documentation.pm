@@ -2006,8 +2006,8 @@ sub _update_json_config_with_scanned_files {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_update_json_config_with_scanned_files',
                 "Added uncategorized page to admin_guides: $page_name");
         } else {
-            $category = $metadata->{category} || $self->_determine_page_category($page_name, $metadata->{path});
-            $roles = $metadata->{roles};
+            $category = $config->{pages}->{$page_name}->{category} || $metadata->{category} || $self->_determine_page_category($page_name, $metadata->{path});
+            $roles = $config->{pages}->{$page_name}->{roles} || $metadata->{roles};
             $title = $metadata->{title} || $self->_format_title($page_name);
             $update_count++;
         }
