@@ -352,11 +352,15 @@ sub index :Path('/Documentation') :Args(0) {
     $self->_ensure_scanned($c);
 
     # Get the current user's role
-    my $user_role = 'normal';  # Default to normal user
+    my $user_role = 'guest';  # Default to guest — unauthenticated users get no access above guest
     my $is_admin = 0;  # Flag to track if user has admin role
 
+    # Only assign a real role if the user has an authenticated session (non-anonymous username)
+    my $session_username = $c->session->{username} // '';
+    my $is_authenticated = ($session_username && $session_username ne 'anonymous');
+
     # First check session roles (this works even if user is not fully authenticated)
-    if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
+    if ($is_authenticated && $c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
         # Log all roles for debugging
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
             "Session roles: " . join(", ", @{$c->session->{roles}}));
@@ -372,8 +376,8 @@ sub index :Path('/Documentation') :Args(0) {
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
             "User role determined from session: $user_role, is_admin: $is_admin");
     }
-    # If no role found in session but user exists, try to get role from user object
-    elsif ($c->controller('Root')->user_exists($c)) {
+    # If no role found in session but user is authenticated, use 'normal' as fallback
+    elsif ($is_authenticated && $c->controller('Root')->user_exists($c)) {
         $user_role = $c->session->{roles} || 'normal';
         $is_admin = 1 if lc($user_role) eq 'admin';
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
@@ -417,10 +421,6 @@ sub index :Path('/Documentation') :Args(0) {
     foreach my $page_name (keys %$pages) {
         my $metadata = $pages->{$page_name};
 
-        # TEMPORARY: Show ALL pages for debugging - REMOVE THIS LATER
-        $filtered_pages{$page_name} = $metadata;
-        next;  # Skip all the filtering logic temporarily
-
         # Log the admin status for debugging
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
             "Processing page $page_name, is_admin: $is_admin");
@@ -454,8 +454,8 @@ sub index :Path('/Documentation') :Args(0) {
                         last;
                     }
                 }
-                # Special case for normal role - any authenticated user can access normal content
-                elsif ($role eq 'normal' && $user_role) {
+                # Special case for normal role - only authenticated users (not guest) can access normal content
+                elsif ($role eq 'normal' && $is_authenticated) {
                     $has_role = 1;
                     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
                         "Normal role access granted for user with role $user_role");
@@ -2426,7 +2426,13 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
             "Could not fetch all_plans: $@");
     }
 
-    # --- Active Priorities: DB-driven, role/site/user scoped, dependency-ordered ---
+    # --- Active Priorities: DB-driven, role/site/user scoped, smart-scored ordering ---
+    # Score formula (lower = shown first):
+    #   status tier:   IN PROGRESS = 0, NEW/Pending = 1, anything else = 2
+    #   is_blocking:   halves the effective priority within tier
+    #   priority:      1 (critical) .. 10 (low)
+    #   staleness:     > 180 days since last activity adds +500 (pushes to bottom)
+    # Fetch 60 rows from DB (raw sort: active statuses first, then priority), then re-score in Perl.
     my @active_priorities;
     eval {
         my $user_id  = $c->session->{user_id};
@@ -2434,9 +2440,11 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         my $can_see_all = $c->stash->{is_admin}
             || grep { lc($_) =~ /^(developer|devops|editor)$/ } @$roles;
 
-        my %ap_cond = (status => { '!=' => 3 });   # exclude DONE
-        $ap_cond{sitename} = $sitename unless $is_csc;  # non-CSC: own site only
-        $ap_cond{user_id}  = $user_id  unless $can_see_all;  # members: own todos only
+        # Exclude all "done" status variants — numeric AND string
+        my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+        my %ap_cond = (status => { -not_in => \@done_statuses });
+        $ap_cond{sitename} = $sitename unless $is_csc;
+        $ap_cond{user_id}  = $user_id  unless $can_see_all;
 
         my @rows = $c->model('DBEncy')->resultset('Todo')->search(
             \%ap_cond,
@@ -2444,32 +2452,54 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
                 order_by => [
                     { -asc  => 'priority'    },
                     { -desc => 'is_blocking' },
-                    { -asc  => 'start_date'  },
+                    { -desc => 'last_mod_date' },
                 ],
-                rows => 20,
+                rows => 60,   # fetch more so Perl scoring can find the best 25
             }
         )->all;
 
-        # Pre-fetch all returned IDs for fast blocker lookup
         my %row_by_id = map { $_->record_id => $_ } @rows;
-
-        # Cache for project names
         my %proj_cache;
+        my $now_epoch = time();
 
+        my @scored;
         for my $todo (@rows) {
             my %h = $todo->get_columns;
 
-            # Blocker info
+            # ── Status tier ──────────────────────────────────────────────────
+            my $st = $h{status} // '';
+            my $in_progress = ($st == 2 || $st =~ /^(in.progress|in.process|IN PROGRESS)$/i) ? 1 : 0;
+            my $status_tier = $in_progress ? 0 : 1;
+
+            # ── Staleness (days since last activity) ─────────────────────────
+            my $activity_str = $h{last_mod_date} || $h{date_time_posted} || '';
+            my $days_stale   = 0;
+            if ($activity_str =~ /^(\d{4})-(\d{2})-(\d{2})/) {
+                require POSIX;
+                my $act_epoch = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
+                $days_stale = int(($now_epoch - $act_epoch) / 86400) if $act_epoch;
+            }
+            my $stale_penalty = $days_stale > 180 ? 500 : ($days_stale > 90 ? 50 : 0);
+            $h{stale_days}    = $days_stale;
+            $h{is_stale}      = $days_stale > 180 ? 1 : 0;
+
+            # ── Composite score (lower = higher priority) ─────────────────────
+            my $priority    = ($h{priority} || 5);
+            my $block_bonus = $h{is_blocking} ? -0.4 : 0;
+            $h{ap_score}    = ($status_tier * 100) + ($priority + $block_bonus) + $stale_penalty;
+
+            # ── Blocker info ──────────────────────────────────────────────────
             if ($h{blocked_by_todo_id}) {
                 my $blocker = $row_by_id{$h{blocked_by_todo_id}}
                     || eval { $c->model('DBEncy')->resultset('Todo')->find($h{blocked_by_todo_id}) };
                 if ($blocker) {
                     $h{blocker_subject} = $blocker->subject;
-                    $h{blocker_done}    = ($blocker->status == 3) ? 1 : 0;
+                    my $bs = $blocker->status // '';
+                    $h{blocker_done} = ($bs == 3 || $bs =~ /^(done|completed|closed)$/i) ? 1 : 0;
                 }
             }
 
-            # Project name (cached)
+            # ── Project name (cached) ─────────────────────────────────────────
             if ($h{project_id}) {
                 unless (exists $proj_cache{$h{project_id}}) {
                     my $p = eval { $c->model('DBEncy')->resultset('Project')->find($h{project_id}) };
@@ -2478,8 +2508,12 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
                 $h{project_name} = $proj_cache{$h{project_id}};
             }
 
-            push @active_priorities, \%h;
+            push @scored, \%h;
         }
+
+        # Sort by composite score, then by priority as tiebreaker
+        @active_priorities = (sort { $a->{ap_score} <=> $b->{ap_score} || $a->{priority} <=> $b->{priority} } @scored)[0..24];
+        @active_priorities = grep { defined } @active_priorities;  # trim undef if fewer than 25
     };
     if ($@) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',

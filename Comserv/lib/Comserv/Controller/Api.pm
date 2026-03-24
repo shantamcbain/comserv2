@@ -715,6 +715,93 @@ sub api_create_chat_message :Path('chat/message') :Args(0) {
     $c->detach();
 }
 
+=head2 api_system_logs
+
+GET /api/system_logs - Query system_log table for AI agents and monitoring tools
+
+Optional query params:
+  level     - filter by level: error, warn, info (default: all)
+  limit     - max records to return (default: 100, max: 1000)
+  since     - ISO datetime string, return only records after this time
+  sitename  - filter by sitename
+  subroutine - filter by subroutine name (partial match)
+  search    - search message text (partial match)
+
+Returns: { success, count, logs: [ { id, timestamp, level, file, line, subroutine, message, sitename, username, system_identifier } ] }
+=cut
+
+sub api_system_logs :Path('system_logs') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $address  = $c->req->address;
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
+
+    unless ($is_local) {
+        my $validation = Comserv::Util::ApiTokenValidator->validate_from_request($c);
+        unless ($validation->{valid}) {
+            $c->res->status($validation->{code} || 401);
+            $c->res->content_type('application/json');
+            $c->res->body(encode_json({ success => 0, error => $validation->{error} || 'Authentication required' }));
+            $c->detach();
+        }
+    }
+
+    my $level      = $c->req->param('level')      // '';
+    my $limit      = $c->req->param('limit')      // 100;
+    my $since      = $c->req->param('since')      // '';
+    my $sitename   = $c->req->param('sitename')   // '';
+    my $subroutine = $c->req->param('subroutine') // '';
+    my $search     = $c->req->param('search')     // '';
+
+    $limit = int($limit);
+    $limit = 100  if $limit < 1;
+    $limit = 1000 if $limit > 1000;
+
+    my %where;
+    $where{level}      = $level                        if $level;
+    $where{sitename}   = $sitename                     if $sitename;
+    $where{subroutine} = { -like => "%$subroutine%" }  if $subroutine;
+    $where{message}    = { -like => "%$search%" }      if $search;
+    $where{timestamp}  = { '>' => $since }             if $since;
+
+    my $schema = $c->model('DBEncy');
+    my @logs;
+    eval {
+        @logs = $schema->resultset('SystemLog')->search(
+            \%where,
+            { order_by => { -desc => 'timestamp' }, rows => $limit }
+        )->all;
+    };
+    if ($@) {
+        $c->res->status(500);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => "Database error: $@" }));
+        $c->detach();
+    }
+
+    my @log_list = map { { $_->get_columns } } @logs;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_system_logs',
+        "system_logs queried via API: level=$level limit=$limit count=" . scalar(@log_list) . " (Local: $is_local)");
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success => 1,
+        count   => scalar(@log_list),
+        filters => {
+            level      => $level      || undef,
+            since      => $since      || undef,
+            sitename   => $sitename   || undef,
+            subroutine => $subroutine || undef,
+            search     => $search     || undef,
+            limit      => $limit,
+        },
+        logs => \@log_list,
+    }));
+    $c->detach();
+}
+
 sub _todo_to_hash {
     my ($self, $todo) = @_;
     
