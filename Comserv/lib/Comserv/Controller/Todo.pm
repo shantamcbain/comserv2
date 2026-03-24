@@ -1716,4 +1716,109 @@ sub _project_to_hash {
     };
 }
 
+sub quick_close :Path('quick_close') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $username = $c->session->{username} // '';
+    my $roles    = $c->session->{roles} || [];
+    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
+    unless ($username && $username ne 'anonymous' && grep { /^(admin|developer|editor|devops)$/i } @rl) {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Admin role required"}');
+        return;
+    }
+
+    my $body = $c->req->content;
+    my $data;
+    eval { require JSON; $data = JSON::decode_json($body); };
+    my $record_id = $data->{record_id} if $data;
+    unless ($record_id) {
+        $c->response->status(400);
+        $c->response->body('{"ok":0,"error":"Missing record_id"}');
+        return;
+    }
+
+    my $today = DateTime->now->ymd;
+    eval {
+        my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
+        die "Todo not found\n" unless $todo;
+
+        $todo->update({
+            status       => 3,
+            last_mod_by  => $username,
+            last_mod_date => $today,
+        });
+
+        $c->model('DBEncy')->resultset('Log')->create({
+            todo_record_id => $record_id,
+            owner          => $username,
+            sitename       => $todo->sitename || $c->session->{SiteName},
+            abstract       => 'Quick-closed from Active Priorities panel',
+            details        => 'Marked done via quick-close button on DailyPlan by ' . $username,
+            start_date     => $today,
+            status         => 3,
+            last_mod_by    => $username,
+            last_mod_date  => $today,
+        });
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'quick_close',
+            "Failed quick_close for todo $record_id: $@");
+        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'quick_close',
+        "Todo $record_id quick-closed by $username");
+    $c->response->body('{"ok":1}');
+}
+
+sub triage_stale :Path('triage_stale') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $username = $c->session->{username} // '';
+    my $roles    = $c->session->{roles} || [];
+    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
+    unless ($username && $username ne 'anonymous' && grep { /^(admin)$/i } @rl) {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Admin role required"}');
+        return;
+    }
+
+    require POSIX;
+    my $now_epoch = time();
+    my $count     = 0;
+
+    eval {
+        my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+        my @rows = $c->model('DBEncy')->resultset('Todo')->search(
+            { status => { -not_in => \@done_statuses } },
+            { columns => [qw(record_id priority last_mod_date date_time_posted)] }
+        )->all;
+
+        for my $row (@rows) {
+            my $activity_str = $row->last_mod_date || $row->date_time_posted || '';
+            next unless $activity_str =~ /^(\d{4})-(\d{2})-(\d{2})/;
+            my $act_epoch = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
+            my $days_stale = int(($now_epoch - $act_epoch) / 86400);
+            next unless $days_stale > 180;
+            my $new_priority = ($row->priority || 5) + 2;
+            $new_priority = 10 if $new_priority > 10;
+            $row->update({ priority => $new_priority });
+            $count++;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'triage_stale', "Error: $@");
+        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'triage_stale',
+        "Triaged $count stale todos by $username");
+    $c->response->body('{"ok":1,"count":' . $count . '}');
+}
+
 1;

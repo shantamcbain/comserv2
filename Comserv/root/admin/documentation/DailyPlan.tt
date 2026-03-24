@@ -179,10 +179,13 @@
             <div style="margin-bottom:24px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--primary-color);">
                     <h3 style="margin:0;font-size:1.1em;">🎯 Current Active Priorities</h3>
-                    <div style="display:flex;gap:8px;">
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
                         <a href="/todo/addtodo" style="background:var(--primary-color);color:#fff;padding:4px 12px;border-radius:4px;text-decoration:none;font-size:0.82em;">+ Add Todo</a>
                         <a href="/todo" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">All Todos</a>
                         <a href="/log" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">Logs</a>
+                        [% IF is_admin %]
+                        <button onclick="triageStale()" style="padding:4px 12px;border:1px solid #fd7e14;border-radius:4px;background:transparent;font-size:0.82em;color:#fd7e14;cursor:pointer;" title="Reduce priority of todos inactive for 180+ days">⚠ Triage Stale</button>
+                        [% END %]
                     </div>
                 </div>
 
@@ -192,8 +195,8 @@
                 [% SET rank = rank + 1 %]
                 [%# Determine if this todo is blocked by an incomplete blocker %]
                 [% SET is_blocked = ap.blocked_by_todo_id && !ap.blocker_done %]
-                <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;margin-bottom:6px;
-                    border-radius:6px;border:1px solid var(--border-color);
+                <div id="ap-row-[% ap.record_id %]" style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;margin-bottom:6px;
+                    border-radius:6px;border:1px solid [% IF ap.is_stale %]#fd7e14[% ELSE %]var(--border-color)[% END %];
                     background:[% IF is_blocked %]var(--bg-secondary)[% ELSIF ap.status == 2 %]color-mix(in srgb,var(--primary-color) 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];
                     opacity:[% IF is_blocked %]0.65[% ELSE %]1[% END %];">
 
@@ -224,6 +227,11 @@
                                 [% IF ap.status == 2 %]IN PROGRESS[% ELSE %]NEW[% END %]
                             </span>
 
+                            [%# Stale badge %]
+                            [% IF ap.is_stale %]
+                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#fd7e14;color:#fff;" title="No activity for [% ap.stale_days %] days — may be outdated or already done">⏳ STALE [% ap.stale_days %]d</span>
+                            [% END %]
+
                             [%# Blocking badge %]
                             [% IF ap.is_blocking %]
                             <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#dc3545;color:#fff;" title="Other tasks depend on this">🔒 BLOCKING</span>
@@ -251,13 +259,19 @@
                             [% IF ap.project_name %]<span>📁 [% ap.project_name %]</span>[% END %]
                             [% IF ap.due_date %]<span>📅 Due: [% ap.due_date %]</span>[% END %]
                             [% IF is_blocked %]<span>⏸ Waiting on: <em>[% ap.blocker_subject %]</em></span>[% END %]
-                            [% IF ap.sitename %]<span>[% ap.sitename %]</span>[% END %]
+                            [% IF ap.sitename && !(is_csc && ap.sitename != 'CSC') %]<span>[% ap.sitename %]</span>[% END %]
                         </div>
                     </div>
 
-                    [%# Quick action %]
-                    <a href="/todo/details?record_id=[% ap.record_id %]"
-                       style="font-size:0.75em;color:var(--primary-color);text-decoration:none;flex-shrink:0;padding-top:4px;">View →</a>
+                    [%# Quick actions %]
+                    <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;padding-top:2px;">
+                        <a href="/todo/details?record_id=[% ap.record_id %]"
+                           style="font-size:0.75em;color:var(--primary-color);text-decoration:none;">View →</a>
+                        [% IF is_admin %]
+                        <button onclick="quickClose([% ap.record_id %])"
+                            style="font-size:0.7em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark done and create log">✓ Done</button>
+                        [% END %]
+                    </div>
                 </div>
                 [% END %]
 
@@ -268,6 +282,36 @@
                 </div>
                 [% END %]
             </div>
+
+            <script>
+            function quickClose(recordId) {
+                if (!confirm('Mark todo #' + recordId + ' as Done and create a log entry?')) return;
+                fetch('/todo/quick_close', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                    body: JSON.stringify({record_id: recordId})
+                }).then(function(r){ return r.json(); }).then(function(d){
+                    if (d.ok) {
+                        var row = document.getElementById('ap-row-' + recordId);
+                        if (row) { row.style.opacity = '0.4'; row.style.textDecoration = 'line-through'; }
+                        setTimeout(function(){ if (row) row.remove(); }, 1200);
+                    } else {
+                        alert('Could not close: ' + (d.error || 'unknown error'));
+                    }
+                }).catch(function(e){ alert('Error: ' + e); });
+            }
+            function triageStale() {
+                if (!confirm('Reduce priority of all todos inactive for 180+ days by 2 levels?')) return;
+                fetch('/todo/triage_stale', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                    body: JSON.stringify({})
+                }).then(function(r){ return r.json(); }).then(function(d){
+                    if (d.ok) { alert('Triaged ' + d.count + ' stale todos. Reloading…'); location.reload(); }
+                    else { alert('Error: ' + (d.error || 'unknown')); }
+                }).catch(function(e){ alert('Error: ' + e); });
+            }
+            </script>
 
             [%# ── CSC LEGACY: Master Plan Priority List (being migrated to DB above) ── %]
             [% IF is_csc %]
