@@ -1,5 +1,5 @@
-[% META title = 'View Ticket Status' %]
-[% PageVersion = 'CSC/HelpDesk/ticket_status.tt,v 0.01 2025/04/18 shanta Exp shanta ' %]
+[% META title = 'Support Tickets' %]
+[% PageVersion = 'CSC/HelpDesk/ticket_status.tt,v 0.02 2026/03/24 shanta Exp shanta ' %]
 
 [% IF c.session.debug_mode == 1 %]
  <br>[% PageVersion %]</br>
@@ -7,168 +7,262 @@
 [% END %]
 
 <div class="helpdesk-container">
-    <h1>View Ticket Status</h1>
-    
+    <h1>[% title || 'Support Tickets' %]</h1>
+
+    [% IF error_msg %]
+    <div class="alert-error">[% error_msg %]</div>
+    [% END %]
+
+    [% IF success_msg %]
+    <div class="alert-success">[% success_msg %]</div>
+    [% END %]
+
     <div class="ticket-search">
-        <form method="get" action="[% c.uri_for('/HelpDesk/ticket/search') %]">
-            <div class="form-group">
-                <label for="ticket_id">Ticket ID:</label>
-                <input type="text" id="ticket_id" name="ticket_id" class="form-control" placeholder="Enter your ticket ID">
-            </div>
-            
-            <div class="form-group">
-                <label for="email">Email Address:</label>
-                <input type="email" id="email" name="email" class="form-control" placeholder="Enter your email address">
-            </div>
-            
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Search</button>
+        <form method="get" action="[% c.uri_for('/HelpDesk/ticket/view') %]">
+            <div class="form-inline">
+                <label for="ticket_id">Find Ticket by Number:</label>
+                <input type="text" id="ticket_id" name="ticket_number" class="form-control"
+                       placeholder="e.g. CSC-20260324-0042">
+                <button type="submit" class="btn btn-primary">Look Up</button>
             </div>
         </form>
     </div>
-    
+
     <div class="ticket-list">
-        <h2>Your Recent Tickets</h2>
-        
         [% IF c.session.username %]
-            <!-- This would be populated with actual ticket data from the database -->
+            <h2>
+                Tickets
+                [% IF c.check_user_roles('admin') %]<span class="badge-admin">Admin View</span>[% END %]
+            </h2>
+
+            [% IF tickets && tickets.size %]
             <table class="tickets-table">
                 <thead>
                     <tr>
-                        <th>Ticket ID</th>
+                        <th>Ticket #</th>
                         <th>Subject</th>
+                        <th>Category</th>
+                        <th>Priority</th>
                         <th>Status</th>
-                        <th>Last Updated</th>
+                        <th>Created</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
+                [% FOREACH t IN tickets %]
                     <tr>
-                        <td>DEMO-1001</td>
-                        <td>Website Login Issue</td>
-                        <td><span class="status-open">Open</span></td>
-                        <td>2025-04-17</td>
-                        <td><a href="#" class="btn btn-sm btn-primary">View</a></td>
+                        <td><code>[% t.ticket_number %]</code></td>
+                        <td>[% t.subject %]</td>
+                        <td>[% t.category || 'other' %]</td>
+                        <td>
+                            [% IF t.priority == 'critical' %]
+                                <span class="priority-critical">Critical</span>
+                            [% ELSIF t.priority == 'high' %]
+                                <span class="priority-high">High</span>
+                            [% ELSIF t.priority == 'medium' %]
+                                <span class="priority-medium">Medium</span>
+                            [% ELSE %]
+                                <span class="priority-low">Low</span>
+                            [% END %]
+                        </td>
+                        <td>
+                            [% IF t.status == 'open' %]
+                                <span class="status-open">Open</span>
+                            [% ELSIF t.status == 'in_progress' %]
+                                <span class="status-in-progress">In Progress</span>
+                            [% ELSIF t.status == 'resolved' %]
+                                <span class="status-resolved">Resolved</span>
+                            [% ELSE %]
+                                <span class="status-closed">Closed</span>
+                            [% END %]
+                        </td>
+                        <td>[% t.created_at %]</td>
+                        <td>
+                            <a href="[% c.uri_for('/HelpDesk/ticket/view/' _ t.ticket_number) %]"
+                               class="btn btn-sm btn-primary">View</a>
+                        </td>
                     </tr>
-                    <tr>
-                        <td>DEMO-1002</td>
-                        <td>Email Configuration Problem</td>
-                        <td><span class="status-in-progress">In Progress</span></td>
-                        <td>2025-04-16</td>
-                        <td><a href="#" class="btn btn-sm btn-primary">View</a></td>
-                    </tr>
-                    <tr>
-                        <td>DEMO-1003</td>
-                        <td>Billing Question</td>
-                        <td><span class="status-closed">Closed</span></td>
-                        <td>2025-04-15</td>
-                        <td><a href="#" class="btn btn-sm btn-primary">View</a></td>
-                    </tr>
+                [% END %]
                 </tbody>
             </table>
+            [% ELSE %]
+            <div class="no-tickets">
+                <p>You have no support tickets yet.</p>
+                <a href="[% c.uri_for('/HelpDesk/ticket/new') %]" class="btn btn-primary">Create Your First Ticket</a>
+            </div>
+            [% END %]
+
+            [% IF ticket && ticket.description %]
+            <div class="ticket-detail">
+                <h3>Ticket Details: [% ticket.ticket_number %]</h3>
+                <div class="detail-row"><strong>Subject:</strong> [% ticket.subject %]</div>
+                <div class="detail-row"><strong>Description:</strong>
+                    <pre class="description-box">[% ticket.description %]</pre>
+                </div>
+                [% IF ticket.resolution %]
+                <div class="detail-row"><strong>Resolution:</strong>
+                    <pre class="description-box">[% ticket.resolution %]</pre>
+                </div>
+                [% END %]
+            </div>
+            [% END %]
+
         [% ELSE %]
             <div class="login-prompt">
                 <p>Please <a href="[% c.uri_for('/login') %]">log in</a> to view your tickets.</p>
+                <p>You can also search by ticket number above.</p>
             </div>
         [% END %]
+    </div>
+
+    <div class="helpdesk-actions">
+        <a href="[% c.uri_for('/HelpDesk/ticket/new') %]" class="btn btn-primary">Create New Ticket</a>
+        <a href="[% c.uri_for('/HelpDesk') %]" class="btn btn-secondary">Back to HelpDesk</a>
     </div>
 </div>
 
 <style>
     .helpdesk-container {
-        max-width: 1000px;
+        max-width: 1100px;
         margin: 0 auto;
         padding: 20px;
     }
-    
+
+    .alert-error {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 12px;
+        border-radius: 4px;
+        margin-bottom: 15px;
+    }
+
+    .alert-success {
+        background-color: #d4edda;
+        color: #155724;
+        padding: 12px;
+        border-radius: 4px;
+        margin-bottom: 15px;
+    }
+
     .ticket-search {
         background-color: #f8f9fa;
-        padding: 20px;
+        padding: 15px 20px;
         border-radius: 5px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin-bottom: 30px;
+        margin-bottom: 25px;
     }
-    
-    .form-group {
-        margin-bottom: 20px;
+
+    .form-inline {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
     }
-    
+
     .form-control {
-        width: 100%;
         padding: 8px;
         border: 1px solid #ced4da;
         border-radius: 4px;
+        min-width: 250px;
     }
-    
-    label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: bold;
-    }
-    
-    .form-actions {
+
+    .ticket-list {
         margin-top: 20px;
     }
-    
-    .ticket-list {
-        margin-top: 30px;
-    }
-    
+
     .tickets-table {
         width: 100%;
         border-collapse: collapse;
+        margin-top: 10px;
     }
-    
+
     .tickets-table th, .tickets-table td {
         padding: 12px;
         text-align: left;
         border-bottom: 1px solid #dee2e6;
     }
-    
+
     .tickets-table th {
         background-color: #f8f9fa;
         font-weight: bold;
     }
-    
-    .status-open {
-        color: #28a745;
-        font-weight: bold;
+
+    .status-open        { color: #28a745; font-weight: bold; }
+    .status-in-progress { color: #fd7e14; font-weight: bold; }
+    .status-resolved    { color: #17a2b8; font-weight: bold; }
+    .status-closed      { color: #6c757d; }
+
+    .priority-critical  { color: #dc3545; font-weight: bold; }
+    .priority-high      { color: #fd7e14; font-weight: bold; }
+    .priority-medium    { color: #ffc107; }
+    .priority-low       { color: #6c757d; }
+
+    .badge-admin {
+        background-color: #6f42c1;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 3px;
+        font-size: 0.8rem;
+        margin-left: 10px;
     }
-    
-    .status-in-progress {
-        color: #fd7e14;
-        font-weight: bold;
+
+    .no-tickets {
+        background-color: #e9ecef;
+        padding: 20px;
+        border-radius: 5px;
+        text-align: center;
+        margin: 20px 0;
     }
-    
-    .status-closed {
-        color: #6c757d;
+
+    .ticket-detail {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 5px;
+        margin-top: 30px;
     }
-    
+
+    .detail-row {
+        margin-bottom: 15px;
+    }
+
+    .description-box {
+        background-color: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 10px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: inherit;
+    }
+
     .login-prompt {
         background-color: #e9ecef;
         padding: 20px;
         border-radius: 5px;
         text-align: center;
     }
-    
+
+    .helpdesk-actions {
+        margin-top: 30px;
+    }
+
     .btn {
         display: inline-block;
         padding: 8px 16px;
         text-decoration: none;
         border-radius: 4px;
-    }
-    
-    .btn-sm {
-        padding: 4px 8px;
-        font-size: 0.875rem;
-    }
-    
-    .btn-primary {
-        background-color: #007bff;
-        color: white;
+        margin-right: 8px;
+        cursor: pointer;
         border: none;
     }
-    
+
+    .btn-sm {
+        padding: 4px 10px;
+        font-size: 0.875rem;
+    }
+
+    .btn-primary   { background-color: #007bff; color: white; }
+    .btn-secondary { background-color: #6c757d; color: white; }
+
     .debug-message {
         background-color: #f8d7da;
         color: #721c24;
