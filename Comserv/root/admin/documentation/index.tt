@@ -8,7 +8,7 @@
 [% END %]
 
 <head>
-    <link rel="stylesheet" href="[% c.uri_for('/static/css/components/documentation.css') %]?v=20260324b">
+    <link rel="stylesheet" href="[% c.uri_for('/static/css/components/documentation.css') %]?v=20260324c">
 </head>
 
 <div class="documentation-container">
