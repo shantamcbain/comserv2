@@ -398,8 +398,8 @@ h1 {
 
 /* All Files Container Styles - Theme Compatible */
 .theme-container {
-    background: var(--primary-color, #fff);
-    border: 1px solid var(--border-color, #ddd);
+    background: #ffffff;
+    border: 1px solid #dee2e6;
     border-radius: 8px;
     margin-bottom: 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -407,8 +407,8 @@ h1 {
 }
 
 .container-header {
-    background: var(--accent-color, #0056b3);
-    color: var(--primary-color, #fff);
+    background: #343a40;
+    color: #ffffff;
     padding: 15px 20px;
     cursor: pointer;
     display: flex;
@@ -420,11 +420,11 @@ h1 {
 }
 
 .container-header:hover {
-    background: var(--link-hover-color, #003d82);
+    background: #23272b;
 }
 
 .container-header.expanded {
-    background: var(--link-hover-color, #003d82);
+    background: #23272b;
 }
 
 .toggle-icon {
@@ -440,7 +440,8 @@ h1 {
     max-height: 0;
     overflow: hidden;
     transition: max-height 0.5s ease;
-    background: var(--background-color, #f8f9fa);
+    background: #f8f9fa;
+    color: #212529;
 }
 
 /* Container content when expanded - with scrolling support */
@@ -564,8 +565,8 @@ h1 {
 
 /* All Files Container Styles - Theme Compatible */
 .theme-container {
-    background: var(--primary-color, #fff);
-    border: 1px solid var(--border-color, #ddd);
+    background: #ffffff;
+    border: 1px solid #dee2e6;
     border-radius: 8px;
     margin-bottom: 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -573,8 +574,8 @@ h1 {
 }
 
 .container-header {
-    background: var(--accent-color, #0056b3);
-    color: var(--primary-color, #fff);
+    background: #343a40;
+    color: #ffffff;
     padding: 15px 20px;
     cursor: pointer;
     display: flex;
@@ -586,11 +587,11 @@ h1 {
 }
 
 .container-header:hover {
-    background: var(--link-hover-color, #003d82);
+    background: #23272b;
 }
 
 .container-header.expanded {
-    background: var(--link-hover-color, #003d82);
+    background: #23272b;
 }
 
 .toggle-icon {
@@ -606,7 +607,8 @@ h1 {
     max-height: 0;
     overflow: hidden;
     transition: max-height 0.5s ease;
-    background: var(--background-color, #f8f9fa);
+    background: #f8f9fa;
+    color: #212529;
 }
 
 /* Container content when expanded - with scrolling support */
