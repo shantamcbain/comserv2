@@ -37,10 +37,4 @@ __PACKAGE__->add_unique_constraint(
     'site_module_unique' => ['sitename', 'module_name']
 );
 
-__PACKAGE__->belongs_to(
-    site => 'Comserv::Model::Schema::Ency::Result::Site',
-    { 'foreign.name' => 'self.sitename' },
-    { join_type => 'left' }
-);
-
 1;
