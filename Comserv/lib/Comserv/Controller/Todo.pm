@@ -1758,7 +1758,7 @@ sub quick_close :Path('quick_close') :Args(0) {
         }
         $c->model('DBEncy')->resultset('Log')->create({
             todo_record_id  => $record_id,
-            owner           => $username,
+            username        => $username,
             sitename        => $todo->sitename || $c->session->{SiteName},
             project_code    => $proj_code,
             abstract        => 'Quick-closed from Active Priorities panel',
