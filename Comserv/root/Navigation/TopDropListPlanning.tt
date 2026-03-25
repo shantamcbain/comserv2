@@ -12,16 +12,16 @@
 [% SET site     = c.stash.SiteName || c.session.SiteName || 'CSC' %]
 [% SET is_csc   = (site == 'CSC') %]
 
-[%# Planning access: admin, developer, devops, editor, user, normal (but NOT guest/anonymous) %]
-[% SET can_plan = is_admin
-    || (c.stash.user_roles && (
-           c.stash.user_roles.grep('developer').size
-        || c.stash.user_roles.grep('devops').size
-        || c.stash.user_roles.grep('editor').size
-        || c.stash.user_roles.grep('user').size
-        || c.stash.user_roles.grep('normal').size
-    ))
-%]
+[%# Planning access: any logged-in non-guest user.
+    Content within DailyPlan is filtered by role/site. %]
+[% SET guest_roles = ['guest', 'anonymous', 'Guest', 'Anonymous'] %]
+[% SET is_guest = 0 %]
+[% IF c.stash.user_roles %]
+    [% FOREACH gr IN guest_roles %]
+        [% IF c.stash.user_roles.grep(gr).size %][% SET is_guest = 1 %][% END %]
+    [% END %]
+[% END %]
+[% SET can_plan = c.session.username && !is_guest %]
 
 [% IF can_plan %]
 <li class="horizontal-dropdown">
