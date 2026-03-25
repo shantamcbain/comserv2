@@ -470,6 +470,118 @@ sub api_list_documentation :Path('documentation') :Args(0) {
     $c->detach();
 }
 
+=head2 api_create_project
+
+POST /api/project/create - Create a new project or sub-project (Bypass auth for local requests)
+
+Body (JSON):
+  name, description, start_date, end_date, status, project_code,
+  project_size, estimated_man_hours, developer_name, client_name,
+  sitename, comments, parent_id (optional)
+
+Returns: { success, project_id, project }
+=cut
+
+sub api_create_project :Path('project/create') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $address  = $c->req->address;
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
+
+    my $api_user;
+    unless ($is_local) {
+        my $validation = Comserv::Util::ApiTokenValidator->validate_from_request($c);
+        unless ($validation->{valid}) {
+            $c->res->status($validation->{code} || 401);
+            $c->res->content_type('application/json');
+            $c->res->body(encode_json({ success => 0, error => $validation->{error} || 'Authentication required' }));
+            $c->detach();
+        }
+        my $schema = $c->model('DBEncy');
+        my $api_token = $schema->resultset('ApiToken')->find($validation->{api_token_id});
+        $api_user = $api_token->user if $api_token;
+    }
+
+    my $params;
+    eval {
+        my $body = $c->request->body;
+        if ($body) {
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                my $raw_body = do { local $/; <$body> };
+                $params = decode_json($raw_body);
+            } else {
+                $params = decode_json($body);
+            }
+        }
+    };
+    if ($@) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => "Invalid JSON: $@", code => 'json_parse_error' }));
+        $c->detach();
+    }
+
+    my @required = qw(name start_date end_date status);
+    my @missing  = grep { !defined $params->{$_} || $params->{$_} eq '' } @required;
+    if (@missing) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => 'Missing required fields: ' . join(', ', @missing), code => 'validation_error' }));
+        $c->detach();
+    }
+
+    my $current_user = $api_user ? $api_user->username : ($c->user_exists ? $c->user->username : 'system');
+    my $schema       = $c->model('DBEncy');
+
+    my $parent_id = $params->{parent_id} || undef;
+    $parent_id    = undef if defined $parent_id && $parent_id eq '';
+
+    my $project;
+    eval {
+        $project = $schema->resultset('Project')->create({
+            name                => $params->{name},
+            description         => $params->{description}          || '',
+            start_date          => $params->{start_date},
+            end_date            => $params->{end_date},
+            status              => $params->{status}               || 'Requested',
+            project_code        => $params->{project_code}         || '',
+            project_size        => $params->{project_size}         || 3,
+            estimated_man_hours => $params->{estimated_man_hours}  || 0,
+            developer_name      => $params->{developer_name}       || $current_user,
+            client_name         => $params->{client_name}          || 'CSC',
+            sitename            => $params->{sitename}             || ($c->session->{SiteName} || 'CSC'),
+            comments            => $params->{comments}             || '',
+            username_of_poster  => $current_user,
+            group_of_poster     => 'admin',
+            date_time_posted    => DateTime->now->ymd . ' ' . DateTime->now->hms,
+            parent_id           => $parent_id,
+            record_id           => 0,
+        });
+    };
+    if ($@) {
+        my $err = "$@"; $err =~ s/\s+at\s+.*//s;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_create_project', "Error: $err");
+        $c->res->status(500);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({ success => 0, error => "Failed to create project: $err" }));
+        $c->detach();
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_create_project',
+        "Project created via API: ID=" . $project->id . ", Name=" . $project->name);
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success    => 1,
+        message    => 'Project created successfully',
+        project_id => $project->id,
+        project    => { $project->get_columns },
+    }));
+    $c->detach();
+}
+
 =head2 api_list_projects
 
 GET /api/projects - List all projects (Bypass keyword/token for local/workstation.local)
