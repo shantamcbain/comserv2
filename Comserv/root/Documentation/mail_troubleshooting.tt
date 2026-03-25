@@ -1,0 +1,573 @@
+[% PageVersion = 'Comserv/root/Documentation/mail_troubleshooting.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Mail System Troubleshooting Guide' %]
+
+<!-- Documentation page for mail_troubleshooting -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+This guide provides detailed troubleshooting steps for common mail system issues in the Comserv application. It includes diagnostic procedures, error interpretation, and solutions for various email-related problems.
+
+
+
+<h2>Diagnosing Mail Issues</h2>
+
+
+
+<h3>Check Application Logs</h3>
+
+
+
+The first step in troubleshooting is to check the application logs:
+
+
+
+<code></code>`bash
+
+cat /home/shanta/PycharmProjects/comserv2/Comserv/script/logs/application.log
+
+<code></code>`
+
+
+
+Look for entries with the following patterns:
+
+<ul><li>"Failed to send email"</li></ul>
+
+<ul><li>"Email sent successfully"</li></ul>
+
+<ul><li>"SMTP configuration is missing"</li></ul>
+
+<ul><li>"Mail model failed"</li></ul>
+
+
+
+<h3>Verify Mail Configuration</h3>
+
+
+
+Check if mail configuration exists for the current site:
+
+
+
+<ol><li>Access the database and query the <code>site_config</code> table:</li></ol>
+
+   <code></code>`sql
+
+   SELECT * FROM site_config WHERE site_id = [YOUR_SITE_ID] AND config_key LIKE 'smtp_%';
+
+   <code></code>`
+
+
+
+<ol><li>Ensure all required configuration keys exist:</li></ol>
+
+   - smtp_host
+
+   - smtp_port
+
+   - smtp_username
+
+   - smtp_password
+
+   - smtp_from
+
+
+
+<h3>Test Email Modules</h3>
+
+
+
+Verify that the required email modules are installed and working:
+
+
+
+<code></code>`bash
+
+cd /home/shanta/PycharmProjects/comserv2/Comserv/script
+
+./test_email_modules.pl
+
+<code></code>`
+
+
+
+If modules are missing, install them:
+
+
+
+<code></code>`bash
+
+cd /home/shanta/PycharmProjects/comserv2/Comserv/script
+
+./install_email_only.pl
+
+<code></code>`
+
+
+
+<h2>Common Issues and Solutions</h2>
+
+
+
+<h3>1. Missing SMTP Configuration</h3>
+
+
+
+**Symptoms:**
+
+<ul><li>"SMTP configuration is missing" error in logs</li></ul>
+
+<ul><li>Redirect to <code>/site/add_smtp_config_form</code></li></ul>
+
+
+
+**Solution:**
+
+<ol><li>Navigate to <code>/mail/add_mail_config_form</code></li></ol>
+
+<ol><li>Enter the site ID and SMTP settings</li></ol>
+
+<ol><li>Submit the form</li></ol>
+
+<ol><li>Restart the application if necessary</li></ol>
+
+
+
+<h3>2. Authentication Failures</h3>
+
+
+
+**Symptoms:**
+
+<ul><li>"Authentication failed" in logs</li></ul>
+
+<ul><li>"Invalid credentials" error messages</li></ul>
+
+
+
+**Solution:**
+
+<ol><li>Verify SMTP username and password</li></ol>
+
+<ol><li>For Gmail, ensure you're using an App Password</li></ol>
+
+<ol><li>Check if the account has 2FA enabled</li></ol>
+
+<ol><li>Test the credentials with another mail client</li></ol>
+
+
+
+<h3>3. Connection Issues</h3>
+
+
+
+**Symptoms:**
+
+<ul><li>"Connection refused" errors</li></ul>
+
+<ul><li>"Timeout" when sending emails</li></ul>
+
+
+
+**Solution:**
+
+<ol><li>Verify the SMTP host is correct</li></ol>
+
+<ol><li>Check if the SMTP port is open and accessible</li></ol>
+
+<ol><li>Test connectivity from the server:</li></ol>
+
+   <code></code>`bash
+
+   telnet smtp.example.com 587
+
+   <code></code>`
+
+<ol><li>Check for firewall or network restrictions</li></ol>
+
+
+
+<h3>4. TLS/SSL Issues</h3>
+
+
+
+**Symptoms:**
+
+<ul><li>"TLS/SSL negotiation failed"</li></ul>
+
+<ul><li>"Handshake failed" errors</li></ul>
+
+
+
+**Solution:**
+
+<ol><li>Ensure you're using the correct port for TLS/SSL</li></ol>
+
+<ol><li>Verify SSL libraries are installed:</li></ol>
+
+   <code></code>`bash
+
+   cpanm --installdeps IO::Socket::SSL
+
+   <code></code>`
+
+<ol><li>Update SSL certificates if needed</li></ol>
+
+
+
+<h3>5. Email Module Missing</h3>
+
+
+
+**Symptoms:**
+
+<ul><li>"Can't locate Catalyst/View/Email.pm in @INC"</li></ul>
+
+<ul><li>"Email::Sender::Simple not found"</li></ul>
+
+
+
+**Solution:**
+
+Follow the instructions in <code>/EMAIL_MODULE_FIX.md</code>:
+
+<ol><li>Make the helper scripts executable</li></ol>
+
+<ol><li>Install only the essential email modules</li></ol>
+
+<ol><li>Test if the modules are properly installed</li></ol>
+
+<ol><li>Restart the server</li></ol>
+
+
+
+<h3>6. Rate Limiting or Sending Quota</h3>
+
+
+
+**Symptoms:**
+
+<ul><li>Emails work initially but stop after sending several</li></ul>
+
+<ul><li>"Daily sending quota exceeded" errors</li></ul>
+
+
+
+**Solution:**
+
+<ol><li>Check if your email provider has sending limits</li></ol>
+
+<ol><li>Implement a queue system for high-volume sending</li></ol>
+
+<ol><li>Consider using a dedicated email service provider</li></ol>
+
+
+
+<h2>Debugging Techniques</h2>
+
+
+
+<h3>Enable Debug Logging</h3>
+
+
+
+Increase log verbosity to get more detailed information:
+
+
+
+<ol><li>Edit the logging configuration to set the level to DEBUG</li></ol>
+
+<ol><li>Restart the application</li></ol>
+
+<ol><li>Attempt to send an email</li></ol>
+
+<ol><li>Check the logs for detailed information</li></ol>
+
+
+
+<h3>Test Direct SMTP Connection</h3>
+
+
+
+Test SMTP connection directly from the command line:
+
+
+
+<code></code>`bash
+
+perl -MNet::SMTP -e '$smtp = Net::SMTP->new("smtp.example.com", Port => 587, Debug => 1); $smtp->auth("username", "password"); print "Connected\n" if $smtp;'
+
+<code></code>`
+
+
+
+<h3>Check Email Queue</h3>
+
+
+
+If using a queuing system, check the email queue status:
+
+
+
+<code></code>`bash
+
+<h1>Example for a system using a file-based queue</h1>
+
+ls -la /path/to/email/queue/
+
+<code></code>`
+
+
+
+<h3>Test with Simplified Code</h3>
+
+
+
+Create a simple test script to isolate mail sending issues:
+
+
+
+<code></code>`perl
+
+#!/usr/bin/env perl
+
+use strict;
+
+use warnings;
+
+use Email::Simple;
+
+use Email::Sender::Simple qw(sendmail);
+
+use Email::Sender::Transport::SMTP;
+
+
+
+my $email = Email::Simple->create(
+
+    header => [
+
+        To      => 'recipient@example.com',
+
+        From    => 'sender@example.com',
+
+        Subject => 'Test Email',
+
+    ],
+
+    body => "This is a test email.",
+
+);
+
+
+
+my $transport = Email::Sender::Transport::SMTP->new({
+
+    host          => 'smtp.example.com',
+
+    port          => 587,
+
+    sasl_username => 'username',
+
+    sasl_password => 'password',
+
+});
+
+
+
+eval {
+
+    sendmail($email, { transport => $transport });
+
+    print "Email sent successfully\n";
+
+};
+
+if ($@) {
+
+    print "Error sending email: $@\n";
+
+}
+
+<code></code>`
+
+
+
+<h2>Advanced Troubleshooting</h2>
+
+
+
+<h3>Check for Module Conflicts</h3>
+
+
+
+Sometimes module conflicts can cause email issues:
+
+
+
+<code></code>`bash
+
+perl -MEmail::Sender::Simple -e 'print $INC{"Email/Sender/Simple.pm"}, "\n"'
+
+<code></code>`
+
+
+
+Ensure the path is within your application's library path.
+
+
+
+<h3>Verify SMTP Server Settings</h3>
+
+
+
+Different SMTP servers have different requirements:
+
+
+
+<ol><li>**Gmail**:</li></ol>
+
+   - Requires TLS
+
+   - Requires App Password if 2FA is enabled
+
+   - Has sending limits
+
+
+
+<ol><li>**Office 365**:</li></ol>
+
+   - Requires TLS
+
+   - May require specific authentication methods
+
+   - May have tenant-specific restrictions
+
+
+
+<ol><li>**Self-hosted**:</li></ol>
+
+   - Check server logs for rejected connections
+
+   - Verify DNS and reverse DNS settings
+
+   - Check for IP blacklisting
+
+
+
+<h3>Test with Different Email Libraries</h3>
+
+
+
+If persistent issues occur, try alternative email libraries:
+
+
+
+<code></code>`perl
+
+<h1>Using MIME::Lite</h1>
+
+use MIME::Lite;
+
+
+
+my $msg = MIME::Lite->new(
+
+    From    => 'sender@example.com',
+
+    To      => 'recipient@example.com',
+
+    Subject => 'Test Email',
+
+    Data    => "This is a test email."
+
+);
+
+
+
+$msg->send('smtp', 'smtp.example.com', AuthUser => 'username', AuthPass => 'password');
+
+<code></code>`
+
+
+
+<h2>Preventive Measures</h2>
+
+
+
+<h3>Regular Testing</h3>
+
+
+
+Implement regular email testing:
+
+
+
+<ol><li>Create a scheduled task to send test emails</li></ol>
+
+<ol><li>Monitor delivery success rates</li></ol>
+
+<ol><li>Set up alerts for email failures</li></ol>
+
+
+
+<h3>Configuration Backups</h3>
+
+
+
+Maintain backups of working email configurations:
+
+
+
+<ol><li>Export SMTP settings to a secure location</li></ol>
+
+<ol><li>Document any special configuration requirements</li></ol>
+
+<ol><li>Keep a history of configuration changes</li></ol>
+
+
+
+<h3>Fallback Mechanisms</h3>
+
+
+
+Implement fallback mechanisms for critical emails:
+
+
+
+<ol><li>Configure alternative SMTP servers</li></ol>
+
+<ol><li>Use different email service providers as backups</li></ol>
+
+<ol><li>Implement retry logic with exponential backoff</li></ol>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/Documentation/mail_system.md">Mail System Documentation</a></li></ul>
+
+<ul><li><a href="/Documentation/mail_configuration_guide.md">Mail Configuration Guide</a></li></ul>
+
+<ul><li><a href="/EMAIL_MODULE_FIX.md">Email Module Fix</a></li></ul>
+
+<ul><li><a href="/SERVER_DEPLOYMENT.md">Server Deployment</a></li></ul>
+
+</div>

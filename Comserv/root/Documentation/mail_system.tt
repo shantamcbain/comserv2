@@ -1,0 +1,351 @@
+[% PageVersion = 'Comserv/root/Documentation/mail_system.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Mail System Documentation' %]
+
+<!-- Documentation page for mail_system -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+The Comserv Mail System provides functionality for sending emails and managing mail configurations across different sites. This document explains how to use and configure the mail system, including troubleshooting common issues.
+
+
+
+<h2>Components</h2>
+
+
+
+The mail system consists of the following components:
+
+
+
+<ol><li>**Mail Controller** (<code>Comserv::Controller::Mail</code>): Handles mail-related routes and actions</li></ol>
+
+<ol><li>**Mail Model** (<code>Comserv::Model::Mail</code>): Provides email sending functionality</li></ol>
+
+<ol><li>**Configuration Storage**: Stores SMTP settings in the database</li></ol>
+
+<ol><li>**Templates**: Email templates and configuration forms</li></ol>
+
+<ol><li>**Fallback Mechanism**: Alternative email sending method when primary method fails</li></ol>
+
+
+
+<h2>Mail Controller</h2>
+
+
+
+The Mail Controller (<code>/lib/Comserv/Controller/Mail.pm</code>) provides the following actions:
+
+
+
+<ul><li><code>index</code>: Displays the mail page with webmail links</li></ul>
+
+<ul><li><code>send_welcome_email</code>: Sends a welcome email to new users</li></ul>
+
+<ul><li><code>add_mail_config_form</code>: Displays the form to add mail configuration</li></ul>
+
+<ul><li><code>add_mail_config</code>: Processes the mail configuration form submission</li></ul>
+
+
+
+<h3>Routes</h3>
+
+
+
+<ul><li><code>/mail</code> - Main mail page with webmail links</li></ul>
+
+<ul><li><code>/mail/add_mail_config_form</code> - Form to add mail configuration</li></ul>
+
+<ul><li><code>/mail/add_mail_config</code> - Endpoint to process mail configuration</li></ul>
+
+
+
+<h2>Mail Model</h2>
+
+
+
+The Mail Model (<code>/lib/Comserv/Model/Mail.pm</code>) provides the following methods:
+
+
+
+<ul><li><code>send_email</code>: Sends an email using the configured SMTP settings</li></ul>
+
+<ul><li><code>_get_smtp_config</code>: Retrieves SMTP configuration from the database</li></ul>
+
+
+
+<h3>Email Sending Process</h3>
+
+
+
+<ol><li>Retrieve SMTP configuration from the database</li></ol>
+
+<ol><li>Create an email using Email::Simple</li></ol>
+
+<ol><li>Set up SMTP transport with the configuration</li></ol>
+
+<ol><li>Send the email using Email::Sender::Simple</li></ol>
+
+<ol><li>Log the result (success or failure)</li></ol>
+
+
+
+<h2>Configuration</h2>
+
+
+
+<h3>SMTP Configuration</h3>
+
+
+
+SMTP settings are stored in the <code>site_config</code> table with the following keys:
+
+
+
+<ul><li><code>smtp_host</code>: SMTP server hostname</li></ul>
+
+<ul><li><code>smtp_port</code>: SMTP server port</li></ul>
+
+<ul><li><code>smtp_username</code>: SMTP authentication username</li></ul>
+
+<ul><li><code>smtp_password</code>: SMTP authentication password</li></ul>
+
+<ul><li><code>smtp_from</code>: Default sender email address</li></ul>
+
+
+
+<h3>Adding Mail Configuration</h3>
+
+
+
+To add mail configuration for a site:
+
+
+
+<ol><li>Navigate to <code>/mail/add_mail_config_form</code></li></ol>
+
+<ol><li>Enter the site ID and SMTP settings</li></ol>
+
+<ol><li>Submit the form</li></ol>
+
+<ol><li>The configuration will be stored in the database</li></ol>
+
+
+
+<h2>Webmail Access</h2>
+
+
+
+The system provides webmail access through the <code>/mail</code> route. The webmail URL is determined based on the current site:
+
+
+
+<code></code>`perl
+
+$c->session->{MailServer} = "http://webmail.example.com";
+
+<code></code>`
+
+
+
+Different sites have different webmail servers configured:
+
+
+
+<ul><li>ENCY/EV/Forager: <code>webmail.forager.com:20000</code></li></ul>
+
+<ul><li>CS/LumbyThrift: <code>webmail.countrystores.ca:20000</code></li></ul>
+
+<ul><li>Organic/Sky/AltPower: <code>webmail.computersystemconsulting.ca:20000</code></li></ul>
+
+<ul><li>CSC/CSCDev/Extropia: <code>webmail.computersystemconsulting.ca:20000</code></li></ul>
+
+<ul><li>ECF: <code>webmail.beemaster.ca:20000</code></li></ul>
+
+<ul><li>USBM/3d/ENCY: <code>webmail.usbm.ca:20000</code></li></ul>
+
+<ul><li>HE: <code>webmail.helpfullearth.com:20000</code></li></ul>
+
+<ul><li>Skye: <code>webmail.skyefarm.com:20000</code></li></ul>
+
+<ul><li>Apis/BMaster/Shanta/Brew/CSPS/TelMark: <code>webmail.beemaster.ca:20000</code></li></ul>
+
+
+
+<h2>Fallback Mechanism</h2>
+
+
+
+If the primary email sending method fails, the system uses a fallback mechanism in the Root controller:
+
+
+
+<code></code>`perl
+
+<h1>In Root.pm</h1>
+
+sub send_email {
+
+    # First try to use the Mail model
+
+    eval {
+
+        $c->model('Mail')->send_email(...);
+
+    };
+
+    
+
+    # If Mail model fails, try fallback method
+
+    if ($@) {
+
+        # Use direct Email::Sender with fallback configuration
+
+    }
+
+}
+
+<code></code>`
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+<h3>Common Issues</h3>
+
+
+
+<ol><li>**Missing SMTP Configuration**</li></ol>
+
+   - Error: "SMTP configuration is missing"
+
+   - Solution: Add SMTP configuration using the <code>/mail/add_mail_config_form</code> form
+
+
+
+<ol><li>**Email Module Missing**</li></ol>
+
+   - Error: "Can't locate Catalyst/View/Email.pm in @INC"
+
+   - Solution: Follow the instructions in <code>/EMAIL_MODULE_FIX.md</code>
+
+
+
+<ol><li>**Authentication Failure**</li></ol>
+
+   - Error: "Authentication failed" or "Invalid credentials"
+
+   - Solution: Verify SMTP username and password in the configuration
+
+
+
+<ol><li>**Connection Issues**</li></ol>
+
+   - Error: "Connection refused" or "Timeout"
+
+   - Solution: Check if the SMTP server is accessible and the port is correct
+
+
+
+<h3>Logging</h3>
+
+
+
+The mail system uses comprehensive logging to track email sending:
+
+
+
+<code></code>`perl
+
+$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name',
+
+    "Detailed message with relevant information");
+
+<code></code>`
+
+
+
+Check the application log for detailed error messages:
+
+
+
+<code></code>`
+
+/home/shanta/PycharmProjects/comserv2/Comserv/script/logs/application.log
+
+<code></code>`
+
+
+
+<h2>Best Practices</h2>
+
+
+
+<ol><li>**Configuration Management**</li></ol>
+
+   - Store sensitive SMTP credentials securely
+
+   - Use environment variables for production credentials
+
+   - Regularly rotate SMTP passwords
+
+
+
+<ol><li>**Email Templates**</li></ol>
+
+   - Use Template Toolkit for email templates
+
+   - Include both HTML and plain text versions
+
+   - Test templates with different email clients
+
+
+
+<ol><li>**Error Handling**</li></ol>
+
+   - Always check for errors when sending emails
+
+   - Provide user-friendly error messages
+
+   - Log detailed error information for debugging
+
+
+
+<ol><li>**Security**</li></ol>
+
+   - Use TLS/SSL for SMTP connections
+
+   - Validate email addresses before sending
+
+   - Implement rate limiting to prevent abuse
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/EMAIL_MODULE_FIX.md">Email Module Fix</a></li></ul>
+
+<ul><li><a href="/SERVER_DEPLOYMENT.md">Server Deployment</a></li></ul>
+
+<ul><li><a href="/Documentation/documentation_system_overview.md">Documentation System Overview</a></li></ul>
+
+</div>

@@ -1,20 +1,65 @@
-[% PageVersion = 'Bmaster/hive.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
+[% META title = "Hive Management" %]
+[% PageVersion = 'Bmaster/hive.tt,v 0.02 2026/03/17 shanta Exp shanta' %]
 [% IF debug_mode == 1 %]
+    [% PageVersion %]
 [% END %]
-[% PageVersion %]
-<h1>Hive Information</h1>
 
-<p>Our hives are carefully managed to ensure the health and productivity of our bees. Here's an overview of our hive management practices:</p>
+<div class="app-container">
 
-<h2>Brood Changes Over the Season</h2>
-<!-- Add a graph showing brood changes over the season here -->
+    <div class="page-header">
+        <h1>Hive Management</h1>
+        <p class="page-subtitle">Tracking the life of your hives through the season.</p>
+    </div>
 
-<h2>Hive Inspections</h2>
-<p>We regularly inspect our hives to monitor the health of the bees and the queen, check for pests and diseases, and assess the need for additional space or resources.</p>
+    <div class="content-container">
+        <div class="content-primary">
 
-<h2>Hive Management Practices</h2>
-<p>We use a variety of hive management practices to ensure the health and productivity of our bees, including regular inspections, swarm prevention, and winter preparation.</p>
+            <div class="app-section">
+                <p>Our hives are carefully managed to ensure the health and productivity of our bees. Use the hive management system to track inspections, monitor trends, and plan ahead.</p>
+                <p><a href="/Apiary/HiveManagement" class="btn btn-primary">Open Full Hive Management System</a></p>
+            </div>
 
-<!-- Add more hive information as needed -->
+            <div class="app-section">
+                <h2>Hive Inspections</h2>
+                <div class="content-section">
+                    <p>We regularly inspect our hives to monitor the health of the bees and the queen, check for pests and diseases, and assess the need for additional space or resources. During each inspection, record:</p>
+                    <ul>
+                        <li>Queen presence and laying pattern</li>
+                        <li>Brood pattern — open, capped, stages</li>
+                        <li>Frames of bees, brood, honey, pollen</li>
+                        <li>Signs of disease or pests</li>
+                        <li>Space requirements and swarm indicators</li>
+                    </ul>
+                </div>
+            </div>
 
-<p>For more information on our hive management practices, please contact us.</p>
+            <div class="app-section">
+                <h2>Seasonal Management Priorities</h2>
+                <div class="content-section">
+                    <ul>
+                        <li><strong>Spring:</strong> Assess overwinter survival, feed if needed, manage for swarm prevention, add supers</li>
+                        <li><strong>Summer:</strong> Monitor honey flow, add supers, harvest honey, treat for Varroa if needed</li>
+                        <li><strong>Fall:</strong> Assess food stores, treat for Varroa, reduce entrances, combine weak colonies</li>
+                        <li><strong>Winter:</strong> Insulate, ensure ventilation, monitor food stores, clear entrances</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="app-section">
+                <h2>Brood Patterns Over the Season</h2>
+                <div class="content-section">
+                    <p>Tracking brood frame counts over time reveals colony strength trends. The full Hive Management System provides charts and records for this tracking.</p>
+                    <p><a href="/Apiary/HiveManagement">View Hive Records and Charts</a></p>
+                </div>
+            </div>
+
+            <div class="page-footer">
+                <div class="footer-actions">
+                    <a href="/BMaster" class="btn btn-secondary">Back to BMaster Home</a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>

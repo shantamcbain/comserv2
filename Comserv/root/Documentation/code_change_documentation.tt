@@ -1,0 +1,84 @@
+[% PageVersion = 'Comserv/root/Documentation/code_change_documentation.tt,v 0.01 2025/01/02 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="documentation-content">
+    <h1><i class="fas fa-sync-alt"></i> Code Change Documentation Update</h1>
+    
+    <div class="alert alert-info">
+        <strong>Generated from git diff analysis:</strong> This documents actual code changes requiring documentation updates.
+    </div>
+
+    <h2><i class="fas fa-file-sync"></i> Documentation Sync Update Summary</h2>
+
+    <h3><i class="fas fa-search"></i> Change Scope</h3>
+    <p><strong>Brief Description:</strong> Major refactoring of Documentation system, Navigation directory consolidation, new database models, and enhanced auto-discovery functionality. Changes span controllers, models, templates, and database schema.</p>
+
+    <h3><i class="fas fa-code"></i> Current Implementation State</h3>
+    <p><strong>What the code currently does:</strong></p>
+    <ul>
+        <li><strong>Documentation Controller:</strong> Completely refactored with new auto-discovery system, lightweight patch-review mode, in-memory documentation index caching</li>
+        <li><strong>Navigation System:</strong> Directory consolidated from "navigation" to "Navigation" (proper capitalization), enhanced navigation templates</li>
+        <li><strong>Database Models:</strong> New CustomMenu and MenuVisibility models added for enhanced menu management</li>
+        <li><strong>DocumentationConfig Utility:</strong> New utility class for configuration management</li>
+        <li><strong>AutoDiscovery System:</strong> New automated documentation discovery and indexing system</li>
+        <li><strong>Database Schema:</strong> New pages_ency.sql with enhanced page management capabilities</li>
+    </ul>
+
+    <h3><i class="fas fa-project-diagram"></i> Planned Implementation</h3>
+    <p><strong>Intended changes:</strong> Documentation system modernization with automated discovery, better navigation organization, enhanced database models for page/menu management, and improved caching mechanisms.</p>
+
+    <h3><i class="fas fa-tasks"></i> Implementation Gap Analysis</h3>
+    <p><strong>Remaining work:</strong></p>
+    <ul>
+        <li>Update API documentation to reflect new auto-discovery endpoints</li>
+        <li>Document new database models (CustomMenu, MenuVisibility) usage patterns</li>
+        <li>Update navigation system documentation for directory name change</li>
+        <li>Create migration guide for existing navigation templates</li>
+        <li>Document DocumentationConfig utility class methods</li>
+        <li>Update controller documentation for new patch-review workflow</li>
+    </ul>
+
+    <h3><i class="fas fa-users"></i> Role-Specific Information</h3>
+    <ul>
+        <li><strong><i class="fas fa-user"></i> Normal Users:</strong> Navigation improvements provide better menu organization. Page discovery is now automated with better performance.</li>
+        <li><strong><i class="fas fa-user-cog"></i> Administrators:</strong> New CustomMenu and MenuVisibility models allow fine-grained control over navigation elements. Auto-discovery reduces manual configuration overhead.</li>
+        <li><strong><i class="fas fa-code"></i> Developers:</strong> Major API changes in Documentation controller. Navigation directory moved from lowercase to proper case. New utility classes and database models require code updates for dependent components.</li>
+    </ul>
+
+    <h3><i class="fas fa-globe"></i> Site Impact Assessment</h3>
+    <p><strong>Sites Affected:</strong> All sites - core system changes affect documentation discovery, navigation rendering, and database schema</p>
+
+    <h3><i class="fas fa-file-code"></i> File Update Tracking</h3>
+    <p><strong>PageVersions Updated:</strong></p>
+    <ul>
+        <li>documentation_update_summary.tt (v0.02)</li>
+        <li>code_change_documentation.tt (v0.01 - NEW)</li>
+        <li>Multiple .tt files in Documentation/ tree updated with new PageVersion headers</li>
+        <li>Navigation/ directory templates consolidated and updated</li>
+    </ul>
+
+    <h3><i class="fas fa-code-branch"></i> Code Changes Summary</h3>
+    <p><strong>Key Changes:</strong></p>
+    <ul>
+        <li><strong>Documentation.pm:</strong> -2776/+2776 lines - Complete refactoring with auto-discovery</li>
+        <li><strong>Navigation System:</strong> Directory renamed navigation → Navigation, templates updated</li>
+        <li><strong>New Models:</strong> CustomMenu.pm, MenuVisibility.pm added</li>
+        <li><strong>New Utilities:</strong> DocumentationConfig.pm, AutoDiscovery.pm</li>
+        <li><strong>Database:</strong> pages_ency.sql schema additions</li>
+        <li><strong>134 files changed:</strong> 81,601 insertions(+), 3,339 deletions(-)</li>
+    </ul>
+
+    <h3><i class="fas fa-exclamation-triangle"></i> Critical Documentation Updates Needed</h3>
+    <div class="alert alert-warning">
+        <p><strong>Priority 1:</strong> The following documentation files are severely outdated and must be updated immediately:</p>
+        <ul>
+            <li>Navigation system documentation (directory name change)</li>
+            <li>Documentation controller API reference</li>
+            <li>Database model documentation (new models)</li>
+            <li>Auto-discovery system documentation</li>
+        </ul>
+    </div>
+
+</div>

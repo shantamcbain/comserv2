@@ -1,0 +1,154 @@
+[% META
+   title = "AI & System Server Status"
+   description = "Real-time health monitoring for AI models, databases, and system services"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "AI"
+   page_version = "0.01"
+   last_updated = "2026-03-07"
+%]
+[% PageVersion = 'ai/ServerStatus.tt,v 0.01 2026/03/07 AI Assistant Exp AI Assistant ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>[% title | html %]</h1>
+    </div>
+
+    [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+    [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+    [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+    <div class="content-container">
+        <div class="content-primary">
+            
+            <div class="content-section">
+                <h3>System Information</h3>
+                <div class="data-container">
+                    <table class="data-table">
+                        <tr>
+                            <th>Hostname</th>
+                            <td>[% status.system.hostname | html %]</td>
+                        </tr>
+                        <tr>
+                            <th>Server IP</th>
+                            <td>[% status.system.ip | html %]</td>
+                        </tr>
+                        <tr>
+                            <th>Operating System</th>
+                            <td>[% status.system.os | html %]</td>
+                        </tr>
+                        <tr>
+                            <th>Perl Version</th>
+                            <td>[% status.system.perl_version | html %]</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="content-section">
+                <h3>Database Status</h3>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Model</th>
+                                <th>Host</th>
+                                <th>Database</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% FOREACH db IN status.databases %]
+                            <tr>
+                                <td><strong>[% db.name | html %]</strong></td>
+                                <td>[% db.host || 'N/A' | html %]</td>
+                                <td>[% db.database || 'N/A' | html %]</td>
+                                <td>
+                                    <span class="[% db.status == 'Up' ? 'success' : 'error' %]">
+                                        [% db.status | html %]
+                                    </span>
+                                    [% IF db.error %]
+                                        <br><small class="error">[% db.error | html %]</small>
+                                    [% END %]
+                                </td>
+                            </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="content-section">
+                <h3>AI Services</h3>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Service</th>
+                                <th>Endpoint/Model</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>[% ollama_status.name | html %]</strong></td>
+                                <td>[% ollama_status.host | html %]:[% ollama_status.port | html %]</td>
+                                <td>
+                                    <span class="[% ollama_status.status == 'Up' ? 'success' : 'error' %]">
+                                        [% ollama_status.status | html %]
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>[% grok_status.name | html %]</strong></td>
+                                <td>[% grok_status.model | html %]</td>
+                                <td>
+                                    <span class="[% grok_status.status == 'Up' ? 'success' : 'error' %]">
+                                        [% grok_status.status | html %]
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="content-section">
+                <h3>Email Notification System</h3>
+                <div class="data-container">
+                    <table class="data-table">
+                        <tr>
+                            <th>SMTP Host</th>
+                            <td>[% email_status.host | html %]:[% email_status.port | html %]</td>
+                        </tr>
+                        <tr>
+                            <th>SMTP User</th>
+                            <td>[% email_status.user | html %]</td>
+                        </tr>
+                        <tr>
+                            <th>Transport Status</th>
+                            <td>
+                                <span class="[% email_status.status.search('OK') ? 'success' : 'error' %]">
+                                    [% email_status.status | html %]
+                                </span>
+                                [% IF email_status.error %]
+                                    <br><small class="error">[% email_status.error | html %]</small>
+                                [% END %]
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="page-footer">
+        <div class="footer-actions">
+            <a href="[% c.uri_for('/ai/index') %]" class="btn btn-secondary">Back to AI Assistant</a>
+        </div>
+    </div>
+</div>

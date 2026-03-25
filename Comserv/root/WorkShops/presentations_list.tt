@@ -1,0 +1,193 @@
+[% PageVersion = 'WorkShops/presentations_list.tt,v 0.01 2024/07/01 ' %]
+[% IF debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+
+<h1>Workshop Presentations</h1>
+
+<div class="presentations-container">
+    <div class="presentation-actions">
+        <a href="/workshop/upload" class="button upload-button">Upload New Presentation</a>
+        <a href="/workshop" class="button return-button">Return to Workshops</a>
+    </div>
+
+    <div class="presentations-grid">
+        [% FOREACH presentation IN presentations.keys.sort %]
+            <div class="presentation-card">
+                <div class="presentation-info">
+                    <h3>[% presentations.$presentation.title %]</h3>
+                    <p class="presentation-author">By [% presentations.$presentation.author || 'Unknown' %]</p>
+                    <p class="presentation-date">[% presentations.$presentation.date || '' %]</p>
+                    <div class="presentation-summary">
+                        [% presentations.$presentation.summary || 'No summary available' %]
+                    </div>
+                </div>
+                <div class="presentation-actions">
+                    <a href="/workshop/presentation?name=[% presentation %]" class="view-link">View Online</a>
+                    [% IF presentations.$presentation.filename %]
+                    <a href="/workshop/download?file=[% presentations.$presentation.filename %]" class="download-link">Download</a>
+                    [% END %]
+                </div>
+            </div>
+        [% END %]
+        
+        [% IF presentations.keys.size == 0 %]
+        <div class="no-presentations">
+            <p>No presentations found. Be the first to upload a presentation!</p>
+        </div>
+        [% END %]
+
+        <div class="upload-card">
+            <div class="upload-info">
+                <h3>Share Your Knowledge</h3>
+                <p>Have a presentation to share? Upload it for others to view.</p>
+            </div>
+            <div class="upload-action">
+                <a href="/workshop/upload" class="upload-link">Upload Presentation</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .presentations-container {
+        margin: 20px 0;
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 8px;
+    }
+    
+    .presentation-actions {
+        margin-bottom: 20px;
+    }
+    
+    .button {
+        display: inline-block;
+        padding: 8px 15px;
+        background-color: #4CAF50;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        margin-right: 10px;
+    }
+    
+    .button:hover {
+        background-color: #45a049;
+    }
+    
+    .upload-button {
+        background-color: #ff9800;
+    }
+    
+    .upload-button:hover {
+        background-color: #e68a00;
+    }
+    
+    .return-button {
+        background-color: #607d8b;
+    }
+    
+    .return-button:hover {
+        background-color: #546e7a;
+    }
+    
+    .presentations-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+    }
+    
+    .presentation-card, .upload-card {
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .presentation-card:hover, .upload-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    
+    .presentation-info h3 {
+        margin-top: 0;
+        color: #333;
+    }
+    
+    .presentation-author {
+        color: #666;
+        font-style: italic;
+        margin-bottom: 5px;
+    }
+    
+    .presentation-date {
+        color: #888;
+        font-size: 0.9em;
+        margin-bottom: 10px;
+    }
+    
+    .presentation-summary {
+        color: #666;
+        margin-bottom: 15px;
+    }
+    
+    .presentation-actions, .upload-action {
+        margin-top: 15px;
+        display: flex;
+        gap: 10px;
+    }
+    
+    .view-link, .download-link, .upload-link {
+        padding: 8px 12px;
+        text-decoration: none;
+        border-radius: 4px;
+        text-align: center;
+        font-weight: bold;
+        flex: 1;
+    }
+    
+    .view-link {
+        background-color: #2196F3;
+        color: white;
+    }
+    
+    .view-link:hover {
+        background-color: #0b7dda;
+    }
+    
+    .download-link {
+        background-color: #4CAF50;
+        color: white;
+    }
+    
+    .download-link:hover {
+        background-color: #45a049;
+    }
+    
+    .upload-link {
+        background-color: #ff9800;
+        color: white;
+    }
+    
+    .upload-link:hover {
+        background-color: #e68a00;
+    }
+    
+    .upload-card {
+        background-color: #fff8e1;
+        border: 2px dashed #ffca28;
+    }
+    
+    .no-presentations {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 40px;
+        background-color: #f5f5f5;
+        border-radius: 8px;
+        color: #666;
+    }
+</style>

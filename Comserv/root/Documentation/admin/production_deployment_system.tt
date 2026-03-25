@@ -1,0 +1,203 @@
+[% META title = 'Production Deployment System' %]
+<!-- File: /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/admin/production_deployment_system.tt -->
+[% PageVersion = 'admin/production_deployment_system.tt,v 0.01 2025/01/15 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="apiary-container">
+    <h1>Production Deployment System</h1>
+    
+    <div class="feature-card">
+        <div class="card-header bg-primary text-white">
+            <h2>Overview</h2>
+        </div>
+        <div class="card-body">
+            <p>The production deployment system provides a secure, branch-isolated workflow for updating the production server. This system ensures that dangerous operations are only available to authorized users and only when on the appropriate git branch.</p>
+        </div>
+    </div>
+
+    <div class="feature-card">
+        <div class="card-header bg-info text-white">
+            <h2>Security Features</h2>
+        </div>
+        <div class="card-body">
+            <h3>Enhanced Access Control</h3>
+            <ul>
+                <li><strong>CSC Admin Role:</strong> Only users with 'csc_admin' or 'admin' roles can access deployment functions</li>
+                <li><strong>Branch Isolation:</strong> Dangerous operations are only available when on the 'install' branch</li>
+                <li><strong>Temporary Override:</strong> User 'Shanta' has temporary direct access for development</li>
+            </ul>
+            
+            <h3>Branch-Based Security</h3>
+            <p>The system checks the current git branch before allowing dangerous operations:</p>
+            <ul>
+                <li>Git pull operations</li>
+                <li>Development server startup</li>
+                <li>Production server restart</li>
+            </ul>
+            <p>This prevents accidental production changes when working on other branches.</p>
+        </div>
+    </div>
+
+    <div class="feature-card">
+        <div class="card-header bg-success text-white">
+            <h2>Deployment Workflow</h2>
+        </div>
+        <div class="card-body">
+            <h3>Recommended Process</h3>
+            <ol>
+                <li><strong>Switch to Install Branch:</strong> Ensure you're on the 'install' branch</li>
+                <li><strong>Pull Latest Changes:</strong> Use the Git Pull function to get latest updates</li>
+                <li><strong>Start Development Server:</strong> Test all changes in a development environment</li>
+                <li><strong>Verify Functionality:</strong> Open the development server and test thoroughly</li>
+                <li><strong>Restart Production:</strong> Only after successful testing, restart the Starman server</li>
+            </ol>
+            
+            <h3>Safety Checks</h3>
+            <ul>
+                <li>Module dependencies are automatically installed during development server startup</li>
+                <li>Development server runs on port 3000 for isolated testing</li>
+                <li>Production restart requires explicit confirmation</li>
+                <li>All operations are logged for audit purposes</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="feature-card">
+        <div class="card-header bg-warning text-white">
+            <h2>Available Functions</h2>
+        </div>
+        <div class="card-body">
+            <h3>Git Pull (/admin/git_pull)</h3>
+            <ul>
+                <li>Pulls latest changes from the git repository</li>
+                <li>Automatically handles theme_mappings.json conflicts</li>
+                <li>Backs up and restores local configuration changes</li>
+                <li>Requires CSC admin access and install branch</li>
+            </ul>
+            
+            <h3>Start Development Server (/admin/start_dev_server)</h3>
+            <ul>
+                <li>Automatically installs/updates Perl module dependencies</li>
+                <li>Starts Catalyst development server on port 3000</li>
+                <li>Provides browser link for testing</li>
+                <li>Runs in background with logging</li>
+                <li>Session tracking for server management</li>
+            </ul>
+            
+            <h3>Restart Starman Server (/admin/restart_starman)</h3>
+            <ul>
+                <li>Restarts the production Starman server</li>
+                <li>Tries multiple restart methods (systemctl, service, manual)</li>
+                <li>Requires explicit confirmation</li>
+                <li>Causes temporary production downtime</li>
+            </ul>
+            
+            <h3>Stop Development Server (/admin/stop_dev_server)</h3>
+            <ul>
+                <li>Stops running development server processes</li>
+                <li>Cleans up session tracking</li>
+                <li>Quick cleanup function</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="feature-card">
+        <div class="card-header bg-danger text-white">
+            <h2>Important Warnings</h2>
+        </div>
+        <div class="card-body">
+            <h3>Production Impact</h3>
+            <ul>
+                <li><strong>Starman Restart:</strong> Causes temporary downtime for all users</li>
+                <li><strong>Module Changes:</strong> New dependencies may affect server stability</li>
+                <li><strong>Configuration Changes:</strong> May require manual intervention if conflicts occur</li>
+            </ul>
+            
+            <h3>Testing Requirements</h3>
+            <ul>
+                <li>Always test changes in development server before production deployment</li>
+                <li>Verify all functionality works correctly</li>
+                <li>Check for any error messages or warnings</li>
+                <li>Ensure all required modules are properly installed</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="feature-card">
+        <div class="card-header bg-secondary text-white">
+            <h2>Technical Implementation</h2>
+        </div>
+        <div class="card-body">
+            <h3>Security Methods</h3>
+            <ul>
+                <li><code>check_csc_admin_access()</code> - Enhanced role checking</li>
+                <li><code>check_install_branch()</code> - Git branch verification</li>
+                <li>Session-based access control</li>
+                <li>Comprehensive logging for all operations</li>
+            </ul>
+            
+            <h3>Development Server Features</h3>
+            <ul>
+                <li>Automatic dependency installation via cpanm</li>
+                <li>Background process management</li>
+                <li>Unique log files per session</li>
+                <li>Session tracking for server state</li>
+                <li>Browser integration with target="_blank"</li>
+            </ul>
+            
+            <h3>Starman Restart Methods</h3>
+            <ol>
+                <li>systemctl restart starman</li>
+                <li>service starman restart</li>
+                <li>Manual process kill and restart</li>
+                <li>Custom startup script detection</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="feature-card">
+        <div class="card-header bg-info text-white">
+            <h2>Theme System Integration</h2>
+        </div>
+        <div class="card-body">
+            <p>All CSS styling has been moved to the universal theme system:</p>
+            <ul>
+                <li><strong>Admin Variables:</strong> Added to default.css theme</li>
+                <li><strong>Universal Classes:</strong> Uses apiary-container, feature-card, btn classes</li>
+                <li><strong>Theme-Aware:</strong> Styling adapts to current theme selection</li>
+                <li><strong>Consistent Design:</strong> Matches rest of application styling</li>
+            </ul>
+            
+            <h3>CSS Variables Added</h3>
+            <ul>
+                <li><code>--admin-section-border</code></li>
+                <li><code>--admin-deployment-bg</code></li>
+                <li><code>--admin-deployment-border</code></li>
+                <li><code>--admin-deployment-text</code></li>
+                <li><code>--dev-server-link-color</code></li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="feature-card">
+        <div class="card-header bg-success text-white">
+            <h2>Benefits</h2>
+        </div>
+        <div class="card-body">
+            <ul>
+                <li><strong>Security:</strong> Branch-based isolation prevents accidental production changes</li>
+                <li><strong>Testing:</strong> Development server allows thorough testing before deployment</li>
+                <li><strong>Automation:</strong> Automatic module installation reduces manual steps</li>
+                <li><strong>Logging:</strong> Comprehensive audit trail for all operations</li>
+                <li><strong>User Experience:</strong> Browser integration makes testing seamless</li>
+                <li><strong>Consistency:</strong> Integrated with universal theme system</li>
+                <li><strong>Reliability:</strong> Multiple fallback methods for server restart</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- CSS now handled by theme system -->

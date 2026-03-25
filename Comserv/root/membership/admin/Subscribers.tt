@@ -1,0 +1,104 @@
+[% META
+   title = "Membership Subscribers"
+   description = "View and manage membership subscribers across all sites"
+   roles = "admin,site_admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.02"
+   last_updated = "2026-03-18"
+%]
+[% PageVersion = 'membership/admin/Subscribers.tt,v 0.02 2026/03/18' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Membership Subscribers</h1>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <form method="get" action="[% c.uri_for('/membership/admin/subscribers') %]" style="display:flex;gap:1em;align-items:flex-end;flex-wrap:wrap">
+
+          <div class="form-field">
+            <label for="site_id"><strong>Site</strong></label>
+            <select id="site_id" name="site_id" onchange="this.form.submit()">
+              <option value="0" [% 'selected' IF !site_id_filter %]>All Sites</option>
+              [% FOREACH s IN all_sites %]
+              <option value="[% s.id %]" [% 'selected' IF site_id_filter AND site_id_filter == s.id %]>[% s.name | html %]</option>
+              [% END %]
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label for="status"><strong>Status</strong></label>
+            <select id="status" name="status" onchange="this.form.submit()">
+              <option value="">All Statuses</option>
+              <option value="active"    [% 'selected' IF status_filter == 'active'    %]>Active</option>
+              <option value="grace"     [% 'selected' IF status_filter == 'grace'     %]>Grace Period</option>
+              <option value="cancelled" [% 'selected' IF status_filter == 'cancelled' %]>Cancelled</option>
+              <option value="expired"   [% 'selected' IF status_filter == 'expired'   %]>Expired</option>
+              <option value="suspended" [% 'selected' IF status_filter == 'suspended' %]>Suspended</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <a href="[% c.uri_for('/membership/admin/subscribers') %]" class="btn btn-secondary">Reset</a>
+            <a href="[% c.uri_for('/membership/admin') %]" class="btn btn-secondary">← Back</a>
+          </div>
+        </form>
+      </div>
+
+      <div class="content-section">
+        [% IF memberships.size %]
+        <p>[% memberships.size %] record(s) found.</p>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Site</th>
+                <th>User</th>
+                <th>Plan</th>
+                <th>Billing</th>
+                <th>Price Paid</th>
+                <th>Provider</th>
+                <th>Status</th>
+                <th>Started</th>
+                <th>Expires</th>
+              </tr>
+            </thead>
+            <tbody>
+              [% FOREACH m IN memberships %]
+              <tr>
+                <td><strong>[% m.site.name | html %]</strong></td>
+                <td>[% m.user.username | html %]<br><small>[% m.user.email | html %]</small></td>
+                <td>[% m.plan.name | html %]</td>
+                <td>[% m.billing_cycle | html %]</td>
+                <td>
+                  [% IF m.price_paid %]
+                    [% m.currency_paid | html %] [% m.price_paid %]
+                  [% ELSE %]
+                    Free
+                  [% END %]
+                </td>
+                <td>[% m.payment_provider | html %]</td>
+                <td><span class="status-[% m.status | html %]">[% m.status | html %]</span></td>
+                <td>[% m.started_at | html %]</td>
+                <td>[% m.expires_at || 'Never' | html %]</td>
+              </tr>
+              [% END %]
+            </tbody>
+          </table>
+        </div>
+        [% ELSE %]
+        <p class="empty-state">No subscribers found matching the selected filters.</p>
+        [% END %]
+      </div>
+
+    </div>
+  </div>
+</div>
