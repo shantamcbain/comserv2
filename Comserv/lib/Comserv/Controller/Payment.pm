@@ -2,6 +2,7 @@ package Comserv::Controller::Payment;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::PointSystem;
 use DateTime;
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -192,9 +193,9 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
         my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
         $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
         $plan = $c->model('DBEncy')->resultset('MembershipPlan')->find($plan_id) if $plan_id;
-        $account = $c->model('DBEncy')->resultset('InternalCurrencyAccount')->search(
-            { user_id => $c->session->{user_id} }
-        )->single;
+        my $ps = Comserv::Util::PointSystem->new(c => $c);
+        my $balance = $ps->balance($c->session->{user_id});
+        $account = { balance => $balance };
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'internal_checkout',
