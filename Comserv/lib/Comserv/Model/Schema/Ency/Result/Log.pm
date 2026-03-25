@@ -5,7 +5,7 @@ __PACKAGE__->table('log');
 __PACKAGE__->add_columns(
     record_id => { data_type => 'int', is_auto_increment => 1 },
     todo_record_id => { data_type => 'int' },
-    owner => { data_type => 'varchar', size => 255 },
+    username => { data_type => 'varchar', size => 255 },
     sitename => { data_type => 'varchar', size => 255 },
     start_date => { data_type => 'date' },
     project_code => { data_type => 'varchar', size => 255 },

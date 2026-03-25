@@ -1,0 +1,153 @@
+[%
+   title = "DB Planning System"
+   roles = "admin,developer,devops,editor,user"
+   site_specific = "true"
+   PageVersion = 'admin/plan/list.tt v1.0 2026/03/20 DB-driven plan list, SiteName-filtered'
+%]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% SET view_sitename = filter_site || plan_sitename || c.session.SiteName || 'All' %]
+
+<style>
+.plan-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--primary-color);
+}
+.plan-list-header h1 { margin: 0; font-size: 1.4em; color: var(--text-color); }
+.plan-toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.plan-filter-form { display: flex; gap: 8px; align-items: center; }
+.plan-filter-form select, .plan-filter-form input {
+    padding: 5px 10px; border: 1px solid var(--border-color);
+    border-radius: 4px; background: var(--bg-secondary); color: var(--text-color);
+}
+.btn-primary { background: var(--primary-color); color: #fff; padding: 6px 14px;
+    border: none; border-radius: 4px; cursor: pointer; text-decoration: none; font-size: 0.9em; }
+.btn-secondary { background: var(--bg-secondary); color: var(--text-color); padding: 6px 14px;
+    border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer;
+    text-decoration: none; font-size: 0.9em; }
+.plan-cards { display: grid; gap: 16px; }
+.plan-card {
+    background: var(--bg-secondary); border: 1px solid var(--border-color);
+    border-radius: 6px; padding: 16px; position: relative;
+}
+.plan-card:hover { border-color: var(--primary-color); }
+.plan-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.plan-card-title { font-size: 1.1em; font-weight: bold; color: var(--text-color); margin: 0; }
+.plan-card-title a { color: var(--primary-color); text-decoration: none; }
+.plan-card-title a:hover { text-decoration: underline; }
+.plan-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 3px;
+    font-size: 0.75em; font-weight: bold; white-space: nowrap;
+}
+.badge-active   { background: #28a745; color: #fff; }
+.badge-paused   { background: #ffc107; color: #333; }
+.badge-completed{ background: #6c757d; color: #fff; }
+.badge-archived { background: #343a40; color: #fff; }
+.badge-site     { background: var(--primary-color); color: #fff; margin-left: 6px; }
+.plan-meta { font-size: 0.82em; color: var(--text-muted-color); margin-top: 4px; }
+.plan-description { margin: 8px 0; color: var(--text-color); font-size: 0.9em; }
+.progress-bar-wrap { background: var(--border-color); border-radius: 4px; height: 8px; margin-top: 8px; }
+.progress-bar-fill { background: var(--primary-color); height: 8px; border-radius: 4px; transition: width 0.3s; }
+.plan-footer { display: flex; gap: 12px; align-items: center; margin-top: 10px; font-size: 0.82em; }
+.plan-footer a { color: var(--primary-color); text-decoration: none; }
+.plan-footer a:hover { text-decoration: underline; }
+.overdue { color: #dc3545; font-weight: bold; }
+.no-plans { text-align: center; padding: 40px; color: var(--text-muted-color); }
+.priority-indicator { font-size: 0.8em; color: var(--text-muted-color); }
+</style>
+
+<div class="container">
+    <div class="plan-list-header">
+        <h1>Planning: [% view_sitename %]</h1>
+        <div class="plan-toolbar">
+            [% IF is_csc_admin %]
+            <form class="plan-filter-form" method="get" action="/admin/plan/list">
+                <label for="site-filter">Site:</label>
+                <select id="site-filter" name="sitename" onchange="this.form.submit()">
+                    <option value="">All Sites</option>
+                    [% FOREACH s IN ['CSC','Shanta','Monashee','BMaster','MCoop','ENCY','ULC'] %]
+                        <option value="[% s %]" [% IF filter_site == s %]selected[% END %]>[% s %]</option>
+                    [% END %]
+                </select>
+            </form>
+            [% END %]
+            [% IF is_admin %]
+            <a href="/admin/plan/create" class="btn-primary">+ New Plan</a>
+            [% END %]
+            <a href="/todo" class="btn-secondary">Todo System</a>
+        </div>
+    </div>
+
+    [% IF error_msg %]
+    <div style="background:#fee; border:1px solid #f88; padding:10px; border-radius:4px; margin-bottom:16px; color:#c00;">
+        [% error_msg %]
+    </div>
+    [% END %]
+
+    [% IF plans && plans.size %]
+    <div class="plan-cards">
+        [% FOREACH plan IN plans %]
+        <div class="plan-card">
+            <div class="plan-card-header">
+                <div>
+                    <div class="plan-card-title">
+                        <a href="/admin/plan/[% plan.id %]">[% plan.plan_name %]</a>
+                    </div>
+                    <div class="plan-meta">
+                        [% IF plan.due_date %]
+                            Due: <span [% IF plan.is_overdue %]class="overdue"[% END %]>[% plan.due_date %][% IF plan.is_overdue %] (Overdue)[% END %]</span>
+                            &nbsp;·&nbsp;
+                        [% END %]
+                        Created: [% plan.created_at %]
+                        [% IF plan.created_by %] by [% plan.created_by %][% END %]
+                        [% IF is_csc_admin %]
+                            <span class="plan-badge badge-site">[% plan.sitename %]</span>
+                        [% END %]
+                    </div>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    [% IF plan.priority %]
+                        <span class="priority-indicator">P[% plan.priority %]</span>
+                    [% END %]
+                    <span class="plan-badge badge-[% plan.status || 'active' %]">
+                        [% plan.status || 'active' %]
+                    </span>
+                </div>
+            </div>
+
+            [% IF plan.plan_description %]
+            <div class="plan-description">[% plan.plan_description | truncate(150) %]</div>
+            [% END %]
+
+            [% SET pct = plan.progress_percentage || 0 %]
+            <div class="progress-bar-wrap">
+                <div class="progress-bar-fill" style="width:[% pct %]%"></div>
+            </div>
+
+            <div class="plan-footer">
+                <span>[% plan.completed_todo_count || 0 %] / [% plan.todo_count || 0 %] tasks done</span>
+                <span>·</span>
+                <span>[% pct %]% complete</span>
+                <span style="margin-left:auto">
+                    <a href="/admin/plan/[% plan.id %]">View Details</a>
+                    [% IF is_admin %]
+                    &nbsp;·&nbsp;<a href="/admin/plan/[% plan.id %]/edit">Edit</a>
+                    [% END %]
+                </span>
+            </div>
+        </div>
+        [% END %]
+    </div>
+    [% ELSE %]
+    <div class="no-plans">
+        <p>No plans found for <strong>[% view_sitename %]</strong>.</p>
+        [% IF is_admin %]
+        <a href="/admin/plan/create" class="btn-primary">Create the first plan</a>
+        [% END %]
+    </div>
+    [% END %]
+</div>

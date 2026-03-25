@@ -126,44 +126,29 @@ sub COMPONENT {
             quote_char => '`',
         };
     } else {
-        # CRITICAL FIX (November 2025): Select available database driver
-        # Try MariaDB first (preferred), fall back to mysql if not installed
-        my $driver = $db_type eq 'mariadb' ? 'MariaDB' : 'mysql';
+        # Select driver: prefer DBD::MariaDB regardless of config db_type string,
+        # fall back to DBD::mysql only if MariaDB module is not installed
+        my $driver = 'mysql';
         my $driver_available = 0;
-        
-        # Check if preferred driver is available
-        if ($driver eq 'MariaDB') {
-            eval {
-                require DBD::MariaDB;
-                $driver_available = 1;
-            };
-            # Fall back to mysql if MariaDB not available
-            if (!$driver_available) {
-                eval {
-                    require DBD::mysql;
-                    $driver = 'mysql';
-                    $driver_available = 1;
-                };
-            }
-        } else {
-            # If already set to mysql, check it's available
-            eval {
-                require DBD::mysql;
-                $driver_available = 1;
-            };
+
+        eval { require DBD::MariaDB; $driver = 'MariaDB'; $driver_available = 1; };
+        unless ($driver_available) {
+            eval { require DBD::mysql; $driver_available = 1; };
         }
         
         $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
             "DBForager: Using database driver: $driver (available: $driver_available)");
         
+        my %driver_attrs = $driver eq 'MariaDB'
+            ? (mariadb_connect_timeout => 10, mariadb_read_timeout => 30, mariadb_write_timeout => 30)
+            : ();  # mysql fallback: timeouts go in DSN to avoid attribute-rejection by older DBIx::Class
+        my $dsn = "dbi:$driver:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port};
+        $dsn .= ";mysql_connect_timeout=10;mysql_read_timeout=30;mysql_write_timeout=30" if $driver eq 'mysql';
         $connect_info = {
-            dsn => "dbi:$driver:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port},
+            dsn => $dsn,
             user => $conn->{username},
             password => $conn->{password},
-            mysql_enable_utf8 => 1,
-            mysql_connect_timeout => 10,
-            mysql_read_timeout => 30,
-            mysql_write_timeout => 30,
+            %driver_attrs,
             RaiseError => 1,
             PrintError => 0,
             AutoCommit => 1,
@@ -172,9 +157,11 @@ sub COMPONENT {
             name_sep => '.',
             limit_dialect => 'LimitXY',
             on_connect_do => [
-                "SET NAMES 'utf8'",
-                "SET CHARACTER SET 'utf8'",
-                "SET SESSION max_execution_time=60000",
+                "SET NAMES 'utf8mb4'",
+                "SET CHARACTER SET 'utf8mb4'",
+                ($driver eq 'MariaDB'
+                    ? "SET SESSION max_statement_time=60"
+                    : "SET SESSION max_execution_time=60000"),
                 "SET SESSION net_read_timeout=30",
                 "SET SESSION net_write_timeout=30",
             ],
@@ -250,15 +237,13 @@ sub get_herbal_data {
 sub get_bee_forage_plants {
     my ($self) = @_;
 
-    # Search for herbs that have apis, nectar, or pollen information
+    # Only return herbs with a forage category (apis) or non-zero nectar or pollen.
+    # Uses literal SQL to avoid DBIC/SQL::Abstract duplicate-hash-key issues and
+    # to work correctly with both MySQL and SQLite backends.
     my $bee_plants = $self->schema->resultset('Herb')->search(
-        {
-            -or => [
-                'apis' => { '!=' => '', '!=' => undef },
-                'nectar' => { '!=' => '', '!=' => undef },
-                'pollen' => { '!=' => '', '!=' => undef }
-            ]
-        },
+        \[ "( apis IS NOT NULL AND apis <> '' AND apis <> '0' )
+             OR ( nectar IS NOT NULL AND nectar <> '' AND nectar <> '0' AND nectar > 0 )
+             OR ( pollen IS NOT NULL AND pollen <> '' AND pollen <> '0' AND pollen > 0 )" ],
         {
             order_by => 'botanical_name',
             columns => [qw(record_id botanical_name common_names apis nectar pollen image)]

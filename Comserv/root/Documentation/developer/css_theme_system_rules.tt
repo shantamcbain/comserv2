@@ -1,0 +1,395 @@
+[% PageVersion = 'css_theme_system_rules.tt,v 1.0 2025/01/27 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <header class="header">
+        <h1><i class="fas fa-palette"></i>CSS Theme System Rules</h1>
+        <div class="context">
+            <span class="context-item"><strong>For:</strong> Developers & AI Assistants</span>
+            <span class="context-item"><strong>Status:</strong> <span class="badge badge-warning">Mandatory Policy</span></span>
+        </div>
+    </header>
+
+    <div class="alert alert-danger">
+        <i class="fas fa-exclamation-triangle"></i>
+        <div>
+            <h3>CRITICAL RULE: NO INLINE CSS</h3>
+            <p><strong>NEVER</strong> add <code>&lt;style&gt;</code> blocks or <code>style=""</code> attributes to templates.</p>
+        </div>
+    </div>
+
+    <section class="section">
+        <h2 class="section-header toggle">Universal Container Classes</h2>
+        <div class="section-content collapsible">
+            <p>Use these standard classes for <strong>ALL</strong> pages instead of page-specific classes:</p>
+            
+            <div class="grid">
+                <div class="card">
+                    <h3>Containers</h3>
+                    <ul>
+                        <li><code>.container</code> - Main page container</li>
+                        <li><code>.header</code> - Page header</li>
+                        <li><code>.section</code> - Content sections</li>
+                        <li><code>.card</code> - Individual cards/items</li>
+                    </ul>
+                </div>
+                
+                <div class="card">
+                    <h3>Layouts</h3>
+                    <ul>
+                        <li><code>.grid</code> - Grid layout (auto-sizing columns)</li>
+                        <li><code>.section-content</code> - Section content area</li>
+                        <li><code>.highlight-section</code> - Special highlighted sections</li>
+                    </ul>
+                </div>
+                
+                <div class="card">
+                    <h3>Interactive Elements</h3>
+                    <ul>
+                        <li><code>.btn .btn-primary</code> - Primary buttons</li>
+                        <li><code>.badge .badge-warning</code> - Status badges</li>
+                        <li><code>.alert .alert-info</code> - Alert messages</li>
+                    </ul>
+                </div>
+                
+                <div class="card">
+                    <h3>Context Information</h3>
+                    <ul>
+                        <li><code>.context</code> - Context information area</li>
+                        <li><code>.context-item</code> - Individual context items</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <h2 class="section-header toggle">DEPRECATED Classes - DO NOT USE</h2>
+        <div class="section-content collapsible">
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                <div>
+                    <h3>Legacy Classes Being Phased Out</h3>
+                    <p>These classes are supported for migration but should NOT be used in new code:</p>
+                </div>
+            </div>
+            
+            <div class="changelog-summary">
+                <h3>Container Classes</h3>
+                <ul>
+                    <li><code>.documentation-container</code> → use <code>.container</code></li>
+                    <li><code>.admin-container</code> → use <code>.container</code></li>
+                    <li><code>.apiary-container</code> → use <code>.container</code></li>
+                </ul>
+            </div>
+            
+            <div class="changelog-summary">
+                <h3>Header Classes</h3>
+                <ul>
+                    <li><code>.doc-header</code> → use <code>.header</code></li>
+                    <li><code>.admin-header</code> → use <code>.header</code></li>
+                    <li><code>.apiary-header</code> → use <code>.header</code></li>
+                </ul>
+            </div>
+            
+            <div class="changelog-summary">
+                <h3>Section Classes</h3>
+                <ul>
+                    <li><code>.doc-section</code> → use <code>.section</code></li>
+                    <li><code>.admin-section</code> → use <code>.section</code></li>
+                    <li><code>.section-toggle</code> → use <code>.section-header toggle</code></li>
+                </ul>
+            </div>
+            
+            <div class="changelog-summary">
+                <h3>Card Classes</h3>
+                <ul>
+                    <li><code>.quick-link-card</code> → use <code>.card</code></li>
+                    <li><code>.feature-card</code> → use <code>.card</code></li>
+                    <li><code>.doc-card</code> → use <code>.card</code></li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <h2 class="section-header toggle">Theme Variables</h2>
+        <div class="section-content collapsible">
+            <p>Always use CSS custom properties for consistency:</p>
+            
+            <div class="grid">
+                <div class="card">
+                    <h3>Colors</h3>
+                    <ul>
+                        <li><code>var(--primary-color)</code></li>
+                        <li><code>var(--secondary-color)</code></li>
+                        <li><code>var(--accent-color)</code></li>
+                        <li><code>var(--background-color)</code></li>
+                        <li><code>var(--text-color)</code></li>
+                        <li><code>var(--border-color)</code></li>
+                        <li><code>var(--link-color)</code></li>
+                        <li><code>var(--link-hover-color)</code></li>
+                    </ul>
+                </div>
+                
+                <div class="card">
+                    <h3>Status Colors</h3>
+                    <ul>
+                        <li><code>var(--success-color)</code></li>
+                        <li><code>var(--warning-color)</code></li>
+                        <li><code>var(--danger-color)</code></li>
+                        <li><code>var(--info-color)</code></li>
+                    </ul>
+                </div>
+                
+                <div class="card">
+                    <h3>Layout</h3>
+                    <ul>
+                        <li><code>var(--table-header-bg)</code></li>
+                        <li><code>var(--container-padding)</code></li>
+                        <li><code>var(--border-radius)</code></li>
+                        <li><code>var(--box-shadow)</code></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="changelog-summary">
+                <h3>Example: Good vs Bad CSS</h3>
+                <pre class="debug">
+/* GOOD - Uses theme variables */
+.my-component {
+    background: var(--background-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+/* BAD - Hard-coded values */
+.my-component {
+    background: #ffffff;
+    color: #333333;
+    border: 1px solid #dddddd;
+}</pre>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <h2 class="section-header toggle">File Structure Rules</h2>
+        <div class="section-content collapsible">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                <div>
+                    <h3>Where CSS Goes</h3>
+                    <p>All CSS must be in the theme system - NO exceptions!</p>
+                </div>
+            </div>
+            
+            <div class="changelog-summary">
+                <h3>Allowed Locations</h3>
+                <ul>
+                    <li><code>/static/css/themes/[theme-name].css</code> - Theme-specific styles</li>
+                    <li><code>/static/css/themes/default.css</code> - Universal styles</li>
+                </ul>
+            </div>
+            
+            <div class="changelog-summary">
+                <h3>FORBIDDEN Locations</h3>
+                <ul>
+                    <li><code>&lt;style&gt;</code> blocks in templates</li>
+                    <li><code>style=""</code> attributes on elements</li>
+                    <li><code>/static/css/my-page.css</code> - Individual CSS files</li>
+                    <li><code>/static/css/components/</code> - Component-specific files</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <h2 class="section-header toggle">For AI Assistants</h2>
+        <div class="section-content collapsible">
+            <div class="alert alert-warning">
+                <i class="fas fa-robot"></i>
+                <div>
+                    <h3>AI Development Guidelines</h3>
+                    <p>When creating or modifying templates, ALWAYS follow these rules:</p>
+                </div>
+            </div>
+
+            <div class="grid">
+                <div class="card">
+                    <h3>1. Use Existing Classes</h3>
+                    <p>Before creating new styles, check if existing universal classes can be used:</p>
+                    <ul>
+                        <li><code>.container</code> for main containers</li>
+                        <li><code>.section</code> for content sections</li>
+                        <li><code>.card</code> for individual items</li>
+                        <li><code>.grid</code> for layouts</li>
+                    </ul>
+                </div>
+                
+                <div class="card">
+                    <h3>2. Add New Styles to Theme Files</h3>
+                    <p>If new styles are absolutely necessary:</p>
+                    <ul>
+                        <li>Add them to <code>/static/css/themes/default.css</code></li>
+                        <li>Use theme variables for all colors and spacing</li>
+                        <li>Follow existing naming conventions</li>
+                        <li>Include responsive design considerations</li>
+                    </ul>
+                </div>
+                
+                <div class="card">
+                    <h3>3. Never Use Inline Styles</h3>
+                    <p>NEVER add <code>&lt;style&gt;</code> blocks or <code>style=""</code> attributes to templates.</p>
+                </div>
+                
+                <div class="card">
+                    <h3>4. Test Across Themes</h3>
+                    <p>Ensure new components work with all available themes by using theme variables.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <h2 class="section-header toggle">Quick Reference</h2>
+        <div class="section-content collapsible">
+            <div class="grid">
+                <div class="card">
+                    <h3>Basic Template Structure</h3>
+                    <pre class="debug">
+&lt;div class="container"&gt;
+    &lt;header class="header"&gt;
+        &lt;h1&gt;Page Title&lt;/h1&gt;
+        &lt;div class="context"&gt;
+            &lt;span class="context-item"&gt;Info&lt;/span&gt;
+        &lt;/div&gt;
+    &lt;/header&gt;
+    
+    &lt;section class="section"&gt;
+        &lt;h2 class="section-header"&gt;Section&lt;/h2&gt;
+        &lt;div class="section-content"&gt;
+            &lt;div class="grid"&gt;
+                &lt;div class="card"&gt;
+                    &lt;h3&gt;Card Title&lt;/h3&gt;
+                    &lt;p&gt;Card content&lt;/p&gt;
+                &lt;/div&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+    &lt;/section&gt;
+&lt;/div&gt;</pre>
+                </div>
+                
+                <div class="card">
+                    <h3>Common Button Patterns</h3>
+                    <pre class="debug">
+&lt;a href="/link" class="btn btn-primary"&gt;
+    Primary Action
+&lt;/a&gt;
+
+&lt;button class="btn btn-secondary"&gt;
+    Secondary Action
+&lt;/button&gt;</pre>
+                </div>
+                
+                <div class="card">
+                    <h3>Alert Messages</h3>
+                    <pre class="debug">
+&lt;div class="alert alert-info"&gt;
+    &lt;i class="fas fa-info-circle"&gt;&lt;/i&gt;
+    &lt;div&gt;
+        &lt;h3&gt;Information&lt;/h3&gt;
+        &lt;p&gt;Message content&lt;/p&gt;
+    &lt;/div&gt;
+&lt;/div&gt;</pre>
+                </div>
+                
+                <div class="card">
+                    <h3>Badges</h3>
+                    <pre class="debug">
+&lt;span class="badge badge-warning"&gt;
+    Status
+&lt;/span&gt;</pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <h2 class="section-header toggle">Migration Status</h2>
+        <div class="section-content collapsible">
+            <div class="grid">
+                <div class="card">
+                    <h3><i class="fas fa-check-circle text-success"></i> Completed</h3>
+                    <ul>
+                        <li>Documentation route CSS moved to theme system</li>
+                        <li>Universal container system established</li>
+                        <li>Theme variable system implemented</li>
+                        <li>Legacy class support added</li>
+                    </ul>
+                </div>
+                
+                <div class="card">
+                    <h3><i class="fas fa-clock text-warning"></i> In Progress</h3>
+                    <ul>
+                        <li>Admin theme consolidation</li>
+                        <li>Apiary theme refinement</li>
+                        <li>Individual CSS file removal</li>
+                        <li>Template conversion to universal classes</li>
+                    </ul>
+                </div>
+                
+                <div class="card">
+                    <h3><i class="fas fa-list text-info"></i> Planned</h3>
+                    <ul>
+                        <li>CSC theme consolidation</li>
+                        <li>USBM theme consolidation</li>
+                        <li>Legacy CSS cleanup</li>
+                        <li>Theme switching interface</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<script>
+// Universal toggle functionality for collapsible sections
+document.addEventListener('DOMContentLoaded', function() {
+    // Add click event listeners to all toggle headers
+    const toggleHeaders = document.querySelectorAll('.section-header.toggle');
+    
+    toggleHeaders.forEach(header => {
+        header.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Toggle the expanded class on the header
+            header.classList.toggle('expanded');
+            
+            // Find the content section
+            const section = header.closest('.section');
+            if (!section) return;
+            
+            const content = section.querySelector('.section-content.collapsible');
+            if (!content) return;
+            
+            // Toggle the expanded state
+            if (content.classList.contains('expanded')) {
+                content.style.maxHeight = '0px';
+                content.classList.remove('expanded');
+            } else {
+                content.classList.add('expanded');
+                content.style.maxHeight = content.scrollHeight + 'px';
+            }
+        });
+    });
+    
+    // Start with all sections closed
+    document.querySelectorAll('.section-content.collapsible').forEach(content => {
+        content.classList.remove('expanded');
+        content.style.maxHeight = '0px';
+    });
+});
+</script>

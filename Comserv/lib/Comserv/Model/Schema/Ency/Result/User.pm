@@ -124,8 +124,18 @@ __PACKAGE__->has_many(
 );
 
 __PACKAGE__->has_many(
+    'memberships' => 'Comserv::Model::Schema::Ency::Result::UserMembership',
+    { 'foreign.user_id' => 'self.id' }
+);
+
+__PACKAGE__->has_many(
     'payment_transactions' => 'Comserv::Model::Schema::Ency::Result::PaymentTransaction',
     { 'foreign.user_id' => 'self.id' },
+);
+
+__PACKAGE__->has_many(
+    'service_access' => 'Comserv::Model::Schema::Ency::Result::MembershipServiceAccess',
+    { 'foreign.user_id' => 'self.id' }
 );
 
 # Add method to check password (needed for authentication)

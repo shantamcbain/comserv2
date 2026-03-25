@@ -1,0 +1,237 @@
+[% PageVersion = 'Comserv/root/Documentation/controllers/Documentation_Controller.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation Controller' %]
+
+<!-- Documentation page for Documentation_Controller -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+The Documentation Controller (<code>Comserv::Controller::Documentation</code>) manages the documentation system in the Comserv application. It provides routes for accessing documentation pages, handles role-based access control, and organizes documentation into categories.
+
+
+
+<h2>File Location</h2>
+
+
+
+**IMPORTANT**: The controller file must be located at:
+
+<code></code>`
+
+/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Documentation.pm
+
+<code></code>`
+
+
+
+⚠️ **WARNING**: There was previously a critical issue where the filename (<code>Documantation.pm</code> with an 'a') did not match the package name (<code>Comserv::Controller::Documentation</code> with an 'o'). This mismatch caused route failures. Always ensure filenames match their package declarations.
+
+
+
+<h2>Routes</h2>
+
+
+
+The controller provides the following routes:
+
+
+
+<h3>Main Routes</h3>
+
+
+
+<ul><li><code>/Documentation</code> - Main documentation index (uppercase)</li></ul>
+
+<ul><li><code>/documentation</code> - Alternative route (lowercase)</li></ul>
+
+<ul><li><code>/Documentation/[page]</code> - View specific documentation page</li></ul>
+
+<ul><li><code>/documentation/[page]</code> - Alternative route for specific page</li></ul>
+
+
+
+<h3>Special Routes</h3>
+
+
+
+<ul><li><code>/Documentation/documentation_system_overview</code> - Overview of the documentation system</li></ul>
+
+<ul><li><code>/Documentation/documentation_filename_issue</code> - Information about the filename/package mismatch issue</li></ul>
+
+<ul><li><code>/Documentation/logging_best_practices</code> - Best practices for logging</li></ul>
+
+<ul><li><code>/Documentation/ai_guidelines</code> - Guidelines for AI assistants</li></ul>
+
+<ul><li><code>/Documentation/controller_routing_guidelines</code> - Guidelines for controller routing</li></ul>
+
+<ul><li><code>/Documentation/controllers</code> - Documentation for controllers</li></ul>
+
+<ul><li><code>/Documentation/documentation_update_summary</code> - Summary of documentation updates</li></ul>
+
+<ul><li><code>/Documentation/linux_commands</code> - Linux Commands Reference (redirects to HelpDesk controller)</li></ul>
+
+
+
+<h2>Key Methods</h2>
+
+
+
+<h3><code>index</code></h3>
+
+
+
+The main entry point for the documentation system. It:
+
+<ol><li>Determines the user's role</li></ol>
+
+<ol><li>Filters documentation based on role and site</li></ol>
+
+<ol><li>Organizes documentation into categories</li></ol>
+
+<ol><li>Renders the main documentation index</li></ol>
+
+
+
+<h3><code>view</code></h3>
+
+
+
+Handles viewing individual documentation pages. It:
+
+<ol><li>Checks if the user has permission to view the page</li></ol>
+
+<ol><li>Determines the appropriate template based on file type</li></ol>
+
+<ol><li>Renders the documentation page</li></ol>
+
+
+
+<h3><code>BUILD</code></h3>
+
+
+
+Initializes the documentation system by:
+
+<ol><li>Scanning documentation directories</li></ol>
+
+<ol><li>Categorizing documentation files</li></ol>
+
+<ol><li>Setting up role-based access control</li></ol>
+
+
+
+<h2>Logging</h2>
+
+
+
+The controller uses comprehensive logging to track access and troubleshoot issues:
+
+
+
+<code></code>`perl
+
+$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name',
+
+    "Detailed message with relevant information");
+
+<code></code>`
+
+
+
+<h2>Categories</h2>
+
+
+
+Documentation is organized into the following categories:
+
+
+
+<ol><li>**User Guides**: For end users of the system</li></ol>
+
+<ol><li>**Admin Guides**: For system administrators</li></ol>
+
+<ol><li>**Developer Guides**: For developers</li></ol>
+
+<ol><li>**Tutorials**: Step-by-step guides for common tasks</li></ol>
+
+<ol><li>**Site-Specific**: Documentation specific to a particular site</li></ol>
+
+<ol><li>**Modules**: Documentation for specific system modules</li></ol>
+
+<ol><li>**Controllers**: Documentation for system controllers</li></ol>
+
+<ol><li>**Models**: Documentation for system models</li></ol>
+
+<ol><li>**Changelog**: System changes and updates</li></ol>
+
+10. **General**: Complete list of all documentation files
+
+
+
+<h2>Access Control</h2>
+
+
+
+Access to documentation is controlled by:
+
+
+
+<ol><li>**User Role**: Different roles (normal, editor, admin, developer) have access to different categories</li></ol>
+
+<ol><li>**Site**: Site-specific documentation is only shown to users of that site</li></ol>
+
+<ol><li>**Admin Override**: Administrators can access all documentation regardless of role or site restrictions</li></ol>
+
+
+
+<h2>File Types</h2>
+
+
+
+The system supports multiple file types:
+
+
+
+<ol><li>**Markdown (.md)**: For content-focused documentation</li></ol>
+
+<ol><li>**Template Toolkit (.tt)**: For interactive or complex documentation</li></ol>
+
+<ol><li>**HTML (.html)**: For static HTML content</li></ol>
+
+<ol><li>**Text (.txt)**: For plain text documentation</li></ol>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/Documentation/documentation_system_overview">Documentation System Overview</a></li></ul>
+
+<ul><li><a href="/Documentation/documentation_filename_issue">Documentation Filename Issue</a></li></ul>
+
+<ul><li><a href="/Documentation/logging_best_practices">Logging Best Practices</a></li></ul>
+
+<ul><li><a href="/Documentation/ai_guidelines">AI Guidelines</a></li></ul>
+
+<ul><li><a href="/Documentation/controller_routing_guidelines">Controller Routing Guidelines</a></li></ul>
+
+<ul><li><a href="/Documentation/controllers">Controllers Documentation</a></li></ul>
+
+<ul><li><a href="/Documentation/documentation_update_summary">Documentation Update Summary</a></li></ul>
+
+</div>

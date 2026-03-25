@@ -148,7 +148,7 @@
             
             <!-- Debug: Registration button visibility -->
             [% IF c.request.params.debug == 1 %]
-            <div class="debug-info" style="background: #fff3cd; padding: 10px; margin: 10px 0; border: 1px solid #ffc107;">
+            <div class="debug-info">
                 <p><strong>Registration Debug:</strong></p>
                 <ul>
                     <li>c.user_exists: [% c.user_exists ? 'YES' : 'NO' %]</li>
@@ -164,13 +164,13 @@
             <div class="data-container">
                 <div class="form-actions">
                     [% IF is_full %]
-                    <form action="/workshop/register" method="POST" style="display:inline;">
+                    <form action="/workshop/register" method="POST">
                         <input type="hidden" name="workshop_id" value="[% workshop.id %]">
                         <button type="submit" class="btn btn-warning">Join Waitlist</button>
                         <p class="help-text">This workshop is currently full. You will be added to the waitlist and notified if a spot becomes available.</p>
                     </form>
                     [% ELSE %]
-                    <form action="/workshop/register" method="POST" style="display:inline;">
+                    <form action="/workshop/register" method="POST">
                         <input type="hidden" name="workshop_id" value="[% workshop.id %]">
                         <button type="submit" class="btn btn-primary">Register for Workshop</button>
                         <p class="help-text">Click to register for this workshop.</p>
@@ -184,7 +184,7 @@
                     <p>✓ You are registered for this workshop.</p>
                 </div>
                 <div class="form-actions">
-                    <form action="/workshop/unregister" method="POST" style="display:inline;">
+                    <form action="/workshop/unregister" method="POST">
                         <input type="hidden" name="workshop_id" value="[% workshop.id %]">
                         <button type="submit" class="btn btn-secondary">Cancel Registration</button>
                     </form>
@@ -259,7 +259,7 @@
             
             <!-- Debug: Show button visibility check -->
             [% IF c.session.debug_mode == 1 %]
-            <div class="debug-info" style="background: #fff3cd; padding: 10px; margin: 10px 0; border: 1px solid #ffc107;">
+            <div class="debug-info">
                 <p><strong>Button Visibility Debug:</strong></p>
                 <ul>
                     <li>c.user_exists: [% c.user_exists ? 'YES' : 'NO' %]</li>
@@ -272,7 +272,7 @@
             </div>
             [% END %]
             
-            <div class="form-actions" style="margin-bottom: 50px;">
+            <div class="form-actions">
                 [% IF c.user_exists %]
                     [% IF is_admin || is_workshop_leader %]
                         <a href="/workshop/edit/[% workshop.id %]" class="btn btn-edit">Edit Workshop</a>

@@ -1,0 +1,331 @@
+[% PageVersion = 'Comserv/root/Documentation/logging_best_practices.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Logging Best Practices' %]
+
+<!-- Documentation page for logging_best_practices -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Introduction</h2>
+
+
+
+Proper logging is essential for debugging, monitoring, and maintaining the Comserv system. This document outlines best practices for logging throughout the application, with a focus on the <code>log_with_details</code> method.
+
+
+
+<h2>The <code>log_with_details</code> Method</h2>
+
+
+
+The preferred logging method in the Comserv system is <code>log_with_details</code>, which provides comprehensive context for each log entry:
+
+
+
+<code></code>`perl
+
+$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name',
+
+    "Detailed message with relevant information");
+
+<code></code>`
+
+
+
+<h3>Parameters</h3>
+
+
+
+<ol><li>**Context (<code>$c</code>)**: The Catalyst context object</li></ol>
+
+<ol><li>**Log Level**: One of 'debug', 'info', 'warn', 'error', or 'fatal'</li></ol>
+
+<ol><li>**File**: The current file (use <code>__FILE__</code>)</li></ol>
+
+<ol><li>**Line**: The current line number (use <code>__LINE__</code>)</li></ol>
+
+<ol><li>**Method Name**: The name of the current method</li></ol>
+
+<ol><li>**Message**: A detailed description of what's happening</li></ol>
+
+
+
+<h2>Log Levels</h2>
+
+
+
+Use appropriate log levels based on the importance and impact of the event:
+
+
+
+<ul><li>**debug**: Detailed information for debugging purposes</li></ul>
+
+<ul><li>**info**: General information about system operation</li></ul>
+
+<ul><li>**warn**: Warning conditions that don't affect normal operation</li></ul>
+
+<ul><li>**error**: Error conditions that affect specific operations</li></ul>
+
+<ul><li>**fatal**: Critical errors that prevent the system from functioning</li></ul>
+
+
+
+<h2>When to Log</h2>
+
+
+
+<h3>Always Log</h3>
+
+
+
+<ol><li>**Route Access**: Log when a controller action is accessed</li></ol>
+
+   <code></code>`perl
+
+   $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action_name',
+
+       "Accessing action with parameters: " . join(', ', @parameters));
+
+   <code></code>`
+
+
+
+<ol><li>**Authentication Events**: Log login attempts, logouts, and permission checks</li></ol>
+
+   <code></code>`perl
+
+   $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_permission',
+
+       "User $username checking permission for $resource: " . ($has_permission ? "granted" : "denied"));
+
+   <code></code>`
+
+
+
+<ol><li>**Data Modifications**: Log when data is created, updated, or deleted</li></ol>
+
+   <code></code>`perl
+
+   $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_record',
+
+       "Updated record ID $id with values: " . $c->req->dump);
+
+   <code></code>`
+
+
+
+<ol><li>**Errors and Exceptions**: Log all errors with detailed information</li></ol>
+
+   <code></code>`perl
+
+   $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process_data',
+
+       "Error processing data: $error_message");
+
+   <code></code>`
+
+
+
+<h3>Debug Logging</h3>
+
+
+
+Use debug logging for detailed information that helps during development and troubleshooting:
+
+
+
+<code></code>`perl
+
+$self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'complex_calculation',
+
+    "Intermediate result: $result, inputs: $input1, $input2");
+
+<code></code>`
+
+
+
+<h2>User Feedback</h2>
+
+
+
+In addition to logging, provide appropriate feedback to users:
+
+
+
+<code></code>`perl
+
+<h1>Log the error</h1>
+
+$self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'save_document',
+
+    "Failed to save document: $error_message");
+
+
+
+<h1>Add to stash for display</h1>
+
+$c->stash(
+
+    error_msg => "Unable to save your document. Please try again.",
+
+    debug_msg => "Technical details: $error_message" # Only shown in debug mode
+
+);
+
+<code></code>`
+
+
+
+<h2>Success Messages</h2>
+
+
+
+For successful operations, log the success and provide user feedback:
+
+
+
+<code></code>`perl
+
+<h1>Log the success</h1>
+
+$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_user',
+
+    "Successfully created user: $username");
+
+
+
+<h1>Add to stash for display</h1>
+
+$c->stash(
+
+    success_msg => "User account created successfully."
+
+);
+
+<code></code>`
+
+
+
+<h2>Viewing Logs</h2>
+
+
+
+Application logs are stored in:
+
+<ul><li><code>/home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log</code></li></ul>
+
+
+
+To view recent logs, use:
+
+<code></code>`bash
+
+tail -n 50 /home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log
+
+<code></code>`
+
+
+
+To search for specific log entries:
+
+<code></code>`bash
+
+grep -i "error" /home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log
+
+<code></code>`
+
+
+
+<h2>Common Logging Patterns</h2>
+
+
+
+<h3>Controller Actions</h3>
+
+
+
+<code></code>`perl
+
+sub action_name :Path('path') :Args(0) {
+
+    my ($self, $c) = @_;
+
+    
+
+    # Log the action
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action_name',
+
+        "Accessing action_name");
+
+    
+
+    # Action logic...
+
+    
+
+    # Log success
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action_name',
+
+        "Successfully completed action_name");
+
+}
+
+<code></code>`
+
+
+
+<h3>Error Handling</h3>
+
+
+
+<code></code>`perl
+
+eval {
+
+    # Code that might fail
+
+};
+
+if ($@) {
+
+    # Log the error
+
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'method_name',
+
+        "Error occurred: $@");
+
+    
+
+    # Add to stash for display
+
+    $c->stash(
+
+        error_msg => "An error occurred: " . $self->_user_friendly_error($@)
+
+    );
+
+}
+
+<code></code>`
+
+
+
+<h2>Conclusion</h2>
+
+
+
+Consistent and detailed logging is essential for maintaining and troubleshooting the Comserv system. Always use the <code>log_with_details</code> method to ensure comprehensive logging throughout the application.
+
+</div>

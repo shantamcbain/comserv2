@@ -948,6 +948,7 @@ sub grant_access :Local :Args(0) {
     
     # Check if this is a form submission
     if ($c->req->method eq 'POST') {
+        
         my $username = $c->req->params->{username} || '';
         my $user_id = $c->req->params->{user_id} || 0;
         my $duration = $c->req->params->{duration} || 'temporary';
@@ -1027,6 +1028,8 @@ sub request_access :Local :Args(0) {
     
     # Check if this is a form submission
     if ($c->req->method eq 'POST') {
+        
+        
         my $reason = $c->req->params->{reason} || 'No reason provided';
         my $duration = $c->req->params->{duration} || 'temporary';
         
@@ -1079,6 +1082,11 @@ sub request_access :Local :Args(0) {
 
 sub create_proxy :Local :Args(0) {
     my ($self, $c) = @_;
+    
+    if ($c->req->method eq 'POST') {
+        
+    }
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_proxy',
         "Creating new proxy mapping");
 
