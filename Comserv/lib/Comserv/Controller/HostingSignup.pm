@@ -58,6 +58,8 @@ sub index :Path :Args(0) {
 sub process_signup :Path('process') :Args(0) {
     my ($self, $c) = @_;
     
+    
+    
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process_signup', "Processing hosting signup form");
     push @{$c->stash->{debug_errors}}, "Processing hosting signup form";
     

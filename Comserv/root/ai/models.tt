@@ -243,7 +243,7 @@
                             <h6 class="mt-3 header-text">Available Models to Pull:</h6>
                             <select id="available-select-[% loop.index %]" class="form-select form-select-sm mb-2" style="font-size: 0.85em;">
                                 [% FOREACH avail IN server.available_models %]
-                                <option value="[% avail %]">[% avail %]</option>
+                                <option value="[% avail.name %]">[% avail.name %][% IF avail.params %] ([% avail.params %][% IF avail.size %], [% avail.size %][% END %])[% END %][% IF avail.recommended %] ★[% END %]</option>
                                 [% END %]
                             </select>
                             [% IF can_select_model %]

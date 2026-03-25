@@ -1,0 +1,241 @@
+[% PageVersion = 'Comserv/root/Documentation/general/AI_DEVELOPMENT_GUIDELINES.tt,v 1.0 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'AI Development Guidelines for Comserv2' %]
+
+<div class="documentation-content">
+
+<div class="markdown-content">
+
+# AI Development Guidelines for Comserv2
+
+## Overview
+
+This document provides structured guidelines for AI-assisted development in the Comserv2 project, ensuring consistent implementation approaches and maintaining code quality across development sessions.
+
+## Core Development Principles
+
+### 1. Prompt Efficiency Management
+- **Prompt Limit Awareness**: AI effectiveness decreases significantly after 4-6 prompts in a session
+- **Early Planning**: Create comprehensive implementation plans in prompts 1-2
+- **Documentation First**: Update guidelines before implementation to create a written path
+- **Session Reset**: Start new sessions when approaching prompt limits
+
+### 2. Code Structure Adherence
+- **Follow Existing Patterns**: Use existing code structure and naming conventions
+- **Database Changes via Admin.pm**: All database alterations through Admin controller, not direct SQL
+- **No Root Documentation**: Documentation belongs in `/Comserv/root/Documentation/` only
+- **Theme Integration**: Move CSS to theme system, not separate files
+- **Permission Required**: Ask before creating new files or directory structures
+- **Update Existing Files**: Never create new files when existing ones should be updated
+
+### 3. Implementation Focus
+- **Implementation First**: Focus on coding rather than extensive analysis
+- **Specific File Requests**: Ask for full files only when needed for implementation
+- **Existing Code Reuse**: Leverage existing functionality whenever possible
+- **Step-by-Step Approach**: Break complex features into manageable phases
+
+## Current Active Project: Mailing List System
+
+### Project Status: Phase 1 - Database Schema & Models
+
+### Implementation Plan
+
+#### **Phase 1: Database Schema & Models (Week 1)**
+
+**Step 1.1: Create Database Result Classes** ✅ NEXT
+- Create `MailingList.pm` in `/Comserv/lib/Comserv/Model/Schema/Ency/Result/`
+- Create `MailingListSubscription.pm` in same directory
+- Create `MailingListCampaign.pm` in same directory
+
+**Step 1.2: Enhance Site.pm** 
+- Add `mailing_domain` field to existing Site table via Admin.pm
+
+**Step 1.3: Create Database Tables via Admin.pm**
+- Use Admin controller's database management for table creation
+
+#### **Phase 2: Enhanced Mail Controller (Week 2)**
+
+**Step 2.1: Extend Mail.pm Controller**
+- Add mailing list management actions:
+  - `/Mail/lists` - List all lists for site
+  - `/Mail/lists/create` - Create new mailing list  
+  - `/Mail/lists/edit/{id}` - Edit existing list
+  - `/Mail/lists/delete/{id}` - Delete mailing list
+- Add subscription management actions:
+  - `/Mail/subscribers/{id}` - View list subscribers
+  - `/Mail/lists/{id}/add/{user_id}` - Add user to list
+  - `/Mail/lists/{id}/remove/{user_id}` - Remove user from list
+  - `/Mail/lists/bulk/{id}` - Bulk subscription management
+- Add campaign management actions:
+  - `/Mail/compose/{id}` - Compose email to list
+  - `/Mail/send` - Send campaign
+  - `/Mail/campaigns` - View sent campaigns
+- Add user subscription interface:
+  - `/Mail/subscriptions` - User's subscription management
+  - `/Mail/subscribe/{id}` - User subscribe to list
+  - `/Mail/unsubscribe/{id}` - User unsubscribe from list
+
+**Step 2.2: Enhance Mail.pm Model**
+- Add list management methods
+- Add subscription handling methods  
+- Add campaign sending with role/source filtering
+
+#### **Phase 3: Workshop Integration (Week 3)**
+
+**Step 3.1: Enhance WorkShop.pm Controller**
+- Add auto-subscription logic in workshop registration
+- Create workshop mailing lists automatically
+- Handle attendee subscription management
+
+**Step 3.2: Workshop Mailing List Methods**
+- `workshop_mailing_list` - Create/update workshop lists
+- `add_attendee_to_list` - Auto-subscribe workshop attendees
+
+#### **Phase 4: User Interface & Templates (Week 4)**
+
+**Step 4.1: Admin Interface Templates**
+- `admin/mailing_lists.tt` - List management dashboard
+- `admin/compose_campaign.tt` - Email composition interface
+- `admin/subscribers.tt` - Subscriber management
+
+**Step 4.2: User Interface Templates**  
+- `user/subscriptions.tt` - User subscription management
+- `mail/subscribe_form.tt` - Subscription forms
+
+**Step 4.3: Theme Integration**
+- Move all CSS to theme system
+- Integrate with existing admin theme
+
+### Database Schema Design
+
+#### New Tables Required
+
+1. **mailing_lists**
+   - id (INT, PRIMARY KEY, AUTO_INCREMENT)
+   - site_id (INT, FOREIGN KEY to Site.id)
+   - name (VARCHAR(255))
+   - description (TEXT)
+   - list_email (VARCHAR(255)) 
+   - virtualmin_list_id (VARCHAR(255))
+   - is_software_only (BOOLEAN, DEFAULT 1)
+   - is_active (BOOLEAN, DEFAULT 1)
+   - created_by (INT, FOREIGN KEY to User.id)
+   - created_at (TIMESTAMP)
+   - updated_at (TIMESTAMP)
+
+2. **mailing_list_subscriptions**
+   - id (INT, PRIMARY KEY, AUTO_INCREMENT)
+   - mailing_list_id (INT, FOREIGN KEY)
+   - user_id (INT, FOREIGN KEY)
+   - subscription_source (VARCHAR(50)) - 'manual', 'workshop', 'auto'
+   - source_id (INT) - workshop_id if source is 'workshop'
+   - subscribed_at (TIMESTAMP)
+   - is_active (BOOLEAN, DEFAULT 1)
+
+3. **mailing_list_campaigns**
+   - id (INT, PRIMARY KEY, AUTO_INCREMENT)
+   - mailing_list_id (INT, FOREIGN KEY)
+   - subject (VARCHAR(500))
+   - body_text (TEXT)
+   - body_html (TEXT)
+   - sent_by (INT, FOREIGN KEY to User.id)
+   - sent_at (TIMESTAMP)
+   - recipient_count (INT, DEFAULT 0)
+   - role_filter (VARCHAR(255)) - JSON array
+   - source_filter (VARCHAR(255)) - JSON array
+
+#### Site Table Enhancement
+- Add `mailing_domain` (VARCHAR(255)) field
+
+### Integration Points
+
+#### Workshop System Integration
+- Auto-subscribe users to workshop mailing lists on registration
+- Create workshop-specific mailing lists automatically
+- Support multiple workshop memberships per user
+
+#### User Registration Integration  
+- Auto-subscribe new users to site announcement lists
+- Respect user preferences for auto-subscription
+
+### Key Features Addressed
+
+✅ **Admin-Created Lists**: Via enhanced Mail.pm controller
+✅ **Virtualmin Integration**: Optional API integration for server-side lists  
+✅ **Site-Based Lists**: Multiple lists per site with proper relationships
+✅ **Software-Only Option**: Pure application-based lists (no server required)
+✅ **Role-Based Grouping**: Filter recipients by user roles
+✅ **Workshop Integration**: Automatic subscription for workshop attendees
+
+## Development Session Management
+
+### Current Session Status
+- **Prompt Count**: 4/6
+- **Current Phase**: Phase 1, Step 1.1
+- **Next Action**: Create MailingList.pm Result class
+- **Files to Modify**: New file creation in Schema/Ency/Result/
+
+### Session Handoff Protocol
+When approaching prompt limits:
+1. Update this guidelines document with current progress
+2. Document exact next steps and file locations
+3. Note any blocking issues or dependencies
+4. Start fresh session with updated guidelines
+
+## File Structure Reference
+
+### Key Directories
+- **Controllers**: `/Comserv/lib/Comserv/Controller/`
+- **Models**: `/Comserv/lib/Comserv/Model/`
+- **Schema Results**: `/Comserv/lib/Comserv/Model/Schema/Ency/Result/`
+- **Templates**: `/Comserv/root/templates/`
+- **Documentation**: `/Comserv/root/Documentation/`
+
+### Naming Conventions
+- **Result Classes**: PascalCase (e.g., `MailingList.pm`)
+- **Controller Actions**: snake_case (e.g., `mailing_lists`)
+- **Template Files**: snake_case with .tt extension
+- **Database Tables**: snake_case (e.g., `mailing_lists`)
+
+## Quality Assurance
+
+### Code Review Checklist
+- [ ] Follows existing code patterns
+- [ ] Uses Admin.pm for database changes
+- [ ] Includes proper error handling and logging
+- [ ] Integrates with existing authentication/authorization
+- [ ] CSS moved to theme system
+- [ ] Templates follow existing structure
+- [ ] Proper foreign key relationships
+- [ ] Includes necessary validation
+
+### Testing Strategy
+- **Unit Tests**: Model methods and business logic
+- **Integration Tests**: Controller actions and database operations
+- **User Acceptance Tests**: End-to-end workflows
+
+## Notes and Considerations
+
+### Security Requirements
+- **Admin Only**: List creation, deletion, campaign sending
+- **Role-Based Access**: Respect existing user role system
+- **Data Protection**: Email validation, unsubscribe links, rate limiting
+- **Audit Trail**: Log all mailing list activities
+
+### Performance Considerations
+- **Bulk Operations**: Efficient handling of large subscriber lists
+- **Campaign Sending**: Rate limiting and queue management
+- **Database Indexing**: Proper indexes on foreign keys and search fields
+
+---
+
+*Last Updated: 2025-01-15*
+*Current Implementation Phase: Phase 1, Step 1.1*
+*Next Session Action: Create MailingList.pm Result class*
+
+</div>
+
+</div>

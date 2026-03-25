@@ -1,0 +1,48 @@
+[% PageVersion = 'Comserv/root/Documentation/general/SYSTEM_REQUIREMENTS.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'System-Level Requirements for Comserv' %]
+
+<!-- Documentation page for SYSTEM_REQUIREMENTS -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Required System Packages</h2>
+
+
+
+These packages must be installed via the system package manager (apt, yum, dnf, etc.) rather than CPAN:
+
+
+
+<h3>Database Drivers</h3>
+
+
+
+<h3>System Development Libraries</h3>
+
+
+
+<h3>Perl System Modules</h3>
+
+The following Perl modules should be installed via system packages:
+
+
+
+<h2>Installation Commands</h2>
+
+
+
+<h3>For Debian/Ubuntu:</h3>
+
+
+</div>

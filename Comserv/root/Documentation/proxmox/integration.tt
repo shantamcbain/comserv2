@@ -1,0 +1,317 @@
+[% PageVersion = 'Comserv/root/Documentation/proxmox/integration.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Proxmox Integration Documentation' %]
+
+<!-- Documentation page for integration -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+The Comserv application integrates with Proxmox Virtual Environment (Proxmox VE) to provide VM management capabilities directly from the Comserv interface. This integration allows administrators to view, create, and manage virtual machines hosted on Proxmox servers.
+
+
+
+<h2>Command Reference Documentation</h2>
+
+
+
+For detailed command-line operations in Proxmox VE, refer to these resources:
+
+
+
+<ul><li><a href="../../docs/proxmox_commands.md">Proxmox Command Reference</a> - Comprehensive list of CLI commands for managing all aspects of Proxmox VE</li></ul>
+
+<ul><li><a href="../../docs/proxmox_ip_configuration.md">Proxmox IP Configuration Guide</a> - Detailed guide for configuring IP addresses in Proxmox VE</li></ul>
+
+
+
+<h2>Architecture</h2>
+
+
+
+The Proxmox integration consists of the following components:
+
+
+
+<ol><li>**Proxmox Controller** (<code>Comserv::Controller::Proxmox</code>): Handles user interactions and web interface for Proxmox VM management.</li></ol>
+
+<ol><li>**Proxmox Model** (<code>Comserv::Model::Proxmox</code>): Provides the API integration with Proxmox VE servers.</li></ol>
+
+<ol><li>**ProxmoxCredentials Utility** (<code>Comserv::Util::ProxmoxCredentials</code>): Manages server credentials and configuration.</li></ol>
+
+<ol><li>**ProxmoxServers Controller** (<code>Comserv::Controller::ProxmoxServers</code>): Manages Proxmox server configurations.</li></ol>
+
+<ol><li>**Templates** (<code>proxmox/*.tt</code>): Template files for the Proxmox management interface.</li></ol>
+
+
+
+<h2>Authentication</h2>
+
+
+
+The Proxmox integration uses API tokens for authentication with Proxmox VE servers. These tokens must be created in the Proxmox VE web interface and then configured in Comserv.
+
+
+
+Token format: <code>USER@REALM!TOKENID</code>
+
+
+
+Example: <code>root@pam!mytoken</code>
+
+
+
+<h2>Features</h2>
+
+
+
+The Proxmox integration provides the following features:
+
+
+
+<ol><li>**VM Management**:</li></ol>
+
+   - View list of VMs on Proxmox servers
+
+   - Create new VMs from templates
+
+   - Start, stop, and restart VMs
+
+   - View VM details and status
+
+
+
+<ol><li>**Server Management**:</li></ol>
+
+   - Configure multiple Proxmox servers
+
+   - Test connections to Proxmox servers
+
+   - Manage API tokens and credentials
+
+
+
+<ol><li>**Template Management**:</li></ol>
+
+   - Use predefined VM templates
+
+   - Configure template sources
+
+
+
+<h2>Configuration</h2>
+
+
+
+<h3>Server Configuration</h3>
+
+
+
+Proxmox servers are configured with the following parameters:
+
+
+
+<ul><li>**Server ID**: A unique identifier for the server</li></ul>
+
+<ul><li>**Host**: The hostname or IP address of the Proxmox server</li></ul>
+
+<ul><li>**API URL Base**: The base URL for the Proxmox API (default: <code>https://<host>:8006/api2/json</code>)</li></ul>
+
+<ul><li>**Node**: The Proxmox node name (default: <code>pve</code>)</li></ul>
+
+<ul><li>**Token User**: The API token user in the format <code>USER@REALM!TOKENID</code></li></ul>
+
+<ul><li>**Token Value**: The API token value</li></ul>
+
+
+
+<h3>VM Creation Parameters</h3>
+
+
+
+When creating a new VM, the following parameters are available:
+
+
+
+<ul><li>**Hostname**: The hostname for the new VM</li></ul>
+
+<ul><li>**Description**: A description of the VM</li></ul>
+
+<ul><li>**CPU**: Number of CPU cores</li></ul>
+
+<ul><li>**Memory**: Amount of memory in MB</li></ul>
+
+<ul><li>**Disk Size**: Size of the primary disk in GB</li></ul>
+
+<ul><li>**Template**: The VM template to use</li></ul>
+
+<ul><li>**Network Type**: DHCP or static IP</li></ul>
+
+<ul><li>**IP Address**: Static IP address (if using static IP)</li></ul>
+
+<ul><li>**Subnet Mask**: Subnet mask (if using static IP)</li></ul>
+
+<ul><li>**Gateway**: Default gateway (if using static IP)</li></ul>
+
+<ul><li>**Start After Creation**: Whether to start the VM after creation</li></ul>
+
+<ul><li>**Enable QEMU Agent**: Whether to enable the QEMU guest agent</li></ul>
+
+<ul><li>**Start on Boot**: Whether to start the VM when the Proxmox server boots</li></ul>
+
+
+
+<h2>Recent Changes</h2>
+
+
+
+<h3>August 2024 - Debug Message Handling Fix</h3>
+
+
+
+Fixed an issue in the Proxmox controller where the <code>debug_msg</code> stash variable was being used inconsistently:
+
+
+
+<ol><li>Added type checking for the <code>debug_msg</code> stash variable</li></ol>
+
+<ol><li>Implemented conversion of string values to array references when needed</li></ol>
+
+<ol><li>Ensured consistent handling of debug messages throughout the controller</li></ol>
+
+<ol><li>Fixed potential errors when interacting with other controllers</li></ol>
+
+
+
+See the <a href="changelog/2024-08-proxmox-debug-msg-fix.md">changelog</a> for more details.
+
+
+
+<h3>July 2024 - Syntax Error Fixes</h3>
+
+
+
+Fixed several syntax errors in the Proxmox controller file that were causing the application to fail:
+
+
+
+<ol><li>Fixed duplicate admin role check and malformed code in the index function</li></ol>
+
+<ol><li>Fixed malformed eval block with extra closing braces</li></ol>
+
+<ol><li>Fixed duplicate error handling code</li></ol>
+
+<ol><li>Fixed malformed stash hash with duplicate server_id key</li></ol>
+
+<ol><li>Fixed malformed flash hash for templates</li></ol>
+
+<ol><li>Fixed malformed server_id variable reference</li></ol>
+
+
+
+See the <a href="changelog/2024-07-proxmox-controller-fixes.md">changelog</a> for more details.
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+<h3>Common Issues</h3>
+
+
+
+<ol><li>**Authentication Failures**:</li></ol>
+
+   - Verify that the token format is correct: <code>USER@REALM!TOKENID</code>
+
+   - Ensure the token has appropriate permissions in Proxmox VE
+
+   - Check that the token value is correct and not expired
+
+
+
+<ol><li>**Connection Issues**:</li></ol>
+
+   - Verify that the Proxmox server is reachable from the Comserv server
+
+   - Check that the API URL is correct
+
+   - Ensure that SSL verification is properly configured
+
+
+
+<ol><li>**VM Creation Failures**:</li></ol>
+
+   - Verify that the template URL is accessible from the Proxmox server
+
+   - Check that the Proxmox server has sufficient resources
+
+   - Ensure that the VM parameters are valid
+
+
+
+<h3>Debugging</h3>
+
+
+
+The Proxmox integration includes extensive logging to help diagnose issues:
+
+
+
+<ol><li>**Controller Logging**: The Proxmox controller logs detailed information about user actions and API calls.</li></ol>
+
+<ol><li>**Model Debugging**: The Proxmox model includes a debug_info hash with detailed information about API calls and responses.</li></ol>
+
+<ol><li>**Connection Testing**: The ProxmoxServers controller includes a test_connection action that provides detailed diagnostics.</li></ol>
+
+
+
+<h2>Future Improvements</h2>
+
+
+
+Potential improvements for the Proxmox integration:
+
+
+
+<ol><li>**Enhanced VM Management**: Add support for more VM operations like cloning, snapshots, and backups.</li></ol>
+
+<ol><li>**Improved Template Management**: Add a UI for managing VM templates.</li></ol>
+
+<ol><li>**Resource Monitoring**: Add monitoring of Proxmox server resources.</li></ol>
+
+<ol><li>**Batch Operations**: Add support for performing operations on multiple VMs at once.</li></ol>
+
+<ol><li>**User Management**: Add integration with Proxmox user management.</li></ol>
+
+
+
+<h2>Related Files</h2>
+
+
+
+<ul><li><code>/Comserv/lib/Comserv/Controller/Proxmox.pm</code>: Main controller for Proxmox VM management</li></ul>
+
+<ul><li><code>/Comserv/lib/Comserv/Model/Proxmox.pm</code>: Model for Proxmox API integration</li></ul>
+
+<ul><li><code>/Comserv/lib/Comserv/Util/ProxmoxCredentials.pm</code>: Utility for managing Proxmox credentials</li></ul>
+
+<ul><li><code>/Comserv/lib/Comserv/Controller/ProxmoxServers.pm</code>: Controller for managing Proxmox server configurations</li></ul>
+
+<ul><li><code>/Comserv/root/proxmox/*.tt</code>: Template files for the Proxmox management interface</li></ul>
+
+</div>

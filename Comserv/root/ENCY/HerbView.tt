@@ -2,7 +2,7 @@
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
-[% INCLUDE 'ENCY/ImageHelper.tt' %]
+[% PROCESS 'ENCY/ImageHelper.tt' %]
 
 [% IF mode == 'view' %]
     <h1>[% herb.botanical_name %]</h1>
@@ -16,8 +16,8 @@
 [% IF mode == 'view' %]
     <div>
         <a href="[% c.uri_for('/ENCY/BotanicalNameView') %]">Back to Botanical Name View</a>
-        [% IF c.session.roles == 'admin' %]
-            <a href="[% c.uri_for('/ENCY/edit_herb', { id => herb.record_id }) %]">Edit Herb</a>
+        [% IF is_admin %]
+            <a href="/ENCY/edit_herb">Edit Herb</a>
         [% END %]
     </div>
 [% END %]
