@@ -184,7 +184,7 @@
                         <a href="/todo" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">All Todos</a>
                         <a href="/log" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">Logs</a>
                         [% IF is_admin %]
-                        <a href="/log/log_form?abstract=Good+Morning+%E2%98%80+Work+Session&details=Daily+work+session+log+started+by+[% c.session.username %]&status=2" style="padding:4px 12px;border:1px solid #20c997;border-radius:4px;text-decoration:none;font-size:0.82em;color:#20c997;" title="Start a new time-tracking log entry for this session">☀ Good Morning</a>
+                        <a href="/log/log_form?todo_record_id=221&abstract=Good+Morning+%E2%98%80+Work+Session&details=Daily+work+session+log+started+by+[% c.session.username %]&status=2" style="padding:4px 12px;border:1px solid #20c997;border-radius:4px;text-decoration:none;font-size:0.82em;color:#20c997;" title="Start a new time-tracking log entry for this session">☀ Good Morning</a>
                         <button onclick="triageStale()" style="padding:4px 12px;border:1px solid #fd7e14;border-radius:4px;background:transparent;font-size:0.82em;color:#fd7e14;cursor:pointer;" title="Reduce priority of todos inactive for 180+ days">⚠ Triage Stale</button>
                         [% END %]
                     </div>
