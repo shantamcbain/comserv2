@@ -1,7 +1,7 @@
-package Comserv::Model::Schema::Ency::Result::MemberPoints;
+package Comserv::Model::Schema::Ency::Result::PointAccount;
 use base 'DBIx::Class::Core';
 
-__PACKAGE__->table('member_points');
+__PACKAGE__->table('point_accounts');
 __PACKAGE__->add_columns(
     id => {
         data_type         => 'int',
@@ -12,19 +12,22 @@ __PACKAGE__->add_columns(
         is_nullable => 0,
     },
     balance => {
-        data_type     => 'bigint',
+        data_type     => 'decimal',
+        size          => [14, 4],
         is_nullable   => 0,
-        default_value => 0,
+        default_value => '0.0000',
     },
     lifetime_earned => {
-        data_type     => 'bigint',
+        data_type     => 'decimal',
+        size          => [14, 4],
         is_nullable   => 0,
-        default_value => 0,
+        default_value => '0.0000',
     },
     lifetime_spent => {
-        data_type     => 'bigint',
+        data_type     => 'decimal',
+        size          => [14, 4],
         is_nullable   => 0,
-        default_value => 0,
+        default_value => '0.0000',
     },
     created_at => {
         data_type     => 'timestamp',
@@ -38,7 +41,7 @@ __PACKAGE__->add_columns(
     },
 );
 __PACKAGE__->set_primary_key('id');
-__PACKAGE__->add_unique_constraint('uq_member_points_user' => ['user_id']);
+__PACKAGE__->add_unique_constraint('uq_point_accounts_user' => ['user_id']);
 
 __PACKAGE__->belongs_to(
     user => 'Comserv::Model::Schema::Ency::Result::User',
@@ -46,8 +49,13 @@ __PACKAGE__->belongs_to(
 );
 
 __PACKAGE__->has_many(
-    transactions => 'Comserv::Model::Schema::Ency::Result::PointTransaction',
-    { 'foreign.user_id' => 'self.user_id' },
+    credits_received => 'Comserv::Model::Schema::Ency::Result::PointLedger',
+    { 'foreign.to_user_id' => 'self.user_id' },
+);
+
+__PACKAGE__->has_many(
+    debits_sent => 'Comserv::Model::Schema::Ency::Result::PointLedger',
+    { 'foreign.from_user_id' => 'self.user_id' },
 );
 
 1;

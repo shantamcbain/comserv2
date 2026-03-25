@@ -1,7 +1,7 @@
-package Comserv::Model::Schema::Ency::Result::PaypalTransaction;
+package Comserv::Model::Schema::Ency::Result::PaymentTransaction;
 use base 'DBIx::Class::Core';
 
-__PACKAGE__->table('paypal_transactions');
+__PACKAGE__->table('payment_transactions');
 __PACKAGE__->add_columns(
     id => {
         data_type         => 'bigint',
@@ -11,28 +11,13 @@ __PACKAGE__->add_columns(
         data_type   => 'int',
         is_nullable => 0,
     },
-    package_id => {
+    payable_type => {
+        data_type   => 'varchar',
+        size        => 100,
+        is_nullable => 0,
+    },
+    payable_id => {
         data_type   => 'int',
-        is_nullable => 1,
-    },
-    paypal_order_id => {
-        data_type   => 'varchar',
-        size        => 100,
-        is_nullable => 1,
-    },
-    paypal_subscription_id => {
-        data_type   => 'varchar',
-        size        => 100,
-        is_nullable => 1,
-    },
-    paypal_payer_id => {
-        data_type   => 'varchar',
-        size        => 100,
-        is_nullable => 1,
-    },
-    paypal_payer_email => {
-        data_type   => 'varchar',
-        size        => 255,
         is_nullable => 1,
     },
     amount => {
@@ -51,16 +36,15 @@ __PACKAGE__->add_columns(
         size        => [10, 2],
         is_nullable => 0,
     },
-    points_credited => {
-        data_type     => 'bigint',
-        is_nullable   => 0,
-        default_value => 0,
+    provider => {
+        data_type   => 'varchar',
+        size        => 30,
+        is_nullable => 0,
     },
-    payment_type => {
-        data_type     => 'varchar',
-        size          => 20,
-        is_nullable   => 0,
-        default_value => 'one_time',
+    provider_transaction_id => {
+        data_type   => 'varchar',
+        size        => 255,
+        is_nullable => 1,
     },
     status => {
         data_type     => 'varchar',
@@ -68,23 +52,28 @@ __PACKAGE__->add_columns(
         is_nullable   => 0,
         default_value => 'pending',
     },
-    paypal_status => {
+    description => {
         data_type   => 'varchar',
-        size        => 50,
+        size        => 500,
         is_nullable => 1,
     },
-    ipn_verified => {
-        data_type     => 'tinyint',
-        size          => 1,
+    points_credited => {
+        data_type     => 'decimal',
+        size          => [14, 4],
         is_nullable   => 0,
-        default_value => 0,
+        default_value => '0',
     },
-    raw_response => {
+    point_ledger_id => {
+        data_type   => 'bigint',
+        is_nullable => 1,
+    },
+    metadata => {
         data_type   => 'text',
         is_nullable => 1,
     },
-    point_transaction_id => {
-        data_type   => 'bigint',
+    ip_address => {
+        data_type   => 'varchar',
+        size        => 45,
         is_nullable => 1,
     },
     created_at => {
@@ -106,9 +95,9 @@ __PACKAGE__->belongs_to(
 );
 
 __PACKAGE__->belongs_to(
-    package => 'Comserv::Model::Schema::Ency::Result::PointPackage',
-    'package_id',
-    { join_type => 'left', on_delete => 'set null' },
+    point_ledger_entry => 'Comserv::Model::Schema::Ency::Result::PointLedger',
+    'point_ledger_id',
+    { join_type => 'left' },
 );
 
 1;
