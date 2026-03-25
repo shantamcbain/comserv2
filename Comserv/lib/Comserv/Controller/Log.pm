@@ -280,25 +280,28 @@ sub log_form :Path('/log/log_form') :Args() {
         );
     }
 
+    # Allow GET params to pre-fill the form when no todo is linked
+    my $p = $c->request->parameters;
+
     # Add the priority, status, and record_id to the stash
     $c->stash(
         build_priority => $self->priority,
         build_status   => $self->status,
-        priority       => $todo_record ? $todo_record->priority : '',
-        status         => $todo_record ? $todo_record->status : '',
-        project_id     => $todo_record ? $todo_record->project_id : '',
-        todo_record_id => $todo_record ? $todo_record->record_id : $todo_record_id,
-        start_date     => $todo_record ? $todo_record->start_date : '',
-        site_name      => $todo_record ? $todo_record->sitename : $c->session->{SiteName},
-        due_date       => $todo_record ? $todo_record->due_date : '',
-        abstract       => $todo_record ? $todo_record->subject : '',
-        details        => $todo_record ? $todo_record->description : '',
-        comments       => $todo_record ? $todo_record->comments : '',
-        start_time     => $current_time_short, # Set start_time to current time
-        end_time       => $current_time_short, # Set end_time to current time
-        projects       => $projects,     # Add projects for selection
-        sites          => $sites,        # Add sites for selection
-        form_data      => $form_data,    # Add form_data for project_list.tt and site_list.tt
+        priority       => $todo_record ? $todo_record->priority   : ($p->{priority} || ''),
+        status         => $todo_record ? $todo_record->status     : ($p->{status}   || ''),
+        project_id     => $todo_record ? $todo_record->project_id : ($p->{project_id} || ''),
+        todo_record_id => $todo_record ? $todo_record->record_id  : $todo_record_id,
+        start_date     => $todo_record ? $todo_record->start_date : ($p->{start_date} || ''),
+        site_name      => $todo_record ? $todo_record->sitename   : ($p->{site_name} || $c->session->{SiteName}),
+        due_date       => $todo_record ? $todo_record->due_date   : ($p->{due_date}  || ''),
+        abstract       => $todo_record ? $todo_record->subject    : ($p->{abstract}  || ''),
+        details        => $todo_record ? $todo_record->description: ($p->{details}   || ''),
+        comments       => $todo_record ? $todo_record->comments   : ($p->{comments}  || ''),
+        start_time     => $current_time_short,
+        end_time       => $current_time_short,
+        projects       => $projects,
+        sites          => $sites,
+        form_data      => $form_data,
     );
 
     # Render the form
