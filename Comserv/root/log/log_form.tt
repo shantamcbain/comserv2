@@ -28,6 +28,9 @@ window.onload = function() {
     <input type="hidden" id="todo_record_id" name="todo_record_id" value="[% todo_record_id %]">
     <input type="text" id="todo_record_id_display" name="todo_record_id_display" value="[% todo_record_id %]" readonly>
 
+    <input type="hidden" id="username" name="username" value="[% c.session.username %]">
+    <label>Logged by:</label> <strong>[% c.session.username %]</strong><br>
+
     <a href="[% c.uri_for('/todo/addtodo') %]"> Add Todo</a><br>
 
     [% INCLUDE "todo/site_list.tt" %]<br>

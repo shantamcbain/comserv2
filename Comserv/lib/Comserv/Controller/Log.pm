@@ -317,8 +317,8 @@ sub create_log :Path('/log/create_log') :Args() {
 
     # Retrieve start_date from form data
     my $start_date = $c->request->body_parameters->{start_date};
-    # Set owner to 'none' if it's not provided
-    my $owner = $c->request->body_parameters->{owner} || 'none';
+    # Set username to session user if not provided
+    my $username = $c->session->{username} || $c->request->body_parameters->{username} || 'none';
 
     # Check if start_date is empty
     if ($start_date eq '') {
@@ -354,7 +354,7 @@ sub create_log :Path('/log/create_log') :Args() {
         # Stash the form data
         $c->stash(
             todo_record_id => $c->request->body_parameters->{todo_record_id},
-            owner          => $c->request->body_parameters->{owner} || 'none',
+            username       => $c->session->{username} || $c->request->body_parameters->{username} || 'none',
             sitename       => $c->session->{SiteName},
             start_date     => $start_date,
             due_date       => $c->request->body_parameters->{due_date},
@@ -455,7 +455,7 @@ sub create_log :Path('/log/create_log') :Args() {
 
     my $logEntry = $rs->create({
         todo_record_id  => $c->request->body_parameters->{todo_record_id},
-        owner           => $owner,
+        username        => $username,
         sitename        => $sitename,
         start_date      => $start_date || $current_date,
         project_code    => $project_id, # Use project_id from project_list.tt
