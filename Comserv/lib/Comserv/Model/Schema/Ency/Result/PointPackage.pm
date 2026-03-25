@@ -61,13 +61,9 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key('id');
 
 __PACKAGE__->has_many(
-    paypal_transactions => 'Comserv::Model::Schema::Ency::Result::PaypalTransaction',
-    'package_id',
-);
-
-__PACKAGE__->has_many(
-    subscriptions => 'Comserv::Model::Schema::Ency::Result::PaypalSubscription',
-    'package_id',
+    payment_transactions => 'Comserv::Model::Schema::Ency::Result::PaymentTransaction',
+    { 'foreign.payable_id' => 'self.id', 'foreign.payable_type' => \[ "= 'point_purchase'" ] },
+    { join_type => 'left' },
 );
 
 1;
