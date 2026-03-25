@@ -4,6 +4,7 @@ use namespace::autoclean;
 use Try::Tiny;
 use JSON;
 use Comserv::Util::Logging;
+use Comserv::Util::PointSystem;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -634,29 +635,17 @@ sub benefactor_contribution :Local :Args(0) {
                     contribution_date => $p->{contribution_date},
                 });
 
-                my $acct = $c->model('DBEncy')->resultset('InternalCurrencyAccount')->find_or_create(
-                    { user_id => $p->{user_id} },
-                    { key     => 'unique_user_id' }
-                );
-
-                my $new_balance = ($acct->balance || 0) + $coins;
-                my $tx = $c->model('DBEncy')->resultset('InternalCurrencyTransaction')->create({
-                    from_user_id     => undef,
-                    to_user_id       => $p->{user_id},
+                my $ps = Comserv::Util::PointSystem->new(c => $c);
+                my $ledger = $ps->credit(
+                    user_id          => $p->{user_id},
                     amount           => $coins,
-                    transaction_type => 'earn',
+                    transaction_type => 'bonus',
                     description      => 'Benefactor contribution: ' . ($p->{description} || $p->{contribution_type}),
                     reference_type   => 'benefactor_contribution',
                     reference_id     => $contrib->id,
-                    balance_after    => $new_balance,
-                });
+                );
 
-                $acct->update({
-                    balance         => $new_balance,
-                    lifetime_earned => ($acct->lifetime_earned || 0) + $coins,
-                });
-
-                $contrib->update({ currency_transaction_id => $tx->id });
+                $contrib->update({ currency_transaction_id => $ledger->id });
             });
             $c->flash->{success_msg} = sprintf(
                 'Contribution recorded. %.2f CAD value credited as %.2f coins.', $amount_cad, $coins);
