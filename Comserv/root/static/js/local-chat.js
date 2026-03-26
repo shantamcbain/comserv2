@@ -458,16 +458,36 @@
                                 wst.style.display = 'inline';
                                 wst.title = 'Enable web search for Grok requests (uses API credits)';
                             }
-                        } else if (p.service === 'ollama' && p.models && p.models.length > 0) {
-                            // Filter to chat-capable models only, then sort by size
-                            const chatModels = p.models.filter(function(m) { return isChatModel(m.id); });
-                            if (chatModels.length > 0) {
-                                const sorted = chatModels.slice().sort(function(a, b) {
-                                    return modelSizeScore(a.id) - modelSizeScore(b.id);
+                        } else if (p.service === 'ollama') {
+                            // Update the default "Ollama (Local)" option label
+                            const defaultOpt = sel.querySelector('option[value="ollama"]');
+                            if (defaultOpt) defaultOpt.textContent = p.name || 'Ollama (Local AI)';
+
+                            // Admin server switcher: add optgroup if multiple servers available
+                            if (p.servers && p.servers.length > 1 && data.is_admin) {
+                                const svrGrp = document.createElement('optgroup');
+                                svrGrp.label = 'Ollama Server';
+                                p.servers.forEach(function(srv) {
+                                    const opt = document.createElement('option');
+                                    opt.value = 'ollama_server|' + srv.host;
+                                    opt.textContent = srv.label + (srv.active ? ' ✓' : '');
+                                    if (srv.active) opt.selected = false; // keep default selected
+                                    svrGrp.appendChild(opt);
                                 });
-                                state.modelTiers.small  = 'ollama|' + sorted[0].id;
-                                state.modelTiers.large  = 'ollama|' + sorted[sorted.length - 1].id;
-                                state.modelTiers.medium = 'ollama|' + sorted[Math.floor(sorted.length / 2)].id;
+                                sel.appendChild(svrGrp);
+                            }
+
+                            // Build model tiers from chat-capable installed models
+                            if (p.models && p.models.length > 0) {
+                                const chatModels = p.models.filter(function(m) { return isChatModel(m.id); });
+                                if (chatModels.length > 0) {
+                                    const sorted = chatModels.slice().sort(function(a, b) {
+                                        return modelSizeScore(a.id) - modelSizeScore(b.id);
+                                    });
+                                    state.modelTiers.small  = 'ollama|' + sorted[0].id;
+                                    state.modelTiers.large  = 'ollama|' + sorted[sorted.length - 1].id;
+                                    state.modelTiers.medium = 'ollama|' + sorted[Math.floor(sorted.length / 2)].id;
+                                }
                             }
                         }
                     });
@@ -600,11 +620,53 @@
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
         });
         document.getElementById('ai-provider').addEventListener('change', function(e) {
-            state.selectedProvider = e.target.value;
+            const selectedVal = e.target.value;
+            const parts = selectedVal.split('|');
+            const isGrok         = parts[0] === 'grok';
+            const isServerSwitch = parts[0] === 'ollama_server';
+
+            if (isServerSwitch) {
+                // Switch Ollama host — call /ai/set_host then revert selector to 'ollama'
+                const newHost = parts[1] || '';
+                const sel = document.getElementById('ai-provider');
+                const statusEl = document.getElementById('chat-status');
+                if (statusEl) { statusEl.textContent = '⏳ Switching to ' + newHost + '…'; statusEl.className = 'chat-status processing'; }
+                fetch('/ai/set_host', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ host: newHost })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    if (result.success) {
+                        state.ollamaHost = newHost;
+                        if (statusEl) { statusEl.textContent = '✅ Ollama server: ' + newHost; statusEl.className = 'chat-status connected'; }
+                        // Update active marker in optgroup
+                        if (sel) {
+                            Array.from(sel.options).forEach(function(o) {
+                                if (o.value.startsWith('ollama_server|')) {
+                                    o.textContent = o.textContent.replace(' ✓', '');
+                                    if (o.value === 'ollama_server|' + newHost) o.textContent += ' ✓';
+                                }
+                            });
+                            sel.value = 'ollama'; // revert to primary option
+                        }
+                    } else {
+                        if (statusEl) { statusEl.textContent = '⚠️ Server switch failed'; statusEl.className = 'chat-status error'; }
+                        if (sel) sel.value = 'ollama';
+                    }
+                })
+                .catch(function() {
+                    if (statusEl) { statusEl.textContent = '⚠️ Server switch failed'; statusEl.className = 'chat-status error'; }
+                    if (sel) sel.value = 'ollama';
+                });
+                return; // don't update selectedProvider
+            }
+
+            state.selectedProvider = selectedVal;
             state.userModelOverride = true;   // user chose manually — disable auto-select
-            const parts = state.selectedProvider.split('|');
             let modelDisplay;
-            const isGrok = parts[0] === 'grok';
             if (isGrok) {
                 modelDisplay = 'Grok (xAI)' + (parts[1] ? ': ' + parts[1] : '');
             } else {

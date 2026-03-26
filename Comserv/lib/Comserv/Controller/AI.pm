@@ -4251,33 +4251,65 @@ sub get_user_providers :Local :Args(0) {
 
     my @providers;
 
-    # 1. Ollama (Local) — always present, include installed models
+    # 1. Ollama — always present; admins get server-switching info
     try {
-        my $ollama_cfg   = $c->config->{Ollama} || {};
-        my $primary_host = $ollama_cfg->{host}          || '192.168.1.199';
-        my $cfg_port     = $ollama_cfg->{port}          || 11434;
-        my $ollama       = $c->model('Ollama');
+        my $ollama_cfg     = $c->config->{Ollama} || {};
+        my $primary_host   = $ollama_cfg->{host}          || '192.168.1.199';
+        my $fallback_host  = $ollama_cfg->{fallback_host} || $primary_host;
+        my $cfg_port       = $ollama_cfg->{port}          || 11434;
+        my $session_host   = ($can_select_model && $c->session->{ollama_host}) ? $c->session->{ollama_host} : '';
+        my $active_host    = $session_host || $primary_host;
+
+        my $ollama = $c->model('Ollama');
         if ($ollama) {
-            $ollama->host($primary_host);
+            $ollama->host($active_host);
             $ollama->port($cfg_port);
             my $installed = $ollama->list_models() || [];
-            # Exclude embedding, reranker, and cloud-routed models from the chat list
             my @chat_models = grep {
                 my $n = $_->{name} || '';
                 $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i
                    && $n !~ /:cloud$/i;
             } @$installed;
+
+            # Build servers list for admins (used by widget server-switcher)
+            my @servers;
+            if ($can_select_model) {
+                push @servers, {
+                    host     => $primary_host,
+                    label    => "Primary ($primary_host)",
+                    active   => ($active_host eq $primary_host) ? JSON::true : JSON::false,
+                };
+                if ($fallback_host ne $primary_host) {
+                    push @servers, {
+                        host   => $fallback_host,
+                        label  => "Fallback ($fallback_host)",
+                        active => ($active_host eq $fallback_host) ? JSON::true : JSON::false,
+                    };
+                }
+                # If session overrides to a host not in config, add it too
+                if ($session_host && $session_host ne $primary_host && $session_host ne $fallback_host) {
+                    push @servers, {
+                        host   => $session_host,
+                        label  => "Custom ($session_host)",
+                        active => JSON::true,
+                    };
+                }
+            }
+
             push @providers, {
-                service  => 'ollama',
-                name     => 'Ollama (Local)',
-                is_local => JSON::true,
-                models   => [ map { { id => $_->{name} } } @chat_models ],
+                service     => 'ollama',
+                name        => 'Ollama (Local AI)',
+                is_local    => JSON::true,
+                active_host => $active_host,
+                servers     => \@servers,
+                models      => [ map { { id => $_->{name} } } @chat_models ],
             };
         }
     } catch {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
             'get_user_providers', "Ollama list failed: $_");
-        push @providers, { service => 'ollama', name => 'Ollama (Local)', is_local => JSON::true, models => [] };
+        push @providers, { service => 'ollama', name => 'Ollama (Local AI)', is_local => JSON::true,
+                           active_host => '', servers => [], models => [] };
     };
 
     # 2. External API keys — authenticated users only
