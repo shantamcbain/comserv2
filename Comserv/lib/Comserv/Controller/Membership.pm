@@ -144,8 +144,8 @@ sub account :Local :Args(0) {
         my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
         if ($site) {
             my @rows = $c->model('DBEncy')->resultset('UserMembership')->search(
-                { user_id => $user_id, site_id => $site->id },
-                { order_by => { -desc => 'created_at' }, prefetch => 'plan' }
+                { 'me.user_id' => $user_id, 'me.site_id' => $site->id },
+                { order_by => { -desc => 'me.created_at' }, prefetch => 'plan' }
             )->all;
             $memberships = \@rows;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'account',
