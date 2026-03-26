@@ -1615,7 +1615,10 @@ sub api_todo_update :Path('/api/todo/update') :Args(1) {
     my ($self, $c, $todo_id) = @_;
 
     my $address  = $c->req->address;
-    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1'
+        || $address =~ /^192\.168\./
+        || $address =~ /^172\.(1[6-9]|2[0-9]|3[01])\./
+        || $address =~ /^10\./);
 
     unless ($is_local) {
         $self->_api_validate_token($c);
