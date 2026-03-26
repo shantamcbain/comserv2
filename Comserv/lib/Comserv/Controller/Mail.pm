@@ -824,13 +824,25 @@ sub send_test_email :Local {
 #  MAILING LIST MANAGEMENT
 # ─────────────────────────────────────────────────────────────
 
+sub _get_site_id {
+    my ($self, $c) = @_;
+    my $site_id = $c->session->{site_id} || $c->stash->{site_id};
+    if (!$site_id && $c->stash->{SiteName}) {
+        eval {
+            my $site = $c->model('DBEncy')->resultset('Site')->find({ name => $c->stash->{SiteName} });
+            $site_id = $site->id if $site;
+        };
+    }
+    return $site_id;
+}
+
 sub lists :Local :Args(0) {
     my ($self, $c) = @_;
 
-    my $site_id = $c->session->{site_id} || $c->stash->{site_id};
+    my $site_id = $self->_get_site_id($c);
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'lists',
-        "lists action called: site_id=" . ($site_id // 'undef'));
+        "lists action called: site_id=" . ($site_id // 'undef') . " SiteName=" . ($c->stash->{SiteName} // 'undef'));
 
     # Auto-create and sync the three default list categories
     $self->_sync_default_lists($c, $site_id);
@@ -899,7 +911,7 @@ sub lists_create :Path('/mail/lists/create') :Args(0) {
     }
 
     if ($c->req->method eq 'POST') {
-        my $site_id = $c->session->{site_id} || $c->stash->{site_id};
+        my $site_id = $self->_get_site_id($c);
         my $name    = $c->req->param('name') || '';
         unless ($name) {
             $c->stash(debug_msg => 'List name is required.', template => 'mail/create_list.tt');
@@ -1039,7 +1051,7 @@ sub mass_email :Local :Args(0) {
         return;
     }
 
-    my $site_id = $c->session->{site_id} || $c->stash->{site_id};
+    my $site_id = $self->_get_site_id($c);
 
     my $all_count  = _count_site_users($c, $site_id, 'all');
     my $paid_count = _count_site_users($c, $site_id, 'paid');
@@ -1072,7 +1084,7 @@ sub send_mass_email :Local :Args(0) {
         return;
     }
 
-    my $site_id   = $c->session->{site_id} || $c->stash->{site_id};
+    my $site_id = $self->_get_site_id($c);
     my $subject   = $c->req->param('subject') || '';
     my $body_tmpl = $c->req->param('body')    || '';
     my $group     = $c->req->param('group')   || 'all';
