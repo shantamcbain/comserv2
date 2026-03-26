@@ -437,29 +437,96 @@
 
         [%# ── Branch server launcher (admin only) ── %]
         [% IF is_admin %]
-        [% SET cur_branch   = c.stash.app_workflow || 'main' %]
-        [% SET cur_port     = c.req.uri.port || 3001 %]
-        [% SET is_worktree  = (cur_branch != 'main' && cur_branch != '') %]
-        [% IF is_worktree %]
-        [% SET branch_port  = cur_port + 1000 %]
-        [% SET worktree_dir = '/home/shanta/.zenflow/worktrees/' _ cur_branch _ '/Comserv' %]
-        [% SET start_cmd    = 'cd ' _ worktree_dir _ ' && perl script/comserv_server.pl -p ' _ branch_port %]
-        [% SET branch_url   = c.req.uri.scheme _ '://' _ c.req.uri.host _ ':' _ branch_port _ '/Documentation/DailyPlan' %]
-        <div style="margin-bottom:14px;padding:10px 14px;background:color-mix(in srgb,#fd7e14 10%,var(--bg-color));border:1px solid #fd7e14;border-radius:6px;font-size:0.85em;">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <span style="font-weight:bold;color:#fd7e14;">🌿 Branch: <code style="font-size:1em;">[% cur_branch %]</code></span>
-                <a href="[% branch_url %]" target="_blank"
-                   style="padding:4px 12px;background:#fd7e14;color:#fff;border-radius:4px;text-decoration:none;font-size:0.9em;">
-                    Open Branch Server (:[% branch_port %]) →
-                </a>
+        [% SET cur_branch = c.stash.app_workflow || 'main' %]
+        [% SET host       = c.req.uri.host %]
+        [% SET scheme     = c.req.uri.scheme %]
+
+        [%# Static branch → port map (matches Planning.tt overview) %]
+        [% SET bp = {
+            'planningsystem-59ae'                      => 4001,
+            'aichatsystem-ef4e'                        => 4001,
+            'schema-management-system-7eb3'            => 4002,
+            'new-task-9cf1'                            => 4003,
+            'workshops-7d21'                           => 4004,
+            'users-e5b8'                               => 4005,
+            'set-up-project-config-d327'               => 3000,
+            'new-task-bb05'                            => 4006,
+            'unified-mail-system-site-managed-2c53'    => 4007,
+            'membership-1304'                          => 4008,
+            'pointsystem-3230'                         => 4009,
+        } %]
+
+        [%# All known branch servers for the overview panel %]
+        [% SET all_branches = [
+            { name => 'planningsystem-59ae',                   port => 4001, label => 'PlanningSystem',    url => '/Documentation/DailyPlan' },
+            { name => 'aichatsystem-ef4e',                     port => 4001, label => 'AIChatSystem',      url => '/Documentation/DailyPlan' },
+            { name => 'schema-management-system-7eb3',         port => 4002, label => 'SchemaManagement',  url => '/Documentation/DailyPlan' },
+            { name => 'new-task-9cf1',                         port => 4003, label => 'InfrastructureHA',  url => '/Documentation/DailyPlan' },
+            { name => 'workshops-7d21',                        port => 4004, label => 'WorkShops',         url => '/workshop' },
+            { name => 'users-e5b8',                            port => 4005, label => 'Users',             url => '/user/dashboard' },
+            { name => 'set-up-project-config-d327',            port => 3000, label => 'ProjectConfig',     url => '/Documentation/DailyPlan' },
+            { name => 'new-task-bb05',                         port => 4006, label => 'FileManagement',    url => '/admin/planning' },
+            { name => 'unified-mail-system-site-managed-2c53', port => 4007, label => 'UnifiedMail',       url => '/Documentation/DailyPlan' },
+            { name => 'membership-1304',                       port => 4008, label => 'Membership',        url => '/membership' },
+            { name => 'pointsystem-3230',                      port => 4009, label => 'PointSystem',       url => '/Documentation/DailyPlan' },
+        ] %]
+
+        <details style="margin-bottom:14px;border:1px solid #fd7e14;border-radius:6px;font-size:0.85em;">
+            <summary style="padding:8px 14px;cursor:pointer;background:color-mix(in srgb,#fd7e14 10%,var(--bg-color));border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-weight:bold;color:#fd7e14;">🌿 Branch Servers
+                    [% IF cur_branch && cur_branch != 'main' %]
+                    — currently on <code style="font-size:1em;">[% cur_branch %]</code>
+                    [% END %]
+                </span>
+                <span style="color:var(--text-muted-color);font-size:0.9em;">▾</span>
+            </summary>
+            <div style="padding:10px 14px;">
+
+                [%# Current branch start command %]
+                [% IF cur_branch && cur_branch != 'main' %]
+                [% SET cur_port     = bp.$cur_branch || '????' %]
+                [% SET worktree_dir = '/home/shanta/.zenflow/worktrees/' _ cur_branch _ '/Comserv' %]
+                [% SET start_cmd    = 'cd ' _ worktree_dir _ ' && perl script/comserv_server.pl -p ' _ cur_port %]
+                <div style="margin-bottom:10px;padding:8px 10px;background:color-mix(in srgb,#fd7e14 8%,var(--bg-color));border-radius:4px;">
+                    <div style="margin-bottom:6px;font-weight:bold;color:#fd7e14;">▶ Start current branch server (port [% cur_port %]):</div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <code id="branch-start-cmd" style="flex:1;padding:4px 8px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:3px;font-size:0.88em;word-break:break-all;">[% start_cmd %]</code>
+                        <button onclick="navigator.clipboard.writeText(document.getElementById('branch-start-cmd').textContent);this.textContent='✓';setTimeout(()=>this.textContent='📋 Copy',1500);"
+                            style="padding:3px 10px;border:1px solid #fd7e14;border-radius:3px;background:transparent;color:#fd7e14;cursor:pointer;white-space:nowrap;">📋 Copy</button>
+                        <a href="[% scheme %]://[% host %]:[% cur_port %]/Documentation/DailyPlan" target="_blank"
+                           style="padding:3px 10px;background:#fd7e14;color:#fff;border-radius:3px;text-decoration:none;white-space:nowrap;">Open →</a>
+                    </div>
+                </div>
+                [% END %]
+
+                [%# All branch servers table %]
+                <table style="width:100%;border-collapse:collapse;font-size:0.88em;">
+                    <tr style="border-bottom:1px solid var(--border-color);">
+                        <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Branch</th>
+                        <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Port</th>
+                        <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Start Command</th>
+                        <th style="padding:4px 8px;"></th>
+                    </tr>
+                    [% FOREACH b IN all_branches %]
+                    [% SET b_cmd = 'cd /home/shanta/.zenflow/worktrees/' _ b.name _ '/Comserv && perl script/comserv_server.pl -p ' _ b.port %]
+                    <tr style="border-bottom:1px solid var(--border-color);[% IF b.name == cur_branch %]background:color-mix(in srgb,#fd7e14 8%,var(--bg-color));[% END %]">
+                        <td style="padding:5px 8px;"><code>[% b.label %]</code>
+                            [% IF b.name == cur_branch %]<span style="color:#fd7e14;font-size:0.8em;"> ← current</span>[% END %]
+                        </td>
+                        <td style="padding:5px 8px;"><code>:[% b.port %]</code></td>
+                        <td style="padding:5px 8px;max-width:320px;">
+                            <code id="cmd-[% b.port %]" style="font-size:0.82em;word-break:break-all;">[% b_cmd %]</code></td>
+                        <td style="padding:5px 8px;white-space:nowrap;">
+                            <button onclick="navigator.clipboard.writeText(document.getElementById('cmd-[% b.port %]').textContent);this.textContent='✓';setTimeout(()=>this.textContent='📋',1500);"
+                                style="padding:2px 6px;border:1px solid var(--border-color);border-radius:3px;background:transparent;color:var(--text-muted-color);cursor:pointer;margin-right:4px;">📋</button>
+                            <a href="[% scheme %]://[% host %]:[% b.port %][% b.url %]" target="_blank"
+                               style="padding:2px 8px;background:var(--primary-color);color:#fff;border-radius:3px;text-decoration:none;font-size:0.85em;">Open</a>
+                        </td>
+                    </tr>
+                    [% END %]
+                </table>
             </div>
-            <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
-                <code id="branch-start-cmd" style="flex:1;padding:5px 8px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:3px;font-size:0.88em;word-break:break-all;">[% start_cmd %]</code>
-                <button onclick="navigator.clipboard.writeText(document.getElementById('branch-start-cmd').textContent);this.textContent='✓ Copied';setTimeout(()=>this.textContent='📋 Copy',1500);"
-                    style="padding:4px 10px;border:1px solid #fd7e14;border-radius:3px;background:transparent;color:#fd7e14;cursor:pointer;white-space:nowrap;">📋 Copy</button>
-            </div>
-        </div>
-        [% END %]
+        </details>
         [% END %]
 
         [%# ── Header row ── %]
