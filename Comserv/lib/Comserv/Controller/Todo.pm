@@ -97,6 +97,9 @@ sub begin :Private {
     # Log the path the user is accessing
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "User accessing path: " . $c->req->uri);
 
+    # API paths handle their own auth — skip session-based checks
+    return 1 if $c->req->path =~ m{^api/};
+
     # Fetch the user's roles from the session
     my $roles = $c->session->{roles} || [];
 
@@ -1610,41 +1613,53 @@ PUT /api/todo/:id - Update a todo (partial update allowed)
 
 sub api_todo_update :Path('/api/todo/update') :Args(1) {
     my ($self, $c, $todo_id) = @_;
-    
-    $self->_api_dev_only_check($c);
-    $self->_api_validate_token($c);
-    
+
+    my $address  = $c->req->address;
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1' || $address =~ /^192\.168\.1\./);
+
+    unless ($is_local) {
+        $self->_api_validate_token($c);
+    }
+
     my $params;
     eval {
         my $body = $c->request->body;
-        $params = decode_json($body) if $body;
+        if ($body) {
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                my $raw = do { local $/; <$body> };
+                $params = decode_json($raw) if $raw && $raw =~ /\S/;
+            } else {
+                $params = decode_json($body);
+            }
+        }
+        $params ||= {};
     };
     if ($@) {
         $self->_api_error($c, "Invalid JSON: $@", 'json_parse_error', 400);
     }
-    
+
     my $schema = $c->model('DBEncy');
-    my $todo = $schema->resultset('Todo')->find($todo_id);
-    
+    my $todo   = $schema->resultset('Todo')->find($todo_id);
+
     unless ($todo) {
         $self->_api_error($c, "Todo not found: $todo_id", 'not_found', 404);
     }
-    
-    my $update_data = {};
-    my %allowed_fields = map { $_ => 1 } qw(status priority description assigned_to);
-    
-    foreach my $field (keys %$params) {
-        if ($allowed_fields{$field}) {
-            $update_data->{$field} = $params->{$field};
-        }
+
+    my %allowed = map { $_ => 1 } qw(status priority description developer comments);
+    my %update;
+    for my $field (keys %$params) {
+        $update{$field} = $params->{$field} if $allowed{$field};
     }
-    
-    if (keys %$update_data) {
-        $todo->update($update_data);
+
+    if (%update) {
+        $update{last_mod_by}   = 'system';
+        $update{last_mod_date} = DateTime->now->ymd;
+        $todo->update(\%update);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_update',
-            "Todo updated via API: ID=$todo_id, Fields=" . join(',', keys %$update_data));
+            "Todo updated via API: record_id=$todo_id, Fields=" . join(',', keys %update));
     }
-    
+
     $self->_api_success($c, 'Todo updated successfully', {
         todo => $self->_todo_to_hash($todo)
     });
