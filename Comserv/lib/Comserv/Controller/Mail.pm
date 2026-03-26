@@ -1453,42 +1453,46 @@ sub _sync_role_lists {
 sub _sync_workshop_attendees_list {
     my ($self, $c, $site_id) = @_;
 
-    my $current_year = (localtime)[5] + 1900;
-    my $year_start   = "$current_year-01-01 00:00:00";
-
     my $list = $self->_find_or_create_list($c, $site_id,
         'All Workshop Attendees',
-        "[auto] All users registered for any $current_year workshop on this site"
+        '[auto] All users registered for any active workshop on this site'
     );
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
-        "Syncing workshop attendees for site_id=$site_id year=$current_year (date >= $year_start)");
+        "Syncing workshop attendees for site_id=$site_id (active workshops only, excluding cancelled)");
 
-    # Get all workshop_ids for this site this year — BOTH from site_workshop join table AND workshop.site_id
+    # Get all active workshop_ids for this site — BOTH from site_workshop join table AND workshop.site_id
+    # Exclude only cancelled workshops; completed/in_progress/published are all valid
     my %seen_wid;
     my @workshop_ids;
 
     eval {
         my @via_link = $c->model('DBEncy')->resultset('SiteWorkshop')->search(
-            { site_id => $site_id },
-            { join => 'workshop', where => \"workshop.date >= '$year_start'" }
+            { site_id => $site_id }
         )->get_column('workshop_id')->all;
-        for my $wid (@via_link) {
-            unless ($seen_wid{$wid}++) { push @workshop_ids, $wid }
+
+        if (@via_link) {
+            # Filter to non-cancelled workshops from the id list
+            my @active = $c->model('DBEncy')->resultset('WorkShop')->search(
+                { id => { -in => \@via_link }, status => { '!=' => 'cancelled' } }
+            )->get_column('id')->all;
+            for my $wid (@active) {
+                unless ($seen_wid{$wid}++) { push @workshop_ids, $wid }
+            }
         }
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
-            "Workshops via site_workshop for site_id=$site_id year>=$current_year: [" . join(',', @via_link) . "]");
+            "Workshops via site_workshop for site_id=$site_id: [" . join(',', @workshop_ids) . "]");
     };
 
     eval {
         my @via_direct = $c->model('DBEncy')->resultset('WorkShop')->search(
-            { site_id => $site_id, date => { '>=' => $year_start } }
+            { site_id => $site_id, status => { '!=' => 'cancelled' } }
         )->get_column('id')->all;
         for my $wid (@via_direct) {
             unless ($seen_wid{$wid}++) { push @workshop_ids, $wid }
         }
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
-            "Workshops via WorkShop.site_id for site_id=$site_id year>=$current_year: [" . join(',', @via_direct) . "]");
+            "Workshops via WorkShop.site_id for site_id=$site_id: [" . join(',', @via_direct) . "]");
     };
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
