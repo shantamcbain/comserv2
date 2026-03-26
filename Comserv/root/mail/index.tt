@@ -75,7 +75,7 @@
                 </div>
                 <div class="feature-actions">
                     <a href="/mail/mass_email" class="btn btn-warning">
-                        <i class="fas fa-envelope-bulk"></i> Mass Email
+                        <i class="fas fa-envelope-bulk"></i> Site Mailout
                     </a>
                     <a href="/mail/add_mail_config_form" class="btn btn-secondary">
                         <i class="fas fa-server"></i> SMTP Config
