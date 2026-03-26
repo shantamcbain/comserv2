@@ -391,8 +391,20 @@ sub api_todo_create :Path('todo/create') :Args(0) {
         $c->detach();
     }
     
-    my $sitename = $c->session->{SiteName} || 'comserv';
-    
+    my $sitename = $params->{sitename} || $c->session->{SiteName} || 'CSC';
+
+    my $poster_user_id;
+    if ($api_user) {
+        $poster_user_id = $api_user->id;
+    } else {
+        my $poster_name = $params->{assigned_to} || $params->{developer} || $current_user;
+        my $poster_row = $schema->resultset('User')->search(
+            { username => $poster_name },
+            { rows => 1 }
+        )->single;
+        $poster_user_id = $poster_row ? $poster_row->id : undef;
+    }
+
     my $todo = $schema->resultset('Todo')->create({
         subject => $params->{subject},
         description => $params->{description} || '',
@@ -401,7 +413,7 @@ sub api_todo_create :Path('todo/create') :Args(0) {
         due_date => $due_date,
         priority => $params->{priority},
         status => $params->{status},
-        developer => $params->{assigned_to} || $current_user,
+        developer => $params->{assigned_to} || $params->{developer} || $current_user,
         sitename => $sitename,
         date_time_posted => DateTime->now->ymd . ' ' . DateTime->now->hms,
         username_of_poster => $current_user,
@@ -413,7 +425,7 @@ sub api_todo_create :Path('todo/create') :Args(0) {
         group_of_poster => 'admin',
         project_code => 'system',
         share => 0,
-        user_id => $api_user ? $api_user->id : 1,
+        ($poster_user_id ? (user_id => $poster_user_id) : ()),
     });
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_create',
