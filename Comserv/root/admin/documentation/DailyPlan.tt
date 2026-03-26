@@ -435,6 +435,33 @@
         [%# ── Data from controller stash (fetched in Documentation.pm::daily_plan) ── %]
         [% SET view_sitename = filter_site || plan_sitename %]
 
+        [%# ── Branch server launcher (admin only) ── %]
+        [% IF is_admin %]
+        [% SET cur_branch   = c.stash.app_workflow || 'main' %]
+        [% SET cur_port     = c.req.uri.port || 3001 %]
+        [% SET is_worktree  = (cur_branch != 'main' && cur_branch != '') %]
+        [% IF is_worktree %]
+        [% SET branch_port  = cur_port + 1000 %]
+        [% SET worktree_dir = '/home/shanta/.zenflow/worktrees/' _ cur_branch _ '/Comserv' %]
+        [% SET start_cmd    = 'cd ' _ worktree_dir _ ' && perl script/comserv_server.pl -p ' _ branch_port %]
+        [% SET branch_url   = c.req.uri.scheme _ '://' _ c.req.uri.host _ ':' _ branch_port _ '/Documentation/DailyPlan' %]
+        <div style="margin-bottom:14px;padding:10px 14px;background:color-mix(in srgb,#fd7e14 10%,var(--bg-color));border:1px solid #fd7e14;border-radius:6px;font-size:0.85em;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <span style="font-weight:bold;color:#fd7e14;">🌿 Branch: <code style="font-size:1em;">[% cur_branch %]</code></span>
+                <a href="[% branch_url %]" target="_blank"
+                   style="padding:4px 12px;background:#fd7e14;color:#fff;border-radius:4px;text-decoration:none;font-size:0.9em;">
+                    Open Branch Server (:[% branch_port %]) →
+                </a>
+            </div>
+            <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+                <code id="branch-start-cmd" style="flex:1;padding:5px 8px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:3px;font-size:0.88em;word-break:break-all;">[% start_cmd %]</code>
+                <button onclick="navigator.clipboard.writeText(document.getElementById('branch-start-cmd').textContent);this.textContent='✓ Copied';setTimeout(()=>this.textContent='📋 Copy',1500);"
+                    style="padding:4px 10px;border:1px solid #fd7e14;border-radius:3px;background:transparent;color:#fd7e14;cursor:pointer;white-space:nowrap;">📋 Copy</button>
+            </div>
+        </div>
+        [% END %]
+        [% END %]
+
         [%# ── Header row ── %]
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--primary-color);">
             <h2 style="margin:0;font-size:1.2em;">
