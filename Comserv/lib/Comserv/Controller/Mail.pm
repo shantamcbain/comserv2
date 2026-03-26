@@ -855,33 +855,58 @@ sub lists :Local :Args(0) {
         );
         while (my $list = $rs->next) {
             my @subs;
-            my $sub_rs = $c->model('DBEncy')->resultset('MailingListSubscription')->search(
-                { mailing_list_id => $list->id, is_active => 1 },
-                { prefetch => 'user' }
-            );
-            while (my $sub = $sub_rs->next) {
-                my $u = eval { $sub->user };
-                if ($u && $u->email) {
-                    push @subs, {
-                        user_id    => $u->id,
-                        username   => $u->username   || '',
-                        first_name => $u->first_name || '',
-                        last_name  => $u->last_name  || '',
-                        email      => $u->email,
-                    };
-                } elsif (!$u) {
-                    # Email-only subscription (no system account)
-                    my $em = eval { $sub->email } || '';
-                    next unless $em;
-                    my $dn = eval { $sub->display_name } || '';
-                    push @subs, {
-                        user_id    => undef,
-                        username   => '',
-                        first_name => $dn,
-                        last_name  => '',
-                        email      => $em,
-                    };
+            eval {
+                my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+                # Try full query with email-only columns; fall back to uid-only if columns missing
+                my $sth;
+                eval {
+                    $sth = $dbh->prepare(
+                        "SELECT s.id, s.user_id, s.email AS sub_email, s.display_name,
+                                u.username, u.first_name, u.last_name, u.email AS user_email
+                         FROM mailing_list_subscriptions s
+                         LEFT JOIN users u ON u.id = s.user_id
+                         WHERE s.mailing_list_id = ? AND s.is_active = 1
+                         ORDER BY COALESCE(u.username, s.email)"
+                    );
+                    $sth->execute($list->id);
+                };
+                if ($@) {
+                    # Fallback: columns not yet added — uid-only query
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'lists',
+                        "Falling back to uid-only subscription query (run ALTER migration): $@");
+                    $sth = $dbh->prepare(
+                        "SELECT s.id, s.user_id,
+                                u.username, u.first_name, u.last_name, u.email AS user_email
+                         FROM mailing_list_subscriptions s
+                         LEFT JOIN users u ON u.id = s.user_id
+                         WHERE s.mailing_list_id = ? AND s.is_active = 1
+                         ORDER BY u.username"
+                    );
+                    $sth->execute($list->id);
                 }
+                while (my $row = $sth->fetchrow_hashref) {
+                    if ($row->{user_email}) {
+                        push @subs, {
+                            user_id    => $row->{user_id},
+                            username   => $row->{username}   || '',
+                            first_name => $row->{first_name} || '',
+                            last_name  => $row->{last_name}  || '',
+                            email      => $row->{user_email},
+                        };
+                    } elsif ($row->{sub_email}) {
+                        push @subs, {
+                            user_id    => undef,
+                            username   => '',
+                            first_name => $row->{display_name} || '',
+                            last_name  => '',
+                            email      => $row->{sub_email},
+                        };
+                    }
+                }
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'lists',
+                    "Subscription query failed for list " . $list->id . ": $@");
             }
             my $row = {
                 id               => $list->id,
@@ -1281,16 +1306,20 @@ sub _upsert_list_subscriptions {
     my $dbh = $c->model('DBEncy')->schema->storage->dbh;
 
     # Mark all auto subscriptions for this list+source inactive
-    $dbh->do(
-        "UPDATE mailing_list_subscriptions SET is_active=0 WHERE mailing_list_id=? AND subscription_source=?",
-        undef, $list_id, $source
-    );
+    eval {
+        $dbh->do(
+            "UPDATE mailing_list_subscriptions SET is_active=0 WHERE mailing_list_id=? AND subscription_source=?",
+            undef, $list_id, $source
+        );
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_upsert_list_subscriptions',
+            "Mark-inactive failed for list $list_id: $@");
+        return;
+    }
 
     my $check_uid_sth = $dbh->prepare(
         "SELECT id FROM mailing_list_subscriptions WHERE mailing_list_id=? AND user_id=? AND subscription_source=?"
-    );
-    my $check_email_sth = $dbh->prepare(
-        "SELECT id FROM mailing_list_subscriptions WHERE mailing_list_id=? AND email=? AND subscription_source=?"
     );
     my $update_sth = $dbh->prepare(
         "UPDATE mailing_list_subscriptions SET is_active=1 WHERE id=?"
@@ -1298,19 +1327,40 @@ sub _upsert_list_subscriptions {
     my $insert_uid_sth = $dbh->prepare(
         "INSERT INTO mailing_list_subscriptions (mailing_list_id, user_id, subscription_source, is_active) VALUES (?,?,?,1)"
     );
-    my $insert_email_sth = $dbh->prepare(
-        "INSERT INTO mailing_list_subscriptions (mailing_list_id, email, display_name, subscription_source, is_active) VALUES (?,?,?,?,1)"
-    );
+
+    # Lazily prepare email statements only if needed (columns may not exist yet pre-ALTER)
+    my ($check_email_sth, $insert_email_sth, $email_stmts_ok);
 
     for my $entry (@$user_ids_ref) {
         if (ref $entry eq 'HASH') {
             my $email = $entry->{email};
             my $name  = $entry->{name} || '';
             next unless $email;
-            $check_email_sth->execute($list_id, $email, $source);
+
+            # Prepare email statements on first use
+            unless (defined $email_stmts_ok) {
+                eval {
+                    $check_email_sth = $dbh->prepare(
+                        "SELECT id FROM mailing_list_subscriptions WHERE mailing_list_id=? AND email=? AND subscription_source=?"
+                    );
+                    $insert_email_sth = $dbh->prepare(
+                        "INSERT INTO mailing_list_subscriptions (mailing_list_id, email, display_name, subscription_source, is_active) VALUES (?,?,?,?,1)"
+                    );
+                    $email_stmts_ok = 1;
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_upsert_list_subscriptions',
+                        "Email column not available yet (run ALTER migration): $@");
+                    $email_stmts_ok = 0;
+                }
+            }
+            next unless $email_stmts_ok;
+
+            eval { $check_email_sth->execute($list_id, $email, $source) };
+            next if $@;
             my $row = $check_email_sth->fetchrow_hashref;
             if ($row) {
-                $update_sth->execute($row->{id});
+                eval { $update_sth->execute($row->{id}) };
             } else {
                 eval { $insert_email_sth->execute($list_id, $email, $name, $source) };
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_upsert_list_subscriptions',
@@ -1318,10 +1368,11 @@ sub _upsert_list_subscriptions {
             }
         } else {
             my $uid = $entry;
-            $check_uid_sth->execute($list_id, $uid, $source);
+            eval { $check_uid_sth->execute($list_id, $uid, $source) };
+            next if $@;
             my $row = $check_uid_sth->fetchrow_hashref;
             if ($row) {
-                $update_sth->execute($row->{id});
+                eval { $update_sth->execute($row->{id}) };
             } else {
                 eval { $insert_uid_sth->execute($list_id, $uid, $source) };
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_upsert_list_subscriptions',
