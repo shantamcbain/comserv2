@@ -829,6 +829,9 @@ sub lists :Local :Args(0) {
 
     my $site_id = $c->session->{site_id} || $c->stash->{site_id};
 
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'lists',
+        "lists action called: site_id=" . ($site_id // 'undef'));
+
     # Auto-create and sync the three default list categories
     $self->_sync_default_lists($c, $site_id);
 
@@ -1226,7 +1229,14 @@ sub _get_site_users {
 
 sub _sync_default_lists {
     my ($self, $c, $site_id) = @_;
-    return unless $site_id;
+    unless ($site_id) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_sync_default_lists',
+            "No site_id — skipping default list sync");
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_default_lists',
+        "Starting default list sync for site_id=$site_id");
 
     eval { $self->_sync_all_members_list($c, $site_id) };
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_sync_default_lists',
