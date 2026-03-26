@@ -14,9 +14,22 @@ ALTER TABLE `mailing_list_subscriptions`
     ADD COLUMN IF NOT EXISTS `display_name` VARCHAR(255) NULL AFTER `email`;
 
 ALTER TABLE `mailing_list_subscriptions`
+    ADD COLUMN IF NOT EXISTS `first_name` VARCHAR(255) NULL AFTER `display_name`;
+
+ALTER TABLE `mailing_list_subscriptions`
+    ADD COLUMN IF NOT EXISTS `last_name` VARCHAR(255) NULL AFTER `first_name`;
+
+ALTER TABLE `mailing_list_subscriptions`
     ADD INDEX IF NOT EXISTS `idx_email` (`email`);
 
 -- Remove old unique key that required non-null user_id
 -- (ignore error if it doesn't exist)
 ALTER TABLE `mailing_list_subscriptions`
     DROP INDEX IF EXISTS `unique_subscription`;
+
+-- Participant table: add first_name/last_name for consistent naming with users table
+ALTER TABLE `participant`
+    ADD COLUMN IF NOT EXISTS `first_name` VARCHAR(255) NULL AFTER `name`;
+
+ALTER TABLE `participant`
+    ADD COLUMN IF NOT EXISTS `last_name` VARCHAR(255) NULL AFTER `first_name`;

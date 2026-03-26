@@ -29,6 +29,16 @@ __PACKAGE__->add_columns(
         size => 255,
         is_nullable => 1,
     },
+    first_name => {
+        data_type => 'varchar',
+        size => 255,
+        is_nullable => 1,
+    },
+    last_name => {
+        data_type => 'varchar',
+        size => 255,
+        is_nullable => 1,
+    },
     subscription_source => {
         data_type => 'varchar',
         size => 50,
