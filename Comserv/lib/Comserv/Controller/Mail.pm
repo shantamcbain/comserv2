@@ -839,10 +839,22 @@ sub lists :Local :Args(0) {
             { order_by => 'name' }
         );
         while (my $list = $rs->next) {
-            my $sub_count = $c->model('DBEncy')->resultset('MailingListSubscription')->count({
-                mailing_list_id => $list->id,
-                is_active => 1,
-            });
+            my @subs;
+            my $sub_rs = $c->model('DBEncy')->resultset('MailingListSubscription')->search(
+                { mailing_list_id => $list->id, is_active => 1 },
+                { prefetch => 'user', order_by => 'user.username' }
+            );
+            while (my $sub = $sub_rs->next) {
+                my $u = $sub->user;
+                next unless $u && $u->email;
+                push @subs, {
+                    user_id    => $u->id,
+                    username   => $u->username   || '',
+                    first_name => $u->first_name || '',
+                    last_name  => $u->last_name  || '',
+                    email      => $u->email,
+                };
+            }
             my $row = {
                 id               => $list->id,
                 name             => $list->name,
@@ -850,7 +862,8 @@ sub lists :Local :Args(0) {
                 list_email       => $list->list_email,
                 is_software_only => $list->is_software_only,
                 is_default       => ($list->description =~ /^\[auto\]/) ? 1 : 0,
-                subscriber_count => $sub_count,
+                subscriber_count => scalar @subs,
+                subscribers      => \@subs,
                 created_at       => $list->created_at,
             };
             if ($row->{is_default}) {
