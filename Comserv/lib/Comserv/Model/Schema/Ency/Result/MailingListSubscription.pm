@@ -17,7 +17,17 @@ __PACKAGE__->add_columns(
     },
     user_id => {
         data_type => 'integer',
-        is_nullable => 0,
+        is_nullable => 1,
+    },
+    email => {
+        data_type => 'varchar',
+        size => 255,
+        is_nullable => 1,
+    },
+    display_name => {
+        data_type => 'varchar',
+        size => 255,
+        is_nullable => 1,
     },
     subscription_source => {
         data_type => 'varchar',
