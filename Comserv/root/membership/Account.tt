@@ -73,6 +73,15 @@
             Started: [% m.started_at | html %]
           </div>
 
+          [% IF m.plan.has_hosting %]
+          <div style="margin-top:0.6rem">
+            <a href="[% c.uri_for('/hosting/renew', { site_id => m.site_id }) %]"
+               class="btn btn-secondary" style="font-size:0.88em;padding:0.3rem 0.8rem">
+              Renew Hosting
+            </a>
+          </div>
+          [% END %]
+
           <!-- ── Auto-pay settings ── -->
           <div style="margin-top:1rem;padding:0.75rem;background:rgba(0,0,0,0.03);border-radius:5px;border:1px solid var(--border-color,#e0e0e0)">
             <strong style="font-size:0.95em">Auto-Pay Settings</strong>
