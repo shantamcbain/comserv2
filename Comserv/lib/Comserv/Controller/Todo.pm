@@ -1700,18 +1700,18 @@ sub _todo_to_hash {
     my ($self, $todo) = @_;
     
     return {
-        id => $todo->id,
-        subject => $todo->subject,
-        description => $todo->description,
-        project_id => $todo->project_id,
-        start_date => $todo->start_date,
-        due_date => $todo->due_date,
-        priority => $todo->priority,
-        status => $todo->status,
-        assigned_to => $todo->assigned_to,
-        sitename => $todo->sitename,
-        date_time_posted => $todo->date_time_posted ? $todo->date_time_posted->iso8601 : undef,
-        posted_by => $todo->posted_by,
+        id                => $todo->id,
+        subject           => $todo->subject,
+        description       => $todo->description,
+        project_id        => $todo->project_id,
+        start_date        => $todo->start_date  ? "${\$todo->start_date}" : undef,
+        due_date          => $todo->due_date    ? "${\$todo->due_date}"   : undef,
+        priority          => $todo->priority,
+        status            => $todo->status,
+        developer         => $todo->developer,
+        sitename          => $todo->sitename,
+        date_time_posted  => $todo->date_time_posted || undef,
+        username_of_poster => $todo->username_of_poster,
         accumulative_time => $todo->accumulative_time || 0,
     };
 }
