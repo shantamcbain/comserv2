@@ -268,8 +268,8 @@
 
     // Detect page context (documentation, helpdesk, project, etc.)
     function detectPageContext() {
-        const pathname = window.location.pathname;
-        const pageTitle = document.title || 'Unknown Page';
+        const pathname = window.HELPDESK_PRESCREEN_PAGE_PATH || window.location.pathname;
+        const pageTitle = window.HELPDESK_PRESCREEN_PAGE_TITLE || document.title || 'Unknown Page';
         
         // Try to load and select agent from config
         const selectedAgent = selectAgentForPage();
@@ -1948,5 +1948,44 @@
                 }
             }
         });
+
+        // HelpDesk pre-screen mode: expose helper + auto-open with greeting
+        if (window.HELPDESK_PRESCREEN) {
+            var _hdOpenAndGreet = function() {
+                if (!state.isOpen) {
+                    var toggleBtn = document.getElementById('chat-button') || document.querySelector('.chat-button');
+                    if (toggleBtn) toggleBtn.click();
+                }
+                // Display greeting bubble immediately (no API call)
+                setTimeout(function() {
+                    var chatMessages = document.getElementById('chat-messages');
+                    if (chatMessages) {
+                        var wrapper = document.createElement('div');
+                        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+                        var lbl = document.createElement('div');
+                        lbl.className = 'msg-label';
+                        lbl.textContent = 'AI Assistant';
+                        var msg = document.createElement('div');
+                        msg.className = 'message ai-message';
+                        msg.innerHTML = '👋 <strong>Before you submit a ticket, let me try to help!</strong><br>'
+                            + 'Describe your issue here and I\'ll do my best to resolve it right away.<br>'
+                            + '<small style="opacity:0.7">If I can\'t solve it, I\'ll let you know and you can use the ticket form.</small>';
+                        wrapper.appendChild(lbl);
+                        wrapper.appendChild(msg);
+                        // Insert after any existing system greeting
+                        var firstChild = chatMessages.firstChild;
+                        if (firstChild) {
+                            chatMessages.insertBefore(wrapper, firstChild.nextSibling);
+                        } else {
+                            chatMessages.appendChild(wrapper);
+                        }
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                }, 200);
+            };
+
+            // Expose for the template button
+            window.openHelpDeskChat = _hdOpenAndGreet;
+        }
     });
 })();

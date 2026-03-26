@@ -3149,7 +3149,26 @@ sub _build_page_navigation_hint {
     my $context_label = $page_title ? "\"$page_title\" ($page_path)" : $page_path;
     my $hint = "\n\nThe user is currently viewing: $context_label.\n";
 
-    if ($page_path =~ m{/Documentation}i) {
+    if ($page_path =~ m{/HelpDesk/ticket/new}i) {
+        $hint .= "SUPPORT PRE-SCREENING MODE:\n"
+               . "The user has navigated to the 'Create New Ticket' page but has been invited to\n"
+               . "try the AI assistant FIRST before submitting a ticket.\n"
+               . "Your goal is to RESOLVE the user's issue so they do NOT need to submit a ticket.\n"
+               . "- Listen carefully to their problem description.\n"
+               . "- Provide clear, actionable step-by-step solutions.\n"
+               . "- Check the Knowledge Base: $base_url/HelpDesk/kb\n"
+               . "- If you solve the issue, say so clearly and tell them no ticket is needed.\n"
+               . "- If you CANNOT resolve it after trying, acknowledge this and tell them:\n"
+               . "  'It looks like this needs human support. Click \"Skip AI — Submit Ticket Directly\" on the page to open the ticket form.'\n"
+               . "Do NOT refuse to help or just redirect them to submit a ticket without genuinely trying to solve the problem first.\n";
+    } elsif ($page_path =~ m{/HelpDesk}i) {
+        $hint .= "Navigation context — HelpDesk:\n"
+               . "- Submit a new ticket: $base_url/HelpDesk/ticket/new\n"
+               . "- Check ticket status: $base_url/HelpDesk/ticket/status\n"
+               . "- Knowledge Base: $base_url/HelpDesk/kb\n"
+               . "- Contact support: $base_url/HelpDesk/contact\n";
+        $hint .= "- Admin panel: $base_url/HelpDesk/admin\n" if $role eq 'admin';
+    } elsif ($page_path =~ m{/Documentation}i) {
         if ($role eq 'admin') {
             $hint .= "Navigation context — Documentation section (admin):\n"
                    . "- You may edit or create documentation pages.\n"
