@@ -142,7 +142,7 @@ CREATE TABLE IF NOT EXISTS `payment_transactions` (
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `currency_rates` (
     `id`            INT             NOT NULL AUTO_INCREMENT,
-    `currency_code` CHAR(3)         NOT NULL COMMENT 'ISO 4217 e.g. USD, EUR, GBP',
+    `currency_code` CHAR(10)        NOT NULL COMMENT 'ISO 4217 or crypto ticker e.g. USD, EUR, BTC, STEEM',
     `currency_name` VARCHAR(100)    NOT NULL,
     `rate_to_cad`   DECIMAL(15,6)   NOT NULL
                       COMMENT '1 CAD = rate_to_cad units of this currency. '
@@ -251,7 +251,7 @@ CREATE TABLE IF NOT EXISTS `crypto_transactions` (
 CREATE TABLE IF NOT EXISTS `site_currency_preference` (
     `id`            INT             NOT NULL AUTO_INCREMENT,
     `site_id`       INT             NOT NULL,
-    `currency_code` CHAR(3)         NOT NULL DEFAULT 'CAD',
+    `currency_code` CHAR(10)        NOT NULL DEFAULT 'CAD',
     `updated_at`    TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP
                       ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
