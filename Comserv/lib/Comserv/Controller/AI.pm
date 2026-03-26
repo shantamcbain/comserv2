@@ -2879,7 +2879,8 @@ sub _pick_ollama_tier {
     my @chat_models = grep {
         my $n = ref($_) ? ($_->{name} || '') : ($_ || '');
         $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i
-           && $n !~ /:cloud$/i;
+           && $n !~ /:cloud$/i
+           && $n !~ /starcoder|coder|codellama/i;
     } @$installed_models;
 
     my @names = map { ref($_) ? ($_->{name} || '') : ($_ || '') } @chat_models;
@@ -4678,9 +4679,8 @@ sub preload_model :Local :Args(0) {
             return;
         }
 
-        my $site_name = $c->stash->{SiteName} || 'CSC';
-        my $agent_id  = $c->req->param('agent_id') || lc($site_name);
-        my $model = $self->_select_model_for_context($agent_id, $agent_id, $installed, $default_model);
+        my ($tier_small, undef) = $self->_pick_ollama_tier($installed, $default_model, '', '');
+        my $model = $tier_small || $default_model;
 
         my $ollama = Comserv::Model::Ollama->new(
             host    => $host,
