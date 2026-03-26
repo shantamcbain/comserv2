@@ -828,7 +828,11 @@ sub lists :Local :Args(0) {
     my ($self, $c) = @_;
 
     my $site_id = $c->session->{site_id} || $c->stash->{site_id};
-    my @lists;
+
+    # Auto-create and sync the three default list categories
+    $self->_sync_default_lists($c, $site_id);
+
+    my (@default_lists, @custom_lists);
     eval {
         my $rs = $c->model('DBEncy')->resultset('MailingList')->search(
             { site_id => $site_id, is_active => 1 },
@@ -839,21 +843,29 @@ sub lists :Local :Args(0) {
                 mailing_list_id => $list->id,
                 is_active => 1,
             });
-            push @lists, {
-                id          => $list->id,
-                name        => $list->name,
-                description => $list->description,
-                list_email  => $list->list_email,
+            my $row = {
+                id               => $list->id,
+                name             => $list->name,
+                description      => $list->description,
+                list_email       => $list->list_email,
                 is_software_only => $list->is_software_only,
+                is_default       => ($list->description =~ /^\[auto\]/) ? 1 : 0,
                 subscriber_count => $sub_count,
-                created_at  => $list->created_at,
+                created_at       => $list->created_at,
             };
+            if ($row->{is_default}) {
+                push @default_lists, $row;
+            } else {
+                push @custom_lists, $row;
+            }
         }
     };
     $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'lists', "DB error: $@") if $@;
 
     $c->stash(
-        mailing_lists => \@lists,
+        default_lists => \@default_lists,
+        custom_lists  => \@custom_lists,
+        mailing_lists => [@default_lists, @custom_lists],
         template => 'mail/mailing_lists.tt',
     );
     $c->forward($c->view('TT'));
@@ -1189,6 +1201,180 @@ sub _get_site_users {
         }
     };
     return @users;
+}
+
+
+# ─────────────────────────────────────────────────────────────
+#  DEFAULT LIST AUTO-SYNC
+#  Runs every time /mail/lists is loaded.
+#  Lists are identified by description starting with "[auto]".
+#  Subscriptions are fully resynced from live DB state.
+# ─────────────────────────────────────────────────────────────
+
+sub _sync_default_lists {
+    my ($self, $c, $site_id) = @_;
+    return unless $site_id;
+
+    eval { $self->_sync_all_members_list($c, $site_id) };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_sync_default_lists',
+        "All-members sync error: $@") if $@;
+
+    eval { $self->_sync_role_lists($c, $site_id) };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_sync_default_lists',
+        "Role-list sync error: $@") if $@;
+
+    eval { $self->_sync_workshop_attendees_list($c, $site_id) };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_sync_default_lists',
+        "Workshop-attendees sync error: $@") if $@;
+}
+
+sub _upsert_list_subscriptions {
+    my ($self, $c, $list_id, $user_ids_ref, $source) = @_;
+    my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+
+    # Mark all auto subscriptions for this list+source inactive
+    $dbh->do(
+        "UPDATE mailing_list_subscriptions SET is_active=0 WHERE mailing_list_id=? AND subscription_source=?",
+        undef, $list_id, $source
+    );
+
+    # Insert or re-activate each current user
+    # Use INSERT ... ON DUPLICATE KEY (MySQL) — key is (mailing_list_id, user_id, source_id)
+    # Since source_id is NULL for auto lists we can't rely on the unique key; use a simpler approach:
+    # check existence then insert/update.
+    my $check_sth = $dbh->prepare(
+        "SELECT id FROM mailing_list_subscriptions WHERE mailing_list_id=? AND user_id=? AND subscription_source=?"
+    );
+    my $update_sth = $dbh->prepare(
+        "UPDATE mailing_list_subscriptions SET is_active=1 WHERE id=?"
+    );
+    my $insert_sth = $dbh->prepare(
+        "INSERT INTO mailing_list_subscriptions (mailing_list_id, user_id, subscription_source, is_active) VALUES (?,?,?,1)"
+    );
+
+    for my $uid (@$user_ids_ref) {
+        $check_sth->execute($list_id, $uid, $source);
+        my $row = $check_sth->fetchrow_hashref;
+        if ($row) {
+            $update_sth->execute($row->{id});
+        } else {
+            eval { $insert_sth->execute($list_id, $uid, $source) };
+        }
+    }
+}
+
+sub _find_or_create_list {
+    my ($self, $c, $site_id, $name, $description) = @_;
+    my $list_rs = $c->model('DBEncy')->resultset('MailingList');
+    my $list = $list_rs->find({ site_id => $site_id, name => $name });
+    unless ($list) {
+        $list = $list_rs->create({
+            site_id          => $site_id,
+            name             => $name,
+            description      => $description,
+            is_software_only => 1,
+            is_active        => 1,
+            created_by       => 0,
+        });
+    } else {
+        $list->update({ is_active => 1, description => $description });
+    }
+    return $list;
+}
+
+sub _sync_all_members_list {
+    my ($self, $c, $site_id) = @_;
+
+    my $list = $self->_find_or_create_list($c, $site_id,
+        'All Site Members',
+        '[auto] Everyone who has created an account on this site'
+    );
+
+    # All users with any role on this site
+    my @user_ids = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+        { site_id => $site_id },
+        { columns => ['user_id'], distinct => 1 }
+    )->get_column('user_id')->all;
+
+    $self->_upsert_list_subscriptions($c, $list->id, \@user_ids, 'auto-all');
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_all_members_list',
+        "Synced All Site Members: " . scalar(@user_ids) . " users for site_id=$site_id");
+}
+
+sub _sync_role_lists {
+    my ($self, $c, $site_id) = @_;
+
+    # Get all distinct roles for this site
+    my @roles = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+        { site_id => $site_id },
+        { columns => ['role'], distinct => 1 }
+    )->get_column('role')->all;
+
+    for my $role (@roles) {
+        next unless $role;
+        my $list_name = "Role: $role";
+        my $list = $self->_find_or_create_list($c, $site_id,
+            $list_name,
+            "[auto] All users with the '$role' role on this site"
+        );
+
+        my @user_ids = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+            { site_id => $site_id, role => $role },
+            { columns => ['user_id'] }
+        )->get_column('user_id')->all;
+
+        $self->_upsert_list_subscriptions($c, $list->id, \@user_ids, 'auto-role');
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_role_lists',
+            "Synced role list '$list_name': " . scalar(@user_ids) . " users for site_id=$site_id");
+    }
+}
+
+sub _sync_workshop_attendees_list {
+    my ($self, $c, $site_id) = @_;
+
+    my $list = $self->_find_or_create_list($c, $site_id,
+        'All Workshop Attendees',
+        '[auto] All users registered for any workshop on this site'
+    );
+
+    # Get all workshop_ids for this site (via site_workshop join table OR workshop.site_id)
+    my @workshop_ids;
+    eval {
+        # Primary: site_workshop linking table
+        @workshop_ids = $c->model('DBEncy')->resultset('SiteWorkshop')->search(
+            { site_id => $site_id }
+        )->get_column('workshop_id')->all;
+    };
+    # Fallback: direct site_id on workshop table
+    unless (@workshop_ids) {
+        eval {
+            @workshop_ids = $c->model('DBEncy')->resultset('WorkShop')->search(
+                { site_id => $site_id }
+            )->get_column('id')->all;
+        };
+    }
+
+    my @user_ids;
+    if (@workshop_ids) {
+        # Participants with user_id (registered status)
+        my $part_rs = $c->model('DBEncy')->resultset('Participant')->search(
+            {
+                workshop_id => { -in => \@workshop_ids },
+                status      => 'registered',
+                user_id     => { '!=' => undef },
+            },
+            { columns => ['user_id'], distinct => 1 }
+        );
+        @user_ids = $part_rs->get_column('user_id')->all;
+    }
+
+    $self->_upsert_list_subscriptions($c, $list->id, \@user_ids, 'auto-workshop');
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
+        "Synced Workshop Attendees: " . scalar(@user_ids) . " users for site_id=$site_id (" .
+        scalar(@workshop_ids) . " workshops)");
 }
 
 __PACKAGE__->meta->make_immutable;
