@@ -820,29 +820,7 @@ Alternative form-based query interface.
 
 sub query_form :Local :Args(0) {
     my ($self, $c) = @_;
-    
-    # Check authentication
-    unless ($c->session->{username}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-            'query_form', "Unauthorized access attempt to AI query form");
-        $c->response->redirect($c->uri_for('/user/login'));
-        return;
-    }
-    
-    my $username = $c->session->{username};
-    
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-        'query_form', "User accessing AI query form");
-    
-    # Set template variables
-    $c->stash(
-        template => 'ai/query_form.tt',
-        page_title => 'AI Query Form',
-        username => $username
-    );
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-        'query_form', "AI query form loaded for user: $username");
+    $c->response->redirect($c->uri_for('/ai'), 301);
 }
 
 =head2 result
@@ -2941,6 +2919,26 @@ sub _build_role_system_prompt {
     my $page_nav   = $self->_build_page_navigation_hint($base_url, $page_path, $page_title, $role_tier);
     my $nav_guide  = $self->_build_navigation_command_guide($base_url, $role_tier);
 
+    my $action_instructions = <<'ACTION';
+
+IN-APP ACTIONS: You can perform write operations in the application on behalf of the logged-in user.
+When the user explicitly asks you to update, reschedule, mark done, add a comment, or create a log entry for a todo — embed an action block in your response using this exact format (on its own line):
+[ACTION: {"action": "ACTION_NAME", "params": {...}}]
+
+Supported actions:
+- Mark a todo done:      [ACTION: {"action": "update_todo_status", "params": {"todo_id": N, "status": 3}}]
+- Mark todo in-progress: [ACTION: {"action": "update_todo_status", "params": {"todo_id": N, "status": 2}}]
+- Reschedule a todo:     [ACTION: {"action": "reschedule_todo",    "params": {"todo_id": N, "due_date": "YYYY-MM-DD"}}]
+- Add a comment:         [ACTION: {"action": "add_todo_comment",   "params": {"todo_id": N, "comment": "text"}}]
+- Create a log entry:    [ACTION: {"action": "create_log_entry",   "params": {"todo_id": N, "abstract": "title", "details": "description"}}]
+
+Rules:
+- ONLY emit an [ACTION: ...] block when the user explicitly asks you to perform a write operation.
+- ALWAYS use the real numeric todo_id from the LIVE TODO DATA above — never make up an ID.
+- Include the action block in addition to your normal response text, not instead of it.
+- The application will automatically execute the action and show the user a confirmation.
+ACTION
+
     if ($is_admin) {
         my $web_search_note = ($provider eq 'grok')
             ? "Web search is available if the user has enabled it — use it to answer questions about external tools, technologies, or anything not covered by the application data."
@@ -2961,6 +2959,7 @@ sub _build_role_system_prompt {
              . $web_search_note . "\n"
              . "NAVIGATION: When the user says 'take me to', 'open', 'go to', or 'show me' a page, "
              . "reply with the exact URL from the navigation guide below.\n"
+             . $action_instructions
              . $page_nav
              . $nav_guide;
     }
@@ -2993,6 +2992,7 @@ sub _build_role_system_prompt {
          . "respond with the URL from the navigation guide so the application can automatically navigate there. "
          . "Use the exact URL from the list — the application will redirect the browser for you."
          . $no_internet
+         . $action_instructions
          . $page_nav
          . $nav_guide;
 }
