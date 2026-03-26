@@ -13,7 +13,7 @@ __PACKAGE__->add_columns(
     },
     currency_code => {
         data_type     => 'char',
-        size          => 3,
+        size          => 10,
         is_nullable   => 0,
         default_value => 'CAD',
     },
