@@ -11,5 +11,12 @@
   --table-header-bg: #2c2c2c;
   --text-color: #e0e0e0;
   --warning-color: #ff9800;
+  --doc-container-bg: #1a1a1a;
+  --doc-container-border: #333333;
+  --doc-header-bg: #3a3a5c;
+  --doc-header-color: #e0e0e0;
+  --doc-header-hover-bg: #2a2a4a;
+  --doc-content-bg: #121212;
+  --doc-content-color: #e0e0e0;
 }
 

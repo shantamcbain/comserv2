@@ -97,21 +97,39 @@ sub begin :Private {
     # Log the path the user is accessing
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "User accessing path: " . $c->req->uri);
 
-    # Fetch roles: prefer stash (set by Root::auto, includes site-specific admin detection)
-    my $roles = $c->stash->{user_roles} || $c->session->{roles} || [];
+    # API paths handle their own auth — skip session-based checks
+    return 1 if $c->req->path =~ m{^api/};
+
+    # Fetch the user's roles from the session
+    my $roles = $c->session->{roles} || [];
 
     # Ensure roles are an array reference
     if (ref $roles ne 'ARRAY') {
-        $roles = [];
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "Invalid or undefined roles in session for user: " . ($c->session->{username} || 'Guest'));
+
+        # Stash the current path so it can be used for redirection after login
+        $c->stash->{template} = $c->req->uri;
+
+        # Set error message for session problems
+        $c->stash->{error_msg} = "Session expired or invalid. Please log in again.";
+
+        # Redirect to login
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Redirecting to login page due to missing or invalid roles.");
+        $c->res->redirect($c->uri_for('/user/login'));
+        $c->detach;
     }
 
-    # Allow all roles above member: admin, developer, devops, editor, user, normal
-    # Also allow if Root::auto set is_admin (catches site-specific admins from UserSiteRole)
-    unless ($c->stash->{is_admin} || grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal)$/ } @$roles) {
+    # Check if the user has the 'admin' or 'developer' role
+    unless (grep { $_ eq 'admin' || $_ eq 'developer' } @$roles) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
 
-        # Redirect unauthorized users to the login page with the return URL
-        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
+        # Stash the current path for potential use
+        $c->stash->{redirect_to} = $c->req->uri;
+
+        # Redirect unauthorized users to the home page with an error message
+        $c->stash->{error_msg} = "Unauthorized access. You do not have permission to view this page.";
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Redirecting unauthorized user to the home page.");
+        $c->res->redirect($c->uri_for('/'));
         $c->detach;
     }
 
@@ -343,12 +361,24 @@ sub details :Path('/todo/details') :Args {
                 "Error fetching projects: $@");
         }
 
-        # Add the todo, accumulative_time, and projects to the stash
+        # Fetch rescheduling / interval history for this todo
+        my @intervals;
+        eval {
+            @intervals = $schema->resultset('TodoInterval')->search(
+                { todo_record_id => $record_id },
+                { order_by => { -desc => 'record_id' } }
+            )->all;
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'details',
+            "Interval fetch error: $@") if $@;
+
+        # Add the todo, accumulative_time, projects, and interval history to the stash
         $c->stash(
-            record => $todo, 
+            record            => $todo,
             accumulative_time => $accumulative_time,
-            projects => $projects,
-            return_to => $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo')),
+            projects          => $projects,
+            todo_intervals    => \@intervals,
+            return_to         => $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo')),
         );
 
         # Set the template to 'todo/details.tt'
@@ -669,13 +699,20 @@ sub modify :Path('/todo/modify') :Args(1) {
         "Updating todo item with record ID: $record_id."
     );
 
+    # Capture old due_date before update so we can log rescheduling
+    my $old_due_date   = $todo->due_date   // '';
+    my $old_start_date = $todo->start_date // '';
+    my $new_due_date   = $form_data->{due_date} || DateTime->now->add(days => 7)->ymd;
+    my $today          = DateTime->now->ymd;
+    my $current_user   = $c->session->{username} || 'system';
+
     # Attempt to update the todo record
     eval {
         $todo->update({
             sitename             => $form_data->{sitename},
             start_date           => $form_data->{start_date},
             parent_todo          => $parent_todo,
-            due_date             => $form_data->{due_date} || DateTime->now->add(days => 7)->ymd,
+            due_date             => $new_due_date,
             subject              => $form_data->{subject},
             description          => $form_data->{description},
             estimated_man_hours  => $form_data->{estimated_man_hours},
@@ -688,10 +725,10 @@ sub modify :Path('/todo/modify') :Args(1) {
             username_of_poster   => $c->session->{username},
             status               => $form_data->{status},
             priority             => $form_data->{priority},
-            time_of_day          => $form_data->{time_of_day},
+            time_of_day          => ($form_data->{time_of_day} && $form_data->{time_of_day} ne '') ? $form_data->{time_of_day} : undef,
             share                => $form_data->{share} || 0,
-            last_mod_by          => $c->session->{username} || 'system',
-            last_mod_date        => DateTime->now->ymd,
+            last_mod_by          => $current_user,
+            last_mod_date        => $today,
             user_id              => $form_data->{user_id} || 1,
             project_id           => $form_data->{project_id},
             date_time_posted     => $form_data->{date_time_posted},
@@ -724,6 +761,29 @@ sub modify :Path('/todo/modify') :Args(1) {
         'modify.success',
         "Todo item successfully updated for record ID: $record_id."
     );
+
+    # --- Rescheduling interval log ---
+    # If the due_date changed, create a TodoInterval record to track the move.
+    # This builds an audit trail showing how many times and how far a task was deferred.
+    if ($old_due_date && $new_due_date && $old_due_date ne $new_due_date) {
+        eval {
+            $schema->resultset('TodoInterval')->create({
+                todo_record_id => $record_id,
+                start_date     => $old_start_date || $today,
+                end_date       => $today,
+                interval_type  => 'rescheduled',
+                status         => "from:$old_due_date to:$new_due_date",
+                last_mod_by    => $current_user,
+                last_mod_date  => $today,
+            });
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'modify.reschedule',
+                "Logged reschedule for todo $record_id: $old_due_date -> $new_due_date by $current_user");
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'modify.reschedule',
+                "Could not write TodoInterval for todo $record_id: $@");
+        }
+    }
 
     # Handle successful update
     $c->flash->{success_msg} = "Todo item with ID $record_id has been successfully updated.";
@@ -873,7 +933,7 @@ sub create :Local {
         username_of_poster => $current_user,
         status => $self->convert_status_to_string($params->{status}) || 'NEW',
         priority => $params->{priority} || 3, # Medium priority by default
-        time_of_day => $params->{time_of_day},
+        time_of_day => ($params->{time_of_day} && $params->{time_of_day} ne '') ? $params->{time_of_day} : undef,
         share => $params->{share} ? 1 : 0,
         last_mod_by => $current_user,
         last_mod_date => $current_date,
@@ -1553,41 +1613,56 @@ PUT /api/todo/:id - Update a todo (partial update allowed)
 
 sub api_todo_update :Path('/api/todo/update') :Args(1) {
     my ($self, $c, $todo_id) = @_;
-    
-    $self->_api_dev_only_check($c);
-    $self->_api_validate_token($c);
-    
+
+    my $address  = $c->req->address;
+    my $is_local = ($address eq '127.0.0.1' || $address eq '::1'
+        || $address =~ /^192\.168\./
+        || $address =~ /^172\.(1[6-9]|2[0-9]|3[01])\./
+        || $address =~ /^10\./);
+
+    unless ($is_local) {
+        $self->_api_validate_token($c);
+    }
+
     my $params;
     eval {
         my $body = $c->request->body;
-        $params = decode_json($body) if $body;
+        if ($body) {
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                my $raw = do { local $/; <$body> };
+                $params = decode_json($raw) if $raw && $raw =~ /\S/;
+            } else {
+                $params = decode_json($body);
+            }
+        }
+        $params ||= {};
     };
     if ($@) {
         $self->_api_error($c, "Invalid JSON: $@", 'json_parse_error', 400);
     }
-    
+
     my $schema = $c->model('DBEncy');
-    my $todo = $schema->resultset('Todo')->find($todo_id);
-    
+    my $todo   = $schema->resultset('Todo')->find($todo_id);
+
     unless ($todo) {
         $self->_api_error($c, "Todo not found: $todo_id", 'not_found', 404);
     }
-    
-    my $update_data = {};
-    my %allowed_fields = map { $_ => 1 } qw(status priority description assigned_to);
-    
-    foreach my $field (keys %$params) {
-        if ($allowed_fields{$field}) {
-            $update_data->{$field} = $params->{$field};
-        }
+
+    my %allowed = map { $_ => 1 } qw(status priority description developer comments);
+    my %update;
+    for my $field (keys %$params) {
+        $update{$field} = $params->{$field} if $allowed{$field};
     }
-    
-    if (keys %$update_data) {
-        $todo->update($update_data);
+
+    if (%update) {
+        $update{last_mod_by}   = 'system';
+        $update{last_mod_date} = DateTime->now->ymd;
+        $todo->update(\%update);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_update',
-            "Todo updated via API: ID=$todo_id, Fields=" . join(',', keys %$update_data));
+            "Todo updated via API: record_id=$todo_id, Fields=" . join(',', keys %update));
     }
-    
+
     $self->_api_success($c, 'Todo updated successfully', {
         todo => $self->_todo_to_hash($todo)
     });
@@ -1625,18 +1700,18 @@ sub _todo_to_hash {
     my ($self, $todo) = @_;
     
     return {
-        id => $todo->id,
-        subject => $todo->subject,
-        description => $todo->description,
-        project_id => $todo->project_id,
-        start_date => $todo->start_date,
-        due_date => $todo->due_date,
-        priority => $todo->priority,
-        status => $todo->status,
-        assigned_to => $todo->assigned_to,
-        sitename => $todo->sitename,
-        date_time_posted => $todo->date_time_posted ? $todo->date_time_posted->iso8601 : undef,
-        posted_by => $todo->posted_by,
+        id                => $todo->id,
+        subject           => $todo->subject,
+        description       => $todo->description,
+        project_id        => $todo->project_id,
+        start_date        => $todo->start_date  ? "${\$todo->start_date}" : undef,
+        due_date          => $todo->due_date    ? "${\$todo->due_date}"   : undef,
+        priority          => $todo->priority,
+        status            => $todo->status,
+        developer         => $todo->developer,
+        sitename          => $todo->sitename,
+        date_time_posted  => $todo->date_time_posted || undef,
+        username_of_poster => $todo->username_of_poster,
         accumulative_time => $todo->accumulative_time || 0,
     };
 }
@@ -1657,6 +1732,125 @@ sub _project_to_hash {
         sitename => $project->sitename,
         status => $project->status,
     };
+}
+
+sub quick_close :Path('quick_close') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $username = $c->session->{username} // '';
+    my $roles    = $c->session->{roles} || [];
+    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
+    unless ($username && $username ne 'anonymous' && grep { /^(admin|developer|editor|devops)$/i } @rl) {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Admin role required"}');
+        return;
+    }
+
+    my $body_fh = $c->req->body;
+    my $body = $body_fh ? do { local $/; <$body_fh> } : '';
+    my $data;
+    eval { require JSON; $data = JSON::decode_json($body) if $body; };
+    my $record_id = $data->{record_id} if $data;
+    unless ($record_id) {
+        $c->response->status(400);
+        $c->response->body('{"ok":0,"error":"Missing record_id"}');
+        return;
+    }
+
+    my $today = DateTime->now->ymd;
+    eval {
+        my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
+        die "Todo not found\n" unless $todo;
+
+        $todo->update({
+            status       => 3,
+            last_mod_by  => $username,
+            last_mod_date => $today,
+        });
+
+        my $proj_code = '';
+        if ($todo->project_id) {
+            my $proj = eval { $c->model('DBEncy')->resultset('Project')->find($todo->project_id) };
+            $proj_code = $proj ? ($proj->project_code || '') : '';
+        }
+        $c->model('DBEncy')->resultset('Log')->create({
+            todo_record_id  => $record_id,
+            username        => $username,
+            sitename        => $todo->sitename || $c->session->{SiteName},
+            project_code    => $proj_code,
+            abstract        => 'Quick-closed from Active Priorities panel',
+            details         => 'Marked done via quick-close button on DailyPlan by ' . $username,
+            start_date      => $today,
+            due_date        => $today,
+            start_time      => '00:00:00',
+            end_time        => '00:00:00',
+            time            => '00:00:00',
+            status          => 3,
+            priority        => $todo->priority || 5,
+            last_mod_by     => $username,
+            last_mod_date   => $today,
+            group_of_poster => $c->session->{group} || '',
+            comments        => '',
+        });
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'quick_close',
+            "Failed quick_close for todo $record_id: $@");
+        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'quick_close',
+        "Todo $record_id quick-closed by $username");
+    $c->response->body('{"ok":1}');
+}
+
+sub triage_stale :Path('triage_stale') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $username = $c->session->{username} // '';
+    my $roles    = $c->session->{roles} || [];
+    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
+    unless ($username && $username ne 'anonymous' && grep { /^(admin)$/i } @rl) {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Admin role required"}');
+        return;
+    }
+
+    require POSIX;
+    my $now_epoch = time();
+    my $count     = 0;
+
+    eval {
+        my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+        my @rows = $c->model('DBEncy')->resultset('Todo')->search(
+            { status => { -not_in => \@done_statuses } },
+            { columns => [qw(record_id priority last_mod_date date_time_posted)] }
+        )->all;
+
+        for my $row (@rows) {
+            my $activity_str = $row->last_mod_date || $row->date_time_posted || '';
+            next unless $activity_str =~ /^(\d{4})-(\d{2})-(\d{2})/;
+            my $act_epoch = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
+            my $days_stale = int(($now_epoch - $act_epoch) / 86400);
+            next unless $days_stale > 180;
+            my $new_priority = ($row->priority || 5) + 2;
+            $new_priority = 10 if $new_priority > 10;
+            $row->update({ priority => $new_priority });
+            $count++;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'triage_stale', "Error: $@");
+        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'triage_stale',
+        "Triaged $count stale todos by $username");
+    $c->response->body('{"ok":1,"count":' . $count . '}');
 }
 
 1;

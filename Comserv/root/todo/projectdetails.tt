@@ -22,18 +22,26 @@
     <div class="project-details" style="margin-left: [% level * 20 %]px;">
         <h[% level + 1 %]>[% IF level > 0 %]Sub-Project: [% END %][% project.name %]</h[% level + 1 %]>
 
-        <ul>
-            <li>Description: [% project.description OR 'No description' %]</li>
-            <li>Start Date: [% project.start_date %]</li>
-            <li>End Date: [% project.end_date %]</li>
-            <li>Status: [% project.status %]</li>
-            <li>Project Code: [% project.project_code %]</li>
-            <li>Project Size: [% project.project_size %]</li>
-            <li>Estimated Man Hours: [% project.estimated_man_hours %]</li>
-            <li>Developer Name: [% project.developer_name %]</li>
-            <li>Client Name: [% project.client_name %]</li>
-            <li>Comments: [% project.comments OR 'No comments' %]</li>
-        </ul>
+        <table class="project-details-table" style="margin:12px 0;">
+            <tr><th style="width:200px;">Field</th><th>Value</th></tr>
+            <tr><td><strong>ID</strong></td><td>[% project.id %]</td></tr>
+            <tr><td><strong>Record ID</strong></td><td>[% project.record_id OR '—' %]</td></tr>
+            <tr><td><strong>Site</strong></td><td>[% project.sitename OR '—' %]</td></tr>
+            <tr><td><strong>Project Code</strong></td><td>[% project.project_code OR '—' %]</td></tr>
+            <tr><td><strong>Status</strong></td><td>[% project.status OR '—' %]</td></tr>
+            <tr><td><strong>Description</strong></td><td>[% project.description OR '—' %]</td></tr>
+            <tr><td><strong>Start Date</strong></td><td>[% project.start_date OR '—' %]</td></tr>
+            <tr><td><strong>End Date</strong></td><td>[% project.end_date OR '—' %]</td></tr>
+            <tr><td><strong>Project Size</strong></td><td>[% project.project_size OR '—' %]</td></tr>
+            <tr><td><strong>Est. Man Hours</strong></td><td>[% project.estimated_man_hours OR '—' %]</td></tr>
+            <tr><td><strong>Developer</strong></td><td>[% project.developer_name OR '—' %]</td></tr>
+            <tr><td><strong>Client</strong></td><td>[% project.client_name OR '—' %]</td></tr>
+            <tr><td><strong>Parent Project ID</strong></td><td>[% project.parent_id OR '—' %]</td></tr>
+            <tr><td><strong>Posted By</strong></td><td>[% project.username_of_poster OR '—' %]</td></tr>
+            <tr><td><strong>Group</strong></td><td>[% project.group_of_poster OR '—' %]</td></tr>
+            <tr><td><strong>Date Posted</strong></td><td>[% project.date_time_posted OR '—' %]</td></tr>
+            <tr><td><strong>Comments</strong></td><td>[% project.comments OR '—' %]</td></tr>
+        </table>
 
         [% INCLUDE todo/ProjectTodosList.tt project=project level=level %]
 
