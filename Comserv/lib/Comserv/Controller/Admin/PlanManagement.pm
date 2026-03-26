@@ -539,6 +539,52 @@ sub add_todo :Path('/admin/plan/project') :Args(2) {
     };
 }
 
+sub link_project :Path('/admin/plan/link_project') :Args(0) {
+    my ($self, $c) = @_;
+
+    return unless $c->req->method eq 'POST';
+
+    my $plan_id    = $c->req->body_parameters->{plan_id};
+    my $project_id = $c->req->body_parameters->{project_id};
+
+    unless ($plan_id && $project_id) {
+        $c->stash->{json} = { success => 0, error => "plan_id and project_id are required" };
+        $c->forward('View::JSON');
+        $c->detach;
+    }
+
+    try {
+        my $schema = $c->model('DBEncy');
+
+        my $existing = $schema->resultset('DailyPlanProject')->search({
+            plan_id    => $plan_id,
+            project_id => $project_id,
+        })->first;
+
+        if ($existing) {
+            $c->stash->{json} = { success => 0, error => "Already linked" };
+            $c->forward('View::JSON');
+            $c->detach;
+        }
+
+        $schema->resultset('DailyPlanProject')->create({
+            plan_id    => $plan_id,
+            project_id => $project_id,
+        });
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'link_project',
+            "Linked plan $plan_id to project $project_id");
+
+        $c->stash->{json} = { success => 1, message => "Plan linked to project" };
+        $c->forward('View::JSON');
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'link_project',
+            "Error linking plan to project: $_");
+        $c->stash->{json} = { success => 0, error => "Error: $_" };
+        $c->forward('View::JSON');
+    };
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
