@@ -19,18 +19,18 @@
   <div class="content-container">
     <div class="content-primary">
 
-      [% IF account %]
+      [% IF balance %]
       <div class="content-section" style="background:rgba(255,255,255,0.9);padding:0.75rem 1.1rem;margin-bottom:1rem">
         <strong>Your current balance:</strong>
         <span style="font-size:1.2em;color:var(--success-color,#27ae60);margin-left:0.5em">
-          [% account.balance %] coins
+          [% balance | format('%.2f') %] points
         </span>
       </div>
       [% END %]
 
       <div class="content-section">
-        <h2>Choose a Coin Package</h2>
-        <p style="margin-top:0">Coins never expire. 1 coin ≈ $0.01 USD. Secure checkout via PayPal.</p>
+        <h2>Choose a Point Package</h2>
+        <p style="margin-top:0">Points never expire. 1 point = 1 CAD. Secure checkout via PayPal.</p>
 
         [% IF NOT paypal_cfg.is_configured %]
         <div style="padding:0.75rem 1rem;border:2px solid #c0392b;border-radius:6px;background:#fdf0ef;margin-bottom:1rem">
@@ -51,10 +51,10 @@
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-top:1rem">
 
           [% FOREACH pkg IN packages %]
-          <div style="border:2px solid [% pkg.popular ? 'var(--accent-color,#FFB900)' : 'var(--border-color,#ccc)' %];
+          <div style="border:2px solid [% pkg.sort_order == 3 ? 'var(--accent-color,#FFB900)' : 'var(--border-color,#ccc)' %];
                       border-radius:8px;padding:1.25rem;text-align:center;background:rgba(255,255,255,0.9);
                       position:relative">
-            [% IF pkg.popular %]
+            [% IF pkg.sort_order == 3 %]
             <div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);
                         background:var(--accent-color,#FFB900);color:#000;font-size:0.75em;
                         font-weight:bold;padding:2px 12px;border-radius:10px;white-space:nowrap">
@@ -63,31 +63,33 @@
             [% END %]
 
             <div style="font-size:1.6em;font-weight:bold;color:var(--text-color,#000)">
-              [% pkg.label %]
+              [% pkg.name %]
             </div>
             <div style="font-size:1.25em;color:var(--accent-color,#b88a00);margin:0.3rem 0">
-              [% paypal_cfg.currency_code %] $[% pkg.price %]
+              [% paypal_cfg.currency_code %] $[% pkg.price_cad %]
             </div>
             <div style="font-size:0.85em;color:var(--text-muted-color,#666);margin-bottom:1rem">
-              ¢[% pkg.price / pkg.coins * 100 FILTER format('%.2f') %] per coin
+              [% IF pkg.points > 0 %]
+              $[% pkg.price_cad / pkg.points FILTER format('%.4f') %] per point
+              [% END %]
             </div>
 
             [% IF paypal_cfg.is_configured %]
             <form method="post" action="[% paypal_url | html %]">
               <input type="hidden" name="cmd"           value="_xclick">
               <input type="hidden" name="business"      value="[% paypal_cfg.business | html %]">
-              <input type="hidden" name="item_name"     value="[% pkg.label | html %] — Site Coins">
-              <input type="hidden" name="amount"        value="[% pkg.price | html %]">
+              <input type="hidden" name="item_name"     value="[% pkg.name | html %] — Site Points">
+              <input type="hidden" name="amount"        value="[% pkg.price_cad | html %]">
               <input type="hidden" name="currency_code" value="[% paypal_cfg.currency_code | html %]">
               <input type="hidden" name="no_shipping"   value="1">
               <input type="hidden" name="return"        value="[% return_url | html %]">
               <input type="hidden" name="cancel_return" value="[% cancel_url | html %]">
               <input type="hidden" name="notify_url"    value="[% notify_url | html %]">
-              <input type="hidden" name="custom"        value="[% c.session.user_id %]:[% pkg.coins %]">
+              <input type="hidden" name="custom"        value="[% c.session.user_id %]:[% pkg.points %]:[% pkg.id %]">
               <button type="submit"
                       style="width:100%;padding:0.6rem 1rem;border-radius:6px;border:none;cursor:pointer;
                              font-weight:bold;font-size:1em;
-                             background:[% pkg.popular ? 'var(--accent-color,#FFB900)' : 'var(--primary-color,#ccffff)' %];
+                             background:[% pkg.sort_order == 3 ? 'var(--accent-color,#FFB900)' : 'var(--primary-color,#ccffff)' %];
                              color:var(--text-color,#000)">
                 Buy via PayPal
               </button>
@@ -105,13 +107,13 @@
       </div>
 
       <div class="content-section">
-        <h2>About Site Coins</h2>
+        <h2>About Points</h2>
         <ul>
-          <li>Coins work across all member sites (CSC, BMaster, etc.)</li>
-          <li>Use coins to pay for memberships, workshops, and services</li>
-          <li>New accounts get <strong>100 free coins</strong> on signup</li>
-          <li>Coins never expire</li>
-          <li>1 coin = $0.01 USD equivalent</li>
+          <li>Points work across all member sites (CSC, BMaster, etc.)</li>
+          <li>Use points to pay for memberships, workshops, and services</li>
+          <li>New accounts get <strong>100 free points</strong> on signup</li>
+          <li>Points never expire</li>
+          <li>1 point = 1 CAD</li>
         </ul>
         <p>
           <a href="[% c.uri_for('/membership/account') %]" class="btn btn-secondary">← Back to My Account</a>
