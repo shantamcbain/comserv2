@@ -62,8 +62,19 @@ __PACKAGE__->set_primary_key('id');
 
 __PACKAGE__->has_many(
     payment_transactions => 'Comserv::Model::Schema::Ency::Result::PaymentTransaction',
-    { 'foreign.payable_id' => 'self.id', 'foreign.payable_type' => \[ "= 'point_purchase'" ] },
-    { join_type => 'left' },
+    sub {
+        my $args = shift;
+        return (
+            {
+                "$args->{foreign_alias}.payable_id"   => { -ident => "$args->{self_alias}.id" },
+                "$args->{foreign_alias}.payable_type" => 'point_purchase',
+            },
+            $args->{self_rowobj} && {
+                "$args->{foreign_alias}.payable_id"   => $args->{self_rowobj}->id,
+                "$args->{foreign_alias}.payable_type" => 'point_purchase',
+            },
+        );
+    },
 );
 
 1;
