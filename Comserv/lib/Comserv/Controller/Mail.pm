@@ -1393,16 +1393,26 @@ sub _sync_workshop_attendees_list {
 
     my @user_ids;
     if (@workshop_ids) {
-        # Participants with user_id (registered status)
+        # Include registered, waitlist, and attended — exclude only cancelled
         my $part_rs = $c->model('DBEncy')->resultset('Participant')->search(
             {
-                workshop_id => { -in => \@workshop_ids },
-                status      => 'registered',
+                workshop_id => { -in  => \@workshop_ids },
+                status      => { '!=' => 'cancelled' },
                 user_id     => { '!=' => undef },
             },
             { columns => ['user_id'], distinct => 1 }
         );
         @user_ids = $part_rs->get_column('user_id')->all;
+
+        # Log what statuses are actually present to aid debugging
+        my $status_rs = $c->model('DBEncy')->resultset('Participant')->search(
+            { workshop_id => { -in => \@workshop_ids } },
+            { columns => ['status'], distinct => 1 }
+        );
+        my @statuses = $status_rs->get_column('status')->all;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
+            "Participant statuses found for workshops [" . join(',', @workshop_ids) . "]: " .
+            (scalar @statuses ? join(', ', @statuses) : 'NONE'));
     }
 
     $self->_upsert_list_subscriptions($c, $list->id, \@user_ids, 'auto-workshop');
