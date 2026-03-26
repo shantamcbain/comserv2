@@ -2973,7 +2973,12 @@ ACTION
              . "and general knowledge answers for questions about software, tools, or processes. "
              . "Do NOT access private data or APIs. "
              . "Never invent live application data (workshop schedules, user accounts, etc.) — say 'I don't have that live data; please log in or visit the relevant page'. "
-             . "If the user needs account-specific help, ask them to log in."
+             . "If the user needs account-specific help, ask them to log in. "
+             . "SECURITY — STRICT RULE: You MUST ONLY provide URLs that appear in the navigation guide below. "
+             . "NEVER mention /admin, /admin/*, or any administrative URL. "
+             . "NEVER use your training knowledge to guess application URLs — only use the navigation guide. "
+             . "If a user asks about the admin panel or any admin feature, say: "
+             . "'That section requires administrator privileges. Please log in with an admin account or contact your system administrator.'"
              . $guest_knowledge
              . $page_nav
              . $nav_guide;
@@ -2990,7 +2995,12 @@ ACTION
          . "Do not invent live application data; if you don't know something specific to this app, say so and link to the relevant section. "
          . "NAVIGATION: When the user says 'take me to', 'open', 'go to', 'navigate to', or 'show me' a page, "
          . "respond with the URL from the navigation guide so the application can automatically navigate there. "
-         . "Use the exact URL from the list — the application will redirect the browser for you."
+         . "Use the exact URL from the list — the application will redirect the browser for you. "
+         . "SECURITY — STRICT RULE: You MUST ONLY provide URLs from the navigation guide. "
+         . "NEVER guess or invent application URLs using your training knowledge. "
+         . "NEVER provide /admin URLs to users who do not have admin role. "
+         . "If the user asks about admin features and admin URLs are not in the navigation guide for their role, "
+         . "say: 'That section requires administrator privileges.'"
          . $no_internet
          . $action_instructions
          . $page_nav
@@ -3331,9 +3341,14 @@ sub _get_current_ollama_config {
 
     # ── Single source of truth: comserv.conf <Ollama> block ──────────────────
     my $ollama_cfg      = $c->config->{Ollama} || {};
-    my $primary_host    = $ollama_cfg->{host}          || 'localhost';
+    my $primary_host    = $ollama_cfg->{host}          || '192.168.1.199';
     my $fallback_host   = $ollama_cfg->{fallback_host} || $primary_host;
     my $config_port     = $ollama_cfg->{port}          || 11434;
+    # Never silently fall back to localhost — production Docker has no local Ollama.
+    # If fallback is localhost/127.0.0.1 and primary is a real host, keep primary.
+    if ($fallback_host =~ /^(localhost|127\.0\.0\.1)$/i && $primary_host !~ /^(localhost|127\.0\.0\.1)$/i) {
+        $fallback_host = $primary_host;
+    }
 
     my $ollama = $c->model('Ollama');
     my $current_host  = $primary_host;
