@@ -39,7 +39,7 @@
         [%# Compute days-until-expiry and whether balance covers renewal %]
         [% SET days_left = 9999 %]
         [% SET renewal_cost = m.billing_cycle == 'annual' ? m.plan.price_annual : m.plan.price_monthly %]
-        [% SET coin_ok = currency_account && currency_account.balance >= renewal_cost %]
+        [% SET coin_ok = point_balance >= renewal_cost %]
 
         <div class="content-section" style="margin-bottom:1rem;border:1px solid var(--border-color,#ddd);border-radius:6px;padding:1rem">
 
@@ -62,9 +62,9 @@
           [% IF m.expires_at && m.status == 'active' && !coin_ok && renewal_cost > 0 %]
           <div style="margin-top:0.75rem;padding:0.6rem 0.9rem;border:1px solid #f0ad4e;border-radius:5px;background:#fffde7;font-size:0.9em">
             <strong>Low balance warning:</strong>
-            Your coin balance ([% currency_account ? currency_account.balance : 0 %] coins) may not cover the
+            Your point balance ([% point_balance | format('%.2f') %] points) may not cover the
             next renewal cost of <strong>[% m.plan.price_currency | html %] [% renewal_cost %]</strong>.
-            <a href="[% c.uri_for('/payment/buy/coins') %]">Top up coins</a> or enable auto-pay below.
+            <a href="[% c.uri_for('/payment/buy/coins') %]">Top up points</a> or enable auto-pay below.
           </div>
           [% END %]
 
