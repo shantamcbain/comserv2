@@ -857,18 +857,31 @@ sub lists :Local :Args(0) {
             my @subs;
             my $sub_rs = $c->model('DBEncy')->resultset('MailingListSubscription')->search(
                 { mailing_list_id => $list->id, is_active => 1 },
-                { prefetch => 'user', order_by => 'user.username' }
+                { prefetch => 'user' }
             );
             while (my $sub = $sub_rs->next) {
-                my $u = $sub->user;
-                next unless $u && $u->email;
-                push @subs, {
-                    user_id    => $u->id,
-                    username   => $u->username   || '',
-                    first_name => $u->first_name || '',
-                    last_name  => $u->last_name  || '',
-                    email      => $u->email,
-                };
+                my $u = eval { $sub->user };
+                if ($u && $u->email) {
+                    push @subs, {
+                        user_id    => $u->id,
+                        username   => $u->username   || '',
+                        first_name => $u->first_name || '',
+                        last_name  => $u->last_name  || '',
+                        email      => $u->email,
+                    };
+                } elsif (!$u) {
+                    # Email-only subscription (no system account)
+                    my $em = eval { $sub->email } || '';
+                    next unless $em;
+                    my $dn = eval { $sub->display_name } || '';
+                    push @subs, {
+                        user_id    => undef,
+                        username   => '',
+                        first_name => $dn,
+                        last_name  => '',
+                        email      => $em,
+                    };
+                }
             }
             my $row = {
                 id               => $list->id,
@@ -1273,27 +1286,47 @@ sub _upsert_list_subscriptions {
         undef, $list_id, $source
     );
 
-    # Insert or re-activate each current user
-    # Use INSERT ... ON DUPLICATE KEY (MySQL) — key is (mailing_list_id, user_id, source_id)
-    # Since source_id is NULL for auto lists we can't rely on the unique key; use a simpler approach:
-    # check existence then insert/update.
-    my $check_sth = $dbh->prepare(
+    my $check_uid_sth = $dbh->prepare(
         "SELECT id FROM mailing_list_subscriptions WHERE mailing_list_id=? AND user_id=? AND subscription_source=?"
+    );
+    my $check_email_sth = $dbh->prepare(
+        "SELECT id FROM mailing_list_subscriptions WHERE mailing_list_id=? AND email=? AND subscription_source=?"
     );
     my $update_sth = $dbh->prepare(
         "UPDATE mailing_list_subscriptions SET is_active=1 WHERE id=?"
     );
-    my $insert_sth = $dbh->prepare(
+    my $insert_uid_sth = $dbh->prepare(
         "INSERT INTO mailing_list_subscriptions (mailing_list_id, user_id, subscription_source, is_active) VALUES (?,?,?,1)"
     );
+    my $insert_email_sth = $dbh->prepare(
+        "INSERT INTO mailing_list_subscriptions (mailing_list_id, email, display_name, subscription_source, is_active) VALUES (?,?,?,?,1)"
+    );
 
-    for my $uid (@$user_ids_ref) {
-        $check_sth->execute($list_id, $uid, $source);
-        my $row = $check_sth->fetchrow_hashref;
-        if ($row) {
-            $update_sth->execute($row->{id});
+    for my $entry (@$user_ids_ref) {
+        if (ref $entry eq 'HASH') {
+            my $email = $entry->{email};
+            my $name  = $entry->{name} || '';
+            next unless $email;
+            $check_email_sth->execute($list_id, $email, $source);
+            my $row = $check_email_sth->fetchrow_hashref;
+            if ($row) {
+                $update_sth->execute($row->{id});
+            } else {
+                eval { $insert_email_sth->execute($list_id, $email, $name, $source) };
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_upsert_list_subscriptions',
+                    "email-only insert error for $email: $@") if $@;
+            }
         } else {
-            eval { $insert_sth->execute($list_id, $uid, $source) };
+            my $uid = $entry;
+            $check_uid_sth->execute($list_id, $uid, $source);
+            my $row = $check_uid_sth->fetchrow_hashref;
+            if ($row) {
+                $update_sth->execute($row->{id});
+            } else {
+                eval { $insert_uid_sth->execute($list_id, $uid, $source) };
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_upsert_list_subscriptions',
+                    "user_id insert error for uid=$uid: $@") if $@;
+            }
         }
     }
 }
@@ -1374,51 +1407,90 @@ sub _sync_workshop_attendees_list {
         '[auto] All users registered for any workshop on this site'
     );
 
-    # Get all workshop_ids for this site (via site_workshop join table OR workshop.site_id)
+    # Get all workshop_ids for this site — BOTH from site_workshop join table AND workshop.site_id
+    my %seen_wid;
     my @workshop_ids;
+
     eval {
-        # Primary: site_workshop linking table
-        @workshop_ids = $c->model('DBEncy')->resultset('SiteWorkshop')->search(
+        my @via_link = $c->model('DBEncy')->resultset('SiteWorkshop')->search(
             { site_id => $site_id }
         )->get_column('workshop_id')->all;
+        for my $wid (@via_link) {
+            unless ($seen_wid{$wid}++) { push @workshop_ids, $wid }
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
+            "Workshops via site_workshop for site_id=$site_id: [" . join(',', @via_link) . "]");
     };
-    # Fallback: direct site_id on workshop table
-    unless (@workshop_ids) {
-        eval {
-            @workshop_ids = $c->model('DBEncy')->resultset('WorkShop')->search(
-                { site_id => $site_id }
-            )->get_column('id')->all;
-        };
-    }
 
-    my @user_ids;
+    eval {
+        my @via_direct = $c->model('DBEncy')->resultset('WorkShop')->search(
+            { site_id => $site_id }
+        )->get_column('id')->all;
+        for my $wid (@via_direct) {
+            unless ($seen_wid{$wid}++) { push @workshop_ids, $wid }
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
+            "Workshops via WorkShop.site_id for site_id=$site_id: [" . join(',', @via_direct) . "]");
+    };
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
+        "Total unique workshops for site_id=$site_id: [" . join(',', @workshop_ids) . "]");
+
+    my @entries;
     if (@workshop_ids) {
-        # Include registered, waitlist, and attended — exclude only cancelled
-        my $part_rs = $c->model('DBEncy')->resultset('Participant')->search(
-            {
-                workshop_id => { -in  => \@workshop_ids },
-                status      => { '!=' => 'cancelled' },
-                user_id     => { '!=' => undef },
-            },
-            { columns => ['user_id'], distinct => 1 }
-        );
-        @user_ids = $part_rs->get_column('user_id')->all;
-
-        # Log what statuses are actually present to aid debugging
+        # Log statuses for debugging
         my $status_rs = $c->model('DBEncy')->resultset('Participant')->search(
             { workshop_id => { -in => \@workshop_ids } },
             { columns => ['status'], distinct => 1 }
         );
         my @statuses = $status_rs->get_column('status')->all;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
-            "Participant statuses found for workshops [" . join(',', @workshop_ids) . "]: " .
+            "Participant statuses for workshops [" . join(',', @workshop_ids) . "]: " .
             (scalar @statuses ? join(', ', @statuses) : 'NONE'));
+
+        # Include all non-cancelled participants
+        my $part_rs = $c->model('DBEncy')->resultset('Participant')->search(
+            {
+                workshop_id => { -in  => \@workshop_ids },
+                status      => { '!=' => 'cancelled' },
+            },
+            { columns => ['user_id', 'email', 'name'], distinct => 1 }
+        );
+
+        my %seen_email;
+        while (my $p = $part_rs->next) {
+            my $uid   = $p->user_id;
+            my $email = $p->email || '';
+            my $name  = $p->name  || '';
+
+            if ($uid) {
+                push @entries, $uid;
+            } elsif ($email && !$seen_email{lc $email}++) {
+                # Try to find user account by email
+                my $user;
+                eval {
+                    $user = $c->model('DBEncy')->resultset('User')->find({ email => $email });
+                };
+                if ($user && $user->id) {
+                    push @entries, $user->id;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
+                        "Resolved participant email $email to user_id=" . $user->id);
+                } else {
+                    push @entries, { email => $email, name => $name };
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
+                        "Email-only participant: $email ($name) — no system account");
+                }
+            }
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
+            "Total participant entries: " . scalar(@entries) . " for " . scalar(@workshop_ids) . " workshops");
     }
 
-    $self->_upsert_list_subscriptions($c, $list->id, \@user_ids, 'auto-workshop');
+    $self->_upsert_list_subscriptions($c, $list->id, \@entries, 'auto-workshop');
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
-        "Synced Workshop Attendees: " . scalar(@user_ids) . " users for site_id=$site_id (" .
+        "Synced Workshop Attendees: " . scalar(@entries) . " entries for site_id=$site_id (" .
         scalar(@workshop_ids) . " workshops)");
 }
 
