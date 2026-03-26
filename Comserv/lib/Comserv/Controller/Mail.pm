@@ -861,7 +861,8 @@ sub lists :Local :Args(0) {
                 my $sth;
                 eval {
                     $sth = $dbh->prepare(
-                        "SELECT s.id, s.user_id, s.email AS sub_email, s.display_name,
+                        "SELECT s.id, s.user_id, s.email AS sub_email,
+                                s.first_name AS sub_first, s.last_name AS sub_last,
                                 u.username, u.first_name, u.last_name, u.email AS user_email
                          FROM mailing_list_subscriptions s
                          LEFT JOIN users u ON u.id = s.user_id
@@ -897,8 +898,8 @@ sub lists :Local :Args(0) {
                         push @subs, {
                             user_id    => undef,
                             username   => '',
-                            first_name => $row->{display_name} || '',
-                            last_name  => '',
+                            first_name => $row->{sub_first} || '',
+                            last_name  => $row->{sub_last}  || '',
                             email      => $row->{sub_email},
                         };
                     }
@@ -1153,17 +1154,16 @@ sub send_mass_email :Local :Args(0) {
                     $rec->{last_name}  = $u->last_name  || '';
                     $rec->{username}   = $u->username   || '';
                 } else {
-                    # Try mailing_list_subscriptions display_name for email-only entries
+                    # Try mailing_list_subscriptions for email-only entries
                     my $dbh = $c->model('DBEncy')->schema->storage->dbh;
                     my $sth = $dbh->prepare(
-                        "SELECT display_name FROM mailing_list_subscriptions WHERE email=? AND is_active=1 LIMIT 1"
+                        "SELECT first_name, last_name FROM mailing_list_subscriptions WHERE email=? AND is_active=1 LIMIT 1"
                     );
-                    $sth->execute($addr);
-                    my ($dn) = $sth->fetchrow_array;
-                    if ($dn) {
-                        my @parts = split /\s+/, $dn, 2;
-                        $rec->{first_name} = $parts[0] || '';
-                        $rec->{last_name}  = $parts[1] || '';
+                    eval { $sth->execute($addr) };
+                    unless ($@) {
+                        my ($fn, $ln) = $sth->fetchrow_array;
+                        $rec->{first_name} = $fn || '';
+                        $rec->{last_name}  = $ln || '';
                     }
                 }
             };
@@ -1356,7 +1356,8 @@ sub _upsert_list_subscriptions {
     for my $entry (@$user_ids_ref) {
         if (ref $entry eq 'HASH') {
             my $email = $entry->{email};
-            my $name  = $entry->{name} || '';
+            my $first = $entry->{first_name} || '';
+            my $last  = $entry->{last_name}  || '';
             next unless $email;
 
             # Prepare email statements on first use
@@ -1366,7 +1367,7 @@ sub _upsert_list_subscriptions {
                         "SELECT id FROM mailing_list_subscriptions WHERE mailing_list_id=? AND email=? AND subscription_source=?"
                     );
                     $insert_email_sth = $dbh->prepare(
-                        "INSERT INTO mailing_list_subscriptions (mailing_list_id, email, display_name, subscription_source, is_active) VALUES (?,?,?,?,1)"
+                        "INSERT INTO mailing_list_subscriptions (mailing_list_id, email, first_name, last_name, subscription_source, is_active) VALUES (?,?,?,?,?,1)"
                     );
                     $email_stmts_ok = 1;
                 };
@@ -1384,7 +1385,7 @@ sub _upsert_list_subscriptions {
             if ($row) {
                 eval { $update_sth->execute($row->{id}) };
             } else {
-                eval { $insert_email_sth->execute($list_id, $email, $name, $source) };
+                eval { $insert_email_sth->execute($list_id, $email, $first, $last, $source) };
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_upsert_list_subscriptions',
                     "email-only insert error for $email: $@") if $@;
             }
@@ -1538,14 +1539,21 @@ sub _sync_workshop_attendees_list {
                 workshop_id => { -in  => \@workshop_ids },
                 status      => { '!=' => 'cancelled' },
             },
-            { columns => ['user_id', 'email', 'name'], distinct => 1 }
+            { columns => ['user_id', 'email', 'name', 'first_name', 'last_name'], distinct => 1 }
         );
 
         my %seen_email;
         while (my $p = $part_rs->next) {
             my $uid   = $p->user_id;
             my $email = $p->email || '';
-            my $name  = $p->name  || '';
+
+            # Prefer explicit first/last; fall back to splitting the name field
+            my $first = eval { $p->first_name } || '';
+            my $last  = eval { $p->last_name  } || '';
+            if (!$first && !$last) {
+                my $name = $p->name || '';
+                ($first, $last) = $name =~ /^(\S+)\s+(.+)$/ ? ($1, $2) : ($name, '');
+            }
 
             if ($uid) {
                 push @entries, $uid;
@@ -1560,9 +1568,9 @@ sub _sync_workshop_attendees_list {
                     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
                         "Resolved participant email $email to user_id=" . $user->id);
                 } else {
-                    push @entries, { email => $email, name => $name };
+                    push @entries, { email => $email, first_name => $first, last_name => $last };
                     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
-                        "Email-only participant: $email ($name) — no system account");
+                        "Email-only participant: $email ($first $last) — no system account");
                 }
             }
         }
