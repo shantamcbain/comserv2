@@ -9,6 +9,9 @@
 <form method="post" action="[% c.uri_for('/log/update') %]" class="log-form">
     <input type="hidden" name="record_id" value="[% log.record_id %]">
 
+    <label for="username">Logged by (Username):</label><br>
+    <input type="text" id="username" name="username" value="[% log.username %]" readonly><br>
+
     <label for="sitename">Site Name:</label><br>
     <input type="text" id="sitename" name="sitename" value="[% log.sitename %]" readonly><br>
 

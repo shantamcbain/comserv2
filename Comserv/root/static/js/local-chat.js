@@ -451,6 +451,13 @@
                             if (!state.isGuest) {
                                 state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-3-mini';
                             }
+                            // Show web search toggle for any user who has Grok access
+                            // (toggle applies to Grok requests whether selected manually or via auto-routing)
+                            const wst = document.getElementById('web-search-toggle');
+                            if (wst) {
+                                wst.style.display = 'inline';
+                                wst.title = 'Enable web search for Grok requests (uses API credits)';
+                            }
                         } else if (p.service === 'ollama' && p.models && p.models.length > 0) {
                             // Filter to chat-capable models only, then sort by size
                             const chatModels = p.models.filter(function(m) { return isChatModel(m.id); });
@@ -752,18 +759,7 @@
             if (data.is_admin !== undefined) state.isAdmin = !!data.is_admin;
             if (data.is_guest !== undefined) state.isGuest = !!data.is_guest;
 
-            // Clear chat storage if the logged-in user changed (different session)
-            const storedChatUser = sessionStorage.getItem('chatUser');
-            if (data.username && storedChatUser && storedChatUser !== data.username) {
-                sessionStorage.removeItem('chatMessages');
-                sessionStorage.removeItem('currentConversationId');
-                state.currentConversationId = null;
-                const chatMessages = document.getElementById('chat-messages');
-                if (chatMessages) chatMessages.innerHTML = '';
-            }
-            if (data.username) sessionStorage.setItem('chatUser', data.username);
-
-            // Hide provider selector and history button for guests
+            // Hide provider selector and history button for guests / non-admins
             if (data.is_guest || !data.can_access_history) {
                 const selectorBar = document.querySelector('.provider-selector');
                 if (selectorBar) selectorBar.style.display = 'none';
@@ -1072,9 +1068,10 @@
             requestPayload.model = modelName;
         }
 
-        // Include web search flag (Grok only; server enforces admin-only)
+        // Include web search flag — send whenever checkbox is checked.
+        // Server enforces role-based access and only activates it for Grok requests.
         const webSearchEl = document.getElementById('enable-web-search');
-        if (webSearchEl && webSearchEl.checked && providerName === 'grok') {
+        if (webSearchEl && webSearchEl.checked) {
             requestPayload.use_search = true;
         }
 
@@ -1098,10 +1095,11 @@
         
         console.debug('Sending AI request with agent:', state.pageContext.agent_id, requestPayload);
         
-        // Provider-aware client timeout: Ollama can be slow loading a large model from disk;
-        // give it 180 s (server-side is 150 s). External APIs (Grok etc.) cap at 30 s.
+        // Provider-aware client timeout:
+        //   Ollama: 180 s (server-side is 150 s — model cold-start can take ~60 s)
+        //   Grok:   90 s (server-side is 120 s — complex audit/analysis queries need time)
         const isOllama = providerName === 'ollama';
-        const clientTimeoutMs = isOllama ? 180000 : 30000;
+        const clientTimeoutMs = isOllama ? 180000 : 90000;
         const abortCtrl = new AbortController();
         const abortTimer = setTimeout(function() {
             abortCtrl.abort();
@@ -1133,7 +1131,13 @@
             clearTimeout(abortTimer);
             clearTimeout(progressTimer1);
             clearTimeout(progressTimer2);
-            return response.json();
+            return response.text().then(function(text) {
+                try {
+                    return JSON.parse(text);
+                } catch(e) {
+                    throw new Error('Server returned non-JSON response (HTTP ' + response.status + '). The server may have crashed — check logs.');
+                }
+            });
         })
         .then(data => {
             // Remove loading message
@@ -1145,7 +1149,66 @@
             if (data.success) {
                 // Reset retry counter on success
                 state.retryCount = 0;
-                
+
+                // ── Web-search consent flow ───────────────────────────────────
+                // Server found no confident answer locally and is asking for
+                // permission to search the web via Grok.
+                if (data.needs_web_search) {
+                    statusIndicator.textContent = '💬 Escalation needed';
+                    statusIndicator.className = 'chat-status';
+                    const chatMessages = document.getElementById('chat-messages');
+                    const consentWrapper = document.createElement('div');
+                    consentWrapper.className = 'msg-wrapper msg-wrapper-ai';
+
+                    if (data.partial_answer) {
+                        const partialLabel = document.createElement('div');
+                        partialLabel.className = 'msg-label';
+                        partialLabel.textContent = 'AI (local)';
+                        const partialEl = document.createElement('div');
+                        partialEl.className = 'message ai-message';
+                        partialEl.textContent = data.partial_answer;
+                        consentWrapper.appendChild(partialLabel);
+                        consentWrapper.appendChild(partialEl);
+                    }
+
+                    const consentLabel = document.createElement('div');
+                    consentLabel.className = 'msg-label';
+                    consentLabel.textContent = 'System';
+                    const consentEl = document.createElement('div');
+                    consentEl.className = 'message system-message';
+                    consentEl.textContent = data.message || "I couldn't find a confident local answer. Search the web?";
+
+                    const yesBtn = document.createElement('button');
+                    yesBtn.className = 'chat-retry-btn';
+                    yesBtn.textContent = '🔍 Yes, search the web';
+                    yesBtn.style.marginRight = '6px';
+                    yesBtn.onclick = function() {
+                        consentWrapper.remove();
+                        // Re-send with Grok web search
+                        const grokModel = (state.modelTiers && state.modelTiers.grok)
+                                          ? state.modelTiers.grok
+                                          : 'grok|grok-3-mini';
+                        state.userModelOverride = grokModel;
+                        const webEl = document.getElementById('enable-web-search');
+                        if (webEl) webEl.checked = true;
+                        queryAI(prompt);
+                        state.userModelOverride = null;
+                    };
+
+                    const noBtn = document.createElement('button');
+                    noBtn.className = 'chat-retry-btn';
+                    noBtn.textContent = '✕ No thanks';
+                    noBtn.onclick = function() { consentWrapper.remove(); };
+
+                    consentWrapper.appendChild(consentLabel);
+                    consentWrapper.appendChild(consentEl);
+                    consentWrapper.appendChild(yesBtn);
+                    consentWrapper.appendChild(noBtn);
+                    chatMessages.appendChild(consentWrapper);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                    return;
+                }
+
                 // Store conversation ID ONLY if it was successfully created
                 if (data.conversation_id && data.conversation_id !== null && data.conversation_id !== undefined) {
                     state.currentConversationId = data.conversation_id;
@@ -1217,7 +1280,7 @@
                     + (isServerTimeout ? ' — Ollama may still be loading the model.' : '');
                 wrapper.appendChild(label);
                 wrapper.appendChild(errEl);
-                if (isServerTimeout) {
+                if (isServerTimeout || isOllama) {
                     const retryBtn = document.createElement('button');
                     retryBtn.className = 'chat-retry-btn';
                     retryBtn.textContent = '↺ Try Again';
@@ -1245,7 +1308,7 @@
                     + (isOllama ? ' Ollama may be loading a large model.' : ' The AI server may be busy.')
                 : 'Network error: ' + error.message + '. Please try again.';
 
-            // Show error with a Retry button for timeouts
+            // Show error with a Retry button (always — network errors are usually transient)
             const chatMessages = document.getElementById('chat-messages');
             const wrapper = document.createElement('div');
             wrapper.className = 'msg-wrapper msg-wrapper-ai';
@@ -1257,16 +1320,14 @@
             errEl.textContent = msg;
             wrapper.appendChild(label);
             wrapper.appendChild(errEl);
-            if (isTimeout) {
-                const retryBtn = document.createElement('button');
-                retryBtn.className = 'chat-retry-btn';
-                retryBtn.textContent = '↺ Retry';
-                retryBtn.onclick = function() {
-                    wrapper.remove();
-                    queryAI(prompt);
-                };
-                wrapper.appendChild(retryBtn);
-            }
+            const retryBtn = document.createElement('button');
+            retryBtn.className = 'chat-retry-btn';
+            retryBtn.textContent = '↺ Retry';
+            retryBtn.onclick = function() {
+                wrapper.remove();
+                queryAI(prompt);
+            };
+            wrapper.appendChild(retryBtn);
             chatMessages.appendChild(wrapper);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         });
@@ -1275,7 +1336,9 @@
     // Returns true for models that support chat/generate (excludes embeddings, rerankers, etc.)
     function isChatModel(id) {
         const s = id.toLowerCase();
+        // Exclude embedding/reranker/vision-only/cloud-routed models
         if (/embed|rerank|bge|nomic|clip|whisper|tts|vision(?!.*instruct)/.test(s)) return false;
+        if (/:cloud$/.test(s)) return false;  // Ollama cloud-routed models need external API keys
         return true;
     }
 

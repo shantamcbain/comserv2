@@ -38,6 +38,9 @@
             [% INCLUDE 'Navigation/admintopmenu.tt' %]
         [% END %]
         
+        <!-- Planning Menu (logged-in users with planning access only) -->
+        [% INCLUDE 'Navigation/TopDropListPlanning.tt' %]
+
         <!-- HelpDesk Menu -->
         [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
         
