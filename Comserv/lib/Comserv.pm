@@ -268,7 +268,6 @@ around 'finalize_error' => sub {
 __PACKAGE__->_initialize_database_config();
 __PACKAGE__->setup();
 __PACKAGE__->_initialize_ai_chat_schema();
-__PACKAGE__->_initialize_mailing_schema();
 
 # DISABLED: ConfigDatabaseInit was causing segmentation faults during schema queries
 # The config-db initialization is not required for current functionality
@@ -406,91 +405,5 @@ sub _initialize_ai_chat_schema {
         warn "Warning during AI Chat schema initialization: $@\n";
     }
     
-    return 1;
-}
-sub _initialize_mailing_schema {
-    my $class = shift;
-    eval {
-        use Comserv::Util::Logging;
-        my $log = Comserv::Util::Logging->instance;
-        $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_initialize_mailing_schema',
-            'Checking mailing list schema tables...');
-
-        my $schema = $class->model('DBEncy');
-        return unless $schema && $schema->storage && $schema->storage->dbh;
-        my $dbh = $schema->storage->dbh;
-
-        my %ddl = (
-            mailing_lists => q{
-                CREATE TABLE IF NOT EXISTS `mailing_lists` (
-                    `id`                INT NOT NULL AUTO_INCREMENT,
-                    `site_id`           INT NOT NULL,
-                    `name`              VARCHAR(255) NOT NULL,
-                    `description`       TEXT,
-                    `list_email`        VARCHAR(255),
-                    `virtualmin_list_id` VARCHAR(255),
-                    `is_software_only`  TINYINT NOT NULL DEFAULT 1,
-                    `is_active`         TINYINT NOT NULL DEFAULT 1,
-                    `created_by`        INT NOT NULL DEFAULT 0,
-                    `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    `updated_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    PRIMARY KEY (`id`),
-                    UNIQUE KEY `unique_site_name` (`site_id`, `name`),
-                    INDEX `idx_site_id` (`site_id`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-            },
-            mailing_list_subscriptions => q{
-                CREATE TABLE IF NOT EXISTS `mailing_list_subscriptions` (
-                    `id`                    INT NOT NULL AUTO_INCREMENT,
-                    `mailing_list_id`       INT NOT NULL,
-                    `user_id`               INT NOT NULL,
-                    `subscription_source`   VARCHAR(50),
-                    `source_id`             INT,
-                    `subscribed_at`         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    `is_active`             TINYINT NOT NULL DEFAULT 1,
-                    PRIMARY KEY (`id`),
-                    UNIQUE KEY `unique_subscription` (`mailing_list_id`, `user_id`, `source_id`),
-                    INDEX `idx_list_active` (`mailing_list_id`, `is_active`),
-                    INDEX `idx_user_id` (`user_id`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-            },
-            mailing_list_campaigns => q{
-                CREATE TABLE IF NOT EXISTS `mailing_list_campaigns` (
-                    `id`                INT NOT NULL AUTO_INCREMENT,
-                    `mailing_list_id`   INT NOT NULL,
-                    `subject`           VARCHAR(500) NOT NULL,
-                    `body`              MEDIUMTEXT,
-                    `sent_by`           INT NOT NULL DEFAULT 0,
-                    `sent_at`           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    `recipient_count`   INT NOT NULL DEFAULT 0,
-                    `success_count`     INT NOT NULL DEFAULT 0,
-                    `fail_count`        INT NOT NULL DEFAULT 0,
-                    PRIMARY KEY (`id`),
-                    INDEX `idx_list_id` (`mailing_list_id`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-            },
-        );
-
-        for my $table (qw(mailing_lists mailing_list_subscriptions mailing_list_campaigns)) {
-            eval {
-                my $sth = $dbh->prepare("SHOW TABLES LIKE ?");
-                $sth->execute($table);
-                my $exists = $sth->fetchrow_arrayref();
-                if (!$exists) {
-                    $dbh->do($ddl{$table});
-                    $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_initialize_mailing_schema',
-                        "Created table '$table'");
-                }
-            };
-            if ($@) {
-                $log->log_with_details(undef, 'warn', __FILE__, __LINE__, '_initialize_mailing_schema',
-                    "Could not create table '$table': $@");
-            }
-        }
-
-        $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_initialize_mailing_schema',
-            'Mailing schema check complete.');
-    };
-    warn "Warning during mailing schema initialization: $@\n" if $@;
     return 1;
 }
