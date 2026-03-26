@@ -819,5 +819,377 @@ sub send_test_email :Local {
     $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
 }
 
+
+# ─────────────────────────────────────────────────────────────
+#  MAILING LIST MANAGEMENT
+# ─────────────────────────────────────────────────────────────
+
+sub lists :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    my $site_id = $c->session->{site_id} || $c->stash->{site_id};
+    my @lists;
+    eval {
+        my $rs = $c->model('DBEncy')->resultset('MailingList')->search(
+            { site_id => $site_id, is_active => 1 },
+            { order_by => 'name' }
+        );
+        while (my $list = $rs->next) {
+            my $sub_count = $c->model('DBEncy')->resultset('MailingListSubscription')->count({
+                mailing_list_id => $list->id,
+                is_active => 1,
+            });
+            push @lists, {
+                id          => $list->id,
+                name        => $list->name,
+                description => $list->description,
+                list_email  => $list->list_email,
+                is_software_only => $list->is_software_only,
+                subscriber_count => $sub_count,
+                created_at  => $list->created_at,
+            };
+        }
+    };
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'lists', "DB error: $@") if $@;
+
+    $c->stash(
+        mailing_lists => \@lists,
+        template => 'mail/mailing_lists.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub lists_create :Path('/mail/lists/create') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $roles = $c->session->{roles} || [];
+    $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
+    unless (grep { $_ eq 'admin' } @$roles) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        $c->res->redirect($c->uri_for('/mail/lists'));
+        return;
+    }
+
+    if ($c->req->method eq 'POST') {
+        my $site_id = $c->session->{site_id} || $c->stash->{site_id};
+        my $name    = $c->req->param('name') || '';
+        unless ($name) {
+            $c->stash(debug_msg => 'List name is required.', template => 'mail/create_list.tt');
+            $c->forward($c->view('TT'));
+            return;
+        }
+        eval {
+            $c->model('DBEncy')->resultset('MailingList')->create({
+                site_id         => $site_id,
+                name            => $name,
+                description     => $c->req->param('description') || '',
+                list_email      => $c->req->param('list_email')  || undef,
+                is_software_only => $c->req->param('is_software_only') ? 1 : 0,
+                is_active       => 1,
+                created_by      => $c->session->{user_id} || 0,
+            });
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'lists_create', "Create failed: $@");
+            $c->stash(debug_msg => "Failed to create list: $@", template => 'mail/create_list.tt');
+            $c->forward($c->view('TT'));
+            return;
+        }
+        $c->flash->{success_msg} = "Mailing list '$name' created.";
+        $c->res->redirect($c->uri_for('/mail/lists'));
+        return;
+    }
+
+    $c->stash(template => 'mail/create_list.tt');
+    $c->forward($c->view('TT'));
+}
+
+sub lists_delete :Path('/mail/lists') :Args(2) {
+    my ($self, $c, $list_id, $action) = @_;
+    return $self->lists_subscribers($c, $list_id) if $action eq 'subscribers';
+    return $self->lists_edit($c, $list_id)        if $action eq 'edit';
+
+    my $roles = $c->session->{roles} || [];
+    $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
+    unless (grep { $_ eq 'admin' } @$roles) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        $c->res->redirect($c->uri_for('/mail/lists'));
+        return;
+    }
+
+    eval {
+        my $list = $c->model('DBEncy')->resultset('MailingList')->find($list_id);
+        $list->update({ is_active => 0 }) if $list;
+    };
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'lists_delete', "Error: $@") if $@;
+    $c->flash->{success_msg} = 'Mailing list removed.';
+    $c->res->redirect($c->uri_for('/mail/lists'));
+}
+
+sub lists_edit {
+    my ($self, $c, $list_id) = @_;
+
+    my $list = eval { $c->model('DBEncy')->resultset('MailingList')->find($list_id) };
+    unless ($list) {
+        $c->flash->{error_msg} = 'List not found.';
+        $c->res->redirect($c->uri_for('/mail/lists'));
+        return;
+    }
+
+    if ($c->req->method eq 'POST') {
+        eval {
+            $list->update({
+                name            => $c->req->param('name')        || $list->name,
+                description     => $c->req->param('description') // $list->description,
+                list_email      => $c->req->param('list_email')  || undef,
+                is_software_only => $c->req->param('is_software_only') ? 1 : 0,
+            });
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'lists_edit', "Update failed: $@");
+            $c->flash->{error_msg} = "Update failed: $@";
+        } else {
+            $c->flash->{success_msg} = 'List updated.';
+        }
+        $c->res->redirect($c->uri_for('/mail/lists'));
+        return;
+    }
+
+    $c->stash(list => $list, template => 'mail/edit_list.tt');
+    $c->forward($c->view('TT'));
+}
+
+sub lists_subscribers {
+    my ($self, $c, $list_id) = @_;
+
+    my @subscribers;
+    my $list_name = '';
+    eval {
+        my $list = $c->model('DBEncy')->resultset('MailingList')->find($list_id);
+        $list_name = $list->name if $list;
+        my $rs = $c->model('DBEncy')->resultset('MailingListSubscription')->search(
+            { mailing_list_id => $list_id, is_active => 1 },
+            { prefetch => 'user', order_by => 'user.username' }
+        );
+        while (my $sub = $rs->next) {
+            push @subscribers, {
+                id     => $sub->id,
+                source => $sub->subscription_source,
+                user   => {
+                    id       => $sub->user->id,
+                    username => $sub->user->username,
+                    email    => $sub->user->email,
+                    first_name => $sub->user->first_name,
+                    last_name  => $sub->user->last_name,
+                },
+            };
+        }
+    };
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'lists_subscribers', "Error: $@") if $@;
+
+    $c->stash(
+        list_id     => $list_id,
+        list_name   => $list_name,
+        subscribers => \@subscribers,
+        template    => 'mail/list_subscribers.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+# ─────────────────────────────────────────────────────────────
+#  SITE MAILOUT — send to users / paid members / custom list
+# ─────────────────────────────────────────────────────────────
+
+sub mass_email :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    my $roles = $c->session->{roles} || [];
+    $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
+    unless (grep { $_ eq 'admin' } @$roles) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        $c->res->redirect($c->uri_for('/mail'));
+        return;
+    }
+
+    my $site_id = $c->session->{site_id} || $c->stash->{site_id};
+
+    my $all_count  = _count_site_users($c, $site_id, 'all');
+    my $paid_count = _count_site_users($c, $site_id, 'paid');
+
+    my @lists;
+    eval {
+        my $rs = $c->model('DBEncy')->resultset('MailingList')->search(
+            { site_id => $site_id, is_active => 1 }, { order_by => 'name' }
+        );
+        push @lists, { id => $_->id, name => $_->name } while $_ = $rs->next;
+    };
+
+    $c->stash(
+        user_count   => $all_count,
+        paid_count   => $paid_count,
+        mailing_lists => \@lists,
+        template     => 'mail/mailout_compose.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub send_mass_email :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    my $roles = $c->session->{roles} || [];
+    $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
+    unless (grep { $_ eq 'admin' } @$roles) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        $c->res->redirect($c->uri_for('/mail'));
+        return;
+    }
+
+    my $site_id   = $c->session->{site_id} || $c->stash->{site_id};
+    my $subject   = $c->req->param('subject') || '';
+    my $body_tmpl = $c->req->param('body')    || '';
+    my $group     = $c->req->param('group')   || 'all';
+    my $custom_addresses = $c->req->param('custom_addresses') || '';
+
+    unless ($subject && $body_tmpl) {
+        $c->flash->{error_msg} = 'Subject and message body are required.';
+        $c->res->redirect($c->uri_for('/mail/mass_email'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_mass_email',
+        "Mailout started: site_id=$site_id group=$group subject='$subject'");
+
+    # Build recipient list
+    my @recipients;
+
+    if ($group eq 'custom') {
+        # Custom addresses only
+        for my $addr (split /[\s,;]+/, $custom_addresses) {
+            $addr =~ s/^\s+|\s+$//g;
+            push @recipients, { email => $addr, first_name => '', last_name => '', username => $addr }
+                if $addr =~ /\@/;
+        }
+    } else {
+        # DB users (all or paid members)
+        my @users = _get_site_users($c, $site_id, $group);
+        push @recipients, @users;
+
+        # Also add any custom addresses provided
+        for my $addr (split /[\s,;]+/, $custom_addresses) {
+            $addr =~ s/^\s+|\s+$//g;
+            push @recipients, { email => $addr, first_name => '', last_name => '', username => $addr }
+                if $addr =~ /\@/;
+        }
+    }
+
+    unless (@recipients) {
+        $c->flash->{error_msg} = 'No recipients found for the selected group.';
+        $c->res->redirect($c->uri_for('/mail/mass_email'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_mass_email',
+        "Sending to " . scalar(@recipients) . " recipients");
+
+    my ($sent, $failed) = (0, 0);
+    my @failures;
+
+    for my $r (@recipients) {
+        next unless $r->{email};
+
+        # Personalise body
+        my $body = $body_tmpl;
+        $body =~ s/\[FIRST_NAME\]/$r->{first_name} || ''/ge;
+        $body =~ s/\[LAST_NAME\]/$r->{last_name}   || ''/ge;
+        $body =~ s/\[EMAIL\]/$r->{email}/g;
+        $body =~ s/\[USERNAME\]/$r->{username}     || ''/ge;
+
+        my $result = eval {
+            $c->model('Mail')->send_email($c, $r->{email}, $subject, $body, $site_id);
+        };
+        if ($@ || !$result) {
+            $failed++;
+            my $reason = $@ || $c->stash->{debug_msg} || 'unknown error';
+            push @failures, "$r->{email}: $reason";
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_mass_email',
+                "Failed to send to $r->{email}: $reason");
+        } else {
+            $sent++;
+        }
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_mass_email',
+        "Mailout complete: sent=$sent failed=$failed");
+
+    if ($sent && !$failed) {
+        $c->flash->{success_msg} = "Mailout complete — $sent email(s) sent successfully.";
+    } elsif ($sent) {
+        $c->flash->{success_msg} = "$sent sent. $failed failed — check the application log for details.";
+    } else {
+        $c->flash->{error_msg} = "All $failed sends failed. Check SMTP config and application log.";
+    }
+
+    $c->res->redirect($c->uri_for('/mail/mass_email'));
+}
+
+# ─── helpers ──────────────────────────────────────────────────
+
+sub _count_site_users {
+    my ($c, $site_id, $group) = @_;
+    my $count = 0;
+    eval {
+        if ($group eq 'paid') {
+            $count = $c->model('DBEncy')->resultset('UserMembership')->search({
+                site_id => $site_id,
+                status  => ['active', 'grace'],
+            })->count;
+        } else {
+            $count = $c->model('DBEncy')->resultset('UserSiteRole')->search({
+                site_id => $site_id,
+            }, { group_by => 'user_id' })->count;
+        }
+    };
+    return $count;
+}
+
+sub _get_site_users {
+    my ($c, $site_id, $group) = @_;
+    my @users;
+    eval {
+        if ($group eq 'paid') {
+            my $rs = $c->model('DBEncy')->resultset('UserMembership')->search(
+                { 'me.site_id' => $site_id, 'me.status' => ['active', 'grace'] },
+                { prefetch => 'user', group_by => 'me.user_id' }
+            );
+            while (my $mem = $rs->next) {
+                my $u = $mem->user;
+                next unless $u && $u->email;
+                push @users, {
+                    email      => $u->email,
+                    first_name => $u->first_name || '',
+                    last_name  => $u->last_name  || '',
+                    username   => $u->username   || '',
+                };
+            }
+        } else {
+            my $rs = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+                { 'me.site_id' => $site_id },
+                { prefetch => 'user', group_by => 'me.user_id' }
+            );
+            while (my $row = $rs->next) {
+                my $u = $row->user;
+                next unless $u && $u->email;
+                push @users, {
+                    email      => $u->email,
+                    first_name => $u->first_name || '',
+                    last_name  => $u->last_name  || '',
+                    username   => $u->username   || '',
+                };
+            }
+        }
+    };
+    return @users;
+}
+
 __PACKAGE__->meta->make_immutable;
 1;
