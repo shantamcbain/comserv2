@@ -2,6 +2,7 @@ package Comserv::Controller::Membership;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::PointSystem;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -133,7 +134,7 @@ sub account :Local :Args(0) {
 
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
     my $memberships = [];
-    my $currency_account = undef;
+    my $point_balance = 0;
 
     eval {
         my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
@@ -145,9 +146,8 @@ sub account :Local :Args(0) {
             $memberships = \@rows;
         }
 
-        $currency_account = $c->model('DBEncy')->resultset('InternalCurrencyAccount')->search(
-            { user_id => $c->session->{user_id} }
-        )->single;
+        my $ps = Comserv::Util::PointSystem->new(c => $c);
+        $point_balance = $ps->balance($c->session->{user_id});
     };
     if ($@) {
         my $err = "$@";
@@ -156,9 +156,9 @@ sub account :Local :Args(0) {
     }
 
     $c->stash(
-        template         => 'membership/Account.tt',
-        memberships      => $memberships,
-        currency_account => $currency_account,
+        template      => 'membership/Account.tt',
+        memberships   => $memberships,
+        point_balance => $point_balance,
     );
     $c->forward($c->view('TT'));
 }
