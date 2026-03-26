@@ -486,7 +486,7 @@
                 [% IF cur_branch && cur_branch != 'main' %]
                 [% SET cur_port     = bp.$cur_branch || '????' %]
                 [% SET worktree_dir = '/home/shanta/.zenflow/worktrees/' _ cur_branch _ '/Comserv' %]
-                [% SET start_cmd    = 'cd ' _ worktree_dir _ ' && perl script/comserv_server.pl -p ' _ cur_port %]
+                [% SET start_cmd    = 'cd ' _ worktree_dir _ ' && CATALYST_DEBUG=1 perl script/comserv_server.pl -p ' _ cur_port _ ' -r' %]
                 <div style="margin-bottom:10px;padding:8px 10px;background:color-mix(in srgb,#fd7e14 8%,var(--bg-color));border-radius:4px;">
                     <div style="margin-bottom:6px;font-weight:bold;color:#fd7e14;">▶ Start current branch server (port [% cur_port %]):</div>
                     <div style="display:flex;align-items:center;gap:8px;">
@@ -508,7 +508,7 @@
                         <th style="padding:4px 8px;"></th>
                     </tr>
                     [% FOREACH b IN all_branches %]
-                    [% SET b_cmd = 'cd /home/shanta/.zenflow/worktrees/' _ b.name _ '/Comserv && perl script/comserv_server.pl -p ' _ b.port %]
+                    [% SET b_cmd = 'cd /home/shanta/.zenflow/worktrees/' _ b.name _ '/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p ' _ b.port _ ' -r' %]
                     <tr style="border-bottom:1px solid var(--border-color);[% IF b.name == cur_branch %]background:color-mix(in srgb,#fd7e14 8%,var(--bg-color));[% END %]">
                         <td style="padding:5px 8px;"><code>[% b.label %]</code>
                             [% IF b.name == cur_branch %]<span style="color:#fd7e14;font-size:0.8em;"> ← current</span>[% END %]
