@@ -1141,11 +1141,33 @@ sub send_mass_email :Local :Args(0) {
     my @recipients;
 
     if ($group eq 'custom') {
-        # Custom addresses only
+        # Custom addresses from mailing list checkboxes — look up names from DB
         for my $addr (split /[\s,;]+/, $custom_addresses) {
             $addr =~ s/^\s+|\s+$//g;
-            push @recipients, { email => $addr, first_name => '', last_name => '', username => $addr }
-                if $addr =~ /\@/;
+            next unless $addr =~ /\@/;
+            my $rec = { email => $addr, first_name => '', last_name => '', username => '' };
+            eval {
+                my $u = $c->model('DBEncy')->resultset('User')->find({ email => $addr });
+                if ($u) {
+                    $rec->{first_name} = $u->first_name || '';
+                    $rec->{last_name}  = $u->last_name  || '';
+                    $rec->{username}   = $u->username   || '';
+                } else {
+                    # Try mailing_list_subscriptions display_name for email-only entries
+                    my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+                    my $sth = $dbh->prepare(
+                        "SELECT display_name FROM mailing_list_subscriptions WHERE email=? AND is_active=1 LIMIT 1"
+                    );
+                    $sth->execute($addr);
+                    my ($dn) = $sth->fetchrow_array;
+                    if ($dn) {
+                        my @parts = split /\s+/, $dn, 2;
+                        $rec->{first_name} = $parts[0] || '';
+                        $rec->{last_name}  = $parts[1] || '';
+                    }
+                }
+            };
+            push @recipients, $rec;
         }
     } else {
         # DB users (all or paid members)
