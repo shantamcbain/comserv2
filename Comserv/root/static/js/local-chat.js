@@ -1236,9 +1236,17 @@
                 statusIndicator.textContent = '🟢 ' + modelLabel;
                 statusIndicator.className = 'chat-status connected';
                 
-                // Add AI response
-                addMessage(data.response, 'ai-message');
+                // Add AI response — strip any embedded [ACTION: ...] blocks before display
+                const { cleanText, actions } = extractActions(data.response || '');
+                addMessage(cleanText, 'ai-message');
                 persistMessages();
+
+                // Execute any in-app actions the AI embedded
+                if (actions.length > 0) {
+                    actions.forEach(function(actionObj) {
+                        executeAIAction(actionObj);
+                    });
+                }
 
                 // Append web search citations if returned
                 if (data.citations && data.citations.length > 0) {
@@ -1478,6 +1486,66 @@
     }
     
     // Function to add a message to the chat with sender label
+    // Extract [ACTION: {...}] blocks from AI response text.
+    // Returns { cleanText, actions[] } where cleanText has the blocks removed.
+    function extractActions(text) {
+        const actions = [];
+        const cleanText = text.replace(/\[ACTION:\s*(\{[\s\S]*?\})\]/g, function(match, jsonStr) {
+            try {
+                const obj = JSON.parse(jsonStr);
+                if (obj && obj.action) actions.push(obj);
+            } catch(e) {
+                console.warn('AI action JSON parse error:', e, jsonStr);
+            }
+            return '';
+        }).trim();
+        return { cleanText, actions };
+    }
+
+    // POST an action object to /ai/action and show a confirmation bubble.
+    function executeAIAction(actionObj) {
+        const chatMessages = document.getElementById('chat-messages');
+
+        fetch('/ai/action', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(actionObj)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(result) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'msg-wrapper msg-wrapper-ai';
+            const lbl = document.createElement('div');
+            lbl.className = 'msg-label';
+            lbl.textContent = 'System';
+            const el = document.createElement('div');
+            el.className = 'message system-message';
+            el.textContent = result.success
+                ? '✅ ' + (result.message || 'Action completed')
+                : '⚠️ Action failed: ' + (result.error || 'unknown error');
+            wrapper.appendChild(lbl);
+            wrapper.appendChild(el);
+            chatMessages.appendChild(wrapper);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        })
+        .catch(function(err) {
+            console.error('AI action error:', err);
+            const wrapper = document.createElement('div');
+            wrapper.className = 'msg-wrapper msg-wrapper-ai';
+            const lbl = document.createElement('div');
+            lbl.className = 'msg-label';
+            lbl.textContent = 'System';
+            const el = document.createElement('div');
+            el.className = 'message error-message';
+            el.textContent = '⚠️ Action request failed: ' + err.message;
+            wrapper.appendChild(lbl);
+            wrapper.appendChild(el);
+            chatMessages.appendChild(wrapper);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+    }
+
     function addMessage(text, className) {
         const chatMessages = document.getElementById('chat-messages');
         const wrapper = document.createElement('div');
@@ -1511,6 +1579,15 @@
     
     // Add CSS styles
     function addChatStyles() {
+        if (!document.querySelector('link[data-ai-chat-css]')) {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.setAttribute('data-ai-chat-css', '1');
+            link.href = '/static/css/ai-chat.css?v=' + Date.now();
+            document.head.appendChild(link);
+        }
+    }
+    function _addChatStylesLEGACY_UNUSED() {
         const style = document.createElement('style');
         style.textContent = `
             .local-chat-widget {
