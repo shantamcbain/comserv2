@@ -470,6 +470,35 @@
         </div>
         [% END %]
 
+        [%# ── Project search filter ── %]
+        <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;">
+            <input type="text" id="project-search" placeholder="🔍 Search projects by name, site, or status…"
+                oninput="filterProjects(this.value)"
+                style="flex:1;padding:6px 10px;border:1px solid var(--border-color);border-radius:4px;font-size:0.88em;background:var(--bg-color);color:var(--text-color);">
+            <button onclick="document.getElementById('project-search').value='';filterProjects('');"
+                style="padding:5px 10px;border:1px solid var(--border-color);border-radius:4px;background:transparent;color:var(--text-muted-color);cursor:pointer;font-size:0.85em;">✕</button>
+        </div>
+        <script>
+        function filterProjects(q) {
+            q = q.toLowerCase().trim();
+            var cards = document.querySelectorAll('.project-card');
+            var headers = document.querySelectorAll('.site-group-header');
+            cards.forEach(function(card) {
+                var text = card.textContent.toLowerCase();
+                card.style.display = (!q || text.indexOf(q) !== -1) ? '' : 'none';
+            });
+            headers.forEach(function(h) {
+                var next = h.nextElementSibling;
+                var visible = false;
+                while (next && !next.classList.contains('site-group-header')) {
+                    if (next.classList.contains('project-card') && next.style.display !== 'none') visible = true;
+                    next = next.nextElementSibling;
+                }
+                h.style.display = (!q || visible) ? '' : 'none';
+            });
+        }
+        </script>
+
         [%# ── Project → Plan hierarchy (from stash planning_projects) ── %]
         [% IF planning_projects && planning_projects.size %]
         [% IF is_admin %]
