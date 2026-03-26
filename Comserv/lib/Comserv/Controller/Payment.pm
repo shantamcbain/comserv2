@@ -395,6 +395,57 @@ sub _paypal_url {
 }
 
 # ============================================================
+# Balance — member point balance and transaction history
+# ============================================================
+sub balance :Path('balance') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_login($c);
+
+    my $user_id  = $c->session->{user_id};
+    my $ps       = Comserv::Util::PointSystem->new(c => $c);
+
+    my $bal      = 0;
+    my $lifetime_earned = 0;
+    my $lifetime_spent  = 0;
+    my @ledger;
+    my $display  = {};
+
+    eval {
+        my $acct = $c->model('DBEncy')->resultset('PointAccount')
+            ->find({ user_id => $user_id });
+        if ($acct) {
+            $bal            = $acct->balance + 0;
+            $lifetime_earned = $acct->lifetime_earned + 0;
+            $lifetime_spent  = $acct->lifetime_spent  + 0;
+        }
+
+        @ledger = $ps->ledger_for_user($user_id, 25)->all;
+
+        $display = $ps->display_amount(
+            points    => $bal,
+            site_name => $c->stash->{SiteName},
+        );
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'balance',
+            "Error loading balance page: $@");
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'balance',
+        "Balance page for user_id=$user_id balance=$bal");
+
+    $c->stash(
+        template        => 'payment/Balance.tt',
+        balance         => $bal,
+        lifetime_earned => $lifetime_earned,
+        lifetime_spent  => $lifetime_spent,
+        ledger          => \@ledger,
+        display         => $display,
+    );
+    $c->forward($c->view('TT'));
+}
+
+# ============================================================
 # Buy Coins — GET: show packages  POST: launch PayPal form
 # ============================================================
 sub buy_coins :Path('buy/coins') :Args(0) {
