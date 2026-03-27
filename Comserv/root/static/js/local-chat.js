@@ -1265,7 +1265,8 @@
             page_title: state.pageContext.page_title,
             system: state.pageContext.system_prompt,
             agent_id: state.pageContext.agent_id,
-            agent_name: state.pageContext.agent_name
+            agent_name: state.pageContext.agent_name,
+            page_content: extractPageContent()
         };
         
         // Include selected model for Grok
@@ -1653,6 +1654,37 @@
         });
     }
     
+    // Extract visible text content of the current page to give the AI direct context.
+    // Strips the chat widget, nav, scripts and style elements, then trims whitespace.
+    // Result is capped at 4000 chars so the system prompt doesn't balloon.
+    function extractPageContent() {
+        try {
+            const clone = document.body.cloneNode(true);
+            // Remove elements that add noise or duplicate the nav guide
+            clone.querySelectorAll(
+                'script, style, noscript, ' +
+                '.local-chat-widget, #chat-panel, ' +
+                'nav, header, footer, ' +
+                '.navigation, #navigation, .nav-bar, ' +
+                '.debug-info, .page-debug'
+            ).forEach(function(el) { el.remove(); });
+
+            let text = clone.textContent || '';
+            // Collapse runs of whitespace/blank lines
+            text = text.replace(/[ \t]+/g, ' ')
+                       .replace(/\n[ \t]*/g, '\n')
+                       .replace(/\n{3,}/g, '\n\n')
+                       .trim();
+
+            if (text.length > 4000) {
+                text = text.substring(0, 4000) + '\n[... page content truncated]';
+            }
+            return text;
+        } catch(e) {
+            return '';
+        }
+    }
+
     // Returns true for models that support chat/generate (excludes embeddings, rerankers, etc.)
     function isChatModel(id) {
         const s = id.toLowerCase();
