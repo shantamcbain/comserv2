@@ -552,55 +552,54 @@ sub generate :Local :Args(0) {
             my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
             $active_ollama_host = $current_host;
             
-            # Context-aware model selection when user has not picked a specific model
-            unless ($model) {
-                my $before = $current_model;
-                $current_model = $self->_select_model_for_context($agent_id, $page_context, $installed_models, $current_model);
-                push @trace, sprintf("🔍 Model selection: agent=%s context=%s → %s%s",
-                    $agent_id, $page_context, $current_model,
-                    ($before && $before ne $current_model) ? " (was: $before)" : "");
-            } else {
-                $current_model = $model;
-                push @trace, sprintf("🔧 Model override by client: %s", $current_model);
-            }
+            # ── 3-Tier model selection: start small, escalate if needed ─────────
+            # Tier 1 = tier_small (fastest / lightest installed model)
+            # Tier 2 = tier_large (escalated only if Tier-1 quality is poor)
+            my ($tier_small, $tier_large) = $self->_pick_ollama_tier(
+                $installed_models, $current_model, $agent_id, $page_context);
+            my $manual_model = ($model && $can_select_model_gen) ? $model : '';
+            my $use_model    = $manual_model || $tier_small;
+
+            push @trace, sprintf("🔍 Tier selection: small=%s large=%s → using=%s%s",
+                $tier_small, $tier_large, $use_model,
+                $manual_model ? " (manual override)" : "");
 
             $ollama->host($current_host);
             $ollama->port($current_port) if $current_port;
-            $ollama->model($current_model) if $current_model;
+            $ollama->model($use_model);
             $ollama->clear_endpoint;
-            
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-                'generate', "Ollama model selected: $current_model (agent=$agent_id context=$page_context)");
-            
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'generate', "Ollama Tier-1 host=$current_host model=$use_model agent=$agent_id");
+
             # Fast availability check (3-second timeout) before committing
             my $fast_check = Comserv::Model::Ollama->new(host => $current_host, port => $current_port || 11434, timeout => 3);
             unless ($fast_check && $fast_check->check_connection()) {
                 die "Ollama is not reachable at $current_host. Please select an external AI model (Grok) or try again later.";
             }
             $ollama->timeout(150);
-            
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-                'generate', "Querying Ollama host=$current_host model=$current_model timeout=150s prompt_len=" . length($prompt));
-            
+
+            # Build message array once (reused across tiers)
+            my @ollama_msgs;
+            push @ollama_msgs, { role => 'system', content => $system } if $system;
+            for my $h (@$history_items) {
+                my $hrole    = ($h->{role} && $h->{role} eq 'assistant') ? 'assistant' : 'user';
+                my $hcontent = $h->{content} || '';
+                push @ollama_msgs, { role => $hrole, content => $hcontent } if $hcontent;
+            }
+            push @ollama_msgs, { role => 'user', content => $prompt };
+
+            # ── Tier 1 query ─────────────────────────────────────────────────
             my $query_start = time();
-            # Query the API
-            if (@$history_items) {
-                # Multi-turn: use /api/chat with full message history
-                my @ollama_msgs;
-                push @ollama_msgs, { role => 'system', content => $system } if $system;
-                for my $h (@$history_items) {
-                    my $hrole    = ($h->{role} && $h->{role} eq 'assistant') ? 'assistant' : 'user';
-                    my $hcontent = $h->{content} || '';
-                    push @ollama_msgs, { role => $hrole, content => $hcontent } if $hcontent;
-                }
-                push @ollama_msgs, { role => 'user', content => $prompt };
-                push @trace, sprintf("📡 Sending /api/chat to %s — %d messages (system + %d history + prompt)",
-                    $current_host, scalar(@ollama_msgs), scalar(@$history_items));
+            if (@$history_items || $system) {
+                push @trace, sprintf("📡 Tier-1 /api/chat to %s — model=%s %d msgs (system + %d history + prompt)",
+                    $current_host, $use_model, scalar(@ollama_msgs), scalar(@$history_items));
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
-                    'generate', "Using chat API with " . scalar(@ollama_msgs) . " messages (history=" . scalar(@$history_items) . ")");
+                    'generate', "Tier-1 chat API: " . scalar(@ollama_msgs) . " messages");
                 $response = $ollama->chat(messages => \@ollama_msgs);
             } else {
-                push @trace, sprintf("📡 Sending /api/generate to %s — single-turn (no history)", $current_host);
+                push @trace, sprintf("📡 Tier-1 /api/generate to %s — model=%s single-turn",
+                    $current_host, $use_model);
                 $response = $ollama->query(
                     prompt => $prompt,
                     format => $format eq 'json' ? 'json' : undef,
@@ -608,22 +607,83 @@ sub generate :Local :Args(0) {
                 );
             }
             my $query_elapsed = time() - $query_start;
-            
+
             unless ($response) {
-                my $error = $ollama->last_error || 'Unknown error';
+                my $error      = $ollama->last_error || 'Unknown error';
                 my $error_class = ref($error) || 'string';
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-                    'generate', "Ollama FAILED host=$current_host model=$current_model elapsed=${query_elapsed}s error_class=$error_class error=$error");
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                    'generate', "Tier-1 FAILED host=$current_host model=$use_model elapsed=${query_elapsed}s error_class=$error_class error=$error");
+                push @trace, sprintf("❌ Tier-1 FAILED after %ds: %s", $query_elapsed, $error);
                 die "Ollama query failed: $error";
             }
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-                'generate', "Ollama SUCCESS elapsed=${query_elapsed}s model=" . ($response->{model} || $current_model));
-            push @trace, sprintf("✅ Ollama responded in %ds — %d tokens | Response: %d chars",
-                $query_elapsed,
-                $response->{eval_count} || 0,
-                length($response->{response} || ''));
-            
-            $model_used = $response->{model} || $ollama->model;
+
+            # Normalise response text (chat vs generate API have different keys)
+            my $r_text = (ref($response->{message}) eq 'HASH' && $response->{message}->{content})
+                       ? $response->{message}->{content}
+                       : ($response->{response} // '');
+            $model_used = $response->{model} || $use_model;
+
+            push @trace, sprintf("✅ Tier-1 responded in %ds — %d tokens | %d chars",
+                $query_elapsed, $response->{eval_count} || 0, length($r_text));
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'generate', "Tier-1 SUCCESS elapsed=${query_elapsed}s model=$model_used");
+
+            # ── Tier 2: escalate to large model if quality is poor ────────────
+            if (!$manual_model && $tier_large ne $use_model
+                && $self->_assess_response_quality($r_text, $prompt) eq 'poor')
+            {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                    'generate', "Tier-1 quality poor — escalating to Tier-2 model=$tier_large");
+                push @trace, sprintf("⬆️ Tier-2 escalation → model=%s", $tier_large);
+
+                $ollama->model($tier_large);
+                my $t2_start = time();
+                my $resp2;
+                if (@$history_items || $system) {
+                    $resp2 = $ollama->chat(messages => \@ollama_msgs);
+                } else {
+                    $resp2 = $ollama->query(
+                        prompt => $prompt,
+                        format => $format eq 'json' ? 'json' : undef,
+                        system => $system || undef
+                    );
+                }
+                if ($resp2) {
+                    my $text2 = (ref($resp2->{message}) eq 'HASH' && $resp2->{message}->{content})
+                              ? $resp2->{message}->{content}
+                              : ($resp2->{response} // '');
+                    if ($text2) {
+                        $r_text     = $text2;
+                        $model_used = $resp2->{model} || $tier_large;
+                        $response   = $resp2;
+                        push @trace, sprintf("✅ Tier-2 SUCCESS in %ds — %d chars",
+                            time() - $t2_start, length($text2));
+                    }
+                }
+
+                # ── Tier 3: offer web search if still poor and Grok available
+                if ($self->_assess_response_quality($r_text, $prompt) eq 'poor'
+                    && !$is_guest && $c->session->{grok_api_key})
+                {
+                    push @trace, sprintf("⏱️ Total elapsed: %ds", time() - $trace_start);
+                    push @trace, "🌐 Tier-3: quality still poor — offering web search consent";
+                    my $partial = length($r_text) > 20 ? $r_text : undef;
+                    $response_data = {
+                        success          => JSON::true,
+                        needs_web_search => JSON::true,
+                        partial_response => $partial,
+                        conversation_id  => undef,
+                        thinking         => \@trace,
+                    };
+                    my $json_response = encode_json($response_data);
+                    $c->response->body($json_response);
+                    return;
+                }
+            }
+
+            # Normalise $response so downstream code finds text in {response}
+            $response->{response} = $r_text unless ($response->{response} && length($response->{response}));
+            $response->{model}    = $model_used;
         }
         
         # Log success metrics
@@ -4904,8 +4964,8 @@ sub preload_model :Local :Args(0) {
             return;
         }
 
-        my (undef, $tier_large) = $self->_pick_ollama_tier($installed, $default_model, '', '');
-        my $model = $tier_large || $default_model;
+        my ($tier_small, undef) = $self->_pick_ollama_tier($installed, $default_model, '', '');
+        my $model = $tier_small || $default_model;
 
         # Use Ollama's "load-only" mode: POST /api/generate with model + keep_alive
         # but NO prompt. Ollama loads the model into memory without running inference.
