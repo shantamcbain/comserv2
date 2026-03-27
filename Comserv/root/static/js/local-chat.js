@@ -492,6 +492,21 @@
                         }
                     });
                 }
+
+                // Pre-warm the Ollama model at page-load time so the first real
+                // message doesn't hit a cold-start delay.  Re-warm every 25 min
+                // (keep_alive is 30m so this ensures the model stays in VRAM).
+                function _firePreload() {
+                    if ((state.selectedProvider || 'ollama').split('|')[0] !== 'ollama') return;
+                    const agentId = (state.pageContext && state.pageContext.agent_id) || '';
+                    fetch('/ai/preload_model?provider=ollama&agent_id=' + encodeURIComponent(agentId), {
+                        method: 'GET',
+                        credentials: 'include'
+                    }).catch(function() {});
+                }
+                _firePreload();
+                // Re-fire every 25 minutes to keep model warm
+                state._preloadTimer = setInterval(_firePreload, 25 * 60 * 1000);
             })
             .catch(function() {});
 
@@ -972,17 +987,6 @@
         const messageInput = document.getElementById('message-input');
         messageInput.focus();
 
-        // Pre-warm the Ollama model in the background so the user's first
-        // real message doesn't hit a cold-start delay.
-        const provParts = (state.selectedProvider || 'ollama').split('|');
-        if (provParts[0] === 'ollama' && !state._preloadFired) {
-            state._preloadFired = true;
-            const agentId = (state.pageContext && state.pageContext.agent_id) || '';
-            fetch('/ai/preload_model?provider=ollama&agent_id=' + encodeURIComponent(agentId), {
-                method: 'GET',
-                credentials: 'include'
-            }).catch(function() {});
-        }
     }
     
     // Reset conversation - clear session and UI

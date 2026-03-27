@@ -4745,14 +4745,14 @@ sub preload_model :Local :Args(0) {
             return;
         }
 
-        my ($tier_small, undef) = $self->_pick_ollama_tier($installed, $default_model, '', '');
-        my $model = $tier_small || $default_model;
+        my (undef, $tier_large) = $self->_pick_ollama_tier($installed, $default_model, '', '');
+        my $model = $tier_large || $default_model;
 
         my $ollama = Comserv::Model::Ollama->new(
             host    => $host,
             port    => $port || 11434,
             model   => $model,
-            timeout => 120,
+            timeout => 150,
         );
         $ollama->chat(messages => [{ role => 'user', content => 'hi' }]);
     };
