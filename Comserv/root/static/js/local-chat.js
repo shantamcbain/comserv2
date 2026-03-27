@@ -506,7 +506,7 @@
                 }
                 _firePreload();
                 // Re-fire every 25 minutes to keep model warm
-                state._preloadTimer = setInterval(_firePreload, 25 * 60 * 1000);
+                state._preloadTimer = setInterval(_firePreload, 90 * 60 * 1000);
             })
             .catch(function() {});
 
@@ -1158,6 +1158,33 @@
         } else {
             console.debug('No conversation_id in state, starting new conversation');
         }
+
+        // Build conversation history from visible messages (exclude current user msg
+        // which was just appended to the DOM before queryAI() was called).
+        // Send last 6 prior messages (3 exchanges) as multi-turn context.
+        (function buildHistory() {
+            const allWrappers = Array.from(
+                document.querySelectorAll('#chat-messages .msg-wrapper')
+            );
+            // The last wrapper is the current user message — exclude it
+            const priorWrappers = allWrappers.slice(0, -1);
+            const historyMsgs = [];
+            priorWrappers.forEach(function(w) {
+                const isUser = w.classList.contains('msg-wrapper-user');
+                const el = w.querySelector('.message');
+                if (!el) return;
+                const content = el.textContent.trim();
+                if (!content || content === '\u2014 Previous conversation \u2014') return;
+                historyMsgs.push({
+                    role: isUser ? 'user' : 'assistant',
+                    content: content
+                });
+            });
+            if (historyMsgs.length > 0) {
+                requestPayload.history = historyMsgs.slice(-6);
+                console.debug('Sending history:', requestPayload.history.length, 'prior messages');
+            }
+        })();
         
         console.debug('Sending AI request with agent:', state.pageContext.agent_id, requestPayload);
         

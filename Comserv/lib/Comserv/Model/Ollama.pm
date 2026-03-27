@@ -263,7 +263,7 @@ sub query {
         model      => $self->model,
         prompt     => $prompt,
         stream     => $self->stream ? JSON::true : JSON::false,
-        keep_alive => '30m',
+        keep_alive => '2h',
         options    => {
             temperature => $self->temperature,
             num_predict => $self->max_tokens,
@@ -403,7 +403,7 @@ sub chat {
         model      => $self->model,
         messages   => $messages,
         stream     => $self->stream ? JSON::true : JSON::false,
-        keep_alive => '30m',
+        keep_alive => '2h',
         options    => {
             temperature => $self->temperature,
             num_predict => $self->max_tokens,
