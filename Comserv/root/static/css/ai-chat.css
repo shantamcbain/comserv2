@@ -82,14 +82,30 @@
 }
 .chat-header-drag:active { cursor: grabbing; }
 
+.chat-header-title-group {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+}
 .chat-header h3 {
     margin: 0;
     font-size: 14px;
-    flex: 1;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     color: var(--nav-text, var(--text-color, #000));
+}
+.chat-page-label {
+    font-size: 10px;
+    opacity: 0.65;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--nav-text, var(--text-color, #000));
+    line-height: 1.2;
 }
 
 .chat-header-buttons {

@@ -1862,9 +1862,9 @@ sub end : ActionClass('RenderView') {
     if ($status == 204) {
         return;
     }
-    # Also skip if a JSON/non-HTML body has already been set
-    if ($c->response->body && $c->response->content_type &&
-        $c->response->content_type !~ m{^text/html}i) {
+    # Skip TT rendering if response body has already been set by the action
+    # (covers JSON, plain text, AND actions that manually return full HTML like /ai/widget)
+    if ($c->response->body) {
         return;
     }
 

@@ -21,6 +21,7 @@ use Moose;
 use namespace::autoclean;
 use Try::Tiny;
 use JSON;
+use Template;
 use DateTime;
 use LWP::UserAgent;
 use Comserv::Util::Logging;
@@ -167,6 +168,60 @@ sub index :Path :Args(0) {
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
         'index', "AI interface loaded for user: $username (host: $current_host, model: $current_model, can_select: " . ($can_select_model ? 'yes' : 'no') . ", external_models: " . scalar(@external_models) . ")");
+}
+
+=head2 widget
+
+Renders a self-contained, layout-free popup window for the chat widget.
+Opened by the "expand to separate window" button so users can move the
+chat to a second monitor without the page being obscured.  No site
+navigation, header, or footer is included — the response is a complete
+minimal HTML document.
+
+=cut
+
+sub widget :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    my $username   = $c->session->{username} || 'Guest';
+    my $theme_name = $c->stash->{theme_name}
+                  || $c->session->{theme_name}
+                  || 'default';
+
+    # Render widget.tt directly — bypasses layout.tt wrapper entirely so the
+    # popup window contains only the chat UI with no site navigation.
+    my $template_path = $c->path_to('root')->stringify;
+    my $tt = Template->new({
+        INCLUDE_PATH => $template_path,
+        ENCODING     => 'UTF-8',
+    });
+
+    my $from_path   = $c->request->param('from_path')  || '/';
+    my $from_title  = $c->request->param('from_title') || '';
+    my $resume_conv = $c->request->param('resume')     || '';
+
+    my $vars = {
+        username      => $username,
+        theme_name    => $theme_name,
+        widget_config => encode_json({
+            from_path   => $from_path,
+            from_title  => $from_title,
+            resume_conv => $resume_conv,
+        }),
+    };
+
+    my $output = '';
+    unless ($tt->process('ai/widget.tt', $vars, \$output)) {
+        $c->response->status(500);
+        $c->response->content_type('text/plain');
+        $c->response->body('Template error: ' . $tt->error());
+        $c->detach;
+        return;
+    }
+
+    $c->response->content_type('text/html; charset=UTF-8');
+    $c->response->body($output);
+    $c->detach;
 }
 
 =head2 generate
@@ -1337,6 +1392,8 @@ sub chat :Local :Args(0) {
         'chat', "AI chat from user '$username': $prompt_preview");
     
     my $response_data;
+    my @chat_trace;       # Reasoning trace returned to client as 'thinking'
+    my $chat_trace_start = time();
 
     # Determine user permissions for model selection
     my $user_roles_chat = $c->session->{roles} || [];
@@ -1369,6 +1426,18 @@ sub chat :Local :Args(0) {
     push @system_parts, $shared_history if $shared_history;
 
     my $combined_system_prompt = join("\n\n", @system_parts);
+
+    # Build initial trace entries (always shown)
+    push @chat_trace, sprintf("🧑 User: %s (%s) | Site: %s | Page: %s",
+        $username, $is_guest ? 'guest' : 'authenticated',
+        $c->stash->{SiteName} || $c->session->{SiteName} || 'unknown',
+        $chat_page_path || '(unknown)');
+    push @chat_trace, sprintf("🤖 Agent: %s | Provider: %s",
+        $chat_agent_id || 'general', $is_grok_model ? 'grok' : 'ollama');
+    push @chat_trace, sprintf("💬 Prompt (%d chars) | History: %d prior messages",
+        length($prompt), scalar(@$history));
+    push @chat_trace, $module_data   ? "🗂️ DB data injected" : "🗂️ No DB data injected (prompt didn't match todo/project/ENCY keywords)";
+    push @chat_trace, $shared_history ? "📚 Shared KB: matching prior Q&A found" : "📚 Shared KB: no matching prior Q&A found";
 
     # Only admins/editors may use web search
     $use_search_chat = 0 unless $can_select_model_perm;
@@ -1440,6 +1509,8 @@ sub chat :Local :Args(0) {
 
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
                 'chat', "Calling Grok API with model: " . $grok->model . " web_search=$use_search_chat");
+            push @chat_trace, sprintf("📡 Calling Grok API — model=%s web_search=%s",
+                $grok->model, $use_search_chat ? 'yes' : 'no');
 
             # Prepend combined system prompt if available
             my @final_messages = @messages;
@@ -1463,6 +1534,7 @@ sub chat :Local :Args(0) {
             $model_used = $response->{model} || $grok->model;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
                 'chat', "Grok chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars");
+            push @chat_trace, sprintf("✅ Grok responded — model=%s %d chars", $model_used, length($ai_response));
 
         } else {
             # ── Ollama 3-Tier Escalation ──────────────────────────────────────
@@ -1493,6 +1565,11 @@ sub chat :Local :Args(0) {
             # If user manually picked a model (admin override), skip escalation logic
             my $manual_model = ($model && $can_select_model_perm) ? $model : '';
 
+            push @chat_trace, sprintf("🔍 Tier selection: small=%s large=%s → using=%s%s",
+                $tier_small, $tier_large,
+                $manual_model || $tier_small,
+                $manual_model ? ' (manual override)' : '');
+
             # Prepend combined system prompt for Ollama
             my @ollama_messages = @messages;
             if ($combined_system_prompt) {
@@ -1506,6 +1583,9 @@ sub chat :Local :Args(0) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
                 'chat', "Tier-1 Ollama host=$current_host model=$use_model messages=" . scalar(@ollama_messages));
 
+            push @chat_trace, sprintf("📡 Tier-1 /api/chat to %s — model=%s %d msgs (system + %d history + prompt)",
+                $current_host, $use_model, scalar(@ollama_messages), scalar(@$history));
+
             my $chat_start = time();
             my $response   = $ollama->chat(messages => \@ollama_messages);
             my $chat_elapsed = time() - $chat_start;
@@ -1514,6 +1594,7 @@ sub chat :Local :Args(0) {
                 my $error = $ollama->last_error || 'Unknown error';
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
                     'chat', "Tier-1 Ollama FAILED model=$use_model elapsed=${chat_elapsed}s error=$error");
+                push @chat_trace, sprintf("❌ Tier-1 FAILED after %ds: %s", $chat_elapsed, $error);
                 die "Ollama chat failed: $error";
             }
 
@@ -1523,6 +1604,8 @@ sub chat :Local :Args(0) {
                 $ai_response = $response->{response};
             }
             $model_used = $response->{model} || $use_model;
+            push @chat_trace, sprintf("✅ Tier-1 responded in %ds — %d chars",
+                $chat_elapsed, length($ai_response));
 
             # ── Tier 2: Escalate to large model if quality is poor ────────────
             if (!$manual_model && $tier_large ne $tier_small
@@ -1530,6 +1613,7 @@ sub chat :Local :Args(0) {
             {
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
                     'chat', "Tier-1 quality poor — escalating to Tier-2 model=$tier_large");
+                push @chat_trace, sprintf("⬆️ Tier-2 escalation → model=%s", $tier_large);
 
                 $ollama->model($tier_large);
                 my $resp2 = $ollama->chat(messages => \@ollama_messages);
@@ -1542,6 +1626,7 @@ sub chat :Local :Args(0) {
                         $model_used  = $resp2->{model} || $tier_large;
                         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
                             'chat', "Tier-2 SUCCESS model=$model_used");
+                        push @chat_trace, sprintf("✅ Tier-2 SUCCESS model=%s", $model_used);
                     }
                 }
 
@@ -1696,6 +1781,8 @@ sub chat :Local :Args(0) {
                 'chat', "Failed to save conversation to database: $db_error (Final Conv ID: $final_conversation_id, User ID: $user_id)");
         };
         
+        push @chat_trace, sprintf("⏱️ Total elapsed: %ds", time() - $chat_trace_start);
+
         # Build JSON response
         $response_data = {
             success => JSON::true,
@@ -1704,7 +1791,8 @@ sub chat :Local :Args(0) {
             conversation_id => $final_conversation_id || undef,
             created_at => $response_created_at,
             total_duration => $response_total_duration,
-            eval_count => $response_eval_count
+            eval_count => $response_eval_count,
+            thinking => \@chat_trace,
         };
         
     } catch {
@@ -1758,9 +1846,12 @@ sub chat :Local :Args(0) {
             };
         }
         
+        push @chat_trace, sprintf("❌ Error after %ds: %s",
+            time() - $chat_trace_start, $user_error || 'Unknown error');
         $response_data = {
             success => JSON::false,
-            error => $user_error || 'Failed to process AI chat request'
+            error => $user_error || 'Failed to process AI chat request',
+            thinking => \@chat_trace,
         };
         $c->response->status(200);
     };
@@ -3095,8 +3186,13 @@ sub _pick_ollama_tier {
 
     my @sorted = sort { ($size_score{$a} || 7) <=> ($size_score{$b} || 7) } @names;
 
-    my $small = $sorted[0]  || $default_model || 'llama3.1:latest';
-    my $large = $sorted[-1] || $default_model || 'llama3.1:latest';
+    # Exclude sub-2B toy models (tinyllama, 1.1b, etc.) from auto-selection —
+    # they produce unreliable answers.  Only fall back to them if nothing better exists.
+    my @usable = grep { ($size_score{$_} // 7) >= 3 } @sorted;
+    @usable = @sorted unless @usable;  # fallback if ALL models are tiny
+
+    my $small = $usable[0]  || $default_model || 'llama3.1:latest';
+    my $large = $usable[-1] || $default_model || 'llama3.1:latest';
 
     # Only escalate if large model is meaningfully bigger (2x+).
     # If both tiers are similar size, keep them the same to avoid loading two models.
@@ -3513,16 +3609,17 @@ sub _select_model_for_context {
         $installed{$short} = $name;
     }
 
-    # Preferred models per context (ordered: first match wins)
+    # Preferred models per context (ordered: first match wins).
+    # tinyllama intentionally excluded — too small for reliable answers.
     my %context_prefs = (
-        chat        => ['llama3.1', 'llama3', 'deepseek-r1', 'tinyllama', 'mistral'],
-        helpdesk    => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
-        ency        => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral', 'tinyllama'],
-        bmaster     => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral', 'tinyllama'],
-        csc         => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
-        general     => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
-        navigation  => ['tinyllama', 'llama3.1', 'llama3'],
-        simple      => ['tinyllama', 'llama3.1', 'llama3'],
+        chat        => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral'],
+        helpdesk    => ['llama3.1', 'llama3', 'mistral'],
+        ency        => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral'],
+        bmaster     => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral'],
+        csc         => ['llama3.1', 'llama3', 'mistral'],
+        general     => ['llama3.1', 'llama3', 'mistral'],
+        navigation  => ['llama3.1', 'llama3'],
+        simple      => ['llama3.1', 'llama3'],
         code        => ['starcoder2', 'qwen2.5-coder', 'qwen-coder', 'codellama', 'llama3.1'],
         developer   => ['starcoder2', 'qwen2.5-coder', 'codellama', 'llama3.1'],
         docker      => ['starcoder2', 'qwen2.5-coder', 'llama3.1'],

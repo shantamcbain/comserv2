@@ -42,9 +42,16 @@
         }
     };
     
-    // Load persisted state from sessionStorage
+    // Load persisted state from sessionStorage (or from window.AI_RESUME_CONVERSATION
+    // when the widget was opened as a popup/detached window)
     function loadPersistedState() {
         try {
+            // Popup windows set AI_RESUME_CONVERSATION from the URL param via the template
+            if (window.AI_RESUME_CONVERSATION && !state.currentConversationId) {
+                state.currentConversationId = parseInt(window.AI_RESUME_CONVERSATION);
+                console.debug('Restored conversation ID from popup param:', state.currentConversationId);
+                return;
+            }
             const savedConvId = sessionStorage.getItem('currentConversationId');
             if (savedConvId && savedConvId !== 'null' && savedConvId !== 'undefined') {
                 state.currentConversationId = parseInt(savedConvId);
@@ -60,6 +67,11 @@
         try {
             if (state.currentConversationId) {
                 sessionStorage.setItem('currentConversationId', state.currentConversationId);
+                // When running as a popup widget, also write to localStorage so the
+                // parent page can resume the same conversation when the popup closes.
+                if (window.AI_WIDGET_POPUP) {
+                    localStorage.setItem('ai_popup_conv_id', state.currentConversationId);
+                }
                 console.debug('Persisted conversation ID to storage:', state.currentConversationId);
             }
         } catch (e) {
@@ -71,18 +83,36 @@
     function persistMessages() {
         try {
             const items = [];
-            document.querySelectorAll('#chat-messages .msg-wrapper').forEach(function(w) {
-                const isUser = w.classList.contains('msg-wrapper-user');
-                const el = w.querySelector('.message');
-                const lbl = w.querySelector('.msg-label');
-                if (!el) return;
-                items.push({
-                    role: isUser ? 'user' : 'ai',
-                    html: el.innerHTML,
-                    label: lbl ? lbl.textContent : ''
-                });
+            // Walk ALL direct children in order so thinking blocks stay in sequence
+            const chatMessages = document.getElementById('chat-messages');
+            if (!chatMessages) return;
+            Array.from(chatMessages.children).forEach(function(child) {
+                if (child.classList.contains('msg-wrapper')) {
+                    const isUser = child.classList.contains('msg-wrapper-user');
+                    const el  = child.querySelector('.message');
+                    const lbl = child.querySelector('.msg-label');
+                    if (!el) return;
+                    items.push({
+                        type:  'message',
+                        role:  isUser ? 'user' : 'ai',
+                        html:  el.innerHTML,
+                        label: lbl ? lbl.textContent : '',
+                        cls:   el.className
+                    });
+                } else if (child.classList.contains('ai-thinking')) {
+                    // Persist thinking/trace block
+                    const summary = child.querySelector('summary');
+                    const steps   = Array.from(child.querySelectorAll('.ai-thinking-step'))
+                                        .map(function(s) { return s.textContent; });
+                    items.push({
+                        type:    'thinking',
+                        summary: summary ? summary.textContent : '🔍 AI Thinking',
+                        steps:   steps,
+                        open:    child.open || false
+                    });
+                }
             });
-            sessionStorage.setItem('chatMessages', JSON.stringify(items.slice(-20)));
+            sessionStorage.setItem('chatMessages', JSON.stringify(items.slice(-30)));
         } catch (e) { }
     }
 
@@ -101,17 +131,38 @@
             sep.textContent = '— Previous conversation —';
             chatMessages.appendChild(sep);
             items.forEach(function(item) {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'msg-wrapper ' + (item.role === 'user' ? 'msg-wrapper-user' : 'msg-wrapper-ai');
-                const label = document.createElement('div');
-                label.className = 'msg-label';
-                label.textContent = item.label || (item.role === 'user' ? 'You' : 'AI');
-                const el = document.createElement('div');
-                el.className = 'message ' + (item.role === 'user' ? 'user-message' : 'ai-message');
-                el.innerHTML = item.html;
-                wrapper.appendChild(label);
-                wrapper.appendChild(el);
-                chatMessages.appendChild(wrapper);
+                if (item.type === 'thinking') {
+                    const details = document.createElement('details');
+                    details.className = 'ai-thinking';
+                    if (item.open) details.open = true;
+                    const summary = document.createElement('summary');
+                    summary.textContent = item.summary || '🔍 AI Thinking';
+                    const body = document.createElement('div');
+                    body.className = 'ai-thinking-body';
+                    (item.steps || []).forEach(function(step) {
+                        const stepEl = document.createElement('div');
+                        stepEl.className = 'ai-thinking-step';
+                        stepEl.textContent = step;
+                        body.appendChild(stepEl);
+                    });
+                    details.appendChild(summary);
+                    details.appendChild(body);
+                    chatMessages.appendChild(details);
+                } else {
+                    // Regular message wrapper
+                    const isUser = item.role === 'user';
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'msg-wrapper ' + (isUser ? 'msg-wrapper-user' : 'msg-wrapper-ai');
+                    const label = document.createElement('div');
+                    label.className = 'msg-label';
+                    label.textContent = item.label || (isUser ? 'You' : 'AI');
+                    const el = document.createElement('div');
+                    el.className = item.cls || ('message ' + (isUser ? 'user-message' : 'ai-message'));
+                    el.innerHTML = item.html;
+                    wrapper.appendChild(label);
+                    wrapper.appendChild(el);
+                    chatMessages.appendChild(wrapper);
+                }
             });
             chatMessages.scrollTop = chatMessages.scrollHeight;
         } catch (e) { }
@@ -277,7 +328,7 @@
         // same agent and context are used as on the page the widget was on.
         let pathname = window.HELPDESK_PRESCREEN_PAGE_PATH || window.location.pathname;
         let pageTitle = window.HELPDESK_PRESCREEN_PAGE_TITLE || document.title || 'Unknown Page';
-        if (PAGE_MODE && (state.detachedFromPath || window.AI_DETACHED_FROM_PATH)) {
+        if ((PAGE_MODE || window.AI_WIDGET_POPUP) && (state.detachedFromPath || window.AI_DETACHED_FROM_PATH)) {
             pathname  = state.detachedFromPath  || window.AI_DETACHED_FROM_PATH  || pathname;
             pageTitle = state.detachedFromTitle || window.AI_DETACHED_FROM_TITLE || pageTitle;
         }
@@ -289,7 +340,9 @@
         let context = {
             page_path: pathname,
             page_title: pageTitle,
-            page_url: window.location.href
+            page_url: window.AI_WIDGET_POPUP
+                ? (window.location.origin + pathname)
+                : window.location.href
         };
         
         // Extract current page content and links for context awareness
@@ -352,11 +405,14 @@
         chatHeader.className = 'chat-header';
         chatHeader.innerHTML =
             '<div class="chat-header-drag" id="chat-drag-handle" title="Drag to move">⠿</div>' +
-            '<h3 id="chat-title">AI Assistant</h3>' +
+            '<div class="chat-header-title-group">' +
+                '<h3 id="chat-title">AI Assistant</h3>' +
+                '<span id="chat-page-label" class="chat-page-label" title="Page being assisted"></span>' +
+            '</div>' +
             '<div class="chat-header-buttons">' +
                 '<button id="toggle-history-btn" class="chat-header-icon-btn" title="Conversation history">🕐</button>' +
                 '<button id="new-chat" class="chat-header-icon-btn" title="New conversation">✏️</button>' +
-                '<button id="detach-chat" class="chat-header-icon-btn" title="Detach to moveable window (works across monitors)">⤢</button>' +
+                '<button id="detach-chat" class="chat-header-icon-btn" title="Open in separate window (move to another monitor)">⤢</button>' +
                 '<button id="close-chat" class="chat-header-icon-btn" title="Close">✕</button>' +
             '</div>';
 
@@ -488,16 +544,20 @@
                                 sel.appendChild(svrGrp);
                             }
 
-                            // Build model tiers from chat-capable installed models
+                            // Build model tiers from chat-capable installed models.
+                            // Exclude sub-2B toy models (tinyllama, 1.1b, etc.) from
+                            // auto-selection — they produce unreliable answers.
                             if (p.models && p.models.length > 0) {
                                 const chatModels = p.models.filter(function(m) { return isChatModel(m.id); });
                                 if (chatModels.length > 0) {
                                     const sorted = chatModels.slice().sort(function(a, b) {
                                         return modelSizeScore(a.id) - modelSizeScore(b.id);
                                     });
-                                    state.modelTiers.small  = 'ollama|' + sorted[0].id;
-                                    state.modelTiers.large  = 'ollama|' + sorted[sorted.length - 1].id;
-                                    state.modelTiers.medium = 'ollama|' + sorted[Math.floor(sorted.length / 2)].id;
+                                    const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 3; });
+                                    const pool   = usable.length > 0 ? usable : sorted; // fallback if all tiny
+                                    state.modelTiers.small  = 'ollama|' + pool[0].id;
+                                    state.modelTiers.large  = 'ollama|' + pool[pool.length - 1].id;
+                                    state.modelTiers.medium = 'ollama|' + pool[Math.floor(pool.length / 2)].id;
                                 }
                             }
                         }
@@ -870,17 +930,23 @@
                     const grp = document.createElement('optgroup');
                     grp.label = 'Ollama (Local)';
                     if (p.models && p.models.length > 0) {
-                        // Build model tiers from chat-capable models only, sorted by size
+                        // Build model tiers from chat-capable models only, sorted by size.
+                        // Exclude sub-2B toy models from auto-selection.
                         const chatModels = p.models.filter(function(m) { return isChatModel(m.id); });
                         if (chatModels.length > 0) {
                             const sorted = chatModels.slice().sort(function(a, b) {
                                 return modelSizeScore(a.id) - modelSizeScore(b.id);
                             });
-                            state.modelTiers.small  = 'ollama|' + sorted[0].id;
-                            state.modelTiers.large  = 'ollama|' + sorted[sorted.length - 1].id;
-                            state.modelTiers.medium = 'ollama|' + sorted[Math.floor(sorted.length / 2)].id;
+                            const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 3; });
+                            const pool   = usable.length > 0 ? usable : sorted;
+                            state.modelTiers.small  = 'ollama|' + pool[0].id;
+                            state.modelTiers.large  = 'ollama|' + pool[pool.length - 1].id;
+                            state.modelTiers.medium = 'ollama|' + pool[Math.floor(pool.length / 2)].id;
                         }
-                        p.models.forEach(function(m) {
+                        // Only show usable (≥3B) models in dropdown; hide toy models
+                        const displayModels = chatModels.filter(function(m) { return modelSizeScore(m.id) >= 3; });
+                        const listModels = displayModels.length > 0 ? displayModels : chatModels;
+                        listModels.forEach(function(m) {
                             const opt = document.createElement('option');
                             opt.value = 'ollama|' + m.id;
                             opt.textContent = m.id;
@@ -941,42 +1007,60 @@
         });
     }
     
-    // Detach widget to a standalone popup window (moveable to any monitor)
+    // Open chat in a separate browser window — user can drag it to another monitor.
+    // Uses /ai/widget which is a self-contained minimal HTML page (no site nav/header/
+    // footer) so the popup always stays clean regardless of link clicks or refreshes.
     function detachToPopup() {
         const convId = state.currentConversationId;
         const params = [];
         if (convId) params.push('resume=' + encodeURIComponent(convId));
-        params.push('popup=1');  // suppress site nav/footer in the popup window
-        // Pass originating page so the /ai page can maintain the same agent/context
-        params.push('from_path=' + encodeURIComponent(window.location.pathname));
+        params.push('from_path='  + encodeURIComponent(window.location.pathname));
         params.push('from_title=' + encodeURIComponent(document.title || ''));
-        const url = '/ai' + (params.length ? '?' + params.join('&') : '');
+        const url = '/ai/widget' + (params.length ? '?' + params.join('&') : '');
         const popup = window.open(url, 'ai-chat-popup',
             'width=720,height=860,resizable=yes,menubar=no,toolbar=no,location=no,status=no');
         if (popup) {
             closeChat();
-            // Change bubble label to show chat is now in a separate window
-            const chatBtn = document.getElementById('chat-button');
-            if (chatBtn) {
-                chatBtn.title = 'Chat is open in a separate window — click ⤡ in the popup to dock back';
-                chatBtn.innerHTML = '<span class="chat-icon">⤢</span> Chat detached';
-            }
-            // When the popup closes, restore the bubble to normal
+            // Hide the entire widget on the parent page while chat is in the popup
+            const widgetEl = document.querySelector('.local-chat-widget');
+            if (widgetEl) widgetEl.style.display = 'none';
             const _pollPopup = setInterval(function() {
                 if (popup.closed) {
                     clearInterval(_pollPopup);
-                    const btn = document.getElementById('chat-button');
-                    if (btn) {
-                        const agentIcon = state.currentAgent ? (state.currentAgent.icon || '🤖') : '🤖';
-                        btn.title = 'Chat with AI';
-                        btn.innerHTML = '<span class="chat-icon">' + agentIcon + '</span> Chat with AI';
-                    }
+                    // Restore the widget on the parent page
+                    if (widgetEl) widgetEl.style.display = '';
+                    // Resume the conversation the user had in the popup
+                    try {
+                        const popupConvId = localStorage.getItem('ai_popup_conv_id');
+                        if (popupConvId) {
+                            state.currentConversationId = parseInt(popupConvId, 10);
+                            sessionStorage.setItem('currentConversationId', popupConvId);
+                            localStorage.removeItem('ai_popup_conv_id');
+                            persistConversationId();
+                        }
+                    } catch(e) {}
                 }
             }, 1000);
         } else {
             const _siD = document.getElementById('chat-status');
-            if (_siD) _siD.textContent = 'Please allow popups for this site to detach chat';
+            if (_siD) _siD.textContent = 'Please allow popups for this site to open chat in a separate window';
         }
+    }
+
+    // Update the page label in the widget header to show what page is being assisted
+    function updatePageLabel() {
+        const labelEl = document.getElementById('chat-page-label');
+        if (!labelEl) return;
+        const ctx = state.pageContext;
+        let pagePath = (ctx && ctx.page_path) || window.location.pathname;
+        // In popup mode use the originating page path
+        if (window.AI_WIDGET_POPUP) {
+            pagePath = window.AI_DETACHED_FROM_PATH || pagePath;
+        }
+        // Show only last two segments for brevity: /Foo/Bar → Foo/Bar
+        const label = pagePath.replace(/^\//, '').replace(/\/$/, '') || '/';
+        labelEl.textContent = label;
+        labelEl.title = 'Assisting page: ' + pagePath;
     }
 
     // Open chat panel
@@ -988,13 +1072,14 @@
         chatButton.style.display = 'none';
         state.isOpen = true;
 
-        // Update chat header with selected agent info
+        // Update chat header with selected agent info and current page
         const chatHeader = document.querySelector('.chat-header h3');
         if (state.pageContext && state.pageContext.agent_name) {
             chatHeader.textContent = state.pageContext.agent_name;
         } else if (state.currentAgent && state.currentAgent.display_name) {
             chatHeader.textContent = state.currentAgent.display_name;
         }
+        updatePageLabel();
 
         // Restore messages from sessionStorage immediately (works for all roles)
         const chatMsgsEl = document.getElementById('chat-messages');
