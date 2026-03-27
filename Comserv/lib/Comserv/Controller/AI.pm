@@ -826,7 +826,8 @@ sub generate :Local :Args(0) {
             
             my $ai_metadata = {
                 total_duration => $response->{total_duration} || 0,
-                eval_count => $response->{eval_count} || 0
+                eval_count     => $response->{eval_count}     || 0,
+                thinking       => \@trace,  # Full reasoning trace for admin diagnostics
             };
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 

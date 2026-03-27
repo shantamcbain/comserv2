@@ -273,8 +273,14 @@
 
     // Detect page context (documentation, helpdesk, project, etc.)
     function detectPageContext() {
-        const pathname = window.HELPDESK_PRESCREEN_PAGE_PATH || window.location.pathname;
-        const pageTitle = window.HELPDESK_PRESCREEN_PAGE_TITLE || document.title || 'Unknown Page';
+        // In PAGE_MODE (detached popup), honour the originating page URL so the
+        // same agent and context are used as on the page the widget was on.
+        let pathname = window.HELPDESK_PRESCREEN_PAGE_PATH || window.location.pathname;
+        let pageTitle = window.HELPDESK_PRESCREEN_PAGE_TITLE || document.title || 'Unknown Page';
+        if (PAGE_MODE && (state.detachedFromPath || window.AI_DETACHED_FROM_PATH)) {
+            pathname  = state.detachedFromPath  || window.AI_DETACHED_FROM_PATH  || pathname;
+            pageTitle = state.detachedFromTitle || window.AI_DETACHED_FROM_TITLE || pageTitle;
+        }
         
         // Try to load and select agent from config
         const selectedAgent = selectAgentForPage();
@@ -938,7 +944,12 @@
     // Detach widget to a standalone popup window (moveable to any monitor)
     function detachToPopup() {
         const convId = state.currentConversationId;
-        const url = '/ai' + (convId ? '?resume=' + convId : '');
+        const params = [];
+        if (convId) params.push('resume=' + encodeURIComponent(convId));
+        // Pass originating page so the /ai page can maintain the same agent/context
+        params.push('from_path=' + encodeURIComponent(window.location.pathname));
+        params.push('from_title=' + encodeURIComponent(document.title || ''));
+        const url = '/ai' + (params.length ? '?' + params.join('&') : '');
         const popup = window.open(url, 'ai-chat-popup',
             'width=720,height=860,resizable=yes,menubar=no,toolbar=no,location=no,status=no');
         if (popup) {
@@ -1341,14 +1352,12 @@
                 statusIndicator.textContent = '🟢 ' + modelLabel;
                 statusIndicator.className = 'chat-status connected';
                 
-                // Add AI response — strip any embedded [ACTION: ...] blocks before display
-                const { cleanText, actions } = extractActions(data.response || '');
-                addMessage(cleanText, 'ai-message');
-
-                // Render thinking/trace block (collapsible, theme-compliant, persisted)
+                // Render thinking/trace block BEFORE the response so context is visible first.
+                // Admin/developer: auto-open. Others: collapsed.
                 if (data.thinking && data.thinking.length > 0) {
                     const thinkingEl = document.createElement('details');
                     thinkingEl.className = 'ai-thinking';
+                    if (state.isAdmin) thinkingEl.open = true;
                     const summary = document.createElement('summary');
                     summary.textContent = '🔍 AI Thinking (' + data.thinking.length + ' steps)';
                     const body = document.createElement('div');
@@ -1363,7 +1372,12 @@
                     thinkingEl.appendChild(body);
                     const chatMessages = document.getElementById('chat-messages');
                     chatMessages.appendChild(thinkingEl);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
                 }
+
+                // Add AI response — strip any embedded [ACTION: ...] blocks before display
+                const { cleanText, actions } = extractActions(data.response || '');
+                addMessage(cleanText, 'ai-message');
 
                 persistMessages();
 
@@ -1760,6 +1774,19 @@
             if (cfg.isGuest  !== undefined) state.isGuest  = !!cfg.isGuest;
             if (cfg.isAdmin  !== undefined) state.isAdmin  = !!cfg.isAdmin;
         }
+
+        // If this /ai page was opened by detaching the widget, honour the original
+        // page path and title so the same agent context is used.
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const fromPath  = urlParams.get('from_path');
+            const fromTitle = urlParams.get('from_title');
+            if (fromPath) {
+                state.detachedFromPath  = fromPath;
+                state.detachedFromTitle = fromTitle || '';
+                console.debug('[AI] Page mode: detached from', fromPath);
+            }
+        } catch(e) {}
 
         // Restore messages saved from prior navigation, load persisted conversation ID
         restoreMessages();
