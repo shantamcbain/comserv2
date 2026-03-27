@@ -820,29 +820,7 @@ Alternative form-based query interface.
 
 sub query_form :Local :Args(0) {
     my ($self, $c) = @_;
-    
-    # Check authentication
-    unless ($c->session->{username}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-            'query_form', "Unauthorized access attempt to AI query form");
-        $c->response->redirect($c->uri_for('/user/login'));
-        return;
-    }
-    
-    my $username = $c->session->{username};
-    
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-        'query_form', "User accessing AI query form");
-    
-    # Set template variables
-    $c->stash(
-        template => 'ai/query_form.tt',
-        page_title => 'AI Query Form',
-        username => $username
-    );
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-        'query_form', "AI query form loaded for user: $username");
+    $c->response->redirect($c->uri_for('/ai'), 301);
 }
 
 =head2 result
@@ -2879,7 +2857,8 @@ sub _pick_ollama_tier {
     my @chat_models = grep {
         my $n = ref($_) ? ($_->{name} || '') : ($_ || '');
         $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i
-           && $n !~ /:cloud$/i;
+           && $n !~ /:cloud$/i
+           && $n !~ /starcoder|coder|codellama/i;
     } @$installed_models;
 
     my @names = map { ref($_) ? ($_->{name} || '') : ($_ || '') } @chat_models;
@@ -2940,6 +2919,26 @@ sub _build_role_system_prompt {
     my $page_nav   = $self->_build_page_navigation_hint($base_url, $page_path, $page_title, $role_tier);
     my $nav_guide  = $self->_build_navigation_command_guide($base_url, $role_tier);
 
+    my $action_instructions = <<'ACTION';
+
+IN-APP ACTIONS: You can perform write operations in the application on behalf of the logged-in user.
+When the user explicitly asks you to update, reschedule, mark done, add a comment, or create a log entry for a todo — embed an action block in your response using this exact format (on its own line):
+[ACTION: {"action": "ACTION_NAME", "params": {...}}]
+
+Supported actions:
+- Mark a todo done:      [ACTION: {"action": "update_todo_status", "params": {"todo_id": N, "status": 3}}]
+- Mark todo in-progress: [ACTION: {"action": "update_todo_status", "params": {"todo_id": N, "status": 2}}]
+- Reschedule a todo:     [ACTION: {"action": "reschedule_todo",    "params": {"todo_id": N, "due_date": "YYYY-MM-DD"}}]
+- Add a comment:         [ACTION: {"action": "add_todo_comment",   "params": {"todo_id": N, "comment": "text"}}]
+- Create a log entry:    [ACTION: {"action": "create_log_entry",   "params": {"todo_id": N, "abstract": "title", "details": "description"}}]
+
+Rules:
+- ONLY emit an [ACTION: ...] block when the user explicitly asks you to perform a write operation.
+- ALWAYS use the real numeric todo_id from the LIVE TODO DATA above — never make up an ID.
+- Include the action block in addition to your normal response text, not instead of it.
+- The application will automatically execute the action and show the user a confirmation.
+ACTION
+
     if ($is_admin) {
         my $web_search_note = ($provider eq 'grok')
             ? "Web search is available if the user has enabled it — use it to answer questions about external tools, technologies, or anything not covered by the application data."
@@ -2960,6 +2959,7 @@ sub _build_role_system_prompt {
              . $web_search_note . "\n"
              . "NAVIGATION: When the user says 'take me to', 'open', 'go to', or 'show me' a page, "
              . "reply with the exact URL from the navigation guide below.\n"
+             . $action_instructions
              . $page_nav
              . $nav_guide;
     }
@@ -2973,7 +2973,12 @@ sub _build_role_system_prompt {
              . "and general knowledge answers for questions about software, tools, or processes. "
              . "Do NOT access private data or APIs. "
              . "Never invent live application data (workshop schedules, user accounts, etc.) — say 'I don't have that live data; please log in or visit the relevant page'. "
-             . "If the user needs account-specific help, ask them to log in."
+             . "If the user needs account-specific help, ask them to log in. "
+             . "SECURITY — STRICT RULE: You MUST ONLY provide URLs that appear in the navigation guide below. "
+             . "NEVER mention /admin, /admin/*, or any administrative URL. "
+             . "NEVER use your training knowledge to guess application URLs — only use the navigation guide. "
+             . "If a user asks about the admin panel or any admin feature, say: "
+             . "'That section requires administrator privileges. Please log in with an admin account or contact your system administrator.'"
              . $guest_knowledge
              . $page_nav
              . $nav_guide;
@@ -2990,8 +2995,14 @@ sub _build_role_system_prompt {
          . "Do not invent live application data; if you don't know something specific to this app, say so and link to the relevant section. "
          . "NAVIGATION: When the user says 'take me to', 'open', 'go to', 'navigate to', or 'show me' a page, "
          . "respond with the URL from the navigation guide so the application can automatically navigate there. "
-         . "Use the exact URL from the list — the application will redirect the browser for you."
+         . "Use the exact URL from the list — the application will redirect the browser for you. "
+         . "SECURITY — STRICT RULE: You MUST ONLY provide URLs from the navigation guide. "
+         . "NEVER guess or invent application URLs using your training knowledge. "
+         . "NEVER provide /admin URLs to users who do not have admin role. "
+         . "If the user asks about admin features and admin URLs are not in the navigation guide for their role, "
+         . "say: 'That section requires administrator privileges.'"
          . $no_internet
+         . $action_instructions
          . $page_nav
          . $nav_guide;
 }
@@ -3148,7 +3159,26 @@ sub _build_page_navigation_hint {
     my $context_label = $page_title ? "\"$page_title\" ($page_path)" : $page_path;
     my $hint = "\n\nThe user is currently viewing: $context_label.\n";
 
-    if ($page_path =~ m{/Documentation}i) {
+    if ($page_path =~ m{/HelpDesk/ticket/new}i) {
+        $hint .= "SUPPORT PRE-SCREENING MODE:\n"
+               . "The user has navigated to the 'Create New Ticket' page but has been invited to\n"
+               . "try the AI assistant FIRST before submitting a ticket.\n"
+               . "Your goal is to RESOLVE the user's issue so they do NOT need to submit a ticket.\n"
+               . "- Listen carefully to their problem description.\n"
+               . "- Provide clear, actionable step-by-step solutions.\n"
+               . "- Check the Knowledge Base: $base_url/HelpDesk/kb\n"
+               . "- If you solve the issue, say so clearly and tell them no ticket is needed.\n"
+               . "- If you CANNOT resolve it after trying, acknowledge this and tell them:\n"
+               . "  'It looks like this needs human support. Click \"Skip AI — Submit Ticket Directly\" on the page to open the ticket form.'\n"
+               . "Do NOT refuse to help or just redirect them to submit a ticket without genuinely trying to solve the problem first.\n";
+    } elsif ($page_path =~ m{/HelpDesk}i) {
+        $hint .= "Navigation context — HelpDesk:\n"
+               . "- Submit a new ticket: $base_url/HelpDesk/ticket/new\n"
+               . "- Check ticket status: $base_url/HelpDesk/ticket/status\n"
+               . "- Knowledge Base: $base_url/HelpDesk/kb\n"
+               . "- Contact support: $base_url/HelpDesk/contact\n";
+        $hint .= "- Admin panel: $base_url/HelpDesk/admin\n" if $role eq 'admin';
+    } elsif ($page_path =~ m{/Documentation}i) {
         if ($role eq 'admin') {
             $hint .= "Navigation context — Documentation section (admin):\n"
                    . "- You may edit or create documentation pages.\n"
@@ -3311,9 +3341,14 @@ sub _get_current_ollama_config {
 
     # ── Single source of truth: comserv.conf <Ollama> block ──────────────────
     my $ollama_cfg      = $c->config->{Ollama} || {};
-    my $primary_host    = $ollama_cfg->{host}          || 'localhost';
+    my $primary_host    = $ollama_cfg->{host}          || '192.168.1.199';
     my $fallback_host   = $ollama_cfg->{fallback_host} || $primary_host;
     my $config_port     = $ollama_cfg->{port}          || 11434;
+    # Never silently fall back to localhost — production Docker has no local Ollama.
+    # If fallback is localhost/127.0.0.1 and primary is a real host, keep primary.
+    if ($fallback_host =~ /^(localhost|127\.0\.0\.1)$/i && $primary_host !~ /^(localhost|127\.0\.0\.1)$/i) {
+        $fallback_host = $primary_host;
+    }
 
     my $ollama = $c->model('Ollama');
     my $current_host  = $primary_host;
@@ -4231,33 +4266,65 @@ sub get_user_providers :Local :Args(0) {
 
     my @providers;
 
-    # 1. Ollama (Local) — always present, include installed models
+    # 1. Ollama — always present; admins get server-switching info
     try {
-        my $ollama_cfg   = $c->config->{Ollama} || {};
-        my $primary_host = $ollama_cfg->{host}          || '192.168.1.199';
-        my $cfg_port     = $ollama_cfg->{port}          || 11434;
-        my $ollama       = $c->model('Ollama');
+        my $ollama_cfg     = $c->config->{Ollama} || {};
+        my $primary_host   = $ollama_cfg->{host}          || '192.168.1.199';
+        my $fallback_host  = $ollama_cfg->{fallback_host} || $primary_host;
+        my $cfg_port       = $ollama_cfg->{port}          || 11434;
+        my $session_host   = ($can_select_model && $c->session->{ollama_host}) ? $c->session->{ollama_host} : '';
+        my $active_host    = $session_host || $primary_host;
+
+        my $ollama = $c->model('Ollama');
         if ($ollama) {
-            $ollama->host($primary_host);
+            $ollama->host($active_host);
             $ollama->port($cfg_port);
             my $installed = $ollama->list_models() || [];
-            # Exclude embedding, reranker, and cloud-routed models from the chat list
             my @chat_models = grep {
                 my $n = $_->{name} || '';
                 $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i
                    && $n !~ /:cloud$/i;
             } @$installed;
+
+            # Build servers list for admins (used by widget server-switcher)
+            my @servers;
+            if ($can_select_model) {
+                push @servers, {
+                    host     => $primary_host,
+                    label    => "Primary ($primary_host)",
+                    active   => ($active_host eq $primary_host) ? JSON::true : JSON::false,
+                };
+                if ($fallback_host ne $primary_host) {
+                    push @servers, {
+                        host   => $fallback_host,
+                        label  => "Fallback ($fallback_host)",
+                        active => ($active_host eq $fallback_host) ? JSON::true : JSON::false,
+                    };
+                }
+                # If session overrides to a host not in config, add it too
+                if ($session_host && $session_host ne $primary_host && $session_host ne $fallback_host) {
+                    push @servers, {
+                        host   => $session_host,
+                        label  => "Custom ($session_host)",
+                        active => JSON::true,
+                    };
+                }
+            }
+
             push @providers, {
-                service  => 'ollama',
-                name     => 'Ollama (Local)',
-                is_local => JSON::true,
-                models   => [ map { { id => $_->{name} } } @chat_models ],
+                service     => 'ollama',
+                name        => 'Ollama (Local AI)',
+                is_local    => JSON::true,
+                active_host => $active_host,
+                servers     => \@servers,
+                models      => [ map { { id => $_->{name} } } @chat_models ],
             };
         }
     } catch {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
             'get_user_providers', "Ollama list failed: $_");
-        push @providers, { service => 'ollama', name => 'Ollama (Local)', is_local => JSON::true, models => [] };
+        push @providers, { service => 'ollama', name => 'Ollama (Local AI)', is_local => JSON::true,
+                           active_host => '', servers => [], models => [] };
     };
 
     # 2. External API keys — authenticated users only
@@ -4678,9 +4745,8 @@ sub preload_model :Local :Args(0) {
             return;
         }
 
-        my $site_name = $c->stash->{SiteName} || 'CSC';
-        my $agent_id  = $c->req->param('agent_id') || lc($site_name);
-        my $model = $self->_select_model_for_context($agent_id, $agent_id, $installed, $default_model);
+        my ($tier_small, undef) = $self->_pick_ollama_tier($installed, $default_model, '', '');
+        my $model = $tier_small || $default_model;
 
         my $ollama = Comserv::Model::Ollama->new(
             host    => $host,
