@@ -995,6 +995,22 @@
                 }
             });
 
+            // Auto-correct stale selection: if previously selected model was removed,
+            // reset to the first available option so the user doesn't silently use a
+            // model that no longer exists on the server.
+            if (state.selectedProvider && state.selectedProvider !== 'ollama') {
+                const allOpts = Array.from(providerSelect.options);
+                const stillExists = allOpts.some(function(o) {
+                    return o.value === state.selectedProvider;
+                });
+                if (!stillExists && allOpts.length > 0) {
+                    state.selectedProvider = allOpts[0].value;
+                    providerSelect.value   = allOpts[0].value;
+                    state.userModelOverride = false;
+                    console.warn('Previously selected model no longer available; reset to', allOpts[0].value);
+                }
+            }
+
             // Show web-search toggle only when a Grok option is selected
             const curVal = providerSelect.value || '';
             const wst = document.getElementById('web-search-toggle');
