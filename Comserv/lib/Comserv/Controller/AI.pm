@@ -2923,16 +2923,36 @@ sub _pick_ollama_tier {
 
     my @names = map { ref($_) ? ($_->{name} || '') : ($_ || '') } @chat_models;
 
-    # Score models by parameter count (from name hints)
+    # Score models by parameter count (billions).
+    # Known families mapped first; then extract Nb from name; then defaults.
     my %size_score;
+    my %known_family = (
+        'tinyllama'  => 1,
+        'llama3.2'   => 3,
+        'llama3.1'   => 8, 'llama3'   => 8, 'llama2' => 7,
+        'mistral'    => 7, 'mixtral'  => 47,
+        'qwen2.5'    => 7, 'qwen2'    => 7,
+        'phi3'       => 4, 'phi'      => 4,
+        'gemma2'     => 9, 'gemma'    => 7,
+    );
     for my $n (@names) {
-        if    ($n =~ /(\d+)b/i)        { $size_score{$n} = $1;       }
-        elsif ($n =~ /tiny/i)           { $size_score{$n} = 1;        }
-        elsif ($n =~ /small/i)          { $size_score{$n} = 3;        }
-        elsif ($n =~ /mini/i)           { $size_score{$n} = 3;        }
-        elsif ($n =~ /medium/i)         { $size_score{$n} = 7;        }
-        elsif ($n =~ /large/i)          { $size_score{$n} = 13;       }
-        else                            { $size_score{$n} = 7;        }
+        my $score;
+        # 1. Explicit Nb in name (deepseek-r1:7b, llama2:13b, etc.)
+        if ($n =~ /[:\-](\d+)b/i) { $score = $1; }
+        # 2. Known family prefix
+        unless ($score) {
+            for my $family (sort { length($b) <=> length($a) } keys %known_family) {
+                if (index(lc($n), lc($family)) == 0) { $score = $known_family{$family}; last; }
+            }
+        }
+        # 3. Generic hints
+        $score //= $n =~ /tiny/i   ? 1
+                 : $n =~ /small/i  ? 3
+                 : $n =~ /mini/i   ? 3
+                 : $n =~ /medium/i ? 7
+                 : $n =~ /large/i  ? 13
+                 :                   7;
+        $size_score{$n} = $score;
     }
 
     my @sorted = sort { ($size_score{$a} || 7) <=> ($size_score{$b} || 7) } @names;
@@ -2940,8 +2960,10 @@ sub _pick_ollama_tier {
     my $small = $sorted[0]  || $default_model || 'llama3.1:latest';
     my $large = $sorted[-1] || $default_model || 'llama3.1:latest';
 
-    # If only one model installed, both tiers use it
+    # Only escalate if large model is meaningfully bigger (2x+).
+    # If both tiers are similar size, keep them the same to avoid loading two models.
     $large = $small if @sorted <= 1;
+    $large = $small if ($size_score{$large} // 7) < ($size_score{$small} // 7) * 2;
 
     return ($small, $large);
 }
