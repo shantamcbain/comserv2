@@ -146,6 +146,11 @@ sub index :Path :Args(0) {
         };
     }
 
+    # popup=1 means the /ai page was opened as a detached popup from the widget.
+    # In that mode, suppress the site navigation / header / footer so the window
+    # is a clean standalone chat interface.
+    my $popup_mode = $c->request->param('popup') ? 1 : 0;
+
     # Set template variables
     $c->stash(
         template => 'ai/index.tt',
@@ -157,6 +162,7 @@ sub index :Path :Args(0) {
         current_model => $current_model,
         installed_models => $installed_models,
         external_models => \@external_models,
+        ai_popup_mode => $popup_mode,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
