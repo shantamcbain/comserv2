@@ -954,6 +954,24 @@
             'width=720,height=860,resizable=yes,menubar=no,toolbar=no,location=no,status=no');
         if (popup) {
             closeChat();
+            // Change bubble label to show chat is now in a separate window
+            const chatBtn = document.getElementById('chat-button');
+            if (chatBtn) {
+                chatBtn.title = 'Chat is open in a separate window — click ⤡ in the popup to dock back';
+                chatBtn.innerHTML = '<span class="chat-icon">⤢</span> Chat detached';
+            }
+            // When the popup closes, restore the bubble to normal
+            const _pollPopup = setInterval(function() {
+                if (popup.closed) {
+                    clearInterval(_pollPopup);
+                    const btn = document.getElementById('chat-button');
+                    if (btn) {
+                        const agentIcon = state.currentAgent ? (state.currentAgent.icon || '🤖') : '🤖';
+                        btn.title = 'Chat with AI';
+                        btn.innerHTML = '<span class="chat-icon">' + agentIcon + '</span> Chat with AI';
+                    }
+                }
+            }, 1000);
         } else {
             const _siD = document.getElementById('chat-status');
             if (_siD) _siD.textContent = 'Please allow popups for this site to detach chat';
@@ -1213,9 +1231,28 @@
         const isOllama = providerName === 'ollama';
         const clientTimeoutMs = isOllama ? 180000 : 90000;
         const abortCtrl = new AbortController();
+        state.currentAbortCtrl = abortCtrl;   // expose for cancel button
         const abortTimer = setTimeout(function() {
             abortCtrl.abort();
         }, clientTimeoutMs);
+
+        // Add a Cancel button to the loading message so the user can abort
+        // a slow cold-start without the page feeling frozen.
+        const loadingEl2 = document.getElementById('ai-loading');
+        if (loadingEl2) {
+            const cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button';
+            cancelBtn.id = 'ai-cancel-btn';
+            cancelBtn.className = 'chat-retry-btn';
+            cancelBtn.style.cssText = 'margin-left:10px;font-size:0.8em;vertical-align:middle;';
+            cancelBtn.textContent = '✕ Cancel';
+            cancelBtn.addEventListener('click', function() {
+                abortCtrl.abort();
+                cancelBtn.disabled = true;
+                cancelBtn.textContent = 'Cancelling…';
+            });
+            loadingEl2.appendChild(cancelBtn);
+        }
 
         // Progressive loading status: update the placeholder message so the user
         // knows a model is being loaded rather than assuming the page is frozen.
@@ -1223,10 +1260,10 @@
         if (isOllama) {
             const loadingEl = document.getElementById('ai-loading');
             progressTimer1 = setTimeout(function() {
-                if (loadingEl) loadingEl.textContent = '⏳ Loading AI model into memory…';
+                if (loadingEl) { const t = loadingEl.querySelector('#ai-cancel-btn'); loadingEl.firstChild.textContent = '⏳ Loading AI model into memory…'; }
             }, 15000);
             progressTimer2 = setTimeout(function() {
-                if (loadingEl) loadingEl.textContent = '⏳ Still loading model (first load can take ~60 s)… please wait';
+                if (loadingEl) { loadingEl.firstChild.textContent = '⏳ Still loading model (first load can take ~60 s)… please wait'; }
             }, 45000);
         }
 
@@ -1243,6 +1280,7 @@
             clearTimeout(abortTimer);
             clearTimeout(progressTimer1);
             clearTimeout(progressTimer2);
+            state.currentAbortCtrl = null;
             return response.text().then(function(text) {
                 try {
                     return JSON.parse(text);
