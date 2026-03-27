@@ -1348,8 +1348,9 @@ sub chat :Local :Args(0) {
     my $use_search_chat = $json_data->{use_search} ? 1 : 0;
     my $chat_page_path  = $json_data->{page_path}  || $c->request->params->{page_path}  || '';
     my $chat_page_title = $json_data->{page_title} || $c->request->params->{page_title} || '';
-    my $chat_agent_id   = $json_data->{agent_id}   || $c->request->params->{agent_id}   || '';
-    my $chat_agent_system = $json_data->{system}   || $c->request->params->{system}     || '';
+    my $chat_agent_id     = $json_data->{agent_id}      || $c->request->params->{agent_id}      || '';
+    my $chat_agent_system = $json_data->{system}        || $c->request->params->{system}        || '';
+    my $chat_page_content = $json_data->{page_content}  || $c->request->params->{page_content}  || '';
     
     # Validate prompt
     unless ($prompt && length($prompt) > 0) {
@@ -1425,6 +1426,17 @@ sub chat :Local :Args(0) {
     my $shared_history = $self->_search_shared_history($c, $prompt, $site_name_chat);
     push @system_parts, $shared_history if $shared_history;
 
+    # Inject current page content sent by the browser.
+    # This is the single most important context source — the AI can see exactly what
+    # the user sees (buttons, tables, links, labels) without any keyword matching.
+    if ($chat_page_content && length($chat_page_content) > 20) {
+        my $page_snippet = "--- Current Page Content (what the user sees on screen) ---\n"
+                         . "URL: $chat_page_path\n\n"
+                         . $chat_page_content
+                         . "\n--- End of Page Content ---";
+        push @system_parts, $page_snippet;
+    }
+
     my $combined_system_prompt = join("\n\n", @system_parts);
 
     # Build initial trace entries (always shown)
@@ -1438,6 +1450,9 @@ sub chat :Local :Args(0) {
         length($prompt), scalar(@$history));
     push @chat_trace, $module_data   ? "🗂️ DB data injected" : "🗂️ No DB data injected (prompt didn't match todo/project/ENCY keywords)";
     push @chat_trace, $shared_history ? "📚 Shared KB: matching prior Q&A found" : "📚 Shared KB: no matching prior Q&A found";
+    push @chat_trace, $chat_page_content
+        ? sprintf("📄 Page content injected (%d chars)", length($chat_page_content))
+        : "📄 No page content received from browser";
 
     # Only admins/editors may use web search
     $use_search_chat = 0 unless $can_select_model_perm;
