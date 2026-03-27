@@ -2287,6 +2287,19 @@
         document.head.appendChild(style);
     }
     
+    // Listen for dock-back message from detached popup so the widget re-opens
+    // on the parent page when the user clicks ⤡ in the popup.
+    if (!PAGE_MODE) {
+        window.addEventListener('message', function(event) {
+            if (event.origin !== window.location.origin) return;
+            if (event.data && event.data.type === 'ai-dock-back') {
+                const btn = document.getElementById('chat-button');
+                if (btn) btn.click();
+                else openChat();
+            }
+        });
+    }
+
     // Initialize chat when the DOM is loaded
     document.addEventListener('DOMContentLoaded', function() {
         addChatStyles();
