@@ -1332,6 +1332,27 @@
                 // Add AI response — strip any embedded [ACTION: ...] blocks before display
                 const { cleanText, actions } = extractActions(data.response || '');
                 addMessage(cleanText, 'ai-message');
+
+                // Render thinking/trace block (collapsible, theme-compliant, persisted)
+                if (data.thinking && data.thinking.length > 0) {
+                    const thinkingEl = document.createElement('details');
+                    thinkingEl.className = 'ai-thinking';
+                    const summary = document.createElement('summary');
+                    summary.textContent = '🔍 AI Thinking (' + data.thinking.length + ' steps)';
+                    const body = document.createElement('div');
+                    body.className = 'ai-thinking-body';
+                    data.thinking.forEach(function(step) {
+                        const stepEl = document.createElement('div');
+                        stepEl.className = 'ai-thinking-step';
+                        stepEl.textContent = step;
+                        body.appendChild(stepEl);
+                    });
+                    thinkingEl.appendChild(summary);
+                    thinkingEl.appendChild(body);
+                    const chatMessages = document.getElementById('chat-messages');
+                    chatMessages.appendChild(thinkingEl);
+                }
+
                 persistMessages();
 
                 // Execute any in-app actions the AI embedded
@@ -1389,6 +1410,27 @@
                     wrapper.appendChild(retryBtn);
                 }
                 chatMessages.appendChild(wrapper);
+
+                // Show thinking trace even on error for diagnostics
+                if (data.thinking && data.thinking.length > 0) {
+                    const thinkingEl = document.createElement('details');
+                    thinkingEl.className = 'ai-thinking';
+                    thinkingEl.open = true;
+                    const summary = document.createElement('summary');
+                    summary.textContent = '🔍 AI Thinking — Error Trace (' + data.thinking.length + ' steps)';
+                    const body = document.createElement('div');
+                    body.className = 'ai-thinking-body';
+                    data.thinking.forEach(function(step) {
+                        const stepEl = document.createElement('div');
+                        stepEl.className = 'ai-thinking-step';
+                        stepEl.textContent = step;
+                        body.appendChild(stepEl);
+                    });
+                    thinkingEl.appendChild(summary);
+                    thinkingEl.appendChild(body);
+                    chatMessages.appendChild(thinkingEl);
+                }
+
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }
         })
