@@ -946,6 +946,7 @@
         const convId = state.currentConversationId;
         const params = [];
         if (convId) params.push('resume=' + encodeURIComponent(convId));
+        params.push('popup=1');  // suppress site nav/footer in the popup window
         // Pass originating page so the /ai page can maintain the same agent/context
         params.push('from_path=' + encodeURIComponent(window.location.pathname));
         params.push('from_title=' + encodeURIComponent(document.title || ''));
