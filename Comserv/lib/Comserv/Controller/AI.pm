@@ -22,6 +22,7 @@ use namespace::autoclean;
 use Try::Tiny;
 use JSON;
 use DateTime;
+use LWP::UserAgent;
 use Comserv::Util::Logging;
 use Comserv::Model::Ollama;
 use Comserv::Model::Grok;
@@ -242,6 +243,7 @@ sub generate :Local :Args(0) {
     my $agent_name = 'AI Assistant';
     my $conversation_id = undef;  # For continuing existing conversations
     my $use_search = 0;           # Grok web search toggle
+    my $history_items = [];       # Conversation history messages from client
     
     # Check if request body is JSON
     my $content_type = $c->request->content_type || '';
@@ -301,6 +303,7 @@ sub generate :Local :Args(0) {
             $conversation_id = $json_data->{conversation_id};
             $model = $json_data->{model} || '';
             $use_search = $json_data->{use_search} ? 1 : 0;
+            $history_items = (ref($json_data->{history}) eq 'ARRAY') ? $json_data->{history} : [];
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'generate', "Extracted from JSON: prompt='" . substr($prompt, 0, 100) . "', provider='$provider', conversation_id=" . ($conversation_id || 'NEW') . ", use_search=$use_search");
         } else {
@@ -460,11 +463,15 @@ sub generate :Local :Args(0) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'generate', "Querying Grok API (model: " . $grok->model . ")");
             
+            my @grok_messages = ({ role => 'system', content => $system || 'You are a helpful assistant.' });
+            for my $h (@$history_items) {
+                my $hrole    = ($h->{role} && $h->{role} eq 'assistant') ? 'assistant' : 'user';
+                my $hcontent = $h->{content} || '';
+                push @grok_messages, { role => $hrole, content => $hcontent } if $hcontent;
+            }
+            push @grok_messages, { role => 'user', content => $prompt };
             $response = $grok->chat(
-                messages => [
-                    { role => 'system', content => $system || 'You are a helpful assistant.' },
-                    { role => 'user', content => $prompt }
-                ],
+                messages   => \@grok_messages,
                 use_search => $use_search,
             );
             
@@ -476,10 +483,7 @@ sub generate :Local :Args(0) {
                         'generate', "Model " . $grok->model . " unavailable, retrying with grok-3-mini");
                     $grok->model('grok-3-mini');
                     $response = $grok->chat(
-                        messages => [
-                            { role => 'system', content => $system || 'You are a helpful assistant.' },
-                            { role => 'user', content => $prompt }
-                        ],
+                        messages   => \@grok_messages,
                         use_search => $use_search,
                     );
                 }
@@ -539,11 +543,26 @@ sub generate :Local :Args(0) {
             
             my $query_start = time();
             # Query the API
-            $response = $ollama->query(
-                prompt => $prompt,
-                format => $format eq 'json' ? 'json' : undef,
-                system => $system || undef
-            );
+            if (@$history_items) {
+                # Multi-turn: use /api/chat with full message history
+                my @ollama_msgs;
+                push @ollama_msgs, { role => 'system', content => $system } if $system;
+                for my $h (@$history_items) {
+                    my $hrole    = ($h->{role} && $h->{role} eq 'assistant') ? 'assistant' : 'user';
+                    my $hcontent = $h->{content} || '';
+                    push @ollama_msgs, { role => $hrole, content => $hcontent } if $hcontent;
+                }
+                push @ollama_msgs, { role => 'user', content => $prompt };
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                    'generate', "Using chat API with " . scalar(@ollama_msgs) . " messages (history=" . scalar(@$history_items) . ")");
+                $response = $ollama->chat(messages => \@ollama_msgs);
+            } else {
+                $response = $ollama->query(
+                    prompt => $prompt,
+                    format => $format eq 'json' ? 'json' : undef,
+                    system => $system || undef
+                );
+            }
             my $query_elapsed = time() - $query_start;
             
             unless ($response) {
@@ -4836,13 +4855,14 @@ sub preload_model :Local :Args(0) {
         my (undef, $tier_large) = $self->_pick_ollama_tier($installed, $default_model, '', '');
         my $model = $tier_large || $default_model;
 
-        my $ollama = Comserv::Model::Ollama->new(
-            host    => $host,
-            port    => $port || 11434,
-            model   => $model,
-            timeout => 150,
-        );
-        $ollama->chat(messages => [{ role => 'user', content => 'hi' }]);
+        # Use Ollama's "load-only" mode: POST /api/generate with model + keep_alive
+        # but NO prompt. Ollama loads the model into memory and returns immediately.
+        # This is much faster than running actual inference for the warmup.
+        my $port_num  = $port || 11434;
+        my $url       = "http://$host:$port_num/api/generate";
+        my $payload   = encode_json({ model => $model, keep_alive => '2h' });
+        my $ua        = LWP::UserAgent->new(timeout => 30);
+        $ua->post($url, 'Content-Type' => 'application/json', Content => $payload);
     };
 
     $c->response->body('{"success":true,"message":"model preloaded"}');
