@@ -403,3 +403,47 @@
 }
 .chat-citations ul { margin: 4px 0 0; padding-left: 18px; }
 .chat-citations li { margin: 2px 0; }
+
+/* ── AI Thinking / Trace block ──────────────────────────────────────────── */
+.ai-thinking {
+    margin-top: 6px;
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 6px;
+    font-size: 0.80em;
+    font-family: monospace;
+    background: var(--secondary-color, #f5f5f5);
+    color: var(--text-color, #333);
+    overflow: hidden;
+}
+.ai-thinking summary {
+    padding: 5px 10px;
+    cursor: pointer;
+    background: var(--nav-bg, #e8e8e8);
+    color: var(--nav-text, #333);
+    border-radius: 6px 6px 0 0;
+    user-select: none;
+    font-family: inherit;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.ai-thinking summary::-webkit-details-marker { display: none; }
+.ai-thinking[open] summary { border-radius: 6px 6px 0 0; }
+.ai-thinking summary::before {
+    content: '▶';
+    font-size: 0.75em;
+    transition: transform 0.2s;
+}
+.ai-thinking[open] summary::before { transform: rotate(90deg); }
+.ai-thinking-body {
+    padding: 8px 12px;
+    border-top: 1px solid var(--border-color, #ccc);
+}
+.ai-thinking-step {
+    padding: 2px 0;
+    border-bottom: 1px dotted var(--border-color, #ddd);
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+.ai-thinking-step:last-child { border-bottom: none; }
