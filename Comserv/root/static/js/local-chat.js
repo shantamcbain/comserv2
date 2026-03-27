@@ -1568,20 +1568,28 @@
                     + (isServerTimeout ? ' — Ollama may still be loading the model.' : '');
                 wrapper.appendChild(label);
                 wrapper.appendChild(errEl);
+                // errThinkingEl captured by retry onclick closure — set below
+                var errThinkingEl = null;
+
                 if (isServerTimeout || isOllama) {
                     const retryBtn = document.createElement('button');
                     retryBtn.className = 'chat-retry-btn';
                     retryBtn.textContent = '↺ Try Again';
-                    retryBtn.onclick = function() { wrapper.remove(); queryAI(prompt); };
+                    retryBtn.onclick = function() {
+                        persistMessages();        // save error in history before removing
+                        wrapper.remove();
+                        if (errThinkingEl) errThinkingEl.remove();
+                        queryAI(prompt);
+                    };
                     wrapper.appendChild(retryBtn);
                 }
                 chatMessages.appendChild(wrapper);
 
                 // Show thinking trace even on error for diagnostics
                 if (data.thinking && data.thinking.length > 0) {
-                    const thinkingEl = document.createElement('details');
-                    thinkingEl.className = 'ai-thinking';
-                    thinkingEl.open = true;
+                    errThinkingEl = document.createElement('details');
+                    errThinkingEl.className = 'ai-thinking';
+                    errThinkingEl.open = true;
                     const summary = document.createElement('summary');
                     summary.textContent = '🔍 AI Thinking — Error Trace (' + data.thinking.length + ' steps)';
                     const body = document.createElement('div');
@@ -1592,11 +1600,12 @@
                         stepEl.textContent = step;
                         body.appendChild(stepEl);
                     });
-                    thinkingEl.appendChild(summary);
-                    thinkingEl.appendChild(body);
-                    chatMessages.appendChild(thinkingEl);
+                    errThinkingEl.appendChild(summary);
+                    errThinkingEl.appendChild(body);
+                    chatMessages.appendChild(errThinkingEl);
                 }
 
+                persistMessages();  // save error + thinking into session history
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }
         })
@@ -1633,11 +1642,13 @@
             retryBtn.className = 'chat-retry-btn';
             retryBtn.textContent = '↺ Retry';
             retryBtn.onclick = function() {
+                persistMessages();    // save network error in history before removing
                 wrapper.remove();
                 queryAI(prompt);
             };
             wrapper.appendChild(retryBtn);
             chatMessages.appendChild(wrapper);
+            persistMessages();  // save network error into session history
             chatMessages.scrollTop = chatMessages.scrollHeight;
         });
     }
