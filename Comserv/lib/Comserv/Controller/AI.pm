@@ -3220,17 +3220,23 @@ sub _build_page_navigation_hint {
     my $hint = "\n\nThe user is currently viewing: $context_label.\n";
 
     if ($page_path =~ m{/HelpDesk/ticket/new}i) {
-        $hint .= "SUPPORT PRE-SCREENING MODE:\n"
-               . "The user has navigated to the 'Create New Ticket' page but has been invited to\n"
-               . "try the AI assistant FIRST before submitting a ticket.\n"
-               . "Your goal is to RESOLVE the user's issue so they do NOT need to submit a ticket.\n"
-               . "- Listen carefully to their problem description.\n"
-               . "- Provide clear, actionable step-by-step solutions.\n"
-               . "- Check the Knowledge Base: $base_url/HelpDesk/kb\n"
-               . "- If you solve the issue, say so clearly and tell them no ticket is needed.\n"
-               . "- If you CANNOT resolve it after trying, acknowledge this and tell them:\n"
-               . "  'It looks like this needs human support. Click \"Skip AI — Submit Ticket Directly\" on the page to open the ticket form.'\n"
-               . "Do NOT refuse to help or just redirect them to submit a ticket without genuinely trying to solve the problem first.\n";
+        if ($role eq 'admin') {
+            $hint .= "NOTE: This page has a HelpDesk pre-screening form, but you are an admin user.\n"
+                   . "Answer questions about projects, todos, system state, and application features normally.\n"
+                   . "Only switch to support pre-screening mode if the user explicitly describes a support problem.\n";
+        } else {
+            $hint .= "SUPPORT PRE-SCREENING MODE:\n"
+                   . "The user has navigated to the 'Create New Ticket' page but has been invited to\n"
+                   . "try the AI assistant FIRST before submitting a ticket.\n"
+                   . "Your goal is to RESOLVE the user's issue so they do NOT need to submit a ticket.\n"
+                   . "- Listen carefully to their problem description.\n"
+                   . "- Provide clear, actionable step-by-step solutions.\n"
+                   . "- Check the Knowledge Base: $base_url/HelpDesk/kb\n"
+                   . "- If you solve the issue, say so clearly and tell them no ticket is needed.\n"
+                   . "- If you CANNOT resolve it after trying, acknowledge this and tell them:\n"
+                   . "  'It looks like this needs human support. Click \"Skip AI — Submit Ticket Directly\" on the page to open the ticket form.'\n"
+                   . "Do NOT refuse to help or just redirect them to submit a ticket without genuinely trying to solve the problem first.\n";
+        }
     } elsif ($page_path =~ m{/HelpDesk}i) {
         $hint .= "Navigation context — HelpDesk:\n"
                . "- Submit a new ticket: $base_url/HelpDesk/ticket/new\n"
