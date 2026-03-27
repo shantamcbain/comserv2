@@ -268,8 +268,8 @@
 
     // Detect page context (documentation, helpdesk, project, etc.)
     function detectPageContext() {
-        const pathname = window.location.pathname;
-        const pageTitle = document.title || 'Unknown Page';
+        const pathname = window.HELPDESK_PRESCREEN_PAGE_PATH || window.location.pathname;
+        const pageTitle = window.HELPDESK_PRESCREEN_PAGE_TITLE || document.title || 'Unknown Page';
         
         // Try to load and select agent from config
         const selectedAgent = selectAgentForPage();
@@ -458,16 +458,36 @@
                                 wst.style.display = 'inline';
                                 wst.title = 'Enable web search for Grok requests (uses API credits)';
                             }
-                        } else if (p.service === 'ollama' && p.models && p.models.length > 0) {
-                            // Filter to chat-capable models only, then sort by size
-                            const chatModels = p.models.filter(function(m) { return isChatModel(m.id); });
-                            if (chatModels.length > 0) {
-                                const sorted = chatModels.slice().sort(function(a, b) {
-                                    return modelSizeScore(a.id) - modelSizeScore(b.id);
+                        } else if (p.service === 'ollama') {
+                            // Update the default "Ollama (Local)" option label
+                            const defaultOpt = sel.querySelector('option[value="ollama"]');
+                            if (defaultOpt) defaultOpt.textContent = p.name || 'Ollama (Local AI)';
+
+                            // Admin server switcher: add optgroup if multiple servers available
+                            if (p.servers && p.servers.length > 1 && data.is_admin) {
+                                const svrGrp = document.createElement('optgroup');
+                                svrGrp.label = 'Ollama Server';
+                                p.servers.forEach(function(srv) {
+                                    const opt = document.createElement('option');
+                                    opt.value = 'ollama_server|' + srv.host;
+                                    opt.textContent = srv.label + (srv.active ? ' ✓' : '');
+                                    if (srv.active) opt.selected = false; // keep default selected
+                                    svrGrp.appendChild(opt);
                                 });
-                                state.modelTiers.small  = 'ollama|' + sorted[0].id;
-                                state.modelTiers.large  = 'ollama|' + sorted[sorted.length - 1].id;
-                                state.modelTiers.medium = 'ollama|' + sorted[Math.floor(sorted.length / 2)].id;
+                                sel.appendChild(svrGrp);
+                            }
+
+                            // Build model tiers from chat-capable installed models
+                            if (p.models && p.models.length > 0) {
+                                const chatModels = p.models.filter(function(m) { return isChatModel(m.id); });
+                                if (chatModels.length > 0) {
+                                    const sorted = chatModels.slice().sort(function(a, b) {
+                                        return modelSizeScore(a.id) - modelSizeScore(b.id);
+                                    });
+                                    state.modelTiers.small  = 'ollama|' + sorted[0].id;
+                                    state.modelTiers.large  = 'ollama|' + sorted[sorted.length - 1].id;
+                                    state.modelTiers.medium = 'ollama|' + sorted[Math.floor(sorted.length / 2)].id;
+                                }
                             }
                         }
                     });
@@ -600,11 +620,53 @@
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
         });
         document.getElementById('ai-provider').addEventListener('change', function(e) {
-            state.selectedProvider = e.target.value;
+            const selectedVal = e.target.value;
+            const parts = selectedVal.split('|');
+            const isGrok         = parts[0] === 'grok';
+            const isServerSwitch = parts[0] === 'ollama_server';
+
+            if (isServerSwitch) {
+                // Switch Ollama host — call /ai/set_host then revert selector to 'ollama'
+                const newHost = parts[1] || '';
+                const sel = document.getElementById('ai-provider');
+                const statusEl = document.getElementById('chat-status');
+                if (statusEl) { statusEl.textContent = '⏳ Switching to ' + newHost + '…'; statusEl.className = 'chat-status processing'; }
+                fetch('/ai/set_host', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ host: newHost })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    if (result.success) {
+                        state.ollamaHost = newHost;
+                        if (statusEl) { statusEl.textContent = '✅ Ollama server: ' + newHost; statusEl.className = 'chat-status connected'; }
+                        // Update active marker in optgroup
+                        if (sel) {
+                            Array.from(sel.options).forEach(function(o) {
+                                if (o.value.startsWith('ollama_server|')) {
+                                    o.textContent = o.textContent.replace(' ✓', '');
+                                    if (o.value === 'ollama_server|' + newHost) o.textContent += ' ✓';
+                                }
+                            });
+                            sel.value = 'ollama'; // revert to primary option
+                        }
+                    } else {
+                        if (statusEl) { statusEl.textContent = '⚠️ Server switch failed'; statusEl.className = 'chat-status error'; }
+                        if (sel) sel.value = 'ollama';
+                    }
+                })
+                .catch(function() {
+                    if (statusEl) { statusEl.textContent = '⚠️ Server switch failed'; statusEl.className = 'chat-status error'; }
+                    if (sel) sel.value = 'ollama';
+                });
+                return; // don't update selectedProvider
+            }
+
+            state.selectedProvider = selectedVal;
             state.userModelOverride = true;   // user chose manually — disable auto-select
-            const parts = state.selectedProvider.split('|');
             let modelDisplay;
-            const isGrok = parts[0] === 'grok';
             if (isGrok) {
                 modelDisplay = 'Grok (xAI)' + (parts[1] ? ': ' + parts[1] : '');
             } else {
@@ -1236,9 +1298,17 @@
                 statusIndicator.textContent = '🟢 ' + modelLabel;
                 statusIndicator.className = 'chat-status connected';
                 
-                // Add AI response
-                addMessage(data.response, 'ai-message');
+                // Add AI response — strip any embedded [ACTION: ...] blocks before display
+                const { cleanText, actions } = extractActions(data.response || '');
+                addMessage(cleanText, 'ai-message');
                 persistMessages();
+
+                // Execute any in-app actions the AI embedded
+                if (actions.length > 0) {
+                    actions.forEach(function(actionObj) {
+                        executeAIAction(actionObj);
+                    });
+                }
 
                 // Append web search citations if returned
                 if (data.citations && data.citations.length > 0) {
@@ -1478,6 +1548,66 @@
     }
     
     // Function to add a message to the chat with sender label
+    // Extract [ACTION: {...}] blocks from AI response text.
+    // Returns { cleanText, actions[] } where cleanText has the blocks removed.
+    function extractActions(text) {
+        const actions = [];
+        const cleanText = text.replace(/\[ACTION:\s*(\{[\s\S]*?\})\]/g, function(match, jsonStr) {
+            try {
+                const obj = JSON.parse(jsonStr);
+                if (obj && obj.action) actions.push(obj);
+            } catch(e) {
+                console.warn('AI action JSON parse error:', e, jsonStr);
+            }
+            return '';
+        }).trim();
+        return { cleanText, actions };
+    }
+
+    // POST an action object to /ai/action and show a confirmation bubble.
+    function executeAIAction(actionObj) {
+        const chatMessages = document.getElementById('chat-messages');
+
+        fetch('/ai/action', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(actionObj)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(result) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'msg-wrapper msg-wrapper-ai';
+            const lbl = document.createElement('div');
+            lbl.className = 'msg-label';
+            lbl.textContent = 'System';
+            const el = document.createElement('div');
+            el.className = 'message system-message';
+            el.textContent = result.success
+                ? '✅ ' + (result.message || 'Action completed')
+                : '⚠️ Action failed: ' + (result.error || 'unknown error');
+            wrapper.appendChild(lbl);
+            wrapper.appendChild(el);
+            chatMessages.appendChild(wrapper);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        })
+        .catch(function(err) {
+            console.error('AI action error:', err);
+            const wrapper = document.createElement('div');
+            wrapper.className = 'msg-wrapper msg-wrapper-ai';
+            const lbl = document.createElement('div');
+            lbl.className = 'msg-label';
+            lbl.textContent = 'System';
+            const el = document.createElement('div');
+            el.className = 'message error-message';
+            el.textContent = '⚠️ Action request failed: ' + err.message;
+            wrapper.appendChild(lbl);
+            wrapper.appendChild(el);
+            chatMessages.appendChild(wrapper);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+    }
+
     function addMessage(text, className) {
         const chatMessages = document.getElementById('chat-messages');
         const wrapper = document.createElement('div');
@@ -1511,6 +1641,15 @@
     
     // Add CSS styles
     function addChatStyles() {
+        if (!document.querySelector('link[data-ai-chat-css]')) {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.setAttribute('data-ai-chat-css', '1');
+            link.href = '/static/css/ai-chat.css?v=' + Date.now();
+            document.head.appendChild(link);
+        }
+    }
+    function _addChatStylesLEGACY_UNUSED() {
         const style = document.createElement('style');
         style.textContent = `
             .local-chat-widget {
@@ -1871,5 +2010,44 @@
                 }
             }
         });
+
+        // HelpDesk pre-screen mode: expose helper + auto-open with greeting
+        if (window.HELPDESK_PRESCREEN) {
+            var _hdOpenAndGreet = function() {
+                if (!state.isOpen) {
+                    var toggleBtn = document.getElementById('chat-button') || document.querySelector('.chat-button');
+                    if (toggleBtn) toggleBtn.click();
+                }
+                // Display greeting bubble immediately (no API call)
+                setTimeout(function() {
+                    var chatMessages = document.getElementById('chat-messages');
+                    if (chatMessages) {
+                        var wrapper = document.createElement('div');
+                        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+                        var lbl = document.createElement('div');
+                        lbl.className = 'msg-label';
+                        lbl.textContent = 'AI Assistant';
+                        var msg = document.createElement('div');
+                        msg.className = 'message ai-message';
+                        msg.innerHTML = '👋 <strong>Before you submit a ticket, let me try to help!</strong><br>'
+                            + 'Describe your issue here and I\'ll do my best to resolve it right away.<br>'
+                            + '<small style="opacity:0.7">If I can\'t solve it, I\'ll let you know and you can use the ticket form.</small>';
+                        wrapper.appendChild(lbl);
+                        wrapper.appendChild(msg);
+                        // Insert after any existing system greeting
+                        var firstChild = chatMessages.firstChild;
+                        if (firstChild) {
+                            chatMessages.insertBefore(wrapper, firstChild.nextSibling);
+                        } else {
+                            chatMessages.appendChild(wrapper);
+                        }
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                }, 200);
+            };
+
+            // Expose for the template button
+            window.openHelpDeskChat = _hdOpenAndGreet;
+        }
     });
 })();
