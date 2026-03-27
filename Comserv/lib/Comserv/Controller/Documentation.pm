@@ -376,9 +376,9 @@ sub index :Path('/Documentation') :Args(0) {
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
             "User role determined from session: $user_role, is_admin: $is_admin");
     }
-    # If no role found in session but user is authenticated, use 'normal' as fallback
+    # If no role found in session but user is authenticated, use 'user' as fallback (not 'normal')
     elsif ($is_authenticated && $c->controller('Root')->user_exists($c)) {
-        $user_role = $c->session->{roles} || 'normal';
+        $user_role = $c->session->{roles} || 'user';
         $is_admin = 1 if lc($user_role) eq 'admin';
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
             "User role determined from session: $user_role, is_admin: $is_admin");
@@ -610,11 +610,14 @@ sub view :Path('/Documentation') :Args(1) {
         "After scanning, found $pages_count pages in documentation_pages hash");
 
     # Get the current user's role
-    my $user_role = 'normal';  # Default to normal user
+    my $user_role = 'guest';  # Default to guest — unauthenticated users get no access above guest
     my $is_admin = 0;  # Flag to track if user has admin role
-    
+
+    my $session_username_v = $c->session->{username} // '';
+    my $is_authenticated = ($session_username_v && $session_username_v ne 'anonymous');
+
     # First check if user is authenticated
-    if ($c->user_exists) {
+    if ($is_authenticated) {
         # Check if roles are stored in session
         if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
             # Log all roles for debugging
@@ -632,9 +635,9 @@ sub view :Path('/Documentation') :Args(1) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'view',
                 "User role determined from session: $user_role, is_admin: $is_admin");
         }
-        # If no role found in session but user exists, try to get role from user object
+        # If no role found in session but user is authenticated, use 'user' as fallback
         else {
-            $user_role = $c->session->{roles} || 'normal';
+            $user_role = $c->session->{roles} || 'user';
             $is_admin = 1 if lc($user_role) eq 'admin';
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'view',
                 "User role determined from session: $user_role, is_admin: $is_admin");
@@ -685,7 +688,7 @@ sub view :Path('/Documentation') :Args(1) {
             foreach my $role (@{$metadata->{roles}}) {
                 if ($role eq $user_role || 
                     ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && grep { $_ eq $role } @{$c->session->{roles}}) ||
-                    ($role eq 'normal' && $user_role)) {
+                    ($role eq 'normal' && $is_authenticated)) {
                     $has_role = 1;
                     last;
                 }
