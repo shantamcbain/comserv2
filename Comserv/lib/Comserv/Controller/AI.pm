@@ -2633,11 +2633,24 @@ sub _get_module_data {
     }
 
     # --- Todo / Task data ---
-    if ($prompt =~ /todo|task|overdue|due|deadline|priority|critical|reschedul|plan|backlog/i) {
+    # Triggers on todo keywords OR when asking about project state/status/progress
+    my $want_todos = ($prompt =~ /todo|task|overdue|due|deadline|priority|critical|reschedul|plan|backlog/i)
+                  || ($prompt =~ /project/i && $prompt =~ /state|status|progress|what|how|summar|complet|done|remain|left|next/i);
+
+    if ($want_todos) {
         eval {
             my $schema = $c->model('DBEncy')->schema;
             if ($schema) {
                 my $rs = $schema->resultset('Todo');
+
+                # Build project name map for display
+                my %proj_name;
+                eval {
+                    my $projects = $c->model('Project')->get_projects($schema, $site_name);
+                    if ($projects) {
+                        $proj_name{$_->id} = $_->name for @$projects;
+                    }
+                };
 
                 # Fetch all active todos for this site (status != 3 = not done)
                 # For CSC admins, show all sites
@@ -2650,7 +2663,7 @@ sub _get_module_data {
 
                 my @todos = $rs->search(
                     \%site_filter,
-                    { order_by => [{ -asc => 'priority' }, { -asc => 'due_date' }], rows => 30 }
+                    { order_by => [{ -asc => 'priority' }, { -asc => 'due_date' }], rows => 40 }
                 );
 
                 if (@todos) {
@@ -2659,13 +2672,20 @@ sub _get_module_data {
                         my $due  = $t->due_date   // '';
                         my $subj = $t->subject    // 'Untitled';
                         my $pri  = $t->priority   // 99;
-                        my $proj = $t->project_id // '';
+                        my $proj_id = $t->project_id // '';
+                        my $proj_label = $proj_id
+                            ? ($proj_name{$proj_id} ? "$proj_name{$proj_id} (#$proj_id)" : "#$proj_id")
+                            : '';
                         my $id   = $t->record_id  // '';
                         my $stat = $t->status     // '';
-                        my $line = "  [#$id] Pri=$pri | $subj"
-                            . ($due  ? " | Due: $due" : " | No due date")
-                            . ($proj ? " | Project: $proj" : '')
-                            . " | Status: $stat";
+                        my $stat_label = $stat == 1 ? 'NEW'
+                                       : $stat == 2 ? 'IN PROGRESS'
+                                       : $stat == 3 ? 'DONE'
+                                       : "status=$stat";
+                        my $line = "  [#$id] P$pri | $subj"
+                            . ($due        ? " | Due: $due" : " | No due date")
+                            . ($proj_label ? " | Project: $proj_label" : '')
+                            . " | $stat_label";
 
                         if ($due && $due lt $today) {
                             push @overdue,  "OVERDUE $line";
@@ -2687,7 +2707,7 @@ sub _get_module_data {
                     if (@other) {
                         $block .= "OTHER ACTIVE ITEMS:\n" . join("\n", @other) . "\n";
                     }
-                    $block .= "Browse all todos at /todo | View a specific todo at /todo/view/ID (replace ID with record_id number above)";
+                    $block .= "Browse all todos at /todo | View a specific todo at /todo/details?record_id=ID";
                     push @sections, $block;
                 }
             }
@@ -2697,7 +2717,7 @@ sub _get_module_data {
     }
 
     # --- Project data ---
-    if ($prompt =~ /project|projects/i) {
+    if ($prompt =~ /project/i) {
         eval {
             my $schema = $c->model('DBEncy')->schema;
             if ($schema) {
@@ -2720,6 +2740,46 @@ sub _get_module_data {
         };
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
             '_get_module_data', "Project fetch error: $@") if $@;
+    }
+
+    # --- ENCY / Herb / Plant / Bee forage data ---
+    if ($prompt =~ /plant|herb|flower|forage|pasture|nectar|pollen|bee\s*food|pollinator|garden|grow/i) {
+        eval {
+            my $forager = $c->model('DBForager');
+            if ($forager) {
+                # Extract key search terms from the prompt
+                my @keywords = ($prompt =~ /(\w{4,})/g);
+                my $search   = join(' ', grep { /plant|herb|flower|forage|nectar|pollen|bee|grow|garden/i } @keywords);
+                $search ||= 'bee';
+
+                my $results = $forager->searchHerbs($c, $search);
+                if ($results && @$results) {
+                    my @lines;
+                    my $last = $#$results < 14 ? $#$results : 14;
+                    for my $h (@{$results}[0..$last]) {
+                        my $name   = $h->botanical_name // '';
+                        my $common = $h->common_names   // '';
+                        my $nectar = $h->nectar         // '';
+                        my $pollen = $h->pollen         // '';
+                        my $apis   = $h->apis           // '';
+                        my $id     = $h->record_id      // '';
+                        push @lines, "  [#$id] $name"
+                            . ($common ? " ($common)" : '')
+                            . ($nectar ? " | Nectar: $nectar" : '')
+                            . ($pollen ? " | Pollen: $pollen" : '')
+                            . ($apis   ? " | Bee use: $apis"  : '');
+                    }
+                    if (@lines) {
+                        push @sections,
+                            "LIVE ENCY HERB/PLANT DATA (search: '$search'):\n"
+                            . join("\n", @lines)
+                            . "\nView full encyclopedia at /ENCY | Bee forage plants at /ENCY/BeePastureView";
+                    }
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_get_module_data', "ENCY herb fetch error: $@") if $@;
     }
 
     return join("\n\n", @sections);
