@@ -1748,7 +1748,12 @@ sub chat :Local :Args(0) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'chat', "Saved user message to conversation $final_conversation_id");
             
-            # Save AI's response message
+            # Finalise the trace before saving so the permanent DB record is complete
+            push @chat_trace, sprintf("⏱️ Total elapsed: %ds", time() - $chat_trace_start);
+
+            # Save AI's response message — includes full thinking trace in metadata
+            # so the diagnostic trail is permanently recorded and can be reviewed in
+            # the conversation history viewer.
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'chat', "Saving AI response to conversation: $final_conversation_id");
             
@@ -1760,17 +1765,18 @@ sub chat :Local :Args(0) {
                 agent_type => 'documentation',
                 model_used => $model_used,
                 metadata => encode_json({
-                    total_duration => $response_total_duration,
-                    eval_count => $response_eval_count,
-                    is_guest => $is_guest ? 1 : 0,
-                    guest_session_id => $guest_session_id
+                    total_duration   => $response_total_duration,
+                    eval_count       => $response_eval_count,
+                    is_guest         => $is_guest ? 1 : 0,
+                    guest_session_id => $guest_session_id,
+                    thinking_trace   => \@chat_trace,
                 }),
                 ip_address => $c->request->address,
                 user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
             });
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'chat', "Saved AI response to conversation $final_conversation_id");
+                'chat', "Saved AI response (with thinking trace) to conversation $final_conversation_id");
             
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
                 'chat', "Messages saved to conversation ID: $final_conversation_id for user: $username");
@@ -1780,8 +1786,6 @@ sub chat :Local :Args(0) {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
                 'chat', "Failed to save conversation to database: $db_error (Final Conv ID: $final_conversation_id, User ID: $user_id)");
         };
-        
-        push @chat_trace, sprintf("⏱️ Total elapsed: %ds", time() - $chat_trace_start);
 
         # Build JSON response
         $response_data = {
@@ -1803,6 +1807,10 @@ sub chat :Local :Args(0) {
         my $user_error = "$error";
         $user_error =~ s/ at \/.*? line \d+.*$//s;
         
+        # Finalise the error trace (once, before DB save so the record is complete)
+        push @chat_trace, sprintf("❌ Error after %ds: %s",
+            time() - $chat_trace_start, $user_error || 'Unknown error');
+
         # Save failed request to DB so conversation record is complete
         if ($user_id && $prompt) {
             eval {
@@ -1839,15 +1847,14 @@ sub chat :Local :Args(0) {
                             content  => '[ERROR] ' . $user_error,
                             agent_type => 'documentation',
                             model_used => $model || 'unknown',
+                            metadata   => encode_json({ thinking_trace => \@chat_trace }),
                             ip_address => $c->request->address,
                         });
                     }
                 }
             };
         }
-        
-        push @chat_trace, sprintf("❌ Error after %ds: %s",
-            time() - $chat_trace_start, $user_error || 'Unknown error');
+
         $response_data = {
             success => JSON::false,
             error => $user_error || 'Failed to process AI chat request',
@@ -3161,7 +3168,7 @@ sub _pick_ollama_tier {
         'llama3.1'   => 8, 'llama3'   => 8, 'llama2' => 7,
         'mistral'    => 7, 'mixtral'  => 47,
         'qwen2.5'    => 7, 'qwen2'    => 7,
-        'phi3'       => 4, 'phi'      => 4,
+        'phi3'       => 4, 'phi'      => 2,
         'gemma2'     => 9, 'gemma'    => 7,
     );
     for my $n (@names) {
