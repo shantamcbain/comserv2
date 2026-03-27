@@ -4856,13 +4856,19 @@ sub preload_model :Local :Args(0) {
         my $model = $tier_large || $default_model;
 
         # Use Ollama's "load-only" mode: POST /api/generate with model + keep_alive
-        # but NO prompt. Ollama loads the model into memory and returns immediately.
-        # This is much faster than running actual inference for the warmup.
-        my $port_num  = $port || 11434;
-        my $url       = "http://$host:$port_num/api/generate";
-        my $payload   = encode_json({ model => $model, keep_alive => '2h' });
-        my $ua        = LWP::UserAgent->new(timeout => 30);
-        $ua->post($url, 'Content-Type' => 'application/json', Content => $payload);
+        # but NO prompt. Ollama loads the model into memory without running inference.
+        # We fork so the Perl process returns immediately — loading takes 60-120s on CPU.
+        my $port_num = $port || 11434;
+        my $url      = "http://$host:$port_num/api/generate";
+        my $payload  = encode_json({ model => $model, keep_alive => '2h' });
+        my $pid = fork();
+        if (defined $pid && $pid == 0) {
+            # Child process: fire the load request and exit
+            my $child_ua = LWP::UserAgent->new(timeout => 180);
+            $child_ua->post($url, 'Content-Type' => 'application/json', Content => $payload);
+            exit 0;
+        }
+        # Parent returns immediately — child does the work
     };
 
     $c->response->body('{"success":true,"message":"model preloaded"}');
