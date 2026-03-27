@@ -205,14 +205,14 @@
             clone.querySelectorAll(skipSelectors).forEach(function(e) { e.remove(); });
             const text = clone.textContent.replace(/\s+/g, ' ').trim();
             if (text.length > 200) {
-                return text.substring(0, 3000);
+                return text.substring(0, 6000);
             }
         }
         // Fallback: body text
         const bodyClone = document.body.cloneNode(true);
         bodyClone.querySelectorAll(skipSelectors).forEach(function(e) { e.remove(); });
         const bodyText = bodyClone.textContent.replace(/\s+/g, ' ').trim();
-        return bodyText.substring(0, 2000);
+        return bodyText.substring(0, 4000);
     }
 
     // Extract all meaningful links from the current page (nav menu + quick links + content links)
