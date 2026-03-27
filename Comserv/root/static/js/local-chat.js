@@ -4,6 +4,11 @@
  */
 
 (function() {
+    // PAGE_MODE: when true, local-chat.js binds to the /ai page's existing DOM
+    // instead of creating a floating widget.  Set window.AI_CHAT_PAGE_MODE = true
+    // in ai/index.tt before this script loads.
+    const PAGE_MODE = !!(window.AI_CHAT_PAGE_MODE);
+
     // Configuration
     const config = {
         apiEndpoints: {
@@ -780,8 +785,8 @@
     
     // Load a specific conversation's messages
     function loadConversation(conversationId) {
-        const statusIndicator = document.getElementById('chat-status');
-        statusIndicator.textContent = 'Loading conversation...';
+        const _si = document.getElementById('chat-status');
+        const statusIndicator = _si || { textContent: '' };
         
         fetch(`/ai/get_conversation_messages/${conversationId}`, {
             method: 'GET',
@@ -939,8 +944,8 @@
         if (popup) {
             closeChat();
         } else {
-            const statusIndicator = document.getElementById('chat-status');
-            statusIndicator.textContent = 'Please allow popups for this site to detach chat';
+            const _siD = document.getElementById('chat-status');
+            if (_siD) _siD.textContent = 'Please allow popups for this site to detach chat';
         }
     }
 
@@ -1000,9 +1005,11 @@
         chatMessages.innerHTML = '<div class="message system-message">Hello! I\'m your AI assistant. Ask me anything and I\'ll help you right away.</div>';
         
         // Reset status
-        const statusIndicator = document.getElementById('chat-status');
-        statusIndicator.textContent = 'AI Ready - New Conversation';
-        statusIndicator.className = 'chat-status connected';
+        const _si2 = document.getElementById('chat-status');
+        if (_si2) {
+            _si2.textContent = 'AI Ready - New Conversation';
+            _si2.className = 'chat-status connected';
+        }
         
         console.debug('Conversation reset - starting fresh');
         
@@ -1034,7 +1041,8 @@
     
     // Function to query AI and get response
     function queryAI(prompt) {
-        const statusIndicator = document.getElementById('chat-status');
+        const _siQ = document.getElementById('chat-status');
+        const statusIndicator = _siQ || { textContent: '', className: '' };
         statusIndicator.textContent = 'AI is thinking...';
         statusIndicator.className = 'chat-status processing';
         
@@ -1307,6 +1315,10 @@
                     state.currentConversationId = data.conversation_id;
                     persistConversationId();  // Save to sessionStorage
                     console.debug('Conversation created successfully with ID:', data.conversation_id);
+                    // Notify /ai page sidebar via bridge
+                    if (PAGE_MODE && window.AIChatPageBridge && window.AIChatPageBridge.onConversationIdChange) {
+                        window.AIChatPageBridge.onConversationIdChange(data.conversation_id);
+                    }
                 } else {
                     console.warn('Warning: Conversation was not saved to database. New chat will be created on next message.');
                     if (data.warning) {
@@ -1712,6 +1724,187 @@
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
     
+    // ── PAGE MODE ─────────────────────────────────────────────────────────────
+    // Reads the model/provider selection from the /ai page dropdown.
+    function _applyPageModelSelection() {
+        const modelSelectEl = document.getElementById('model-select');
+        if (!modelSelectEl || !modelSelectEl.value) return;
+        const val = modelSelectEl.value;
+        const opt = modelSelectEl.options[modelSelectEl.selectedIndex];
+        const provider = (opt && opt.dataset.provider) || 'ollama';
+        if (provider === 'grok' || val.startsWith('grok')) {
+            state.selectedProvider = 'grok|' + val;
+        } else {
+            state.selectedProvider = 'ollama|' + val;
+        }
+        state.userModelOverride = true;
+    }
+
+    // Initialize local-chat.js in "page mode" — binds to existing /ai DOM elements
+    // instead of creating a floating widget.
+    function initPageMode() {
+        const form     = document.getElementById('chat-form');
+        const input    = document.getElementById('user-input');
+        const messages = document.getElementById('chat-messages');
+        const sendBtn  = document.getElementById('send-button');
+
+        if (!form || !input || !messages) {
+            console.error('[AI] Page mode: required DOM elements missing (#chat-form, #user-input, #chat-messages)');
+            return;
+        }
+
+        // Apply user config injected by the template
+        if (window.AI_CHAT_USER_CONFIG) {
+            const cfg = window.AI_CHAT_USER_CONFIG;
+            if (cfg.username) state.username = cfg.username;
+            if (cfg.isGuest  !== undefined) state.isGuest  = !!cfg.isGuest;
+            if (cfg.isAdmin  !== undefined) state.isAdmin  = !!cfg.isAdmin;
+        }
+
+        // Restore messages saved from prior navigation, load persisted conversation ID
+        restoreMessages();
+        loadPersistedState();
+
+        // Initialize agent context and user providers
+        loadAgentsConfig().then(function() {
+            state.pageContext = detectPageContext();
+        }).catch(function() {
+            state.pageContext = detectPageContext();
+        });
+        loadUserProviders().catch(function() {});
+
+        // Read model selection from page dropdown when it changes
+        const modelSelectEl = document.getElementById('model-select');
+        if (modelSelectEl) {
+            modelSelectEl.addEventListener('change', _applyPageModelSelection);
+            _applyPageModelSelection();
+        }
+
+        // Submit: Nav intercept → AI query (same logic as widget's sendMessage)
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const prompt = input.value.trim();
+            if (!prompt) return;
+
+            if (!state.pageContext) state.pageContext = detectPageContext();
+
+            // Client-side navigation interception
+            const navMatch = prompt.match(NAV_RE);
+            if (navMatch) {
+                const matches = resolveNavIntent(prompt);
+                if (matches && matches.length === 1) {
+                    addMessage(prompt, 'user-message');
+                    input.value = '';
+                    persistMessages();
+                    addMessage('Navigating to [' + matches[0].label + '](' + matches[0].url + ')', 'ai-message');
+                    persistMessages();
+                    setTimeout(function() { window.location.href = matches[0].url; }, 600);
+                    return;
+                } else if (matches && matches.length > 1) {
+                    addMessage(prompt, 'user-message');
+                    input.value = '';
+                    persistMessages();
+                    const listMsg = 'Multiple pages match — which did you mean?\n'
+                        + matches.slice(0, 8).map(function(m) { return '- [' + m.label + '](' + m.url + ')'; }).join('\n');
+                    addMessage(listMsg, 'ai-message');
+                    persistMessages();
+                    return;
+                }
+            }
+
+            addMessage(prompt, 'user-message');
+            input.value = '';
+            input.style.height = 'auto';
+            persistMessages();
+
+            // Show send button loading state
+            if (sendBtn) {
+                sendBtn.disabled = true;
+                const sp = sendBtn.querySelector('.button-spinner');
+                const tx = sendBtn.querySelector('.button-text');
+                if (sp) sp.style.display = 'inline';
+                if (tx) tx.style.display = 'none';
+            }
+
+            queryAI(prompt);
+
+            // Reset button after a short delay (queryAI is async, no promise returned)
+            // The actual reset is done inside sendAIRequest's finally-equivalent
+        });
+
+        // Reset send button when response arrives — watch for loading message removal
+        // by observing the chat area for new non-loading messages
+        (function watchSendBtn() {
+            const obs = new MutationObserver(function(muts) {
+                muts.forEach(function(m) {
+                    m.addedNodes.forEach(function(n) {
+                        if (n.classList && (n.classList.contains('msg-wrapper') || n.classList.contains('ai-thinking'))) {
+                            if (sendBtn) {
+                                sendBtn.disabled = false;
+                                const sp = sendBtn.querySelector('.button-spinner');
+                                const tx = sendBtn.querySelector('.button-text');
+                                if (sp) sp.style.display = 'none';
+                                if (tx) tx.style.display = 'inline';
+                            }
+                        }
+                    });
+                });
+            });
+            obs.observe(messages, { childList: true });
+        })();
+
+        // Enter to submit (Shift+Enter = new line)
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                form.dispatchEvent(new Event('submit'));
+            }
+        });
+
+        // Auto-resize textarea
+        input.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = this.scrollHeight + 'px';
+        });
+
+        // Clear/new-chat button (✏️)
+        const clearBtn = document.getElementById('clear-chat');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function() {
+                if (!confirm('Start a new conversation?')) return;
+                fetch('/ai/reset_conversation', { method: 'POST', credentials: 'include' }).catch(function() {});
+                state.currentConversationId = null;
+                try { sessionStorage.removeItem('currentConversationId'); sessionStorage.removeItem('chatMessages'); } catch(ex) {}
+                messages.innerHTML = '';
+                const wEl = document.createElement('div');
+                wEl.className = 'welcome-message';
+                wEl.innerHTML = '<div class="welcome-icon">🤖</div><h2>How can I help you today?</h2><p>Ask me anything.</p>';
+                messages.appendChild(wEl);
+                if (window.AIChatPageBridge && window.AIChatPageBridge.onConversationIdChange) {
+                    window.AIChatPageBridge.onConversationIdChange(null);
+                }
+            });
+        }
+
+        // Expose bridge so page-specific JS (sidebar etc.) can integrate
+        window.AIChatPageBridge = {
+            getState: function() { return state; },
+            getConversationId: function() { return state.currentConversationId; },
+            setConversationId: function(id) {
+                state.currentConversationId = id;
+                if (id) {
+                    try { sessionStorage.setItem('currentConversationId', id); } catch(ex) {}
+                } else {
+                    try { sessionStorage.removeItem('currentConversationId'); } catch(ex) {}
+                }
+            },
+            onConversationIdChange: null,
+            addSystemMessage: function(text) { addMessage(text, 'ai-message'); persistMessages(); }
+        };
+
+        console.debug('[AI] Page mode initialized — bound to #chat-form / #user-input / #chat-messages');
+    }
+
     // Add CSS styles
     function addChatStyles() {
         if (!document.querySelector('link[data-ai-chat-css]')) {
@@ -2070,22 +2263,28 @@
     // Initialize chat when the DOM is loaded
     document.addEventListener('DOMContentLoaded', function() {
         addChatStyles();
-        createChatWidget();
-        
-        // Load agents config asynchronously (doesn't block widget creation)
-        loadAgentsConfig().then(function() {
-            console.debug('Agents config loaded successfully');
-            // Update button icon/text based on selected agent if widget is open
-            if (state.isOpen && state.currentAgent) {
-                const chatButton = document.getElementById('chat-button');
-                if (chatButton && state.currentAgent.icon) {
-                    chatButton.querySelector('.chat-icon').textContent = state.currentAgent.icon;
-                }
-            }
-        });
 
-        // HelpDesk pre-screen mode: expose helper + auto-open with greeting
-        if (window.HELPDESK_PRESCREEN) {
+        if (PAGE_MODE) {
+            // /ai full-page mode: bind to existing DOM, no floating widget
+            initPageMode();
+        } else {
+            // Widget mode: create floating bubble + panel on every page
+            createChatWidget();
+
+            // Load agents config asynchronously (doesn't block widget creation)
+            loadAgentsConfig().then(function() {
+                console.debug('Agents config loaded successfully');
+                if (state.isOpen && state.currentAgent) {
+                    const chatButton = document.getElementById('chat-button');
+                    if (chatButton && state.currentAgent.icon) {
+                        chatButton.querySelector('.chat-icon').textContent = state.currentAgent.icon;
+                    }
+                }
+            });
+        }
+
+        // HelpDesk pre-screen mode: expose helper + auto-open with greeting (widget only)
+        if (!PAGE_MODE && window.HELPDESK_PRESCREEN) {
             var _hdOpenAndGreet = function() {
                 if (!state.isOpen) {
                     var toggleBtn = document.getElementById('chat-button') || document.querySelector('.chat-button');

@@ -244,6 +244,8 @@ sub generate :Local :Args(0) {
     my $conversation_id = undef;  # For continuing existing conversations
     my $use_search = 0;           # Grok web search toggle
     my $history_items = [];       # Conversation history messages from client
+    my @trace;                    # Reasoning/thinking trace returned to client
+    my $trace_start = time();
     
     # Check if request body is JSON
     my $content_type = $c->request->content_type || '';
@@ -416,6 +418,40 @@ sub generate :Local :Args(0) {
         $use_search = 0;
     }
 
+    # --- Live DB data injection (same as /ai/chat) ---
+    my $site_name_gen = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $module_data_gen = $self->_get_module_data($c, $prompt, $agent_id);
+    if ($module_data_gen) {
+        $system .= "\n\n" . $module_data_gen;
+    }
+    my $shared_hist_gen = $self->_search_shared_history($c, $prompt, $site_name_gen);
+    if ($shared_hist_gen) {
+        $system .= "\n\n" . $shared_hist_gen;
+    }
+
+    # --- Trace: initial context ---
+    push @trace, sprintf("🧑 User: %s (%s) | Site: %s | Page: %s",
+        $username,
+        join(', ', ref($user_roles_gen) eq 'ARRAY' ? @$user_roles_gen : ($user_roles_gen || 'guest')),
+        $c->stash->{SiteName} || $c->session->{SiteName} || '?',
+        $page_path || '/'
+    );
+    push @trace, sprintf("🤖 Agent: %s | Provider: %s%s",
+        $agent_id || 'general',
+        $provider,
+        $use_search ? ' + web search' : ''
+    );
+    push @trace, sprintf("💬 Prompt (%d chars)%s",
+        length($prompt),
+        @$history_items ? " | History: " . scalar(@$history_items) . " prior messages" : ""
+    );
+    push @trace, $module_data_gen
+        ? sprintf("🗄️ DB data injected (%d chars) — todos/projects/ENCY matched keywords", length($module_data_gen))
+        : "🗄️ No DB data injected (prompt didn't match todo/project/ENCY keywords)";
+    push @trace, $shared_hist_gen
+        ? sprintf("📚 Shared KB: found relevant past Q&A (%d chars)", length($shared_hist_gen))
+        : "📚 Shared KB: no matching prior Q&A found";
+
     my $response_data;
     my $ollama_started = 0;
     my $model_used = 'unknown';
@@ -518,9 +554,14 @@ sub generate :Local :Args(0) {
             
             # Context-aware model selection when user has not picked a specific model
             unless ($model) {
+                my $before = $current_model;
                 $current_model = $self->_select_model_for_context($agent_id, $page_context, $installed_models, $current_model);
+                push @trace, sprintf("🔍 Model selection: agent=%s context=%s → %s%s",
+                    $agent_id, $page_context, $current_model,
+                    ($before && $before ne $current_model) ? " (was: $before)" : "");
             } else {
                 $current_model = $model;
+                push @trace, sprintf("🔧 Model override by client: %s", $current_model);
             }
 
             $ollama->host($current_host);
@@ -553,10 +594,13 @@ sub generate :Local :Args(0) {
                     push @ollama_msgs, { role => $hrole, content => $hcontent } if $hcontent;
                 }
                 push @ollama_msgs, { role => 'user', content => $prompt };
+                push @trace, sprintf("📡 Sending /api/chat to %s — %d messages (system + %d history + prompt)",
+                    $current_host, scalar(@ollama_msgs), scalar(@$history_items));
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
                     'generate', "Using chat API with " . scalar(@ollama_msgs) . " messages (history=" . scalar(@$history_items) . ")");
                 $response = $ollama->chat(messages => \@ollama_msgs);
             } else {
+                push @trace, sprintf("📡 Sending /api/generate to %s — single-turn (no history)", $current_host);
                 $response = $ollama->query(
                     prompt => $prompt,
                     format => $format eq 'json' ? 'json' : undef,
@@ -574,6 +618,10 @@ sub generate :Local :Args(0) {
             }
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
                 'generate', "Ollama SUCCESS elapsed=${query_elapsed}s model=" . ($response->{model} || $current_model));
+            push @trace, sprintf("✅ Ollama responded in %ds — %d tokens | Response: %d chars",
+                $query_elapsed,
+                $response->{eval_count} || 0,
+                length($response->{response} || ''));
             
             $model_used = $response->{model} || $ollama->model;
         }
@@ -757,6 +805,7 @@ sub generate :Local :Args(0) {
         };
         
         # Build JSON response
+        push @trace, sprintf("⏱️ Total elapsed: %ds", time() - $trace_start);
         $response_data = {
             success => JSON::true,
             response => $ai_response,
@@ -767,7 +816,8 @@ sub generate :Local :Args(0) {
             conversation_id => $conversation_id || undef,
             created_at => $response->{created_at} || '',
             total_duration => $response->{total_duration} || 0,
-            eval_count => $response->{eval_count} || 0
+            eval_count => $response->{eval_count} || 0,
+            thinking => \@trace,
         };
         
     } catch {
@@ -820,10 +870,12 @@ sub generate :Local :Args(0) {
             };
         }
 
+        push @trace, sprintf("❌ Error after %ds: %s", time() - $trace_start, $user_error || 'Unknown error');
         $response_data = {
             success => JSON::false,
             error => $user_error || 'Failed to process AI request',
             conversation_id => $conversation_id || undef,
+            thinking => \@trace,
         };
     };
     
