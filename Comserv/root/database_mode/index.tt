@@ -1,0 +1,1068 @@
+[% PageVersion = 'Comserv/root/database_mode/index.tt,v 0.01 2025/01/28 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Database Backend Selection - Hybrid Offline Mode' %]
+
+<style>
+/* Modal CSS for proper display */
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    overflow: auto;
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 0;
+    border: 1px solid #888;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.modal-header {
+    background-color: #f8f9fa;
+    padding: 15px 20px;
+    border-bottom: 1px solid #dee2e6;
+    cursor: move;
+    position: relative;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: #495057;
+}
+
+.modal-body {
+    padding: 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.modal-footer {
+    background-color: #f8f9fa;
+    padding: 15px 20px;
+    border-top: 1px solid #dee2e6;
+    text-align: right;
+}
+
+.close {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 24px;
+    font-weight: bold;
+    color: #aaa;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.close:hover,
+.close:focus {
+    color: #000;
+    text-decoration: none;
+}
+
+/* Form styling */
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #495057;
+}
+
+.form-control {
+    display: block;
+    width: 100%;
+    padding: 0.375rem 0.75rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: #495057;
+    background-color: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    box-sizing: border-box;
+}
+
+.form-control:focus {
+    border-color: #80bdff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.form-text {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.form-check {
+    position: relative;
+    display: block;
+    padding-left: 1.25rem;
+}
+
+.form-check-input {
+    position: absolute;
+    margin-top: 0.3rem;
+    margin-left: -1.25rem;
+}
+
+.form-check-label {
+    margin-bottom: 0;
+}
+
+/* Button styling */
+.btn {
+    display: inline-block;
+    padding: 0.375rem 0.75rem;
+    margin-bottom: 0;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: middle;
+    cursor: pointer;
+    border: 1px solid transparent;
+    border-radius: 0.25rem;
+    text-decoration: none;
+}
+
+.btn-primary {
+    color: #fff;
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+    border-color: #004085;
+}
+
+.btn-secondary {
+    color: #fff;
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+
+.btn-secondary:hover {
+    background-color: #545b62;
+    border-color: #4e555b;
+}
+
+.btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+/* Multi-backend specific styling */
+.multi-backend-summary {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    border-left: 4px solid #007bff;
+}
+
+.routing-grid {
+    display: grid;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.routing-item {
+    padding: 8px 12px;
+    background-color: white;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+}
+
+.data-types-section {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #dee2e6;
+}
+
+.data-types-badges {
+    margin-top: 5px;
+}
+
+.badge-outline {
+    background-color: transparent;
+    border: 1px solid;
+}
+
+.badge-outline.badge-warning {
+    color: #856404;
+    border-color: #ffc107;
+}
+
+.badge-outline.badge-info {
+    color: #0c5460;
+    border-color: #17a2b8;
+}
+
+.badge-outline.badge-success {
+    color: #155724;
+    border-color: #28a745;
+}
+
+.badge-outline.badge-secondary {
+    color: #383d41;
+    border-color: #6c757d;
+}
+
+.badge-outline.badge-light {
+    color: #818182;
+    border-color: #f8f9fa;
+}
+</style>
+
+<div class="apiary-container">
+    <header class="feature-header">
+        <h1><i class="fas fa-database"></i> Database Backend Selection</h1>
+        <p class="context-info">Hybrid Offline Mode - Choose your database backend</p>
+        <div class="version-info">
+            <span class="badge badge-info">Hybrid Mode</span>
+            <span class="badge badge-warning">Admin Only</span>
+        </div>
+    </header>
+
+    [% IF error_message %]
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>Error:</strong> [% error_message | html %]
+        </div>
+    [% END %]
+
+    <div class="feature-grid">
+        <!-- Current Status Card -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-info-circle"></i> Current Status</h3>
+            </div>
+            <div class="feature-content">
+                [% IF status %]
+                    <div class="status-grid">
+                        <div class="status-item">
+                            <strong>Default Backend:</strong>
+                            <span class="badge badge-primary">
+                                [% status.current_backend | html %]
+                            </span>
+                        </div>
+                        <div class="status-item">
+                            <strong>Active Backends:</strong>
+                            <span class="badge badge-success">
+                                [% status.active_count || 0 %] / [% status.total_backends || 0 %]
+                            </span>
+                        </div>
+                        <div class="status-item">
+                            <strong>Multi-Backend Mode:</strong>
+                            <span class="badge badge-info">
+                                [% IF status.active_count > 1 %]Enabled[% ELSE %]Single Backend[% END %]
+                            </span>
+                        </div>
+                        <div class="status-item">
+                            <strong>Connection Test:</strong>
+                            <span class="badge [% IF connection_test %]badge-success[% ELSE %]badge-danger[% END %]">
+                                [% IF connection_test %]Success[% ELSE %]Failed[% END %]
+                            </span>
+                        </div>
+                        [% IF status.sqlite_path %]
+                        <div class="status-item">
+                            <strong>SQLite Path:</strong>
+                            <code>[% status.sqlite_path | html %]</code>
+                        </div>
+                        [% END %]
+                    </div>
+                    
+                    [% IF status.active_backends && status.active_backends.keys.size > 1 %]
+                    <div class="multi-backend-summary">
+                        <h4><i class="fas fa-network-wired"></i> Active Backend Routing</h4>
+                        <div class="routing-grid">
+                            [% FOREACH backend_name IN status.active_backends.keys.sort %]
+                                [% backend = status.active_backends.$backend_name %]
+                                [% IF backend.data_types && backend.data_types.size > 0 %]
+                                <div class="routing-item">
+                                    <strong>[% backend.description || backend_name %]:</strong>
+                                    [% FOREACH data_type IN backend.data_types %]
+                                        <span class="badge badge-outline">[% data_type %]</span>
+                                    [% END %]
+                                </div>
+                                [% END %]
+                            [% END %]
+                        </div>
+                    </div>
+                    [% END %]
+                [% ELSE %]
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Status information not available
+                    </div>
+                [% END %]
+            </div>
+            <div class="feature-actions">
+                <button type="button" class="btn btn-secondary" onclick="refreshStatus()">
+                    <i class="fas fa-sync-alt"></i> Refresh Status
+                </button>
+                <button type="button" class="btn btn-warning" onclick="refreshBackends()">
+                    <i class="fas fa-search"></i> Refresh Detection
+                </button>
+                <button type="button" class="btn btn-info" onclick="debugBackends()">
+                    <i class="fas fa-bug"></i> Debug Backends
+                </button>
+            </div>
+        </div>
+
+        <!-- Available Backends -->
+        [% IF status && status.available_backends %]
+            [% FOREACH backend_name IN status.available_backends.keys.sort %]
+                [% backend = status.available_backends.$backend_name %]
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h3>
+                            [% IF backend.type == 'mysql' %]
+                                <i class="fas fa-server"></i>
+                            [% ELSE %]
+                                <i class="fas fa-cube"></i>
+                            [% END %]
+                            [% backend.config.description || backend_name %]
+                        </h3>
+                        [% IF backend.available %]
+                            <span class="badge badge-success">Available</span>
+                        [% ELSE %]
+                            <span class="badge badge-danger">Unavailable</span>
+                        [% END %]
+                        [% IF status.current_backend == backend_name %]
+                            <span class="badge badge-primary">Active</span>
+                        [% END %]
+                    </div>
+                    <div class="feature-content">
+                        <div class="backend-info">
+                            [% IF backend.type == 'mysql' %]
+                                <div class="backend-details">
+                                    <strong>Host:</strong> [% backend.config.host %]<br>
+                                    <strong>Port:</strong> [% backend.config.port %]<br>
+                                    <strong>Database:</strong> [% backend.config.database %]<br>
+                                    <strong>Priority:</strong> [% backend.config.priority || 'N/A' %]
+                                    [% IF backend.config.localhost_override %]
+                                        <br><strong>Localhost Override:</strong> Enabled
+                                    [% END %]
+                                </div>
+                            [% ELSE %]
+                                <div class="backend-details">
+                                    <strong>Type:</strong> SQLite Database<br>
+                                    <strong>Path:</strong> [% backend.config.database_path %]<br>
+                                    <strong>Features:</strong> Offline capable, No server required
+                                </div>
+                            [% END %]
+                            
+                            [% IF backend.config.data_types && backend.config.data_types.size > 0 %]
+                            <div class="data-types-section">
+                                <strong>Data Types Handled:</strong><br>
+                                <div class="data-types-badges">
+                                    [% FOREACH data_type IN backend.config.data_types %]
+                                        <span class="badge badge-outline 
+                                            [% IF data_type == 'private' %]badge-warning
+                                            [% ELSIF data_type == 'shared' %]badge-info
+                                            [% ELSIF data_type == 'production' %]badge-success
+                                            [% ELSIF data_type == 'offline' %]badge-secondary
+                                            [% ELSE %]badge-light[% END %]">
+                                            [% data_type %]
+                                        </span>
+                                    [% END %]
+                                </div>
+                            </div>
+                            [% END %]
+                        </div>
+                    </div>
+                    <div class="feature-actions">
+                        [% IF backend.available %]
+                            <button type="button" class="btn btn-primary" onclick="switchBackend('[% backend_name %]')"
+                                    [% IF status.current_backend == backend_name %]disabled[% END %]>
+                                <i class="fas fa-exchange-alt"></i>
+                                [% IF status.current_backend == backend_name %]Currently Active[% ELSE %]Switch to This Backend[% END %]
+                            </button>
+                        [% ELSE %]
+                            <button type="button" class="btn btn-secondary" disabled>
+                                <i class="fas fa-times"></i> Not Available
+                            </button>
+                        [% END %]
+                        <button type="button" class="btn btn-info" onclick="testConnection('[% backend_name %]')">
+                            <i class="fas fa-plug"></i> Test Connection
+                        </button>
+                        <button type="button" class="btn btn-warning" onclick="editBackend('[% backend_name %]')">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button type="button" class="btn btn-danger" onclick="deleteBackend('[% backend_name %]')">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+            [% END %]
+        [% ELSE %]
+            <div class="feature-card">
+                <div class="feature-header">
+                    <h3><i class="fas fa-exclamation-triangle"></i> No Backends Available</h3>
+                </div>
+                <div class="feature-content">
+                    <div class="alert alert-warning">
+                        No database backends are currently configured or available.
+                    </div>
+                </div>
+            </div>
+        [% END %]
+
+        <!-- Database Synchronization Card -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-sync-alt"></i> Database Synchronization</h3>
+            </div>
+            <div class="feature-content">
+                <div class="sync-info">
+                    <h4>Production Sync:</h4>
+                    <p>Keep your development database in sync with the production server. This will copy all tables and data from your current backend to the production server.</p>
+                    
+                    <div class="alert alert-warning">
+                        <strong>Warning:</strong> This operation will overwrite data on the production server. Use dry run first to preview changes.
+                    </div>
+                    
+                    <div class="sync-options">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="dryRunCheck" checked>
+                            <label class="form-check-label" for="dryRunCheck">
+                                Dry Run (Preview only - no actual changes)
+                            </label>
+                        </div>
+                        <div class="form-group mt-2">
+                            <label for="tablesToSync">Tables to sync (leave empty for all tables):</label>
+                            <input type="text" class="form-control" id="tablesToSync" placeholder="table1,table2,table3">
+                            <small class="form-text text-muted">Comma-separated list of table names</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="feature-actions">
+                <button type="button" class="btn btn-warning" onclick="syncToProduction()">
+                    <i class="fas fa-sync-alt"></i> Sync to Production
+                </button>
+            </div>
+        </div>
+
+        <!-- Backend Management Card -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-cogs"></i> Backend Management</h3>
+            </div>
+            <div class="feature-content">
+                <div class="backend-management-info">
+                    <h4>Configuration Management:</h4>
+                    <p>Add, edit, or remove database backend configurations. Changes are saved to the JSON configuration file with automatic backup.</p>
+                    
+                    <div class="alert alert-info">
+                        <strong>Note:</strong> Configuration changes require application restart to take full effect. Backend detection will be refreshed automatically.
+                    </div>
+                </div>
+            </div>
+            <div class="feature-actions">
+                <button type="button" class="btn btn-success" onclick="showAddBackendModal()">
+                    <i class="fas fa-plus"></i> Add New Backend
+                </button>
+            </div>
+        </div>
+
+        <!-- System Information Card -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-cogs"></i> System Information</h3>
+            </div>
+            <div class="feature-content">
+                <div class="system-info">
+                    <h4>Hybrid Database Architecture:</h4>
+                    <p>This system automatically detects available database backends and allows you to choose between local MySQL and SQLite storage.</p>
+                    
+                    <div class="alert alert-info">
+                        <strong>Production Safety:</strong> All changes are synchronized with the production MySQL database using transactional updates with rollback capability.
+                    </div>
+                    
+                    <h4>Backend Selection Guidelines:</h4>
+                    <ul>
+                        <li><strong>Use MySQL</strong> when local server is available for best compatibility</li>
+                        <li><strong>Use SQLite</strong> as fallback when MySQL is unavailable</li>
+                        <li><strong>Auto-detection</strong> will choose the best available option</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="feature-actions">
+                <a href="/Documentation/developer/offline_mode_system" class="btn btn-secondary">
+                    <i class="fas fa-book"></i> View Documentation
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Messages -->
+    <div id="status-messages" class="mt-3"></div>
+</div>
+
+<script>
+// Database backend management JavaScript
+function showMessage(message, type = 'info') {
+    const container = document.getElementById('status-messages');
+    const alertClass = type === 'error' ? 'alert-danger' : 
+                      type === 'success' ? 'alert-success' : 
+                      type === 'warning' ? 'alert-warning' : 'alert-info';
+    
+    const messageHtml = `
+        <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+            <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : 
+                              type === 'success' ? 'check-circle' : 
+                              type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    container.innerHTML = messageHtml;
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        const alert = container.querySelector('.alert');
+        if (alert) {
+            alert.remove();
+        }
+    }, 5000);
+}
+
+function switchBackend(backendName) {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Show loading state
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Switching...';
+    
+    fetch(`/admin/database_mode/switch_backend/${backendName}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage(data.message, 'success');
+            // Reload page to update status
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showMessage(data.error, 'error');
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        showMessage('Network error: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
+
+function testConnection(backendName) {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Show loading state
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+    
+    fetch(`/admin/database_mode/test_connection/${backendName}`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const messageType = data.connection_test ? 'success' : 'warning';
+            showMessage(data.message, messageType);
+        } else {
+            showMessage(data.error, 'error');
+        }
+        
+        button.disabled = false;
+        button.innerHTML = originalText;
+    })
+    .catch(error => {
+        showMessage('Network error: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
+
+function refreshStatus() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Show loading state
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+    
+    fetch('/admin/database_mode/status', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage('Status refreshed successfully', 'success');
+            // Reload page to update status display
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            showMessage(data.error, 'error');
+        }
+        
+        button.disabled = false;
+        button.innerHTML = originalText;
+    })
+    .catch(error => {
+        showMessage('Network error: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
+
+function refreshBackends() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Show loading state
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Detecting...';
+    
+    fetch('/admin/database_mode/refresh_backends', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage(`Backend detection refreshed - Found ${data.available_count} of ${data.total_backends} backends available`, 'success');
+            // Reload page to update backend display
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showMessage(data.error, 'error');
+        }
+        
+        button.disabled = false;
+        button.innerHTML = originalText;
+    })
+    .catch(error => {
+        showMessage('Network error: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
+
+function debugBackends() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Show loading state
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+    
+    fetch('/admin/database_mode/debug_backends', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Display debug information in a modal or alert
+            const debugInfo = data.debug_info;
+            let message = `=== Backend Debug Information ===\n\n`;
+            message += `Current Backend: ${debugInfo.current_backend}\n`;
+            message += `Total Backends: ${debugInfo.total_backends}\n`;
+            message += `Available Backends: ${debugInfo.available_count}\n\n`;
+            
+            message += `=== Backend Details ===\n`;
+            Object.keys(debugInfo.backends).forEach(backendName => {
+                const backend = debugInfo.backends[backendName];
+                message += `\n${backendName}:\n`;
+                message += `  Type: ${backend.type}\n`;
+                message += `  Available: ${backend.available ? 'Yes' : 'No'}\n`;
+                message += `  Description: ${backend.description}\n`;
+                
+                if (backend.type === 'mysql') {
+                    message += `  Host: ${backend.config.host}\n`;
+                    message += `  Port: ${backend.config.port}\n`;
+                    message += `  Database: ${backend.config.database}\n`;
+                    message += `  Priority: ${backend.config.priority || 'N/A'}\n`;
+                    message += `  Localhost Override: ${backend.config.localhost_override ? 'Yes' : 'No'}\n`;
+                } else if (backend.type === 'sqlite') {
+                    message += `  Database Path: ${backend.config.database_path}\n`;
+                }
+            });
+            
+            // Show in alert for now (could be enhanced with a proper modal)
+            alert(message);
+            showMessage('Debug information retrieved successfully', 'success');
+        } else {
+            showMessage(data.error, 'error');
+        }
+        
+        button.disabled = false;
+        button.innerHTML = originalText;
+    })
+    .catch(error => {
+        showMessage('Network error: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
+
+function syncToProduction() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Get form values
+    const dryRun = document.getElementById('dryRunCheck').checked;
+    const tables = document.getElementById('tablesToSync').value.trim();
+    
+    // Confirm action if not dry run
+    if (!dryRun) {
+        const confirmMessage = 'This will overwrite data on the production server. Are you sure you want to continue?';
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+    }
+    
+    // Show loading state
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (dryRun ? 'Running Preview...' : 'Syncing...');
+    
+    // Prepare form data
+    const formData = new FormData();
+    formData.append('dry_run', dryRun ? '1' : '0');
+    if (tables) {
+        formData.append('tables', tables);
+    }
+    
+    fetch('/admin/database_mode/sync_to_production', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const messageType = dryRun ? 'info' : 'success';
+            showMessage(data.message, messageType);
+            
+            // Show detailed results if available
+            if (data.sync_results) {
+                const results = data.sync_results;
+                let detailMessage = `Tables processed: ${results.tables_synced}, Records: ${results.records_synced}`;
+                
+                if (results.errors && results.errors.length > 0) {
+                    detailMessage += `\nErrors: ${results.errors.length}`;
+                    console.error('Sync errors:', results.errors);
+                }
+                
+                setTimeout(() => {
+                    showMessage(detailMessage, 'info');
+                }, 2000);
+            }
+        } else {
+            showMessage(data.error, 'error');
+        }
+        
+        button.disabled = false;
+        button.innerHTML = originalText;
+    })
+    .catch(error => {
+        showMessage('Network error: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
+
+// Backend Management Functions
+function showAddBackendModal() {
+    document.getElementById('backendModalTitle').textContent = 'Add New Backend';
+    document.getElementById('backendForm').reset();
+    document.getElementById('backendModal').style.display = 'block';
+    document.getElementById('isEditMode').value = 'false';
+    document.getElementById('originalBackendName').value = '';
+    toggleBackendFields(); // Show appropriate fields based on default db_type
+}
+
+function editBackend(backendName) {
+    document.getElementById('backendModalTitle').textContent = 'Edit Backend: ' + backendName;
+    document.getElementById('isEditMode').value = 'true';
+    document.getElementById('originalBackendName').value = backendName;
+    
+    // Fetch backend configuration
+    fetch(`/admin/database_mode/get_backend/${backendName}`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const config = data.config;
+            
+            // Populate form fields
+            document.getElementById('backend_name').value = backendName;
+            document.getElementById('db_type').value = config.db_type;
+            document.getElementById('description').value = config.description || '';
+            document.getElementById('priority').value = config.priority || 999;
+            document.getElementById('localhost_override').checked = config.localhost_override || false;
+            
+            if (config.db_type === 'mysql') {
+                document.getElementById('host').value = config.host || '';
+                document.getElementById('port').value = config.port || 3306;
+                document.getElementById('username').value = config.username || '';
+                document.getElementById('password').value = config.password || '';
+                document.getElementById('database').value = config.database || '';
+            } else if (config.db_type === 'sqlite') {
+                document.getElementById('database_path').value = config.database_path || '';
+            }
+            
+            toggleBackendFields();
+            document.getElementById('backendModal').style.display = 'block';
+        } else {
+            showMessage('Failed to load backend configuration: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('Network error: ' + error.message, 'error');
+    });
+}
+
+function deleteBackend(backendName) {
+    if (!confirm(`Are you sure you want to delete backend '${backendName}'? This action cannot be undone.`)) {
+        return;
+    }
+    
+    fetch(`/admin/database_mode/delete_backend/${backendName}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage(data.message, 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showMessage('Failed to delete backend: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('Network error: ' + error.message, 'error');
+    });
+}
+
+function closeBackendModal() {
+    document.getElementById('backendModal').style.display = 'none';
+}
+
+function toggleBackendFields() {
+    const dbType = document.getElementById('db_type').value;
+    const mysqlFields = document.getElementById('mysqlFields');
+    const sqliteFields = document.getElementById('sqliteFields');
+    
+    if (dbType === 'mysql') {
+        mysqlFields.style.display = 'block';
+        sqliteFields.style.display = 'none';
+    } else if (dbType === 'sqlite') {
+        mysqlFields.style.display = 'none';
+        sqliteFields.style.display = 'block';
+    }
+}
+
+function saveBackend() {
+    const form = document.getElementById('backendForm');
+    const formData = new FormData(form);
+    const isEditMode = document.getElementById('isEditMode').value === 'true';
+    const originalName = document.getElementById('originalBackendName').value;
+    const backendName = formData.get('backend_name');
+    
+    if (!backendName) {
+        showMessage('Backend name is required', 'error');
+        return;
+    }
+    
+    const button = document.querySelector('#backendModal .btn-primary');
+    const originalText = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    
+    const url = isEditMode ? 
+        `/admin/database_mode/update_backend/${originalName}` : 
+        '/admin/database_mode/add_backend';
+    
+    fetch(url, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage(data.message, 'success');
+            closeBackendModal();
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showMessage('Failed to save backend: ' + data.error, 'error');
+        }
+        
+        button.disabled = false;
+        button.innerHTML = originalText;
+    })
+    .catch(error => {
+        showMessage('Network error: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('backendModal');
+    if (event.target === modal) {
+        closeBackendModal();
+    }
+}
+</script>
+
+<!-- Backend Configuration Modal -->
+<div id="backendModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="backendModalTitle">Add New Backend</h3>
+            <span class="close" onclick="closeBackendModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="backendForm">
+                <input type="hidden" id="isEditMode" name="isEditMode" value="false">
+                <input type="hidden" id="originalBackendName" name="originalBackendName" value="">
+                
+                <div class="form-group">
+                    <label for="backend_name">Backend Name:</label>
+                    <input type="text" id="backend_name" name="backend_name" class="form-control" required>
+                    <small class="form-text text-muted">Unique identifier for this backend configuration</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="db_type">Database Type:</label>
+                    <select id="db_type" name="db_type" class="form-control" onchange="toggleBackendFields()" required>
+                        <option value="mysql">MySQL</option>
+                        <option value="sqlite">SQLite</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="description">Description:</label>
+                    <input type="text" id="description" name="description" class="form-control">
+                    <small class="form-text text-muted">Optional description for this backend</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="priority">Priority:</label>
+                    <input type="number" id="priority" name="priority" class="form-control" value="999" min="1" max="999">
+                    <small class="form-text text-muted">Lower numbers have higher priority (1 = highest)</small>
+                </div>
+                
+                <div class="form-group">
+                    <div class="form-check">
+                        <input type="checkbox" id="localhost_override" name="localhost_override" class="form-check-input">
+                        <label for="localhost_override" class="form-check-label">
+                            Localhost Override (connect to localhost instead of configured host)
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- MySQL-specific fields -->
+                <div id="mysqlFields" style="display: block;">
+                    <div class="form-group">
+                        <label for="host">Host:</label>
+                        <input type="text" id="host" name="host" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="port">Port:</label>
+                        <input type="number" id="port" name="port" class="form-control" value="3306" min="1" max="65535">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="username">Username:</label>
+                        <input type="text" id="username" name="username" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">Password:</label>
+                        <input type="password" id="password" name="password" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="database">Database:</label>
+                        <input type="text" id="database" name="database" class="form-control">
+                    </div>
+                </div>
+                
+                <!-- SQLite-specific fields -->
+                <div id="sqliteFields" style="display: none;">
+                    <div class="form-group">
+                        <label for="database_path">Database Path:</label>
+                        <input type="text" id="database_path" name="database_path" class="form-control">
+                        <small class="form-text text-muted">Path to SQLite database file</small>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeBackendModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="saveBackend()">Save Backend</button>
+        </div>
+    </div>
+</div>
+

@@ -19,7 +19,7 @@ __PACKAGE__->add_columns(
 );
 
 __PACKAGE__->set_primary_key('id');
-__PACKAGE__->add_unique_constraint(['plan_id', 'project_id']);
+__PACKAGE__->add_unique_constraint('dailyplan_project_plan_id_project_id' => ['plan_id', 'project_id']);
 
 __PACKAGE__->belongs_to(
     'plan' => 'Comserv::Model::Schema::Ency::Result::DailyPlan',

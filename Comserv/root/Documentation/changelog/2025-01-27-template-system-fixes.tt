@@ -1,0 +1,136 @@
+[% PageVersion = '2025-01-27-template-system-fixes.tt,v 0.01 2025/01/27 shanta Exp shanta ' %]
+[% META title = 'Template System Fixes - Double Header Resolution' %]
+
+<h2>Template System Fixes - January 27, 2025</h2>
+
+<h3>Issue Resolution: Double Header Problem</h3>
+
+<h4>Problem Identified</h4>
+<p>The application was experiencing double header issues due to:</p>
+<ul>
+    <li>Catalyst Template Toolkit automatically applying wrapper (layout.tt)</li>
+    <li>Individual templates having conflicting H1 headers with the main application header</li>
+    <li>Template syntax errors causing missing end token errors</li>
+    <li>Inline CSS styles not following the theme system</li>
+</ul>
+
+<h4>Root Cause</h4>
+<p>The Template Toolkit system is configured with <code>WRAPPER => 'layout.tt'</code> in the TT view configuration, which means:</p>
+<ul>
+    <li><strong>layout.tt</strong> automatically wraps all template content</li>
+    <li><strong>Header.tt</strong> provides HTML head section (not visual header)</li>
+    <li><strong>pagetop.tt</strong> provides the main application header and navigation</li>
+    <li><strong>Individual templates</strong> should only contain page-specific content</li>
+</ul>
+
+<h4>Template Structure (Correct)</h4>
+<pre>
+layout.tt (WRAPPER - automatically applied)
+├── Header.tt (HTML &lt;head&gt; section)
+├── pagetop.tt (Visual header + navigation)
+├── [INDIVIDUAL PAGE CONTENT] (e.g., apiary.tt, dev/index.tt)
+├── AdminNotes.tt
+└── footer.tt
+</pre>
+
+<h4>Files Modified</h4>
+
+<h5>1. Layout System Fixes</h5>
+<ul>
+    <li><strong>layout.tt</strong> - v0.04
+        <ul>
+            <li>Fixed duplicate HTML declarations</li>
+            <li>Cleaned up template syntax</li>
+            <li>Added proper content wrapper structure</li>
+            <li>Improved error handling for includes</li>
+        </ul>
+    </li>
+    <li><strong>base.css</strong> - Added content-wrapper styles for responsive layout</li>
+</ul>
+
+<h5>2. PageVersion Format Standardization</h5>
+<ul>
+    <li><strong>apiary.tt</strong> - v0.03: Fixed incorrect date format (2025/05/259 → 2025/01/27)</li>
+    <li><strong>dev/index.tt</strong> - v0.03: Updated version and fixed template syntax</li>
+    <li><strong>BMaster.tt</strong> - v0.03: Updated path format and debug syntax</li>
+    <li><strong>accounts.tt</strong> - v0.02: Updated version and cleaned syntax</li>
+    <li><strong>index.tt</strong> - v0.02: Removed commented layout include</li>
+</ul>
+
+<h5>3. Header Hierarchy Fixes</h5>
+<p>Changed conflicting H1 tags to H2 tags to maintain proper semantic hierarchy:</p>
+<ul>
+    <li><strong>apiary.tt</strong>: "Welcome to the Apiary Management System" → "Apiary Management System" (H2)</li>
+    <li><strong>dev/index.tt</strong>: "Welcome to the Dev Site" → "Development Site" (H2)</li>
+    <li><strong>BMaster.tt</strong>: "BMaster Module" → H2</li>
+    <li><strong>accounts.tt</strong>: "Hosted Sites" → H2</li>
+</ul>
+
+<h5>4. CSS Theme System Integration</h5>
+<ul>
+    <li><strong>apiary.css</strong> - Added new classes:
+        <ul>
+            <li><code>.graph-container</code> - Styled container for graph display</li>
+            <li><code>.no-data-message</code> - Themed message for missing data</li>
+            <li>Enhanced styling with theme colors and hover effects</li>
+        </ul>
+    </li>
+    <li><strong>apiary.tt</strong> - Removed inline styles, implemented theme classes</li>
+</ul>
+
+<h5>5. Template Syntax Cleanup</h5>
+<ul>
+    <li>Removed commented <code>[%# INCLUDE 'layout.tt' %]</code> lines (not needed with wrapper)</li>
+    <li>Fixed debug block syntax errors</li>
+    <li>Standardized debug mode checking to <code>c.session.debug_mode</code></li>
+    <li>Cleaned up template structure for better maintainability</li>
+</ul>
+
+<h4>Technical Details</h4>
+
+<h5>Template Wrapper System</h5>
+<p>The Catalyst application uses automatic template wrapping:</p>
+<ul>
+    <li><strong>Configuration</strong>: <code>WRAPPER => 'layout.tt'</code> in TT view</li>
+    <li><strong>Process</strong>: Individual templates are automatically wrapped by layout.tt</li>
+    <li><strong>Content Injection</strong>: Template content appears at <code>[% content %]</code> in layout.tt</li>
+</ul>
+
+<h5>Header Hierarchy</h5>
+<ul>
+    <li><strong>H1</strong>: Main application header (from pagetop.tt) - "Welcome [User] to [App]!"</li>
+    <li><strong>H2</strong>: Section/page headers (from individual templates)</li>
+    <li><strong>H3+</strong>: Subsection headers within pages</li>
+</ul>
+
+<h4>Benefits Achieved</h4>
+<ul>
+    <li>✅ Eliminated double header display issue</li>
+    <li>✅ Proper semantic HTML hierarchy</li>
+    <li>✅ Consistent PageVersion format across all templates</li>
+    <li>✅ All CSS moved to theme system (no inline styles)</li>
+    <li>✅ Clean template syntax without errors</li>
+    <li>✅ Improved maintainability and consistency</li>
+    <li>✅ Responsive layout with content wrapper</li>
+</ul>
+
+<h4>Testing Recommendations</h4>
+<ul>
+    <li>Test all modified pages for proper header display</li>
+    <li>Verify theme styling is applied correctly</li>
+    <li>Check debug mode functionality</li>
+    <li>Validate responsive layout on different screen sizes</li>
+    <li>Ensure no template syntax errors in server logs</li>
+</ul>
+
+<h4>Future Maintenance</h4>
+<ul>
+    <li>Always use H2 for main page headers (not H1)</li>
+    <li>Follow PageVersion format: <code>path/filename.tt,v version date username Exp username</code></li>
+    <li>Use theme CSS classes instead of inline styles</li>
+    <li>Do not include layout wrapper code in individual templates</li>
+    <li>Use <code>c.session.debug_mode</code> for debug checks</li>
+</ul>
+
+<p><strong>Resolution Status:</strong> ✅ Complete</p>
+<p><strong>Next Task:</strong> Ready for additional Apiary Management System enhancements</p>

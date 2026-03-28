@@ -277,16 +277,6 @@ h6.section-subhead {
                 <div class="models-alert-info">Management requires admin/developer role.</div>
                 [% END %]
 
-                [% IF can_select_model %]
-                <h6 class="section-subhead">Currently Loaded in Memory
-                    <button class="btn btn-sm" style="font-size:0.75em;margin-left:8px;"
-                            onclick="refreshRunning([% loop.index %], '[% server.host %]', [% server.port %])">↺ Refresh</button>
-                </h6>
-                <ul class="models-list" id="running-[% loop.index %]">
-                    <li><span class="color-muted">Loading…</span></li>
-                </ul>
-                [% END %]
-
                 <h6 class="section-subhead">Installed Models</h6>
                 <ul class="models-list">
                     [% IF server.installed_models.size %]
@@ -299,10 +289,6 @@ h6.section-subhead {
                             <button class="btn btn-sm btn-outline-success"
                                     onclick="testModel('[% model.name %]', '[% server.host %]', [% server.port %])">
                                 Test
-                            </button>
-                            <button class="btn btn-sm" style="background:var(--link-color,#2196f3);color:#fff;"
-                                    onclick="unloadModel('[% model.name %]', '[% server.host %]', [% server.port %], [% loop.index %])">
-                                Unload
                             </button>
                             <button class="btn btn-sm btn-outline-danger"
                                     onclick="removeModel('[% model.name %]', '[% server.host %]', [% server.port %])">
@@ -398,15 +384,11 @@ var canSelectModel = [% can_select_model ? 'true' : 'false' %];
 document.addEventListener('DOMContentLoaded', function() {
     servers.forEach(function(server, index) {
         checkServerStatus(index);
-        if (canSelectModel) refreshRunning(index, server.host, server.port);
     });
     if (canSelectModel) {
         setInterval(function() {
             servers.forEach(function(s, i) { checkServerStatus(i); });
         }, 10000);
-        setInterval(function() {
-            servers.forEach(function(s, i) { refreshRunning(i, s.host, s.port); });
-        }, 15000);
     }
 });
 
@@ -525,53 +507,6 @@ function removeModel(model, host, port) {
         }
     })
     .catch(function() { alert('Request failed.'); });
-}
-
-function refreshRunning(index, host, port) {
-    var list = document.getElementById('running-' + index);
-    if (!list) return;
-    fetch('/ai/running_models?host=' + encodeURIComponent(host) + '&port=' + encodeURIComponent(port), {
-        credentials: 'include'
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (!data.success || !data.models || !data.models.length) {
-            list.innerHTML = '<li><span class="color-muted">None (all unloaded)</span></li>';
-            return;
-        }
-        list.innerHTML = data.models.map(function(m) {
-            var sizeStr = m.size_vram ? ' — ' + Math.round(m.size_vram / 1024 / 1024) + ' MB VRAM' : '';
-            var expiry  = m.expires_at ? ' · expires ' + new Date(m.expires_at).toLocaleTimeString() : '';
-            return '<li>' +
-                '<span class="model-name">' + m.name + '</span>' +
-                '<span class="models-badge badge-connected">In memory' + sizeStr + expiry + '</span>' +
-                '<button class="btn btn-sm" style="background:var(--link-color,#2196f3);color:#fff;" ' +
-                    'onclick="unloadModel(\'' + m.name + '\',\'' + host + '\',' + port + ',' + index + ')">Unload</button>' +
-                '</li>';
-        }).join('');
-    })
-    .catch(function() {
-        if (list) list.innerHTML = '<li><span class="color-muted">Could not query memory status</span></li>';
-    });
-}
-
-function unloadModel(model, host, port, serverIndex) {
-    if (!confirm('Unload ' + model + ' from memory on ' + host + ':' + port + '?\n(Model stays installed — just freed from RAM)')) return;
-    fetch('/ai/unload_model', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ model: model, host: host, port: port })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (data.success) {
-            setTimeout(function() { refreshRunning(serverIndex, host, port); }, 1500);
-        } else {
-            alert('Unload failed: ' + (data.error || 'unknown'));
-        }
-    })
-    .catch(function() { alert('Unload request failed.'); });
 }
 </script>
 

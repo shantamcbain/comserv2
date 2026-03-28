@@ -1,0 +1,205 @@
+[% PageVersion = 'Comserv/root/Documentation/general/THEME_SYSTEM_CLEANUP.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Theme System Cleanup' %]
+
+<!-- Documentation page for THEME_SYSTEM_CLEANUP -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+After implementing the new theme system, the following files can be safely deleted:
+
+
+
+<h2>Files to Delete</h2>
+
+
+
+<ol><li>**Old ThemeController file (if it exists):**</li></ol>
+
+   <code></code>`
+
+   /comserv/Comserv/lib/Comserv/Controller/Admin/ThemeController.pm
+
+   <code></code>`
+
+
+
+<ol><li>**Old ThemeEditor controller (replaced by our new Theme controller):**</li></ol>
+
+   <code></code>`
+
+   /comserv/Comserv/lib/Comserv/Controller/Admin/ThemeEditor.pm
+
+   <code></code>`
+
+
+
+<ol><li>**Old ThemeManager utility (replaced by our new ThemeConfig model):**</li></ol>
+
+   <code></code>`
+
+   /comserv/Comserv/lib/Comserv/Util/ThemeManager.pm
+
+   <code></code>`
+
+
+
+<ol><li>**ThemeUtils utility (functionality now included in Theme controller):**</li></ol>
+
+   <code></code>`
+
+   /comserv/Comserv/lib/Comserv/Util/ThemeUtils.pm
+
+   <code></code>`
+
+
+
+<ol><li>**Temporary template files (if they exist):**</li></ol>
+
+   <code></code>`
+
+   /comserv/Comserv/root/admin/theme/new_index.tt
+
+   /comserv/Comserv/root/admin/theme/new_edit_css.tt
+
+   /comserv/Comserv/root/admin/theme/index.tt.new
+
+   /comserv/Comserv/root/admin/theme/edit_css.tt.new
+
+   <code></code>`
+
+
+
+<ol><li>**Migration scripts (if they exist):**</li></ol>
+
+   <code></code>`
+
+   /comserv/Comserv/script/migrate_theme_templates.sh
+
+   /comserv/Comserv/script/migrate_theme_controllers.sh
+
+   /comserv/Comserv/script/cleanup_theme_system.sh
+
+   /comserv/Comserv/script/make_migration_scripts_executable.sh
+
+   /comserv/Comserv/script/delete_old_theme_files.sh
+
+   /comserv/Comserv/script/delete_themecontroller.sh
+
+   <code></code>`
+
+
+
+<h2>Verification Before Deletion</h2>
+
+
+
+Before deleting these files, make sure the new theme system is working correctly:
+
+
+
+<ol><li>Test the theme selection functionality</li></ol>
+
+<ol><li>Test the theme editing functionality</li></ol>
+
+<ol><li>Test the custom theme creation</li></ol>
+
+<ol><li>Test the legacy URL redirection</li></ol>
+
+
+
+<h2>How to Delete</h2>
+
+
+
+You can delete these files using the <code>rm</code> command:
+
+
+
+<code></code>`bash
+
+<h1>Delete old controller files</h1>
+
+rm /comserv/Comserv/lib/Comserv/Controller/Admin/ThemeController.pm
+
+rm /comserv/Comserv/lib/Comserv/Controller/Admin/ThemeEditor.pm
+
+
+
+<h1>Delete old utility file</h1>
+
+rm /comserv/Comserv/lib/Comserv/Util/ThemeManager.pm
+
+
+
+<h1>Delete temporary template files</h1>
+
+rm /comserv/Comserv/root/admin/theme/new_*.tt
+
+rm /comserv/Comserv/root/admin/theme/*.new
+
+
+
+<h1>Delete migration scripts</h1>
+
+rm /comserv/Comserv/script/migrate_theme_*.sh
+
+rm /comserv/Comserv/script/cleanup_theme_system.sh
+
+rm /comserv/Comserv/script/make_migration_scripts_executable.sh
+
+<code></code>`
+
+
+
+<h2>New Theme System Structure</h2>
+
+
+
+The new theme system consists of the following components:
+
+
+
+<ol><li>**Model:**</li></ol>
+
+   - <code>Comserv::Model::ThemeConfig</code> - Handles theme configuration and CSS generation
+
+
+
+<ol><li>**Controller:**</li></ol>
+
+   - <code>Comserv::Controller::Admin::Theme</code> - Handles all theme-related actions
+
+
+
+<ol><li>**Templates:**</li></ol>
+
+   - <code>/comserv/Comserv/root/admin/theme/index.tt</code> - Theme management interface
+
+   - <code>/comserv/Comserv/root/admin/theme/edit_css.tt</code> - Theme CSS editor
+
+
+
+<ol><li>**Configuration Files:**</li></ol>
+
+   - <code>/comserv/Comserv/root/static/config/theme_definitions.json</code> - Theme definitions
+
+   - <code>/comserv/Comserv/root/static/config/theme_mappings.json</code> - Site to theme mappings
+
+
+
+<ol><li>**CSS Files:**</li></ol>
+
+   - <code>/comserv/Comserv/root/static/css/themes/</code> - Generated theme CSS files
+
+</div>

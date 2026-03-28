@@ -67,6 +67,11 @@ __PACKAGE__->add_columns(
     date_time_posted => {
         data_type => 'datetime',
     },
+    sort_order => {
+        data_type   => 'integer',
+        is_nullable => 1,
+        default_value => 9999,
+    },
     );
 
 __PACKAGE__->set_primary_key('id');
