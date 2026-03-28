@@ -4,8 +4,8 @@
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
-[% SET roles = c.session.roles || [] %]
-[% SET is_admin = roles.grep('admin').size > 0 ? 1 : 0 %]
+[% SET roles = c.stash.user_roles || c.session.roles || [] %]
+[% SET is_admin = c.stash.is_admin || roles.grep('admin').size > 0 ? 1 : 0 %]
 
 <!-- Add Font Awesome for the paint brush icon -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -208,10 +208,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <header>
     <h1>
-        Welcome [% IF roles.grep('admin').size %]
-[% c.session.first_name %] [% c.session.last_name %] Administrator
-[% ELSIF roles.grep('user').size %]
- [% c.session.first_name %] [% c.session.last_name %] User
+        Welcome [% IF c.session.username %]
+[% c.session.first_name || c.session.username %] [% c.session.last_name %][% IF is_admin %] Administrator[% END %]
 [% ELSE %]
  Guest
 [% END %] to [% site_display_name || SiteDisplayName || c.stash.site_display_name || c.stash.SiteDisplayName || c.session.site_display_name || SiteName || c.session.SiteName || 'this site' %]!
@@ -240,6 +238,7 @@ document.addEventListener('DOMContentLoaded', function() {
         [% IF is_admin %]
             [% INCLUDE 'Navigation/admintopmenu.tt' %]
         [% END %]
+        [% INCLUDE 'Navigation/TopDropListPlanning.tt' %]
         [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
         [% INCLUDE 'Navigation/TopDropListWorkshop.tt' %]
         </ul>

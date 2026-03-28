@@ -128,7 +128,6 @@
     transition: opacity 0.15s, background 0.15s;
 }
 .chat-header-icon-btn:hover { opacity: 1; background: rgba(0,0,0,0.08); }
-a.chat-header-icon-btn { display: inline-flex; align-items: center; text-decoration: none; line-height: 1; }
 
 /* History drawer */
 .widget-history-drawer {
@@ -464,12 +463,3 @@ a.chat-header-icon-btn { display: inline-flex; align-items: center; text-decorat
     white-space: pre-wrap;
 }
 .ai-thinking-step:last-child { border-bottom: none; }
-
-/* Live pre-send thinking block — shown while waiting for server response */
-.ai-thinking-live {
-    opacity: 0.75;
-    border-style: dashed;
-}
-.ai-thinking-live summary {
-    font-style: italic;
-}

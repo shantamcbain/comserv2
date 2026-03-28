@@ -1,0 +1,112 @@
+[% META
+   title = "Pay with PayPal"
+   description = "Complete your membership payment via PayPal"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "Payment"
+   page_version = "0.01"
+   last_updated = "2026-03-19"
+%]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Pay with PayPal</h1>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      [% IF NOT paypal_cfg.is_configured %]
+      <div style="padding:0.75rem 1rem;border:2px solid #c0392b;border-radius:6px;background:#fdf0ef;margin-bottom:1rem">
+        <strong>PayPal not fully configured.</strong>
+        A PayPal Business email must be set (not the default placeholder).
+        [% IF c.session.roles.grep('admin').size OR c.session.roles == 'admin' %]
+        <a href="[% c.uri_for('/membership/admin/paypal_settings') %]">Configure PayPal →</a>
+        [% ELSE %]
+        Please contact the site administrator.
+        [% END %]
+      </div>
+      [% END %]
+      [% IF paypal_cfg.sandbox %]
+      <div style="padding:0.6rem 1rem;border:1px solid #f0ad4e;border-radius:6px;background:#fffde7;margin-bottom:1rem">
+        <strong>Sandbox / Test Mode</strong> — No real money will be charged.
+        Use a PayPal sandbox buyer account to complete the test payment.
+      </div>
+      [% END %]
+      [% IF paypal_cfg.business %]
+      <div style="padding:0.4rem 0.8rem;font-size:0.8em;color:#666;background:rgba(0,0,0,0.03);border-radius:4px;margin-bottom:0.5rem">
+        Paying to: <code>[% paypal_cfg.business | html %]</code>
+        ([% paypal_cfg.currency_code %], [% paypal_cfg.sandbox ? 'sandbox' : 'live' %])
+        — configured: [% paypal_cfg.is_configured ? 'YES' : 'NO' %]
+      </div>
+      [% END %]
+
+      <div class="content-section">
+        <h2>Order Summary</h2>
+        <table class="data-table">
+          <tr><th>Site</th><td>[% site.name | html %]</td></tr>
+          <tr><th>Plan</th><td><strong>[% plan.name | html %]</strong></td></tr>
+          <tr><th>Billing</th><td>[% billing_cycle | html %]</td></tr>
+          <tr><th>Regular Price</th><td>[% plan.price_currency | html %] [% base_price %]</td></tr>
+          [% IF promo %]
+          <tr><th>Promo Code</th><td>[% promo.code | html %] — [% promo.description | html %]</td></tr>
+          [% END %]
+          <tr>
+            <th style="font-size:1.1em">Amount Due</th>
+            <td style="font-size:1.1em"><strong>
+              [% IF final_price == 0 %]FREE[% ELSE %][% plan.price_currency | html %] [% final_price %][% END %]
+            </strong></td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="content-section">
+        [% IF final_price == 0 %]
+        <p>This plan is free — no PayPal payment is required.</p>
+        <div class="form-actions">
+          <a href="[% c.uri_for('/payment/internal/checkout', { plan_id => plan.id, billing_cycle => billing_cycle, promo_code => promo_code }) %]"
+             class="btn btn-primary">Activate Free Plan</a>
+        </div>
+        [% ELSE %]
+        <form method="post" action="[% paypal_url | html %]">
+          <input type="hidden" name="cmd"           value="_xclick">
+          <input type="hidden" name="business"      value="[% paypal_cfg.business | html %]">
+          <input type="hidden" name="item_name"     value="[% site.name | html %] — [% plan.name | html %] ([% billing_cycle | html %])">
+          <input type="hidden" name="amount"        value="[% final_price | html %]">
+          <input type="hidden" name="currency_code" value="[% paypal_cfg.currency_code | html %]">
+          <input type="hidden" name="no_shipping"   value="1">
+          <input type="hidden" name="return"        value="[% return_url | html %]">
+          <input type="hidden" name="cancel_return" value="[% cancel_url | html %]">
+          <input type="hidden" name="notify_url"    value="[% notify_url | html %]">
+          <input type="hidden" name="custom"        value="[% custom | html %]">
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" style="font-size:1.05em;padding:0.65rem 1.6rem">
+              Pay [% paypal_cfg.currency_code || plan.price_currency | html %] [% final_price %] via PayPal →
+            </button>
+            <a href="[% c.uri_for('/membership/subscribe', { plan_id => plan.id }) %]"
+               class="btn btn-secondary">← Change payment method</a>
+          </div>
+          <p style="font-size:0.85em;color:#666;margin-top:0.5rem">
+            You will be redirected to PayPal to complete payment securely.
+            No PayPal account required — credit and debit cards accepted.
+          </p>
+        </form>
+        [% END %]
+      </div>
+
+    </div>
+
+    <div class="content-secondary">
+      <div class="content-section">
+        <h2>Secure Payment</h2>
+        <p>Payment is processed by PayPal. We never see your card details.</p>
+        <p>After payment, you will be returned here and your membership will be activated immediately.</p>
+        <hr style="margin:0.75rem 0;border:none;border-top:1px solid var(--border-color,#ccc)">
+        <p><strong>Alternative:</strong> pay with <a href="[% c.uri_for('/payment/internal/checkout', { plan_id => plan.id, billing_cycle => billing_cycle, promo_code => promo_code }) %]">Site Coins</a> for instant activation without PayPal.</p>
+      </div>
+    </div>
+
+  </div>
+</div>

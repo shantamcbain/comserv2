@@ -1,0 +1,198 @@
+[% PageVersion = 'Comserv/root/Documentation/general/Root.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Root' %]
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+INFO: Comserv::Util::Logging=HASH(0x5800d4a912f8)
+
+INFO: Comserv::Util::Logging=HASH(0x5800d4a912f8)
+
+INFO: Comserv::Util::Logging=HASH(0x5800d4a912f8)
+
+INFO: Comserv::Util::Logging=HASH(0x5800d4a9af68)
+
+INFO: Comserv::Util::Logging=HASH(0x5800d4a9af68)
+
+INFO: Comserv::Util::Logging=HASH(0x5800d4a9af68)
+
+INFO: Comserv::Util::Logging=HASH(0x62fb8955b498)
+
+INFO: Comserv::Util::Logging=HASH(0x62fb8955b498)
+
+INFO: Comserv::Util::Logging=HASH(0x62fb8955b498)
+
+INFO: Comserv::Util::Logging=HASH(0x62fb895a00e0)
+
+INFO: Comserv::Util::Logging=HASH(0x62fb895a00e0)
+
+INFO: Comserv::Util::Logging=HASH(0x62fb895a00e0)
+
+INFO: Comserv::Util::Logging=HASH(0x62fb894fdf00)
+
+INFO: Comserv::Util::Logging=HASH(0x62fb894fdf00)
+
+INFO: Comserv::Util::Logging=HASH(0x62fb894fdf00)
+
+INFO: Comserv::Util::Logging=HASH(0x62fb895074a0)
+
+INFO: Comserv::Util::Logging=HASH(0x62fb895074a0)
+
+INFO: Comserv::Util::Logging=HASH(0x62fb895074a0)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488dc548)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488dc548)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488dc548)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d7b18)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d7b18)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d7b18)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d9570)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d9570)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d9570)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d9dd8)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d9dd8)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d9dd8)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d5910)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d5910)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d5910)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488e5328)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488e5328)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488e5328)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488da378)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488da378)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488da378)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488e4050)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488e4050)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488e4050)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488e1ce0)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488e1ce0)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488e1ce0)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488f6640)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488f6640)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488f6640)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488f7818)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488f7818)
+
+INFO: Comserv::Util::Logging=HASH(0x5ef2488f7818)
+
+INFO: Comserv::Util::Logging=HASH(0x6503253bdc70)
+
+INFO: Comserv::Util::Logging=HASH(0x6503253bdc70)
+
+INFO: Comserv::Util::Logging=HASH(0x6503253bdc70)
+
+INFO: Comserv::Util::Logging=HASH(0x56f5cd5c6060)
+
+INFO: Comserv::Util::Logging=HASH(0x56f5cd5c6060)
+
+INFO: Comserv::Util::Logging=HASH(0x56f5cd5c6060)
+
+INFO: Comserv::Util::Logging=HASH(0x5711abb8dac0)
+
+INFO: Comserv::Util::Logging=HASH(0x5711abb8dac0)
+
+INFO: Comserv::Util::Logging=HASH(0x5711abb8dac0)
+
+INFO: Comserv::Util::Logging=HASH(0x5bab0ceaf330)
+
+INFO: Comserv::Util::Logging=HASH(0x5bab0ceaf330)
+
+INFO: Comserv::Util::Logging=HASH(0x5bab0ceaf330)
+
+INFO: Comserv::Util::Logging=HASH(0x60c4229acb40)
+
+INFO: Comserv::Util::Logging=HASH(0x60c4229acb40)
+
+INFO: Comserv::Util::Logging=HASH(0x60c4229acb40)
+
+INFO: Comserv::Util::Logging=HASH(0x5da22ff517e8)
+
+INFO: Comserv::Util::Logging=HASH(0x5da22ff517e8)
+
+INFO: Comserv::Util::Logging=HASH(0x5da22ff517e8)
+
+INFO: Comserv::Util::Logging=HASH(0x560539529a40)
+
+INFO: Comserv::Util::Logging=HASH(0x560539529a40)
+
+INFO: Comserv::Util::Logging=HASH(0x560539529a40)
+
+INFO: Comserv::Util::Logging=HASH(0x63d29fc1b938)
+
+INFO: Comserv::Util::Logging=HASH(0x63d29fc1b938)
+
+INFO: Comserv::Util::Logging=HASH(0x63d29fc1b938)
+
+INFO: Comserv::Util::Logging=HASH(0x5ddf6473fbf8)
+
+INFO: Comserv::Util::Logging=HASH(0x5ddf6473fbf8)
+
+INFO: Comserv::Util::Logging=HASH(0x5ddf6473fbf8)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b65244df8)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b65244df8)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b65244df8)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b6527e9f0)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b6527e9f0)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b6527e9f0)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b65284368)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b65284368)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b65284368)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b65283960)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b65283960)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b65283960)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b6528b458)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b6528b458)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b6528b458)
+
+</div>

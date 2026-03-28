@@ -517,12 +517,7 @@ sub generate :Local :Args(0) {
     my $ollama_started = 0;
     my $model_used = 'unknown';
     my $active_ollama_host = '';
-    my $pre_saved_user_msg = 0;  # set to 1 once user message is saved pre-Ollama
-
-    # Clear progress file so the JS poller sees fresh steps for this request
-    my $gen_progress_file = $self->_progress_file_path($c);
-    if (open my $pfh, '>', $gen_progress_file) { close $pfh; }
-
+    
     try {
         my $response;
         
@@ -643,114 +638,7 @@ sub generate :Local :Args(0) {
             unless ($fast_check && $fast_check->check_connection()) {
                 die "Ollama is not reachable at $current_host. Please select an external AI model (Grok) or try again later.";
             }
-
-            # ── Prefer in-memory models to avoid cold-start delays ──────────────
-            # If the selected tier_small is NOT already loaded but another installed
-            # model IS in RAM, use that one instead — zero cold-start cost.
-            unless ($manual_model) {
-                my $running = $fast_check->get_running_models() || [];
-                if (@$running) {
-                    my %in_mem;
-                    for my $r (@$running) { $in_mem{$r->{name}} = 1 if $r->{name}; }
-                    push @trace, "💾 In-memory: " . join(', ', sort keys %in_mem);
-                    if (!$in_mem{$use_model}) {
-                        my @inst_names = map { ref($_) ? ($_->{name} || '') : ($_ || '') } @$installed_models;
-                        my ($preferred) = grep { $in_mem{$_} } ($tier_large, @inst_names);
-                        if ($preferred) {
-                            push @trace, "💾 Switched tier_small '$use_model' → '$preferred' (already in memory)";
-                            $use_model = $preferred;
-                            $ollama->model($use_model);
-                        }
-                    } else {
-                        push @trace, "💾 '$use_model' already in memory — no cold-start needed";
-                    }
-                    # Renew keep_alive to prevent expiry race between /api/ps check and actual request
-                    eval {
-                        my $ping_ua  = LWP::UserAgent->new(timeout => 10);
-                        my $ping_url = "http://$current_host:" . ($current_port || 11434) . "/api/generate";
-                        my $ping_payload = encode_json({
-                            model      => $use_model,
-                            prompt     => '',
-                            stream     => JSON::false,
-                            keep_alive => '2h',
-                        });
-                        $ping_ua->post($ping_url, 'Content-Type' => 'application/json', Content => $ping_payload);
-                        push @trace, "🔁 keep_alive renewed for '$use_model'";
-                    };
-                }
-            }
-
-            $ollama->timeout(300);
-
-            # ── Pre-call: create conversation + save user prompt BEFORE Ollama ─
-            # This guarantees the conversation record exists even if Ollama times out,
-            # so /ai/conversations always shows a history of attempted queries.
-            {
-                my $pre_schema;
-                eval { $pre_schema = $c->model('DBEncy')->schema; };
-                if ($pre_schema && $user_id) {
-                    eval {
-                        # Validate conversation_id (must be numeric)
-                        if ($conversation_id && $conversation_id !~ /^\d+$/) {
-                            $conversation_id = undef;
-                        }
-                        unless ($conversation_id) {
-                            my $title = substr($prompt, 0, 80);
-                            $title =~ s/\n/ /g;
-                            $title = 'AI Query' unless $title && length($title);
-                            my $conv_meta = encode_json({
-                                page_context     => $page_context,
-                                page_path        => $page_path,
-                                page_title       => $page_title,
-                                agent_id         => $agent_id,
-                                agent_name       => $agent_name,
-                                created_from_widget => 1,
-                                widget_version      => '2.0',
-                                is_guest            => $is_guest ? 1 : 0,
-                                guest_session_id    => $guest_session_id,
-                            });
-                            my $conv = $pre_schema->resultset('AiConversation')->create({
-                                user_id  => $user_id,
-                                title    => $title,
-                                status   => 'active',
-                                metadata => $conv_meta,
-                            });
-                            if ($conv && $conv->id) {
-                                $conversation_id = $conv->id;
-                                $c->session->{current_conversation_id} = $conversation_id;
-                                push @trace, sprintf("💾 Conversation %d created", $conversation_id);
-                            }
-                        } else {
-                            $c->session->{current_conversation_id} = $conversation_id;
-                        }
-                        if ($conversation_id) {
-                            $pre_schema->resultset('AiMessage')->create({
-                                conversation_id => $conversation_id,
-                                user_id         => $user_id,
-                                role            => 'user',
-                                content         => $prompt,
-                                agent_type      => $normalized_agent_type,
-                                model_used      => 'pending',
-                                metadata        => encode_json({
-                                    format       => $format,
-                                    page_context => $page_context,
-                                    page_path    => $page_path,
-                                    page_title   => $page_title,
-                                }),
-                                ip_address => $c->request->address,
-                                user_role  => $c->session->{roles}
-                                    ? join(',', @{$c->session->{roles}}) : 'user',
-                            });
-                            $pre_saved_user_msg = 1;
-                            push @trace, "💾 User message saved pre-call";
-                        }
-                    };
-                    if ($@) {
-                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                            'generate', "Pre-call DB save failed (non-fatal): $@");
-                    }
-                }
-            }
+            $ollama->timeout(150);
 
             # Build message array once (reused across tiers)
             my @ollama_msgs;
@@ -762,40 +650,6 @@ sub generate :Local :Args(0) {
             }
             push @ollama_msgs, { role => 'user', content => $prompt };
 
-            # ── Hard context budget: keep total input under ~12 000 chars (~3 000 tokens)
-            # CPU Ollama prefill at ~46 tok/s: 3 000 tokens = ~65s — safe under 300s timeout.
-            # Over-budget → trim history content first, then strip page_content from system.
-            my $BUDGET_CHARS = 12_000;
-            my $raw_total_gen = 0;
-            $raw_total_gen += length($_->{content} || '') for @ollama_msgs;
-            if ($raw_total_gen > $BUDGET_CHARS) {
-                push @trace, sprintf("⚠️ Context %d chars > %d budget — trimming history", $raw_total_gen, $BUDGET_CHARS);
-                for my $msg (@ollama_msgs) {
-                    next if ($msg->{role} || '') eq 'system';
-                    my $len = length($msg->{content} || '');
-                    if ($len > 300) {
-                        $msg->{content} = substr($msg->{content}, 0, 300) . '…';
-                    }
-                }
-                my $after_trim_gen = 0;
-                $after_trim_gen += length($_->{content} || '') for @ollama_msgs;
-                if ($after_trim_gen > $BUDGET_CHARS && @ollama_msgs && $ollama_msgs[0]{role} eq 'system') {
-                    my $sys = $ollama_msgs[0]{content};
-                    $sys =~ s/\n\n---[ ]Current Page Content.*$//s;
-                    $ollama_msgs[0]{content} = $sys;
-                    push @trace, "⚠️ Stripped page_content from system prompt (still over budget)";
-                }
-            }
-
-            my $total_chars = 0;
-            $total_chars += length($_->{content} || '') for @ollama_msgs;
-            my $est_tokens  = int($total_chars / 4);
-            push @trace, sprintf("📊 Input size: %d chars (~%d tokens) across %d messages | timeout=%ds",
-                $total_chars, $est_tokens, scalar(@ollama_msgs), $ollama->timeout);
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                'generate', "Pre-request: model=$use_model msgs=" . scalar(@ollama_msgs) .
-                " chars=$total_chars est_tokens=$est_tokens timeout=300s host=$current_host");
-
             # ── Tier 1 query ─────────────────────────────────────────────────
             my $query_start = time();
             if (@$history_items || $system) {
@@ -803,14 +657,10 @@ sub generate :Local :Args(0) {
                     $current_host, $use_model, scalar(@ollama_msgs), scalar(@$history_items));
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
                     'generate', "Tier-1 chat API: " . scalar(@ollama_msgs) . " messages");
-                # Flush trace to progress file before blocking call so JS poller can read it
-                $self->_flush_progress($gen_progress_file, \@trace, 0);
                 $response = $ollama->chat(messages => \@ollama_msgs);
             } else {
                 push @trace, sprintf("📡 Tier-1 /api/generate to %s — model=%s single-turn",
                     $current_host, $use_model);
-                # Flush trace to progress file before blocking call so JS poller can read it
-                $self->_flush_progress($gen_progress_file, \@trace, 0);
                 $response = $ollama->query(
                     prompt => $prompt,
                     format => $format eq 'json' ? 'json' : undef,
@@ -825,7 +675,6 @@ sub generate :Local :Args(0) {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
                     'generate', "Tier-1 FAILED host=$current_host model=$use_model elapsed=${query_elapsed}s error_class=$error_class error=$error");
                 push @trace, sprintf("❌ Tier-1 FAILED after %ds: %s", $query_elapsed, $error);
-                $self->_flush_progress($gen_progress_file, \@trace, 1);
                 die "Ollama query failed: $error";
             }
 
@@ -851,7 +700,6 @@ sub generate :Local :Args(0) {
                 $ollama->model($tier_large);
                 my $t2_start = time();
                 my $resp2;
-                $self->_flush_progress($gen_progress_file, \@trace, 0);
                 if (@$history_items || $system) {
                     $resp2 = $ollama->chat(messages => \@ollama_msgs);
                 } else {
@@ -995,32 +843,39 @@ sub generate :Local :Args(0) {
                 $c->session->{current_conversation_id} = $conversation_id;
             }
             
-            # Save user's message (the prompt) — skipped if pre-call block already saved it
-            unless ($pre_saved_user_msg) {
+            # Save user's message (the prompt)
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "Saving user message to conversation: $conversation_id");
+            
+            my $user_metadata = {
+                system_prompt => $system || '',
+                format => $format || 'text',
+                page_context => $page_context,
+                page_path => $page_path,
+                page_title => $page_title
+            };
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "USER_MSG: conversation_id=$conversation_id, role=user, content_length=" . length($prompt));
+            
+            my $user_msg = $schema->resultset('AiMessage')->create({
+                conversation_id => $conversation_id,
+                user_id => $user_id,
+                role => 'user',
+                content => $prompt,
+                agent_type => $normalized_agent_type,
+                model_used => $model_used,
+                metadata => encode_json($user_metadata),
+                ip_address => $c->request->address,
+                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
+            });
+            
+            unless ($user_msg) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                    'generate', "FAILED_USER_MSG: create() returned undef for conversation_id=$conversation_id");
+            } else {
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                    'generate', "Saving user message to conversation: $conversation_id");
-                my $user_metadata = {
-                    system_prompt => $system || '',
-                    format => $format || 'text',
-                    page_context => $page_context,
-                    page_path => $page_path,
-                    page_title => $page_title
-                };
-                my $user_msg = $schema->resultset('AiMessage')->create({
-                    conversation_id => $conversation_id,
-                    user_id => $user_id,
-                    role => 'user',
-                    content => $prompt,
-                    agent_type => $normalized_agent_type,
-                    model_used => $model_used,
-                    metadata => encode_json($user_metadata),
-                    ip_address => $c->request->address,
-                    user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
-                });
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
-                    'generate', $user_msg
-                        ? "SUCCESS_USER_MSG: id=" . $user_msg->id
-                        : "FAILED_USER_MSG: create() returned undef");
+                    'generate', "SUCCESS_USER_MSG: created message ID=" . $user_msg->id . " for conversation_id=$conversation_id");
             }
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -1033,7 +888,7 @@ sub generate :Local :Args(0) {
             my $ai_metadata = {
                 total_duration => $response->{total_duration} || 0,
                 eval_count     => $response->{eval_count}     || 0,
-                thinking_trace => \@trace,  # Full reasoning trace for admin diagnostics
+                thinking       => \@trace,  # Full reasoning trace for admin diagnostics
             };
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -1073,8 +928,6 @@ sub generate :Local :Args(0) {
         
         # Build JSON response
         push @trace, sprintf("⏱️ Total elapsed: %ds", time() - $trace_start);
-        # Flush final trace so JS poller sees all steps including elapsed time
-        $self->_flush_progress($gen_progress_file, \@trace, 1);
         $response_data = {
             success => JSON::true,
             response => $ai_response,
@@ -1097,14 +950,11 @@ sub generate :Local :Args(0) {
         my $user_error = "$error";
         $user_error =~ s/ at \/.*? line \d+.*$//s;
         
-        # Save error to DB so the conversation record is complete.
-        # The pre-call block already created the conversation and saved the user message,
-        # so we only need to save the error assistant message here.
+        # Save user question and error to DB so the conversation record is complete
         if ($user_id && $prompt) {
             eval {
                 my $schema = $c->model('DBEncy')->schema;
                 if ($schema) {
-                    # Conversation should already exist from pre-call block, but create as fallback
                     unless ($conversation_id && $conversation_id =~ /^\d+$/) {
                         my $title = substr($prompt, 0, 80);
                         $title =~ s/\n/ /g;
@@ -1119,19 +969,15 @@ sub generate :Local :Args(0) {
                         $c->session->{current_conversation_id} = $conversation_id if $conversation_id;
                     }
                     if ($conversation_id) {
-                        # Only save user message if pre-call block didn't already do it
-                        unless ($pre_saved_user_msg) {
-                            $schema->resultset('AiMessage')->create({
-                                conversation_id => $conversation_id,
-                                user_id  => $user_id,
-                                role     => 'user',
-                                content  => $prompt,
-                                agent_type => $agent_id || 'general',
-                                model_used => $provider || 'unknown',
-                                ip_address => $c->request->address,
-                            });
-                        }
-                        push @trace, sprintf("❌ Error after %ds: %s", time() - $trace_start, $user_error || 'Unknown error');
+                        $schema->resultset('AiMessage')->create({
+                            conversation_id => $conversation_id,
+                            user_id  => $user_id,
+                            role     => 'user',
+                            content  => $prompt,
+                            agent_type => $agent_id || 'general',
+                            model_used => $provider || 'unknown',
+                            ip_address => $c->request->address,
+                        });
                         $schema->resultset('AiMessage')->create({
                             conversation_id => $conversation_id,
                             user_id  => $user_id,
@@ -1139,7 +985,6 @@ sub generate :Local :Args(0) {
                             content  => '[ERROR] ' . ($user_error || 'Failed to process AI request'),
                             agent_type => $agent_id || 'general',
                             model_used => $provider || 'unknown',
-                            metadata   => encode_json({ thinking_trace => \@trace }),
                             ip_address => $c->request->address,
                         });
                     }
@@ -1147,10 +992,7 @@ sub generate :Local :Args(0) {
             };
         }
 
-        push @trace, sprintf("❌ Error after %ds: %s", time() - $trace_start, $user_error || 'Unknown error')
-            unless grep { /❌ Error after/ } @trace;
-        # Flush error trace so JS poller sees it
-        $self->_flush_progress($gen_progress_file, \@trace, 1);
+        push @trace, sprintf("❌ Error after %ds: %s", time() - $trace_start, $user_error || 'Unknown error');
         $response_data = {
             success => JSON::false,
             error => $user_error || 'Failed to process AI request',
@@ -1553,8 +1395,6 @@ sub chat :Local :Args(0) {
     my $response_data;
     my @chat_trace;       # Reasoning trace returned to client as 'thinking'
     my $chat_trace_start = time();
-    my $progress_file = $self->_progress_file_path($c);
-    unlink $progress_file if -f $progress_file;
 
     # Determine user permissions for model selection
     my $user_roles_chat = $c->session->{roles} || [];
@@ -1730,7 +1570,7 @@ sub chat :Local :Args(0) {
             }
 
             $ollama->set_host($current_host);
-            $ollama->timeout(300);
+            $ollama->timeout(150);
             $ollama->port($current_port) if $current_port;
 
             # Determine small and large model tiers from installed list
@@ -1745,104 +1585,21 @@ sub chat :Local :Args(0) {
                 $manual_model || $tier_small,
                 $manual_model ? ' (manual override)' : '');
 
-            # ── Prefer in-memory models to avoid cold-start delays ──────────────
-            my $chat_use_model = $manual_model || $tier_small;
-            unless ($manual_model) {
-                my $running = $avail_check->get_running_models() || [];
-                if (@$running) {
-                    my %in_mem;
-                    for my $r (@$running) { $in_mem{$r->{name}} = 1 if $r->{name}; }
-                    push @chat_trace, "💾 In-memory: " . join(', ', sort keys %in_mem);
-                    if (!$in_mem{$chat_use_model}) {
-                        my @inst_names = map { ref($_) ? ($_->{name} || '') : ($_ || '') } @$installed_models;
-                        my ($preferred) = grep { $in_mem{$_} } ($tier_large, @inst_names);
-                        if ($preferred) {
-                            push @chat_trace, "💾 Switched '$chat_use_model' → '$preferred' (already in memory)";
-                            $chat_use_model = $preferred;
-                        }
-                    } else {
-                        push @chat_trace, "💾 '$chat_use_model' already in memory — no cold-start needed";
-                    }
-                    # Renew keep_alive so model doesn't expire between the /api/ps
-                    # check and the actual /api/chat call (race condition fix).
-                    # Sending an empty-prompt generate with stream:false returns instantly.
-                    eval {
-                        my $ping_ua  = LWP::UserAgent->new(timeout => 10);
-                        my $ping_url = "http://$current_host:" . ($current_port || 11434) . "/api/generate";
-                        my $ping_payload = encode_json({
-                            model      => $chat_use_model,
-                            prompt     => '',
-                            stream     => JSON::false,
-                            keep_alive => '2h',
-                        });
-                        $ping_ua->post($ping_url, 'Content-Type' => 'application/json', Content => $ping_payload);
-                        push @chat_trace, "🔁 keep_alive renewed for '$chat_use_model'";
-                    };
-                }
-            }
-
             # Prepend combined system prompt for Ollama
             my @ollama_messages = @messages;
             if ($combined_system_prompt) {
                 unshift @ollama_messages, { role => 'system', content => $combined_system_prompt };
             }
 
-            # ── Hard context budget: keep total input under ~12 000 chars (~3 000 tokens)
-            # CPU Ollama prefill runs at ~46 tok/s; 3 000 tokens takes ~65s — safe under
-            # 300s timeout even with generation.  Over-budget → trim history content first.
-            my $BUDGET_CHARS = 12_000;
-            my $raw_total = 0;
-            $raw_total += length($_->{content} || '') for @ollama_messages;
-            if ($raw_total > $BUDGET_CHARS) {
-                push @chat_trace, sprintf("⚠️ Context %d chars > %d budget — trimming history", $raw_total, $BUDGET_CHARS);
-                # Trim non-system messages (history) by truncating content to 300 chars each
-                for my $msg (@ollama_messages) {
-                    next if ($msg->{role} || '') eq 'system';
-                    my $len = length($msg->{content} || '');
-                    if ($len > 300) {
-                        $msg->{content} = substr($msg->{content}, 0, 300) . '…';
-                    }
-                }
-                # Recalculate; if still over, strip the page_content section from system prompt
-                my $after_trim = 0;
-                $after_trim += length($_->{content} || '') for @ollama_messages;
-                if ($after_trim > $BUDGET_CHARS && @ollama_messages && $ollama_messages[0]{role} eq 'system') {
-                    my $sys = $ollama_messages[0]{content};
-                    $sys =~ s/\n\n---[ ]Current Page Content.*$//s;
-                    $ollama_messages[0]{content} = $sys;
-                    push @chat_trace, "⚠️ Stripped page_content from system prompt (still over budget)";
-                }
-            }
-
             # ── Tier 1: Small / fast model ────────────────────────────────────
-            my $use_model = $chat_use_model;
+            my $use_model = $manual_model || $tier_small;
             $ollama->model($use_model);
 
-            my $total_chat_chars = 0;
-            $total_chat_chars += length($_->{content} || '') for @ollama_messages;
-            my $est_chat_tokens  = int($total_chat_chars / 4);
-            push @chat_trace, sprintf("📊 Input size: %d chars (~%d tokens) across %d messages | timeout=%ds",
-                $total_chat_chars, $est_chat_tokens, scalar(@ollama_messages), $ollama->timeout);
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                'chat', "Pre-request: model=$use_model msgs=" . scalar(@ollama_messages) .
-                " chars=$total_chat_chars est_tokens=$est_chat_tokens timeout=300s host=$current_host");
+                'chat', "Tier-1 Ollama host=$current_host model=$use_model messages=" . scalar(@ollama_messages));
 
             push @chat_trace, sprintf("📡 Tier-1 /api/chat to %s — model=%s %d msgs (system + %d history + prompt)",
                 $current_host, $use_model, scalar(@ollama_messages), scalar(@$history));
-
-            # ── Verbose message dump (admin diagnostics — like zenflow thinking) ──
-            for my $i (0 .. $#ollama_messages) {
-                my $msg  = $ollama_messages[$i];
-                my $role = $msg->{role} || '?';
-                my $body = $msg->{content} || '';
-                my $preview = length($body) > 600
-                    ? substr($body, 0, 600) . "\n…[+" . (length($body) - 600) . " chars]"
-                    : $body;
-                push @chat_trace, sprintf("📨 msg[%d] %s:\n%s", $i, uc($role), $preview);
-            }
-
-            # Flush trace to progress file so the polling endpoint can serve it
-            $self->_flush_progress($progress_file, \@chat_trace, 0);
 
             my $chat_start = time();
             my $response   = $ollama->chat(messages => \@ollama_messages);
@@ -1862,13 +1619,8 @@ sub chat :Local :Args(0) {
                 $ai_response = $response->{response};
             }
             $model_used = $response->{model} || $use_model;
-            push @chat_trace, sprintf("✅ Tier-1 responded in %ds — %d tokens | %d chars",
-                $chat_elapsed, $response->{eval_count} || 0, length($ai_response));
-            # Show first 800 chars of AI response in trace for full visibility
-            push @chat_trace, "🤖 AI response:\n"
-                . (length($ai_response) > 800
-                    ? substr($ai_response, 0, 800) . "\n…[+" . (length($ai_response) - 800) . " chars]"
-                    : $ai_response);
+            push @chat_trace, sprintf("✅ Tier-1 responded in %ds — %d chars",
+                $chat_elapsed, length($ai_response));
 
             # ── Tier 2: Escalate to large model if quality is poor ────────────
             if (!$manual_model && $tier_large ne $tier_small
@@ -2050,9 +1802,6 @@ sub chat :Local :Args(0) {
                 'chat', "Failed to save conversation to database: $db_error (Final Conv ID: $final_conversation_id, User ID: $user_id)");
         };
 
-        # Mark progress as done so poller stops
-        $self->_flush_progress($progress_file, \@chat_trace, 1);
-
         # Build JSON response
         $response_data = {
             success => JSON::true,
@@ -2120,9 +1869,6 @@ sub chat :Local :Args(0) {
                 }
             };
         }
-
-        # Mark progress as done (with error trace) so poller stops
-        $self->_flush_progress($progress_file, \@chat_trace, 1);
 
         $response_data = {
             success => JSON::false,
@@ -2714,92 +2460,6 @@ sub remove_model :Local :Args(0) {
     
     my $json_response = encode_json($response_data);
     $c->response->body($json_response);
-}
-
-=head2 unload_model
-
-Force-unload a model from Ollama memory (keep_alive=0).
-Requires admin/developer role.  Accepts JSON body: { model, host, port }
-
-=cut
-
-sub unload_model :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    my $username  = $c->session->{username} || '';
-    my $roles_ref = $c->session->{roles}    || [];
-    $roles_ref = [split(/\s*,\s*/, $roles_ref)] unless ref($roles_ref);
-    my $is_admin  = grep { /^(admin|developer)$/i } @$roles_ref;
-
-    unless ($username && $is_admin) {
-        $c->response->status(403);
-        $c->response->body(encode_json({ success => JSON::false, error => 'Admin access required' }));
-        return;
-    }
-
-    my $json_data  = {};
-    my $body_text  = $c->request->content || '';
-    eval { $json_data = decode_json($body_text) if $body_text; };
-
-    my $model_name  = $json_data->{model}  || '';
-    my $server_host = $json_data->{host}   || '127.0.0.1';
-    my $server_port = $json_data->{port}   || 11434;
-
-    unless ($model_name) {
-        $c->response->status(400);
-        $c->response->body(encode_json({ success => JSON::false, error => 'Model name required' }));
-        return;
-    }
-
-    my $ollama = Comserv::Model::Ollama->new;
-    $ollama->host($server_host);
-    $ollama->port($server_port);
-    $ollama->clear_endpoint;
-
-    my $result = $ollama->unload_model(model => $model_name);
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-        'unload_model', "Unload '$model_name' on $server_host:$server_port by $username — " .
-        ($result->{success} ? 'OK' : ('FAILED: ' . ($result->{error} || '?'))));
-
-    $c->response->status($result->{success} ? 200 : 500);
-    $c->response->body(encode_json($result));
-}
-
-=head2 running_models
-
-Return the list of models currently loaded in Ollama memory (/api/ps).
-Requires admin/developer role.
-
-=cut
-
-sub running_models :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    my $username  = $c->session->{username} || '';
-    my $roles_ref = $c->session->{roles}    || [];
-    $roles_ref = [split(/\s*,\s*/, $roles_ref)] unless ref($roles_ref);
-    my $is_admin  = grep { /^(admin|developer)$/i } @$roles_ref;
-
-    unless ($username && $is_admin) {
-        $c->response->status(403);
-        $c->response->body(encode_json({ success => JSON::false, error => 'Admin access required' }));
-        return;
-    }
-
-    my $host = $c->request->params->{host} || '127.0.0.1';
-    my $port = $c->request->params->{port} || 11434;
-
-    my $ollama = Comserv::Model::Ollama->new;
-    $ollama->host($host);
-    $ollama->port($port);
-    $ollama->clear_endpoint;
-
-    my $running = $ollama->get_running_models();
-
-    $c->response->body(encode_json({ success => JSON::true, models => $running }));
 }
 
 =head2 check_status
@@ -3736,7 +3396,6 @@ sub _build_navigation_command_guide {
             [ 'AI query form',              '/ai/query_form'            ],
         ]],
         [ 'AI Assistant (logged in)', 'user', [
-            [ 'AI conversations / chat history', '/ai/conversations'    ],
             [ 'Manage API keys',            '/ai/manage_api_keys'       ],
             [ 'AI in-app action endpoint',  '/ai/action'                ],
         ]],
@@ -5406,74 +5065,6 @@ sub _doc_candidates {
     return grep { !$seen{$_}++ } @cands;
 }
 
-=head2 chat_progress
-
-Polling endpoint called by the chat widget every 3 s while waiting for a
-response.  Returns the server-side trace steps accumulated so far so admins
-can watch the reasoning live (model selection, DB lookups, context budget, etc.)
-
-=cut
-
-sub chat_progress :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    my $session_id = $c->sessionid || '';
-    my $progress_file = "/tmp/comserv_chat_progress_${session_id}";
-
-    unless ($session_id && -f $progress_file) {
-        $c->response->body(encode_json({ steps => [], done => JSON::true }));
-        return;
-    }
-
-    my @steps;
-    my $done = 0;
-    if (open my $fh, '<', $progress_file) {
-        while (my $line = <$fh>) {
-            chomp $line;
-            if ($line eq '__DONE__') { $done = 1; next; }
-            push @steps, $line;
-        }
-        close $fh;
-    }
-
-    $c->response->body(encode_json({
-        steps => \@steps,
-        done  => $done ? JSON::true : JSON::false,
-    }));
-}
-
-=head2 _progress_file_path
-
-Return the temp file path for real-time progress streaming for the current session.
-
-=cut
-
-sub _progress_file_path {
-    my ($self, $c) = @_;
-    my $sid = $c->sessionid || 'unknown';
-    return "/tmp/comserv_chat_progress_${sid}";
-}
-
-=head2 _flush_progress
-
-Write the accumulated trace steps to the progress temp file so the
-chat_progress polling endpoint can serve them to the browser in real time.
-
-=cut
-
-sub _flush_progress {
-    my ($self, $progress_file, $steps_ref, $done) = @_;
-    return unless $progress_file && ref($steps_ref) eq 'ARRAY';
-    if (open my $fh, '>', $progress_file) {
-        for my $step (@$steps_ref) {
-            print $fh $step, "\n";
-        }
-        print $fh "__DONE__\n" if $done;
-        close $fh;
-    }
-}
-
 =head2 preload_model
 
 Send a minimal prompt to Ollama to pre-warm the selected model so subsequent
@@ -5492,7 +5083,6 @@ sub preload_model :Local :Args(0) {
         return;
     }
 
-    my $preload_msg = 'skipped';
     eval {
         my ($host, $port, $default_model, $installed) = $self->_get_current_ollama_config($c, 0);
         unless ($host) {
@@ -5500,50 +5090,26 @@ sub preload_model :Local :Args(0) {
             return;
         }
 
-        my $port_num = $port || 11434;
-
-        # Check what is already in memory — avoid loading a model that is already warm
-        my $check_ua = LWP::UserAgent->new(timeout => 5);
-        my $ps_resp  = eval { $check_ua->get("http://$host:$port_num/api/ps") };
-        my %in_mem;
-        if ($ps_resp && $ps_resp->is_success) {
-            eval {
-                my $ps_data = decode_json($ps_resp->content);
-                for my $m (@{ $ps_data->{models} || [] }) {
-                    $in_mem{$m->{name}} = 1 if $m->{name};
-                }
-            };
-        }
-
         my ($tier_small, undef) = $self->_pick_ollama_tier($installed, $default_model, '', '');
         my $model = $tier_small || $default_model;
 
-        # If any suitable model is already loaded, skip the preload entirely
-        if ($in_mem{$model}) {
-            $preload_msg = "already_in_memory:$model";
-        } else {
-            # Prefer any already-in-memory installed model so we don't evict it
-            my @inst_names = map { ref($_) ? ($_->{name} || '') : ($_ || '') } @$installed;
-            my ($warm) = grep { $in_mem{$_} } @inst_names;
-            if ($warm) {
-                $preload_msg = "already_in_memory:$warm (skipping load of $model)";
-            } else {
-                # Nothing is loaded — fire a background load of tier_small
-                # Use Ollama's "load-only" mode: POST /api/generate with no prompt
-                my $url     = "http://$host:$port_num/api/generate";
-                my $payload = encode_json({ model => $model, keep_alive => '5m' });
-                my $pid = fork();
-                if (defined $pid && $pid == 0) {
-                    my $child_ua = LWP::UserAgent->new(timeout => 180);
-                    $child_ua->post($url, 'Content-Type' => 'application/json', Content => $payload);
-                    exit 0;
-                }
-                $preload_msg = "loading:$model";
-            }
+        # Use Ollama's "load-only" mode: POST /api/generate with model + keep_alive
+        # but NO prompt. Ollama loads the model into memory without running inference.
+        # We fork so the Perl process returns immediately — loading takes 60-120s on CPU.
+        my $port_num = $port || 11434;
+        my $url      = "http://$host:$port_num/api/generate";
+        my $payload  = encode_json({ model => $model, keep_alive => '2h' });
+        my $pid = fork();
+        if (defined $pid && $pid == 0) {
+            # Child process: fire the load request and exit
+            my $child_ua = LWP::UserAgent->new(timeout => 180);
+            $child_ua->post($url, 'Content-Type' => 'application/json', Content => $payload);
+            exit 0;
         }
+        # Parent returns immediately — child does the work
     };
 
-    $c->response->body(encode_json({ success => JSON::true, message => $preload_msg }));
+    $c->response->body('{"success":true,"message":"model preloaded"}');
 }
 
 =head2 action

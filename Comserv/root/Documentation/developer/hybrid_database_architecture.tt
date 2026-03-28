@@ -1,0 +1,31 @@
+[% PageVersion = 'Comserv/root/Documentation/developer/hybrid_database_architecture.tt,v 0.01 2025-01-28 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+// Patch: no functional changes, patch-based review in progress
+
+[% META title = 'Hybrid Database Architecture - Multi-Device Offline Sync System' %]
+
+<!-- Documentation page for hybrid_database_architecture -->
+<div class="documentation-content">
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+# HYBRID DATABASE ARCHITECTURE
+## Multi-Device Offline Synchronization System
+
+### 🎯 STRATEGIC OVERVIEW
+
+The Comserv hybrid database system provides intelligent database backend selection with multi-device offline synchronization capabilities. The system is designed to support various device types with different storage capacities and connectivity requirements.
+
+### 🏗️ ARCHITECTURE COMPONENTS
+
+#### 1. DBEncy Model Enhancement (Central Router)
+**File**: `Comserv/lib/Comserv/Model/DBEncy.pm`
+
+**Primary Functions**:
+
+**Key Methods**:

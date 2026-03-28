@@ -1,0 +1,66 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-01-20-collapsible-changelog-enhancement.tt,v 0.01 2025/01/20 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Enhanced Changelog Display with Collapsible Sections' %]
+
+[% SET 
+   entry_date = '2025-01-20'
+   entry_author = 'Development Team'
+   entry_description = 'Implemented collapsible sections and enhanced changelog display with date sorting and show/hide functionality'
+%]
+
+<h1>[% template.title %]</h1>
+<div class="changelog-meta">
+    <span class="date">[% entry_date.replace('-', '/') %]</span>
+    <span class="author">by [% entry_author %]</span>
+</div>
+
+<div class="changelog-content">
+    <h2>Overview</h2>
+    <p>[% entry_description %]</p>
+    
+    <h2>Key Features Implemented</h2>
+    <ul>
+        <li><strong>Collapsible Sections</strong>: All documentation sections now start collapsed for better page organization</li>
+        <li><strong>Date-Sorted Changelog</strong>: Changelog entries automatically sorted by date (newest first)</li>
+        <li><strong>Show All Functionality</strong>: "Show All" button appears when changelog has more than 5 entries</li>
+        <li><strong>Interactive Controls</strong>: JavaScript functions for section toggling and changelog expansion</li>
+        <li><strong>Proper Directory Integration</strong>: Fixed template to use existing directory parsing system</li>
+    </ul>
+    
+    <h2>Technical Implementation</h2>
+    <ul>
+        <li><strong>Collapsible Headers</strong>: Added <code>collapsible-header</code> class with toggle icons (▼/▲)</li>
+        <li><strong>JavaScript Functions</strong>:
+            <ul>
+                <li><code>toggleSection(sectionId)</code> - Controls section expand/collapse</li>
+                <li><code>toggleAllChangelogs()</code> - Shows/hides additional changelog entries</li>
+            </ul>
+        </li>
+        <li><strong>Date Sorting Logic</strong>: Extracts dates from filenames and sorts chronologically</li>
+        <li><strong>Display Limits</strong>: Configurable limits (5 for changelog) with overflow handling</li>
+    </ul>
+    
+    <h2>User Experience Improvements</h2>
+    <ul>
+        <li><strong>Cleaner Interface</strong>: Sections start collapsed, reducing visual clutter</li>
+        <li><strong>Progressive Disclosure</strong>: Users can expand only sections they need</li>
+        <li><strong>Chronological Order</strong>: Most recent changes appear first</li>
+        <li><strong>Scalable Display</strong>: Handles large numbers of changelog entries gracefully</li>
+    </ul>
+    
+    <h2>Files Modified</h2>
+    <ul>
+        <li><code>Documentation/index.tt</code> - Enhanced changelog section with collapsible functionality</li>
+        <li><code>AI_DEVELOPMENT_GUIDELINES.tt</code> - Updated with next phase tasks</li>
+    </ul>
+    
+    <h2>Next Phase</h2>
+    <p>The next development phase will extend the collapsible pattern to all other documentation sections (admin_guides, proxmox, controllers, models, etc.) for consistent user experience across the entire documentation system.</p>
+</div>
+
+<div class="back-link">
+    <a href="[% c.uri_for('/Documentation') %]">← Back to Documentation Home</a>
+</div>

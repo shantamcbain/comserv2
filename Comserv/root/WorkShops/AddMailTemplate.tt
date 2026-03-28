@@ -1,0 +1,118 @@
+[% META
+   title = "Mail Template"
+   description = "Create or edit a reusable email template"
+   roles = "admin,workshop_leader"
+   TemplateType = "Application"
+   category = "WorkShops"
+   page_version = "0.01"
+   last_updated = "2026-03-22"
+%]
+[% PageVersion = 'WorkShops/AddMailTemplate.tt,v 0.01 2026/03/22 shanta Exp shanta' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+[% is_edit = mail_template.id ? 1 : 0 %]
+
+<div class="app-container">
+
+    <div class="page-header">
+        <h1>[% is_edit ? 'Edit' : 'New' %] Mail Template</h1>
+        <h2 class="page-subtitle">Workshop: [% workshop.title | html %]</h2>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+
+            [% IF error_msg %]
+                <div class="error">[% error_msg | html %]</div>
+            [% END %]
+
+            <div class="form-container">
+                <form method="POST" action="/workshop/save_mail_template/[% workshop.id %]" class="app-form">
+
+                    [% IF is_edit %]
+                        <input type="hidden" name="template_id" value="[% mail_template.id %]">
+                    [% END %]
+
+                    <div class="form-section">
+                        <h3>Template Details</h3>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="name">Template Name <span class="required">*</span></label>
+                                <input type="text" id="name" name="name" class="form-input"
+                                       value="[% mail_template.name || form_data.name || '' | html %]"
+                                       placeholder="e.g. registration_confirmation" required>
+                                <small>Unique identifier for this template (no spaces)</small>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="template_type">Type</label>
+                                <select id="template_type" name="template_type" class="form-input">
+                                    [% FOREACH type IN ['registration_confirmation', 'announcement', 'reminder', 'update', 'cancellation', 'custom'] %]
+                                        [% selected = (mail_template.template_type == type || form_data.template_type == type) ? 'selected' : '' %]
+                                        <option value="[% type | html %]" [% selected %]>[% type | html %]</option>
+                                    [% END %]
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label>
+                                    <input type="checkbox" name="is_global" value="1"
+                                        [% IF !mail_template.workshop_id && is_edit %]checked[% END %]
+                                        [% IF form_data.is_global %]checked[% END %]>
+                                    Global template (available to all workshops)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>Email Content</h3>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="subject">Subject <span class="required">*</span></label>
+                                <input type="text" id="subject" name="subject" class="form-input"
+                                       value="[% mail_template.subject || form_data.subject || '' | html %]"
+                                       placeholder="Email subject line" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="body_text">Body (Plain Text) <span class="required">*</span></label>
+                                <small><strong>Available placeholders:</strong>
+                                [% '[[message_body]]' %] &mdash; replaced by the leader's typed message at send time<br>
+                                [% '[[participant.name]]' %] [% '[[participant.first_name]]' %]
+                                [% '[[workshop.title]]' %] [% '[[workshop.date]]' %] [% '[[workshop.time]]' %]
+                                [% '[[workshop.location]]' %] [% '[[workshop.instructor]]' %]
+                                [% '[[leader.name]]' %] [% '[[workshop.url]]' %]<br>
+                                (Subject also supports: [% '[[workshop.title]]' %] [% '[[leader.name]]' %])
+                                </small>
+                                <textarea id="body_text" name="body_text" class="form-input" rows="12" required>[% mail_template.body_text || form_data.body_text || '' | html %]</textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="body_html">Body (HTML, optional)</label>
+                                <textarea id="body_html" name="body_html" class="form-input" rows="12">[% mail_template.body_html || form_data.body_html || '' | html %]</textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">[% is_edit ? 'Save Changes' : 'Create Template' %]</button>
+                        <a href="/workshop/mail_templates/[% workshop.id %]" class="btn btn-secondary">Cancel</a>
+                    </div>
+
+                </form>
+            </div>
+
+        </div>
+    </div>
+</div>

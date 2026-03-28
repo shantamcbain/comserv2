@@ -8,383 +8,7 @@
 [% END %]
 
 <head>
-    <link rel="stylesheet" href="[% c.uri_for('/static/css/components/documentation.css') %]">
-    <style>
-        .documentation-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            font-family: Arial, sans-serif;
-            background: #f8f9fa;
-        }
-        
-        .doc-header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding: 20px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .doc-header h1 {
-            color: #333;
-            margin-bottom: 10px;
-        }
-        
-        .user-context {
-            color: #666;
-            font-size: 14px;
-        }
-        
-        .context-item {
-            margin: 0 15px;
-        }
-        
-        /* Use global theme compatibility - remove local overrides */
-        .theme-container {
-            /* Inherits from global documentation.css */
-        }
-        
-        .container-header {
-            /* Inherits from global documentation.css */
-        }
-        
-        .container-header:hover {
-            /* Inherits from global documentation.css */
-        }
-        
-        .container-header h2 {
-            margin: 0;
-            font-size: 1.4em;
-            font-weight: 600;
-        }
-        
-        .toggle-icon {
-            /* CSS-based arrow that works without Font Awesome */
-            display: inline-block;
-            width: 0;
-            height: 0;
-            border-left: 6px solid transparent;
-            border-right: 6px solid transparent;
-            border-top: 8px solid currentColor;
-            transition: transform 0.3s ease;
-            vertical-align: middle;
-        }
-        
-        .container-header.expanded .toggle-icon {
-            transform: rotate(180deg);
-        }
-        
-        .container-content {
-            /* Inherits from global documentation.css */
-        }
-        
-        .container-content.expanded {
-            /* Inherits from global documentation.css with dynamic padding */
-            padding: 20px;
-        }
-        
-        /* File List Grid */
-        .files-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 15px;
-        }
-        
-        .file-card {
-            background: white;
-            border: 1px solid #e1e5e9;
-            border-radius: 6px;
-            padding: 15px;
-            transition: all 0.3s ease;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        
-        .file-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-            border-color: #667eea;
-        }
-        
-        .file-title {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-        
-        .file-title a {
-            color: #333;
-            text-decoration: none;
-        }
-        
-        .file-title a:hover {
-            color: #667eea;
-        }
-        
-        .file-meta {
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 10px;
-        }
-        
-        .file-roles {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-        }
-        
-        .role-badge {
-            background: #e3f2fd;
-            color: #1565c0;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 500;
-        }
-        
-        .role-badge.admin {
-            background: #ffebee;
-            color: #c62828;
-        }
-        
-        .role-badge.developer {
-            background: #e8f5e8;
-            color: #2e7d32;
-        }
-        
-        .role-badge.editor {
-            background: #fff3e0;
-            color: #ef6c00;
-        }
-        
-        .role-badge.clickable {
-            cursor: pointer;
-            transition: all 0.3s ease;
-            position: relative;
-        }
-        
-        .role-badge.clickable:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            opacity: 0.8;
-        }
-        
-        .file-card-actions {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid #e1e5e9;
-        }
-        
-        .edit-roles-btn {
-            background: #667eea;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            text-decoration: none;
-            font-size: 11px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-        
-        .edit-roles-btn:hover {
-            background: #5a67d8;
-            color: white;
-            text-decoration: none;
-        }
-        
-        .roles-edit-hint {
-            font-size: 10px;
-            color: #666;
-            font-style: italic;
-        }
-        
-        .summary-info {
-            text-align: center;
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 15px;
-        }
-        
-        /* Category-specific styles */
-        .badge {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-left: 8px;
-        }
-        
-        .category-description {
-            background: #f8f9fa;
-            padding: 12px;
-            border-radius: 6px;
-            border-left: 4px solid #667eea;
-            margin-bottom: 20px;
-            font-size: 14px;
-            color: #555;
-            font-style: italic;
-        }
-        
-        /* Search Form Styles */
-        .search-container {
-            margin: 20px 0;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .search-form {
-            display: flex;
-            justify-content: center;
-        }
-        
-        .search-input-group {
-            display: flex;
-            gap: 10px;
-            max-width: 600px;
-            width: 100%;
-        }
-        
-        .search-input {
-            flex: 2;
-            padding: 12px 15px;
-            border: 2px solid #e1e5e9;
-            border-radius: 6px;
-            font-size: 14px;
-            transition: border-color 0.3s ease;
-        }
-        
-        .search-input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        
-        .search-category {
-            flex: 1;
-            padding: 12px 15px;
-            border: 2px solid #e1e5e9;
-            border-radius: 6px;
-            font-size: 14px;
-            background: white;
-            cursor: pointer;
-        }
-        
-        .search-category:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        .search-button {
-            padding: 12px 20px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .search-button:hover {
-            background: #5a67d8;
-            transform: translateY(-1px);
-        }
-        
-        /* Search Results Styles */
-        .search-results {
-            margin: 20px 0;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .search-results-header {
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #e1e5e9;
-        }
-        
-        .search-results-header h3 {
-            margin: 0 0 10px 0;
-            color: #333;
-            font-size: 1.5em;
-        }
-        
-        .search-results-header p {
-            margin: 5px 0;
-            color: #666;
-            font-size: 14px;
-        }
-        
-        .search-results-grid {
-            margin-top: 0;
-        }
-        
-        .search-result-card {
-            border-left: 4px solid #667eea;
-        }
-        
-        .search-result-card .file-title {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .match-score {
-            background: #e3f2fd;
-            color: #1565c0;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: bold;
-        }
-        
-        .search-excerpt {
-            background: #f8f9fa;
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 4px;
-            font-size: 13px;
-            line-height: 1.4;
-            color: #555;
-            border-left: 3px solid #667eea;
-        }
-        
-        .search-excerpt strong {
-            background: #ffeb3b;
-            padding: 1px 2px;
-            border-radius: 2px;
-        }
-
-        @media (max-width: 768px) {
-            .files-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .container-header h2 {
-                font-size: 1.2em;
-            }
-            
-            .search-input-group {
-                flex-direction: column;
-                gap: 10px;
-            }
-            
-            .search-input, .search-category, .search-button {
-                width: 100%;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="[% c.uri_for('/static/css/components/documentation.css') %]?v=20260324c">
 </head>
 
 <div class="documentation-container">
@@ -491,16 +115,28 @@
 
     <!-- All Files Container (Global Theme Compatible) -->
     <div class="theme-container">
-        <div class="container-header" onclick="toggleContainer(this)">
+        <div class="container-header" onclick="toggleContainer(this)" data-container-id="all-files">
             <h2>All Files</h2>
             <span class="toggle-icon"></span>
         </div>
         <div class="container-content">
             <div class="summary-info">
                 Complete documentation library with [% page_count || 0 %] available files
+                <span class="role-filter-count" id="all-files-count"></span>
+            </div>
+
+            <div class="role-filter-bar" id="all-files-filter-bar">
+                <label>Filter by role:</label>
+                <button class="role-filter-btn active" data-role="all" onclick="filterAllFiles('all', this)">All</button>
+                <button class="role-filter-btn role-guest" data-role="guest" onclick="filterAllFiles('guest', this)">Guest</button>
+                <button class="role-filter-btn role-normal" data-role="normal" onclick="filterAllFiles('normal', this)">Normal</button>
+                <button class="role-filter-btn role-editor" data-role="editor" onclick="filterAllFiles('editor', this)">Editor</button>
+                <button class="role-filter-btn role-developer" data-role="developer" onclick="filterAllFiles('developer', this)">Developer</button>
+                <button class="role-filter-btn role-admin" data-role="admin" onclick="filterAllFiles('admin', this)">Admin</button>
+                <button class="role-filter-btn role-csc_admin" data-role="csc_admin" onclick="filterAllFiles('csc_admin', this)">CSC Admin</button>
             </div>
             
-            <div class="files-grid">
+            <div class="files-grid" id="all-files-grid">
                 [% FOREACH page_name IN sorted_pages %]
                     [% page = pages.$page_name %]
                     [% # Show all pages if admin, or pages without roles, or pages with matching user role %]
@@ -515,7 +151,8 @@
                         [% END %]
                     [% END %]
                     [% IF show_page %]
-                        <div class="file-card">
+                        [% roles_str = page.roles ? page.roles.join(',') : '' %]
+                        <div class="file-card" data-roles="[% roles_str %]">
                             <div class="file-title">
                                 <a href="[% page.url %]">[% page.title || page_name %]</a>
                             </div>
@@ -595,7 +232,7 @@
         [% IF accessible_pages.size > 0 %]
             <!-- Each category gets its own collapsible container -->
             <div class="theme-container">
-                <div class="container-header" onclick="toggleContainer(this)">
+                <div class="container-header" onclick="toggleContainer(this)" data-container-id="cat-[% category_key %]">
                     <h2>
                         [% IF category.icon %]<i class="[% category.icon %]"></i> [% END %]
                         [% category.title || category_key.ucfirst %]
@@ -667,38 +304,100 @@
 </div>
 
 <script>
+const DOC_STORAGE_KEY = 'doc_container_states';
+const DOC_FILTER_KEY  = 'doc_all_files_filter';
+
+function getContainerStates() {
+    try { return JSON.parse(localStorage.getItem(DOC_STORAGE_KEY) || '{}'); }
+    catch(e) { return {}; }
+}
+
+function saveContainerState(id, open) {
+    const states = getContainerStates();
+    states[id] = open;
+    localStorage.setItem(DOC_STORAGE_KEY, JSON.stringify(states));
+}
+
+function expandContainer(header, content) {
+    content.classList.add('expanded');
+    header.classList.add('expanded');
+    const actualHeight = content.scrollHeight;
+    const maxAllowedHeight = Math.min(actualHeight, window.innerHeight - 300);
+    content.style.maxHeight = maxAllowedHeight + 'px';
+    if (actualHeight > maxAllowedHeight) {
+        content.style.overflowY = 'auto';
+        content.style.overflowX = 'hidden';
+    }
+}
+
+function collapseContainer(header, content) {
+    content.style.maxHeight = '0px';
+    content.classList.remove('expanded');
+    header.classList.remove('expanded');
+}
+
 function toggleContainer(header) {
     const content = header.nextElementSibling;
+    const id = header.getAttribute('data-container-id') || header.textContent.trim().substring(0, 30);
     const isExpanded = content.classList.contains('expanded');
-    
     if (isExpanded) {
-        // Collapse
-        content.style.maxHeight = '0px';
-        content.classList.remove('expanded');
-        header.classList.remove('expanded');
+        collapseContainer(header, content);
+        saveContainerState(id, false);
     } else {
-        // Expand - calculate actual content height
-        content.classList.add('expanded');
-        header.classList.add('expanded');
-        
-        // Get the actual scrollHeight to determine how much space is needed
-        const actualHeight = content.scrollHeight;
-        const viewportHeight = window.innerHeight;
-        const maxAllowedHeight = Math.min(actualHeight, viewportHeight - 300);
-        
-        content.style.maxHeight = maxAllowedHeight + 'px';
-        
-        // Force scrolling if content is taller than container
-        if (actualHeight > maxAllowedHeight) {
-            content.style.overflowY = 'auto';
-            content.style.overflowX = 'hidden';
-        }
+        expandContainer(header, content);
+        saveContainerState(id, true);
     }
 }
 
 // Function to handle role editing
 function editRoles(pageName) {
     window.location.href = '/Documentation/edit_roles/' + encodeURIComponent(pageName);
+}
+
+// Role filter for "All Files" grid
+function filterAllFiles(role, btn) {
+    const grid = document.getElementById('all-files-grid');
+    const countEl = document.getElementById('all-files-count');
+    if (!grid) return;
+
+    const bar = document.getElementById('all-files-filter-bar');
+    if (bar) {
+        bar.querySelectorAll('.role-filter-btn').forEach(b => b.classList.remove('active'));
+    }
+    if (btn) btn.classList.add('active');
+
+    const cards = grid.querySelectorAll('.file-card');
+    let visible = 0;
+
+    cards.forEach(card => {
+        if (role === 'all') {
+            card.classList.remove('role-hidden');
+            visible++;
+        } else {
+            const rolesAttr = card.getAttribute('data-roles') || '';
+            const roles = rolesAttr ? rolesAttr.split(',').map(r => r.trim()) : [];
+            if (roles.includes(role)) {
+                card.classList.remove('role-hidden');
+                visible++;
+            } else {
+                card.classList.add('role-hidden');
+            }
+        }
+    });
+
+    if (countEl) {
+        countEl.textContent = role === 'all'
+            ? ''
+            : '— showing ' + visible + ' file' + (visible !== 1 ? 's' : '') + ' with role: ' + role;
+    }
+
+    localStorage.setItem(DOC_FILTER_KEY, role);
+
+    const container = grid.closest('.container-content');
+    if (container && container.classList.contains('expanded')) {
+        const newHeight = container.scrollHeight;
+        container.style.maxHeight = Math.min(newHeight, window.innerHeight - 150) + 'px';
+    }
 }
 
 // Function to trigger manual rescan
@@ -734,12 +433,24 @@ function rescanDocumentation() {
         });
 }
 
-// Initialize container as closed
 document.addEventListener('DOMContentLoaded', function() {
-    // Ensure all containers start closed
-    const containers = document.querySelectorAll('.container-content');
-    containers.forEach(container => {
-        container.style.maxHeight = '0px';
+    const states = getContainerStates();
+
+    document.querySelectorAll('.container-header[data-container-id]').forEach(header => {
+        const id = header.getAttribute('data-container-id');
+        const content = header.nextElementSibling;
+        if (states[id] === true) {
+            expandContainer(header, content);
+        } else {
+            content.style.maxHeight = '0px';
+        }
     });
+
+    // Restore sticky filter
+    const savedFilter = localStorage.getItem(DOC_FILTER_KEY) || 'all';
+    const filterBtn = document.querySelector('.role-filter-btn[data-role="' + savedFilter + '"]');
+    if (filterBtn) {
+        filterAllFiles(savedFilter, filterBtn);
+    }
 });
 </script>

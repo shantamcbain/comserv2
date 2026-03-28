@@ -2,7 +2,7 @@
    title = "Bee Pasture - Forage Plant Encyclopedia"
    description = "Discover bee forage plants: nectar and pollen sources to support healthy bees year-round"
 %]
-[% INCLUDE 'ENCY/ImageHelper.tt' %]
+[% PROCESS 'ENCY/ImageHelper.tt' %]
 
 <div class="app-container">
 
@@ -22,7 +22,7 @@
             <div class="app-section">
                 <h2>Bee Forage Plants by Botanical Name</h2>
 
-                [% IF c.check_user_roles('admin', 'developer') %]
+                [% IF is_admin %]
                 <div class="content-section">
                     <a href="/ENCY/add_herb" class="btn btn-primary">Add Herb</a>
                 </div>
@@ -56,7 +56,7 @@
                             <tr>
                                 <td>
                                     <strong>Botanical Name:</strong> [% link.botanical_name | html %]<br>
-                                    <strong>Common Name:</strong> [% link.common_names | html %]<br>
+                                    <strong>Common Name:</strong> [% link.common_names %]<br>
                                     <strong>Forage:</strong> [% link.apis | html %]<br>
                                     <strong>Nectar:</strong> [% link.nectar | html %]<br>
                                     <strong>Pollen:</strong> [% link.pollen | html %]<br>
