@@ -267,6 +267,7 @@ sub query {
         options    => {
             temperature => $self->temperature,
             num_predict => $self->max_tokens,
+            num_ctx     => 8192,
         }
     };
     
@@ -407,6 +408,7 @@ sub chat {
         options    => {
             temperature => $self->temperature,
             num_predict => $self->max_tokens,
+            num_ctx     => 8192,
         }
     };
     

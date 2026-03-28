@@ -2,7 +2,9 @@ package Comserv::Controller::HostingSignup;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::PointSystem;
 use Try::Tiny;
+use DateTime;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -282,6 +284,62 @@ sub process_signup :Path('process') :Args(0) {
                 }
             }
             
+            # Grant joining bonus and set up default hosting membership via PointSystem
+            eval {
+                my $ps = Comserv::Util::PointSystem->new(c => $c);
+
+                # 100-point welcome bonus (idempotent — skips if already granted)
+                $ps->apply_joining_bonus($user->id);
+
+                # Find the cheapest hosting-enabled plan (Developer = free)
+                my $default_plan = $c->model('DBEncy')->resultset('MembershipPlan')->search(
+                    { has_hosting => 1, is_active => 1 },
+                    { order_by => 'price_monthly', rows => 1 }
+                )->single;
+
+                if ($default_plan && $site) {
+                    my $expires_at = DateTime->now->add(years => 1)->strftime('%Y-%m-%d %H:%M:%S');
+
+                    $c->model('DBEncy')->resultset('UserMembership')->find_or_create(
+                        {
+                            user_id          => $user->id,
+                            site_id          => $site->id,
+                        },
+                        {
+                            key => 'primary',
+                            default => {
+                                plan_id          => $default_plan->id,
+                                billing_cycle    => 'one_time',
+                                status           => 'active',
+                                payment_provider => 'internal',
+                                expires_at       => $expires_at,
+                            }
+                        }
+                    );
+
+                    # Debit points only if the plan has a cost
+                    if ($default_plan->price_monthly > 0) {
+                        my ($ok, $err) = $ps->debit(
+                            user_id          => $user->id,
+                            amount           => $default_plan->price_monthly,
+                            transaction_type => 'spend',
+                            description      => 'Hosting setup: ' . $default_plan->name . ' plan for ' . $site->name,
+                            reference_type   => 'hosting',
+                            reference_id     => $site->id,
+                        );
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process_signup',
+                            "Hosting plan debit failed: $err") unless $ok;
+                    }
+
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process_signup',
+                        "Hosting membership created: plan=" . $default_plan->name . " site=" . $site->name);
+                }
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process_signup',
+                    "PointSystem setup failed (non-fatal): $@");
+            }
+
             # Log success
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process_signup', 
                 "Signup successful - User: " . $user->username . ", Site: " . $site->name . ", Domain: " . $domain->domain);

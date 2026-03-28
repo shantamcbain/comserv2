@@ -10,6 +10,7 @@ use Email::Sender::Transport::SMTP;
 use Comserv::Util::UserVerification;
 use Comserv::Util::EmailNotification;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::PointSystem;
 use DateTime;
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -379,6 +380,40 @@ sub do_login :Local {
             "Setting roles in session: $roles_debug"
         );
         
+        # Merge site-specific roles from UserSiteRole table.
+        # A user may be a site admin without having 'admin' in the global roles column.
+        my $login_sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+        eval {
+            my $site_obj = $c->model('DBEncy')->resultset('Site')->search({ name => $login_sitename })->single;
+            if ($site_obj) {
+                my @site_role_rows = $c->model('DBEncy')->resultset('UserSiteRole')->search({
+                    user_id   => $user->id,
+                    site_id   => $site_obj->id,
+                    is_active => 1,
+                })->all;
+                if (@site_role_rows) {
+                    my %existing = map { lc($_) => 1 } @$roles;
+                    my @added;
+                    for my $sr (@site_role_rows) {
+                        my $r = lc($sr->role);
+                        unless ($existing{$r}) {
+                            push @$roles, $r;
+                            $existing{$r} = 1;
+                            push @added, $r;
+                        }
+                    }
+                    if (@added) {
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                            "Merged site roles for '$login_sitename': " . join(', ', @added));
+                    }
+                }
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                "Could not merge UserSiteRole for '$login_sitename': $@");
+        }
+
         # Assign roles to session (no hard-coded username-based tweaks)
         $c->session->{roles}    = $roles;
         $c->session->{is_admin} = (grep { lc($_) eq 'admin' } @$roles) ? 1 : 0;
@@ -1076,6 +1111,21 @@ sub do_create_account :Local {
                 "Could not create UserSiteRole (table may not exist): $@");
         }
         
+        eval {
+            my $ps = Comserv::Util::PointSystem->new(c => $c);
+            $ps->apply_joining_bonus($new_user->id);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+                "Granted joining bonus to user_id=" . $new_user->id);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+                "Could not grant joining bonus: $@");
+        }
+
+        delete $c->session->{$_} for qw(
+            username user_id roles first_name last_name email
+            group_membership group_name SiteName theme_name debug_mode
+        );
         $c->session->{verification_user_id} = $new_user->id;
         $c->session->{verification_code_display} = $verification_code;
         

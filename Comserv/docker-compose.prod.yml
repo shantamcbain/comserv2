@@ -1,8 +1,9 @@
 services:
   web-prod:
     build:
-      context: ./Comserv
+      context: .
       dockerfile: Dockerfile
+    image: comserv-web-prod:latest
     container_name: comserv-web-prod
     restart: always
     labels:
@@ -40,6 +41,8 @@ services:
       - ./script:/opt/comserv/script:ro
       - ./root/static:/opt/comserv/root/static:ro
       - ./root/Documentation:/opt/comserv/root/Documentation:ro
+      - ./root/membership:/opt/comserv/root/membership:ro
+      - ./root/payment:/opt/comserv/root/payment:ro
       - ./config:/opt/comserv/config:ro
       - ./t:/opt/comserv/t:ro
       # Note: db_config.json NOT mounted in production

@@ -1,0 +1,147 @@
+[% META title = 'Start Development Server' %]
+<!-- File: /home/shanta/PycharmProjects/comserv2/Comserv/root/admin/start_dev_server.tt -->
+[% PageVersion = 'admin/start_dev_server.tt,v 0.01 2025/01/15 shanta Exp shanta ' %]
+
+<!-- Include admin-specific CSS -->
+<link rel="stylesheet" type="text/css" href="[% c.uri_for('/static/css/themes/admin.css') %]">
+
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<!-- Quick Navigation -->
+<div class="quick-nav">
+    <a href="[% c.uri_for('/admin') %]" class="btn btn-sm btn-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
+    </a>
+</div>
+
+<div class="apiary-container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Start Development Server</h1>
+            
+            [% IF debug_msg || c.session.debug_mode == 1 %]
+                <div class="alert alert-info">
+                    <strong>Debug Information:</strong>
+                    [% IF debug_msg %]
+                        [% FOREACH msg IN debug_msg %]
+                            <p>[% msg %]</p>
+                        [% END %]
+                    [% END %]
+                    <p>User exists: [% c.user_exists ? 'Yes' : 'No' %]</p>
+                    <p>Username: [% c.user.username || 'Not logged in' %]</p>
+                    <p>Session roles: [% c.session.roles.join(', ') || 'None' %]</p>
+                    <p>Current branch: [% git_branch || 'Unknown' %]</p>
+                </div>
+            [% END %]
+            
+            [% IF error_msg %]
+                <div class="alert alert-danger">
+                    <strong>Error:</strong> [% error_msg %]
+                </div>
+            [% END %]
+            
+            [% IF success_msg %]
+                <div class="alert alert-success">
+                    <strong>Success:</strong> [% success_msg %]
+                </div>
+            [% END %]
+            
+            [% IF warning_msg %]
+                <div class="alert alert-warning">
+                    <strong>Warning:</strong> [% warning_msg %]
+                </div>
+            [% END %]
+            
+            [% IF dev_server_url %]
+                <div class="feature-card mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h3 class="mb-0">Development Server Started</h3>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Development server is now running!</strong></p>
+                        <p>Server URL: <a href="[% dev_server_url %]" target="_blank" class="btn btn-primary">
+                            <i class="fas fa-external-link-alt"></i> Open Development Server
+                        </a></p>
+                        <p class="text-muted">The development server will automatically install and test all required modules.</p>
+                    </div>
+                </div>
+            [% END %]
+            
+            [% IF output %]
+                <div class="feature-card mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h3 class="mb-0">Development Server Output</h3>
+                    </div>
+                    <div class="card-body">
+                        <pre class="server-output">[% output | html %]</pre>
+                    </div>
+                </div>
+            [% END %]
+            
+            [% UNLESS output %]
+                <div class="alert alert-warning">
+                    <strong>Warning:</strong> This action will start a development server for testing new modules and changes.
+                </div>
+                
+                <div class="alert alert-info">
+                    <strong>Security Notice:</strong> This function is only available:
+                    <ul>
+                        <li>To CSC administrators</li>
+                        <li>When on the install branch</li>
+                        <li>For testing purposes before production deployment</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="card-header bg-primary text-white">
+                        <h3 class="mb-0">Start Development Server</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>
+                            The development server will:
+                        </p>
+                        <ul>
+                            <li>Automatically install/update all required Perl modules</li>
+                            <li>Start on the default development port (3000)</li>
+                            <li>Provide a testing environment before production deployment</li>
+                            <li>Allow you to verify all functionality works correctly</li>
+                        </ul>
+                        
+                        <p><strong>Are you sure you want to start the development server?</strong></p>
+                        
+                        <form method="POST" action="[% c.uri_for('/admin/start_dev_server') %]">
+                            <input type="hidden" name="confirm" value="1">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-play"></i> Yes, Start Development Server
+                            </button>
+                            <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </form>
+                    </div>
+                </div>
+            [% ELSE %]
+                <div class="mt-4">
+                    [% IF dev_server_url %]
+                        <a href="[% dev_server_url %]" target="_blank" class="btn btn-success">
+                            <i class="fas fa-external-link-alt"></i> Open Development Server
+                        </a>
+                    [% END %]
+                    <a href="[% c.uri_for('/admin/start_dev_server') %]" class="btn btn-primary">
+                        <i class="fas fa-sync"></i> Start Another Server
+                    </a>
+                    <a href="[% c.uri_for('/admin/stop_dev_server') %]" class="btn btn-warning">
+                        <i class="fas fa-stop"></i> Stop Development Server
+                    </a>
+                    <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
+                    </a>
+                </div>
+            [% END %]
+        </div>
+    </div>
+</div>
+
+<!-- CSS now handled by theme system -->

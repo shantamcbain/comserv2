@@ -1,0 +1,258 @@
+[% PageVersion = 'Comserv/docs/database_connection.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Database Connection Configuration Guide' %]
+
+<!-- Include documentation CSS -->
+<link rel="stylesheet" href="/static/css/documentation.css">
+
+<div class="markdown-content">
+
+
+## Overview
+
+
+
+This document explains how to properly configure database connections in the Comserv application. It includes information about the correct DSN (Data Source Name) format for MySQL connections and how to troubleshoot common connection issues.
+
+
+
+## Database Configuration File
+
+
+
+The database configuration is stored in `db_config.json` in the root directory of the application. This file contains connection details for all databases used by the application.
+
+
+
+### Required Fields
+
+
+
+Each database connection requires the following fields:
+
+
+
+- `db_type`: The database driver type (e.g., "mysql")
+
+- `host`: The database server hostname or IP address
+
+- `port`: The database server port
+
+- `username`: The database username
+
+- `password`: The database password
+
+- `database`: The name of the database to connect to
+
+
+
+### Example Configuration
+
+
+
+```json
+
+{
+
+    "shanta_ency": {
+
+        "db_type": "mysql",
+
+        "host": "localhost",
+
+        "port": 3306,
+
+        "username": "db_user",
+
+        "password": "db_password",
+
+        "database": "ency"
+
+    },
+
+    "shanta_forager": {
+
+        "db_type": "mysql",
+
+        "host": "localhost",
+
+        "port": 3306,
+
+        "username": "db_user",
+
+        "password": "db_password",
+
+        "database": "shanta_forager"
+
+    },
+
+    "remote_connections": {
+
+        "local_ency": {
+
+            "db_type": "mysql",
+
+            "host": "localhost",
+
+            "port": 3306,
+
+            "username": "db_user",
+
+            "password": "db_password",
+
+            "database": "ency"
+
+        }
+
+    }
+
+}
+
+```
+
+
+
+## DSN Format for MySQL
+
+
+
+The correct DSN format for MySQL connections is:
+
+
+
+```
+
+dbi:mysql:database=DATABASE_NAME;host=HOST;port=PORT
+
+```
+
+
+
+This format is used in the following files:
+
+- `Comserv/lib/Comserv/Model/DBEncy.pm`
+
+- `Comserv/lib/Comserv/Model/DBForager.pm`
+
+- `Comserv/lib/Comserv/Model/RemoteDB.pm`
+
+- `Comserv/lib/Comserv/Model/DBSchemaManager.pm`
+
+
+
+## Common Connection Issues
+
+
+
+### Missing db_type Field
+
+
+
+If the `db_type` field is missing from the configuration, you may see an error like:
+
+
+
+```
+
+DBI Connection failed: Can't connect to data source 'dbi::dbname=ency;host=localhost;port=3306' because I can't work out what driver to use
+
+```
+
+
+
+**Solution**: Add the `db_type` field with value "mysql" to your database configuration.
+
+
+
+### Incorrect DSN Format
+
+
+
+If the DSN format is incorrect, you may see errors related to connection failures.
+
+
+
+**Solution**: Ensure the DSN format follows the pattern shown above.
+
+
+
+### Database Access Permissions
+
+
+
+If the database user doesn't have the necessary permissions, you may see access denied errors.
+
+
+
+**Solution**: Check that the database user has the appropriate permissions for the database.
+
+## Critical Schema Issues (2025-07-30)
+
+### Column Name Mismatches
+
+**Problem**: Code referencing non-existent column names causes SQL errors like:
+```
+Unknown column 'project_id' in 'ORDER BY'
+```
+
+**Common Causes**:
+- Assuming column names without checking schema files
+- Using logical names instead of actual database column names
+- Copy-pasting code between different table structures
+
+**Solution Process**:
+1. **Check Schema Files**: Always verify column names in `/lib/Comserv/Model/Schema/Ency/Result/*.pm`
+2. **Use Application Logs**: SQL errors show exact column names and table structures
+3. **Test Queries**: Verify column references before deployment
+
+### NOT NULL Constraint Violations
+
+**Problem**: Attempting to insert NULL values into required fields:
+```
+Column 'project_id' cannot be null
+```
+
+**Prevention**:
+- Check schema definitions for `is_nullable => 1` settings
+- Provide default values for required fields
+- Validate form data before database operations
+- Use application logs to identify exact parameter values being passed
+
+### Schema Verification Checklist
+
+Before modifying database-related code:
+1. ✅ Check actual column names in schema files
+2. ✅ Verify NOT NULL constraints
+3. ✅ Test with empty/null form submissions
+4. ✅ Review application logs for SQL errors
+5. ✅ Confirm foreign key relationships match actual table structures
+
+## Testing Database Connections
+
+
+
+You can test database connections using the following Perl command:
+
+
+
+```perl
+
+perl -MDBI -e 'DBI->connect("dbi:mysql:database=ency;host=localhost;port=3306", "username", "password") or die $DBI::errstr'
+
+```
+
+
+
+Replace the connection details with your actual database information.
+
+
+
+## Support
+
+
+
+For additional help with database connection issues, please contact the system administrator.
+</div>
