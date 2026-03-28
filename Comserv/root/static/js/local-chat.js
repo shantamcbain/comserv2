@@ -1926,7 +1926,7 @@
     // Try to resolve a navigation intent query to a list of {label,url} matches
     function resolveNavIntent(rawQuery) {
         const q = rawQuery
-            .replace(/^(open|go to|take me to|navigate to|show me|find|visit|switch to|switch|bring me to|load)\s+/i, '')
+            .replace(/^(open|go to|take me to|navigate to|visit|switch to|switch|bring me to|load)\s+/i, '')
             .replace(/^(the|a|an)\s+/i, '')
             .replace(/[^\w\s]/g, ' ')
             .replace(/\s+/g, ' ')
@@ -1947,7 +1947,9 @@
     }
 
     // Navigation command regex — explicit nav keywords (voice-friendly: "open X", "go to X", etc.)
-    const NAV_RE = /^(open|go to|take me to|navigate to|show me|find|visit|switch to|switch|bring me to|load)\s+(.+)/i;
+    // NOTE: "show me" and "find" are intentionally excluded — they are question/display words
+    // that should be answered by the AI, not treated as navigation commands.
+    const NAV_RE = /^(open|go to|take me to|navigate to|visit|switch to|switch|bring me to|load)\s+(.+)/i;
 
     // Helper: handle a resolved navigation match — announce and navigate
     function _executeNavMatch(message, messageInput, matches) {
