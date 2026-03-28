@@ -866,9 +866,30 @@
                 const chatMessages = document.getElementById('chat-messages');
                 chatMessages.innerHTML = '';
                 
-                // Add conversation messages
+                // Add conversation messages (with thinking traces for admin users)
                 data.messages.forEach(msg => {
                     const className = msg.role === 'user' ? 'user-message' : 'ai-message';
+                    // Render thinking trace BEFORE the message content (for AI messages with traces)
+                    if (msg.role === 'assistant' && msg.thinking_trace && msg.thinking_trace.length > 0 && state.isAdmin) {
+                        var isErrTrace = msg.thinking_trace.some(function(s) { return s && s.indexOf('FAILED') !== -1; });
+                        var traceEl = document.createElement('details');
+                        traceEl.className = 'ai-thinking' + (isErrTrace ? '' : '');
+                        traceEl.open = false;
+                        var traceSummary = document.createElement('summary');
+                        traceSummary.textContent = (isErrTrace ? '⚠️ AI Thinking — Error Trace' : '🔍 AI Thinking')
+                            + ' (' + msg.thinking_trace.length + ' steps)';
+                        var traceBody = document.createElement('div');
+                        traceBody.className = 'ai-thinking-body';
+                        msg.thinking_trace.forEach(function(step) {
+                            var stepEl = document.createElement('div');
+                            stepEl.className = 'ai-thinking-step';
+                            stepEl.textContent = step;
+                            traceBody.appendChild(stepEl);
+                        });
+                        traceEl.appendChild(traceSummary);
+                        traceEl.appendChild(traceBody);
+                        chatMessages.appendChild(traceEl);
+                    }
                     addMessage(msg.content, className);
                 });
                 
@@ -914,9 +935,30 @@
                 if (selectorBar) selectorBar.style.display = 'none';
                 const histBtn = document.getElementById('toggle-history-btn');
                 if (histBtn) histBtn.style.display = 'none';
+                const convLink = document.getElementById('conversations-link');
+                if (convLink) convLink.style.display = 'none';
                 // Clear any stale conversation ID left from a previous login session
                 state.currentConversationId = null;
                 sessionStorage.removeItem('currentConversationId');
+                // For guests: still populate modelTiers from available Ollama models
+                // so query auto-tier selection works correctly.
+                if (data.providers) {
+                    data.providers.forEach(function(p) {
+                        if (p.service === 'ollama' && p.models && p.models.length > 0) {
+                            const chatModels = p.models.filter(function(m) { return isChatModel(m.id); });
+                            if (chatModels.length > 0) {
+                                const sorted = chatModels.slice().sort(function(a, b) {
+                                    return modelSizeScore(a.id) - modelSizeScore(b.id);
+                                });
+                                const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 3; });
+                                const pool   = usable.length > 0 ? usable : sorted;
+                                state.modelTiers.small  = 'ollama|' + pool[0].id;
+                                state.modelTiers.large  = 'ollama|' + pool[pool.length - 1].id;
+                                state.modelTiers.medium = 'ollama|' + pool[Math.floor(pool.length / 2)].id;
+                            }
+                        }
+                    });
+                }
                 return;
             }
 
