@@ -1110,9 +1110,24 @@ sub generate :Local :Args(0) {
         # Save error to DB so the conversation record is complete.
         # The pre-call block already created the conversation and saved the user message,
         # so we only need to save the error assistant message here.
+        push @trace, sprintf("❌ Error after %ds: %s", time() - $trace_start, $user_error || 'Unknown error')
+            unless grep { /❌ Error after/ } @trace;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'generate', sprintf("catch: user_id=%s conv_id=%s pre_saved=%d trace_steps=%d",
+                $user_id || 'none', $conversation_id || 'none', $pre_saved_user_msg, scalar(@trace)));
+
         if ($user_id && $prompt) {
+            my $save_ok = 0;
             eval {
+                # After a 300s Ollama timeout the DBIx::Class connection may be stale.
+                # Call ->storage->ensure_connected to force a reconnect before writing.
                 my $schema = $c->model('DBEncy')->schema;
+                eval { $schema->storage->ensure_connected; };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'generate', "DB reconnect warning (non-fatal): $@");
+                }
+
                 if ($schema) {
                     # Conversation should already exist from pre-call block, but create as fallback
                     unless ($conversation_id && $conversation_id =~ /^\d+$/) {
@@ -1137,28 +1152,45 @@ sub generate :Local :Args(0) {
                                 role     => 'user',
                                 content  => $prompt,
                                 agent_type => $agent_id || 'general',
-                                model_used => $provider || 'unknown',
+                                model_used => $model_used || $provider || 'unknown',
                                 ip_address => $c->request->address,
                             });
                         }
-                        push @trace, sprintf("❌ Error after %ds: %s", time() - $trace_start, $user_error || 'Unknown error');
                         my $err_msg = $schema->resultset('AiMessage')->create({
                             conversation_id => $conversation_id,
                             user_id  => $user_id,
                             role     => 'assistant',
                             content  => '[ERROR] ' . ($user_error || 'Failed to process AI request'),
                             agent_type => $agent_id || 'general',
-                            model_used => $provider || 'unknown',
+                            model_used => $model_used || $provider || 'unknown',
                             metadata   => encode_json({ thinking_trace => \@trace }),
                             ip_address => $c->request->address,
                         });
-                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                            'generate', $err_msg
-                                ? sprintf("ERROR msg saved: id=%d conv=%d trace_steps=%d", $err_msg->id, $conversation_id, scalar(@trace))
-                                : "ERROR msg save FAILED for conv=$conversation_id");
+                        if ($err_msg && $err_msg->id) {
+                            $save_ok = 1;
+                            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                                'generate', sprintf("ERROR msg saved: id=%d conv=%d trace_steps=%d",
+                                    $err_msg->id, $conversation_id, scalar(@trace)));
+                        } else {
+                            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                                'generate', "ERROR msg create returned undef for conv=$conversation_id");
+                        }
+                    } else {
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                            'generate', "catch: no conversation_id available — error message NOT saved to DB");
                     }
+                } else {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                        'generate', "catch: could not get DB schema — error message NOT saved");
                 }
+                1;
             };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                    'generate', "catch DB save FAILED (eval died): $@");
+            }
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'generate', "catch: DB save result = " . ($save_ok ? "OK" : "FAILED"));
         }
 
         push @trace, sprintf("❌ Error after %ds: %s", time() - $trace_start, $user_error || 'Unknown error')
@@ -1643,9 +1675,10 @@ sub chat :Local :Args(0) {
         return;
     }
 
+    my $model_used = 'unknown';  # declared before try so catch block can read it
+
     try {
         my $ai_response = '';
-        my $model_used = 'unknown';
         my $response_created_at = '';
         my $response_total_duration = 0;
         my $response_eval_count = 0;
@@ -2098,9 +2131,19 @@ sub chat :Local :Args(0) {
             time() - $chat_trace_start, $user_error || 'Unknown error');
 
         # Save failed request to DB so conversation record is complete
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'chat', sprintf("catch: user_id=%s conv_id=%s trace_steps=%d",
+                $user_id || 'none', $conversation_id || 'none', scalar(@chat_trace)));
+
         if ($user_id && $prompt) {
+            my $chat_save_ok = 0;
             eval {
                 my $schema = $c->model('DBEncy')->schema;
+                eval { $schema->storage->ensure_connected; };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'chat', "DB reconnect warning (non-fatal): $@");
+                }
                 if ($schema) {
                     my $save_conv_id = $conversation_id;
                     unless ($save_conv_id && $save_conv_id =~ /^\d+$/) {
@@ -2122,23 +2165,42 @@ sub chat :Local :Args(0) {
                             user_id  => $user_id,
                             role     => 'user',
                             content  => $prompt,
-                            agent_type => 'documentation',
-                            model_used => $model || 'unknown',
+                            agent_type => $chat_agent_id || 'documentation',
+                            model_used => $model_used || $model || 'unknown',
                             ip_address => $c->request->address,
                         });
-                        $schema->resultset('AiMessage')->create({
+                        my $chat_err_msg = $schema->resultset('AiMessage')->create({
                             conversation_id => $save_conv_id,
                             user_id  => $user_id,
                             role     => 'assistant',
                             content  => '[ERROR] ' . $user_error,
-                            agent_type => 'documentation',
-                            model_used => $model || 'unknown',
+                            agent_type => $chat_agent_id || 'documentation',
+                            model_used => $model_used || $model || 'unknown',
                             metadata   => encode_json({ thinking_trace => \@chat_trace }),
                             ip_address => $c->request->address,
                         });
+                        if ($chat_err_msg && $chat_err_msg->id) {
+                            $chat_save_ok = 1;
+                            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                                'chat', sprintf("ERROR msg saved: id=%d conv=%d trace_steps=%d",
+                                    $chat_err_msg->id, $save_conv_id, scalar(@chat_trace)));
+                        } else {
+                            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                                'chat', "ERROR msg create returned undef for conv=$save_conv_id");
+                        }
+                    } else {
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                            'chat', "catch: no conversation_id — error message NOT saved");
                     }
                 }
+                1;
             };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                    'chat', "catch DB save FAILED (eval died): $@");
+            }
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'chat', "catch: DB save result = " . ($chat_save_ok ? "OK" : "FAILED"));
         }
 
         # Mark progress as done (with error trace) so poller stops
