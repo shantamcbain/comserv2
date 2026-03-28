@@ -13,7 +13,41 @@
 [% END %]
 
 <div class="container">
-    
+
+[% IF single_conv %]
+    <!-- ── Single conversation detail view ── -->
+    <div class="ai-conversations-header-section">
+        <h1>[% single_conv.title | html %]</h1>
+        <p class="intro">
+            ID: [% single_conv.id %] &nbsp;|&nbsp;
+            Status: [% single_conv.status | html %] &nbsp;|&nbsp;
+            Created: [% single_conv.created_at %]
+        </p>
+        <a href="/ai/conversations" class="button button-secondary">← Back to Conversations</a>
+        <a href="/ai" class="button button-primary">New Chat</a>
+    </div>
+
+    <div class="ai-conversations-messages-section">
+        [% FOREACH msg IN messages %]
+        <div class="ai-message-block ai-message-[% msg.role | html %]"
+             data-metadata="[% USE JSON; msg.metadata.json | html %]">
+            <div class="ai-message-header">
+                <span class="ai-message-role">[% msg.role == 'user' ? 'You' : 'AI' %]</span>
+                [% IF msg.model_used && msg.model_used != 'pending' %]
+                <span class="ai-message-model">([% msg.agent_type | html %] &bull; [% msg.model_used | html %])</span>
+                [% END %]
+                <span class="ai-message-time">[% USE date; date.format(msg.created_at, '%H:%M:%S') %]</span>
+            </div>
+            <div class="ai-message-content">[% msg.content | html %]</div>
+        </div>
+        [% END %]
+        [% IF messages.size == 0 %]
+        <p>No messages in this conversation.</p>
+        [% END %]
+    </div>
+
+[% ELSE %]
+    <!-- ── Conversation list view ── -->
     <div class="ai-conversations-header-section">
         <h1>[% IF view_all %]All Conversations (Admin)[% ELSE %]My Conversations[% END %]</h1>
         <p class="intro">View and manage [% IF view_all %]all[% ELSE %]your[% END %] saved AI conversations</p>
@@ -865,3 +899,4 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+[% END %]
