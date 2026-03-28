@@ -764,12 +764,15 @@ sub generate :Local :Args(0) {
 
             # ── Hard context budget: keep total input under ~12 000 chars (~3 000 tokens)
             # CPU Ollama prefill at ~46 tok/s: 3 000 tokens = ~65s — safe under 300s timeout.
-            # Over-budget → trim history content first, then strip page_content from system.
-            my $BUDGET_CHARS = 12_000;
+            # Pass 1: trim history messages.  Pass 2: strip page_content from system.
+            # Pass 3: hard-cap system prompt so it cannot alone exceed the budget.
+            my $BUDGET_CHARS  = 12_000;
+            my $SYS_MAX_CHARS =  8_000;  # system prompt hard cap (nav guide can be 30K+)
             my $raw_total_gen = 0;
             $raw_total_gen += length($_->{content} || '') for @ollama_msgs;
             if ($raw_total_gen > $BUDGET_CHARS) {
                 push @trace, sprintf("⚠️ Context %d chars > %d budget — trimming history", $raw_total_gen, $BUDGET_CHARS);
+                # Pass 1: cap each non-system message at 300 chars
                 for my $msg (@ollama_msgs) {
                     next if ($msg->{role} || '') eq 'system';
                     my $len = length($msg->{content} || '');
@@ -777,13 +780,20 @@ sub generate :Local :Args(0) {
                         $msg->{content} = substr($msg->{content}, 0, 300) . '…';
                     }
                 }
-                my $after_trim_gen = 0;
-                $after_trim_gen += length($_->{content} || '') for @ollama_msgs;
-                if ($after_trim_gen > $BUDGET_CHARS && @ollama_msgs && $ollama_msgs[0]{role} eq 'system') {
+                my $after_p1 = 0;
+                $after_p1 += length($_->{content} || '') for @ollama_msgs;
+                if ($after_p1 > $BUDGET_CHARS && @ollama_msgs && $ollama_msgs[0]{role} eq 'system') {
                     my $sys = $ollama_msgs[0]{content};
+                    # Pass 2: strip page_content section
                     $sys =~ s/\n\n---[ ]Current Page Content.*$//s;
                     $ollama_msgs[0]{content} = $sys;
                     push @trace, "⚠️ Stripped page_content from system prompt (still over budget)";
+
+                    # Pass 3: hard-cap system prompt to SYS_MAX_CHARS
+                    if (length($sys) > $SYS_MAX_CHARS) {
+                        $ollama_msgs[0]{content} = substr($sys, 0, $SYS_MAX_CHARS) . "\n[system prompt truncated to fit context budget]";
+                        push @trace, sprintf("⚠️ System prompt truncated from %d to %d chars", length($sys), $SYS_MAX_CHARS);
+                    }
                 }
             }
 
@@ -1794,12 +1804,13 @@ sub chat :Local :Args(0) {
             # ── Hard context budget: keep total input under ~12 000 chars (~3 000 tokens)
             # CPU Ollama prefill runs at ~46 tok/s; 3 000 tokens takes ~65s — safe under
             # 300s timeout even with generation.  Over-budget → trim history content first.
-            my $BUDGET_CHARS = 12_000;
+            my $BUDGET_CHARS  = 12_000;
+            my $SYS_MAX_CHARS_CHAT = 8_000;
             my $raw_total = 0;
             $raw_total += length($_->{content} || '') for @ollama_messages;
             if ($raw_total > $BUDGET_CHARS) {
                 push @chat_trace, sprintf("⚠️ Context %d chars > %d budget — trimming history", $raw_total, $BUDGET_CHARS);
-                # Trim non-system messages (history) by truncating content to 300 chars each
+                # Pass 1: cap each non-system message at 300 chars
                 for my $msg (@ollama_messages) {
                     next if ($msg->{role} || '') eq 'system';
                     my $len = length($msg->{content} || '');
@@ -1807,14 +1818,19 @@ sub chat :Local :Args(0) {
                         $msg->{content} = substr($msg->{content}, 0, 300) . '…';
                     }
                 }
-                # Recalculate; if still over, strip the page_content section from system prompt
-                my $after_trim = 0;
-                $after_trim += length($_->{content} || '') for @ollama_messages;
-                if ($after_trim > $BUDGET_CHARS && @ollama_messages && $ollama_messages[0]{role} eq 'system') {
+                my $after_p1 = 0;
+                $after_p1 += length($_->{content} || '') for @ollama_messages;
+                if ($after_p1 > $BUDGET_CHARS && @ollama_messages && $ollama_messages[0]{role} eq 'system') {
                     my $sys = $ollama_messages[0]{content};
+                    # Pass 2: strip page_content section
                     $sys =~ s/\n\n---[ ]Current Page Content.*$//s;
                     $ollama_messages[0]{content} = $sys;
                     push @chat_trace, "⚠️ Stripped page_content from system prompt (still over budget)";
+                    # Pass 3: hard-cap system prompt
+                    if (length($sys) > $SYS_MAX_CHARS_CHAT) {
+                        $ollama_messages[0]{content} = substr($sys, 0, $SYS_MAX_CHARS_CHAT) . "\n[system prompt truncated to fit context budget]";
+                        push @chat_trace, sprintf("⚠️ System prompt truncated from %d to %d chars", length($sys), $SYS_MAX_CHARS_CHAT);
+                    }
                 }
             }
 
