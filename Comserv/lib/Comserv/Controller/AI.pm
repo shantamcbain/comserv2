@@ -1132,7 +1132,7 @@ sub generate :Local :Args(0) {
                             });
                         }
                         push @trace, sprintf("❌ Error after %ds: %s", time() - $trace_start, $user_error || 'Unknown error');
-                        $schema->resultset('AiMessage')->create({
+                        my $err_msg = $schema->resultset('AiMessage')->create({
                             conversation_id => $conversation_id,
                             user_id  => $user_id,
                             role     => 'assistant',
@@ -1142,6 +1142,10 @@ sub generate :Local :Args(0) {
                             metadata   => encode_json({ thinking_trace => \@trace }),
                             ip_address => $c->request->address,
                         });
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                            'generate', $err_msg
+                                ? sprintf("ERROR msg saved: id=%d conv=%d trace_steps=%d", $err_msg->id, $conversation_id, scalar(@trace))
+                                : "ERROR msg save FAILED for conv=$conversation_id");
                     }
                 }
             };
@@ -4438,8 +4442,7 @@ sub conversation :Local :Args(1) {
             { order_by => { -asc => 'created_at' } }
         );
         while (my $msg = $msg_rs->next) {
-            my $mmeta = {};
-            eval { $mmeta = decode_json($msg->metadata || '{}'); };
+            my $raw_meta = $msg->metadata || '{}';
             push @messages, {
                 id          => $msg->id,
                 role        => $msg->role,
@@ -4447,7 +4450,7 @@ sub conversation :Local :Args(1) {
                 model_used  => $msg->model_used,
                 agent_type  => $msg->agent_type,
                 created_at  => $msg->created_at,
-                metadata    => $mmeta,
+                metadata    => $raw_meta,
             };
         }
     } catch {
