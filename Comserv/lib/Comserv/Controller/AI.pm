@@ -4756,11 +4756,16 @@ sub get_conversation_messages :Local :Args(1) {
         
         my @messages;
         foreach my $msg ($conv->ai_messages->search({}, { order_by => { -asc => 'created_at' } })->all) {
+            my $msg_meta = {};
+            eval { $msg_meta = decode_json($msg->metadata || '{}'); };
             push @messages, {
-                id => $msg->id,
-                role => $msg->role,
-                content => $msg->content,
-                created_at => $msg->created_at->strftime('%Y-%m-%d %H:%M:%S')
+                id         => $msg->id,
+                role       => $msg->role,
+                content    => $msg->content,
+                agent_type => $msg->agent_type || '',
+                model_used => $msg->model_used || '',
+                created_at => $msg->created_at->strftime('%Y-%m-%d %H:%M:%S'),
+                thinking_trace => $msg_meta->{thinking_trace} || [],
             };
         }
         
