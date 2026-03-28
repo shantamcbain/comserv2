@@ -65,6 +65,7 @@
         </div>
         <div class="ai-topbar-right">
             [% IF username && !username.match('^Guest-') %]
+            <a href="/ai/conversations" class="ai-topbar-btn" title="View conversation history">📋 History</a>
             <a href="/ai/manage_api_keys" class="ai-topbar-btn" title="Manage API keys">🔑</a>
             <a href="/ai/models" class="ai-topbar-btn" title="Manage models">⚙️</a>
             [% END %]
