@@ -764,12 +764,15 @@ sub generate :Local :Args(0) {
 
             # ── Hard context budget: keep total input under ~12 000 chars (~3 000 tokens)
             # CPU Ollama prefill at ~46 tok/s: 3 000 tokens = ~65s — safe under 300s timeout.
-            # Over-budget → trim history content first, then strip page_content from system.
-            my $BUDGET_CHARS = 12_000;
+            # Pass 1: trim history messages.  Pass 2: strip page_content from system.
+            # Pass 3: hard-cap system prompt so it cannot alone exceed the budget.
+            my $BUDGET_CHARS  = 12_000;
+            my $SYS_MAX_CHARS =  8_000;  # system prompt hard cap (nav guide can be 30K+)
             my $raw_total_gen = 0;
             $raw_total_gen += length($_->{content} || '') for @ollama_msgs;
             if ($raw_total_gen > $BUDGET_CHARS) {
                 push @trace, sprintf("⚠️ Context %d chars > %d budget — trimming history", $raw_total_gen, $BUDGET_CHARS);
+                # Pass 1: cap each non-system message at 300 chars
                 for my $msg (@ollama_msgs) {
                     next if ($msg->{role} || '') eq 'system';
                     my $len = length($msg->{content} || '');
@@ -777,13 +780,20 @@ sub generate :Local :Args(0) {
                         $msg->{content} = substr($msg->{content}, 0, 300) . '…';
                     }
                 }
-                my $after_trim_gen = 0;
-                $after_trim_gen += length($_->{content} || '') for @ollama_msgs;
-                if ($after_trim_gen > $BUDGET_CHARS && @ollama_msgs && $ollama_msgs[0]{role} eq 'system') {
+                my $after_p1 = 0;
+                $after_p1 += length($_->{content} || '') for @ollama_msgs;
+                if ($after_p1 > $BUDGET_CHARS && @ollama_msgs && $ollama_msgs[0]{role} eq 'system') {
                     my $sys = $ollama_msgs[0]{content};
+                    # Pass 2: strip page_content section
                     $sys =~ s/\n\n---[ ]Current Page Content.*$//s;
                     $ollama_msgs[0]{content} = $sys;
                     push @trace, "⚠️ Stripped page_content from system prompt (still over budget)";
+
+                    # Pass 3: hard-cap system prompt to SYS_MAX_CHARS
+                    if (length($sys) > $SYS_MAX_CHARS) {
+                        $ollama_msgs[0]{content} = substr($sys, 0, $SYS_MAX_CHARS) . "\n[system prompt truncated to fit context budget]";
+                        push @trace, sprintf("⚠️ System prompt truncated from %d to %d chars", length($sys), $SYS_MAX_CHARS);
+                    }
                 }
             }
 
@@ -1100,9 +1110,24 @@ sub generate :Local :Args(0) {
         # Save error to DB so the conversation record is complete.
         # The pre-call block already created the conversation and saved the user message,
         # so we only need to save the error assistant message here.
+        push @trace, sprintf("❌ Error after %ds: %s", time() - $trace_start, $user_error || 'Unknown error')
+            unless grep { /❌ Error after/ } @trace;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'generate', sprintf("catch: user_id=%s conv_id=%s pre_saved=%d trace_steps=%d",
+                $user_id || 'none', $conversation_id || 'none', $pre_saved_user_msg, scalar(@trace)));
+
         if ($user_id && $prompt) {
+            my $save_ok = 0;
             eval {
+                # After a 300s Ollama timeout the DBIx::Class connection may be stale.
+                # Call ->storage->ensure_connected to force a reconnect before writing.
                 my $schema = $c->model('DBEncy')->schema;
+                eval { $schema->storage->ensure_connected; };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'generate', "DB reconnect warning (non-fatal): $@");
+                }
+
                 if ($schema) {
                     # Conversation should already exist from pre-call block, but create as fallback
                     unless ($conversation_id && $conversation_id =~ /^\d+$/) {
@@ -1127,24 +1152,45 @@ sub generate :Local :Args(0) {
                                 role     => 'user',
                                 content  => $prompt,
                                 agent_type => $agent_id || 'general',
-                                model_used => $provider || 'unknown',
+                                model_used => $model_used || $provider || 'unknown',
                                 ip_address => $c->request->address,
                             });
                         }
-                        push @trace, sprintf("❌ Error after %ds: %s", time() - $trace_start, $user_error || 'Unknown error');
-                        $schema->resultset('AiMessage')->create({
+                        my $err_msg = $schema->resultset('AiMessage')->create({
                             conversation_id => $conversation_id,
                             user_id  => $user_id,
                             role     => 'assistant',
                             content  => '[ERROR] ' . ($user_error || 'Failed to process AI request'),
                             agent_type => $agent_id || 'general',
-                            model_used => $provider || 'unknown',
+                            model_used => $model_used || $provider || 'unknown',
                             metadata   => encode_json({ thinking_trace => \@trace }),
                             ip_address => $c->request->address,
                         });
+                        if ($err_msg && $err_msg->id) {
+                            $save_ok = 1;
+                            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                                'generate', sprintf("ERROR msg saved: id=%d conv=%d trace_steps=%d",
+                                    $err_msg->id, $conversation_id, scalar(@trace)));
+                        } else {
+                            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                                'generate', "ERROR msg create returned undef for conv=$conversation_id");
+                        }
+                    } else {
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                            'generate', "catch: no conversation_id available — error message NOT saved to DB");
                     }
+                } else {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                        'generate', "catch: could not get DB schema — error message NOT saved");
                 }
+                1;
             };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                    'generate', "catch DB save FAILED (eval died): $@");
+            }
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'generate', "catch: DB save result = " . ($save_ok ? "OK" : "FAILED"));
         }
 
         push @trace, sprintf("❌ Error after %ds: %s", time() - $trace_start, $user_error || 'Unknown error')
@@ -1629,9 +1675,10 @@ sub chat :Local :Args(0) {
         return;
     }
 
+    my $model_used = 'unknown';  # declared before try so catch block can read it
+
     try {
         my $ai_response = '';
-        my $model_used = 'unknown';
         my $response_created_at = '';
         my $response_total_duration = 0;
         my $response_eval_count = 0;
@@ -1790,12 +1837,13 @@ sub chat :Local :Args(0) {
             # ── Hard context budget: keep total input under ~12 000 chars (~3 000 tokens)
             # CPU Ollama prefill runs at ~46 tok/s; 3 000 tokens takes ~65s — safe under
             # 300s timeout even with generation.  Over-budget → trim history content first.
-            my $BUDGET_CHARS = 12_000;
+            my $BUDGET_CHARS  = 12_000;
+            my $SYS_MAX_CHARS_CHAT = 8_000;
             my $raw_total = 0;
             $raw_total += length($_->{content} || '') for @ollama_messages;
             if ($raw_total > $BUDGET_CHARS) {
                 push @chat_trace, sprintf("⚠️ Context %d chars > %d budget — trimming history", $raw_total, $BUDGET_CHARS);
-                # Trim non-system messages (history) by truncating content to 300 chars each
+                # Pass 1: cap each non-system message at 300 chars
                 for my $msg (@ollama_messages) {
                     next if ($msg->{role} || '') eq 'system';
                     my $len = length($msg->{content} || '');
@@ -1803,14 +1851,19 @@ sub chat :Local :Args(0) {
                         $msg->{content} = substr($msg->{content}, 0, 300) . '…';
                     }
                 }
-                # Recalculate; if still over, strip the page_content section from system prompt
-                my $after_trim = 0;
-                $after_trim += length($_->{content} || '') for @ollama_messages;
-                if ($after_trim > $BUDGET_CHARS && @ollama_messages && $ollama_messages[0]{role} eq 'system') {
+                my $after_p1 = 0;
+                $after_p1 += length($_->{content} || '') for @ollama_messages;
+                if ($after_p1 > $BUDGET_CHARS && @ollama_messages && $ollama_messages[0]{role} eq 'system') {
                     my $sys = $ollama_messages[0]{content};
+                    # Pass 2: strip page_content section
                     $sys =~ s/\n\n---[ ]Current Page Content.*$//s;
                     $ollama_messages[0]{content} = $sys;
                     push @chat_trace, "⚠️ Stripped page_content from system prompt (still over budget)";
+                    # Pass 3: hard-cap system prompt
+                    if (length($sys) > $SYS_MAX_CHARS_CHAT) {
+                        $ollama_messages[0]{content} = substr($sys, 0, $SYS_MAX_CHARS_CHAT) . "\n[system prompt truncated to fit context budget]";
+                        push @chat_trace, sprintf("⚠️ System prompt truncated from %d to %d chars", length($sys), $SYS_MAX_CHARS_CHAT);
+                    }
                 }
             }
 
@@ -2078,9 +2131,19 @@ sub chat :Local :Args(0) {
             time() - $chat_trace_start, $user_error || 'Unknown error');
 
         # Save failed request to DB so conversation record is complete
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'chat', sprintf("catch: user_id=%s conv_id=%s trace_steps=%d",
+                $user_id || 'none', $conversation_id || 'none', scalar(@chat_trace)));
+
         if ($user_id && $prompt) {
+            my $chat_save_ok = 0;
             eval {
                 my $schema = $c->model('DBEncy')->schema;
+                eval { $schema->storage->ensure_connected; };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'chat', "DB reconnect warning (non-fatal): $@");
+                }
                 if ($schema) {
                     my $save_conv_id = $conversation_id;
                     unless ($save_conv_id && $save_conv_id =~ /^\d+$/) {
@@ -2102,23 +2165,42 @@ sub chat :Local :Args(0) {
                             user_id  => $user_id,
                             role     => 'user',
                             content  => $prompt,
-                            agent_type => 'documentation',
-                            model_used => $model || 'unknown',
+                            agent_type => $chat_agent_id || 'documentation',
+                            model_used => $model_used || $model || 'unknown',
                             ip_address => $c->request->address,
                         });
-                        $schema->resultset('AiMessage')->create({
+                        my $chat_err_msg = $schema->resultset('AiMessage')->create({
                             conversation_id => $save_conv_id,
                             user_id  => $user_id,
                             role     => 'assistant',
                             content  => '[ERROR] ' . $user_error,
-                            agent_type => 'documentation',
-                            model_used => $model || 'unknown',
+                            agent_type => $chat_agent_id || 'documentation',
+                            model_used => $model_used || $model || 'unknown',
                             metadata   => encode_json({ thinking_trace => \@chat_trace }),
                             ip_address => $c->request->address,
                         });
+                        if ($chat_err_msg && $chat_err_msg->id) {
+                            $chat_save_ok = 1;
+                            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                                'chat', sprintf("ERROR msg saved: id=%d conv=%d trace_steps=%d",
+                                    $chat_err_msg->id, $save_conv_id, scalar(@chat_trace)));
+                        } else {
+                            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                                'chat', "ERROR msg create returned undef for conv=$save_conv_id");
+                        }
+                    } else {
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                            'chat', "catch: no conversation_id — error message NOT saved");
                     }
                 }
+                1;
             };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                    'chat', "catch DB save FAILED (eval died): $@");
+            }
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'chat', "catch: DB save result = " . ($chat_save_ok ? "OK" : "FAILED"));
         }
 
         # Mark progress as done (with error trace) so poller stops
@@ -4372,6 +4454,138 @@ sub conversations :Local :Args(0) {
         view_all => $view_all,
         is_guest => $is_guest
     );
+}
+
+=head2 conversation
+
+Display a single conversation by ID.
+
+=cut
+
+sub conversation :Local :Args(1) {
+    my ($self, $c, $conv_id) = @_;
+
+    my $username     = $c->session->{username};
+    my $user_id      = $c->session->{user_id};
+    my $user_roles   = $c->session->{roles} || [];
+    $user_roles      = [split(/\s*,\s*/, $user_roles)] unless ref($user_roles);
+    my $is_admin     = grep { /^admin$/i } @$user_roles;
+
+    unless ($username && $user_id) {
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    unless ($conv_id && $conv_id =~ /^\d+$/) {
+        $c->stash(error_msg => "Invalid conversation ID.");
+        $c->response->status(400);
+        $c->stash(template => 'error.tt');
+        return;
+    }
+
+    my ($conversation, @messages);
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $conv = $schema->resultset('AiConversation')->find($conv_id);
+
+        unless ($conv) {
+            $c->stash(error_msg => "Conversation not found.");
+            $c->response->status(404);
+            $c->stash(template => 'error.tt');
+            return;
+        }
+
+        # Non-admins can only see their own conversations
+        unless ($is_admin || $conv->user_id == $user_id) {
+            $c->stash(error_msg => "Access denied.");
+            $c->response->status(403);
+            $c->stash(template => 'error.tt');
+            return;
+        }
+
+        my $meta = {};
+        eval { $meta = decode_json($conv->metadata || '{}'); };
+
+        $conversation = {
+            id         => $conv->id,
+            title      => $conv->title || 'Untitled',
+            status     => $conv->status || 'active',
+            created_at => $conv->created_at,
+            updated_at => $conv->updated_at,
+            metadata   => $meta,
+        };
+
+        my $msg_rs = $schema->resultset('AiMessage')->search(
+            { conversation_id => $conv_id },
+            { order_by => { -asc => 'created_at' } }
+        );
+        while (my $msg = $msg_rs->next) {
+            my $raw_meta = $msg->metadata || '{}';
+            push @messages, {
+                id          => $msg->id,
+                role        => $msg->role,
+                content     => $msg->content,
+                model_used  => $msg->model_used,
+                agent_type  => $msg->agent_type,
+                created_at  => $msg->created_at,
+                metadata    => $raw_meta,
+            };
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'conversation', "Failed to fetch conversation $conv_id: $_");
+        $c->stash(error_msg => "Failed to load conversation.");
+        $c->stash(template => 'error.tt');
+        return;
+    };
+
+    $c->stash(
+        template     => 'ai/conversations.tt',
+        page_title   => 'Conversation: ' . ($conversation->{title} || 'Untitled'),
+        single_conv  => $conversation,
+        messages     => \@messages,
+        conversations => [],
+        total_conversations => 0,
+        username     => $username,
+        is_admin     => $is_admin,
+        view_all     => 0,
+        is_guest     => 0,
+    );
+}
+
+=head2 conversation_delete
+
+Delete a conversation by ID.
+
+=cut
+
+sub conversation_delete :Path('conversation') :Args(2) {
+    my ($self, $c, $conv_id, $action) = @_;
+
+    return unless $action eq 'delete';
+
+    my $username   = $c->session->{username};
+    my $user_id    = $c->session->{user_id};
+    my $user_roles = $c->session->{roles} || [];
+    $user_roles    = [split(/\s*,\s*/, $user_roles)] unless ref($user_roles);
+    my $is_admin   = grep { /^admin$/i } @$user_roles;
+
+    unless ($username && $user_id && $conv_id =~ /^\d+$/) {
+        $c->response->redirect($c->uri_for('/ai/conversations'));
+        return;
+    }
+
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my $conv   = $schema->resultset('AiConversation')->find($conv_id);
+        if ($conv && ($is_admin || $conv->user_id == $user_id)) {
+            $schema->resultset('AiMessage')->search({ conversation_id => $conv_id })->delete;
+            $conv->delete;
+        }
+    };
+
+    $c->response->body(encode_json({ success => \1 }));
+    $c->response->content_type('application/json');
 }
 
 =head2 session_details
