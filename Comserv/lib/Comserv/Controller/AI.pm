@@ -765,8 +765,8 @@ sub generate :Local :Args(0) {
 
             # ── Hard context budget: keep total input under ~12 000 chars (~3 000 tokens)
             # CPU Ollama prefill at ~46 tok/s: 3 000 tokens = ~65s — safe under 300s timeout.
-            # Pass 1: trim history messages.  Pass 2: strip page_content from system.
-            # Pass 3: hard-cap system prompt so it cannot alone exceed the budget.
+            # Pass 1: trim history messages.  Pass 1.5: drop oldest history pairs.
+            # Pass 2: strip page_content from system.  Pass 3: hard-cap system prompt.
             my $BUDGET_CHARS  = 12_000;
             my $SYS_MAX_CHARS =  8_000;  # system prompt hard cap (nav guide can be 30K+)
             my $raw_total_gen = 0;
@@ -783,7 +783,23 @@ sub generate :Local :Args(0) {
                 }
                 my $after_p1 = 0;
                 $after_p1 += length($_->{content} || '') for @ollama_msgs;
-                if ($after_p1 > $BUDGET_CHARS && @ollama_msgs && $ollama_msgs[0]{role} eq 'system') {
+                # Pass 1.5: drop oldest history pairs before stripping page_content
+                if ($after_p1 > $BUDGET_CHARS && @ollama_msgs > 3) {
+                    # Keep: [0]=system, then drop pairs from index 1 onward, keep last 2 pairs + final user
+                    my @sys_msg   = ($ollama_msgs[0]);
+                    my @non_sys   = @ollama_msgs[1 .. $#ollama_msgs];
+                    # Keep at most last 4 non-system messages (2 pairs)
+                    my $keep = 4;
+                    if (@non_sys > $keep) {
+                        my $dropped = @non_sys - $keep;
+                        @non_sys = @non_sys[-$keep .. -1];
+                        push @trace, sprintf("⚠️ Dropped %d oldest history messages to fit budget", $dropped);
+                    }
+                    @ollama_msgs = (@sys_msg, @non_sys);
+                }
+                my $after_p15 = 0;
+                $after_p15 += length($_->{content} || '') for @ollama_msgs;
+                if ($after_p15 > $BUDGET_CHARS && @ollama_msgs && $ollama_msgs[0]{role} eq 'system') {
                     my $sys = $ollama_msgs[0]{content};
                     # Pass 2: strip page_content section
                     $sys =~ s/\n\n---[ ]Current Page Content.*$//s;
@@ -1838,6 +1854,8 @@ sub chat :Local :Args(0) {
             # ── Hard context budget: keep total input under ~12 000 chars (~3 000 tokens)
             # CPU Ollama prefill runs at ~46 tok/s; 3 000 tokens takes ~65s — safe under
             # 300s timeout even with generation.  Over-budget → trim history content first.
+            # Pass 1: trim messages.  Pass 1.5: drop oldest history pairs.
+            # Pass 2: strip page_content.  Pass 3: hard-cap system prompt.
             my $BUDGET_CHARS  = 12_000;
             my $SYS_MAX_CHARS_CHAT = 8_000;
             my $raw_total = 0;
@@ -1854,7 +1872,21 @@ sub chat :Local :Args(0) {
                 }
                 my $after_p1 = 0;
                 $after_p1 += length($_->{content} || '') for @ollama_messages;
-                if ($after_p1 > $BUDGET_CHARS && @ollama_messages && $ollama_messages[0]{role} eq 'system') {
+                # Pass 1.5: drop oldest history pairs before stripping page_content
+                if ($after_p1 > $BUDGET_CHARS && @ollama_messages > 3) {
+                    my @sys_msg  = ($ollama_messages[0]);
+                    my @non_sys  = @ollama_messages[1 .. $#ollama_messages];
+                    my $keep = 4;
+                    if (@non_sys > $keep) {
+                        my $dropped = @non_sys - $keep;
+                        @non_sys = @non_sys[-$keep .. -1];
+                        push @chat_trace, sprintf("⚠️ Dropped %d oldest history messages to fit budget", $dropped);
+                    }
+                    @ollama_messages = (@sys_msg, @non_sys);
+                }
+                my $after_p15 = 0;
+                $after_p15 += length($_->{content} || '') for @ollama_messages;
+                if ($after_p15 > $BUDGET_CHARS && @ollama_messages && $ollama_messages[0]{role} eq 'system') {
                     my $sys = $ollama_messages[0]{content};
                     # Pass 2: strip page_content section
                     $sys =~ s/\n\n---[ ]Current Page Content.*$//s;
