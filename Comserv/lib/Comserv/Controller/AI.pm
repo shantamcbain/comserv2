@@ -4374,6 +4374,139 @@ sub conversations :Local :Args(0) {
     );
 }
 
+=head2 conversation
+
+Display a single conversation by ID.
+
+=cut
+
+sub conversation :Local :Args(1) {
+    my ($self, $c, $conv_id) = @_;
+
+    my $username     = $c->session->{username};
+    my $user_id      = $c->session->{user_id};
+    my $user_roles   = $c->session->{roles} || [];
+    $user_roles      = [split(/\s*,\s*/, $user_roles)] unless ref($user_roles);
+    my $is_admin     = grep { /^admin$/i } @$user_roles;
+
+    unless ($username && $user_id) {
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    unless ($conv_id && $conv_id =~ /^\d+$/) {
+        $c->stash(error_msg => "Invalid conversation ID.");
+        $c->response->status(400);
+        $c->stash(template => 'error.tt');
+        return;
+    }
+
+    my ($conversation, @messages);
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $conv = $schema->resultset('AiConversation')->find($conv_id);
+
+        unless ($conv) {
+            $c->stash(error_msg => "Conversation not found.");
+            $c->response->status(404);
+            $c->stash(template => 'error.tt');
+            return;
+        }
+
+        # Non-admins can only see their own conversations
+        unless ($is_admin || $conv->user_id == $user_id) {
+            $c->stash(error_msg => "Access denied.");
+            $c->response->status(403);
+            $c->stash(template => 'error.tt');
+            return;
+        }
+
+        my $meta = {};
+        eval { $meta = decode_json($conv->metadata || '{}'); };
+
+        $conversation = {
+            id         => $conv->id,
+            title      => $conv->title || 'Untitled',
+            status     => $conv->status || 'active',
+            created_at => $conv->created_at,
+            updated_at => $conv->updated_at,
+            metadata   => $meta,
+        };
+
+        my $msg_rs = $schema->resultset('AiMessage')->search(
+            { conversation_id => $conv_id },
+            { order_by => { -asc => 'created_at' } }
+        );
+        while (my $msg = $msg_rs->next) {
+            my $mmeta = {};
+            eval { $mmeta = decode_json($msg->metadata || '{}'); };
+            push @messages, {
+                id          => $msg->id,
+                role        => $msg->role,
+                content     => $msg->content,
+                model_used  => $msg->model_used,
+                agent_type  => $msg->agent_type,
+                created_at  => $msg->created_at,
+                metadata    => $mmeta,
+            };
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'conversation', "Failed to fetch conversation $conv_id: $_");
+        $c->stash(error_msg => "Failed to load conversation.");
+        $c->stash(template => 'error.tt');
+        return;
+    };
+
+    $c->stash(
+        template     => 'ai/conversations.tt',
+        page_title   => 'Conversation: ' . ($conversation->{title} || 'Untitled'),
+        single_conv  => $conversation,
+        messages     => \@messages,
+        conversations => [],
+        total_conversations => 0,
+        username     => $username,
+        is_admin     => $is_admin,
+        view_all     => 0,
+        is_guest     => 0,
+    );
+}
+
+=head2 conversation_delete
+
+Delete a conversation by ID.
+
+=cut
+
+sub conversation_delete :Path('conversation') :Args(2) {
+    my ($self, $c, $conv_id, $action) = @_;
+
+    return unless $action eq 'delete';
+
+    my $username   = $c->session->{username};
+    my $user_id    = $c->session->{user_id};
+    my $user_roles = $c->session->{roles} || [];
+    $user_roles    = [split(/\s*,\s*/, $user_roles)] unless ref($user_roles);
+    my $is_admin   = grep { /^admin$/i } @$user_roles;
+
+    unless ($username && $user_id && $conv_id =~ /^\d+$/) {
+        $c->response->redirect($c->uri_for('/ai/conversations'));
+        return;
+    }
+
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my $conv   = $schema->resultset('AiConversation')->find($conv_id);
+        if ($conv && ($is_admin || $conv->user_id == $user_id)) {
+            $schema->resultset('AiMessage')->search({ conversation_id => $conv_id })->delete;
+            $conv->delete;
+        }
+    };
+
+    $c->response->body(encode_json({ success => \1 }));
+    $c->response->content_type('application/json');
+}
+
 =head2 session_details
 
 API endpoint to retrieve session information (username, hostname, conversation_id)
