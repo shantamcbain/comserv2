@@ -430,16 +430,17 @@ sub generate :Local :Args(0) {
     
     # Normalize agent_type to database enum values
     # Normalize agent_type for dynamic storage (was database enum)
-    my $normalized_agent_type = $agent_id || 'documentation';
-    if ($agent_id && $agent_id =~ /^(documentation|helpdesk|ency|beekeeping|hamradio|chat|cleanup|cleanup-agent|docker|master-plan-updater|daily-audit|daily-plan-automator|master-plan-manager|daily-plans-generator|daily-plans|documentation-sync|main|MainAgent|planning|prompt-logging)$/i) {
+    my $normalized_agent_type = $agent_id || 'general';
+    if ($agent_id && $agent_id =~ /^(documentation|helpdesk|ency|beekeeping|hamradio|chat|cleanup|cleanup-agent|docker|master-plan-updater|daily-audit|daily-plan-automator|master-plan-manager|daily-plans-generator|daily-plans|documentation-sync|main|MainAgent|planning|prompt-logging|general)$/i) {
         $normalized_agent_type = lc($agent_id);
         # Special case for MainAgent which is camelcase in enum
         $normalized_agent_type = 'MainAgent' if lc($agent_id) eq 'mainagent';
-    } elsif ($agent_id && ($agent_id eq 'general' || $agent_id eq 'documentation-agent')) {
-        $normalized_agent_type = 'documentation';  # map general and documentation-agent to documentation
+        # Preserve 'general' case
+        $normalized_agent_type = 'general' if lc($agent_id) eq 'general';
+    } elsif ($agent_id && $agent_id eq 'documentation-agent') {
+        $normalized_agent_type = 'documentation';
     } else {
-        # Allow any agent_id since we switched to VARCHAR
-        $normalized_agent_type = $agent_id if $agent_id;
+        $normalized_agent_type = $agent_id ? 'general' : 'general';
     }
     
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -1151,7 +1152,7 @@ sub generate :Local :Args(0) {
                                 user_id  => $user_id,
                                 role     => 'user',
                                 content  => $prompt,
-                                agent_type => $agent_id || 'general',
+                                agent_type => $normalized_agent_type || 'general',
                                 model_used => $model_used || $provider || 'unknown',
                                 ip_address => $c->request->address,
                             });
@@ -1161,7 +1162,7 @@ sub generate :Local :Args(0) {
                             user_id  => $user_id,
                             role     => 'assistant',
                             content  => '[ERROR] ' . ($user_error || 'Failed to process AI request'),
-                            agent_type => $agent_id || 'general',
+                            agent_type => $normalized_agent_type || 'general',
                             model_used => $model_used || $provider || 'unknown',
                             metadata   => encode_json({ thinking_trace => \@trace }),
                             ip_address => $c->request->address,
