@@ -65,9 +65,11 @@
         </div>
         <div class="ai-topbar-right">
             [% IF username && !username.match('^Guest-') %]
+            <a href="/ai/conversations" class="ai-topbar-btn" title="View conversation history">📋 History</a>
             <a href="/ai/manage_api_keys" class="ai-topbar-btn" title="Manage API keys">🔑</a>
             <a href="/ai/models" class="ai-topbar-btn" title="Manage models">⚙️</a>
             [% END %]
+            <button type="button" id="dock-to-page-btn" class="ai-topbar-btn" title="Dock chat back to page" style="display:none;">⤡</button>
             <button type="button" id="clear-chat" class="ai-topbar-btn" title="New chat">✏️</button>
             <a href="/" class="ai-topbar-btn" title="Return to menu">🏠</a>
             [% IF username && !username.match('^Guest-') && can_select_model %]
@@ -510,23 +512,27 @@
 }
 </style>
 
+<script>
+// Tell local-chat.js to run in page mode (bind to this page's DOM, no floating widget)
+window.AI_CHAT_PAGE_MODE = true;
+window.AI_CHAT_USER_CONFIG = {
+    username: '[% username || 'Guest' %]',
+    isGuest:  [% (username && !username.match('^Guest-')) ? 'false' : 'true' %],
+    isAdmin:  [% can_select_model ? 'true' : 'false' %]
+};
+</script>
 <script src="/static/js/ai-common.js"></script>
 <script>
-// Chat state management
-let conversationHistory = [];
-let isProcessing = false;
+// Sidebar-only state (core chat is handled by local-chat.js in page mode)
 let currentConversationId = null;
 
-// DOM elements
-const chatForm = document.getElementById('chat-form');
+// DOM elements needed by sidebar / server-status JS
 const userInput = document.getElementById('user-input');
 const chatMessages = document.getElementById('chat-messages');
-const sendButton = document.getElementById('send-button');
-const clearChatButton = document.getElementById('clear-chat');
-const modelSelect = document.getElementById('model-select');
-const hostSelect = document.getElementById('host-select');
+const modelSelect    = document.getElementById('model-select');
+const hostSelect     = document.getElementById('host-select');
 const statusIndicator = document.getElementById('status-indicator');
-const statusText = document.getElementById('status-text');
+const statusText     = document.getElementById('status-text');
 const startServerBtn = document.getElementById('start-server-btn');
 
 // ── Sidebar ──────────────────────────────────────────────────────────────────
@@ -547,7 +553,9 @@ function setSidebar(open) {
     }
 }
 
-toggleSidebarBtn.addEventListener('click', function() { setSidebar(!sidebarOpen); });
+if (toggleSidebarBtn) {
+    toggleSidebarBtn.addEventListener('click', function() { setSidebar(!sidebarOpen); });
+}
 
 // ── Sidebar flip (left/right) ─────────────────────────────────────────────────
 const flipSidebarBtn = document.getElementById('flip-sidebar-btn');
@@ -569,12 +577,14 @@ try {
     if (savedPos) applySidebarPosition(savedPos);
 } catch(e) {}
 
-flipSidebarBtn.addEventListener('click', function() {
-    const isLeft = sidebarEl.classList.contains('sidebar-left');
-    const newPos = isLeft ? 'right' : 'left';
-    applySidebarPosition(newPos);
-    try { localStorage.setItem('ai_sidebar_pos', newPos); } catch(e) {}
-});
+if (flipSidebarBtn && sidebarEl) {
+    flipSidebarBtn.addEventListener('click', function() {
+        const isLeft = sidebarEl.classList.contains('sidebar-left');
+        const newPos = isLeft ? 'right' : 'left';
+        applySidebarPosition(newPos);
+        try { localStorage.setItem('ai_sidebar_pos', newPos); } catch(e) {}
+    });
+}
 
 // Sidebar tab switching
 document.querySelectorAll('.sidebar-nav-btn:not([disabled])').forEach(function(btn) {
@@ -589,20 +599,27 @@ document.querySelectorAll('.sidebar-nav-btn:not([disabled])').forEach(function(b
 });
 
 // New chat button in sidebar
-document.getElementById('new-chat-sidebar').addEventListener('click', function() {
-    if (conversationHistory.length > 0) {
-        if (!confirm('Start a new chat? Current conversation will be saved.')) return;
-    }
+const _newChatSidebar = document.getElementById('new-chat-sidebar');
+if (_newChatSidebar) _newChatSidebar.addEventListener('click', function() {
+    if (!confirm('Start a new chat? Current conversation will be saved.')) return;
     fetch('/ai/reset_conversation', { method: 'POST', credentials: 'include' }).catch(() => {});
-    conversationHistory = [];
     currentConversationId = null;
-    saveConversationHistory();
-    try { sessionStorage.removeItem('ai_current_conversation_id'); } catch(e) {}
+    // Clear bridge state and sessionStorage
+    if (window.AIChatPageBridge) {
+        window.AIChatPageBridge.setConversationId(null);
+    }
     document.getElementById('conversation-info').style.display = 'none';
     document.getElementById('conversation-id-display').textContent = '-';
-    renderMessages();
+    // Clear messages area
+    if (chatMessages) {
+        chatMessages.innerHTML = '';
+        const wEl = document.createElement('div');
+        wEl.className = 'welcome-message';
+        wEl.innerHTML = '<div class="welcome-icon">🤖</div><h2>How can I help you today?</h2><p>Ask me anything.</p>';
+        chatMessages.appendChild(wEl);
+    }
     document.querySelectorAll('.sidebar-conv-item').forEach(i => i.classList.remove('active'));
-    userInput.focus();
+    if (userInput) userInput.focus();
 });
 
 // Load conversation list into sidebar
@@ -638,16 +655,44 @@ function loadSidebarConversation(convId, btnEl) {
         .then(r => r.json())
         .then(function(data) {
             if (!data.success) { showStatus('error', data.error || 'Failed to load'); return; }
-            conversationHistory = data.messages.map(function(m) {
-                return { role: m.role, content: m.content, timestamp: m.created_at, model: m.model_used || null };
-            });
+
             currentConversationId = convId;
-            saveConversationHistory();
-            saveConversationId();
-            document.getElementById('conversation-id-display').textContent = convId;
-            document.getElementById('conversation-info').style.display = 'block';
-            renderMessages();
-            scrollToBottom();
+
+            // Sync with local-chat.js bridge state
+            if (window.AIChatPageBridge) {
+                window.AIChatPageBridge.setConversationId(convId);
+            }
+
+            // Update badge
+            const displayEl = document.getElementById('conversation-id-display');
+            const infoEl    = document.getElementById('conversation-info');
+            if (displayEl) displayEl.textContent = convId;
+            if (infoEl)    infoEl.style.display   = 'block';
+
+            // Re-render messages using local-chat.js msg-wrapper structure
+            if (chatMessages) {
+                chatMessages.innerHTML = '';
+                (data.messages || []).forEach(function(m) {
+                    const isUser = (m.role === 'user');
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'msg-wrapper msg-wrapper-' + (isUser ? 'user' : 'ai');
+                    const lbl = document.createElement('div');
+                    lbl.className = 'msg-label';
+                    lbl.textContent = isUser ? (m.username || 'You') : (m.model_used || 'AI Assistant');
+                    const el = document.createElement('div');
+                    el.className = 'message ' + (isUser ? 'user-message' : 'ai-message');
+                    if (!isUser && window.AIUtils) {
+                        el.innerHTML = AIUtils.formatMessageContent(m.content || '');
+                    } else {
+                        el.textContent = m.content || '';
+                    }
+                    wrapper.appendChild(lbl);
+                    wrapper.appendChild(el);
+                    chatMessages.appendChild(wrapper);
+                });
+                scrollToBottom();
+            }
+
             document.querySelectorAll('.sidebar-conv-item').forEach(i => i.classList.remove('active'));
             if (btnEl) btnEl.classList.add('active');
             showStatus('success', 'Loaded: ' + (data.conversation.title || 'Conversation #' + convId));
@@ -658,7 +703,7 @@ function loadSidebarConversation(convId, btnEl) {
 // Search
 const searchInput = document.getElementById('sidebar-search-input');
 let _searchTimer;
-searchInput.addEventListener('input', function() {
+if (searchInput) searchInput.addEventListener('input', function() {
     clearTimeout(_searchTimer);
     const q = this.value.trim().toLowerCase();
     _searchTimer = setTimeout(function() {
@@ -706,53 +751,59 @@ function formatRelativeTime(dateStr) {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
-    // Load conversation history and conversation ID from sessionStorage
-    loadConversationHistory();
+    // Load conversation ID badge from sessionStorage
     loadConversationId();
 
-    // Kick off sidebar
-    setSidebar(true);
+    // Kick off sidebar (admin/editor only — sidebarEl may be null for guests)
+    if (sidebarEl && toggleSidebarBtn) setSidebar(true);
 
     // Auto-resume conversation if URL ?resume=ID param present (e.g. from widget detach)
     try {
         const urlParams = new URLSearchParams(window.location.search);
         const resumeId = urlParams.get('resume');
         if (resumeId && !isNaN(resumeId)) {
-            setTimeout(function() {
-                loadSidebarConversation(resumeId, null);
-            }, 800);
+            setTimeout(function() { loadSidebarConversation(resumeId, null); }, 800);
         }
     } catch(e) {}
-    
-    // Set up event listeners
-    chatForm.addEventListener('submit', handleSubmit);
-    clearChatButton.addEventListener('click', clearChat);
-    
-    // Allow Ctrl+Enter to submit
-    userInput.addEventListener('keydown', function(e) {
-        if (e.ctrlKey && e.key === 'Enter') {
-            e.preventDefault();
-            chatForm.dispatchEvent(new Event('submit'));
-        }
-    });
-    
-    // Auto-resize textarea
-    userInput.addEventListener('input', function() {
-        this.style.height = 'auto';
-        this.style.height = (this.scrollHeight) + 'px';
-    });
-    
-    // Handle host selection change
-    if (hostSelect) {
-        hostSelect.addEventListener('change', handleHostChange);
+
+    // Dock-back button: only show when this page is a popup opened by the widget
+    const dockBtn = document.getElementById('dock-to-page-btn');
+    if (dockBtn) {
+        try {
+            if (window.opener && !window.opener.closed) {
+                dockBtn.style.display = '';
+                dockBtn.addEventListener('click', function() {
+                    // Tell the parent page to re-open the chat widget
+                    window.opener.postMessage({ type: 'ai-dock-back' }, window.location.origin);
+                    window.close();
+                });
+            }
+        } catch(e) {}
     }
-    
-    // Handle server start button
+
+    // Wire up bridge callback so sidebar updates when local-chat.js creates a conversation
+    // local-chat.js sets AIChatPageBridge in initPageMode() which runs before DOMContentLoaded
+    // resolves, but we use a short timeout as safety margin.
+    setTimeout(function() {
+        if (window.AIChatPageBridge) {
+            window.AIChatPageBridge.onConversationIdChange = function(convId) {
+                currentConversationId = convId;
+                const displayEl = document.getElementById('conversation-id-display');
+                const infoEl    = document.getElementById('conversation-info');
+                if (displayEl) displayEl.textContent = convId || '-';
+                if (infoEl)    infoEl.style.display   = convId ? 'block' : 'none';
+                if (convId && sidebarOpen) loadSidebarHistory();
+            };
+        }
+    }, 200);
+
+    // Host selection change
+    if (hostSelect) hostSelect.addEventListener('change', handleHostChange);
+
+    // Server start button
     if (startServerBtn) {
         startServerBtn.addEventListener('click', startOllamaServer);
-        // Check server status on page load
         checkServerStatus();
-        // Check server status every 60 seconds (reduced from 5s to avoid hammering)
         setInterval(checkServerStatus, 60000);
     }
 });
@@ -957,308 +1008,24 @@ async function startOllamaServer() {
     }
 }
 
-// Handle form submission
-async function handleSubmit(e) {
-    e.preventDefault();
-    
-    if (isProcessing) return;
-    
-    const prompt = userInput.value.trim();
-    if (!prompt) return;
-    
-    // Get selected model (if available)
-    const selectedModel = modelSelect ? modelSelect.value : null;
-    
-    // Add user message to chat
-    addMessage('user', prompt);
-    
-    // Clear input
-    userInput.value = '';
-    userInput.style.height = 'auto';
-    
-    // Show loading state
-    isProcessing = true;
-    updateSendButton(true);
-    const loadingId = addLoadingMessage();
-    
-    try {
-        // Send request to server
-        const requestBody = {
-            prompt: prompt,
-            model: selectedModel,
-            history: conversationHistory.slice(-10) // Send last 10 messages for context
-        };
-        
-        // Include conversation ID if we're continuing an existing conversation
-        console.log('DEBUG: Before sending request - currentConversationId:', currentConversationId);
-        if (currentConversationId) {
-            requestBody.conversation_id = currentConversationId;
-            console.log('DEBUG: Adding conversation_id to request body:', currentConversationId);
-        } else {
-            console.log('DEBUG: No currentConversationId - will create NEW conversation');
-        }
-        console.log('DEBUG: Full request body:', requestBody);
-        
-        const response = await fetch('/ai/chat', {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody)
-        });
-        
-        const data = await response.json();
-        
-        // Remove loading message
-        removeLoadingMessage(loadingId);
-        
-        if (data.success) {
-            // Update conversation ID if returned (first message in conversation)
-            if (data.conversation_id) {
-                const isNew = !currentConversationId;
-                currentConversationId = data.conversation_id;
-                saveConversationId();
-                document.getElementById('conversation-id-display').textContent = data.conversation_id;
-                document.getElementById('conversation-info').style.display = 'block';
-                if (isNew) showStatus('success', `Conversation #${data.conversation_id} saved`);
-                // Refresh sidebar history to show the new/updated conversation
-                if (sidebarOpen) loadSidebarHistory();
-            }
-            // Add AI response to chat
-            addMessage('assistant', data.response, data.model);
-        } else {
-            showStatus('error', data.error || 'Failed to get response');
-            // Remove the user message if request failed
-            conversationHistory.pop();
-            renderMessages();
-        }
-    } catch (error) {
-        removeLoadingMessage(loadingId);
-        showStatus('error', 'Network error: ' + error.message);
-        // Remove the user message if request failed
-        conversationHistory.pop();
-        renderMessages();
-    } finally {
-        isProcessing = false;
-        updateSendButton(false);
-        userInput.focus();
-    }
-}
-
-// Add message to conversation
-function addMessage(role, content, model = null) {
-    const message = {
-        role: role,
-        content: content,
-        timestamp: new Date().toISOString(),
-        model: model
-    };
-    
-    conversationHistory.push(message);
-    saveConversationHistory();
-    renderMessages();
-    scrollToBottom();
-}
-
-// Render all messages
-function renderMessages() {
-    // Clear existing messages except welcome
-    const welcomeMessage = chatMessages.querySelector('.welcome-message');
-    chatMessages.innerHTML = '';
-    
-    if (conversationHistory.length === 0 && welcomeMessage) {
-        chatMessages.appendChild(welcomeMessage);
-        return;
-    }
-    
-    conversationHistory.forEach(message => {
-        const messageDiv = createMessageElement(message);
-        chatMessages.appendChild(messageDiv);
-    });
-}
-
-// Create message element
-function createMessageElement(message) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `chat-message ${message.role}`;
-    
-    const timestamp = new Date(message.timestamp).toLocaleTimeString();
-    
-    messageDiv.innerHTML = `
-        <div class="message-header">
-            <span class="message-role ${message.role}">
-                ${message.role === 'user' ? 'You' : 'AI Assistant'}
-            </span>
-            <span class="message-timestamp">${timestamp}</span>
-            ${message.model ? `<span class="message-model">(${message.model})</span>` : ''}
-            ${message.role === 'assistant' ? `<button class="copy-message-btn" onclick="copyMessageText(this)" title="Copy message content">📋</button>` : ''}
-        </div>
-        <div class="message-content" data-raw-content="${AIUtils.escapeHtml(message.content)}">${AIUtils.formatMessageContent(message.content)}</div>
-    `;
-    
-    return messageDiv;
-}
-
-// Add loading message
-function addLoadingMessage() {
-    const loadingId = 'loading-' + Date.now();
-    const loadingDiv = document.createElement('div');
-    loadingDiv.id = loadingId;
-    loadingDiv.className = 'chat-message assistant';
-    loadingDiv.innerHTML = `
-        <div class="message-loading">
-            <span class="loading-spinner">⏳</span>
-            <span>AI is thinking...</span>
-        </div>
-    `;
-    chatMessages.appendChild(loadingDiv);
-    scrollToBottom();
-    return loadingId;
-}
-
-// Remove loading message
-function removeLoadingMessage(loadingId) {
-    const loadingDiv = document.getElementById(loadingId);
-    if (loadingDiv) {
-        loadingDiv.remove();
-    }
-}
-
-// Update send button state
-function updateSendButton(loading) {
-    const buttonText = sendButton.querySelector('.button-text');
-    const buttonSpinner = sendButton.querySelector('.button-spinner');
-    
-    if (loading) {
-        sendButton.disabled = true;
-        buttonText.style.display = 'none';
-        buttonSpinner.style.display = 'inline';
-    } else {
-        sendButton.disabled = false;
-        buttonText.style.display = 'inline';
-        buttonSpinner.style.display = 'none';
-    }
-}
-
-// Clear chat
-async function clearChat() {
-    if (confirm('Are you sure you want to clear the chat history?')) {
-        // Clear server session
-        try {
-            await fetch('/ai/reset_conversation', { method: 'POST' });
-        } catch (e) {
-            console.error('Failed to reset conversation on server:', e);
-        }
-
-        conversationHistory = [];
-        currentConversationId = null;
-        saveConversationHistory();
-        try {
-            sessionStorage.removeItem('ai_current_conversation_id');
-        } catch (e) {
-            console.error('Failed to clear conversation ID:', e);
-        }
-        document.getElementById('conversation-info').style.display = 'none';
-        document.getElementById('conversation-id-display').textContent = '-';
-        renderMessages();
-        showStatus('info', 'Chat history cleared');
-    }
-}
-
-// Save conversation to sessionStorage
-function saveConversationHistory() {
-    try {
-        sessionStorage.setItem('ai_chat_history', JSON.stringify(conversationHistory));
-    } catch (e) {
-        console.error('Failed to save conversation history:', e);
-    }
-}
-
-// Load conversation from sessionStorage
-function loadConversationHistory() {
-    try {
-        const saved = sessionStorage.getItem('ai_chat_history');
-        if (saved) {
-            conversationHistory = JSON.parse(saved);
-            renderMessages();
-        }
-    } catch (e) {
-        console.error('Failed to load conversation history:', e);
-    }
-}
-
-// Save conversation ID to sessionStorage
-function saveConversationId() {
-    try {
-        if (currentConversationId) {
-            sessionStorage.setItem('ai_current_conversation_id', currentConversationId);
-            console.log('DEBUG: Saved conversationId to sessionStorage:', currentConversationId);
-        } else {
-            console.warn('DEBUG: Attempted saveConversationId but currentConversationId is:', currentConversationId);
-        }
-    } catch (e) {
-        console.error('Failed to save conversation ID:', e);
-    }
-}
-
-// Load conversation ID from sessionStorage
+// Load conversation ID from sessionStorage into the badge display
 function loadConversationId() {
     try {
-        const saved = sessionStorage.getItem('ai_current_conversation_id');
-        console.log('DEBUG: loadConversationId() - saved value:', saved);
+        const saved = sessionStorage.getItem('ai_current_conversation_id')
+            || sessionStorage.getItem('currentConversationId');
         if (saved) {
             currentConversationId = saved;
             const displayEl = document.getElementById('conversation-id-display');
-            const infoEl = document.getElementById('conversation-info');
-            if (displayEl && infoEl) {
-                displayEl.textContent = currentConversationId;
-                infoEl.style.display = 'block';
-            }
-            console.log('DEBUG: Loaded conversationId from sessionStorage:', currentConversationId);
-        } else {
-            console.log('DEBUG: No conversation ID in sessionStorage - will create new conversation');
+            const infoEl    = document.getElementById('conversation-info');
+            if (displayEl) displayEl.textContent = currentConversationId;
+            if (infoEl)    infoEl.style.display   = 'block';
         }
-    } catch (e) {
-        console.error('Failed to load conversation ID:', e);
-    }
+    } catch (e) { }
 }
 
 // Scroll to bottom of chat
 function scrollToBottom() {
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-// Copy message text
-function copyMessageText(btn) {
-    const messageDiv = btn.closest('.chat-message');
-    const contentDiv = messageDiv.querySelector('.message-content');
-    
-    // Find the message in history or extract from textContent
-    // Using textContent might be slightly off if formatted, better to find in history
-    // But since history is global, we can use it.
-    
-    // Find which index this is
-    const messages = Array.from(chatMessages.querySelectorAll('.chat-message'));
-    const index = messages.indexOf(messageDiv);
-    
-    let textToCopy = '';
-    if (index !== -1 && conversationHistory[index]) {
-        textToCopy = conversationHistory[index].content;
-    } else {
-        textToCopy = contentDiv.textContent;
-    }
-    
-    navigator.clipboard.writeText(textToCopy).then(() => {
-        const originalText = btn.textContent;
-        btn.textContent = '✅';
-        setTimeout(() => {
-            btn.textContent = originalText;
-        }, 2000);
-    }).catch(err => {
-        console.error('Failed to copy text: ', err);
-        showStatus('error', 'Failed to copy text');
-    });
+    if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 // Show status message
