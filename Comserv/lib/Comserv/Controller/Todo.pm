@@ -1853,4 +1853,78 @@ sub triage_stale :Path('triage_stale') :Args(0) {
     $c->response->body('{"ok":1,"count":' . $count . '}');
 }
 
+sub reschedule :Path('reschedule') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $username = $c->session->{username} // '';
+    my $roles    = $c->session->{roles} || [];
+    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
+    unless ($username && $username ne 'anonymous' && grep { /^(admin)$/i } @rl) {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Admin role required"}');
+        return;
+    }
+
+    require POSIX;
+    my $now_epoch  = time();
+    my $today      = DateTime->now->ymd;
+    my $count      = 0;
+    my @errors;
+
+    eval {
+        my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+        my @rows = $c->model('DBEncy')->resultset('Todo')->search(
+            { status => { -not_in => \@done_statuses } },
+            { columns => [qw(record_id priority status is_blocking
+                             due_date last_mod_date date_time_posted)] }
+        )->all;
+
+        for my $todo (@rows) {
+            my $orig_priority = $todo->priority || 5;
+            my $new_priority  = $orig_priority;
+
+            # Staleness: >180 days inactive → lower priority (push down)
+            my $activity_str = $todo->last_mod_date || $todo->date_time_posted || '';
+            if ($activity_str =~ /^(\d{4})-(\d{2})-(\d{2})/) {
+                my $act_epoch  = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
+                my $days_stale = int(($now_epoch - $act_epoch) / 86400);
+                $new_priority  = ($new_priority + 2 <= 10) ? $new_priority + 2 : 10
+                    if $days_stale > 180;
+            }
+
+            # Due-date urgency: overdue → raise priority; due within 7 days → raise slightly
+            if ($todo->due_date && $todo->due_date =~ /^(\d{4})-(\d{2})-(\d{2})/) {
+                my $due_epoch      = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
+                my $days_until_due = int(($due_epoch - $now_epoch) / 86400);
+                if ($days_until_due < 0) {
+                    $new_priority = ($new_priority - 2 >= 1) ? $new_priority - 2 : 1;
+                } elsif ($days_until_due <= 7) {
+                    $new_priority = ($new_priority - 1 >= 1) ? $new_priority - 1 : 1;
+                }
+            }
+
+            # Blocking: raises priority by 1
+            if ($todo->is_blocking) {
+                $new_priority = ($new_priority - 1 >= 1) ? $new_priority - 1 : 1;
+            }
+
+            next if $new_priority == $orig_priority;
+
+            eval { $todo->update({ priority => $new_priority, last_mod_by => 'reschedule', last_mod_date => $today }) };
+            if ($@) { push @errors, "todo " . $todo->record_id . ": $@"; }
+            else     { $count++; }
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'reschedule', "Error: $@");
+        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reschedule',
+        "Reschedule by $username: $count todos updated");
+    $c->response->body('{"ok":1,"count":' . $count . ',"errors":' . (JSON::encode_json(\@errors)) . '}');
+}
+
 1;
