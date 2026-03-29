@@ -186,6 +186,7 @@
                         [% IF is_admin %]
                         <a href="/log/log_form?todo_record_id=221&abstract=Good+Morning+%E2%98%80+Work+Session&details=Daily+work+session+log+started+by+[% c.session.username %]&status=2" style="padding:4px 12px;border:1px solid #20c997;border-radius:4px;text-decoration:none;font-size:0.82em;color:#20c997;" title="Start a new time-tracking log entry for this session">☀ Good Morning</a>
                         <button onclick="triageStale()" style="padding:4px 12px;border:1px solid #fd7e14;border-radius:4px;background:transparent;font-size:0.82em;color:#fd7e14;cursor:pointer;" title="Reduce priority of todos inactive for 180+ days">⚠ Triage Stale</button>
+                        <button onclick="rescheduleTodos(this)" style="padding:4px 12px;border:1px solid #6f42c1;border-radius:4px;background:transparent;font-size:0.82em;color:#6f42c1;cursor:pointer;" title="Re-score all todos: staleness, due dates, blocking status — then reload">♻ Reschedule</button>
                         [% END %]
                     </div>
                 </div>
@@ -302,6 +303,28 @@
                         alert('Could not close: ' + (d.error || 'unknown error'));
                     }
                 }).catch(function(e){ alert('Error: ' + e); });
+            }
+            function rescheduleTodos(btn) {
+                btn.disabled = true;
+                btn.textContent = '⏳ Rescheduling…';
+                fetch('/todo/reschedule', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                    body: JSON.stringify({})
+                }).then(function(r){ return r.json(); }).then(function(d){
+                    if (d.ok) {
+                        alert('Rescheduled: ' + d.count + ' todo' + (d.count !== 1 ? 's' : '') + ' updated. Reloading…');
+                        location.reload();
+                    } else {
+                        btn.disabled = false;
+                        btn.textContent = '♻ Reschedule';
+                        alert('Error: ' + (d.error || 'unknown'));
+                    }
+                }).catch(function(e){
+                    btn.disabled = false;
+                    btn.textContent = '♻ Reschedule';
+                    alert('Error: ' + e);
+                });
             }
             function triageStale() {
                 if (!confirm('Reduce priority of all todos inactive for 180+ days by 2 levels?')) return;
