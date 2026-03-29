@@ -40,7 +40,7 @@ sub initialize {
         my $dbh = DBI->connect($dsn, $user, $pass, { 
             RaiseError => 1, 
             PrintError => 0,
-            mysql_enable_utf8mb4 => 1,
+            mariadb_enable_utf8mb4 => 1,
         }) or die "Failed to connect to config database: $DBI::errstr";
         
         $class->_create_tables($dbh);
