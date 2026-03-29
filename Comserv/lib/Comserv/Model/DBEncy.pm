@@ -159,7 +159,6 @@ sub COMPONENT {
             quote_char => '`',
             name_sep => '.',
             limit_dialect => 'LimitXY',
-            mariadb_enable_utf8mb4 => 1,
             on_connect_do => [
                 "SET NAMES 'utf8mb4'",
                 "SET CHARACTER SET 'utf8mb4'",
