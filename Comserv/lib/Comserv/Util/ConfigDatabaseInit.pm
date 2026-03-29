@@ -40,8 +40,8 @@ sub initialize {
         my $dbh = DBI->connect($dsn, $user, $pass, { 
             RaiseError => 1, 
             PrintError => 0,
-            mariadb_enable_utf8mb4 => 1,
         }) or die "Failed to connect to config database: $DBI::errstr";
+        $dbh->do("SET NAMES 'utf8mb4'");
         
         $class->_create_tables($dbh);
         $class->_import_dbi_config($dbh);
