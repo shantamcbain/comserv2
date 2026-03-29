@@ -16,13 +16,13 @@
 .chat-button {
     background-color: var(--nav-bg, #ccffff);
     color: var(--nav-text, var(--text-color, #000));
-    border: 1px solid var(--border-color, #ccc);
+    border: 2px solid var(--nav-text, #333);
     border-radius: 50px;
     padding: 10px 20px;
     cursor: pointer;
     display: flex;
     align-items: center;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.35);
     font-family: inherit;
     position: relative;
     z-index: 10000;
