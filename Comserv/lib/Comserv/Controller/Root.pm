@@ -199,13 +199,21 @@ sub auto :Private {
         
         # Set up theme using canonical ThemeConfig model with timeout protection
         my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+
+        # Determine request domain (host without port) and non-standard port
+        my $req_host = $c->req->uri->host;   # strips port already
+        my $req_port = $c->req->uri->port;
+        $c->stash->{req_port} = ($req_port && $req_port != 80 && $req_port != 443) ? $req_port : 0;
+
         eval {
             local $SIG{ALRM} = sub { die "Theme fetch timeout\n"; };
             alarm(3);  # 3 second timeout for theme fetch
             my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $SiteName);
             $c->stash->{theme_name} = $theme_name;
-            my $site_favicon = $c->model('ThemeConfig')->get_site_favicon($c, $SiteName);
-            $c->stash->{site_favicon} = $site_favicon if $site_favicon;
+            # Favicon priority: domain-specific → site-specific → default (handled in template)
+            my $domain_favicon = $c->model('ThemeConfig')->get_domain_favicon($c, $req_host);
+            my $site_favicon   = $c->model('ThemeConfig')->get_site_favicon($c, $SiteName);
+            $c->stash->{site_favicon} = $domain_favicon || $site_favicon || '';
             alarm(0);
         };
         alarm(0);  # Make sure alarm is cancelled
@@ -1819,6 +1827,41 @@ sub begin :Private {
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "BEGIN INIT ERROR: $@");
     }
+}
+
+sub port_favicon :Path('/favicon/port') :Args(1) {
+    my ($self, $c, $port) = @_;
+
+    unless ($port && $port =~ /^\d{1,5}$/ && $port > 0 && $port <= 65535) {
+        $c->response->status(400);
+        $c->response->content_type('text/plain');
+        $c->response->body('Invalid port');
+        return;
+    }
+
+    my @colors = (
+        '#1565C0',  # 0 – dark blue
+        '#2E7D32',  # 1 – dark green
+        '#E65100',  # 2 – deep orange
+        '#6A1B9A',  # 3 – deep purple
+        '#B71C1C',  # 4 – dark red
+        '#00695C',  # 5 – dark teal
+        '#4E342E',  # 6 – brown
+        '#37474F',  # 7 – blue-grey
+    );
+    my $bg     = $colors[$port % 8];
+    my $len    = length($port);
+    my $fs     = $len <= 3 ? 14 : $len == 4 ? 11 : 9;
+    my $y      = $len <= 3 ? 22 : 21;
+
+    my $svg = qq{<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="4" fill="$bg"/>
+  <text x="16" y="$y" text-anchor="middle" font-family="monospace,sans-serif" font-weight="bold" font-size="$fs" fill="white">$port</text>
+</svg>};
+
+    $c->response->content_type('image/svg+xml');
+    $c->response->headers->header('Cache-Control' => 'public, max-age=86400');
+    $c->response->body($svg);
 }
 
 sub end : ActionClass('RenderView') {
