@@ -214,6 +214,12 @@ sub auto :Private {
             my $domain_favicon = $c->model('ThemeConfig')->get_domain_favicon($c, $req_host);
             my $site_favicon   = $c->model('ThemeConfig')->get_site_favicon($c, $SiteName);
             $c->stash->{site_favicon} = $domain_favicon || $site_favicon || '';
+            # Stash theme primary colour (stripped of #) for port-favicon background
+            my $theme_data  = $c->model('ThemeConfig')->get_theme($c, $theme_name) || {};
+            my $theme_vars  = $theme_data->{variables} || {};
+            my $bg_raw      = $theme_vars->{'primary-color'} || $theme_vars->{'background-color'} || '#ccffff';
+            (my $bg_hex = $bg_raw) =~ s/^#//;
+            $c->stash->{favicon_bg_color} = $bg_hex;
             alarm(0);
         };
         alarm(0);  # Make sure alarm is cancelled
@@ -1829,6 +1835,24 @@ sub begin :Private {
     }
 }
 
+sub _port_label {
+    my ($port) = @_;
+    my $s = "$port";
+    $s =~ s/0+$// if $s =~ /0+$/;
+    if (length($s) > 2) { $s = substr($s, -2) }
+    $s =~ s/^0// if length($s) == 2 && substr($s, 0, 1) eq '0';
+    return $s || "$port";
+}
+
+sub _svg_text_color {
+    my ($hex) = @_;
+    $hex =~ s/^#//;
+    return 'white' unless $hex =~ /^[0-9a-fA-F]{6}$/;
+    my ($r, $g, $b) = map { hex($_) } ($hex =~ /(..)(..)(..)/);
+    my $lum = (0.299 * $r + 0.587 * $g + 0.114 * $b) / 255;
+    return $lum > 0.5 ? '#222222' : 'white';
+}
+
 sub port_favicon :Path('/favicon/port') :Args(1) {
     my ($self, $c, $port) = @_;
 
@@ -1839,24 +1863,54 @@ sub port_favicon :Path('/favicon/port') :Args(1) {
         return;
     }
 
-    my @colors = (
-        '#1565C0',  # 0 – dark blue
-        '#2E7D32',  # 1 – dark green
-        '#E65100',  # 2 – deep orange
-        '#6A1B9A',  # 3 – deep purple
-        '#B71C1C',  # 4 – dark red
-        '#00695C',  # 5 – dark teal
-        '#4E342E',  # 6 – brown
-        '#37474F',  # 7 – blue-grey
+    my @fallback_colors = (
+        '#1565C0', '#2E7D32', '#E65100', '#6A1B9A',
+        '#B71C1C', '#00695C', '#4E342E', '#37474F',
     );
-    my $bg     = $colors[$port % 8];
-    my $len    = length($port);
-    my $fs     = $len <= 3 ? 14 : $len == 4 ? 11 : 9;
-    my $y      = $len <= 3 ? 22 : 21;
+
+    my $bg_param = $c->req->param('bg') || '';
+    my $bg;
+    if ($bg_param =~ /^[0-9a-fA-F]{6}$/) {
+        $bg = '#' . lc($bg_param);
+    } else {
+        $bg = $fallback_colors[$port % 8];
+    }
+
+    my $label = _port_label($port);
+    my $len   = length($label);
+    my $fs    = $len == 1 ? 20 : $len == 2 ? 15 : 12;
+    my $y     = $len == 1 ? 23 : $len == 2 ? 22 : 21;
+    my $fg    = _svg_text_color($bg);
 
     my $svg = qq{<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" rx="4" fill="$bg"/>
-  <text x="16" y="$y" text-anchor="middle" font-family="monospace,sans-serif" font-weight="bold" font-size="$fs" fill="white">$port</text>
+  <text x="16" y="$y" text-anchor="middle" font-family="monospace,sans-serif" font-weight="bold" font-size="$fs" fill="$fg">$label</text>
+</svg>};
+
+    $c->response->content_type('image/svg+xml');
+    $c->response->headers->header('Cache-Control' => 'public, max-age=3600');
+    $c->response->body($svg);
+}
+
+sub site_favicon :Path('/favicon/site') :Args(1) {
+    my ($self, $c, $sitename) = @_;
+
+    $sitename =~ s/[^A-Za-z0-9_-]//g;
+    my $letter = uc(substr($sitename, 0, 1)) || '?';
+
+    my @palette = (
+        '#1565C0', '#2E7D32', '#E65100', '#6A1B9A',
+        '#B71C1C', '#00695C', '#4E342E', '#37474F',
+        '#AD1457', '#0277BD', '#558B2F', '#EF6C00',
+    );
+    my $sum = 0;
+    $sum += ord($_) for split //, $sitename;
+    my $bg = $palette[$sum % scalar(@palette)];
+    my $fg = _svg_text_color($bg);
+
+    my $svg = qq{<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="4" fill="$bg"/>
+  <text x="16" y="23" text-anchor="middle" font-family="sans-serif" font-weight="bold" font-size="20" fill="$fg">$letter</text>
 </svg>};
 
     $c->response->content_type('image/svg+xml');
