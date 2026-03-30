@@ -2,6 +2,7 @@ package Comserv::Controller::Membership;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::PointSystem;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -132,33 +133,48 @@ sub account :Local :Args(0) {
     }
 
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-    my $memberships = [];
-    my $currency_account = undef;
+    my $user_id   = $c->session->{user_id};
+    my $memberships   = [];
+    my $point_balance = 0;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'account',
+        "Loading account for user_id=$user_id site=$site_name");
 
     eval {
         my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
         if ($site) {
             my @rows = $c->model('DBEncy')->resultset('UserMembership')->search(
-                { user_id => $c->session->{user_id}, site_id => $site->id },
-                { order_by => { -desc => 'created_at' }, prefetch => 'plan' }
+                { 'me.user_id' => $user_id, 'me.site_id' => $site->id },
+                { order_by => { -desc => 'me.created_at' }, prefetch => 'plan' }
             )->all;
             $memberships = \@rows;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'account',
+                "Found " . scalar(@rows) . " membership(s) for site_id=" . $site->id);
+        } else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'account',
+                "Site not found: $site_name");
         }
-
-        $currency_account = $c->model('DBEncy')->resultset('InternalCurrencyAccount')->search(
-            { user_id => $c->session->{user_id} }
-        )->single;
     };
     if ($@) {
-        my $err = "$@";
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'account',
-            "Could not load membership account data: $err");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'account',
+            "Membership query failed: $@");
+    }
+
+    eval {
+        my $ps = Comserv::Util::PointSystem->new(c => $c);
+        $point_balance = $ps->balance($user_id);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'account',
+            "Point balance for user_id=$user_id: $point_balance");
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'account',
+            "Balance lookup failed: $@");
     }
 
     $c->stash(
-        template         => 'membership/Account.tt',
-        memberships      => $memberships,
-        currency_account => $currency_account,
+        template      => 'membership/Account.tt',
+        memberships   => $memberships,
+        point_balance => $point_balance,
     );
     $c->forward($c->view('TT'));
 }

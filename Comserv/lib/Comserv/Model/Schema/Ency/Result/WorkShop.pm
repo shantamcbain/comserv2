@@ -74,6 +74,12 @@ __PACKAGE__->add_columns(
         data_type => 'integer',
         is_nullable => 1,
     },
+    registration_fee => {
+        data_type     => 'decimal',
+        size          => [10, 2],
+        default_value => '0.00',
+        is_nullable   => 1,
+    },
 );
 
 __PACKAGE__->set_primary_key('id');

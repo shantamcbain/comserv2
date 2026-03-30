@@ -90,10 +90,18 @@
         </form>
     </div>
 
+    <div class="function-section" style="border-left-color:#28a745;">
+        <h4>Mailing Lists &amp; Mailouts</h4>
+        <ul>
+            <li><a href="[% c.uri_for('/mail/lists') %]"><strong>Manage Mailing Lists</strong></a> — Create, edit and view subscriber lists for this site</li>
+            <li><a href="[% c.uri_for('/mail/mass_email') %]"><strong>Send a Mailout</strong></a> — Email all site users, paid members, or custom addresses</li>
+        </ul>
+    </div>
+
     <div class="function-section">
         <h4>Server Configuration</h4>
         <ul>
-            <li><a href="[% c.uri_for('/mail/add_mail_config_form') %]">Configure SMTP Settings</a> - Set up outbound mail server</li>
+            <li><a href="[% c.uri_for('/mail/add_mail_config_form') %]">Configure SMTP Settings</a> — Set up outbound mail server</li>
         </ul>
     </div>
     

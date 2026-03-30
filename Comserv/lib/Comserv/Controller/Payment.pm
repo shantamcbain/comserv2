@@ -2,6 +2,7 @@ package Comserv::Controller::Payment;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::PointSystem;
 use DateTime;
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -12,6 +13,68 @@ has 'logging' => (
     is      => 'ro',
     default => sub { Comserv::Util::Logging->instance }
 );
+
+sub _notify_admin_membership {
+    my ($self, $c, $user_id, $plan, $site, $billing_cycle, $price_paid, $currency) = @_;
+    eval {
+        unless (ref $plan) {
+            $plan = $c->model('DBEncy')->resultset('MembershipPlan')->find($plan);
+        }
+        unless (ref $site) {
+            $site = $c->model('DBEncy')->resultset('Site')->find($site);
+        }
+        return unless $plan && $site;
+
+        my $user = $c->model('DBEncy')->resultset('User')->find($user_id);
+        return unless $user;
+
+        my $admin_email = ($site->mail_to_admin)
+            ? $site->mail_to_admin
+            : $c->config->{FallbackSMTP}{username}
+            || 'admin@computersystemconsulting.ca';
+
+        my $site_name  = $site->name;
+        my $user_name  = join(' ', grep { $_ } ($user->first_name, $user->last_name));
+        $user_name   ||= $user->username;
+        my $amount_str = sprintf('%.2f %s', $price_paid || 0,
+                                  $currency || $plan->price_currency || 'USD');
+        my $timestamp  = scalar localtime;
+
+        my $body = <<"END_BODY";
+New Membership Activated — $site_name
+Time: $timestamp
+
+Member : $user_name
+  Username : @{[ $user->username ]}
+  Email    : @{[ $user->email ]}
+  User ID  : $user_id
+
+Plan     : @{[ $plan->name ]}
+Billing  : $billing_cycle
+Amount   : $amount_str
+
+This is an automated notification from the membership system.
+END_BODY
+
+        $c->model('Mail')->send_email(
+            $c,
+            $admin_email,
+            "[Membership] New " . $plan->name . " subscriber on $site_name",
+            $body,
+            eval { $site->id } || undef,
+        );
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            '_notify_admin_membership',
+            "Admin membership notification sent to $admin_email for user_id=$user_id "
+            . "plan=" . $plan->name . " site=$site_name");
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            '_notify_admin_membership',
+            "Could not send admin membership notification: $@");
+    }
+}
 
 sub _alert_admin {
     my ($self, $c, $subject, $body) = @_;
@@ -130,9 +193,9 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
         my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
         $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
         $plan = $c->model('DBEncy')->resultset('MembershipPlan')->find($plan_id) if $plan_id;
-        $account = $c->model('DBEncy')->resultset('InternalCurrencyAccount')->search(
-            { user_id => $c->session->{user_id} }
-        )->single;
+        my $ps = Comserv::Util::PointSystem->new(c => $c);
+        my $balance = $ps->balance($c->session->{user_id});
+        $account = { balance => $balance };
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'internal_checkout',
@@ -159,27 +222,17 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
 
         eval {
             $schema->txn_do(sub {
+                my $ledger_row;
                 if ($final_price > 0) {
-                    unless ($account) {
-                        die "No coin account found. Please contact support to get coins.\n";
-                    }
-                    if ($account->balance < $final_price) {
-                        die sprintf("Insufficient coins. You have %.2f but need %.2f.\n",
-                            $account->balance, $final_price);
-                    }
-
-                    my $new_balance = $account->balance - $final_price;
-                    $account->update({ balance => $new_balance, lifetime_spent => $account->lifetime_spent + $final_price });
-
-                    $c->model('DBEncy')->resultset('InternalCurrencyTransaction')->create({
-                        from_user_id     => $c->session->{user_id},
-                        to_user_id       => undef,
+                    my $ps = Comserv::Util::PointSystem->new(c => $c);
+                    my ($ok, $err) = $ps->debit(
+                        user_id          => $c->session->{user_id},
                         amount           => $final_price,
                         transaction_type => 'spend',
-                        balance_after    => $new_balance,
                         description      => 'Membership: ' . $plan->name . ' (' . $billing_cycle . ')',
                         reference_type   => 'membership',
-                    });
+                    );
+                    die $err . "\n" unless $ok;
                 }
 
                 my $expires_at = undef;
@@ -245,7 +298,8 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
                     payable_type => 'membership',
                     payable_id   => $plan->id,
                     amount       => $final_price,
-                    currency     => $plan->price_currency,
+                    amount_cad   => $final_price,
+                    currency     => $plan->price_currency || 'CAD',
                     provider     => 'internal',
                     status       => 'completed',
                     description  => 'Membership: ' . $plan->name . ' (' . $billing_cycle . ')'
@@ -269,6 +323,9 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
             $c->response->redirect($c->uri_for('/payment/internal/checkout',
                 { plan_id => $plan_id, billing_cycle => $billing_cycle, promo_code => $promo_code }));
         } else {
+            $self->_notify_admin_membership($c,
+                $c->session->{user_id}, $plan, $site,
+                $billing_cycle, $final_price, $plan->price_currency);
             $c->flash->{success_msg} = 'Membership activated! Welcome to ' . $plan->name . '.';
             $c->response->redirect($c->uri_for('/membership/account'));
         }
@@ -338,17 +395,70 @@ sub _paypal_url {
 }
 
 # ============================================================
+# Balance — member point balance and transaction history
+# ============================================================
+sub balance :Path('balance') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_login($c);
+
+    my $user_id  = $c->session->{user_id};
+    my $ps       = Comserv::Util::PointSystem->new(c => $c);
+
+    my $bal      = 0;
+    my $lifetime_earned = 0;
+    my $lifetime_spent  = 0;
+    my @ledger;
+    my $display  = {};
+
+    eval {
+        my $acct = $c->model('DBEncy')->resultset('PointAccount')
+            ->find({ user_id => $user_id });
+        if ($acct) {
+            $bal            = $acct->balance + 0;
+            $lifetime_earned = $acct->lifetime_earned + 0;
+            $lifetime_spent  = $acct->lifetime_spent  + 0;
+        }
+
+        @ledger = $ps->ledger_for_user($user_id, 25)->all;
+
+        $display = $ps->display_amount(
+            points    => $bal,
+            site_name => $c->stash->{SiteName},
+        );
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'balance',
+            "Error loading balance page: $@");
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'balance',
+        "Balance page for user_id=$user_id balance=$bal");
+
+    $c->stash(
+        template        => 'payment/Balance.tt',
+        balance         => $bal,
+        lifetime_earned => $lifetime_earned,
+        lifetime_spent  => $lifetime_spent,
+        ledger          => \@ledger,
+        display         => $display,
+    );
+    $c->forward($c->view('TT'));
+}
+
+# ============================================================
 # Buy Coins — GET: show packages  POST: launch PayPal form
 # ============================================================
 sub buy_coins :Path('buy/coins') :Args(0) {
     my ($self, $c) = @_;
     return unless $self->_require_login($c);
 
-    my $account;
+    my $balance = 0;
+    my @packages;
     eval {
-        $account = $c->model('DBEncy')->resultset('InternalCurrencyAccount')->search(
-            { user_id => $c->session->{user_id} }
-        )->single;
+        my $ps = Comserv::Util::PointSystem->new(c => $c);
+        $balance  = $ps->balance($c->session->{user_id});
+        @packages = $c->model('DBEncy')->resultset('PointPackage')
+            ->search({ is_active => 1 }, { order_by => 'sort_order' })->all;
     };
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'buy_coins',
@@ -356,8 +466,8 @@ sub buy_coins :Path('buy/coins') :Args(0) {
 
     $c->stash(
         template     => 'payment/BuyCoins.tt',
-        packages     => \@COIN_PACKAGES,
-        account      => $account,
+        packages     => \@packages,
+        balance      => $balance,
         paypal_url   => $self->_paypal_url($c),
         paypal_cfg   => $self->_paypal_config($c),
         return_url   => $c->uri_for('/payment/paypal/coins_return')->as_string,
@@ -538,39 +648,28 @@ sub paypal_coins_cancel :Path('paypal/coins_cancel') :Args(0) {
 sub _credit_coins {
     my ($self, $c, $user_id, $coins, $provider, $tx_id, $description) = @_;
 
-    my $schema = $c->model('DBEncy')->schema;
-    $schema->txn_do(sub {
-        my $acct = $schema->resultset('InternalCurrencyAccount')->find_or_create(
-            { user_id => $user_id },
-            { key => 'primary' }
-        );
-        my $new_balance = ($acct->balance || 0) + $coins;
-        $acct->update({
-            balance        => $new_balance,
-            lifetime_earned => ($acct->lifetime_earned || 0) + $coins,
-        });
+    my $ps = Comserv::Util::PointSystem->new(c => $c);
+    my $ledger = $ps->credit(
+        user_id          => $user_id,
+        amount           => $coins,
+        transaction_type => 'purchase',
+        description      => $description,
+    );
 
-        $schema->resultset('InternalCurrencyTransaction')->create({
-            to_user_id       => $user_id,
-            from_user_id     => undef,
-            amount           => $coins,
-            transaction_type => 'earn',
-            balance_after    => $new_balance,
-            description      => $description,
-            reference_type   => 'purchase',
-        });
-
-        $schema->resultset('PaymentTransaction')->create({
-            user_id      => $user_id,
-            payable_type => 'coins',
-            payable_id   => $coins,
-            amount       => $coins,
-            currency     => 'COINS',
-            provider     => $provider,
-            status       => 'completed',
-            description  => $description,
-            ip_address   => eval { $c->req->address } || undef,
-        });
+    $c->model('DBEncy')->resultset('PaymentTransaction')->create({
+        user_id                 => $user_id,
+        payable_type            => 'point_purchase',
+        payable_id              => undef,
+        amount                  => $coins,
+        amount_cad              => $coins,
+        currency                => 'CAD',
+        provider                => $provider,
+        provider_transaction_id => $tx_id || undef,
+        status                  => 'completed',
+        description             => $description,
+        points_credited         => $coins,
+        point_ledger_id         => $ledger->id,
+        ip_address              => eval { $c->req->address } || undef,
     });
 }
 
@@ -639,6 +738,9 @@ sub paypal_return :Path('paypal/return') :Args(0) {
                 . "User ID: $user_id\nError: $err");
             $c->flash->{error_msg} = 'Payment received but membership activation failed. Please contact support with reference: ' . ($tx || 'unknown');
         } else {
+            $self->_notify_admin_membership($c,
+                $user_id, $plan_id, $site_id,
+                $billing || 'monthly', undef, undef);
             $c->flash->{success_msg} = 'Payment confirmed via PayPal! Your membership is now active.';
         }
     } else {
