@@ -3,7 +3,14 @@ use Moose;
 use namespace::autoclean;
 use Data::FormValidator;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::Logging;
+use Comserv::Util::PointSystem;
 BEGIN { extends 'Catalyst::Controller'; }
+
+has 'logging' => (
+    is      => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
 
 # In Workshop Controller
 sub index :Path :Args(0) {
@@ -148,13 +155,13 @@ sub dashboard :Local {
     my $admin_type = $admin_auth->get_admin_type($c);
     my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
 
-    $c->log->debug("Dashboard: user_id=$user_id, sitename=$sitename, admin_type=$admin_type, is_csc_admin=$is_csc_admin");
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'workshop', "Dashboard: user_id=$user_id, sitename=$sitename, admin_type=$admin_type, is_csc_admin=$is_csc_admin");
 
     my $search_filter;
 
     if ($is_csc_admin) {
         $search_filter = {};
-        $c->log->debug("Dashboard: CSC admin - showing ALL workshops");
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'workshop', "Dashboard: CSC admin - showing ALL workshops");
     } else {
         $search_filter = {
             -or => [
@@ -164,7 +171,7 @@ sub dashboard :Local {
         if ($sitename) {
             push @{$search_filter->{-or}}, { sitename => $sitename, created_by => undef };
         }
-        $c->log->debug("Dashboard: Regular admin filter applied");
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'workshop', "Dashboard: Regular admin filter applied");
     }
 
     my @my_workshops = $schema->resultset('WorkShop')->search(
@@ -175,7 +182,7 @@ sub dashboard :Local {
         }
     )->all;
 
-    $c->log->debug("Dashboard: Found " . scalar(@my_workshops) . " workshops from main search");
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'workshop', "Dashboard: Found " . scalar(@my_workshops) . " workshops from main search");
 
     my @workshop_leader_ids = $schema->resultset('WorkshopRole')->search(
         {
@@ -218,11 +225,21 @@ sub dashboard :Local {
 sub add :Local {
     my ( $self, $c ) = @_;
 
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/workshop/add' }));
+        return;
+    }
+
     # Set the TT template to use
     $c->stash->{template} = 'WorkShops/AddWorkshop.tt';
 }
 sub addworkshop :Local {
     my ( $self, $c ) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
 
     # Retrieve the form data from the request
     my $params = $c->request->parameters;
@@ -306,7 +323,7 @@ sub addworkshop :Local {
     if ($@) {
         # Log error with details and send email to site admin
         my $error_msg = "Failed to create workshop: $@";
-        $c->log->error($error_msg);
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', $error_msg);
         
         # Send error notification to site admin
         $self->_send_error_notification($c, {
@@ -396,7 +413,7 @@ sub details :Path('/workshop/details') :Args(0) {
     };
 
     if ($@ || !$workshop) {
-        $c->log->error("Failed to find workshop with ID $id: " . ($@ || 'Workshop not found'));
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to find workshop with ID $id: " . ($@ || 'Workshop not found'));
         $c->flash->{error_msg} = 'Failed to find workshop: ' . ($@ || 'Workshop not found');
         $c->response->redirect($c->uri_for($self->action_for('index')));
         return;
@@ -416,7 +433,7 @@ sub details :Path('/workshop/details') :Args(0) {
             }
         };
         if ($@) {
-            $c->log->error("Error formatting workshop date: $@");
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Error formatting workshop date: $@");
             $formatted_date = $workshop->date || '';
         }
     }
@@ -458,7 +475,7 @@ sub details :Path('/workshop/details') :Args(0) {
             };
         }
     };
-    $c->log->error("details: file query error: $@") if $@;
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "details: file query error: $@") if $@;
 
     eval {
         my @resources = $schema->resultset('WorkshopResource')->search(
@@ -477,7 +494,7 @@ sub details :Path('/workshop/details') :Args(0) {
             };
         }
     };
-    $c->log->error("details: resource query error: $@") if $@;
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "details: resource query error: $@") if $@;
 
     # Get workshop content
     my @workshop_content = $schema->resultset('WorkshopContent')->search(
@@ -522,13 +539,13 @@ sub edit :Path('/workshop/edit') :Args(1) {
     my $is_leader = $self->_is_workshop_leader($c, $workshop);
     my $can_edit = $self->_can_edit_workshop($c, $workshop);
     
-    $c->log->info("Edit Workshop Authorization Debug:");
-    $c->log->info("  Workshop ID: " . $workshop->id);
-    $c->log->info("  Workshop created_by: " . ($workshop->created_by || 'NULL'));
-    $c->log->info("  Session user_id: " . ($user_id || 'NULL'));
-    $c->log->info("  Admin type: " . ($admin_type || 'NONE'));
-    $c->log->info("  Is workshop leader: " . ($is_leader ? 'YES' : 'NO'));
-    $c->log->info("  Can edit workshop: " . ($can_edit ? 'YES' : 'NO'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "Edit Workshop Authorization Debug:");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  Workshop ID: " . $workshop->id);
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  Workshop created_by: " . ($workshop->created_by || 'NULL'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  Session user_id: " . ($user_id || 'NULL'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  Admin type: " . ($admin_type || 'NONE'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  Is workshop leader: " . ($is_leader ? 'YES' : 'NO'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  Can edit workshop: " . ($can_edit ? 'YES' : 'NO'));
 
     # Authorization check using helper method
     unless ($can_edit) {
@@ -537,85 +554,93 @@ sub edit :Path('/workshop/edit') :Args(1) {
         return;
     }
 
+    my @all_sites = $c->model('DBEncy')->resultset('Site')->search({}, { order_by => 'name' })->all;
+
+    my $raw_date = $workshop->date;
+    my $formatted_date = '';
+    if ($raw_date) {
+        if (ref($raw_date) && $raw_date->can('strftime')) {
+            $formatted_date = $raw_date->strftime('%Y-%m-%d');
+        } else {
+            ($formatted_date = "$raw_date") =~ s/ .*$//;
+        }
+    }
+
     # For GET requests, display the edit form
     if ($c->request->method eq 'GET') {
-        my $raw_date = $workshop->date;
-        my $formatted_date = '';
-        if ($raw_date) {
-            if (ref($raw_date) && $raw_date->can('strftime')) {
-                $formatted_date = $raw_date->strftime('%Y-%m-%d');
-            } else {
-                ($formatted_date = "$raw_date") =~ s/ .*$//;
-            }
-        }
-
         $c->stash(
-            workshop => $workshop,
+            workshop       => $workshop,
             formatted_date => $formatted_date,
-            template => 'WorkShops/Edit.tt'
+            all_sites      => \@all_sites,
+            template       => 'WorkShops/Edit.tt',
         );
         return;
     }
 
     # Handle POST request for updates
     if ($c->request->method eq 'POST') {
-        my $params = $c->request->body_parameters;
-        my $old_share = $workshop->share;
-        my $new_share = $params->{share};
-        
+        my $params    = $c->request->body_parameters;
+        my $old_share = $workshop->share || '';
+        my $new_share = $params->{share} || 'private';
+        my $new_sitename = $params->{sitename} || $workshop->sitename;
+
+        my $err;
         eval {
             $workshop->update({
-                title                => $params->{title},
-                description          => $params->{description},
-                date                 => $params->{date},
-                time                 => $params->{time},
-                end_time             => $params->{end_time},
-                location             => $params->{location},
-                instructor           => $params->{instructor},
-                max_participants     => $params->{max_participants},
-                share                => $new_share,
-                status               => $params->{status},
-                registration_deadline => $params->{registration_deadline},
+                title                 => $params->{title},
+                description           => $params->{description},
+                date                  => $params->{date},
+                time                  => $params->{time},
+                end_time              => $params->{end_time},
+                location              => $params->{location},
+                instructor            => $params->{instructor},
+                max_participants      => $params->{max_participants},
+                share                 => $new_share,
+                status                => $params->{status},
+                registration_deadline => $params->{registration_deadline} || undef,
+                sitename              => $new_sitename,
             });
-            
+
             # Update site_workshop records if share setting changed
             if ($old_share ne $new_share) {
                 my $schema = $c->model('DBEncy');
-                
-                # Delete existing site_workshop records
-                $schema->resultset('SiteWorkshop')->search({
-                    workshop_id => $workshop->id
-                })->delete;
-                
-                # Create new records based on new share setting
+                $schema->resultset('SiteWorkshop')->search({ workshop_id => $workshop->id })->delete;
+
                 if ($new_share eq 'public') {
-                    # Create records for all sites
-                    my @all_sites = $schema->resultset('Site')->all;
                     for my $site (@all_sites) {
                         $schema->resultset('SiteWorkshop')->create({
-                            site_id => $site->id,
-                            workshop_id => $workshop->id,
+                            site_id => $site->id, workshop_id => $workshop->id,
                         });
                     }
                 } else {
-                    # Create record only for workshop's site
-                    if ($workshop->site_id) {
+                    my $site_obj = $schema->resultset('Site')->search({ name => $new_sitename })->first;
+                    if ($site_obj) {
                         $schema->resultset('SiteWorkshop')->create({
-                            site_id => $workshop->site_id,
-                            workshop_id => $workshop->id,
+                            site_id => $site_obj->id, workshop_id => $workshop->id,
                         });
                     }
                 }
             }
         };
+        $err = "$@" if $@;
 
-        if ($@) {
-            $c->stash->{error_msg} = 'Failed to update workshop: ' . $@;
-        } else {
-            $c->flash->{success_msg} = 'Workshop updated successfully.';
-            $c->res->redirect($c->uri_for($self->action_for('index')));
+        if ($err) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to update workshop " . $workshop->id . ": $err");
+            $c->stash(
+                workshop       => $workshop,
+                formatted_date => $formatted_date,
+                all_sites      => \@all_sites,
+                error_msg      => "Failed to update workshop: $err",
+                template       => 'WorkShops/Edit.tt',
+            );
+            $c->forward($c->view('TT'));
             return;
         }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "Workshop " . $workshop->id . " updated by user " . ($c->session->{user_id} || 'unknown'));
+        $c->flash->{success_msg} = 'Workshop updated successfully.';
+        $c->res->redirect($c->uri_for($self->action_for('index')));
+        return;
     }
 }
 
@@ -674,24 +699,24 @@ sub _check_workshop_access {
     if ($required_level eq 'leader' || $required_level eq 'edit') {
         # Site admin can edit workshops from their site
         if ($admin_type eq 'standard' && $sitename && $sitename eq $workshop->sitename) {
-            $c->log->info("_check_workshop_access: GRANTED (site admin for " . $sitename . ")");
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "_check_workshop_access: GRANTED (site admin for " . $sitename . ")");
             return 1;
         }
         
         # Workshop leader (creator or workshop_roles)
         if ($self->_is_workshop_leader($c, $workshop)) {
-            $c->log->info("_check_workshop_access: GRANTED (workshop leader)");
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "_check_workshop_access: GRANTED (workshop leader)");
             return 1;
         }
         
         # Fallback: If created_by is NULL and user is admin, allow edit
         if (!$workshop->created_by && ($admin_type eq 'standard' || $admin_type eq 'csc' || $admin_type eq 'special')) {
-            $c->log->info("_check_workshop_access: GRANTED (created_by is NULL and user is admin)");
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "_check_workshop_access: GRANTED (created_by is NULL and user is admin)");
             return 1;
         }
     }
     
-    $c->log->info("_check_workshop_access: DENIED (no matching authorization criteria)");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "_check_workshop_access: DENIED (no matching authorization criteria)");
     return 0;
 }
 
@@ -701,12 +726,12 @@ sub _is_workshop_leader {
     my $user_id = $c->session->{user_id};
     return 0 unless $user_id;
     
-    $c->log->info("_is_workshop_leader check:");
-    $c->log->info("  user_id: " . ($user_id || 'NULL'));
-    $c->log->info("  workshop.created_by: " . ($workshop->created_by || 'NULL'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "_is_workshop_leader check:");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  user_id: " . ($user_id || 'NULL'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  workshop.created_by: " . ($workshop->created_by || 'NULL'));
     
     if ($workshop->created_by && $user_id && $workshop->created_by == $user_id) {
-        $c->log->info("  Result: TRUE (created_by matches)");
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  Result: TRUE (created_by matches)");
         return 1;
     }
     
@@ -716,8 +741,8 @@ sub _is_workshop_leader {
         role => 'workshop_leader'
     })->count > 0;
     
-    $c->log->info("  has_leader_role from workshop_roles: " . ($has_leader_role ? 'YES' : 'NO'));
-    $c->log->info("  Result: " . ($has_leader_role ? 'TRUE' : 'FALSE'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  has_leader_role from workshop_roles: " . ($has_leader_role ? 'YES' : 'NO'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "  Result: " . ($has_leader_role ? 'TRUE' : 'FALSE'));
     
     return $has_leader_role;
 }
@@ -907,7 +932,7 @@ sub delete :Local :Args(1) {
     };
     
     if ($@) {
-        $c->log->error("Failed to delete workshop: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to delete workshop: $@");
         $c->flash->{error_msg} = 'Failed to delete workshop: ' . $@;
         $c->response->redirect($c->uri_for($self->action_for('dashboard')));
     } else {
@@ -964,6 +989,24 @@ sub register :Local :Args(1) {
         $participant_status = 'registered';
     }
     
+    my $registration_fee = $workshop->registration_fee || 0;
+    if ($registration_fee > 0 && $participant_status eq 'registered') {
+        my $ps = Comserv::Util::PointSystem->new(c => $c);
+        my ($ok, $err) = $ps->debit(
+            user_id          => $user_id,
+            amount           => $registration_fee,
+            transaction_type => 'spend',
+            description      => 'Workshop registration: ' . $workshop->title,
+            reference_type   => 'workshop',
+            reference_id     => $id,
+        );
+        unless ($ok) {
+            $c->flash->{error_msg} = $err || 'Insufficient points to register for this workshop.';
+            $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
+            return;
+        }
+    }
+
     my $participant;
     eval {
         $participant = $c->model('DBEncy::Participant')->create({
@@ -1008,30 +1051,37 @@ sub register :Local :Args(1) {
                 }
             }
             
-            $c->stash->{email} = {
-                to       => $email,
-                from     => $from_address,
-                reply_to => $reply_to,
-                subject  => 'Workshop Registration Confirmation - ' . $workshop->title,
-                template => 'email/workshop/registration_confirmation.tt',
-                template_vars => {
-                    name => $user_name,
-                    workshop_title => $workshop->title,
-                    workshop_instructor => $workshop->instructor,
-                    workshop_date => $formatted_date,
-                    workshop_time => $formatted_time,
-                    workshop_end_time => $formatted_end_time,
-                    workshop_location => $workshop->location,
-                    workshop_url => $full_url,
-                    status => $participant_status,
-                },
-            };
-            
-            $c->forward($c->view('Email::Template'));
+            my $status_line = $participant_status eq 'registered'
+                ? "Your registration is confirmed! We look forward to seeing you."
+                : "You are on the waitlist. We will notify you if a spot becomes available.";
+            my $time_range = $formatted_time;
+            $time_range .= " - $formatted_end_time" if $formatted_end_time;
+            my $reg_body = "Hello $user_name,\n\n"
+                . "Thank you for registering for the following workshop:\n\n"
+                . "  " . $workshop->title . "\n"
+                . "  Instructor: " . ($workshop->instructor || '') . "\n"
+                . "  Date:       $formatted_date\n"
+                . "  Time:       $time_range\n"
+                . "  Location:   " . ($workshop->location || '') . "\n\n"
+                . "$status_line\n\n"
+                . "Workshop details: $full_url\n\n"
+                . "Best regards,\nThe Workshop Team\n";
+
+            my $reg_result = $c->model('Mail')->send_email(
+                $c,
+                $email,
+                'Workshop Registration Confirmation - ' . $workshop->title,
+                $reg_body,
+                undef,
+            );
+            unless ($reg_result) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'workshop',
+                    "Registration confirmation email not delivered to $email (Model::Mail returned failure)");
+            }
         };
         
         if ($@) {
-            $c->log->warn("Failed to send registration confirmation email: $@");
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'workshop', "Failed to send registration confirmation email: $@");
         }
     }
     
@@ -1082,7 +1132,24 @@ sub unregister :Local :Args(1) {
     if ($@) {
         $c->flash->{error_msg} = 'Failed to cancel registration: ' . $@;
     } else {
-        $c->flash->{success_msg} = 'Your registration has been cancelled.';
+        my $registration_fee = $workshop->registration_fee || 0;
+        if ($registration_fee > 0 && $participant->status eq 'cancelled') {
+            eval {
+                my $ps = Comserv::Util::PointSystem->new(c => $c);
+                $ps->credit(
+                    user_id          => $user_id,
+                    amount           => $registration_fee,
+                    transaction_type => 'refund',
+                    description      => 'Workshop cancellation refund: ' . $workshop->title,
+                    reference_type   => 'workshop',
+                    reference_id     => $id,
+                );
+            };
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'unregister',
+                "Refund failed: $@") if $@;
+        }
+        $c->flash->{success_msg} = 'Your registration has been cancelled.'
+            . ($registration_fee > 0 ? " $registration_fee points have been refunded." : '');
     }
     
     $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
@@ -1108,7 +1175,7 @@ sub participants :Local :Args(1) {
     my @registered = $c->model('DBEncy::Participant')->search(
         {
             workshop_id => $id,
-            status => 'registered'
+            'me.status' => 'registered'
         },
         {
             order_by => { -asc => 'registered_at' },
@@ -1119,7 +1186,7 @@ sub participants :Local :Args(1) {
     my @waitlist = $c->model('DBEncy::Participant')->search(
         {
             workshop_id => $id,
-            status => 'waitlist'
+            'me.status' => 'waitlist'
         },
         {
             order_by => { -asc => 'registered_at' },
@@ -1129,9 +1196,9 @@ sub participants :Local :Args(1) {
     
     $c->stash(
         workshop => $workshop,
-        registered_participants => \@registered,
-        waitlist_participants => \@waitlist,
-        template => 'WorkShops/Participants.tt',
+        registered => \@registered,
+        waitlist   => \@waitlist,
+        template   => 'WorkShops/Participants.tt',
     );
 }
 
@@ -1215,10 +1282,15 @@ sub add_participant :Local :Args(1) {
             status => $participant_status,
         });
     };
-    
-    if ($@) {
-        $c->flash->{error_msg} = 'Failed to add participant: ' . $@;
+    my $create_err = "$@" if $@;
+
+    if ($create_err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_participant',
+            "Failed to create participant for workshop_id=$id email=$email: $create_err");
+        $c->flash->{error_msg} = "Failed to add participant: $create_err";
     } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_participant',
+            "Participant added: workshop_id=$id name=$name email=$email status=$participant_status");
         if ($participant_status eq 'registered') {
             $c->flash->{success_msg} = "Participant added successfully.";
         } else {
@@ -1358,7 +1430,7 @@ sub upload :Local :Args(1) {
     
     unless (-d $upload_dir) {
         mkdir $upload_dir or do {
-            $c->log->error("Failed to create upload directory: $!");
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to create upload directory: $!");
             $c->flash->{error_msg} = 'Failed to create upload directory.';
             $c->response->redirect($c->uri_for($self->action_for('files'), [$id]));
             return;
@@ -1393,7 +1465,7 @@ sub upload :Local :Args(1) {
     };
     
     if ($@) {
-        $c->log->error("File upload failed: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "File upload failed: $@");
         $c->flash->{error_msg} = "Failed to upload file: $@";
     } else {
         $c->flash->{success_msg} = 'File uploaded successfully.';
@@ -1461,7 +1533,7 @@ sub download :Local :Args(1) {
             close $fh;
         };
         if ($@) {
-            $c->log->error("download read error: $@");
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "download read error: $@");
             $c->flash->{error_msg} = 'Failed to read file.';
             $c->response->redirect($back_url);
             return;
@@ -1709,7 +1781,7 @@ sub resources :Path('/workshop/resources') :Args(0) {
     };
     if ($@) {
         $db_error = $@;
-        $c->log->error("Resource library DB error: $db_error");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Resource library DB error: $db_error");
     }
     my $matches_filter = sub {
         my ($row, $filter_name, $search_text) = @_;
@@ -1842,7 +1914,7 @@ sub resources :Path('/workshop/resources') :Args(0) {
     };
     if ($@) {
         $lib_error = $@;
-        $c->log->error("File library DB error: $lib_error");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "File library DB error: $lib_error");
     }
     if ($lib_filter ne 'all') {
         @file_library = grep { $matches_filter->($_, $lib_filter, '') } @file_library;
@@ -1975,7 +2047,7 @@ sub resource_fs_list :Path('/workshop/resource_fs_list') :Args(0) {
         closedir($dh);
     };
     eval { $scan->($nfs_root, '') };
-    $c->log->error("NFS scan error: $@") if $@;
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "NFS scan error: $@") if $@;
 
     @files = sort { lc($a->{file_name}) cmp lc($b->{file_name}) } @files;
 
@@ -2077,7 +2149,7 @@ sub resource_upload :Path('/workshop/resource_upload') :Args(0) {
         });
     };
     if ($@) {
-        $c->log->error("resource_upload DB error: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_upload DB error: $@");
         $c->flash->{error_msg} = "File saved to storage but database record failed: $@. Please contact the administrator.";
     } else {
         $c->flash->{success_msg} = "File '$filename' uploaded successfully.";
@@ -2142,7 +2214,7 @@ sub resource_add_url :Path('/workshop/resource_add_url') :Args(0) {
         });
     };
     if ($@) {
-        $c->log->error("resource_add_url DB error: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_add_url DB error: $@");
         $c->flash->{error_msg} = "Failed to save link: $@";
     } else {
         $c->flash->{success_msg} = "Link '$title' added successfully.";
@@ -2166,7 +2238,7 @@ sub resource_download :Path('/workshop/resource_download') :Args(1) {
     $find_err = $@;
 
     if ($find_err || !$resource) {
-        $c->log->error("resource_download find error: " . ($find_err || 'not found'));
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_download find error: " . ($find_err || 'not found'));
         $c->flash->{error_msg} = 'File not found.';
         $c->response->redirect($c->uri_for($self->action_for('index')));
         return;
@@ -2229,7 +2301,7 @@ sub resource_download :Path('/workshop/resource_download') :Args(1) {
         close $fh;
     };
     if ($@) {
-        $c->log->error("resource_download read error: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_download read error: $@");
         $c->flash->{error_msg} = "Could not read file.";
         $c->response->redirect($back_url);
         return;
@@ -2286,7 +2358,7 @@ sub resource_view :Path('/workshop/resource_view') :Args(1) {
             $c->response->body($data);
         };
         if ($@) {
-            $c->log->error("resource_view serve error: $@");
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_view serve error: $@");
             return $json_error->(500, "Cannot read file: $@");
         }
         return;
@@ -2332,7 +2404,7 @@ sub resource_view :Path('/workshop/resource_view') :Args(1) {
         );
     };
     if ($@) {
-        $c->log->error("resource_view metadata error: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_view metadata error: $@");
         return $json_error->(500, "Error building metadata: $@");
     }
 }
@@ -2362,13 +2434,13 @@ sub resource_delete :Path('/workshop/resource_delete') :Args(1) {
 
     my $full_path = $self->_resolve_storage_path($c, $resource->file_path // '');
     if (-f $full_path) {
-        unlink($full_path) or $c->log->warn("Could not delete NFS file '$full_path': $!");
+        unlink($full_path) or $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'workshop', "Could not delete NFS file '$full_path': $!");
     }
 
     my $name = $resource->file_name;
     eval { $resource->delete };
     if ($@) {
-        $c->log->error("resource_delete DB error: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_delete DB error: $@");
         $c->flash->{error_msg} = "Failed to remove database record: $@";
     } else {
         $c->flash->{success_msg} = "File '$name' deleted.";
@@ -2411,7 +2483,7 @@ sub resource_fs_download :Path('/workshop/resource_fs_download') :Args(0) {
         close $fh;
     };
     if ($@) {
-        $c->log->error("resource_fs_download read error: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_fs_download read error: $@");
         $c->flash->{error_msg} = "Could not read file: $@";
         $c->response->redirect($c->uri_for('/workshop/resources'));
         return;
@@ -2747,7 +2819,7 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
                             $existing_files{$full} = $rec;
                         };
                         if ($@) {
-                            $c->log->error("resource_scan_nfs files insert error for $full: $@");
+                            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_scan_nfs files insert error for $full: $@");
                             $errors++;
                         }
                     }
@@ -2773,7 +2845,7 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
                         $inserted++ if $target_table eq 'workshop_resource';
                     };
                     if ($@) {
-                        $c->log->error("resource_scan_nfs workshop_resource insert error for $full: $@");
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_scan_nfs workshop_resource insert error for $full: $@");
                         $errors++ if $target_table eq 'workshop_resource';
                     }
                 }
@@ -2783,7 +2855,7 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
     };
 
     eval { $scan->($scan_root) };
-    $c->log->error("NFS scan failed: $@") if $@;
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "NFS scan failed: $@") if $@;
 
     my $target_label = $target_table eq 'both' ? 'files + workshop_resource' : $target_table;
     my $msg = "NFS scan of '$scan_root' → $target_label: $inserted new, $skipped already in DB, $duplicates duplicates, $errors errors.";
@@ -2857,7 +2929,7 @@ sub file_view :Path('/workshop/file_view') :Args(1) {
         $c->response->body($data);
     };
     if ($@) {
-        $c->log->error("file_view read error: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "file_view read error: $@");
         $c->response->status(500);
         $c->response->body('Could not read file');
     }
@@ -2936,7 +3008,7 @@ sub resource_attach :Path('/workshop/resource_attach') :Args(0) {
         });
     };
     if ($@) {
-        $c->log->error("resource_attach error: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "resource_attach error: $@");
         $c->flash->{error_msg} = 'Failed to attach file: ' . (split /\n/, $@)[0];
     } else {
         my $ws_label = ($workshop_id && $workshop_id =~ /^\d+$/) ? " to workshop #$workshop_id" : '';
@@ -3075,7 +3147,7 @@ sub file_update :Path('/workshop/file_update') :Args(0) {
 
     if (!$ok || $@) {
         my $err = $@ || 'unknown error';
-        $c->log->error("file_update failed for file_id=$file_id: $err");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "file_update failed for file_id=$file_id: $err");
         $c->flash->{error_msg} = 'Failed to update file record.';
     } else {
         $c->flash->{success_msg} = "Updated file '$new_name'.";
@@ -3169,7 +3241,7 @@ sub add_content :Local :Args(1) {
     };
     
     if ($@) {
-        $c->log->error("Failed to create content: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to create content: $@");
         $c->flash->{error_msg} = "Failed to create content: $@";
     } else {
         $c->flash->{success_msg} = 'Content added successfully.';
@@ -3232,7 +3304,7 @@ sub edit_content :Local :Args(1) {
     };
     
     if ($@) {
-        $c->log->error("Failed to update content: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to update content: $@");
         $c->flash->{error_msg} = "Failed to update content: $@";
     } else {
         $c->flash->{success_msg} = 'Content updated successfully.';
@@ -3266,7 +3338,7 @@ sub delete_content :Local :Args(1) {
     };
     
     if ($@) {
-        $c->log->error("Failed to delete content: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to delete content: $@");
         $c->flash->{error_msg} = "Failed to delete content: $@";
     } else {
         $c->flash->{success_msg} = 'Content deleted successfully.';
@@ -3311,7 +3383,7 @@ sub reorder_content :Local :Args(1) {
                 $content_record->update({ sort_order => $sort_order });
             };
             if ($@) {
-                $c->log->error("Failed to update sort_order for content $content_id: $@");
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to update sort_order for content $content_id: $@");
             }
             $sort_order++;
         }
@@ -3342,11 +3414,93 @@ sub compose_email :Local :Args(1) {
         workshop_id => $id,
         status => 'registered'
     })->count;
-    
+
+    # Get leader email to pre-fill reply-to field
+    my $leader_email_default = '';
+    if ($workshop->created_by) {
+        my $lu = $c->model('DBEncy::User')->find($workshop->created_by);
+        $leader_email_default = $lu->email || '' if $lu;
+    }
+
+    my @workshop_templates = $c->model('DBEncy::WorkshopMailTemplate')->search(
+        { workshop_id => $id, is_active => 1 },
+        { order_by => { -asc => 'name' } }
+    )->all;
+    my @global_templates = $c->model('DBEncy::WorkshopMailTemplate')->search(
+        { workshop_id => undef, is_active => 1 },
+        { order_by => { -asc => 'name' } }
+    )->all;
+
+    # Fetch all other workshops this leader owns (or all workshops for CSC admin)
+    my $user_id    = $c->session->{user_id};
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my @leader_workshops_raw;
+    if ($admin_type eq 'CSC') {
+        @leader_workshops_raw = $c->model('DBEncy::WorkShop')->search(
+            { id => { '!=' => $id } },
+            { order_by => { -asc => 'title' } }
+        )->all;
+    } elsif ($user_id) {
+        @leader_workshops_raw = $c->model('DBEncy::WorkShop')->search(
+            { created_by => $user_id, id => { '!=' => $id } },
+            { order_by => { -asc => 'title' } }
+        )->all;
+    }
+
+    # Pre-compute participant counts — TT cannot call .search({}) on DBIC relationships
+    my @leader_workshops = map {
+        my $ws = $_;
+        my $cnt = $c->model('DBEncy::Participant')->search({
+            workshop_id => $ws->id,
+            status      => 'registered',
+        })->count;
+        { workshop => $ws, count => $cnt }
+    } @leader_workshops_raw;
+
+    # Fetch ALL unique participants across primary + all leader workshops for the recipient checklist
+    my @all_ids = ($id, map { $_->{workshop}->id } @leader_workshops);
+    my @all_participants_rs = $c->model('DBEncy::Participant')->search(
+        { workshop_id => \@all_ids, 'me.status' => 'registered' },
+        { prefetch => 'user', order_by => [\'me.name', \'me.email'] }
+    )->all;
+
+    # Deduplicate by email, keep best name
+    my %seen_email;
+    my @all_recipients;
+    for my $p (@all_participants_rs) {
+        my $email = $p->email || '';
+        next unless $email =~ /\@/;
+        next if $seen_email{lc $email}++;
+        my $name = '';
+        if ($p->user) {
+            $name = join(' ', grep { $_ } ($p->user->first_name, $p->user->last_name));
+            $name ||= $p->user->username || '';
+        }
+        $name ||= $p->name || '';
+        $name =~ s/^\s+|\s+$//g;
+        push @all_recipients, {
+            email       => $email,
+            name        => $name,
+            display     => $name ? "$name <$email>" : $email,
+            workshop_id => $p->workshop_id,
+        };
+    }
+    my $unique_total = scalar @all_recipients;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'compose_email',
+        "compose_email for workshop_id=$id: primary=$registered_count unique_total=$unique_total");
+
     $c->stash(
-        workshop => $workshop,
-        recipient_count => $registered_count,
-        template => 'WorkShops/ComposeEmail.tt',
+        workshop              => $workshop,
+        recipient_count       => $registered_count,
+        unique_total          => $unique_total,
+        all_recipients        => \@all_recipients,
+        workshop_templates    => \@workshop_templates,
+        global_templates      => \@global_templates,
+        leader_workshops      => \@leader_workshops,
+        leader_email_default  => $leader_email_default,
+        template              => 'WorkShops/ComposeEmail.tt',
     );
 }
 
@@ -3368,9 +3522,43 @@ sub send_email :Local :Args(1) {
     }
     
     my $params = $c->request->body_parameters;
-    my $subject = $params->{subject};
-    my $body = $params->{body};
-    
+    my $subject      = $params->{subject};
+    my $message_body = $params->{message_body} || '';
+    my $body = $params->{body} || $message_body;
+
+    # Read selected recipients from form: values are "Name\x00email" pairs
+    my @selected_raw;
+    if (ref $params->{selected_recipient} eq 'ARRAY') {
+        @selected_raw = @{ $params->{selected_recipient} };
+    } elsif ($params->{selected_recipient}) {
+        @selected_raw = ($params->{selected_recipient});
+    }
+
+    # Build deduplicated list of { email, name } from selected checkboxes
+    # Values are plain email addresses; look up participant name from DB
+    my @registered_participants;
+    my %seen_emails;
+    for my $raw (@selected_raw) {
+        my $email = $raw;
+        $email =~ s/^\s+|\s+$//g;
+        next unless $email && $email =~ /\@/;
+        next if $seen_emails{lc $email}++;
+        my $p = $c->model('DBEncy::Participant')->search(
+            { 'me.email' => $email, 'me.status' => 'registered' },
+            { rows => 1, prefetch => 'user' }
+        )->first;
+        my $name = '';
+        if ($p) {
+            if ($p->user) {
+                $name = join(' ', grep { $_ } ($p->user->first_name, $p->user->last_name));
+                $name ||= $p->user->username || '';
+            }
+            $name ||= $p->name || '';
+        }
+        $name =~ s/^\s+|\s+$//g;
+        push @registered_participants, { email => $email, name => $name };
+    }
+
     unless ($subject && $body) {
         $c->stash->{error_msg} = 'Subject and body are required.';
         my $registered_count = $c->model('DBEncy::Participant')->search({
@@ -3378,44 +3566,23 @@ sub send_email :Local :Args(1) {
             status => 'registered'
         })->count;
         $c->stash(
-            workshop => $workshop,
+            workshop        => $workshop,
             recipient_count => $registered_count,
-            form_data => $params,
-            template => 'WorkShops/ComposeEmail.tt',
+            form_data       => $params,
+            template        => 'WorkShops/ComposeEmail.tt',
         );
         return;
     }
-    
-    my @registered_participants = $c->model('DBEncy::Participant')->search(
-        {
-            workshop_id => $id,
-            status => 'registered'
-        },
-        { prefetch => 'user' }
-    )->all;
-    
+
     unless (@registered_participants) {
-        $c->flash->{error_msg} = 'No registered participants to email.';
-        $c->response->redirect($c->uri_for($self->action_for('participants'), [$id]));
+        $c->flash->{error_msg} = 'No recipients selected — please tick at least one address.';
+        $c->response->redirect($c->uri_for($self->action_for('compose_email'), [$id]));
         return;
     }
     
-    my @recipient_emails;
-    for my $participant (@registered_participants) {
-        if ($participant->email && $participant->email =~ /\@/) {
-            push @recipient_emails, $participant->email;
-        }
-    }
-    
-    unless (@recipient_emails) {
-        $c->flash->{error_msg} = 'No valid email addresses found for registered participants.';
-        $c->response->redirect($c->uri_for($self->action_for('participants'), [$id]));
-        return;
-    }
-    
-    my $from_address = $c->config->{mail_from} || 'noreply@computersystemconsulting.ca';
-    my $reply_to = $c->config->{mail_replyto} || 'helpdesk@computersystemconsulting.ca';
-    
+    my $from_address    = $c->config->{mail_from}    || 'noreply@computersystemconsulting.ca';
+    my $default_replyto = $c->config->{mail_replyto} || 'helpdesk@computersystemconsulting.ca';
+
     my $workshop_url = $c->uri_for($self->action_for('details'), { id => $id });
     my $base_uri = $c->req->base;
     my $full_url = $base_uri . $workshop_url;
@@ -3429,56 +3596,120 @@ sub send_email :Local :Args(1) {
         $t ? (ref($t) && $t->can('strftime') ? $t->strftime('%H:%M') : substr("$t", 0, 5)) : 'TBD';
     };
     my $formatted_end_time = $workshop->end_time || '';
-    
+
+    # Build leader name and email for [[leader.name]] placeholder and Reply-To
+    my $leader_name  = '';
+    my $leader_email = '';
+    if ($workshop->created_by) {
+        my $leader_user = $c->model('DBEncy::User')->find($workshop->created_by);
+        if ($leader_user) {
+            $leader_name = $leader_user->first_name || $leader_user->username || '';
+            $leader_name .= ' ' . $leader_user->last_name if $leader_user->last_name;
+            $leader_name  =~ s/^\s+|\s+$//g;
+            $leader_email = $leader_user->email || '';
+        }
+    }
+    $leader_name ||= $workshop->instructor || '';
+
+    # Allow leader to override reply-to from the form (e.g. use a different address)
+    my $reply_to_override = $params->{reply_to_override} || '';
+    $reply_to_override =~ s/^\s+|\s+$//g;
+    if ($reply_to_override && $reply_to_override =~ /\@/) {
+        $leader_email = $reply_to_override;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+            "reply_to overridden to '$reply_to_override' by form input");
+    }
+
+    # From/Reply-To: leader's real email; SMTP envelope stays as system address (avoids SPF issues)
+    my $reply_to = $leader_email || $default_replyto || $from_address;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+        "send_email From header will use: leader_name='$leader_name' leader_email='$leader_email' reply_to='$reply_to'");
+
+    # Process workshop-level [[placeholders]] in subject (same for all recipients)
+    (my $processed_subject = $subject) =~ s/\[\[workshop\.title\]\]/${\($workshop->title || '')}/g;
+    $processed_subject =~ s/\[\[workshop\.date\]\]/$formatted_date/g;
+    $processed_subject =~ s/\[\[workshop\.location\]\]/${\($workshop->location || '')}/g;
+    $processed_subject =~ s/\[\[leader\.name\]\]/$leader_name/g;
+
     my $sent_count = 0;
     my $failed_count = 0;
     my @failed_emails;
-    
+    my %sent_to;
+    my @sent_log;    # { email, name, status, error }
+    my @failed_log;
+
     for my $participant (@registered_participants) {
-        my $email = $participant->email;
+        my $email = $participant->{email};
         next unless $email && $email =~ /\@/;
-        
-        my $user_name = '';
-        if ($participant->user) {
-            $user_name = $participant->user->first_name || $participant->user->username || '';
-            if ($participant->user->last_name) {
-                $user_name .= ' ' . $participant->user->last_name;
-            }
-        } elsif ($participant->name) {
-            $user_name = $participant->name;
-        }
-        
+        next if $sent_to{lc $email}++;
+
+        my $user_name  = $participant->{name} || '';
+        $user_name =~ s/^\s+|\s+$//g;
+        my $first_name = (split /\s+/, $user_name)[0] || $user_name;
+
+        # Process per-participant [[placeholders]] in body
+        my $processed_body = $body;
+        $processed_body =~ s/\[\[message_body\]\]/$message_body/g;
+        $processed_body =~ s/\[\[participant\.name\]\]/$user_name/g;
+        $processed_body =~ s/\[\[participant\.first_name\]\]/$first_name/g;
+        $processed_body =~ s/\[\[workshop\.title\]\]/${\($workshop->title || '')}/g;
+        $processed_body =~ s/\[\[workshop\.date\]\]/$formatted_date/g;
+        $processed_body =~ s/\[\[workshop\.time\]\]/$formatted_time/g;
+        $processed_body =~ s/\[\[workshop\.location\]\]/${\($workshop->location || '')}/g;
+        $processed_body =~ s/\[\[workshop\.instructor\]\]/${\($workshop->instructor || '')}/g;
+        $processed_body =~ s/\[\[leader\.name\]\]/$leader_name/g;
+        $processed_body =~ s/\[\[workshop\.url\]\]/$full_url/g;
+
+        my $send_result;
+        my $send_err;
         eval {
-            $c->stash->{email} = {
-                to       => $email,
-                from     => $from_address,
-                reply_to => $reply_to,
-                subject  => $subject,
-                template => 'email/workshop/workshop_announcement.tt',
-                template_vars => {
-                    name => $user_name,
-                    workshop_title => $workshop->title,
-                    workshop_instructor => $workshop->instructor,
-                    workshop_date => $formatted_date,
-                    workshop_time => $formatted_time,
-                    workshop_end_time => $formatted_end_time,
-                    workshop_location => $workshop->location,
-                    workshop_url => $full_url,
-                    message_body => $body,
-                },
-            };
-            
-            $c->forward($c->view('Email::Template'));
-            $sent_count++;
+            $send_result = $c->model('Mail')->send_email(
+                $c,
+                $email,
+                $processed_subject,
+                $processed_body,
+                undef,
+                { reply_to => $reply_to, leader_name => $leader_name },
+            );
         };
-        
-        if ($@) {
-            $c->log->warn("Failed to send email to $email: $@");
+        $send_err = "$@" if $@;
+
+        if ($send_err || !$send_result) {
+            my $reason = $send_err || 'Mail server returned failure';
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
+                "SEND FAILED to=$email name='$user_name' subject='$processed_subject' error=$reason");
             $failed_count++;
             push @failed_emails, $email;
+            push @failed_log, { email => $email, name => $user_name, error => $reason };
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+                "SEND OK to=$email name='$user_name' subject='$processed_subject' workshop_id=$id");
+            $sent_count++;
+            push @sent_log, { email => $email, name => $user_name };
         }
     }
-    
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+        "Email send summary: workshop_id=$id sent=$sent_count failed=$failed_count" .
+        ($failed_count ? " failed_addresses=" . join(',', @failed_emails) : ''));
+
+    # Build JSON recipients log for the DB record
+    my $recipients_json = do {
+        my @parts;
+        push @parts, '"sent":[' . join(',', map {
+            my $e = $_->{email}; $e =~ s/"/\\"/g;
+            my $n = $_->{name};  $n =~ s/"/\\"/g;
+            qq|{"email":"$e","name":"$n"}|
+        } @sent_log) . ']';
+        push @parts, '"failed":[' . join(',', map {
+            my $e = $_->{email}; $e =~ s/"/\\"/g;
+            my $n = $_->{name};  $n =~ s/"/\\"/g;
+            my $r = $_->{error}; $r =~ s/"/\\"/g; $r =~ s/\n/ /g;
+            qq|{"email":"$e","name":"$n","error":"$r"}|
+        } @failed_log) . ']';
+        '{' . join(',', @parts) . '}';
+    };
+
     my $email_status = 'sent';
     if ($failed_count > 0 && $sent_count == 0) {
         $email_status = 'failed';
@@ -3489,25 +3720,33 @@ sub send_email :Local :Args(1) {
     my $email_record;
     eval {
         $email_record = $c->model('DBEncy::WorkshopEmail')->create({
-            workshop_id => $id,
-            subject => $subject,
-            body => $body,
-            sent_by => $c->session->{user_id},
-            sent_at => DateTime->now,
+            workshop_id     => $id,
+            subject         => $processed_subject,
+            body            => $body,
+            sent_by         => $c->session->{user_id},
+            sent_at         => DateTime->now,
             recipient_count => $sent_count,
-            status => $email_status,
+            status          => $email_status,
+            recipients_log  => $recipients_json,
         });
     };
-    
-    if ($@) {
-        $c->log->error("Failed to record email in database: $@");
+    my $db_err = "$@" if $@;
+
+    if ($db_err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
+            "Failed to record email in database: $db_err");
     }
     
-    if ($failed_count > 0) {
+    my $mode_note = '';
+
+    if ($failed_count > 0 && $sent_count == 0) {
         my $failed_list = join(', ', @failed_emails);
-        $c->flash->{warning_msg} = "Email sent to $sent_count participant(s). Failed to send to $failed_count: $failed_list";
+        $c->flash->{error_msg} = "All $failed_count email(s) failed to send: $failed_list$mode_note";
+    } elsif ($failed_count > 0) {
+        my $failed_list = join(', ', @failed_emails);
+        $c->flash->{warning_msg} = "Email processed for $sent_count participant(s). Failed: $failed_count ($failed_list).$mode_note";
     } else {
-        $c->flash->{success_msg} = "Email sent successfully to $sent_count participant(s).";
+        $c->flash->{success_msg} = "Email processed for $sent_count participant(s).$mode_note";
     }
     
     $c->response->redirect($c->uri_for($self->action_for('email_history'), [$id]));
@@ -3542,6 +3781,58 @@ sub email_history :Local :Args(1) {
         workshop => $workshop,
         emails => \@emails,
         template => 'WorkShops/EmailHistory.tt',
+    );
+}
+
+sub email_detail :Local :Args(1) {
+    my ($self, $c, $email_id) = @_;
+
+    my $email_record = $c->model('DBEncy::WorkshopEmail')->find(
+        $email_id,
+        { prefetch => ['sender', 'workshop'] }
+    );
+
+    unless ($email_record) {
+        $c->flash->{error_msg} = 'Email record not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    unless ($self->_check_workshop_access($c, $email_record->workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    # Parse recipients_log JSON into sent/failed arrays
+    my (@sent_recipients, @failed_recipients);
+    my $raw_log = $email_record->recipients_log || '';
+    if ($raw_log) {
+        # Simple JSON parsing for our controlled format - no external module needed
+        if ($raw_log =~ /"sent":\[([^\]]*)\]/) {
+            my $sent_json = $1;
+            while ($sent_json =~ /\{"email":"([^"]*?)","name":"([^"]*?)"\}/g) {
+                push @sent_recipients, { email => $1, name => $2 };
+            }
+        }
+        if ($raw_log =~ /"failed":\[([^\]]*)\]/) {
+            my $failed_json = $1;
+            while ($failed_json =~ /\{"email":"([^"]*?)","name":"([^"]*?)","error":"([^"]*?)"\}/g) {
+                push @failed_recipients, { email => $1, name => $2, error => $3 };
+            }
+        }
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'email_detail',
+        "Viewing email detail id=$email_id sent=" . scalar(@sent_recipients) .
+        " failed=" . scalar(@failed_recipients));
+
+    $c->stash(
+        email_record      => $email_record,
+        workshop          => $email_record->workshop,
+        sent_recipients   => \@sent_recipients,
+        failed_recipients => \@failed_recipients,
+        template          => 'WorkShops/EmailDetail.tt',
     );
 }
 
@@ -3580,24 +3871,228 @@ sub _send_error_notification {
         }
     }
     
-    # Send email notification
+    # Send email notification via Model::Mail (routes through PMG)
     eval {
-        $c->stash->{email} = {
-            to       => $admin_email,
-            from     => $c->config->{system_email} || 'noreply@comserv.ca',
-            subject  => '[Workshop System Error] ' . $error_details->{error_type},
-            body     => $error_report,
-        };
-        
-        $c->forward($c->view('Email'));
-        $c->log->info("Error notification sent to admin: $admin_email");
+        my $result = $c->model('Mail')->send_email(
+            $c,
+            $admin_email,
+            '[Workshop System Error] ' . $error_details->{error_type},
+            $error_report,
+            undef,
+        );
+        if ($result) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'workshop', "Error notification sent to admin: $admin_email");
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Error notification delivery failed to: $admin_email");
+        }
     };
     
     if ($@) {
-        $c->log->error("Failed to send error notification email: $@");
+        my $err = "$@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to send error notification email: $err");
     }
 }
 
+
+sub mail_templates :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    my @workshop_templates = $c->model('DBEncy::WorkshopMailTemplate')->search(
+        { workshop_id => $id, is_active => 1 },
+        { order_by => { -asc => 'name' } }
+    )->all;
+
+    my @global_templates = $c->model('DBEncy::WorkshopMailTemplate')->search(
+        { workshop_id => undef, is_active => 1 },
+        { order_by => { -asc => 'name' } }
+    )->all;
+
+    $c->stash(
+        workshop          => $workshop,
+        workshop_templates => \@workshop_templates,
+        global_templates  => \@global_templates,
+        template          => 'WorkShops/MailTemplates.tt',
+    );
+}
+
+sub add_mail_template :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    $c->stash(
+        workshop => $workshop,
+        template => 'WorkShops/AddMailTemplate.tt',
+    );
+}
+
+sub save_mail_template :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    my $params = $c->request->body_parameters;
+    my $name          = $params->{name} || '';
+    my $subject       = $params->{subject} || '';
+    my $body_text     = $params->{body_text} || '';
+    my $body_html     = $params->{body_html} || '';
+    my $template_type = $params->{template_type} || 'custom';
+    my $is_global     = $params->{is_global} ? 1 : 0;
+    my $template_id   = $params->{template_id} || '';
+
+    unless ($name && $subject && $body_text) {
+        $c->stash(
+            workshop      => $workshop,
+            error_msg     => 'Name, subject, and body are required.',
+            form_data     => $params,
+            template      => 'WorkShops/AddMailTemplate.tt',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    my $err;
+    eval {
+        my $workshop_id = $is_global ? undef : $id;
+
+        if ($template_id) {
+            my $tmpl = $c->model('DBEncy::WorkshopMailTemplate')->find($template_id);
+            if ($tmpl) {
+                $tmpl->update({
+                    name          => $name,
+                    subject       => $subject,
+                    body_text     => $body_text,
+                    body_html     => $body_html,
+                    template_type => $template_type,
+                    workshop_id   => $workshop_id,
+                });
+            }
+        } else {
+            $c->model('DBEncy::WorkshopMailTemplate')->create({
+                name          => $name,
+                subject       => $subject,
+                body_text     => $body_text,
+                body_html     => $body_html,
+                template_type => $template_type,
+                workshop_id   => $workshop_id,
+                created_by    => $c->session->{user_id},
+                is_active     => 1,
+            });
+        }
+    };
+    $err = "$@" if $@;
+
+    if ($err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'save_mail_template',
+            "Error saving mail template: $err");
+        $c->stash(
+            workshop  => $workshop,
+            error_msg => "Error saving template: $err",
+            form_data => $params,
+            template  => 'WorkShops/AddMailTemplate.tt',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'save_mail_template',
+        "Mail template '$name' saved for workshop $id");
+    $c->flash->{success_msg} = "Template '$name' saved successfully.";
+    $c->response->redirect($c->uri_for($self->action_for('mail_templates'), [$id]));
+}
+
+sub edit_mail_template :Local :Args(2) {
+    my ($self, $c, $workshop_id, $template_id) = @_;
+
+    my $workshop = $c->model('DBEncy::WorkShop')->find($workshop_id);
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    my $tmpl = $c->model('DBEncy::WorkshopMailTemplate')->find($template_id);
+    unless ($tmpl) {
+        $c->flash->{error_msg} = 'Template not found.';
+        $c->response->redirect($c->uri_for($self->action_for('mail_templates'), [$workshop_id]));
+        return;
+    }
+
+    $c->stash(
+        workshop     => $workshop,
+        mail_template => $tmpl,
+        template     => 'WorkShops/AddMailTemplate.tt',
+    );
+}
+
+sub delete_mail_template :Local :Args(2) {
+    my ($self, $c, $workshop_id, $template_id) = @_;
+
+    my $workshop = $c->model('DBEncy::WorkShop')->find($workshop_id);
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    my $err;
+    eval {
+        my $tmpl = $c->model('DBEncy::WorkshopMailTemplate')->find($template_id);
+        $tmpl->update({ is_active => 0 }) if $tmpl;
+    };
+    $err = "$@" if $@;
+
+    if ($err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete_mail_template',
+            "Error deleting template $template_id: $err");
+        $c->flash->{error_msg} = "Error deleting template: $err";
+    } else {
+        $c->flash->{success_msg} = 'Template deleted.';
+    }
+    $c->response->redirect($c->uri_for($self->action_for('mail_templates'), [$workshop_id]));
+}
 
 __PACKAGE__->meta->make_immutable;
 

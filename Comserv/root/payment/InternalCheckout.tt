@@ -1,0 +1,71 @@
+[% META
+   title = "Confirm Payment"
+   description = "Confirm your membership payment using site coins"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-03-18"
+%]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Confirm Membership Payment</h1>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <h2>Order Summary</h2>
+        <div class="table-container">
+          <table class="data-table">
+            <tr><th>Site</th><td>[% site.name | html %]</td></tr>
+            <tr><th>Plan</th><td><strong>[% plan.name | html %]</strong></td></tr>
+            <tr><th>Billing</th><td>[% billing_cycle | html %]</td></tr>
+            <tr><th>Regular Price</th><td>[% plan.price_currency | html %] [% base_price %]</td></tr>
+            [% IF promo %]
+            <tr><th>Promo Code</th><td>[% promo.code | html %] — [% promo.description | html %]</td></tr>
+            [% END %]
+            <tr><th style="font-size:1.1em">Amount Due</th>
+                <td style="font-size:1.1em"><strong>
+                  [% IF final_price == 0 %]FREE[% ELSE %][% plan.price_currency | html %] [% final_price %][% END %]
+                </strong></td>
+            </tr>
+          </table>
+        </div>
+
+        [% IF account %]
+        <p>Your coin balance: <strong>[% account.balance %] coins</strong></p>
+        [% IF final_price > account.balance %]
+        <div class="error">Insufficient coins. You need [% final_price %] but have [% account.balance %].
+          <a href="[% c.uri_for('/membership') %]">Go back</a> or choose PayPal.
+        </div>
+        [% END %]
+        [% ELSE %]
+        <div class="error">No coin account found. <a href="[% c.uri_for('/membership') %]">Contact support</a> or use PayPal.</div>
+        [% END %]
+      </div>
+
+      <div class="content-section">
+        <form method="post" action="[% c.uri_for('/payment/internal/checkout') %]">
+          <input type="hidden" name="plan_id"       value="[% plan.id %]">
+          <input type="hidden" name="billing_cycle" value="[% billing_cycle | html %]">
+          <input type="hidden" name="promo_code"    value="[% promo_code | html %]">
+          <div class="form-actions">
+            [% IF final_price == 0 || (account && account.balance >= final_price) %]
+            <button type="submit" class="btn btn-primary">
+              [% IF final_price == 0 %]Activate Free Trial[% ELSE %]Confirm — Pay [% plan.price_currency | html %][% final_price %][% END %]
+            </button>
+            [% END %]
+            <a href="[% c.uri_for('/membership/subscribe', { plan_id => plan.id }) %]"
+               class="btn btn-secondary">← Back</a>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</div>

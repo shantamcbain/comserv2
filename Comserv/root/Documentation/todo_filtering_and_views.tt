@@ -1,0 +1,163 @@
+[% PageVersion = 'Comserv/root/Documentation/todo_filtering_and_views.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Todo Filtering and Views' %]
+
+<!-- Documentation page for todo_filtering_and_views -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+This document describes the implementation of filtering and different views for the Todo system in the Comserv application.
+
+
+
+<h2>Features Added</h2>
+
+
+
+<h3>1. Enhanced Todo Controller</h3>
+
+
+
+The Todo controller has been enhanced to support:
+
+
+
+<ul><li>Filtering by time period (day, week, month)</li></ul>
+
+<ul><li>Filtering by project</li></ul>
+
+<ul><li>Filtering by status (new, in progress, completed)</li></ul>
+
+<ul><li>Searching in subject, description, and comments</li></ul>
+
+<ul><li>Improved day, week, and month views</li></ul>
+
+
+
+<h3>2. List View with Filtering</h3>
+
+
+
+The main Todo list view now includes:
+
+
+
+<ul><li>A filter panel with dropdowns for time period, project, and status</li></ul>
+
+<ul><li>A search box for finding todos by keywords</li></ul>
+
+<ul><li>View buttons for switching between list, day, week, and month views</li></ul>
+
+<ul><li>Color-coding based on priority</li></ul>
+
+
+
+<h3>3. Day View</h3>
+
+
+
+The day view has been enhanced with:
+
+
+
+<ul><li>Navigation buttons for moving between days</li></ul>
+
+<ul><li>Color-coding based on priority</li></ul>
+
+<ul><li>Consistent styling with other views</li></ul>
+
+<ul><li>Action buttons for each todo (Add Log, Details, Edit)</li></ul>
+
+
+
+<h3>4. Week View</h3>
+
+
+
+The week view has been enhanced with:
+
+
+
+<ul><li>A calendar-style layout showing the full week</li></ul>
+
+<ul><li>Navigation buttons for moving between weeks</li></ul>
+
+<ul><li>Color-coding based on priority</li></ul>
+
+<ul><li>Quick access to add todos for specific days</li></ul>
+
+
+
+<h3>5. Month View</h3>
+
+
+
+A new month view has been added that:
+
+
+
+<ul><li>Shows a calendar-style layout for the entire month</li></ul>
+
+<ul><li>Displays todos on their respective days</li></ul>
+
+<ul><li>Provides navigation between months</li></ul>
+
+<ul><li>Allows adding todos for specific days</li></ul>
+
+<ul><li>Color-codes todos based on priority</li></ul>
+
+
+
+<h3>6. Admin Menu Integration</h3>
+
+
+
+The admin menu has been updated to:
+
+
+
+<ul><li>Include links to filtered views (today, this week, this month)</li></ul>
+
+<ul><li>Include links to different view types (day, week, month)</li></ul>
+
+<ul><li>Improve the display of recent todos</li></ul>
+
+
+
+<h2>Technical Details</h2>
+
+
+
+The implementation involved:
+
+
+
+<ol><li>Enhancing the Todo controller to support filtering and different views</li></ol>
+
+<ol><li>Creating a new month.tt template for the month view</li></ol>
+
+<ol><li>Updating the day.tt and week.tt templates for consistency</li></ol>
+
+<ol><li>Adding a filter panel to the todo.tt template</li></ol>
+
+<ol><li>Updating the admin menu links to use the new filtering capabilities</li></ol>
+
+
+
+These changes make the Todo system more user-friendly and efficient, allowing users to quickly find and manage their todos based on various criteria.
+
+</div>

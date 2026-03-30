@@ -1,0 +1,151 @@
+[% PageVersion = 'Comserv/root/Documentation/roles/normal/todo_user_guide.tt,v 0.01 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Todo System User Guide' %]
+
+<!-- Todo user guide for normal users -->
+<div class="documentation-content">
+
+<div class="markdown-content">
+
+# Todo System User Guide
+
+Welcome to the Todo system! This guide will help you manage your tasks effectively using the integrated todo and project management features.
+
+## Getting Started
+
+### Accessing the Todo System
+1. Navigate to the **Todo** section from the main menu
+2. You'll see your active todos, overdue items, and calendar views
+3. Use the filtering options to focus on specific projects or date ranges
+
+### Main Todo Page Overview
+- **Active Todos** - Your current tasks with status indicators
+- **Overdue Section** - Important! Tasks that need immediate attention
+- **Quick Actions** - Edit, complete, or delete tasks with one click
+- **Project Filter** - Focus on specific project work
+
+## Managing Your Tasks
+
+### Creating a New Todo
+1. Click **"Add New Todo"** button
+2. Fill in the required information:
+   - **Subject** - Brief description of the task
+   - **Description** - Detailed information about what needs to be done
+   - **Project** - Select the relevant project (if applicable)
+   - **Priority** - Set importance level (1=High, 5=Low)
+   - **Start Date** - When you plan to begin
+   - **Due Date** - When the task should be completed
+   - **Status** - Usually starts as "New"
+3. Click **"Save"** to create your todo
+
+### Editing Existing Todos
+1. Find your todo in the list
+2. Click the **"Edit"** button next to the task
+3. Update any fields as needed
+4. Click **"Save Changes"** to update
+
+### Completing Tasks
+1. When you finish a task, click the **"Complete"** button
+2. The task will be marked as completed and moved out of your active list
+3. Completed tasks can still be viewed in calendar views for reference
+
+## Using Calendar Views
+
+### Month View
+- **Visual Overview** - See all your todos and related activities in a monthly calendar
+- **Color Coding** - Todos appear prominently, logs appear subtly
+- **Click Navigation** - Click on any item to view details
+- **Due Date Alerts** - Tasks due soon have special highlighting
+
+### Week View
+- **Weekly Planning** - Perfect for planning your week ahead
+- **Daily Breakdown** - See what's scheduled for each day
+- **Time Management** - View time allocations across the week
+
+### Day View
+- **Daily Focus** - Concentrate on today's tasks
+- **Time Slots** - See when tasks are scheduled
+- **Quick Updates** - Easy access to modify daily tasks
+
+## Project Integration
+
+### Working with Projects
+- **Project Association** - Link todos to specific projects for better organization
+- **Project Filtering** - Use the project dropdown to see only relevant tasks
+- **Hierarchical Projects** - Some projects have sub-projects for detailed organization
+
+### Project-Based Workflow
+1. Select a project from the filter dropdown
+2. View all todos associated with that project
+3. Create new todos within the project context
+4. Track project progress through todo completion
+
+## Time Tracking and Logs
+
+### Adding Activity Logs
+1. Click the **"Add Log"** button next to any todo
+2. The log form will pre-populate with todo information
+3. Set your **start time** and **end time** for the work session
+4. Add any notes about the work completed
+5. Save the log entry
+
+### Viewing Time Tracking
+- **Accumulative Time** - See total time spent on each todo
+- **Calendar Integration** - Logs appear in calendar views alongside todos
+- **Project Time** - Track total time spent on project-related tasks
+
+## Best Practices
+
+### Daily Workflow
+1. **Start Your Day** - Check the overdue section first
+2. **Review Today's Tasks** - Use the day view to see what's planned
+3. **Update Status** - Mark tasks as "In Progress" when you start working
+4. **Log Your Time** - Add log entries for work sessions
+5. **Complete Tasks** - Mark finished tasks as completed
+
+### Weekly Planning
+1. **Use Month View** - Get overview of upcoming deadlines
+2. **Plan Ahead** - Create todos for next week's work
+3. **Review Projects** - Check project progress and priorities
+4. **Adjust Schedules** - Move tasks if needed based on priorities
+
+### Staying Organized
+- **Use Clear Subjects** - Make todo titles descriptive
+- **Set Realistic Due Dates** - Don't overcommit yourself
+- **Regular Updates** - Keep your todos current and accurate
+- **Project Grouping** - Use projects to organize related work
+
+## Troubleshooting
+
+### Common Issues
+- **Can't See My Todos** - Check your project filter settings
+- **Overdue Items** - Review the overdue section regularly
+- **Calendar Not Loading** - Refresh the page or contact support
+- **Project Selection Issues** - Make sure you have access to the selected project
+
+### Getting Help
+- Contact your system administrator for access issues
+- Use the documentation system for detailed technical information
+- Report bugs or issues through your normal support channels
+
+## Tips for Success
+
+### Productivity Tips
+- **Prioritize Ruthlessly** - Use priority levels effectively
+- **Break Down Large Tasks** - Create multiple todos for complex projects
+- **Use Due Dates Wisely** - Set realistic deadlines
+- **Review Regularly** - Check your todo list daily
+
+### Time Management
+- **Log Your Time** - Track how long tasks actually take
+- **Plan Buffer Time** - Don't pack your schedule too tightly
+- **Use Calendar Views** - Visual planning is often more effective
+- **Focus on Overdue Items** - Address overdue tasks immediately
+
+Remember: The todo system is designed to help you stay organized and productive. Use the features that work best for your workflow and don't hesitate to ask for help when needed!
+
+</div>
+</div>
