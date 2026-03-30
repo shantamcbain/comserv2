@@ -181,9 +181,9 @@
                 <div style="font-weight:bold;color:#dc3545;margin-bottom:6px;">🔒 [% active_blockers.size %] cross-project block[% active_blockers.size > 1 ? 's' : '' %] affecting today's priorities</div>
                 [% FOREACH ab IN active_blockers %]
                 <div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid color-mix(in srgb,#dc3545 20%,var(--bg-color));">
-                    <span style="color:var(--primary-color);font-weight:bold;">[% ab.project_name %]</span>
+                    <a href="/project/details?project_id=[% ab.project_id %]" style="color:var(--primary-color);font-weight:bold;text-decoration:none;">[% ab.project_name %]</a>
                     <span style="color:var(--text-muted-color);">is blocking</span>
-                    <span style="font-weight:bold;">[% ab.depends_on_name %]</span>
+                    <a href="/project/details?project_id=[% ab.depends_on_id %]" style="font-weight:bold;color:var(--text-color);text-decoration:none;">[% ab.depends_on_name %]</a>
                     [% IF ab.description %]<span style="color:var(--text-muted-color);">— [% ab.description | truncate(60) %]</span>[% END %]
                 </div>
                 [% END %]
