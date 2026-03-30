@@ -665,14 +665,12 @@ sub generate :Local :Args(0) {
                     } else {
                         push @trace, "💾 '$use_model' already in memory — no cold-start needed";
                     }
-                    # Renew keep_alive to prevent expiry race between /api/ps check and actual request
+                    # Renew keep_alive — no prompt so Ollama just refreshes timer without generating
                     eval {
                         my $ping_ua  = LWP::UserAgent->new(timeout => 10);
                         my $ping_url = "http://$current_host:" . ($current_port || 11434) . "/api/generate";
                         my $ping_payload = encode_json({
                             model      => $use_model,
-                            prompt     => '',
-                            stream     => JSON::false,
                             keep_alive => '2h',
                         });
                         $ping_ua->post($ping_url, 'Content-Type' => 'application/json', Content => $ping_payload);
@@ -681,7 +679,14 @@ sub generate :Local :Args(0) {
                 }
             }
 
-            $ollama->timeout(300);
+            # Use a longer timeout when model is NOT in memory (cold start: load + generate)
+            my $is_cold_start = !grep { ($_ && ref $_ ? $_->{name} : $_) eq $use_model }
+                                      @{ $fast_check->get_running_models() || [] };
+            my $timeout_secs = $is_cold_start ? 600 : 300;
+            push @trace, $is_cold_start
+                ? "🧊 Cold start detected — timeout extended to ${timeout_secs}s"
+                : "🔥 Model warm — timeout ${timeout_secs}s";
+            $ollama->timeout($timeout_secs);
 
             # ── Pre-call: create conversation + save user prompt BEFORE Ollama ─
             # This guarantees the conversation record exists even if Ollama times out,
@@ -1827,16 +1832,12 @@ sub chat :Local :Args(0) {
                     } else {
                         push @chat_trace, "💾 '$chat_use_model' already in memory — no cold-start needed";
                     }
-                    # Renew keep_alive so model doesn't expire between the /api/ps
-                    # check and the actual /api/chat call (race condition fix).
-                    # Sending an empty-prompt generate with stream:false returns instantly.
+                    # Renew keep_alive — no prompt so Ollama just refreshes timer without generating
                     eval {
                         my $ping_ua  = LWP::UserAgent->new(timeout => 10);
                         my $ping_url = "http://$current_host:" . ($current_port || 11434) . "/api/generate";
                         my $ping_payload = encode_json({
                             model      => $chat_use_model,
-                            prompt     => '',
-                            stream     => JSON::false,
                             keep_alive => '2h',
                         });
                         $ping_ua->post($ping_url, 'Content-Type' => 'application/json', Content => $ping_payload);
@@ -1844,6 +1845,15 @@ sub chat :Local :Args(0) {
                     };
                 }
             }
+
+            # Use a longer timeout for cold starts (model not in memory)
+            my $chat_running = eval { $fast_check->get_running_models() } || [];
+            my $chat_cold = !grep { ($_ && ref $_ ? $_->{name} : $_) eq $chat_use_model } @$chat_running;
+            my $chat_timeout = $chat_cold ? 600 : 300;
+            push @chat_trace, $chat_cold
+                ? "🧊 Cold start — timeout extended to ${chat_timeout}s"
+                : "🔥 Model warm — timeout ${chat_timeout}s";
+            $ollama->timeout($chat_timeout);
 
             # Prepend combined system prompt for Ollama
             my @ollama_messages = @messages;
@@ -3724,6 +3734,7 @@ Supported actions:
 - Reschedule a todo:     [ACTION: {"action": "reschedule_todo",    "params": {"todo_id": N, "due_date": "YYYY-MM-DD"}}]
 - Add a comment:         [ACTION: {"action": "add_todo_comment",   "params": {"todo_id": N, "comment": "text"}}]
 - Create a log entry:    [ACTION: {"action": "create_log_entry",   "params": {"todo_id": N, "abstract": "title", "details": "description"}}]
+- Create a new todo:     [ACTION: {"action": "create_todo", "params": {"subject": "title", "description": "details", "project_id": N, "due_date": "YYYY-MM-DD", "priority": 3}}]
 
 Rules:
 - ONLY emit an [ACTION: ...] block when the user explicitly asks you to perform a write operation.
@@ -5783,7 +5794,7 @@ sub preload_model :Local :Args(0) {
                 # Nothing is loaded — fire a background load of tier_small
                 # Use Ollama's "load-only" mode: POST /api/generate with no prompt
                 my $url     = "http://$host:$port_num/api/generate";
-                my $payload = encode_json({ model => $model, keep_alive => '5m' });
+                my $payload = encode_json({ model => $model, keep_alive => '2h' });
                 my $pid = fork();
                 if (defined $pid && $pid == 0) {
                     my $child_ua = LWP::UserAgent->new(timeout => 180);
@@ -5811,6 +5822,7 @@ Supported actions (passed as JSON body):
   { "action": "reschedule_todo",     "params": { "todo_id": N, "due_date": "YYYY-MM-DD" } }
   { "action": "create_log_entry",    "params": { "todo_id": N, "abstract": "...", "details": "..." } }
   { "action": "add_todo_comment",    "params": { "todo_id": N, "comment": "..." } }
+  { "action": "create_todo",         "params": { "subject": "...", "description": "...", "project_id": N, "due_date": "YYYY-MM-DD", "priority": 3 } }
 
 Returns JSON: { success: true/false, message: "..." }
 
@@ -6015,6 +6027,92 @@ sub action :Local :Args(0) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
             "AI action add_todo_comment: todo=$todo_id by=$current_user");
         $c->response->body(encode_json({ success => JSON::true, message => "Comment added to Todo #$todo_id" }));
+        return;
+    }
+
+    # ── create_todo ───────────────────────────────────────────────────────────
+    if ($action_name eq 'create_todo') {
+        my $subject = $params->{subject};
+        unless ($subject) {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'subject required' }));
+            return;
+        }
+        my $project_id = $params->{project_id};
+        unless ($project_id && $project_id =~ /^\d+$/) {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'project_id (numeric) required' }));
+            return;
+        }
+
+        # Look up project_code from project_id
+        my $project_code = 'default_code';
+        eval {
+            my $proj = $schema->resultset('Project')->find($project_id);
+            $project_code = $proj->project_code if $proj && $proj->project_code;
+        };
+
+        my $due_date   = $params->{due_date} || do {
+            my $dt = DateTime->now->add(days => 7); $dt->ymd;
+        };
+        unless ($due_date =~ /^\d{4}-\d{2}-\d{2}$/) {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'due_date must be YYYY-MM-DD' }));
+            return;
+        }
+
+        my $priority    = $params->{priority} // 3;
+        my $description = $params->{description} || '';
+        my $parent_id   = $params->{parent_id}  || undef;
+        my $sitename    = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+        my $user_id     = $c->session->{user_id} || 1;
+        my $roles       = $c->session->{roles}   || [];
+        my $group       = ref $roles eq 'ARRAY' && @$roles ? $roles->[0] : 'user';
+
+        my $new_todo;
+        eval {
+            $new_todo = $schema->resultset('Todo')->create({
+                sitename            => $sitename,
+                start_date          => $today,
+                parent_todo         => '',
+                due_date            => $due_date,
+                subject             => $subject,
+                description         => $description,
+                estimated_man_hours => 0,
+                comments            => '',
+                reporter            => $current_user,
+                company_code        => 'default',
+                owner               => $current_user,
+                project_code        => $project_code,
+                developer           => $current_user,
+                username_of_poster  => $current_user,
+                status              => 'NEW',
+                priority            => $priority,
+                share               => 0,
+                last_mod_by         => $current_user,
+                last_mod_date       => $today,
+                user_id             => $user_id,
+                group_of_poster     => $group,
+                project_id          => $project_id,
+                date_time_posted    => $today,
+                ($parent_id ? (parent_id => $parent_id) : ()),
+            });
+        };
+        if ($@ || !$new_todo) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'action', "create_todo failed: $@");
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Todo creation failed' }));
+            return;
+        }
+        my $new_id = $new_todo->record_id // $new_todo->id // '?';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
+            "AI action create_todo: id=$new_id project=$project_id subject='$subject' by=$current_user");
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            message  => "Todo #$new_id created: \"$subject\"",
+            todo_id  => $new_id + 0,
+            todo_url => "/todo/details?record_id=$new_id",
+        }));
         return;
     }
 

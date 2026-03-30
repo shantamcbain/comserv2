@@ -1472,9 +1472,9 @@
         }
 
         // Provider-aware client timeout:
-        //   Ollama: 360 s (server-side is 300 s — code analysis generation can take 200+ s)
+        //   Ollama: 660 s (server-side is 600 s for cold starts, 300 s warm — give extra buffer)
         //   Grok:   90 s (server-side is 120 s — complex audit/analysis queries need time)
-        const clientTimeoutMs = isOllama ? 360000 : 90000;
+        const clientTimeoutMs = isOllama ? 660000 : 90000;
         const abortCtrl = new AbortController();
         state.currentAbortCtrl = abortCtrl;   // expose for cancel button
         const abortTimer = setTimeout(function() {
@@ -1508,9 +1508,9 @@
                 if (loadingEl && loadingEl.firstChild) loadingEl.firstChild.textContent = txt;
             };
             progressTimer1 = setTimeout(function() { _setLoadTxt('⏳ Processing your request…'); },      10000);
-            progressTimer2 = setTimeout(function() { _setLoadTxt('⏳ Model is generating response… (may take 60–120 s for long answers)'); }, 30000);
-            progressTimer3 = setTimeout(function() { _setLoadTxt('⏳ Still generating… complex analysis takes time on CPU — please wait'); }, 90000);
-            progressTimer4 = setTimeout(function() { _setLoadTxt('⏳ Almost there… finalising response (up to 6 min total for code analysis)'); }, 180000);
+            progressTimer2 = setTimeout(function() { _setLoadTxt('⏳ Model is generating response… (60–120 s warm / up to 5 min cold start)'); }, 30000);
+            progressTimer3 = setTimeout(function() { _setLoadTxt('⏳ Still working… model may be loading from disk on first use — please wait'); }, 90000);
+            progressTimer4 = setTimeout(function() { _setLoadTxt('⏳ Almost there… CPU inference is slow for large inputs (up to 10 min cold start)'); }, 300000);
         }
 
         fetch(config.apiEndpoints.generateResponse, {
