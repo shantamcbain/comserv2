@@ -3,6 +3,7 @@ use Moose;
 use namespace::autoclean;
 use DateTime;
 use Data::Dumper;
+use JSON ();
 use Comserv::Util::Logging;
 use Comserv::Controller::Site;
 BEGIN { extends 'Catalyst::Controller'; }
@@ -839,6 +840,52 @@ sub reorder :Path('reorder') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reorder',
         "Project sort order updated by $username: " . join(',', @{ $data->{order} }));
 
+    $c->response->body('{"ok":1}');
+}
+
+sub resolve_dependency :Path('resolve_dependency') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $username = $c->session->{username} // '';
+    unless ($username && $username ne 'anonymous') {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Login required"}');
+        return;
+    }
+    my $roles    = $c->session->{roles} || [];
+    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
+    unless (grep { /^(admin|developer)$/i } @rl) {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Admin role required"}');
+        return;
+    }
+
+    my $data = eval { $c->req->body_data } // {};
+    my $id   = $data->{id} || $c->req->param('id');
+    unless ($id && $id =~ /^\d+$/) {
+        $c->response->status(400);
+        $c->response->body('{"ok":0,"error":"Invalid id"}');
+        return;
+    }
+
+    eval {
+        my $dep = $c->model('DBEncy')->resultset('ProjectDependency')->find($id);
+        unless ($dep) {
+            $c->response->status(404);
+            $c->response->body('{"ok":0,"error":"Dependency not found"}');
+            return;
+        }
+        $dep->update({ status => 'resolved', resolved_at => DateTime->now->ymd . ' ' . DateTime->now->hms });
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resolve_dependency', "Error: $@");
+        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_dependency',
+        "Dependency $id resolved by $username");
     $c->response->body('{"ok":1}');
 }
 
