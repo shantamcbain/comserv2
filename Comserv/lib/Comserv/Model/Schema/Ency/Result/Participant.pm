@@ -51,6 +51,11 @@ __PACKAGE__->add_columns(
             list => ['registered', 'waitlist', 'attended', 'cancelled']
         },
     },
+    email_opt_out => {
+        data_type     => 'tinyint',
+        default_value => 0,
+        is_nullable   => 0,
+    },
 );
 
 __PACKAGE__->set_primary_key('id');
