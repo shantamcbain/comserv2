@@ -1,8 +1,9 @@
 services:
   web-prod:
     build:
-      context: ./Comserv
+      context: .
       dockerfile: Dockerfile
+    image: comserv-web-prod:latest
     container_name: comserv-web-prod
     restart: always
     labels:
@@ -14,6 +15,7 @@ services:
       TZ: UTC
       ENABLE_MONITORING: 1
       ENABLE_LOGGING: 1
+      SYSTEM_IDENTIFIER: "${HOSTNAME:-unknown}-prod"
       # Set in .env file: CATALYST_SERVER_IP=192.168.1.126  (host LAN IP, shown in admin bar)
       CATALYST_SERVER_IP: "${CATALYST_SERVER_IP}"
       # NFS resource library path inside container (NFS root mounted at /data/nfs)
@@ -39,6 +41,8 @@ services:
       - ./script:/opt/comserv/script:ro
       - ./root/static:/opt/comserv/root/static:ro
       - ./root/Documentation:/opt/comserv/root/Documentation:ro
+      - ./root/membership:/opt/comserv/root/membership:ro
+      - ./root/payment:/opt/comserv/root/payment:ro
       - ./config:/opt/comserv/config:ro
       - ./t:/opt/comserv/t:ro
       # Note: db_config.json NOT mounted in production

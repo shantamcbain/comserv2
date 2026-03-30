@@ -1,0 +1,47 @@
+[%
+   title = "Application Logs"
+   description = "View application log files"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Admin"
+   page_version = "0.01"
+   last_updated = "2026-03-21"
+%]
+
+<div class="container-fluid mt-3">
+    <h1>Application Logs</h1>
+
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <form method="get" action="">
+                <div class="input-group">
+                    <select name="file" class="form-control">
+                        [% FOREACH f IN log_files %]
+                            <option value="[% f %]" [% IF f == log_file %]selected[% END %]>[% f %]</option>
+                        [% END %]
+                    </select>
+                    <div class="input-group-append">
+                        <button type="submit" class="btn btn-primary">Load</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="col-md-8 text-right">
+            <strong>Viewing:</strong> [% log_file | html %]
+        </div>
+    </div>
+
+    [% IF log_content %]
+        <div class="card">
+            <div class="card-body p-0">
+                <pre class="m-0 p-3" style="background:#1a1a1a; color:#00ff00; font-size:0.8em; max-height:600px; overflow-y:auto;">[% log_content | html %]</pre>
+            </div>
+        </div>
+    [% ELSE %]
+        <div class="alert alert-info">No log content available for <strong>[% log_file | html %]</strong>.</div>
+    [% END %]
+
+    <div class="mt-3">
+        <a href="/admin" class="btn btn-secondary">Back to Admin</a>
+    </div>
+</div>

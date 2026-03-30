@@ -1,7 +1,7 @@
 [%
    title = "NFS → Database Sync"
    description = "Configure and run an NFS filesystem scan to populate the files and workshop_resource tables"
-   roles = "admin"
+   roles = "admin,workshop_leader"
    TemplateType = "Application"
    category = "WorkShops"
    page_version = "0.01"
@@ -16,7 +16,6 @@
     border-radius: 6px;
     padding: 20px;
     margin-bottom: 20px;
-    background: var(--card-bg, #fff);
 }
 .sync-section h3 {
     margin-top: 0;
@@ -57,14 +56,14 @@
     </p>
 
     [% IF c.flash.success_msg %]
-        <div class="alert alert-success" style="background:#d4edda;border:1px solid #c3e6cb;padding:12px;border-radius:4px;margin-bottom:16px;">[% c.flash.success_msg | html %]</div>
+        <div class="success">[% c.flash.success_msg | html %]</div>
     [% END %]
     [% IF c.flash.error_msg %]
-        <div class="alert alert-danger" style="background:#f8d7da;border:1px solid #f5c6cb;padding:12px;border-radius:4px;margin-bottom:16px;">[% c.flash.error_msg | html %]</div>
+        <div class="error">[% c.flash.error_msg | html %]</div>
     [% END %]
 
     [% UNLESS nfs_available %]
-    <div style="background:#fff3cd;border:1px solid #ffc107;padding:12px;border-radius:4px;margin-bottom:16px;">
+    <div class="warning">
         <strong>⚠ NFS not mounted.</strong>
         The share at <code>[% nfs_root | html %]</code> is not available.
         File scanning will not work until the share is mounted.
@@ -81,8 +80,7 @@
             <div class="form-grid">
                 <div class="form-field">
                     <label>NFS Root</label>
-                    <input type="text" readonly value="[% nfs_root | html %]"
-                           style="background:var(--table-header-bg,#f8f9fa);">
+                    <input type="text" readonly value="[% nfs_root | html %]">
                     <span class="hint">
                         [% IF nfs_available %]<span style="color:#155724;">✓ Mounted</span>[% ELSE %]<span style="color:#721c24;">✗ Not mounted</span>[% END %]
                     </span>

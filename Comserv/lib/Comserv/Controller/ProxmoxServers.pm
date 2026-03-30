@@ -3,6 +3,7 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::ProxmoxCredentials;
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
 use JSON;
 use Try::Tiny;
 
@@ -35,6 +36,13 @@ List all configured Proxmox servers
 
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'proxmox_servers_index')) {
+        $c->flash->{error_msg} = 'You must be an administrator to manage Proxmox servers.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Starting Proxmox server management");
 
@@ -70,6 +78,13 @@ Display the form to add a new Proxmox server
 sub add_server_form :Path('add') :Args(0) {
     my ($self, $c) = @_;
 
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'proxmox_servers_add_form')) {
+        $c->flash->{error_msg} = 'You must be an administrator to manage Proxmox servers.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_server_form', "Displaying add server form");
 
     $c->stash(
@@ -90,6 +105,13 @@ Process the form submission to add a new Proxmox server
 
 sub add_server :Path('add_server') :Args(0) {
     my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'proxmox_servers_add')) {
+        $c->flash->{error_msg} = 'You must be an administrator to manage Proxmox servers.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_server', "Processing add server form submission");
 
@@ -169,6 +191,13 @@ Display the form to edit a Proxmox server
 sub edit_server_form :Path('edit') :Args(1) {
     my ($self, $c, $server_id) = @_;
 
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'proxmox_servers_edit_form')) {
+        $c->flash->{error_msg} = 'You must be an administrator to manage Proxmox servers.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_server_form', "Displaying edit server form for server: $server_id");
 
     # Get the server credentials
@@ -203,6 +232,13 @@ Process the form submission to edit a Proxmox server
 
 sub edit_server :Path('edit_server') :Args(0) {
     my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'proxmox_servers_edit')) {
+        $c->flash->{error_msg} = 'You must be an administrator to manage Proxmox servers.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
 
     # Get form parameters
     my $server_id = $c->req->params->{server_id} || 'default';
@@ -275,7 +311,14 @@ Delete a Proxmox server
 
 sub delete_server :Path('delete') :Args(1) {
     my ($self, $c, $server_id) = @_;
-    
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'proxmox_servers_delete')) {
+        $c->flash->{error_msg} = 'You must be an administrator to manage Proxmox servers.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     # Delete the server
     try {
         if (Comserv::Util::ProxmoxCredentials::delete_server($server_id)) {
@@ -299,6 +342,13 @@ Test the connection to a Proxmox server
 
 sub test_connection :Path('test') :Args(1) {
     my ($self, $c, $server_id) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'proxmox_servers_test')) {
+        $c->response->content_type('application/json');
+        $c->response->body('{"success":false,"error":"Access denied: admin required"}');
+        return;
+    }
 
     # Log that we've entered the test_connection action with high visibility
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test_connection',

@@ -17,7 +17,7 @@ ok($grok, "Grok model instantiated");
 
 # Test 3: Check default attributes
 is($grok->endpoint, 'https://api.x.ai/v1/chat/completions', "Correct default endpoint");
-is($grok->model, 'grok-beta', "Correct default model");
+is($grok->model, 'grok-3', "Correct default model");
 is($grok->timeout, 120, "Correct default timeout");
 is($grok->temperature, 0.7, "Correct default temperature");
 is($grok->max_tokens, 2048, "Correct default max_tokens");

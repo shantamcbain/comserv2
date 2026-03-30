@@ -1,4 +1,5 @@
-[% META title = 'View Remote Database: ' _ conn_name %]
+[% META title = 'View Remote Database: ' %]
+[% title = 'View Remote Database: ' _ conn_name %]
 
 <div class="container">
     <h1>Remote Database: [% conn_name %]</h1>

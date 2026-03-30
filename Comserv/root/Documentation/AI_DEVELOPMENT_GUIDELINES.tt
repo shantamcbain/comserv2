@@ -1,0 +1,46 @@
+[% META title = 'AI Development Guidelines for Comserv2' %]
+[% PageVersion = 'Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+
+<!-- Documentation page for AI_DEVELOPMENT_GUIDELINES -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+# CRITICAL AI DEVELOPMENT GUIDELINES FOR COMSERV
+
+## 🚀 By improving AI development practices, we can ensure a more efficient, consistent, and maintainable codebase for the Comserv project. This document outlines the key guidelines and best practices for AI-assisted development within the Comserv2 framework.
+     - by keeping this file up-to-date, we can ensure that AI development remains aligned with the project's goals and standards.
+
+## 🚨 DEVELOPMENT WORKFLOW CONSTRAINTS
+
+### Prompt Limitations & AI Thread Management
+
+### Zencoder Configuration & Context Management
+  - **WARNING PROTOCOL**: When zencoder warns about approaching limits:
+    - **DO NOT RESTART** the chat session
+    - **CONTINUE FROM CURRENT POINT** - maintain context and progress
+    - **NOTE**: Every code execution/tool use adds to the token count
+    - **STRATEGY**: Minimize unnecessary tool calls when near limits
+    - **FOCUS**: Complete current task efficiently without expanding scope
+
+### Zencoder Rules & Standards
+
+### Thread Degradation Signs & 4th Prompt Protocol
+  - AI starts making assumptions about unseen code
+  - AI creates unnecessary test files instead of direct fixes
+  - AI loses focus on the specific problem
+  - AI starts "hallucinating" about file contents or structures
+  1. **UPDATE THIS GUIDELINES FILE** with current task context and lessons learned
+  2. **PROVIDE HANDOFF INFORMATION** using the template below in a formatted box for easy copy-paste
+
+### HANDOFF TEMPLATE (Use this exact format):

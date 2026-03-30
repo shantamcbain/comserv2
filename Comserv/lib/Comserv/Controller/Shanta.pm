@@ -32,23 +32,23 @@ sub index :Path('/Shanta') :Args(0) {
     # Set mail server for session
     $c->session->{MailServer} = "http://webmail.usbm.ca";
     
-    # Get user information from session
-    my $username = $c->session->{username} || '';
-    my $firstname = $c->session->{firstname} || '';
-    my $lastname = $c->session->{lastname} || '';
-    my $roles = $c->session->{roles} || [];
+    # Get user information from session (use is_admin already set by Root::auto)
+    my $username  = $c->session->{username}   || '';
+    my $firstname = $c->session->{first_name} || '';
+    my $lastname  = $c->session->{last_name}  || '';
+    my $roles     = $c->session->{roles}      || [];
     
     # Log user access
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
         "User '$username' accessing Shanta dashboard");
     
-    # Prepare stash data
+    # Prepare stash data — do NOT overwrite is_admin; Root::auto already set it correctly
     $c->stash(
-        username => $username,
-        firstname => $firstname,
-        lastname => $lastname,
+        username   => $username,
+        firstname  => $firstname,
+        lastname   => $lastname,
         user_roles => $roles,
-        template => 'Shanta/Shanta.tt'
+        template   => 'Shanta/Shanta.tt'
     );
     
     # Set todolist view if user is Shanta

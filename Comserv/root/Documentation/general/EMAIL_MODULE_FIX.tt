@@ -1,0 +1,167 @@
+[% PageVersion = 'Comserv/root/Documentation/general/EMAIL_MODULE_FIX.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Email Module Fix' %]
+
+<!-- Documentation page for EMAIL_MODULE_FIX -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+This document explains how to fix issues with the Catalyst::View::Email and Catalyst::View::Email::Template modules in the Comserv application.
+
+
+
+<h2>Issue</h2>
+
+
+
+The application was encountering errors related to missing or improperly loaded email modules:
+
+
+
+<code></code>`
+
+Can't locate Catalyst/View/Email.pm in @INC (you may need to install the Catalyst::View::Email module)
+
+<code></code>`
+
+
+
+<h2>Solution</h2>
+
+
+
+We've implemented several changes to fix this issue:
+
+
+
+<ol><li>**Robust Email View Modules**:</li></ol>
+
+   - Created self-contained modules that work even when dependencies are missing
+
+   - Implemented fallback mechanisms that prevent application crashes
+
+   - Added graceful degradation for email functionality
+
+
+
+<ol><li>**Simplified Module Loading**:</li></ol>
+
+   - Removed dependency on external modules being loaded first
+
+   - Made the views self-sufficient with internal error handling
+
+   - Eliminated the need for dummy implementations in Comserv.pm
+
+
+
+<ol><li>**Added Helper Scripts**:</li></ol>
+
+   - <code>install_email_only.pl</code> - Installs only the essential email modules
+
+   - <code>test_email_modules.pl</code> - Tests if email modules are properly loaded
+
+
+
+<h2>How to Fix</h2>
+
+
+
+If you encounter email module issues, follow these steps:
+
+
+
+<ol><li>Make the helper scripts executable:</li></ol>
+
+   <code></code>`
+
+   cd /path/to/Comserv/script
+
+   ./make_scripts_executable.sh
+
+   <code></code>`
+
+
+
+<ol><li>Install only the essential email modules:</li></ol>
+
+   <code></code>`
+
+   cd /path/to/Comserv/script
+
+   ./install_email_only.pl
+
+   <code></code>`
+
+
+
+<ol><li>Test if the modules are properly installed:</li></ol>
+
+   <code></code>`
+
+   cd /path/to/Comserv/script
+
+   ./test_email_modules.pl
+
+   <code></code>`
+
+
+
+<ol><li>Restart the server:</li></ol>
+
+   <code></code>`
+
+   cd /path/to/Comserv/script
+
+   ./comserv_server.pl -r
+
+   <code></code>`
+
+
+
+<h2>Technical Details</h2>
+
+
+
+The fix addresses several issues:
+
+
+
+<ol><li>**Self-Contained Views**: Each view module can function independently</li></ol>
+
+<ol><li>**Graceful Degradation**: Email functionality degrades gracefully when modules are missing</li></ol>
+
+<ol><li>**Minimal Dependencies**: Only essential modules are required</li></ol>
+
+<ol><li>**Backward Compatibility**: Works with older versions of Catalyst::View::Email</li></ol>
+
+
+
+<h2>Production Deployment</h2>
+
+
+
+When deploying to production, you only need to:
+
+
+
+<ol><li>Copy the updated files to the production server</li></ol>
+
+<ol><li>Run the <code>install_email_only.pl</code> script to install the essential modules</li></ol>
+
+<ol><li>Restart the application using the standard method: <code>script/comserv_server.pl -r</code></li></ol>
+
+
+
+The application will now work correctly even if some email modules can't be installed. Email functionality will be disabled gracefully if the modules are missing, but the rest of the application will continue to function normally.
+
+</div>
