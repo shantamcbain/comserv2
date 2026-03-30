@@ -4,6 +4,7 @@ use namespace::autoclean;
 use Data::FormValidator;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::Logging;
+use Comserv::Util::PointSystem;
 BEGIN { extends 'Catalyst::Controller'; }
 
 has 'logging' => (
@@ -988,6 +989,24 @@ sub register :Local :Args(1) {
         $participant_status = 'registered';
     }
     
+    my $registration_fee = $workshop->registration_fee || 0;
+    if ($registration_fee > 0 && $participant_status eq 'registered') {
+        my $ps = Comserv::Util::PointSystem->new(c => $c);
+        my ($ok, $err) = $ps->debit(
+            user_id          => $user_id,
+            amount           => $registration_fee,
+            transaction_type => 'spend',
+            description      => 'Workshop registration: ' . $workshop->title,
+            reference_type   => 'workshop',
+            reference_id     => $id,
+        );
+        unless ($ok) {
+            $c->flash->{error_msg} = $err || 'Insufficient points to register for this workshop.';
+            $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
+            return;
+        }
+    }
+
     my $participant;
     eval {
         $participant = $c->model('DBEncy::Participant')->create({
@@ -1113,7 +1132,24 @@ sub unregister :Local :Args(1) {
     if ($@) {
         $c->flash->{error_msg} = 'Failed to cancel registration: ' . $@;
     } else {
-        $c->flash->{success_msg} = 'Your registration has been cancelled.';
+        my $registration_fee = $workshop->registration_fee || 0;
+        if ($registration_fee > 0 && $participant->status eq 'cancelled') {
+            eval {
+                my $ps = Comserv::Util::PointSystem->new(c => $c);
+                $ps->credit(
+                    user_id          => $user_id,
+                    amount           => $registration_fee,
+                    transaction_type => 'refund',
+                    description      => 'Workshop cancellation refund: ' . $workshop->title,
+                    reference_type   => 'workshop',
+                    reference_id     => $id,
+                );
+            };
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'unregister',
+                "Refund failed: $@") if $@;
+        }
+        $c->flash->{success_msg} = 'Your registration has been cancelled.'
+            . ($registration_fee > 0 ? " $registration_fee points have been refunded." : '');
     }
     
     $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));

@@ -1,0 +1,139 @@
+[% META title = 'Site Mailout' %]
+
+<div class="admin-content">
+    <div class="admin-header">
+        <h1>Site Mailout</h1>
+        <div class="admin-actions">
+            <a href="[% c.uri_for('/mail/lists') %]" class="btn btn-secondary">Mailing Lists</a>
+            <a href="[% c.uri_for('/mail/mail_admin_dashboard') %]" class="btn btn-secondary">Mail Admin</a>
+        </div>
+    </div>
+
+    [% IF c.flash.success_msg %]
+        <div class="alert alert-success">[% c.flash.success_msg | html %]</div>
+    [% END %]
+    [% IF c.flash.error_msg %]
+        <div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
+    [% END %]
+
+    <div class="admin-card">
+        <form method="POST" action="[% c.uri_for('/mail/send_mass_email') %]" id="mailout-form">
+
+            <div class="form-section">
+                <h3>Recipients</h3>
+                <div class="form-group">
+                    <label><input type="radio" name="group" value="all" checked onchange="updateCount(this)">
+                        All site users <strong>([% user_count %])</strong>
+                        <small style="color:#666;"> — everyone with a role on this site</small>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label><input type="radio" name="group" value="paid" onchange="updateCount(this)">
+                        Paid / active members <strong>([% paid_count %])</strong>
+                        <small style="color:#666;"> — active or grace-period memberships</small>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label><input type="radio" name="group" value="custom" onchange="updateCount(this)">
+                        Custom addresses only
+                        <small style="color:#666;"> — use the field below, no DB users</small>
+                    </label>
+                </div>
+
+                <div class="form-group" style="margin-top:12px;">
+                    <label for="custom_addresses">Additional / Custom Addresses:</label>
+                    <textarea name="custom_addresses" id="custom_addresses" rows="3"
+                              placeholder="extra@example.com, another@example.com"
+                              style="width:100%;padding:6px;"></textarea>
+                    <small style="color:#666;">Comma, semicolon or space-separated. Added on top of the selected group (or used alone for Custom mode).</small>
+                </div>
+            </div>
+
+            <div class="form-section" style="margin-top:20px;">
+                <h3>Message</h3>
+                <div class="form-group">
+                    <label for="subject">Subject <span style="color:red;">*</span></label>
+                    <input type="text" name="subject" id="subject" required
+                           style="width:100%;padding:6px;" placeholder="Your subject line">
+                </div>
+                <div class="form-group" style="margin-top:10px;">
+                    <label for="body">Message Body <span style="color:red;">*</span></label>
+                    <textarea name="body" id="body" rows="14" required
+                              style="width:100%;padding:6px;"
+                              placeholder="Write your message here..."></textarea>
+                    <small style="color:#666;">
+                        Personalisation tags: <code>[FIRST_NAME]</code> <code>[LAST_NAME]</code>
+                        <code>[EMAIL]</code> <code>[USERNAME]</code> — replaced per recipient.
+                    </small>
+                </div>
+            </div>
+
+            <div class="form-section" style="margin-top:20px;background:#fff8e1;border:1px solid #ffc107;padding:14px;border-radius:6px;">
+                <p id="confirm-text" style="margin:0 0 8px;">
+                    You are about to send to <strong id="recipient-count">[% user_count %]</strong> recipient(s).
+                </p>
+                <label>
+                    <input type="checkbox" id="confirm_send" required>
+                    I confirm I want to send this mailout.
+                </label>
+            </div>
+
+            <div class="form-actions" style="margin-top:16px;">
+                <button type="submit" id="send-btn" class="btn btn-primary btn-lg" disabled>
+                    Send Mailout
+                </button>
+                <a href="[% c.uri_for('/mail/lists') %]" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+
+    [% IF mailing_lists.size %]
+    <div class="admin-card" style="margin-top:20px;">
+        <h3>Named Mailing Lists</h3>
+        <table class="admin-table">
+            <thead><tr><th>List</th><th>Actions</th></tr></thead>
+            <tbody>
+            [% FOREACH list IN mailing_lists %]
+            <tr>
+                <td><strong>[% list.name | html %]</strong></td>
+                <td>
+                    <a href="[% c.uri_for('/mail/lists', list.id, 'subscribers') %]" class="btn-small">Subscribers</a>
+                    <a href="[% c.uri_for('/mail/lists', list.id, 'edit') %]" class="btn-small">Edit</a>
+                </td>
+            </tr>
+            [% END %]
+            </tbody>
+        </table>
+    </div>
+    [% END %]
+</div>
+
+<script>
+var counts = { all: [% user_count %], paid: [% paid_count %], custom: 0 };
+
+function updateCount(radio) {
+    var n = counts[radio.value] !== undefined ? counts[radio.value] : '?';
+    document.getElementById('recipient-count').textContent = n;
+}
+
+document.getElementById('confirm_send').addEventListener('change', function() {
+    document.getElementById('send-btn').disabled = !this.checked;
+});
+
+document.getElementById('mailout-form').addEventListener('submit', function(e) {
+    var subject = document.getElementById('subject').value.trim();
+    var body    = document.getElementById('body').value.trim();
+    if (!subject || !body) {
+        e.preventDefault();
+        alert('Please fill in subject and message.');
+        return false;
+    }
+    if (!document.getElementById('confirm_send').checked) {
+        e.preventDefault();
+        alert('Please tick the confirmation checkbox.');
+        return false;
+    }
+    document.getElementById('send-btn').textContent = 'Sending…';
+    document.getElementById('send-btn').disabled = true;
+});
+</script>

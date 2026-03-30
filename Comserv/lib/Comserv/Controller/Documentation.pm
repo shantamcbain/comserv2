@@ -320,10 +320,10 @@ sub _ensure_scanned {
         # Run the existing scan routines to refresh in-memory index
         _scan_directories($self, $c);
         _categorize_pages($self, $c);
-        # Update JSON config with newly scanned files
+        # Update JSON config with newly scanned files (preserves existing roles)
         $self->_update_json_config_with_scanned_files($c);
-        # Update JSON config with newly scanned files
-        $self->_update_json_config_with_scanned_files($c);
+        # Sync JSON config roles back into in-memory pages (overrides scan defaults)
+        $self->_apply_json_roles_to_memory($c);
         # Persist new fingerprint atomically
         _store_fingerprint($state_path, $current_fp) or do {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_ensure_scanned',
@@ -352,11 +352,15 @@ sub index :Path('/Documentation') :Args(0) {
     $self->_ensure_scanned($c);
 
     # Get the current user's role
-    my $user_role = 'normal';  # Default to normal user
+    my $user_role = 'guest';  # Default to guest — unauthenticated users get no access above guest
     my $is_admin = 0;  # Flag to track if user has admin role
 
+    # Only assign a real role if the user has an authenticated session (non-anonymous username)
+    my $session_username = $c->session->{username} // '';
+    my $is_authenticated = ($session_username && $session_username ne 'anonymous');
+
     # First check session roles (this works even if user is not fully authenticated)
-    if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
+    if ($is_authenticated && $c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
         # Log all roles for debugging
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
             "Session roles: " . join(", ", @{$c->session->{roles}}));
@@ -372,9 +376,9 @@ sub index :Path('/Documentation') :Args(0) {
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
             "User role determined from session: $user_role, is_admin: $is_admin");
     }
-    # If no role found in session but user exists, try to get role from user object
-    elsif ($c->controller('Root')->user_exists($c)) {
-        $user_role = $c->session->{roles} || 'normal';
+    # If no role found in session but user is authenticated, use 'user' as fallback (not 'normal')
+    elsif ($is_authenticated && $c->controller('Root')->user_exists($c)) {
+        $user_role = $c->session->{roles} || 'user';
         $is_admin = 1 if lc($user_role) eq 'admin';
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
             "User role determined from session: $user_role, is_admin: $is_admin");
@@ -417,10 +421,6 @@ sub index :Path('/Documentation') :Args(0) {
     foreach my $page_name (keys %$pages) {
         my $metadata = $pages->{$page_name};
 
-        # TEMPORARY: Show ALL pages for debugging - REMOVE THIS LATER
-        $filtered_pages{$page_name} = $metadata;
-        next;  # Skip all the filtering logic temporarily
-
         # Log the admin status for debugging
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
             "Processing page $page_name, is_admin: $is_admin");
@@ -454,8 +454,8 @@ sub index :Path('/Documentation') :Args(0) {
                         last;
                     }
                 }
-                # Special case for normal role - any authenticated user can access normal content
-                elsif ($role eq 'normal' && $user_role) {
+                # Special case for normal role - only authenticated users (not guest) can access normal content
+                elsif ($role eq 'normal' && $is_authenticated) {
                     $has_role = 1;
                     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
                         "Normal role access granted for user with role $user_role");
@@ -610,11 +610,14 @@ sub view :Path('/Documentation') :Args(1) {
         "After scanning, found $pages_count pages in documentation_pages hash");
 
     # Get the current user's role
-    my $user_role = 'normal';  # Default to normal user
+    my $user_role = 'guest';  # Default to guest — unauthenticated users get no access above guest
     my $is_admin = 0;  # Flag to track if user has admin role
-    
+
+    my $session_username_v = $c->session->{username} // '';
+    my $is_authenticated = ($session_username_v && $session_username_v ne 'anonymous');
+
     # First check if user is authenticated
-    if ($c->user_exists) {
+    if ($is_authenticated) {
         # Check if roles are stored in session
         if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
             # Log all roles for debugging
@@ -632,9 +635,9 @@ sub view :Path('/Documentation') :Args(1) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'view',
                 "User role determined from session: $user_role, is_admin: $is_admin");
         }
-        # If no role found in session but user exists, try to get role from user object
+        # If no role found in session but user is authenticated, use 'user' as fallback
         else {
-            $user_role = $c->session->{roles} || 'normal';
+            $user_role = $c->session->{roles} || 'user';
             $is_admin = 1 if lc($user_role) eq 'admin';
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'view',
                 "User role determined from session: $user_role, is_admin: $is_admin");
@@ -685,7 +688,7 @@ sub view :Path('/Documentation') :Args(1) {
             foreach my $role (@{$metadata->{roles}}) {
                 if ($role eq $user_role || 
                     ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && grep { $_ eq $role } @{$c->session->{roles}}) ||
-                    ($role eq 'normal' && $user_role)) {
+                    ($role eq 'normal' && $is_authenticated)) {
                     $has_role = 1;
                     last;
                 }
@@ -2006,8 +2009,8 @@ sub _update_json_config_with_scanned_files {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_update_json_config_with_scanned_files',
                 "Added uncategorized page to admin_guides: $page_name");
         } else {
-            $category = $metadata->{category} || $self->_determine_page_category($page_name, $metadata->{path});
-            $roles = $metadata->{roles};
+            $category = $config->{pages}->{$page_name}->{category} || $metadata->{category} || $self->_determine_page_category($page_name, $metadata->{path});
+            $roles = $config->{pages}->{$page_name}->{roles} || $metadata->{roles};
             $title = $metadata->{title} || $self->_format_title($page_name);
             $update_count++;
         }
@@ -2037,6 +2040,24 @@ sub _update_json_config_with_scanned_files {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_update_json_config_with_scanned_files',
             "Failed to write JSON config file");
     }
+}
+
+sub _apply_json_roles_to_memory {
+    my ($self, $c) = @_;
+    my $config_file = $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json');
+    return unless -e $config_file;
+    my $config = _load_json_file($config_file) || {};
+    my $json_pages = $config->{pages} || {};
+    my $memory_pages = $self->documentation_pages;
+    my $synced = 0;
+    foreach my $page_name (keys %$json_pages) {
+        if (exists $memory_pages->{$page_name} && ref $json_pages->{$page_name}->{roles} eq 'ARRAY') {
+            $memory_pages->{$page_name}->{roles} = $json_pages->{$page_name}->{roles};
+            $synced++;
+        }
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_apply_json_roles_to_memory',
+        "Synced roles from JSON config into memory for $synced pages");
 }
 
 # Helper method to clean data structure for JSON encoding
@@ -2332,7 +2353,7 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
 
         my @proj_rows = $c->model('DBEncy')->resultset('Project')->search(
             \%proj_cond,
-            { order_by => ['sitename', 'name'] }
+            { order_by => ['sort_order', 'sitename', 'name'] }
         )->all;
 
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'daily_plan',
@@ -2355,6 +2376,24 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
                     "Could not fetch linked plans for project $p{id}: $@");
             }
             $p{linked_plans} = \@linked_plans;
+
+            # Sub-projects (direct children of this project)
+            my @sub_projects;
+            eval {
+                my @subs = $c->model('DBEncy')->resultset('Project')->search(
+                    { parent_id => $p{id} },
+                    { order_by  => ['name'] }
+                )->all;
+                for my $sub (@subs) {
+                    push @sub_projects, { $sub->get_columns };
+                }
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+                    "Could not fetch sub-projects for project $p{id}: $@");
+            }
+            $p{sub_projects} = \@sub_projects;
+
             push @planning_projects, \%p;
 
             # Collect sitenames for filter toggle (skip blank)
@@ -2394,7 +2433,27 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         @orphan_plans      = grep { ($_->{sitename} || '') eq $filter_site } @orphan_plans;
     }
 
-    # --- Active Priorities: DB-driven, role/site/user scoped, dependency-ordered ---
+    # --- All plans (for link-plan-to-project form, admin only) ---
+    my @all_plans;
+    eval {
+        my %plan_cond = $is_csc ? () : (sitename => $sitename);
+        @all_plans = map { { $_->get_columns } }
+            $c->model('DBEncy')->resultset('DailyPlan')->search(
+                \%plan_cond, { order_by => ['plan_name'] }
+            )->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Could not fetch all_plans: $@");
+    }
+
+    # --- Active Priorities: DB-driven, role/site/user scoped, smart-scored ordering ---
+    # Score formula (lower = shown first):
+    #   status tier:   IN PROGRESS = 0, NEW/Pending = 1, anything else = 2
+    #   is_blocking:   halves the effective priority within tier
+    #   priority:      1 (critical) .. 10 (low)
+    #   staleness:     > 180 days since last activity adds +500 (pushes to bottom)
+    # Fetch 60 rows from DB (raw sort: active statuses first, then priority), then re-score in Perl.
     my @active_priorities;
     eval {
         my $user_id  = $c->session->{user_id};
@@ -2402,9 +2461,11 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         my $can_see_all = $c->stash->{is_admin}
             || grep { lc($_) =~ /^(developer|devops|editor)$/ } @$roles;
 
-        my %ap_cond = (status => { '!=' => 3 });   # exclude DONE
-        $ap_cond{sitename} = $sitename unless $is_csc;  # non-CSC: own site only
-        $ap_cond{user_id}  = $user_id  unless $can_see_all;  # members: own todos only
+        # Exclude all "done" status variants — numeric AND string
+        my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+        my %ap_cond = (status => { -not_in => \@done_statuses });
+        $ap_cond{sitename} = $sitename unless $is_csc;
+        $ap_cond{user_id}  = $user_id  unless $can_see_all;
 
         my @rows = $c->model('DBEncy')->resultset('Todo')->search(
             \%ap_cond,
@@ -2412,32 +2473,54 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
                 order_by => [
                     { -asc  => 'priority'    },
                     { -desc => 'is_blocking' },
-                    { -asc  => 'start_date'  },
+                    { -desc => 'last_mod_date' },
                 ],
-                rows => 20,
+                rows => 60,   # fetch more so Perl scoring can find the best 25
             }
         )->all;
 
-        # Pre-fetch all returned IDs for fast blocker lookup
         my %row_by_id = map { $_->record_id => $_ } @rows;
-
-        # Cache for project names
         my %proj_cache;
+        my $now_epoch = time();
 
+        my @scored;
         for my $todo (@rows) {
             my %h = $todo->get_columns;
 
-            # Blocker info
+            # ── Status tier ──────────────────────────────────────────────────
+            my $st = $h{status} // '';
+            my $in_progress = ($st == 2 || $st =~ /^(in.progress|in.process|IN PROGRESS)$/i) ? 1 : 0;
+            my $status_tier = $in_progress ? 0 : 1;
+
+            # ── Staleness (days since last activity) ─────────────────────────
+            my $activity_str = $h{last_mod_date} || $h{date_time_posted} || '';
+            my $days_stale   = 0;
+            if ($activity_str =~ /^(\d{4})-(\d{2})-(\d{2})/) {
+                require POSIX;
+                my $act_epoch = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
+                $days_stale = int(($now_epoch - $act_epoch) / 86400) if $act_epoch;
+            }
+            my $stale_penalty = $days_stale > 180 ? 500 : ($days_stale > 90 ? 50 : 0);
+            $h{stale_days}    = $days_stale;
+            $h{is_stale}      = $days_stale > 180 ? 1 : 0;
+
+            # ── Composite score (lower = higher priority) ─────────────────────
+            my $priority    = ($h{priority} || 5);
+            my $block_bonus = $h{is_blocking} ? -0.4 : 0;
+            $h{ap_score}    = ($status_tier * 100) + ($priority + $block_bonus) + $stale_penalty;
+
+            # ── Blocker info ──────────────────────────────────────────────────
             if ($h{blocked_by_todo_id}) {
                 my $blocker = $row_by_id{$h{blocked_by_todo_id}}
                     || eval { $c->model('DBEncy')->resultset('Todo')->find($h{blocked_by_todo_id}) };
                 if ($blocker) {
                     $h{blocker_subject} = $blocker->subject;
-                    $h{blocker_done}    = ($blocker->status == 3) ? 1 : 0;
+                    my $bs = $blocker->status // '';
+                    $h{blocker_done} = ($bs == 3 || $bs =~ /^(done|completed|closed)$/i) ? 1 : 0;
                 }
             }
 
-            # Project name (cached)
+            # ── Project name (cached) ─────────────────────────────────────────
             if ($h{project_id}) {
                 unless (exists $proj_cache{$h{project_id}}) {
                     my $p = eval { $c->model('DBEncy')->resultset('Project')->find($h{project_id}) };
@@ -2446,8 +2529,12 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
                 $h{project_name} = $proj_cache{$h{project_id}};
             }
 
-            push @active_priorities, \%h;
+            push @scored, \%h;
         }
+
+        # Sort by composite score, then by priority as tiebreaker
+        @active_priorities = (sort { $a->{ap_score} <=> $b->{ap_score} || $a->{priority} <=> $b->{priority} } @scored)[0..24];
+        @active_priorities = grep { defined } @active_priorities;  # trim undef if fewer than 25
     };
     if ($@) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
@@ -2464,6 +2551,7 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         orphan_plans   => \@orphan_plans,
         plan_sitenames => \@plan_sitenames,
         filter_site    => $filter_site,
+        all_plans      => \@all_plans,
         is_admin       => $c->stash->{is_admin},
 
         # Date strings

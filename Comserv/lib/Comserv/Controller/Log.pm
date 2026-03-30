@@ -239,6 +239,12 @@ sub update :Path('/log/update') :Args(0) {
 # This method will only display the form
 sub log_form :Path('/log/log_form') :Args() {
     my ($self, $c) = @_;
+
+    unless ($c->session->{username} && $c->session->{username} ne 'anonymous') {
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     my $schema = $c->model('DBEncy');
 
     my $todo_record_id = $c->request->parameters->{todo_record_id} || '';
@@ -274,25 +280,28 @@ sub log_form :Path('/log/log_form') :Args() {
         );
     }
 
+    # Allow GET params to pre-fill the form when no todo is linked
+    my $p = $c->request->parameters;
+
     # Add the priority, status, and record_id to the stash
     $c->stash(
         build_priority => $self->priority,
         build_status   => $self->status,
-        priority       => $todo_record ? $todo_record->priority : '',
-        status         => $todo_record ? $todo_record->status : '',
-        project_id     => $todo_record ? $todo_record->project_id : '',
-        todo_record_id => $todo_record ? $todo_record->record_id : $todo_record_id,
-        start_date     => $todo_record ? $todo_record->start_date : '',
-        site_name      => $todo_record ? $todo_record->sitename : $c->session->{SiteName},
-        due_date       => $todo_record ? $todo_record->due_date : '',
-        abstract       => $todo_record ? $todo_record->subject : '',
-        details        => $todo_record ? $todo_record->description : '',
-        comments       => $todo_record ? $todo_record->comments : '',
-        start_time     => $current_time_short, # Set start_time to current time
-        end_time       => $current_time_short, # Set end_time to current time
-        projects       => $projects,     # Add projects for selection
-        sites          => $sites,        # Add sites for selection
-        form_data      => $form_data,    # Add form_data for project_list.tt and site_list.tt
+        priority       => $todo_record ? $todo_record->priority   : ($p->{priority} || ''),
+        status         => $todo_record ? $todo_record->status     : ($p->{status}   || ''),
+        project_id     => $todo_record ? $todo_record->project_id : ($p->{project_id} || ''),
+        todo_record_id => $todo_record ? $todo_record->record_id  : $todo_record_id,
+        start_date     => $todo_record ? $todo_record->start_date : ($p->{start_date} || DateTime->now->ymd),
+        site_name      => $todo_record ? $todo_record->sitename   : ($p->{site_name} || $c->session->{SiteName}),
+        due_date       => $todo_record ? $todo_record->due_date   : ($p->{due_date}  || DateTime->now->ymd),
+        abstract       => $todo_record ? $todo_record->subject    : ($p->{abstract}  || ''),
+        details        => $todo_record ? $todo_record->description: ($p->{details}   || ''),
+        comments       => $todo_record ? $todo_record->comments   : ($p->{comments}  || ''),
+        start_time     => $current_time_short,
+        end_time       => $current_time_short,
+        projects       => $projects,
+        sites          => $sites,
+        form_data      => $form_data,
     );
 
     # Render the form
@@ -308,8 +317,8 @@ sub create_log :Path('/log/create_log') :Args() {
 
     # Retrieve start_date from form data
     my $start_date = $c->request->body_parameters->{start_date};
-    # Set owner to 'none' if it's not provided
-    my $owner = $c->request->body_parameters->{owner} || 'none';
+    # Set username to session user if not provided
+    my $username = $c->session->{username} || $c->request->body_parameters->{username} || 'none';
 
     # Check if start_date is empty
     if ($start_date eq '') {
@@ -345,7 +354,7 @@ sub create_log :Path('/log/create_log') :Args() {
         # Stash the form data
         $c->stash(
             todo_record_id => $c->request->body_parameters->{todo_record_id},
-            owner          => $c->request->body_parameters->{owner} || 'none',
+            username       => $c->session->{username} || $c->request->body_parameters->{username} || 'none',
             sitename       => $c->session->{SiteName},
             start_date     => $start_date,
             due_date       => $c->request->body_parameters->{due_date},
@@ -446,7 +455,7 @@ sub create_log :Path('/log/create_log') :Args() {
 
     my $logEntry = $rs->create({
         todo_record_id  => $c->request->body_parameters->{todo_record_id},
-        owner           => $owner,
+        username        => $username,
         sitename        => $sitename,
         start_date      => $start_date || $current_date,
         project_code    => $project_id, # Use project_id from project_list.tt
