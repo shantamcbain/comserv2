@@ -1,10 +1,10 @@
-package Comserv::Model::Schema::Ency::Result::InventoryItem;
+package Comserv::Model::Schema::Ency::Result::InventoryLocation;
 use strict;
 use warnings;
 use base 'DBIx::Class::Core';
 
 __PACKAGE__->load_components('InflateColumn::DateTime', 'TimeStamp');
-__PACKAGE__->table('inventory_items');
+__PACKAGE__->table('inventory_locations');
 
 __PACKAGE__->add_columns(
     id => {
@@ -17,11 +17,6 @@ __PACKAGE__->add_columns(
         size        => 255,
         is_nullable => 0,
     },
-    sku => {
-        data_type   => 'varchar',
-        size        => 100,
-        is_nullable => 0,
-    },
     name => {
         data_type   => 'varchar',
         size        => 255,
@@ -31,31 +26,15 @@ __PACKAGE__->add_columns(
         data_type   => 'text',
         is_nullable => 1,
     },
-    category => {
-        data_type   => 'varchar',
-        size        => 100,
-        is_nullable => 1,
-    },
-    unit_of_measure => {
+    location_type => {
         data_type     => 'varchar',
-        size          => 50,
-        is_nullable   => 0,
-        default_value => 'each',
-    },
-    unit_cost => {
-        data_type     => 'decimal',
-        size          => [10, 2],
+        size          => 100,
         is_nullable   => 1,
+        default_value => 'warehouse',
     },
-    reorder_point => {
-        data_type     => 'integer',
-        is_nullable   => 1,
-        default_value => 0,
-    },
-    reorder_quantity => {
-        data_type     => 'integer',
-        is_nullable   => 1,
-        default_value => 0,
+    address => {
+        data_type   => 'text',
+        is_nullable => 1,
     },
     status => {
         data_type     => 'varchar',
@@ -86,34 +65,17 @@ __PACKAGE__->add_columns(
 );
 
 __PACKAGE__->set_primary_key('id');
-__PACKAGE__->add_unique_constraint(['sku']);
 
 __PACKAGE__->has_many(
     'stock_levels' => 'Comserv::Model::Schema::Ency::Result::InventoryStockLevel',
-    { 'foreign.item_id' => 'self.id' },
-    { cascade_delete => 1 }
-);
-
-__PACKAGE__->has_many(
-    'transactions' => 'Comserv::Model::Schema::Ency::Result::InventoryTransaction',
-    { 'foreign.item_id' => 'self.id' },
+    { 'foreign.location_id' => 'self.id' },
     { cascade_delete => 0 }
 );
 
 __PACKAGE__->has_many(
     'assignments' => 'Comserv::Model::Schema::Ency::Result::InventoryAssignment',
-    { 'foreign.item_id' => 'self.id' },
+    { 'foreign.location_id' => 'self.id' },
     { cascade_delete => 0 }
-);
-
-__PACKAGE__->has_many(
-    'item_suppliers' => 'Comserv::Model::Schema::Ency::Result::InventoryItemSupplier',
-    { 'foreign.item_id' => 'self.id' },
-    { cascade_delete => 1 }
-);
-
-__PACKAGE__->many_to_many(
-    'suppliers' => 'item_suppliers', 'supplier'
 );
 
 1;
