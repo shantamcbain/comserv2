@@ -463,6 +463,7 @@
             'api-bc05'                                 => 4018,
             'bmaster-f0fd'                             => 4019,
             'aichatsystem-planning-system-int-f187'    => 4020,
+            'inventory-system'                         => 4021,
         } %]
 
         [%# All known branch servers for the overview panel %]
@@ -488,6 +489,7 @@
             { name => 'api-bc05',                              port => 4018, label => 'APISystem',            url => '/Documentation/DailyPlan' },
             { name => 'bmaster-f0fd',                          port => 4019, label => 'BMaster',              url => '/Documentation/DailyPlan' },
             { name => 'aichatsystem-planning-system-int-f187', port => 4020, label => 'AIChatPlanInt',        url => '/Documentation/DailyPlan' },
+            { name => 'inventory-system',                      port => 4021, label => 'Inventory',            url => '/Documentation/DailyPlan' },
         ] %]
 
         <details style="margin-bottom:14px;border:1px solid #fd7e14;border-radius:6px;font-size:0.85em;">
