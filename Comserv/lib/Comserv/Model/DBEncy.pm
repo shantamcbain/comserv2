@@ -160,8 +160,8 @@ sub COMPONENT {
             name_sep => '.',
             limit_dialect => 'LimitXY',
             on_connect_do => [
-                "SET NAMES 'utf8'",
-                "SET CHARACTER SET 'utf8'",
+                "SET NAMES 'utf8mb4'",
+                "SET CHARACTER SET 'utf8mb4'",
                 "SET SESSION net_read_timeout=30",
                 "SET SESSION net_write_timeout=30",
             ],
