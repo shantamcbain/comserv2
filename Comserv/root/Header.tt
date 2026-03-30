@@ -30,7 +30,12 @@
         <meta name="description" content="[% http_header_description %]">
     [% END %]
     [%- SET site_favicon = c.stash.site_favicon || '' -%]
-    [% IF site_favicon %]
+    [%- SET req_port     = c.stash.req_port || 0 -%]
+    [%- SET fallback_icon = site_favicon || '/static/images/favicon.ico' -%]
+    [% IF req_port %]
+    <link rel="icon" type="image/svg+xml" href="/favicon/port/[% req_port %]">
+    <link rel="alternate icon" sizes="32x32" href="[% fallback_icon %]">
+    [% ELSIF site_favicon %]
     <link rel="shortcut icon" href="[% site_favicon %]">
     [% ELSE %]
     <link rel="shortcut icon" href="/static/images/favicon.ico">
