@@ -2467,6 +2467,21 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         $ap_cond{sitename} = $sitename unless $is_csc;
         $ap_cond{user_id}  = $user_id  unless $can_see_all;
 
+        # ── Load projects that are blocking other projects ────────────────────
+        # A project is a "cross-project blocker" if it appears as depends_on_id
+        # in an active project_dependency row. Todos in these projects get a
+        # priority boost so they float to the top of active priorities.
+        my %cross_blocker_projects;  # project_id => [names of projects it is blocking]
+        my @dep_rows_ap = eval {
+            $c->model('DBEncy')->resultset('ProjectDependency')->search(
+                { status => 'active', dependency_type => 'blocks' },
+                { columns => [qw(depends_on_id project_id)] }
+            )->all;
+        };
+        for my $dr (@dep_rows_ap) {
+            push @{ $cross_blocker_projects{$dr->depends_on_id} }, $dr->project_id;
+        }
+
         my @rows = $c->model('DBEncy')->resultset('Todo')->search(
             \%ap_cond,
             {
@@ -2507,7 +2522,16 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
             # ── Composite score (lower = higher priority) ─────────────────────
             my $priority    = ($h{priority} || 5);
             my $block_bonus = $h{is_blocking} ? -0.4 : 0;
-            $h{ap_score}    = ($status_tier * 100) + ($priority + $block_bonus) + $stale_penalty;
+
+            # Cross-project blocker bonus: this todo's project is blocking other projects
+            my $cross_block_bonus = 0;
+            if ($h{project_id} && $cross_blocker_projects{$h{project_id}}) {
+                $cross_block_bonus = -1.5;   # pull it higher than a same-priority non-blocker
+                $h{is_cross_blocker} = 1;
+                $h{blocking_count}   = scalar @{ $cross_blocker_projects{$h{project_id}} };
+            }
+
+            $h{ap_score} = ($status_tier * 100) + ($priority + $block_bonus + $cross_block_bonus) + $stale_penalty;
 
             # ── Blocker info ──────────────────────────────────────────────────
             if ($h{blocked_by_todo_id}) {
@@ -2539,6 +2563,34 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     if ($@) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
             "Could not fetch active priorities: $@");
+    }
+
+    # ── Project dependencies (cross-project blocking) ─────────────────────────
+    my @project_deps;
+    eval {
+        my @dep_rows = $c->model('DBEncy')->resultset('ProjectDependency')->search(
+            { status => 'active' },
+            { order_by => { -asc => 'project_id' } }
+        )->all;
+
+        my %proj_name_cache;
+        my $prs = $c->model('DBEncy')->resultset('Project');
+        for my $dep (@dep_rows) {
+            my %d = $dep->get_columns;
+            for my $fid ($d{project_id}, $d{depends_on_id}) {
+                unless (exists $proj_name_cache{$fid}) {
+                    my $p = eval { $prs->find($fid) };
+                    $proj_name_cache{$fid} = $p ? $p->name : "Project #$fid";
+                }
+            }
+            $d{project_name}    = $proj_name_cache{$d{project_id}};
+            $d{depends_on_name} = $proj_name_cache{$d{depends_on_id}};
+            push @project_deps, \%d;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Could not fetch project dependencies: $@");
     }
 
     # Pass all date information and todos to template
@@ -2582,7 +2634,9 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         # Todos
         todos           => $all_todos_calendar,    # For week.tt
         todos_for_today => $todos_for_today,       # For day view
-        active_priorities => \@active_priorities,  # DB-driven priority list for TODAY'S FOCUS
+        active_priorities    => \@active_priorities,    # DB-driven priority list for TODAY'S FOCUS
+        project_deps         => \@project_deps,         # Cross-project blocking dependencies
+        active_blockers      => [ grep { $_->{dependency_type} eq 'blocks' && $_->{status} eq 'active' } @project_deps ],
 
         template => 'admin/documentation/DailyPlan.tt'
     );
