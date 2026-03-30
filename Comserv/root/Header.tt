@@ -30,15 +30,20 @@
         <meta name="description" content="[% http_header_description %]">
     [% END %]
     [%- SET site_favicon = c.stash.site_favicon || '' -%]
-    [%- SET req_port     = c.stash.req_port || 0 -%]
-    [%- SET fallback_icon = site_favicon || '/static/images/favicon.ico' -%]
+    [%- SET req_port      = c.stash.req_port || 0 -%]
+    [%- SET fav_bg        = c.stash.favicon_bg_color || '' -%]
+    [%- SET site_name_enc = SiteName | uri -%]
+    [%- SET fallback_icon = site_favicon
+            ? site_favicon
+            : '/favicon/site/' _ site_name_enc -%]
     [% IF req_port %]
-    <link rel="icon" type="image/svg+xml" href="/favicon/port/[% req_port %]">
+    [%- SET port_icon_url = '/favicon/port/' _ req_port _ (fav_bg ? '?bg=' _ fav_bg : '') -%]
+    <link rel="icon" type="image/svg+xml" href="[% port_icon_url %]">
     <link rel="alternate icon" sizes="32x32" href="[% fallback_icon %]">
     [% ELSIF site_favicon %]
     <link rel="shortcut icon" href="[% site_favicon %]">
     [% ELSE %]
-    <link rel="shortcut icon" href="/static/images/favicon.ico">
+    <link rel="icon" type="image/svg+xml" href="/favicon/site/[% site_name_enc %]">
     [% END %]
     [% IF SiteName == "CSC" %]
         [% embed('CSCWHMCSInterface') %]
