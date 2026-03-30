@@ -13,6 +13,12 @@ branches:
     application_url: "http://workstation.local:4000"
     api_url: "http://api.workstation.local:4000"
     
+  ency-53b0:
+    name: "Encyclopedia (ENCY) Feature"
+    description: "Full development of the Encyclopedia of Biological Life — herbs, animals, insects, diseases, symptoms, constituents, glossary, cross-referencing, and AI integration"
+    application_url: "http://workstation.local:4003"
+    api_url: "http://api.workstation.local:4003"
+
   # Add other branches as needed
   # branch-name:
   #   application_url: "http://workstation.local:PORT"
