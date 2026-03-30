@@ -343,7 +343,10 @@
                     body: JSON.stringify({})
                 }).then(function(r){ return r.json(); }).then(function(d){
                     if (d.ok) {
-                        alert('Rescheduled: ' + d.count + ' todo' + (d.count !== 1 ? 's' : '') + ' updated. Reloading…');
+                        var msg = 'Rescheduled: ' + d.count + ' todo' + (d.count !== 1 ? 's' : '') + ' updated';
+                        if (d.date_count) msg += ' (' + d.date_count + ' due-dates extended)';
+                        msg += '. Reloading…';
+                        alert(msg);
                         location.reload();
                     } else {
                         btn.disabled = false;
