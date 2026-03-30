@@ -6,8 +6,7 @@ use warnings;
 __PACKAGE__->load_components(qw/TimeStamp/);
 __PACKAGE__->table('mailing_list_subscriptions');
 
-__PACKAGE__->add_columns(
-    id => {
+__PACKAGE__->add_columns(id => {
         data_type => 'integer',
         is_auto_increment => 1,
     },
@@ -59,6 +58,16 @@ __PACKAGE__->add_columns(
         data_type => 'tinyint',
         default_value => 1,
     },
+    display_name => {
+        data_type => 'varchar(255)',
+        size => 255,
+        is_nullable => 1,
+    },
+    email => {
+        data_type => 'varchar(255)',
+        size => 255,
+        is_nullable => 1,
+    }
 );
 
 __PACKAGE__->set_primary_key('id');

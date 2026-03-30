@@ -40,6 +40,10 @@
                         ${issues.map(issue => `<li>${issue}</li>`).join('')}
                     </ul>
                 </span>
+                <span class="health-banner-links" style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
+                    <a href="/log" style="color:#fff;text-decoration:underline;font-size:0.85em;white-space:nowrap;" title="View system logs">📋 View Logs</a>
+                    <a href="/admin/health" style="color:#fff;text-decoration:underline;font-size:0.85em;white-space:nowrap;" title="Open health dashboard">🩺 Health</a>
+                </span>
                 <button class="health-banner-close" onclick="this.parentElement.parentElement.remove()">×</button>
             </div>
         `;
