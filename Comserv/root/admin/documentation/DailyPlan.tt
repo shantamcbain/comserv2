@@ -339,17 +339,7 @@
             }
             </script>
 
-            [%# ── CSC LEGACY: Master Plan Priority List (being migrated to DB above) ── %]
-            [% IF is_csc %]
-            <details style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;margin-bottom:16px;">
-                <summary style="padding:10px 14px;cursor:pointer;font-size:0.85em;color:var(--text-muted-color);">
-                    📋 Legacy: Master Plan Priority List (text-based — being migrated to DB above)
-                </summary>
-                <div style="padding:14px;">
-                    [% INCLUDE "admin/documentation/PriorityTodos.tt" %]
-                </div>
-            </details>
-            [% END %]
+
 
         </div>
     </div>
@@ -420,20 +410,6 @@
         </div>
         [% END %]<!-- end is_csc resources -->
 
-        <h4 style="margin-top: 30px;">Quick Todo Actions</h4>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-            <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
-                <a href="/todo" style="display: block; color: var(--link-color); text-decoration: none; font-weight: bold; padding: 10px; border: 1px solid var(--primary-color); border-radius: 3px; text-align: center;">📋 Open Todo System</a>
-            </div>
-            <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
-                <a href="/todo/addtodo" onclick="window.open('/todo/addtodo', '_blank'); return false;" style="display: block; color: var(--link-color); text-decoration: none; font-weight: bold; padding: 10px; border: 1px solid var(--success-color); border-radius: 3px; text-align: center;">➕ Add New Todo</a>
-            </div>
-        </div>
-
-        <h4>Daily Notes for [% display_date %]:</h4>
-        <div style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 15px; min-height: 150px;">
-            <p><em>Add notes about this day's work here...</em></p>
-        </div>
     </div>
 
     <!-- TAB: MONTH VIEW -->
@@ -794,11 +770,6 @@
         </div>
         [% END %]
 
-        [% IF is_csc %]
-        <hr style="margin:30px 0;border-color:var(--border-color);">
-        <h3 style="color:var(--text-muted-color);font-size:0.95em;">CSC Text-Based Planning (being migrated to DB above)</h3>
-        [% INCLUDE "admin/documentation/Planning.tt" %]
-        [% END %]
     </div>
 
     <!-- TAB: GANTT VIEW (all sites — DB-driven project timeline) -->
