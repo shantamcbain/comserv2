@@ -1,19 +1,18 @@
-
 [% META
     title = "AI Models Management"
     category = "AI"
     roles = "admin,developer,user"
-    page_version = "1.05"
-    last_updated = "Fri Jan 23 15:00:00 UTC 2026"
+    page_version = "1.06"
+    last_updated = "Fri Mar 27 2026"
     description = "Manage Ollama models across servers, including pull/test/remove and start buttons."
     keywords = "Ollama, models, pull, test, remove"
     author = "Comserv Team"
 %]
 
-[% PageVersion = 'ai/models.tt,v 1.05 2026/01/23 15:00:00 CleanupAgent Exp - Theme compliance and card style standardization'; %]
+[% PageVersion = 'ai/models.tt,v 1.06 2026/03/27 - Theme compliance, no jQuery, fix remove/pull JSON'; %]
 
 [% IF c.debug %]
-    <div class="debug-info">
+    <div class="models-debug-info">
         <p>Debug Mode: User=[% username %] | Servers Count=[% servers.size %] | Can Manage=[% can_select_model %]</p>
     </div>
 [% END %]
@@ -21,391 +20,558 @@
 <style>
 .models-container {
     padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
 }
 
-.debug-info {
-    background-color: var(--secondary-color);
+.models-debug-info {
+    background-color: var(--secondary-color, #f5f5f5);
     padding: 10px;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border-color, #ccc);
     margin-bottom: 20px;
     font-size: 0.9em;
+    color: var(--text-color, #333);
 }
 
-.toc-section {
-    background-color: var(--secondary-color);
+.models-toc {
+    background-color: var(--secondary-color, #f5f5f5);
     padding: 15px;
     border-radius: 8px;
     margin-bottom: 20px;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border-color, #ccc);
+    color: var(--text-color, #333);
 }
 
-.card {
-    background-color: var(--secondary-color);
-    border: 1px solid var(--border-color);
+.models-card {
+    background-color: var(--secondary-color, #f5f5f5);
+    border: 1px solid var(--border-color, #ccc);
     border-radius: 8px;
     margin-bottom: 20px;
     overflow: hidden;
-    box-shadow: var(--dropdown-shadow);
 }
 
-.card-header {
-    background-color: var(--primary-color);
-    padding: 15px;
-    border-bottom: 1px solid var(--border-color);
+.models-card-header {
+    background-color: var(--nav-bg, #e0e0e0);
+    color: var(--nav-text, var(--text-color, #000));
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color, #ccc);
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
-.card-header h5 {
+.models-card-header h5 {
     margin: 0;
-    color: var(--text-color);
+    font-size: 1em;
+    color: var(--nav-text, var(--text-color, #000));
 }
 
-.card-body {
-    padding: 20px;
-    color: var(--text-color);
+.models-card-body {
+    padding: 16px;
+    color: var(--text-color, #333);
+}
+
+.models-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 20px;
 }
 
 .server-message {
     min-height: 20px;
     font-size: 0.9em;
-    color: var(--text-color);
-    opacity: 0.8;
+    color: var(--text-color, #333);
+    margin: 8px 0;
 }
 
-.badge {
-    padding: 4px 8px;
+.models-badge {
+    display: inline-block;
+    padding: 3px 8px;
     border-radius: 4px;
-    font-size: 0.8em;
+    font-size: 0.78em;
     font-weight: bold;
-    color: var(--text-color);
+    color: var(--text-color, #000);
 }
 
-.badge-success { background-color: var(--success-color); }
-.badge-danger { background-color: var(--warning-color); }
-.badge-info { background-color: var(--link-color); }
+.badge-connected    { background-color: var(--success-color, #4caf50); color: #fff; }
+.badge-disconnected { background-color: var(--warning-color, #f44336); color: #fff; }
+.badge-size         { background-color: var(--link-color, #2196f3);    color: #fff; }
 
-.list-group-item {
-    background-color: transparent;
-    border-bottom: 1px solid var(--border-color);
-    padding: 10px 0;
+.models-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.models-list li {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color, #ddd);
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
-.list-group-item:last-child {
-    border-bottom: none;
+.models-list li:last-child { border-bottom: none; }
+
+.model-name {
+    flex: 1;
+    min-width: 0;
+    word-break: break-all;
+    font-size: 0.9em;
 }
 
-.footer {
-    margin-top: 40px;
-    padding: 20px;
-    background-color: var(--secondary-color);
-    color: var(--text-color);
-    text-align: center;
-    border-top: 1px solid var(--border-color);
+.model-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
 }
 
-.btn-full {
+.models-select {
     width: 100%;
+    padding: 6px 8px;
+    font-size: 0.85em;
+    background-color: var(--background-color, #fff);
+    color: var(--text-color, #333);
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 4px;
+    margin-bottom: 8px;
+    font-family: inherit;
 }
 
-.alert-warning-custom {
-    background-color: var(--secondary-color);
-    border: 1px solid var(--warning-color);
-    color: var(--text-color);
-    padding: 10px;
+.btn-block { width: 100%; margin-bottom: 8px; }
+
+.btn-sm {
+    padding: 3px 8px;
+    font-size: 0.78em;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: inherit;
+    border: 1px solid transparent;
+}
+
+.btn-outline-success {
+    background: none;
+    color: var(--success-color, #4caf50);
+    border-color: var(--success-color, #4caf50);
+}
+.btn-outline-success:hover {
+    background-color: var(--success-color, #4caf50);
+    color: #fff;
+}
+
+.btn-outline-danger {
+    background: none;
+    color: var(--warning-color, #f44336);
+    border-color: var(--warning-color, #f44336);
+}
+.btn-outline-danger:hover {
+    background-color: var(--warning-color, #f44336);
+    color: #fff;
+}
+
+.models-alert-info {
+    background-color: var(--secondary-color, #f5f5f5);
+    border: 1px solid var(--link-color, #2196f3);
+    color: var(--text-color, #333);
+    padding: 8px 12px;
     border-radius: 4px;
-    margin-bottom: 15px;
+    margin-bottom: 12px;
+    font-size: 0.85em;
+}
+
+.models-alert-error {
+    background-color: var(--secondary-color, #f5f5f5);
+    border: 1px solid var(--warning-color, #f44336);
+    color: var(--text-color, #333);
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+}
+
+.models-footer {
+    margin-top: 40px;
+    padding: 16px;
+    background-color: var(--secondary-color, #f5f5f5);
+    color: var(--text-color, #333);
+    text-align: center;
+    border-top: 1px solid var(--border-color, #ccc);
+    font-size: 0.85em;
+    opacity: 0.7;
+}
+
+.models-section-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-top: 16px;
+}
+
+.color-success { color: var(--success-color, #4caf50); }
+.color-danger  { color: var(--warning-color, #f44336); }
+.color-info    { color: var(--link-color, #2196f3); }
+.color-muted   { opacity: 0.65; }
+
+h6.section-subhead {
+    margin: 12px 0 6px 0;
+    font-size: 0.9em;
+    color: var(--text-color, #333);
+    opacity: 0.8;
 }
 </style>
 
-<div class="container models-container" data-page-date="2024-10-18">
-    <div class="row">
-        <div class="col-12">
-            <div class="metadata" style="display: none;">
-                <meta name="title" content="AI Models Management">
-                <meta name="category" content="AI">
-                <meta name="roles" content="admin,developer,user">
-            </div>
+<div class="models-container" data-page-date="2026-03-27">
 
-            <!-- TOC -->
-            <div id="toc" class="toc-section">
-                <h2>Table of Contents</h2>
-                <ul>
-                    <li><a href="#overview">Overview</a></li>
-                    [% FOREACH server IN servers %]
-                    <li><a href="#server-[% loop.index %]">[% server.name %]</a></li>
+    <!-- TOC -->
+    <div class="models-toc">
+        <h2>Table of Contents</h2>
+        <ul>
+            <li><a href="#overview">Overview</a></li>
+            [% FOREACH server IN servers %]
+            <li><a href="#server-[% loop.index %]">[% server.name %]</a></li>
+            [% END %]
+            <li><a href="#user-api-keys">Your API Keys</a></li>
+            <li><a href="#troubleshooting">Troubleshooting</a></li>
+        </ul>
+    </div>
+
+    <!-- Overview -->
+    <section id="overview">
+        <h1>AI Models Management</h1>
+        <p>Hello, [% username %]. View and manage Ollama models per server. Use buttons to start servers and pull/test models (admin/developer only).</p>
+
+        [% IF error %]
+        <div class="models-alert-error">
+            <strong>Error:</strong> [% error %]
+        </div>
+        [% END %]
+    </section>
+
+    <!-- Server cards -->
+    <div class="models-grid">
+        [% FOREACH server IN servers %]
+        <div class="models-card" id="server-[% loop.index %]">
+            <div class="models-card-header">
+                <h5>[% server.name %] ([% server.location %])</h5>
+                <div id="status-[% loop.index %]">
+                    [% IF server.connected %]
+                    <span class="models-badge badge-connected">Connected</span>
+                    [% ELSE %]
+                    <span class="models-badge badge-disconnected">Disconnected</span>
                     [% END %]
-                    <li><a href="#troubleshooting">Troubleshooting</a></li>
-                </ul>
-            </div>
-
-            <!-- Page Content -->
-            <section id="overview">
-                <h1>AI Models Management</h1>
-                <p>Hello, [% username %]. View and manage Ollama models per server. Use buttons to start servers and pull/test models (admin/developer only).</p>
-
-                [% IF error %]
-                <div class="alert alert-danger" role="alert">
-                    <strong>Error:</strong> [% error %]
                 </div>
+            </div>
+            <div class="models-card-body">
+                [% IF server.error %]
+                <div class="models-alert-error">[% server.error %]</div>
                 [% END %]
-            </section>
 
-            <!-- User API Keys Section -->
-            <section id="user-api-keys" style="margin: 20px 0;">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Your AI Provider API Keys</h5>
-                        <a href="/ai/manage_api_keys" class="btn-secondary" style="padding: 6px 12px; text-decoration: none; font-size: 0.9em;">Manage API Keys</a>
-                    </div>
-                    <div class="card-body">
-                        [% IF user_api_keys.size %]
-                        <p style="margin-bottom: 10px; color: var(--text-color);">Configured providers for [% username %]:</p>
-                        <ul class="list-group list-group-flush">
-                            [% FOREACH api_key IN user_api_keys %]
-                            <li class="list-group-item">
-                                <span class="model-name" style="text-transform: capitalize;">[% api_key.service %]</span>
-                                <span class="badge badge-success">🔒 Configured</span>
-                                <small style="color: var(--text-color); opacity: 0.7; margin-left: 10px;">Added: [% api_key.created_at %]</small>
-                            </li>
-                            [% END %]
-                        </ul>
-                        [% ELSE %]
-                        <div style="text-align: center; padding: 20px; color: var(--text-color);">
-                            <p>No API keys configured yet.</p>
-                            <p style="font-size: 0.9em; opacity: 0.8;">Add API keys for services like Grok, OpenAI, Claude, Gemini to use them in the chat.</p>
+                [% IF can_select_model %]
+                <button class="btn btn-primary btn-block"
+                        onclick="startServer([% loop.index %], '[% server.host %]', [% server.port %])">
+                    [% IF NOT server.connected %]Start Server[% ELSE %]Restart[% END %]
+                </button>
+                <div id="message-[% loop.index %]" class="server-message"></div>
+                [% ELSE %]
+                <div class="models-alert-info">Management requires admin/developer role.</div>
+                [% END %]
+
+                [% IF can_select_model %]
+                <h6 class="section-subhead">Currently Loaded in Memory
+                    <button class="btn btn-sm" style="font-size:0.75em;margin-left:8px;"
+                            onclick="refreshRunning([% loop.index %], '[% server.host %]', [% server.port %])">↺ Refresh</button>
+                </h6>
+                <ul class="models-list" id="running-[% loop.index %]">
+                    <li><span class="color-muted">Loading…</span></li>
+                </ul>
+                [% END %]
+
+                <h6 class="section-subhead">Installed Models</h6>
+                <ul class="models-list">
+                    [% IF server.installed_models.size %]
+                    [% FOREACH model IN server.installed_models %]
+                    <li>
+                        <span class="model-name">[% model.name %]</span>
+                        <span class="models-badge badge-size">[% model.size %]</span>
+                        [% IF can_select_model %]
+                        <div class="model-actions">
+                            <button class="btn btn-sm btn-outline-success"
+                                    onclick="testModel('[% model.name %]', '[% server.host %]', [% server.port %])">
+                                Test
+                            </button>
+                            <button class="btn btn-sm" style="background:var(--link-color,#2196f3);color:#fff;"
+                                    onclick="unloadModel('[% model.name %]', '[% server.host %]', [% server.port %], [% loop.index %])">
+                                Unload
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger"
+                                    onclick="removeModel('[% model.name %]', '[% server.host %]', [% server.port %])">
+                                Remove
+                            </button>
                         </div>
                         [% END %]
-                    </div>
-                </div>
-            </section>
+                    </li>
+                    [% END %]
+                    [% ELSE %]
+                    <li><span class="color-muted">No models installed</span></li>
+                    [% END %]
+                </ul>
 
-            <div class="row">
-                [% FOREACH server IN servers %]
-                <div class="col-md-6 mb-4">
-                    <div class="card" id="server-[% loop.index %]">
-                        <div class="card-header">
-                            <h5>[% server.name %] ([% server.location %])</h5>
-                            <div class="status-indicator">
-                                [% IF server.connected %]
-                                <span class="badge badge-success">Connected</span>
-                                [% ELSE %]
-                                <span class="badge badge-danger">Disconnected</span>
-                                [% END %]
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            [% IF server.error %]
-                            <div class="alert-warning-custom">
-                                [% server.error %]
-                            </div>
-                            [% END %]
+                <h6 class="section-subhead">Available Models to Pull</h6>
+                <select id="available-select-[% loop.index %]" class="models-select">
+                    [% FOREACH avail IN server.available_models %]
+                    <option value="[% avail.name %]">[% avail.name %][% IF avail.params %] ([% avail.params %][% IF avail.size %], [% avail.size %][% END %])[% END %][% IF avail.recommended %] ★[% END %]</option>
+                    [% END %]
+                </select>
+                [% IF can_select_model %]
+                <button class="btn btn-success btn-block"
+                        onclick="pullModel([% loop.index %], '[% server.host %]', [% server.port %])">
+                    Pull Selected Model
+                </button>
+                [% END %]
+            </div>
+        </div>
+        [% END %]
+    </div>
 
-                            [% IF can_select_model %]
-                            <button class="btn btn-primary mb-2 btn-full" onclick="startServer([% loop.index %], '[% server.host %]', [% server.port %])">
-                                [% IF NOT server.connected %]Start Server[% ELSE %]Restart[% END %]
-                            </button>
-                            <div id="message-[% loop.index %]" class="server-message mb-3"></div>
-                            [% ELSE %]
-                            <div class="alert alert-info mb-3" role="alert" style="font-size: 0.85em;">
-                                <small>Management requires admin/developer role.</small>
-                            </div>
-                            [% END %]
-
-                            <h6 class="header-text">Installed Models:</h6>
-                            <ul class="list-group list-group-flush">
-                                [% IF server.installed_models.size %]
-                                [% FOREACH model IN server.installed_models %]
-                                <li class="list-group-item">
-                                    <span class="model-name">[% model.name %]</span>
-                                    <span class="badge badge-info">[% model.size %]</span>
-                                    [% IF can_select_model %]
-                                    <div class="btn-group btn-group-sm ms-2">
-                                        <button class="btn btn-outline-success" onclick="testModel('[% model.name %]', '[% server.host %]', [% server.port %])" style="font-size: 0.75em;">
-                                            Test
-                                        </button>
-                                        <button class="btn btn-outline-danger" onclick="removeModel('[% model.name %]', '[% server.host %]', [% server.port %])" style="font-size: 0.75em;">
-                                            Remove
-                                        </button>
-                                    </div>
-                                    [% END %]
-                                </li>
-                                [% END %]
-                                [% ELSE %]
-                                <li class="list-group-item text-muted">No models installed</li>
-                                [% END %]
-                            </ul>
-
-                            <h6 class="mt-3 header-text">Available Models to Pull:</h6>
-                            <select id="available-select-[% loop.index %]" class="form-select form-select-sm mb-2" style="font-size: 0.85em;">
-                                [% FOREACH avail IN server.available_models %]
-                                <option value="[% avail.name %]">[% avail.name %][% IF avail.params %] ([% avail.params %][% IF avail.size %], [% avail.size %][% END %])[% END %][% IF avail.recommended %] ★[% END %]</option>
-                                [% END %]
-                            </select>
-                            [% IF can_select_model %]
-                            <button class="btn btn-success btn-sm btn-full" onclick="pullModel([% loop.index %], '[% server.host %]', [% server.port %])"
-                                    style="font-size: 0.85em;">
-                                Pull Selected Model
-                            </button>
-                            [% END %]
-                        </div>
-                    </div>
+    <!-- User API Keys -->
+    <section id="user-api-keys" style="margin: 20px 0;">
+        <div class="models-card">
+            <div class="models-card-header">
+                <h5>Your AI Provider API Keys</h5>
+                <a href="/ai/manage_api_keys" class="btn btn-secondary" style="padding: 5px 12px; text-decoration: none; font-size: 0.9em;">Manage API Keys</a>
+            </div>
+            <div class="models-card-body">
+                [% IF user_api_keys.size %]
+                <p>Configured providers for [% username %]:</p>
+                <ul class="models-list">
+                    [% FOREACH api_key IN user_api_keys %]
+                    <li>
+                        <span style="text-transform: capitalize;">[% api_key.service %]</span>
+                        <span class="models-badge badge-connected">🔒 Configured</span>
+                        <small class="color-muted">Added: [% api_key.created_at %]</small>
+                    </li>
+                    [% END %]
+                </ul>
+                [% ELSE %]
+                <div style="text-align: center; padding: 20px;">
+                    <p>No API keys configured yet.</p>
+                    <p class="color-muted" style="font-size: 0.9em;">Add API keys for services like Grok to use them in the chat.</p>
+                    <a href="/ai/manage_api_keys" class="btn btn-primary">Add API Keys</a>
                 </div>
                 [% END %]
             </div>
-
-            <section id="troubleshooting">
-                <h2>Troubleshooting</h2>
-                <div class="row">
-                    <div class="col-md-6">
-                        <h3>Common Issues</h3>
-                        <ul class="header-text">
-                            <li><strong>Server Offline:</strong> Use Start button; check firewall/port 11434.</li>
-                            <li><strong>No Models:</strong> Pull from list; ensure disk space.</li>
-                            <li><strong>Permission Error:</strong> Login as admin/developer.</li>
-                        </ul>
-                    </div>
-                    <div class="col-md-6">
-                        <h3>Next Steps</h3>
-                        <ul class="header-text">
-                            <li><a href="/Documentation/AI.tt">AI Setup Guide</a></li>
-                            <li><a href="/admin/view_log">View Logs</a></li>
-                            <li><a href="/Documentation/proxmox_integration.tt">Related Integrations</a></li>
-                        </ul>
-                    </div>
-                </div>
-            </section>
         </div>
-    </div>
+    </section>
+
+    <!-- Troubleshooting -->
+    <section id="troubleshooting">
+        <h2>Troubleshooting</h2>
+        <div class="models-section-grid">
+            <div>
+                <h3>Common Issues</h3>
+                <ul>
+                    <li><strong>Server Offline:</strong> Use Start button; check firewall/port 11434.</li>
+                    <li><strong>No Models:</strong> Pull from list; ensure disk space.</li>
+                    <li><strong>Permission Error:</strong> Login as admin/developer.</li>
+                </ul>
+            </div>
+            <div>
+                <h3>Next Steps</h3>
+                <ul>
+                    <li><a href="/Documentation">AI Setup Guide</a></li>
+                    <li><a href="/admin/view_log">View Logs</a></li>
+                </ul>
+            </div>
+        </div>
+    </section>
 </div>
 
-<!-- Footer -->
-<div class="footer">
-    <p>&copy; 2024 Comserv Team | Page Version 1.01 | Last Updated: Fri Oct 18 14:30:00 PDT 2024</p>
+<div class="models-footer">
+    <p>&copy; 2026 Comserv Team | Page Version 1.06</p>
 </div>
 
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-let servers = [% # Assume controller stashes JSON: encode_json($servers) as servers_json %]
-    [% IF servers_json %][% servers_json %][% ELSE %][] [% END %];  // Fallback empty array
-let canSelectModel = [% can_select_model ? 'true' : 'false' %];
+var servers = [% IF servers_json %][% servers_json %][% ELSE %][][% END %];
+var canSelectModel = [% can_select_model ? 'true' : 'false' %];
 
-$(document).ready(function() {
-    // Initial status refresh for each server
-    servers.forEach((server, index) => {
+document.addEventListener('DOMContentLoaded', function() {
+    servers.forEach(function(server, index) {
         checkServerStatus(index);
+        if (canSelectModel) refreshRunning(index, server.host, server.port);
     });
-
-    // Auto-refresh every 10s
     if (canSelectModel) {
-        setInterval(() => servers.forEach((_, index) => checkServerStatus(index)), 10000);
+        setInterval(function() {
+            servers.forEach(function(s, i) { checkServerStatus(i); });
+        }, 10000);
+        setInterval(function() {
+            servers.forEach(function(s, i) { refreshRunning(i, s.host, s.port); });
+        }, 15000);
     }
 });
 
 function checkServerStatus(index) {
-    const server = servers[index];
+    var server = servers[index];
     if (!server) return;
-
-    $.post('/ai/server_status', {
-        host: server.host,
-        port: server.port
-    }, function(data) {
-        const indicator = $(`#server-${index} .status-indicator`);
-        const messageDiv = $(`#message-${index}`);
-
+    fetch('/ai/server_status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        credentials: 'include',
+        body: 'host=' + encodeURIComponent(server.host) + '&port=' + encodeURIComponent(server.port)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        var indicator = document.getElementById('status-' + index);
+        var msgDiv    = document.getElementById('message-' + index);
         if (data.running) {
-            indicator.html('<span class="badge badge-success">Connected</span>');
-            messageDiv.html('<span class="text-success">Active.</span>');
+            if (indicator) indicator.innerHTML = '<span class="models-badge badge-connected">Connected</span>';
+            if (msgDiv)    msgDiv.innerHTML = '<span class="color-success">Active.</span>';
         } else {
-            indicator.html('<span class="badge badge-danger">Disconnected</span>');
-            messageDiv.html('<span class="text-danger">Offline.</span>');
+            if (indicator) indicator.innerHTML = '<span class="models-badge badge-disconnected">Disconnected</span>';
+            if (msgDiv)    msgDiv.innerHTML = '<span class="color-danger">Offline.</span>';
         }
-    }, 'json').fail(function() {
-        $(`#server-${index} .status-indicator`).html('<span class="badge badge-danger">Error</span>');
+    })
+    .catch(function() {
+        var indicator = document.getElementById('status-' + index);
+        if (indicator) indicator.innerHTML = '<span class="models-badge badge-disconnected">Error</span>';
     });
 }
 
 function startServer(index, host, port) {
-    const btn = event.target;
-    const messageDiv = $(`#message-${index}`);
-
+    var btn    = event.target;
+    var msgDiv = document.getElementById('message-' + index);
     btn.disabled = true;
-    btn.innerHTML = 'Starting...';
-    messageDiv.html('<span class="text-info">Starting server...</span>');
+    btn.textContent = 'Starting...';
+    if (msgDiv) msgDiv.innerHTML = '<span class="color-info">Starting server...</span>';
 
-    $.post('/ai/start_server', {
-        host: host,
-        port: port,
-        method: 'systemctl',
-        async: true
-    }, function(data) {
+    fetch('/ai/start_server', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        credentials: 'include',
+        body: 'host=' + encodeURIComponent(host) + '&port=' + encodeURIComponent(port) + '&method=systemctl&async=1'
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
         if (data.success) {
-            messageDiv.html('<span class="text-success">Started! Reloading page...</span>');
-            setTimeout(() => location.reload(), 3000);
+            if (msgDiv) msgDiv.innerHTML = '<span class="color-success">Started! Reloading...</span>';
+            setTimeout(function() { location.reload(); }, 3000);
         } else {
-            messageDiv.html(`<span class="text-danger">Failed: ${data.error}</span>`);
+            if (msgDiv) msgDiv.innerHTML = '<span class="color-danger">Failed: ' + (data.error || 'unknown') + '</span>';
             btn.disabled = false;
-            btn.innerHTML = 'Start Server';
+            btn.textContent = 'Start Server';
         }
-    }, 'json').fail(function() {
-        messageDiv.html('<span class="text-danger">Request failed.</span>');
+    })
+    .catch(function() {
+        if (msgDiv) msgDiv.innerHTML = '<span class="color-danger">Request failed.</span>';
         btn.disabled = false;
-        btn.innerHTML = 'Start Server';
+        btn.textContent = 'Start Server';
     });
 }
 
 function pullModel(index, host, port) {
-    const select = $(`#available-select-${index}`);
-    const model = select.val();
-    if (!model) {
-        alert('Select a model to pull.');
-        return;
-    }
-    if (!confirm(`Pull ${model} to ${host}:${port}?`)) return;
+    var select = document.getElementById('available-select-' + index);
+    var model  = select ? select.value : '';
+    if (!model) { alert('Select a model to pull.'); return; }
+    if (!confirm('Pull ' + model + ' to ' + host + ':' + port + '?')) return;
 
-    // POST to /ai/pull_model
-    $.post('/ai/pull_model', JSON.stringify({ model: model, host: host, port: port }), function(data) {
+    fetch('/ai/pull_model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ model: model, host: host, port: port })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
         if (data.success) {
-            alert('Pulled successfully! Reload page.');
+            alert('Pulled successfully! Reloading page.');
             location.reload();
         } else {
-            alert('Pull failed: ' + data.error);
+            alert('Pull failed: ' + (data.error || 'unknown error'));
         }
-    }, 'json').fail(function() {
-        alert('Request failed.');
-    });
+    })
+    .catch(function() { alert('Request failed.'); });
 }
 
 function testModel(model, host, port) {
-    $.get(`/ai/test_model?model=${encodeURIComponent(model)}&host=${host}&port=${port}`, function(data) {
+    var url = '/ai/test_model?model=' + encodeURIComponent(model) + '&host=' + encodeURIComponent(host) + '&port=' + encodeURIComponent(port);
+    fetch(url, { credentials: 'include' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
         if (data.success) {
-            alert(`Test OK: ${data.response.substring(0, 100)}...`);
+            alert('Test OK: ' + String(data.response || '').substring(0, 100) + '...');
         } else {
-            alert(`Test failed: ${data.error}`);
+            alert('Test failed: ' + (data.error || 'unknown'));
         }
-    }, 'json').fail(function() {
-        alert('Test request failed.');
-    });
+    })
+    .catch(function() { alert('Test request failed.'); });
 }
 
 function removeModel(model, host, port) {
-    if (!confirm(`Remove ${model} from ${host}:${port}?`)) return;
+    if (!confirm('Remove ' + model + ' from ' + host + ':' + port + '?')) return;
 
-    // POST to /ai/remove_model
-    $.post('/ai/remove_model', JSON.stringify({ model: model, host: host, port: port }), function(data) {
+    fetch('/ai/remove_model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ model: model, host: host, port: port })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
         if (data.success) {
-            alert('Removed! Reload page.');
+            alert('Removed! Reloading page.');
             location.reload();
         } else {
-            alert('Remove failed: ' + data.error);
+            alert('Remove failed: ' + (data.error || 'unknown error'));
         }
-    }, 'json').fail(function() {
-        alert('Request failed.');
+    })
+    .catch(function() { alert('Request failed.'); });
+}
+
+function refreshRunning(index, host, port) {
+    var list = document.getElementById('running-' + index);
+    if (!list) return;
+    fetch('/ai/running_models?host=' + encodeURIComponent(host) + '&port=' + encodeURIComponent(port), {
+        credentials: 'include'
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.success || !data.models || !data.models.length) {
+            list.innerHTML = '<li><span class="color-muted">None (all unloaded)</span></li>';
+            return;
+        }
+        list.innerHTML = data.models.map(function(m) {
+            var sizeStr = m.size_vram ? ' — ' + Math.round(m.size_vram / 1024 / 1024) + ' MB VRAM' : '';
+            var expiry  = m.expires_at ? ' · expires ' + new Date(m.expires_at).toLocaleTimeString() : '';
+            return '<li>' +
+                '<span class="model-name">' + m.name + '</span>' +
+                '<span class="models-badge badge-connected">In memory' + sizeStr + expiry + '</span>' +
+                '<button class="btn btn-sm" style="background:var(--link-color,#2196f3);color:#fff;" ' +
+                    'onclick="unloadModel(\'' + m.name + '\',\'' + host + '\',' + port + ',' + index + ')">Unload</button>' +
+                '</li>';
+        }).join('');
+    })
+    .catch(function() {
+        if (list) list.innerHTML = '<li><span class="color-muted">Could not query memory status</span></li>';
     });
+}
+
+function unloadModel(model, host, port, serverIndex) {
+    if (!confirm('Unload ' + model + ' from memory on ' + host + ':' + port + '?\n(Model stays installed — just freed from RAM)')) return;
+    fetch('/ai/unload_model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ model: model, host: host, port: port })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            setTimeout(function() { refreshRunning(serverIndex, host, port); }, 1500);
+        } else {
+            alert('Unload failed: ' + (data.error || 'unknown'));
+        }
+    })
+    .catch(function() { alert('Unload request failed.'); });
 }
 </script>
 

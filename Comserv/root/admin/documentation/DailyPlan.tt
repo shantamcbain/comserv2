@@ -186,6 +186,7 @@
                         [% IF is_admin %]
                         <a href="/log/log_form?todo_record_id=221&abstract=Good+Morning+%E2%98%80+Work+Session&details=Daily+work+session+log+started+by+[% c.session.username %]&status=2" style="padding:4px 12px;border:1px solid #20c997;border-radius:4px;text-decoration:none;font-size:0.82em;color:#20c997;" title="Start a new time-tracking log entry for this session">☀ Good Morning</a>
                         <button onclick="triageStale()" style="padding:4px 12px;border:1px solid #fd7e14;border-radius:4px;background:transparent;font-size:0.82em;color:#fd7e14;cursor:pointer;" title="Reduce priority of todos inactive for 180+ days">⚠ Triage Stale</button>
+                        <button onclick="rescheduleTodos(this)" style="padding:4px 12px;border:1px solid #6f42c1;border-radius:4px;background:transparent;font-size:0.82em;color:#6f42c1;cursor:pointer;" title="Re-score all todos: staleness, due dates, blocking status — then reload">♻ Reschedule</button>
                         [% END %]
                     </div>
                 </div>
@@ -303,6 +304,28 @@
                     }
                 }).catch(function(e){ alert('Error: ' + e); });
             }
+            function rescheduleTodos(btn) {
+                btn.disabled = true;
+                btn.textContent = '⏳ Rescheduling…';
+                fetch('/todo/reschedule', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                    body: JSON.stringify({})
+                }).then(function(r){ return r.json(); }).then(function(d){
+                    if (d.ok) {
+                        alert('Rescheduled: ' + d.count + ' todo' + (d.count !== 1 ? 's' : '') + ' updated. Reloading…');
+                        location.reload();
+                    } else {
+                        btn.disabled = false;
+                        btn.textContent = '♻ Reschedule';
+                        alert('Error: ' + (d.error || 'unknown'));
+                    }
+                }).catch(function(e){
+                    btn.disabled = false;
+                    btn.textContent = '♻ Reschedule';
+                    alert('Error: ' + e);
+                });
+            }
             function triageStale() {
                 if (!confirm('Reduce priority of all todos inactive for 180+ days by 2 levels?')) return;
                 fetch('/todo/triage_stale', {
@@ -316,17 +339,7 @@
             }
             </script>
 
-            [%# ── CSC LEGACY: Master Plan Priority List (being migrated to DB above) ── %]
-            [% IF is_csc %]
-            <details style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;margin-bottom:16px;">
-                <summary style="padding:10px 14px;cursor:pointer;font-size:0.85em;color:var(--text-muted-color);">
-                    📋 Legacy: Master Plan Priority List (text-based — being migrated to DB above)
-                </summary>
-                <div style="padding:14px;">
-                    [% INCLUDE "admin/documentation/PriorityTodos.tt" %]
-                </div>
-            </details>
-            [% END %]
+
 
         </div>
     </div>
@@ -397,20 +410,6 @@
         </div>
         [% END %]<!-- end is_csc resources -->
 
-        <h4 style="margin-top: 30px;">Quick Todo Actions</h4>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-            <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
-                <a href="/todo" style="display: block; color: var(--link-color); text-decoration: none; font-weight: bold; padding: 10px; border: 1px solid var(--primary-color); border-radius: 3px; text-align: center;">📋 Open Todo System</a>
-            </div>
-            <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
-                <a href="/todo/addtodo" onclick="window.open('/todo/addtodo', '_blank'); return false;" style="display: block; color: var(--link-color); text-decoration: none; font-weight: bold; padding: 10px; border: 1px solid var(--success-color); border-radius: 3px; text-align: center;">➕ Add New Todo</a>
-            </div>
-        </div>
-
-        <h4>Daily Notes for [% display_date %]:</h4>
-        <div style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 15px; min-height: 150px;">
-            <p><em>Add notes about this day's work here...</em></p>
-        </div>
     </div>
 
     <!-- TAB: MONTH VIEW -->
@@ -444,8 +443,8 @@
         [%# Static branch → port map (matches Planning.tt overview) %]
         [% SET bp = {
             'planningsystem-59ae'                      => 4001,
-            'aichatsystem-ef4e'                        => 4001,
-            'schema-management-system-7eb3'            => 4002,
+            'aichatsystem-ef4e'                        => 4010,
+            'schema-managment-system-7eb3'             => 4002,
             'new-task-9cf1'                            => 4003,
             'workshops-7d21'                           => 4004,
             'users-e5b8'                               => 4005,
@@ -454,21 +453,43 @@
             'unified-mail-system-site-managed-2c53'    => 4007,
             'membership-1304'                          => 4008,
             'pointsystem-3230'                         => 4009,
+            'cssthemes-9195'                           => 4011,
+            'ency-53b0'                                => 4012,
+            'helpdesk-7217'                            => 4013,
+            'healthplanning-9db9'                      => 4014,
+            'productionserverhealth-82fb'              => 4015,
+            'security-764f'                            => 4016,
+            'documentation-9122'                       => 4017,
+            'api-bc05'                                 => 4018,
+            'bmaster-f0fd'                             => 4019,
+            'aichatsystem-planning-system-int-f187'    => 4020,
+            'inventory-system'                         => 4021,
         } %]
 
         [%# All known branch servers for the overview panel %]
         [% SET all_branches = [
-            { name => 'planningsystem-59ae',                   port => 4001, label => 'PlanningSystem',    url => '/Documentation/DailyPlan' },
-            { name => 'aichatsystem-ef4e',                     port => 4001, label => 'AIChatSystem',      url => '/Documentation/DailyPlan' },
-            { name => 'schema-management-system-7eb3',         port => 4002, label => 'SchemaManagement',  url => '/Documentation/DailyPlan' },
-            { name => 'new-task-9cf1',                         port => 4003, label => 'InfrastructureHA',  url => '/Documentation/DailyPlan' },
-            { name => 'workshops-7d21',                        port => 4004, label => 'WorkShops',         url => '/workshop' },
-            { name => 'users-e5b8',                            port => 4005, label => 'Users',             url => '/user/dashboard' },
-            { name => 'set-up-project-config-d327',            port => 3000, label => 'ProjectConfig',     url => '/Documentation/DailyPlan' },
-            { name => 'new-task-bb05',                         port => 4006, label => 'FileManagement',    url => '/admin/planning' },
-            { name => 'unified-mail-system-site-managed-2c53', port => 4007, label => 'UnifiedMail',       url => '/Documentation/DailyPlan' },
-            { name => 'membership-1304',                       port => 4008, label => 'Membership',        url => '/membership' },
-            { name => 'pointsystem-3230',                      port => 4009, label => 'PointSystem',       url => '/Documentation/DailyPlan' },
+            { name => 'planningsystem-59ae',                   port => 4001, label => 'PlanningSystem',       url => '/Documentation/DailyPlan' },
+            { name => 'aichatsystem-ef4e',                     port => 4010, label => 'AIChatSystem',         url => '/Documentation/DailyPlan' },
+            { name => 'schema-managment-system-7eb3',          port => 4002, label => 'SchemaManagement',     url => '/Documentation/DailyPlan' },
+            { name => 'new-task-9cf1',                         port => 4003, label => 'InfrastructureHA',     url => '/Documentation/DailyPlan' },
+            { name => 'workshops-7d21',                        port => 4004, label => 'WorkShops',            url => '/workshop' },
+            { name => 'users-e5b8',                            port => 4005, label => 'Users',                url => '/user/dashboard' },
+            { name => 'set-up-project-config-d327',            port => 3000, label => 'ProjectConfig',        url => '/Documentation/DailyPlan' },
+            { name => 'new-task-bb05',                         port => 4006, label => 'FileManagement',       url => '/admin/planning' },
+            { name => 'unified-mail-system-site-managed-2c53', port => 4007, label => 'UnifiedMail',          url => '/Documentation/DailyPlan' },
+            { name => 'membership-1304',                       port => 4008, label => 'Membership',           url => '/membership' },
+            { name => 'pointsystem-3230',                      port => 4009, label => 'PointSystem',          url => '/Documentation/DailyPlan' },
+            { name => 'cssthemes-9195',                        port => 4011, label => 'CssThemes',            url => '/Documentation/DailyPlan' },
+            { name => 'ency-53b0',                             port => 4012, label => 'ENCY',                 url => '/ENCY' },
+            { name => 'helpdesk-7217',                         port => 4013, label => 'HelpDesk',             url => '/HelpDesk' },
+            { name => 'healthplanning-9db9',                   port => 4014, label => 'HealthPlanning',       url => '/Documentation/DailyPlan' },
+            { name => 'productionserverhealth-82fb',           port => 4015, label => 'ProdServerHealth',     url => '/Documentation/DailyPlan' },
+            { name => 'security-764f',                         port => 4016, label => 'Security',             url => '/Documentation/DailyPlan' },
+            { name => 'documentation-9122',                    port => 4017, label => 'Documentation',        url => '/Documentation' },
+            { name => 'api-bc05',                              port => 4018, label => 'APISystem',            url => '/Documentation/DailyPlan' },
+            { name => 'bmaster-f0fd',                          port => 4019, label => 'BMaster',              url => '/Documentation/DailyPlan' },
+            { name => 'aichatsystem-planning-system-int-f187', port => 4020, label => 'AIChatPlanInt',        url => '/Documentation/DailyPlan' },
+            { name => 'inventory-system',                      port => 4021, label => 'Inventory',            url => '/Documentation/DailyPlan' },
         ] %]
 
         <details style="margin-bottom:14px;border:1px solid #fd7e14;border-radius:6px;font-size:0.85em;">
@@ -751,11 +772,6 @@
         </div>
         [% END %]
 
-        [% IF is_csc %]
-        <hr style="margin:30px 0;border-color:var(--border-color);">
-        <h3 style="color:var(--text-muted-color);font-size:0.95em;">CSC Text-Based Planning (being migrated to DB above)</h3>
-        [% INCLUDE "admin/documentation/Planning.tt" %]
-        [% END %]
     </div>
 
     <!-- TAB: GANTT VIEW (all sites — DB-driven project timeline) -->
