@@ -778,7 +778,7 @@
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #dc3545;">
             <h3 style="margin:0;font-size:1em;">🔗 Cross-Project Dependencies ([% project_deps.size %] active)</h3>
             [% IF is_admin %]
-            <a href="/project/addproject" style="font-size:0.8em;color:var(--primary-color);">+ Add Dependency</a>
+            <a href="/project/dependency_form" style="font-size:0.8em;color:var(--primary-color);">+ Manage Dependencies</a>
             [% END %]
         </div>
         <div style="font-size:0.8em;color:var(--text-muted-color);margin-bottom:10px;">
