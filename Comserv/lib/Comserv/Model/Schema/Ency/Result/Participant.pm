@@ -20,6 +20,16 @@ __PACKAGE__->add_columns(
         data_type => 'varchar',
         size => 255,
     },
+    first_name => {
+        data_type => 'varchar',
+        size => 255,
+        is_nullable => 1,
+    },
+    last_name => {
+        data_type => 'varchar',
+        size => 255,
+        is_nullable => 1,
+    },
     email => {
         data_type => 'varchar',
         size => 255,

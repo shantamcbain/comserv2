@@ -23,17 +23,26 @@ CREATE TABLE IF NOT EXISTS `mailing_lists` (
 CREATE TABLE IF NOT EXISTS `mailing_list_subscriptions` (
     `id`                    INT NOT NULL AUTO_INCREMENT,
     `mailing_list_id`       INT NOT NULL,
-    `user_id`               INT NOT NULL,
+    `user_id`               INT NULL,
+    `email`                 VARCHAR(255) NULL,
+    `display_name`          VARCHAR(255) NULL,
     `subscription_source`   VARCHAR(50),
     `source_id`             INT,
     `subscribed_at`         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `is_active`             TINYINT NOT NULL DEFAULT 1,
     PRIMARY KEY (`id`),
-    UNIQUE KEY `unique_subscription` (`mailing_list_id`, `user_id`, `source_id`),
     INDEX `idx_list_active` (`mailing_list_id`, `is_active`),
     INDEX `idx_user_id` (`user_id`),
+    INDEX `idx_email` (`email`),
     FOREIGN KEY (`mailing_list_id`) REFERENCES `mailing_lists` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ALTER for existing installs (safe to re-run, errors ignored by application)
+-- Run these manually if the table already exists:
+-- ALTER TABLE `mailing_list_subscriptions` MODIFY COLUMN `user_id` INT NULL;
+-- ALTER TABLE `mailing_list_subscriptions` ADD COLUMN IF NOT EXISTS `email` VARCHAR(255) NULL AFTER `user_id`;
+-- ALTER TABLE `mailing_list_subscriptions` ADD COLUMN IF NOT EXISTS `display_name` VARCHAR(255) NULL AFTER `email`;
+-- DROP INDEX IF EXISTS `unique_subscription` ON `mailing_list_subscriptions`;
 
 CREATE TABLE IF NOT EXISTS `mailing_list_campaigns` (
     `id`                INT NOT NULL AUTO_INCREMENT,
