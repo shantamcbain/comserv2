@@ -230,8 +230,9 @@ sub _scan_directories {
                             } elsif ($path =~ m{Documentation/general/} || $path =~ m{Documentation/tutorials/}) {
                                 @roles = ('normal', 'editor', 'admin', 'developer');
                             } else {
-                                # Default for root-level documentation - accessible to all authenticated users
-                                @roles = ('normal', 'editor', 'admin', 'developer');
+                                # Default for root-level documentation - restrict to admin/developer
+                                # Root-level docs are typically internal/admin documentation
+                                @roles = ('admin', 'developer');
                             }
                         }
                     }

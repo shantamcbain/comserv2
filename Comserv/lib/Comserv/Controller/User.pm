@@ -187,10 +187,15 @@ sub do_login :Local {
     my $redirect_path;
     
     if ($return_to) {
-        $redirect_path = $return_to;
+        # Validate return_to is a local path (no protocol/host) to prevent open redirect
+        if ($return_to =~ m{^/} && $return_to !~ m{^//} && $return_to !~ m{[<>"'\0]}) {
+            $redirect_path = $return_to;
+        } else {
+            $redirect_path = '/';
+        }
         $self->logging->log_with_details(
             $c, 'info', __FILE__, __LINE__, 'do_login',
-            "Using return_to parameter for redirect: $return_to"
+            "Using return_to parameter for redirect: $redirect_path"
         );
     } else {
         # Fall back to session referer
