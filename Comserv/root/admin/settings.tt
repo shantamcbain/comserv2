@@ -1,0 +1,82 @@
+[%
+   title = "Admin Settings"
+   description = "Configure application settings"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Admin"
+   page_version = "0.01"
+   last_updated = "2026-03-21"
+%]
+
+<div class="container mt-3">
+    <h1>Admin Settings</h1>
+
+    [% IF error_msg %]
+        <div class="alert alert-danger">[% error_msg | html %]</div>
+    [% END %]
+    [% IF success_msg %]
+        <div class="alert alert-success">[% success_msg | html %]</div>
+    [% END %]
+
+    <div class="card">
+        <div class="card-header"><strong>Application Settings</strong></div>
+        <div class="card-body">
+            <form method="post" action="/admin/settings">
+                <div class="form-group row">
+                    <label class="col-sm-3 col-form-label">Site Name</label>
+                    <div class="col-sm-9">
+                        <input type="text" name="site_name" class="form-control [% IF errors.site_name %]is-invalid[% END %]"
+                               value="[% form_data.site_name | html %]">
+                        [% IF errors.site_name %]<div class="invalid-feedback">[% errors.site_name | html %]</div>[% END %]
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-sm-3 col-form-label">Site Description</label>
+                    <div class="col-sm-9">
+                        <textarea name="site_description" class="form-control" rows="3">[% form_data.site_description | html %]</textarea>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-sm-3 col-form-label">Admin Email</label>
+                    <div class="col-sm-9">
+                        <input type="email" name="admin_email" class="form-control [% IF errors.admin_email %]is-invalid[% END %]"
+                               value="[% form_data.admin_email | html %]">
+                        [% IF errors.admin_email %]<div class="invalid-feedback">[% errors.admin_email | html %]</div>[% END %]
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-sm-3 col-form-label">Items Per Page</label>
+                    <div class="col-sm-9">
+                        <input type="number" name="items_per_page" class="form-control [% IF errors.items_per_page %]is-invalid[% END %]"
+                               value="[% form_data.items_per_page || 20 %]" min="5" max="200">
+                        [% IF errors.items_per_page %]<div class="invalid-feedback">[% errors.items_per_page | html %]</div>[% END %]
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-sm-3 col-form-label">Allow Comments</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" name="allow_comments" class="form-check-input" value="1"
+                                   [% IF form_data.allow_comments %]checked[% END %]>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-sm-3 col-form-label">Moderate Comments</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" name="moderate_comments" class="form-check-input" value="1"
+                                   [% IF form_data.moderate_comments %]checked[% END %]>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <div class="col-sm-9 offset-sm-3">
+                        <button type="submit" class="btn btn-primary">Save Settings</button>
+                        <a href="/admin" class="btn btn-secondary ml-2">Cancel</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

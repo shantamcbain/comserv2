@@ -161,6 +161,13 @@ sub index :Path('/admin/theme') :Args(0) {
         $c->stash->{error_msg} = "An error occurred loading theme data. Please try again.";
     };
 
+    my $req_host       = $c->req->uri->host;
+    my $domain_favicons = {};
+    try {
+        $domain_favicons = $c->model('ThemeConfig')->get_theme_definitions($c)->{domain_favicons} || {};
+    }
+    catch { };
+
     $c->stash(
         site             => $site,
         sites            => [$site],
@@ -168,6 +175,8 @@ sub index :Path('/admin/theme') :Args(0) {
         themes           => $themes,
         theme_name       => $site->{theme} || 'default',
         site_favicon     => $site_favicon,
+        req_host         => $req_host,
+        domain_favicons  => $domain_favicons,
         template         => 'admin/theme/index.tt',
     );
 }
@@ -760,6 +769,61 @@ sub set_favicon :Path('/admin/theme/set_favicon') :Args(0) {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'set_favicon',
                     "Error setting favicon URL for '$site_name': $_");
                 $c->flash->{error} = "Could not save favicon URL.";
+            };
+        } else {
+            $c->flash->{error} = "No favicon file or URL provided.";
+        }
+    }
+
+    $c->response->redirect($c->uri_for("/admin/theme"));
+    $c->response->status(302);
+}
+
+# Set a custom favicon for a specific domain hostname
+sub set_domain_favicon :Path('/admin/theme/set_domain_favicon') :Args(0) {
+    my ($self, $c) = @_;
+
+    if ($c->req->method eq 'POST') {
+        my $domain      = $c->req->params->{domain} || '';
+        my $favicon_url = $c->req->params->{favicon_url} || '';
+        my $upload      = $c->req->upload('favicon_file');
+
+        $domain =~ s/[<>"'\s]//g;
+
+        unless ($domain) {
+            $c->flash->{error} = "Domain name is required.";
+            $c->response->redirect($c->uri_for("/admin/theme"));
+            return;
+        }
+
+        if ($upload) {
+            my $favicon_dir = $c->path_to('root', 'static', 'images', 'favicons');
+            File::Path::make_path($favicon_dir) unless -d $favicon_dir;
+            my $ext      = ($upload->filename =~ /\.(\w+)$/) ? $1 : 'ico';
+            my $filename = lc($domain) . '_domain_favicon.' . $ext;
+            $filename    =~ s/[^\w._-]/_/g;
+            my $dest     = "$favicon_dir/$filename";
+            try {
+                $upload->copy_to($dest);
+                $favicon_url = "/static/images/favicons/$filename";
+                $c->model('ThemeConfig')->set_domain_favicon($c, $domain, $favicon_url);
+                $c->flash->{message} = "Domain favicon set for '$domain'.";
+            }
+            catch {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'set_domain_favicon',
+                    "Error saving favicon for domain '$domain': $_");
+                $c->flash->{error} = "Error saving favicon file.";
+            };
+        } elsif ($favicon_url) {
+            $favicon_url =~ s/[<>"']//g;
+            try {
+                $c->model('ThemeConfig')->set_domain_favicon($c, $domain, $favicon_url);
+                $c->flash->{message} = "Domain favicon URL set for '$domain'.";
+            }
+            catch {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'set_domain_favicon',
+                    "Error setting favicon URL for domain '$domain': $_");
+                $c->flash->{error} = "Could not save domain favicon URL.";
             };
         } else {
             $c->flash->{error} = "No favicon file or URL provided.";

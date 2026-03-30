@@ -28,7 +28,59 @@ const AIUtils = {
     },
 
     /**
-     * Formats message content, handling markdown-style code blocks
+     * Converts plain text containing markdown links and bare URLs into safe HTML.
+     * Renders [label](url) as <a> tags and bare http(s) URLs as clickable links.
+     * Converts newlines to <br> and escapes all other HTML.
+     * @param {string} text - Plain text (NOT yet HTML-escaped)
+     * @returns {string} - Safe HTML with clickable links
+     */
+    renderTextWithLinks: function(text) {
+        if (!text) return '';
+        // Tokenise: markdown links [label](url), bare https:// URLs, bare /paths
+        // Group 1+2 = markdown link, group 3 = bare URL, group 4 = bare /path
+        const TOKEN_RE = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)|(https?:\/\/[^\s<>")\]]+)|(\/[a-zA-Z][a-zA-Z0-9_\-/.?=&#%]*)/g;
+        let result = '';
+        let lastIndex = 0;
+        let match;
+        while ((match = TOKEN_RE.exec(text)) !== null) {
+            if (match.index > lastIndex) {
+                result += this.escapeHtml(text.slice(lastIndex, match.index));
+            }
+            if (match[1] !== undefined) {
+                // Markdown link: [label](url)
+                const label = this.escapeHtml(match[1]);
+                const url   = this.escapeHtml(match[2]);
+                const sameOrigin = url.startsWith(window.location.origin + '/') || url.startsWith('/');
+                const target = sameOrigin ? '_self' : '_blank';
+                result += `<a href="${url}" target="${target}" rel="noopener noreferrer">${label}</a>`;
+            } else if (match[3] !== undefined) {
+                // Bare https:// URL
+                const url = this.escapeHtml(match[3]);
+                const sameOrigin = url.startsWith(window.location.origin + '/');
+                const target = sameOrigin ? '_self' : '_blank';
+                result += `<a href="${url}" target="${target}" rel="noopener noreferrer">${url}</a>`;
+            } else if (match[4] !== undefined) {
+                // Bare /path — only linkify if preceded by whitespace, line start, or punctuation
+                const path = match[4];
+                const preceding = match.index > 0 ? text[match.index - 1] : ' ';
+                if (/[\s(,:\n]/.test(preceding)) {
+                    result += `<a href="${this.escapeHtml(path)}" target="_self" rel="noopener noreferrer">${this.escapeHtml(path)}</a>`;
+                } else {
+                    result += this.escapeHtml(path);
+                }
+            }
+            lastIndex = TOKEN_RE.lastIndex;
+        }
+        if (lastIndex < text.length) {
+            result += this.escapeHtml(text.slice(lastIndex));
+        }
+        // Convert newlines to <br>
+        return result.replace(/\n/g, '<br>');
+    },
+
+    /**
+     * Formats message content, handling markdown-style code blocks,
+     * markdown links [text](url), bare URLs, and newlines.
      * @param {string} content - Raw message content
      * @returns {string} - Formatted HTML
      */
@@ -41,16 +93,14 @@ const AIUtils = {
         
         for (let i = 0; i < parts.length; i++) {
             if (i % 2 === 0) {
-                // Text part - strip styles then escape HTML but keep newlines
+                // Text part — strip style tags, then render links and newlines
                 let text = this.stripStyles(parts[i]);
-                html += this.escapeHtml(text);
+                html += this.renderTextWithLinks(text);
             } else {
-                // Code part - do NOT strip styles here as they are escaped inside <code> tags
+                // Code block — language specifier on first line is stripped
                 let code = parts[i];
-                // Check if there's a language specifier (e.g., ```javascript)
                 const firstNewLine = code.indexOf('\n');
                 if (firstNewLine !== -1 && firstNewLine < 20) {
-                    // Skip the language specifier line
                     code = code.substring(firstNewLine + 1);
                 }
                 html += `<code class="code-block">${this.escapeHtml(code.trim())}</code>`;

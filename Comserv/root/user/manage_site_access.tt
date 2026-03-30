@@ -1,0 +1,236 @@
+[% PageVersion = 'manage_site_access.tt,v 0.01 2025/01/15 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<h2>User-Site Access Management</h2>
+
+[% IF c.flash.success_msg %]
+    <div class="success-message">[% c.flash.success_msg %]</div>
+[% END %]
+
+[% IF c.flash.error_msg %]
+    <div class="error-message">[% c.flash.error_msg %]</div>
+[% END %]
+
+[% IF error_msg %]
+    <div class="error-message">[% error_msg %]</div>
+[% END %]
+
+<div class="management-section">
+    <h3>Grant Site Access</h3>
+    <form method="post" action="[% c.uri_for('/user/manage_site_access') %]">
+        <input type="hidden" name="action" value="add">
+        
+        <label for="user_id">User:</label>
+        <select name="user_id" id="user_id" required>
+            <option value="">Select User</option>
+            [% FOREACH user IN users %]
+                <option value="[% user.id %]">[% user.username | html %] ([% user.first_name | html %] [% user.last_name | html %])</option>
+            [% END %]
+        </select>
+        
+        <label for="site_id">Site:</label>
+        <select name="site_id" id="site_id" required>
+            <option value="">Select Site</option>
+            [% FOREACH site IN sites %]
+                <option value="[% site.id %]">[% site.name | html %]</option>
+            [% END %]
+        </select>
+        
+        <label for="role">Role:</label>
+        <select name="role" id="role">
+            <option value="site_user">Site User</option>
+            <option value="site_admin">Site Admin</option>
+            <option value="site_viewer">Site Viewer</option>
+        </select>
+        
+        <input type="submit" value="Grant Access">
+    </form>
+</div>
+
+<div class="management-section">
+    <h3>Current User-Site Relationships</h3>
+    
+    [% IF users.size > 0 %]
+        <table class="user-site-table">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Username</th>
+                    <th>Sites</th>
+                    <th>Roles</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                [% FOREACH user IN users %]
+                    <tr>
+                        <td>[% user.first_name | html %] [% user.last_name | html %]</td>
+                        <td>[% user.username | html %]</td>
+                        <td>
+                            [% IF user.user_sites.size > 0 %]
+                                [% FOREACH user_site IN user.user_sites %]
+                                    <div class="site-entry">
+                                        [% user_site.site.name | html %] (ID: [% user_site.site.id %])
+                                        <form method="post" action="[% c.uri_for('/user/manage_site_access') %]" style="display: inline;">
+                                            <input type="hidden" name="action" value="remove">
+                                            <input type="hidden" name="user_id" value="[% user.id %]">
+                                            <input type="hidden" name="site_id" value="[% user_site.site.id %]">
+                                            <input type="submit" value="Remove" class="remove-btn" onclick="return confirm('Remove site access?')">
+                                        </form>
+                                    </div>
+                                [% END %]
+                            [% ELSE %]
+                                <em>No site access</em>
+                            [% END %]
+                        </td>
+                        <td>
+                            [% IF user.user_site_roles.size > 0 %]
+                                [% FOREACH role IN user.user_site_roles %]
+                                    [% IF role.is_active %]
+                                        <div class="role-entry">
+                                            [% IF role.site %]
+                                                [% role.site.name | html %]: [% role.role | html %]
+                                            [% ELSE %]
+                                                Global: [% role.role | html %]
+                                            [% END %]
+                                        </div>
+                                    [% END %]
+                                [% END %]
+                            [% ELSE %]
+                                <em>No specific roles</em>
+                            [% END %]
+                        </td>
+                        <td>
+                            <a href="[% c.uri_for('/user/manage_site_access') %]?user_id=[% user.id %]">Manage</a>
+                        </td>
+                    </tr>
+                [% END %]
+            </tbody>
+        </table>
+    [% ELSE %]
+        <p>No users found.</p>
+    [% END %]
+</div>
+
+<div class="admin-tools">
+    <h3>Administrative Tools</h3>
+    <p><a href="[% c.uri_for('/user/fix_user_site_relationships') %]" onclick="return confirm('This will fix users without site relationships. Continue?')">Fix Users Without Site Relationships</a></p>
+</div>
+
+<style>
+    .management-section {
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+    }
+    
+    .management-section h3 {
+        margin-top: 0;
+        color: #0066cc;
+    }
+    
+    .management-section form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: end;
+    }
+    
+    .management-section label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    .management-section select,
+    .management-section input[type="submit"] {
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    
+    .management-section input[type="submit"] {
+        background-color: #0066cc;
+        color: white;
+        cursor: pointer;
+    }
+    
+    .management-section input[type="submit"]:hover {
+        background-color: #0052a3;
+    }
+    
+    .user-site-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+    
+    .user-site-table th,
+    .user-site-table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+        vertical-align: top;
+    }
+    
+    .user-site-table th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+    }
+    
+    .site-entry,
+    .role-entry {
+        margin: 2px 0;
+        padding: 2px 0;
+    }
+    
+    .remove-btn {
+        background-color: #dc3545;
+        color: white;
+        border: none;
+        padding: 2px 6px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 0.8em;
+        margin-left: 5px;
+    }
+    
+    .remove-btn:hover {
+        background-color: #c82333;
+    }
+    
+    .success-message {
+        background-color: #d4edda;
+        color: #155724;
+        padding: 10px;
+        border: 1px solid #c3e6cb;
+        border-radius: 4px;
+        margin: 10px 0;
+    }
+    
+    .error-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 10px;
+        border: 1px solid #f5c6cb;
+        border-radius: 4px;
+        margin: 10px 0;
+    }
+    
+    .admin-tools {
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid #ffc107;
+        border-radius: 5px;
+        background-color: #fff3cd;
+    }
+    
+    .admin-tools h3 {
+        margin-top: 0;
+        color: #856404;
+    }
+</style>

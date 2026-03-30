@@ -1,0 +1,123 @@
+[% PageVersion = '2025-01-27-fix-schema-compare-table-mapping.tt,v 1.0 2025/01/27 shanta Exp shanta ' %]
+[% WRAPPER layout.tt %]
+
+<div class="changelog-entry">
+    <header class="changelog-header">
+        <h1><i class="fas fa-database"></i> Schema Compare: Fixed Table-Result File Mapping</h1>
+        <div class="changelog-meta">
+            <span class="changelog-date"><i class="fas fa-calendar"></i> January 27, 2025</span>
+            <span class="changelog-author"><i class="fas fa-user"></i> shanta</span>
+            <span class="changelog-type fix"><i class="fas fa-bug"></i> Bug Fix</span>
+        </div>
+    </header>
+
+    <section class="changelog-summary">
+        <h2>Summary</h2>
+        <p>Fixed the schema comparison functionality to correctly read table names from Result files instead of relying on hardcoded mappings. This resolves the issue where table containers were not showing correct counts and comparisons.</p>
+    </section>
+
+    <section class="changelog-problem">
+        <h2>Problem</h2>
+        <ul>
+            <li>Schema comparison was using hardcoded table name mappings instead of reading actual table names from Result files</li>
+            <li>"Tables with Result Files" container was not showing correctly (showing 0 instead of actual count)</li>
+            <li>"Result Files without Tables" was showing incorrect count (13 instead of actual orphaned files)</li>
+            <li>"Tables without Result Files" was showing incorrect count due to mapping issues</li>
+            <li>Field comparison containers were not displaying detailed field comparisons properly</li>
+            <li>Field comparison table was only showing database table values, not Result file values</li>
+            <li>Field comparison format was confusing with property-based rows instead of source-based rows</li>
+        </ul>
+    </section>
+
+    <section class="changelog-solution">
+        <h2>Solution</h2>
+        <ul>
+            <li>Created new method <code>extract_table_name_from_result_file()</code> to read actual table names from <code>__PACKAGE__->table('table_name')</code> declarations</li>
+            <li>Added <code>build_result_table_mapping()</code> to create comprehensive mapping of all Result files to their actual table names</li>
+            <li>Created <code>compare_table_with_result_file_v2()</code> and <code>find_orphaned_result_files_v2()</code> methods using the new mapping approach</li>
+            <li>Updated <code>get_field_comparison</code> endpoint to use <code>get_table_result_comparison_v2()</code> with comprehensive mapping</li>
+            <li>Enhanced logging to provide better debugging information about table-result file relationships</li>
+            <li>Redesigned field comparison table format to show clear source-based rows (Table vs Result)</li>
+            <li>Added proper CSS styling for the new table format with distinct row colors</li>
+        </ul>
+    </section>
+
+    <section class="changelog-technical">
+        <h2>Technical Details</h2>
+        
+        <h3>Files Modified</h3>
+        <ul>
+            <li><strong>File:</strong> <code>Comserv/lib/Comserv/Controller/Admin.pm</code></li>
+            <li><strong>File:</strong> <code>Comserv/root/admin/schema_compare.tt</code></li>
+            <li><strong>File:</strong> <code>Comserv/root/static/css/themes/schema_compare.css</code></li>
+        </ul>
+
+        <h3>New Methods Added</h3>
+        <ul>
+            <li><code>extract_table_name_from_result_file($file_path)</code> - Reads actual table name from Result file</li>
+            <li><code>build_result_table_mapping($c, $database)</code> - Creates comprehensive mapping of Result files to table names</li>
+            <li><code>compare_table_with_result_file_v2($c, $table_name, $database, $mapping)</code> - Improved table comparison using mapping</li>
+            <li><code>find_orphaned_result_files_v2($c, $database, $tables, $mapping)</code> - Improved orphaned file detection</li>
+            <li><code>get_table_result_comparison_v2($c, $table_name, $database, $mapping)</code> - Enhanced field comparison</li>
+        </ul>
+
+        <h3>Logic Changes</h3>
+        <ul>
+            <li>Replaced hardcoded table name mappings with dynamic reading from Result files</li>
+            <li>Updated <code>get_database_comparison()</code> to use new v2 methods</li>
+            <li>Enhanced <code>get_field_comparison</code> endpoint with better debugging and mapping</li>
+            <li>Redesigned field comparison table to show source-based rows instead of property-based columns</li>
+            <li>Added visual distinction between Table rows (white background) and Result rows (light gray background)</li>
+        </ul>
+    </section>
+
+    <section class="changelog-testing">
+        <h2>Testing</h2>
+        <ul>
+            <li>Verified Result file reading logic extracts correct table names from <code>__PACKAGE__->table()</code> declarations</li>
+            <li>Confirmed 30+ Result files in Ency database are properly mapped to their corresponding tables</li>
+            <li>Tested Forager database Result files (Herb.pm -> ency_herb_tb table)</li>
+            <li>Verified table group containers are properly collapsible and show correct counts</li>
+        </ul>
+    </section>
+
+    <section class="changelog-impact">
+        <h2>Impact</h2>
+        <ul>
+            <li><strong>Positive:</strong> Schema comparison now shows accurate counts and relationships</li>
+            <li><strong>Positive:</strong> Field comparison containers will display detailed comparisons correctly</li>
+            <li><strong>Positive:</strong> Better debugging information for troubleshooting schema issues</li>
+            <li><strong>Positive:</strong> More reliable detection of orphaned Result files and missing tables</li>
+            <li><strong>Risk:</strong> Low - New methods are additive, old methods remain for backward compatibility</li>
+        </ul>
+    </section>
+
+    <section class="changelog-usage">
+        <h2>Usage</h2>
+        <ol>
+            <li>Navigate to <code>/admin/schema_compare</code></li>
+            <li>View the three container groups:
+                <ul>
+                    <li><strong>Tables with Result Files</strong> - Shows tables that have corresponding Result files</li>
+                    <li><strong>Result Files without Tables</strong> - Shows Result files that don't have corresponding database tables</li>
+                    <li><strong>Tables without Result Files</strong> - Shows database tables that don't have Result files</li>
+                </ul>
+            </li>
+            <li>Click on container headers to expand/collapse groups</li>
+            <li>Click on individual table comparison cards to view detailed field comparisons</li>
+            <li>Use the field comparison interface to sync differences between database and Result files</li>
+        </ol>
+    </section>
+
+    <section class="changelog-notes">
+        <h2>Notes</h2>
+        <ul>
+            <li>The old hardcoded mapping methods are preserved for backward compatibility</li>
+            <li>New v2 methods provide more accurate and dynamic mapping</li>
+            <li>Enhanced logging helps with debugging schema comparison issues</li>
+            <li>Container groups start collapsed by default for better UX</li>
+        </ul>
+    </section>
+</div>
+
+[% END %]
