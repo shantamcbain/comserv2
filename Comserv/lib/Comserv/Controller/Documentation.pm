@@ -2468,18 +2468,39 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         $ap_cond{user_id}  = $user_id  unless $can_see_all;
 
         # ── Load projects that are blocking other projects ────────────────────
-        # A project is a "cross-project blocker" if it appears as depends_on_id
-        # in an active project_dependency row. Todos in these projects get a
-        # priority boost so they float to the top of active priorities.
-        my %cross_blocker_projects;  # project_id => [names of projects it is blocking]
+        # project_dependencies table:
+        #   project_id    = the BLOCKED project (cannot proceed yet)
+        #   depends_on_id = the BLOCKER project (must deliver first)
+        # Todos in "depends_on_id" projects get a priority boost.
+        my %cross_blocker_projects;  # depends_on_id => [project_ids that are blocked]
+        my %cross_blocker_names;     # depends_on_id => [names of blocked projects]
         my @dep_rows_ap = eval {
             $c->model('DBEncy')->resultset('ProjectDependency')->search(
                 { status => 'active', dependency_type => 'blocks' },
                 { columns => [qw(depends_on_id project_id)] }
             )->all;
         };
-        for my $dr (@dep_rows_ap) {
-            push @{ $cross_blocker_projects{$dr->depends_on_id} }, $dr->project_id;
+        if (@dep_rows_ap) {
+            my %ids_needed;
+            for my $dr (@dep_rows_ap) {
+                push @{ $cross_blocker_projects{$dr->depends_on_id} }, $dr->project_id;
+                $ids_needed{$dr->project_id}    = 1;
+                $ids_needed{$dr->depends_on_id} = 1;
+            }
+            my %pid2name;
+            eval {
+                my @prows = $c->model('DBEncy')->resultset('Project')->search(
+                    { id => { -in => [keys %ids_needed] } },
+                    { columns => [qw(id name)] }
+                )->all;
+                %pid2name = map { $_->id => $_->name } @prows;
+            };
+            for my $dep_id (keys %cross_blocker_projects) {
+                $cross_blocker_names{$dep_id} = [
+                    map { $pid2name{$_} || "Project #$_" }
+                        @{ $cross_blocker_projects{$dep_id} }
+                ];
+            }
         }
 
         my @rows = $c->model('DBEncy')->resultset('Todo')->search(
@@ -2523,12 +2544,14 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
             my $priority    = ($h{priority} || 5);
             my $block_bonus = $h{is_blocking} ? -0.4 : 0;
 
-            # Cross-project blocker bonus: this todo's project is blocking other projects
+            # Cross-project blocker bonus: this todo's project must complete first
+            # (it appears as depends_on_id — other projects are waiting on it)
             my $cross_block_bonus = 0;
             if ($h{project_id} && $cross_blocker_projects{$h{project_id}}) {
                 $cross_block_bonus = -1.5;   # pull it higher than a same-priority non-blocker
                 $h{is_cross_blocker} = 1;
                 $h{blocking_count}   = scalar @{ $cross_blocker_projects{$h{project_id}} };
+                $h{blocking_names}   = join(', ', @{ $cross_blocker_names{$h{project_id}} || [] });
             }
 
             $h{ap_score} = ($status_tier * 100) + ($priority + $block_bonus + $cross_block_bonus) + $stale_penalty;
