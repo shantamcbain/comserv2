@@ -772,6 +772,62 @@
         </div>
         [% END %]
 
+    [%# ── Cross-project dependency map ───────────────────────────────────── %]
+    [% IF project_deps && project_deps.size %]
+    <div style="margin-top:28px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #dc3545;">
+            <h3 style="margin:0;font-size:1em;">🔗 Cross-Project Dependencies ([% project_deps.size %] active)</h3>
+            [% IF is_admin %]
+            <a href="/project/dependency_form" style="font-size:0.8em;color:var(--primary-color);">+ Manage Dependencies</a>
+            [% END %]
+        </div>
+        <div style="font-size:0.8em;color:var(--text-muted-color);margin-bottom:10px;">
+            Projects that cannot proceed until their dependency delivers. Resolve blockers in order.
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:0.85em;">
+            <thead>
+                <tr style="border-bottom:2px solid var(--border-color);background:var(--bg-secondary);">
+                    <th style="text-align:left;padding:6px 10px;color:var(--text-muted-color);">Blocked Project</th>
+                    <th style="text-align:center;padding:6px 4px;color:var(--text-muted-color);">Type</th>
+                    <th style="text-align:left;padding:6px 10px;color:var(--text-muted-color);">Depends On</th>
+                    <th style="text-align:left;padding:6px 10px;color:var(--text-muted-color);">Reason</th>
+                    [% IF is_admin %]<th style="padding:6px 4px;"></th>[% END %]
+                </tr>
+            </thead>
+            <tbody>
+            [% FOREACH dep IN project_deps %]
+            <tr style="border-bottom:1px solid var(--border-color);">
+                <td style="padding:7px 10px;font-weight:bold;">
+                    <a href="/project/[% dep.project_id %]" style="color:var(--text-color);text-decoration:none;">
+                        [% dep.project_name || 'Project #' _ dep.project_id %]
+                    </a>
+                </td>
+                <td style="padding:7px 4px;text-align:center;">
+                    [% IF dep.dependency_type == 'blocks' %]
+                    <span style="font-size:0.75em;padding:1px 5px;border-radius:3px;background:#dc3545;color:#fff;" title="Hard block — cannot start until dependency delivers">🔒 blocks</span>
+                    [% ELSE %]
+                    <span style="font-size:0.75em;padding:1px 5px;border-radius:3px;background:#fd7e14;color:#fff;" title="Soft requirement">⚠ requires</span>
+                    [% END %]
+                </td>
+                <td style="padding:7px 10px;">
+                    <a href="/project/[% dep.depends_on_id %]" style="color:var(--primary-color);text-decoration:none;font-weight:bold;">
+                        [% dep.depends_on_name || 'Project #' _ dep.depends_on_id %]
+                    </a>
+                </td>
+                <td style="padding:7px 10px;color:var(--text-muted-color);font-size:0.9em;">[% dep.description | truncate(80) %]</td>
+                [% IF is_admin %]
+                <td style="padding:7px 4px;text-align:center;">
+                    <button onclick="resolveDep([% dep.id %], this)"
+                        style="font-size:0.72em;padding:2px 7px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark this dependency as resolved">✓ Resolved</button>
+                </td>
+                [% END %]
+            </tr>
+            [% END %]
+            </tbody>
+        </table>
+    </div>
+    [% END %]
+
     </div>
 
     <!-- TAB: GANTT VIEW (all sites — DB-driven project timeline) -->
@@ -1300,6 +1356,31 @@
             btn.disabled = false;
             btn.textContent = 'Link';
             alert('Request failed: ' + e);
+        });
+    }
+
+    function resolveDep(depId, btn) {
+        if (!confirm('Mark this dependency as resolved?')) return;
+        btn.disabled = true;
+        btn.textContent = '…';
+        fetch('/project/resolve_dependency', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+            body: JSON.stringify({id: depId})
+        }).then(function(r){ return r.json(); }).then(function(d){
+            if (d.ok) {
+                var row = btn.closest('tr');
+                if (row) row.style.opacity = '0.4';
+                setTimeout(function(){ if (row) row.remove(); }, 900);
+            } else {
+                btn.disabled = false;
+                btn.textContent = '✓ Resolved';
+                alert('Error: ' + (d.error || 'unknown'));
+            }
+        }).catch(function(e){
+            btn.disabled = false;
+            btn.textContent = '✓ Resolved';
+            alert('Error: ' + e);
         });
     }
 
