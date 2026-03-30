@@ -350,6 +350,51 @@ sub get_site_favicon {
     return $config_data->{site_favicons}{ lc($site_name) };
 }
 
+# Get the favicon URL for a domain hostname (e.g. "workstation.local")
+sub get_domain_favicon {
+    my ($self, $c, $domain) = @_;
+    return undef unless $domain;
+
+    my $config_file = $self->get_theme_definitions_path($c);
+    return undef unless -f $config_file;
+
+    my $config_data;
+    try {
+        my $json = read_file($config_file);
+        $config_data = decode_json($json);
+    }
+    catch {
+        return undef;
+    };
+
+    return $config_data->{domain_favicons}{ lc($domain) };
+}
+
+# Set the favicon URL for a domain hostname (persists to JSON)
+sub set_domain_favicon {
+    my ($self, $c, $domain, $favicon_url) = @_;
+
+    $self->log_with_details($c, 'info', __FILE__, __LINE__, 'set_domain_favicon',
+        "Setting favicon for domain '$domain' to '$favicon_url'");
+
+    try {
+        my $config_file = $self->get_theme_definitions_path($c);
+        my $config_data = {};
+        if (-f $config_file) {
+            my $json = read_file($config_file);
+            $config_data = decode_json($json);
+        }
+        $config_data->{domain_favicons} ||= {};
+        $config_data->{domain_favicons}{ lc($domain) } = $favicon_url;
+        write_file($config_file, encode_json($config_data));
+        return 1;
+    }
+    catch {
+        $self->log_with_details($c, 'error', __FILE__, __LINE__, 'set_domain_favicon', "Error: $_");
+        return 0;
+    };
+}
+
 # Set the favicon URL for a site (persists to JSON)
 sub set_site_favicon {
     my ($self, $c, $site_name, $favicon_url) = @_;
