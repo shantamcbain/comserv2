@@ -90,7 +90,7 @@
         [% FOREACH dep IN deps_display %]
         <tr id="dep-row-[% dep.id %]" style="border-bottom:1px solid var(--border-color);[% IF dep.status == 'resolved' %]opacity:0.5;[% END %]">
             <td style="padding:7px 10px;font-weight:bold;">
-                <a href="/todo/details?project_id=[% dep.project_id %]" style="color:var(--text-color);text-decoration:none;">[% dep.project_name %]</a>
+                <a href="/project/details?project_id=[% dep.project_id %]" style="color:var(--text-color);text-decoration:none;">[% dep.project_name %]</a>
                 <div style="font-size:0.75em;color:var(--text-muted-color);">[% dep.sitename %]</div>
             </td>
             <td style="padding:7px 6px;text-align:center;">
