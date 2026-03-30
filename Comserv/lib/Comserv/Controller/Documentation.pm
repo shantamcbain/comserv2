@@ -2546,9 +2546,11 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
 
             # Cross-project blocker bonus: this todo's project must complete first
             # (it appears as depends_on_id — other projects are waiting on it)
+            # -3 means a P5 blocker (score 102) beats any P3+ non-blocker (score 103+)
+            # Status-tier × 100 ensures IN-PROGRESS always beats NEW regardless of bonus
             my $cross_block_bonus = 0;
             if ($h{project_id} && $cross_blocker_projects{$h{project_id}}) {
-                $cross_block_bonus = -1.5;   # pull it higher than a same-priority non-blocker
+                $cross_block_bonus = -3;   # boosts ~3 priority levels above equivalent non-blocker
                 $h{is_cross_blocker} = 1;
                 $h{blocking_count}   = scalar @{ $cross_blocker_projects{$h{project_id}} };
                 $h{blocking_names}   = join(', ', @{ $cross_blocker_names{$h{project_id}} || [] });
