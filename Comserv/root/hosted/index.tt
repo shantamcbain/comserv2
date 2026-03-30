@@ -1,0 +1,131 @@
+[% PageVersion = 'hosted/index.tt,v 1.0 2025/01/17 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <header class="header">
+        <h1>Hosted Accounts - [% site_domain || site_name %]</h1>
+        <div class="context">
+            <span class="context-item"><strong>Site:</strong> [% site_domain || site_name %]</span>
+        </div>
+    </header>
+    
+    <div class="intro-section">
+        <p class="intro">Welcome to [% site_domain || site_name %]'s hosting services. We provide reliable, secure hosting solutions for businesses and individuals.</p>
+    </div>
+
+    <!-- Hosting Services Overview -->
+    <section class="section">
+        <h2 class="section-header">Our Hosting Services</h2>
+        <div class="grid">
+            <div class="card">
+                <h3>Web Hosting</h3>
+                <p>Professional web hosting with 99.9% uptime guarantee, SSL certificates, and 24/7 support.</p>
+                <ul>
+                    <li>Unlimited bandwidth</li>
+                    <li>Free SSL certificates</li>
+                    <li>Daily backups</li>
+                    <li>Email hosting included</li>
+                </ul>
+            </div>
+            
+            <div class="card">
+                <h3>Application Hosting</h3>
+                <p>Specialized hosting for web applications with database support and custom configurations.</p>
+                <ul>
+                    <li>MySQL/PostgreSQL databases</li>
+                    <li>Custom domain setup</li>
+                    <li>Application monitoring</li>
+                    <li>Performance optimization</li>
+                </ul>
+            </div>
+            
+            <div class="card">
+                <h3>VPS Hosting</h3>
+                <p>Virtual Private Server hosting for advanced users requiring full control and flexibility.</p>
+                <ul>
+                    <li>Root access</li>
+                    <li>Custom OS installation</li>
+                    <li>Scalable resources</li>
+                    <li>Network isolation</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Current Hosted Accounts -->
+    [% IF hosted_accounts.size > 0 %]
+    <section class="section">
+        <h2 class="section-header">Current Hosted Accounts</h2>
+        <div class="accounts-list">
+            [% FOREACH account IN hosted_accounts %]
+            <div class="account-card">
+                <h3>[% account.account_name %]</h3>
+                <div class="account-details">
+                    <p><strong>Domain:</strong> [% account.domain %]</p>
+                    <p><strong>Type:</strong> [% account.hosting_type %]</p>
+                    <p><strong>Status:</strong> <span class="status [% account.status.lower %]">[% account.status %]</span></p>
+                    [% IF account.description %]
+                    <p><strong>Description:</strong> [% account.description %]</p>
+                    [% END %]
+                </div>
+                [% IF account.domain %]
+                <div class="account-actions">
+                    <a href="http://[% account.domain %]" target="_blank" class="btn btn-primary">Visit Site</a>
+                </div>
+                [% END %]
+            </div>
+            [% END %]
+        </div>
+    </section>
+    [% ELSE %]
+    <section class="section">
+        <h2 class="section-header">No Hosted Accounts Found</h2>
+        <p>There are currently no hosted accounts for [% site_domain || site_name %]. Would you like to apply for hosting services?</p>
+    </section>
+    [% END %]
+
+    <!-- Call to Action -->
+    <section class="section highlight-section">
+        <h2>Ready to Get Started?</h2>
+        <p>Join our hosting platform and get your website or application online today!</p>
+        <div class="cta-buttons">
+            <a href="/apply" class="btn btn-primary">Apply for Hosting</a>
+            <a href="/contact" class="btn btn-secondary">Contact Us</a>
+        </div>
+    </section>
+
+    <!-- Existing Hosted Sites (from navigation) -->
+    <section class="section">
+        <h2 class="section-header">Featured Hosted Sites</h2>
+        <div class="featured-sites">
+            <div class="site-link">
+                <a href="https://shamanbotanicals.ca" target="_blank">
+                    <h3>Shaman Botanicals</h3>
+                    <p>Natural health products and botanical supplies</p>
+                </a>
+            </div>
+            <div class="site-link">
+                <a href="https://3d.usbm.ca" target="_blank">
+                    <h3>3D Printing Services</h3>
+                    <p>Professional 3D printing and design services</p>
+                </a>
+            </div>
+            <div class="site-link">
+                <a href="https://ve7tit.com" target="_blank">
+                    <h3>VE7TIT Amateur Radio</h3>
+                    <p>Amateur radio resources and information</p>
+                </a>
+            </div>
+            <div class="site-link">
+                <a href="https://altpowerstore.com" target="_blank">
+                    <h3>Alt Power Store</h3>
+                    <p>Alternative energy solutions and products</p>
+                </a>
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- CSS moved to /static/css/themes/hosted-membership.css for theme consistency -->

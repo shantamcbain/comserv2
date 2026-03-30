@@ -9,7 +9,39 @@
 <h2>Current Initiatives</h2>
 
 <div class="initiative">
-    <h3>1. Controller Routing Standardization</h3>
+    <h3>1. Documentation System Improvements</h3>
+
+    <div class="initiative-meta">
+        <p><strong>Status:</strong> In Progress</p>
+        <p><strong>Priority:</strong> High</p>
+        <p><strong>Lead:</strong> Development Team</p>
+        <p><strong>Project Code:</strong> DOC-ROLE-001</p>
+        <p><strong>Documentation:</strong> <a href="[% c.uri_for('/Documentation/DocumentationRoleAccess') %]">Documentation Role Access</a></p>
+    </div>
+
+    <div class="initiative-description">
+        <p><strong>Description:</strong><br>
+        Improve the documentation system with proper role-based visibility filtering. Unauthenticated users see only login/getting-started docs. Normal users see user-level docs. Editors, developers, admins, and CSC admins see progressively more. Improve the META block scanner to accurately sort documents into correct categories. Add an admin UI for assigning roles to individual documents. Site name and username filtering improvements.</p>
+    </div>
+
+    <div class="initiative-progress">
+        <p><strong>Progress:</strong></p>
+        <ul class="task-list">
+            <li class="completed">✅ Initial role-based filtering infrastructure in place</li>
+            <li class="completed">✅ META block parsing in ScanMethods.pm</li>
+            <li class="completed">✅ DocumentationConfig.json category/role configuration</li>
+            <li class="pending">⬜ Improve unauthenticated (guest) user filtering — limited to login/getting-started only</li>
+            <li class="pending">⬜ Ensure CSC admin role maps to full access</li>
+            <li class="pending">⬜ Fix meta block scanning for accurate initial document categorisation</li>
+            <li class="pending">⬜ Admin UI for assigning roles per document</li>
+            <li class="pending">⬜ SiteName and username filtering improvements</li>
+            <li class="pending">⬜ Consider DB migration using the Pages system for display</li>
+        </ul>
+    </div>
+</div>
+
+<div class="initiative">
+    <h3>2. Controller Routing Standardization</h3>
     
     <div class="initiative-meta">
         <p><strong>Status:</strong> In Progress</p>
@@ -67,7 +99,7 @@
 </div>
 
 <div class="initiative">
-    <h3>3. Theme Handling Improvements</h3>
+    <h3>4. Theme Handling Improvements</h3>
     
     <div class="initiative-meta">
         <p><strong>Status:</strong> Planned</p>

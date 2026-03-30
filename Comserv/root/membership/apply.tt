@@ -1,0 +1,133 @@
+[% PageVersion = 'membership/apply.tt,v 1.0 2025/01/17 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <header class="header">
+        <h1>Apply for Membership - [% site_domain || site_name %]</h1>
+        <div class="context">
+            <span class="context-item"><strong>Site:</strong> [% site_domain || site_name %]</span>
+        </div>
+    </header>
+    
+    <div class="intro-section">
+        <p class="intro">Join our community and unlock exclusive benefits, resources, and support.</p>
+    </div>
+
+    [% IF errors.size > 0 %]
+    <div class="error-section">
+        <h3>Please correct the following errors:</h3>
+        <ul class="error-list">
+            [% FOREACH error IN errors %]
+            <li>[% error %]</li>
+            [% END %]
+        </ul>
+    </div>
+    [% END %]
+
+    <section class="section">
+        <h2 class="section-header">Membership Application</h2>
+        
+        <form method="POST" action="/applymembership" class="membership-form">
+            <div class="form-group">
+                <label for="name">Full Name *</label>
+                <input type="text" id="name" name="name" value="[% form_data.name || '' %]" required>
+                <small class="form-help">Enter your full legal name</small>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email Address *</label>
+                <input type="email" id="email" name="email" value="[% form_data.email || '' %]" required>
+                <small class="form-help">We'll use this for important membership communications</small>
+            </div>
+
+            <div class="form-group">
+                <label for="phone">Phone Number</label>
+                <input type="tel" id="phone" name="phone" value="[% form_data.phone || '' %]">
+                <small class="form-help">Optional - for urgent communications only</small>
+            </div>
+
+            <div class="form-group">
+                <label for="membership_type">Membership Type *</label>
+                <select id="membership_type" name="membership_type" required>
+                    <option value="">Select a membership type</option>
+                    <option value="basic" [% 'selected' IF form_data.membership_type == 'basic' || c.req.params.type == 'basic' %]>Basic Membership (Free)</option>
+                    <option value="premium" [% 'selected' IF form_data.membership_type == 'premium' || c.req.params.type == 'premium' %]>Premium Membership ($19/month)</option>
+                    <option value="enterprise" [% 'selected' IF form_data.membership_type == 'enterprise' || c.req.params.type == 'enterprise' %]>Enterprise Membership (Contact for pricing)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="organization">Organization/Company</label>
+                <input type="text" id="organization" name="organization" value="[% form_data.organization || '' %]">
+                <small class="form-help">Optional - if applying on behalf of an organization</small>
+            </div>
+
+            <div class="form-group">
+                <label for="interests">Areas of Interest</label>
+                <textarea id="interests" name="interests" rows="4">[% form_data.interests || '' %]</textarea>
+                <small class="form-help">Tell us what aspects of our community interest you most</small>
+            </div>
+
+            <div class="form-group">
+                <label for="how_heard">How did you hear about us?</label>
+                <select id="how_heard" name="how_heard">
+                    <option value="">Select an option</option>
+                    <option value="search" [% 'selected' IF form_data.how_heard == 'search' %]>Search Engine</option>
+                    <option value="referral" [% 'selected' IF form_data.how_heard == 'referral' %]>Referral from friend/colleague</option>
+                    <option value="social" [% 'selected' IF form_data.how_heard == 'social' %]>Social Media</option>
+                    <option value="website" [% 'selected' IF form_data.how_heard == 'website' %]>Our Website</option>
+                    <option value="event" [% 'selected' IF form_data.how_heard == 'event' %]>Event/Conference</option>
+                    <option value="other" [% 'selected' IF form_data.how_heard == 'other' %]>Other</option>
+                </select>
+            </div>
+
+            <div class="form-group checkbox-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="agree_terms" value="1" [% 'checked' IF form_data.agree_terms %] required>
+                    <span class="checkmark"></span>
+                    I agree to the <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a> *
+                </label>
+            </div>
+
+            <div class="form-group checkbox-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="newsletter" value="1" [% 'checked' IF form_data.newsletter %]>
+                    <span class="checkmark"></span>
+                    Subscribe to our monthly newsletter
+                </label>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Submit Application</button>
+                <a href="/membership" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </section>
+
+    <!-- Membership Benefits Reminder -->
+    <section class="section benefits-reminder">
+        <h2 class="section-header">What You'll Get</h2>
+        <div class="benefits-summary">
+            <div class="benefit-item">
+                <h3>Priority Support</h3>
+                <p>Faster response times and direct access to our support team</p>
+            </div>
+            <div class="benefit-item">
+                <h3>Exclusive Content</h3>
+                <p>Member-only resources, tutorials, and documentation</p>
+            </div>
+            <div class="benefit-item">
+                <h3>Community Access</h3>
+                <p>Join our private forums and connect with other members</p>
+            </div>
+            <div class="benefit-item">
+                <h3>Regular Updates</h3>
+                <p>Stay informed with our monthly newsletter and announcements</p>
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- CSS moved to /static/css/themes/hosted-membership.css for theme consistency -->

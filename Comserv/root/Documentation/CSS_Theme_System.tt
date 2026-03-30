@@ -1,0 +1,630 @@
+[% PageVersion = 'Comserv/root/Documentation/CSS_Theme_System.tt,v 1.0 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'CSS Theme System Documentation' %]
+
+<div class="documentation-content">
+
+<div class="markdown-content">
+
+# CSS Theme System Documentation
+
+## Overview
+
+The Comserv CSS Theme System provides a unified approach to styling across all modules and components. It uses JSON-based theme definitions with CSS variable injection for consistent theming.
+
+## Architecture
+
+### Theme Directory Structure
+```
+/static/css/themes/
+├── theme_definitions.json    # Theme variable definitions
+├── base-containers.css      # Universal container components
+├── documentation.css        # Documentation-specific styles
+├── default.css             # Default theme
+├── apis.css               # Site-specific themes
+├── csc.css
+├── usbm.css
+└── [other theme files]
+```
+
+### Theme Loading Process
+1. **Controller sets theme** via stash or site detection
+2. **Wrapper.tt loads theme CSS** from `/static/css/themes/{theme_name}.css`
+3. **Additional CSS loaded** via `additional_css` stash parameter
+4. **CSS variables applied** from theme_definitions.json
+
+## Theme Definitions
+
+### JSON Structure
+**File**: `/static/css/themes/theme_definitions.json`
+
+```json
+{
+  "themes": {
+    "default": {
+      "variables": {
+        "primary-color": "#ccffff",
+        "secondary-color": "#f9f9f9",
+        "text-color": "#000000",
+        "background-color": "#ffffff",
+        "border-color": "#cccccc",
+        "success-color": "#009900",
+        "warning-color": "#ff0000",
+        "accent-color": "#FF9900"
+      },
+      "name": "Default Theme",
+      "description": "The default system theme"
+    }
+  }
+}
+```
+
+### CSS Variables Usage
+```css
+.component {
+    color: var(--text-color);
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+}
+```
+
+## Universal Components
+
+### Base Containers System
+**File**: `/static/css/themes/base-containers.css`
+
+**Purpose**: Provides universal styling for collapsible containers, toggle icons, and common UI components used across all modules.
+
+**Key Components**:
+- **Toggle Icon System** - Universal expand/collapse indicators
+- **Section Headers** - Consistent header styling
+- **Collapsible Content** - Smooth transitions and animations
+- **Container Layouts** - Grid and card systems
+
+### Toggle Icon Implementation
+```css
+/* Simple Toggle Icon System - No FontAwesome dependency */
+.toggle-icon {
+    font-size: 1.2em;
+    transition: all 0.3s ease;
+    display: inline-block !important;
+    color: #007bff !important;
+    margin-left: 10px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.toggle-icon::before {
+    content: "▼";
+    font-family: Arial, sans-serif;
+}
+
+.toggle-icon.expanded::before {
+    content: "▲";
+}
+```
+
+## Module-Specific CSS
+
+### Documentation CSS
+**File**: `/static/css/themes/documentation.css`
+
+**Integration**:
+```css
+/* Import base container system for toggle icons and universal styles */
+@import url('base-containers.css');
+
+/* Documentation-specific overrides and badges */
+.site-badge, .file-type-badge, .role-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75em;
+    margin: 0 5px 5px 0;
+    color: white;
+    font-weight: 500;
+}
+```
+
+### Loading Module CSS
+Controllers can load additional CSS via stash:
+```perl
+$c->stash(
+    additional_css => ['/static/css/themes/documentation.css'],
+    # ... other stash variables
+);
+```
+
+## Wrapper Integration
+
+### CSS Loading in wrapper.tt.notusedbyapplication
+```html
+<!-- Theme CSS: [% theme_name %] -->
+<link rel="stylesheet" type="text/css" href="/static/css/themes/[% theme_name %].css">
+
+<!-- Additional CSS -->
+[% IF additional_css %]
+[% FOREACH css_file IN additional_css %]
+<link rel="stylesheet" href="[% css_file %]">
+[% END %]
+[% END %]
+```
+
+### Theme Selection Logic
+```perl
+# Default theme
+IF !theme_name;
+    theme_name = 'default';
+    
+    # Set theme based on site name (lowercase)
+    site_name_lower = c.session.SiteName | lower;
+    
+    # Check if we have a CSS file for this site
+    IF site_name_lower == 'csc' || site_name_lower == 'apis' || site_name_lower == 'usbm';
+        theme_name = site_name_lower;
+    END;
+END;
+```
+
+## Development Guidelines
+
+### Creating New Themes
+1. **Add theme definition** to theme_definitions.json
+2. **Create CSS file** in `/static/css/themes/`
+3. **Use CSS variables** for consistent theming
+4. **Test across modules** to ensure compatibility
+
+### CSS Best Practices
+- **NO INLINE CSS ALLOWED** - Use theme system files
+- **Use existing CSS variables** from theme definitions
+- **Import base-containers.css** for universal components
+- **Follow existing naming patterns**
+- **Test with multiple themes**
+
+### Variable Naming Conventions
+```css
+/* Core Colors */
+--primary-color
+--secondary-color
+--text-color
+--background-color
+--border-color
+
+/* Status Colors */
+--success-color
+--warning-color
+--danger-color
+--accent-color
+
+/* Layout */
+--font-size-base
+--spacing-small
+--spacing-medium
+--spacing-large
+```
+
+## Common CSS Classes
+
+### Reusable Components
+```css
+/* Cards and Containers */
+.feature-card, .admin-card
+.feature-grid, .admin-grid
+
+/* Buttons */
+.btn, .btn-primary, .btn-secondary
+
+/* Forms */
+.search-input, .search-button
+
+/* Layout */
+.section-header, .section-content
+.collapsible-header, .collapsible-content
+```
+
+### Toggle System Classes
+```css
+.toggle-icon           /* Toggle indicator */
+.toggle-icon.expanded  /* Expanded state */
+.collapsible-header    /* Clickable header */
+.collapsible-content   /* Collapsible content area */
+```
+
+## FontAwesome Integration
+
+### Local Installation
+**Location**: `/static/css/fontawesome/all.min.css`
+**Fonts**: `/static/webfonts/`
+
+**Loading**:
+```html
+<!-- Font Awesome - Local Installation -->
+<link rel="stylesheet" href="/static/css/fontawesome/all.min.css">
+```
+
+**Usage**:
+```html
+<i class="fas fa-search"></i>
+<i class="fas fa-tools"></i>
+<i class="fas fa-graduation-cap"></i>
+```
+
+## Troubleshooting
+
+### Common Issues
+1. **CSS not loading**: Check file paths and additional_css stash
+2. **Variables not working**: Verify theme_definitions.json syntax
+3. **Icons not showing**: Check FontAwesome paths or use Unicode fallbacks
+4. **Theme not applying**: Verify theme name and file existence
+
+### Debug Techniques
+- **Browser dev tools** - Check CSS loading and variable values
+- **Debug mode** - Enable in session for detailed logging
+- **CSS validation** - Ensure proper syntax and imports
+- **Cross-browser testing** - Verify compatibility
+
+## Recent Enhancements
+
+### Toggle Icon System (2025-01-15)
+- **Simplified to Unicode characters** for reliability
+- **Removed FontAwesome dependency** for toggle icons
+- **Added universal base-containers.css** system
+- **Improved cross-browser compatibility**
+
+### CSS Loading Improvements
+- **Controller-based CSS loading** via additional_css stash
+- **Automatic theme detection** based on site names
+- **Enhanced error handling** and logging
+- **Consistent import patterns** across modules
+
+## Migration Guide
+
+### From Inline CSS
+1. **Move styles** to appropriate theme file
+2. **Use CSS variables** instead of hardcoded colors
+3. **Import base-containers.css** for universal components
+4. **Test with multiple themes**
+
+### From FontAwesome Dependencies
+1. **Use Unicode characters** for simple icons (▼, ▲, ★, etc.)
+2. **Keep FontAwesome** for complex icons only
+3. **Add fallbacks** for critical UI elements
+4. **Test icon visibility** across browsers
+
+## Icon System Documentation
+
+### FontAwesome Icons by Category
+
+#### Navigation & Interface Icons
+```html
+<i class="fas fa-sitemap"></i>        <!-- Site Management -->
+<i class="fas fa-list"></i>           <!-- Lists/Menus -->
+<i class="fas fa-search"></i>         <!-- Search functionality -->
+<i class="fas fa-plus"></i>           <!-- Add/Create actions -->
+<i class="fas fa-external-link-alt"></i> <!-- External links -->
+<i class="fas fa-question-circle"></i>   <!-- Help/Info -->
+<i class="fas fa-info-circle"></i>       <!-- Information -->
+<i class="fas fa-eye"></i>            <!-- View/Details -->
+<i class="fas fa-edit"></i>           <!-- Edit actions -->
+<i class="fas fa-filter"></i>         <!-- Filter options -->
+<i class="fas fa-chevron-down"></i>   <!-- Collapse/Expand -->
+<i class="fas fa-arrow-up"></i>       <!-- Up/High priority/Return to top -->
+<i class="fas fa-arrow-down"></i>     <!-- Down/Low priority -->
+<i class="fas fa-equals"></i>         <!-- Medium priority -->
+```
+
+#### User & Account Icons
+```html
+<i class="fas fa-user-circle"></i>    <!-- User profile -->
+<i class="fas fa-user-cog"></i>       <!-- Developer/Admin user -->
+<i class="fas fa-user-tie"></i>       <!-- Client/Business user -->
+<i class="fas fa-headset"></i>        <!-- Support/Help desk -->
+<i class="fas fa-phone"></i>          <!-- Contact/Phone -->
+```
+
+#### System & Server Icons
+```html
+<i class="fas fa-server"></i>         <!-- Server/Site listings -->
+<i class="fas fa-tools"></i>          <!-- System tools -->
+<i class="fas fa-graduation-cap"></i> <!-- Education/Training -->
+<i class="fas fa-palette"></i>        <!-- Theme system -->
+<i class="fas fa-robot"></i>          <!-- Automation/AI -->
+<i class="fas fa-project-diagram"></i> <!-- Project structure -->
+```
+
+#### Status & Alert Icons
+```html
+<i class="fas fa-check-circle"></i>   <!-- Success/Complete -->
+<i class="fas fa-exclamation-triangle"></i> <!-- Warning -->
+<i class="fas fa-ticket-alt"></i>     <!-- Support tickets -->
+```
+
+#### Calendar & Time Icons
+```html
+<i class="fas fa-calendar"></i>       <!-- General calendar -->
+<i class="fas fa-calendar-day"></i>   <!-- Day view -->
+<i class="fas fa-calendar-week"></i>  <!-- Week view -->
+<i class="far fa-calendar-alt"></i>   <!-- Start date (outline) -->
+<i class="far fa-calendar-check"></i> <!-- Due date (outline) -->
+```
+
+#### Business & Industry Specific Icons
+```html
+<!-- Apiary/Beekeeping -->
+<i class="fas fa-hive"></i>           <!-- Hive management -->
+<i class="fas fa-crown"></i>          <!-- Queen bees -->
+<i class="fas fa-boxes"></i>          <!-- Inventory -->
+<i class="fas fa-map-marker-alt"></i> <!-- Yards/Locations -->
+
+<!-- Support & Documentation -->
+<i class="fas fa-book"></i>           <!-- Knowledge base -->
+<i class="fas fa-ticket-alt"></i>     <!-- Support tickets -->
+```
+
+#### Social Media Icons (Brand Icons)
+```html
+<i class="fab fa-facebook-square"></i> <!-- Facebook -->
+<i class="fab fa-twitter-square"></i>  <!-- Twitter -->
+<i class="fab fa-instagram"></i>       <!-- Instagram -->
+<i class="fab fa-linkedin"></i>        <!-- LinkedIn -->
+<i class="fab fa-android"></i>         <!-- Android platform -->
+<i class="fab fa-apple"></i>           <!-- iOS/Apple platform -->
+```
+
+### Unicode Icons (FontAwesome-Free)
+For simple toggle and status indicators, the system uses Unicode characters:
+
+```css
+/* Toggle Icons */
+.toggle-icon::before { content: "▼"; }  /* Collapsed */
+.toggle-icon.expanded::before { content: "▲"; }  /* Expanded */
+
+/* Status Indicators */
+content: "★";    /* Featured/Important */
+content: "●";    /* Active status */
+content: "○";    /* Inactive status */
+content: "✓";    /* Success/Complete */
+content: "✗";    /* Error/Failed */
+content: "⚠";    /* Warning */
+content: "ℹ";    /* Information */
+```
+
+### Theme-Specific Icon Colors
+
+#### Default Theme
+```css
+.fas, .far, .fab { color: var(--accent-color, #FF9900); }
+.feature-icon { color: var(--primary-color, #ffffff); }
+.info-icon { color: var(--link-color, #0000FF); }
+```
+
+#### APIS Theme (Honeycomb)
+```css
+.fas, .far, .fab { color: var(--accent-color, #FFB900); }
+.feature-icon { color: var(--text-color, #2C2C2C); }
+.info-icon { color: var(--link-color, #B88A00); }
+```
+
+#### CSC Theme (Light Blue)
+```css
+.fas, .far, .fab { color: var(--accent-color, #FF9900); }
+.feature-icon { color: var(--text-color, #000000); }
+.info-icon { color: var(--link-color, #0000FF); }
+```
+
+#### USBM Theme (Green)
+```css
+.fas, .far, .fab { color: var(--accent-color, #006622); }
+.feature-icon { color: var(--nav-text, #ffffff); }
+.info-icon { color: var(--link-color, #006622); }
+```
+
+#### Dark Theme
+```css
+.fas, .far, .fab { color: var(--accent-color, #6200ee); }
+.feature-icon { color: var(--text-color, #e0e0e0); }
+.info-icon { color: var(--link-color, #bb86fc); }
+```
+
+### Icon Usage Guidelines
+
+#### CSS Classes for Icons
+```css
+/* Standard icon styling */
+.fas, .far, .fab {
+    margin-right: 8px;
+    color: var(--accent-color);
+}
+
+/* Feature icons in cards */
+.feature-icon {
+    font-size: 1.5em;
+    margin-right: 10px;
+    color: var(--primary-color);
+}
+
+/* Info icons */
+.info-icon {
+    margin-left: 10px;
+    color: var(--link-color);
+}
+
+/* Toggle icons */
+.toggle-icon {
+    font-size: 1.2em;
+    transition: all 0.3s ease;
+    color: var(--link-color);
+    cursor: pointer;
+}
+
+/* Collapse icons */
+.collapse-icon {
+    transition: transform 0.3s ease;
+}
+
+/* Status badges with icons */
+.badge .fas {
+    margin-right: 4px;
+}
+
+/* Stat card icons */
+.stat-icon {
+    font-size: 2.5rem;
+    color: var(--primary-color);
+    margin-bottom: 15px;
+}
+```
+
+#### Icon Implementation Examples
+```html
+<!-- Page headers -->
+<h1><i class="fas fa-sitemap"></i> Site Management</h1>
+
+<!-- Feature cards -->
+<h3><i class="feature-icon fas fa-hive"></i>Hive Tracking</h3>
+
+<!-- Action buttons -->
+<a href="/action" class="btn btn-primary">
+    <i class="fas fa-plus"></i>Add New Item
+</a>
+
+<!-- Info indicators -->
+<span>Site Status <i class="info-icon fas fa-question-circle"></i></span>
+
+<!-- Priority badges -->
+<span class="badge badge-danger"><i class="fas fa-arrow-up"></i> High</span>
+<span class="badge badge-warning"><i class="fas fa-equals"></i> Medium</span>
+<span class="badge badge-info"><i class="fas fa-arrow-down"></i> Low</span>
+
+<!-- Collapsible sections -->
+<h4><i class="fas fa-chevron-down collapse-icon mr-2"></i>Section Title</h4>
+
+<!-- Social media links -->
+<a href="#" class="text-primary"><i class="fab fa-facebook-square fa-2x"></i></a>
+```
+
+### Complete Icon Inventory by Module
+
+#### Site Management Module
+- `fas fa-sitemap` - Main site management
+- `fas fa-question-circle` - Help information
+- `fas fa-user-circle` - User information
+- `fas fa-external-link-alt` - External links
+- `fas fa-plus` - Add new site
+- `fas fa-list` - Available sites list
+- `fas fa-server` - Server/site indicators
+- `fas fa-info-circle` - Information messages
+
+#### CSC Help Desk Module
+- `fas fa-headset` - Help desk branding
+- `fas fa-ticket-alt` - Submit tickets
+- `fas fa-search` - Check ticket status
+- `fas fa-book` - Knowledge base
+- `fas fa-phone` - Contact support
+
+#### BMaster Apiary Module
+- `fas fa-hive` - Hive management
+- `fas fa-boxes` - Inventory management
+- `fas fa-calendar` - Seasonal calendar
+- `fas fa-crown` - Queen management
+- `fas fa-map-marker-alt` - Yard locations
+
+#### Todo/Project Management Module
+- `fas fa-check-circle` - Success messages
+- `fas fa-chevron-down` - Collapse sections
+- `fas fa-arrow-up` - High priority
+- `fas fa-equals` - Medium priority
+- `fas fa-arrow-down` - Low priority
+- `fas fa-user-cog` - Developer
+- `fas fa-user-tie` - Client
+- `fas fa-eye` - View details
+- `fas fa-edit` - Edit items
+- `fas fa-project-diagram` - Sub-projects
+- `fas fa-plus` - Add new items
+- `fas fa-exclamation-triangle` - Warnings
+- `fas fa-filter` - Filter options
+- `fas fa-list` - List view
+- `fas fa-calendar-day` - Day view
+- `fas fa-calendar-week` - Week view
+- `fas fa-calendar` - Month view
+- `fas fa-robot` - Automation
+- `far fa-calendar-alt` - Start dates
+- `far fa-calendar-check` - Due dates
+
+#### Social/Contact Modules
+- `fab fa-facebook-square` - Facebook links
+- `fab fa-twitter-square` - Twitter links
+- `fab fa-instagram` - Instagram links
+- `fab fa-linkedin` - LinkedIn links
+
+#### Documentation/Developer Modules
+- `fab fa-android` - Android platform
+- `fab fa-apple` - iOS platform
+
+### Adding New Icons
+
+#### For FontAwesome Icons
+1. **Choose appropriate icon** from FontAwesome library
+2. **Add to relevant theme CSS** with proper color variables
+3. **Test across all themes** to ensure visibility
+4. **Document usage** in this section
+5. **Update this inventory** with new icon usage
+
+#### For Unicode Icons
+1. **Select Unicode character** that works across browsers
+2. **Add to base-containers.css** with proper CSS class
+3. **Test fallback behavior** for unsupported characters
+4. **Provide FontAwesome alternative** if needed
+
+### Icon Accessibility
+
+#### Best Practices
+```html
+<!-- Screen reader friendly -->
+<i class="fas fa-search" aria-hidden="true"></i>
+<span class="sr-only">Search</span>
+
+<!-- With descriptive text -->
+<button>
+    <i class="fas fa-plus" aria-hidden="true"></i>
+    Add New Site
+</button>
+
+<!-- Standalone icons need labels -->
+<i class="fas fa-info-circle" aria-label="Information" role="img"></i>
+```
+
+#### Screen Reader Support
+- **Always include aria-hidden="true"** for decorative icons
+- **Provide text alternatives** for functional icons
+- **Use semantic HTML** alongside icons
+- **Test with screen readers** during development
+
+## Version History
+
+**Version 1.1** (2025-01-27)
+- Added comprehensive icon documentation with complete inventory
+- Documented all FontAwesome icons used across modules
+- Added theme-specific icon colors for all themes
+- Included accessibility guidelines and best practices
+- Added complete icon inventory by module
+- Documented social media and brand icons
+
+**Version 1.0** (2025-01-15)
+- Initial comprehensive documentation
+- Toggle icon system standardization
+- Base containers architecture
+- Module CSS integration patterns
+
+---
+
+**Author**: Development Team  
+**Last Updated**: 2025-01-27  
+**Status**: Active System
+
+</div>
+
+</div>

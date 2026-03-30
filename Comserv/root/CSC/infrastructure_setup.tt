@@ -253,8 +253,11 @@ $(document).ready(function() {
         $('#progress-bar').css('width', '50%');
         $('#installation-status').html('Test progress bar at 50%');
     });
-    // Add AJAX setup for error handling
+    // Add AJAX setup for CSRF protection and error handling
     $.ajaxSetup({
+        headers: {
+            'X-CSRF-Token': $('meta[name="csrf-token"]').attr('content')
+        },
         error: function(xhr, status, error) {
             console.error("AJAX Error:", status, error);
             completeInstallation('error', 'AJAX Error: ' + status, 'Error details: ' + error + '\nResponse: ' + xhr.responseText);

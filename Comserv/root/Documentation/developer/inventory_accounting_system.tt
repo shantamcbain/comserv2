@@ -1,0 +1,150 @@
+[% PageVersion = 'Documentation/developer/inventory_accounting_system.tt,v 0.01 2025/08/02 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% # Set the page title and breadcrumbs %]
+[% META title = 'Inventory and Accounting System' %]
+[% SET active_section = 'developer' %]
+[% SET active_doc = 'inventory_accounting_system' %]
+
+[% INCLUDE 'Documentation/developer/header.tt' %]
+
+<h1>Inventory and Accounting System Implementation</h1>
+
+<div class="alert alert-info">
+    <strong>Note:</strong> This document provides guidelines for implementing a hybrid inventory/accounting system
+    using LedgerSMB and Catalyst, with geolocation and member store support.
+</div>
+
+<h2>Table of Contents</h2>
+<ul>
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#prerequisites">Prerequisites</a></li>
+    <li><a href="#step_by_step">Step-by-Step Implementation</a>
+        <ul>
+            <li><a href="#step1">Step 1: Set Up LedgerSMB</a></li>
+            <li><a href="#step2">Step 2: Configure Inventory and Accounting</a></li>
+            <li><a href="#zencoder_prompt">Zencoder Prompt</a></li>
+        </ul>
+    </li>
+</ul>
+
+<h2 id="overview">Overview</h2>
+
+<p>This guideline outlines the steps to build a hybrid inventory and accounting system for our Catalyst application.</p>
+
+<p>The system will support:</p>
+<ul>
+    <li>3D printing materials and products</li>
+    <li>Herbs and related products</li>
+    <li>Bee-related products</li>
+</ul>
+
+<p>The system uses <strong>LedgerSMB</strong> (an open-source ERP, formerly SQL-Ledger) for inventory and accounting, integrated with our <strong>Catalyst</strong> application for member stores and geolocation-based order routing.</p>
+
+<h2 id="prerequisites">Prerequisites</h2>
+
+<h3>Environment Requirements</h3>
+<ul>
+    <li>Perl 5.36+</li>
+    <li>PostgreSQL 15+ with PostGIS</li>
+    <li>Catalyst 5.901+</li>
+    <li>PyCharm with Zencoder plugin</li>
+</ul>
+
+<h3>Hardware Requirements</h3>
+<ul>
+    <li>Server with 4GB RAM minimum</li>
+    <li>20GB storage minimum</li>
+    <li>Example configurations:
+        <ul>
+            <li>AWS EC2 t3.medium</li>
+            <li>DigitalOcean droplet with equivalent specs</li>
+        </ul>
+    </li>
+</ul>
+
+<h3>Dependencies</h3>
+<ul>
+    <li>Required Perl modules:
+        <ul>
+            <li>DBIx::Class</li>
+            <li>Catalyst::Controller::REST</li>
+            <li>Catalyst::Plugin::Authentication</li>
+        </ul>
+    </li>
+    <li>Database: PostgreSQL with PostGIS extension</li>
+</ul>
+
+<h2 id="step_by_step">Step-by-Step Implementation</h2>
+
+<h3 id="step1">Step 1: Set Up LedgerSMB</h3>
+
+<p>Install and configure LedgerSMB to handle inventory and accounting for all sites.</p>
+
+<h4>Installation Steps</h4>
+<ol>
+    <li>Download LedgerSMB (latest stable, e.g., 1.11.x) from <a href="https://ledgersmb.org">ledgersmb.org</a>.</li>
+    <li>Install required system packages:
+        <pre><code class="language-bash">sudo apt-get update
+sudo apt-get install -y postgresql postgresql-contrib
+</code></pre>
+    </li>
+    <li>Clone the repository and install dependencies:
+        <pre><code class="language-bash">git clone https://github.com/ledgersmb/LedgerSMB.git
+cd LedgerSMB
+cpanm --installdeps .
+</code></pre>
+    </li>
+    <li>Set up PostgreSQL database:
+        <pre><code class="language-bash">sudo -u postgres createuser -s ledgersmb
+sudo -u postgres createdb ledgersmb
+</code></pre>
+    </li>
+    <li>Run the setup script:
+        <pre><code class="language-bash">perl setup.pl
+</code></pre>
+    </li>
+</ol>
+
+<h3 id="step2">Step 2: Configure Inventory and Accounting</h3>
+
+<ol>
+    <li>Access the web interface at: <code>http://your-server:5000</code></li>
+    <li>Complete the initial setup wizard</li>
+    <li>Create a new company (e.g., "Catalyst Inventory")</li>
+    <li>Configure chart of accounts</li>
+    <li>Set up inventory categories:
+        <ul>
+            <li>3D Printing Materials</li>
+            <li>Herbs</li>
+            <li>Bee Products</li>
+        </ul>
+    </li>
+</ol>
+
+<h3 id="zencoder_prompt">Zencoder Prompt</h3>
+
+<div class="card bg-light mb-3">
+    <div class="card-header">Zencoder Prompt for Database Initialization</div>
+    <div class="card-body">
+        <pre><code>Generate a Perl script to initialize LedgerSMB's PostgreSQL database with sample data for:
+- 3D printing (filament, PLA, 1kg, $20)
+- Herbs (basil, 100g, $5)
+- Bee products (honey, 500g, $10)
+
+Include assemblies for:
+- 3D-printed model (2 parts)
+- Herb blend (basil + oregano)</code></pre>
+    </div>
+</div>
+
+[% # Add navigation links %]
+<div class="mt-4">
+    <a href="[% c.uri_for('/Documentation/developer') %]" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Developer Documentation
+    </a>
+</div>
+
+[% INCLUDE 'Documentation/developer/footer.tt' %]

@@ -55,13 +55,15 @@
         <div class="map-section">
             <h2 class="section-title"><i class="icon-documentation"></i> Documentation</h2>
             <div class="map-links">
-                <a href="/documentation" class="map-link"><i class="icon-list"></i> All Documentation</a>
-                <a href="/documentation?category=user_guides" class="map-link"><i class="icon-user-guide"></i> User Guides</a>
                 <a href="/documentation?category=admin_guides" class="map-link"><i class="icon-admin-guide"></i> Admin Guides</a>
-                <a href="/documentation?category=tutorials" class="map-link"><i class="icon-tutorial"></i> Tutorials</a>
+                <a href="/documentation" class="map-link"><i class="icon-list"></i> All Documentation</a>
                 <a href="/documentation?category=changelog" class="map-link"><i class="icon-changelog"></i> Changelog</a>
-                <a href="/documentation/linux_commands" class="map-link"><i class="icon-terminal"></i> Linux Commands</a>
+                <a href="/Documentation/DailyPlan" class="map-link"><i class="icon-calendar"></i> Daily Plan</a>
                 <a href="/admin/edit_documentation" class="map-link"><i class="icon-edit"></i> Edit Documentation</a>
+                <a href="/documentation/linux_commands" class="map-link"><i class="icon-terminal"></i> Linux Commands</a>
+                <a href="/Documentation/Planning" class="map-link"><i class="icon-planning"></i> Planning</a>
+                <a href="/documentation?category=tutorials" class="map-link"><i class="icon-tutorial"></i> Tutorials</a>
+                <a href="/documentation?category=user_guides" class="map-link"><i class="icon-user-guide"></i> User Guides</a>
             </div>
         </div>
 
@@ -92,10 +94,22 @@
             </div>
         </div>
 
+        <!-- System Health Section -->
+        <div class="map-section">
+            <h2 class="section-title"><i class="icon-system"></i> System Health</h2>
+            <div class="map-links">
+                <a href="/admin/hardware_monitor" class="map-link"><i class="icon-server"></i> Hardware Monitor</a>
+                <a href="/admin/logging" class="map-link"><i class="icon-log"></i> Logging Administration</a>
+                <a href="/admin/logging/audit" class="map-link"><i class="icon-status"></i> Log Audit &amp; Health</a>
+                <a href="/admin/docker-containers" class="map-link"><i class="icon-docker"></i> Docker Containers</a>
+            </div>
+        </div>
+
         <!-- Logging Section -->
         <div class="map-section">
             <h2 class="section-title"><i class="icon-log"></i> Logging</h2>
             <div class="map-links">
+                <a href="/admin/hardware_monitor" class="map-link"><i class="icon-server"></i> Hardware Monitor</a>
                 <a href="/log" class="map-link"><i class="icon-log"></i> Logging System</a>
                 <a href="/admin/view_log" class="map-link"><i class="icon-view"></i> View Application Log</a>
                 <a href="/admin/git_pull" class="map-link"><i class="icon-git"></i> Pull from Git Repository</a>

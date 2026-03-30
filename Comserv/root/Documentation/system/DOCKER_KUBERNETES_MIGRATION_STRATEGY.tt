@@ -1,15 +1,15 @@
 <DOCUMENT filename="DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt">
 [% META
-        title = "Docker & Kubernetes Migration Strategy (Updated)"
+   title = "Docker & Kubernetes Migration Strategy (Updated)"
    description = "Strategic roadmap for Docker and Kubernetes adoption across development, testing, and production environments. Aligned with actual 3-host Proxmox cluster infrastructure."
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "infrastructure,deployment"
-   page_version = "1.31"
-   last_updated = "Wed Dec 24 00:35:00 UTC 2025"
+   page_version = "1.32"
+   last_updated = "Tue Mar 10 18:30:00 UTC 2026"
    site_specific = "false"
 %]
-[% PageVersion = 'root/Documentation/system/DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt,v 1.29 2025/12/23 zencoder Exp - Infrastructure context review: Docker container networking section valid and aligns with actual 3-host Proxmox cluster topology (proxmoxt210 gateway, proxmox720/proxmoxws K8s workers, production DB at bare-metal 192.168.1.198)' %]
+[% PageVersion = 'root/Documentation/system/DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt,v 1.32 2026/03/10 zencoder Exp - Added NFS volume recovery solution and Auto Deploy UI enhancements for production stability.' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -93,6 +93,34 @@
     </ul>
     
     <p style="color: #0d47a1; font-family: var(--body-font);"><strong>Approval Status</strong>: Grok's K3s plan APPROVED for integration into Phase 3+. Maintain Docker Compose phases for dev/staging continuity.</p>
+</div>
+
+<!-- ========================================================================== -->
+<!-- CRITICAL DIAGNOSTIC: NFS Volume Mount Failures (2026-03-10)               -->
+<!-- ========================================================================== -->
+<div style="background-color: #fce4ec; border: 2px solid #e91e63; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+    <h3 style="color: #c2185b; font-family: var(--header-font); margin-top: 0;">🔴 CRITICAL: Stale NFS Volume Mounts on Production</h3>
+    
+    <h4 style="color: var(--text-color); font-family: var(--header-font);">Diagnostic & Solution (Mar 10, 2026)</h4>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> NFS volumes (logs or workshop files) appear empty or "stale" inside containers even when the NFS server is reachable from the host.</p>
+    
+    <div style="background-color: #fff; padding: var(--spacing-medium); border-left: 4px solid #e91e63; margin: var(--spacing-small) 0;">
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Root Cause:</strong> Docker caches NFS mount information in its volume metadata. If the NFS server restarts or the mount point changes on the host, the existing Docker volume remains "stale" and fails to reconnect.</p>
+        
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Verified Solution:</strong> Forceful removal and recreation of the Docker volumes.</p>
+        
+        <h5 style="color: var(--text-color); font-family: var(--header-font);">Manual CLI Solution (Production Server):</h5>
+        <pre style="background: #2d2d2d; color: #fff; padding: 10px; border-radius: 4px; overflow-x: auto;"><code># 1. Stop and remove the container
+sudo docker rm -f comserv2-web-prod
+
+# 2. Remove the stale volumes
+sudo docker volume rm comserv2_comserv-logs comserv2_workshop_files_nfs
+
+# 3. Re-deploy (the volumes will be recreated automatically)</code></pre>
+
+        <h5 style="color: var(--text-color); font-family: var(--header-font);">Automated UI Solution:</h5>
+        <p style="color: var(--text-color); font-family: var(--body-font);">The "Docker Container Management" page now includes a <strong>"Recreate NFS Volumes"</strong> checkbox in the Production Deployment section. Enabling this checkbox during an <strong>Auto Deploy</strong> will automatically perform the cleanup steps above.</p>
+    </div>
 </div>
 
 <!-- ========================================================================== -->

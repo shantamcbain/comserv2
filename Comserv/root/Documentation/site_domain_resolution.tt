@@ -1,0 +1,327 @@
+[% PageVersion = 'Comserv/root/Documentation/site_domain_resolution.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Site Domain Resolution Guide' %]
+
+<!-- Documentation page for site_domain_resolution -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+This document explains how the Comserv application resolves domains to sites, how it handles domains not found in the database, and common issues that can occur in this process.
+
+
+
+<h2>How Domain Resolution Works</h2>
+
+
+
+<ol><li>When a request comes in, the <code>Root</code> controller's <code>auto</code> method calls <code>setup_site</code>.</li></ol>
+
+<ol><li>The <code>setup_site</code> method extracts the domain from the request.</li></ol>
+
+<ol><li>If no site name is set in the session, it looks up the domain in the <code>sitedomain</code> table.</li></ol>
+
+<ol><li>If a matching domain is found, it retrieves the associated site details.</li></ol>
+
+<ol><li>The site's name and home_view are used to determine which controller should handle the request.</li></ol>
+
+<ol><li>If no matching domain is found, the system uses default settings (SiteName='default', ControllerName='Root').</li></ol>
+
+
+
+<h2>Default Behavior for Unknown Domains</h2>
+
+
+
+When a domain is not found in the sitedomain table, the system should:
+
+
+
+<ol><li>Set <code>SiteName</code> to 'default'</li></ol>
+
+<ol><li>Set <code>ControllerName</code> to 'Root'</li></ol>
+
+<ol><li>Set <code>theme_name</code> to 'default'</li></ol>
+
+<ol><li>Set default values for critical variables:</li></ol>
+
+   - <code>ScriptDisplayName</code> = 'Site'
+
+   - <code>css_view_name</code> = '/static/css/default.css'
+
+   - <code>mail_to_admin</code> = 'admin@computersystemconsulting.ca'
+
+   - <code>mail_replyto</code> = 'helpdesk.computersystemconsulting.ca'
+
+   - <code>cmenu_css</code> = '/static/css/menu.css'
+
+<ol><li>Display the Root controller's index.tt template with default styling</li></ol>
+
+
+
+This ensures a consistent experience for domains not in the database without leaking site-specific information.
+
+
+
+<h2>Common Issues</h2>
+
+
+
+<h3>1. Parameter Order Mismatch</h3>
+
+
+
+One recurring issue is a parameter order mismatch in the <code>get_site_details</code> method call. The correct order is:
+
+
+
+<code></code>`perl
+
+$c->model('Site')->get_site_details($c, $site_id);
+
+<code></code>`
+
+
+
+Incorrect order:
+
+
+
+<code></code>`perl
+
+$c->model('Site')->get_site_details($site_id, $c);  # WRONG!
+
+<code></code>`
+
+
+
+This causes the site details to not be retrieved correctly, resulting in all sites showing the default home page.
+
+
+
+<h3>2. Missing Domain in sitedomain Table</h3>
+
+
+
+If a domain is not found in the <code>sitedomain</code> table, the application will use default settings. Previously, the system incorrectly tried to use CSC as a fallback site, which has been fixed to use truly default values.
+
+
+
+<h3>3. Incorrect home_view Setting</h3>
+
+
+
+If a site's <code>home_view</code> field is set to a controller that doesn't exist, the application will fall back to the Root controller.
+
+
+
+<h3>4. Overriding Default Settings</h3>
+
+
+
+Be careful not to override default settings by calling methods like <code>fetch_and_set</code> or <code>site_setup</code> after setting default values. This can cause inconsistent behavior.
+
+
+
+<h2>How to Fix Domain Resolution Issues</h2>
+
+
+
+<h3>1. Check Parameter Order</h3>
+
+
+
+Ensure all calls to <code>get_site_details</code> have the correct parameter order: context first, then site ID.
+
+
+
+<h3>2. Verify Domain in Database</h3>
+
+
+
+Make sure the domain is properly added to the <code>sitedomain</code> table and associated with the correct site ID.
+
+
+
+<code></code>`sql
+
+SELECT * FROM sitedomain WHERE domain = 'example.com';
+
+<code></code>`
+
+
+
+<h3>3. Check Site Configuration</h3>
+
+
+
+Verify that the site record has the correct <code>home_view</code> value:
+
+
+
+<code></code>`sql
+
+SELECT id, name, home_view FROM sites WHERE id = [site_id];
+
+<code></code>`
+
+
+
+<h3>4. Enable Debug Mode</h3>
+
+
+
+Enable debug mode to see detailed logging about the domain resolution process:
+
+
+
+<code></code>`
+
+http://yourdomain.com/?debug=1
+
+<code></code>`
+
+
+
+<h3>5. Check Controller Existence</h3>
+
+
+
+Make sure the controller specified in <code>home_view</code> actually exists and is properly configured.
+
+
+
+<h2>Recent Fixes (2025-03-29)</h2>
+
+
+
+<h3>Domain Resolution Fallback Fix</h3>
+
+
+
+We fixed an issue where domains not found in the sitedomain table were incorrectly using CSC-specific settings instead of default settings. The changes included:
+
+
+
+<ol><li>Modified the <code>auto</code> method in Root.pm to use 'default' as SiteName and 'Root' as ControllerName when a domain is not found</li></ol>
+
+<ol><li>Set default values for critical variables like ScriptDisplayName and css_view_name</li></ol>
+
+<ol><li>Removed code that was trying to use CSC as a fallback site</li></ol>
+
+<ol><li>Commented out calls to <code>site_setup</code> and <code>fetch_and_set</code> that were overriding default settings</li></ol>
+
+
+
+These changes ensure that unknown domains show a generic site with default styling rather than leaking site-specific information.
+
+
+
+<h2>Preventing Future Issues</h2>
+
+
+
+<ol><li>**Use Consistent Parameter Order**: Always follow the convention of passing the context (<code>$c</code>) as the first parameter.</li></ol>
+
+
+
+<ol><li>**Add Validation**: Consider adding parameter validation to critical methods to catch incorrect parameter order.</li></ol>
+
+
+
+<ol><li>**Use Named Parameters**: For complex methods, consider using named parameters:</li></ol>
+
+
+
+<code></code>`perl
+
+$c->model('Site')->get_site_details(
+
+    context => $c,
+
+    site_id => $site_id
+
+);
+
+<code></code>`
+
+
+
+<ol><li>**Early Returns**: Use early returns in methods to avoid executing code that might change important settings.</li></ol>
+
+
+
+<ol><li>**Avoid Overriding Settings**: Be careful not to override carefully set default values by calling methods that might change them.</li></ol>
+
+
+
+<ol><li>**Regular Testing**: Periodically test all domains to ensure they resolve to the correct sites.</li></ol>
+
+
+
+<ol><li>**Documentation First**: Always check existing documentation before making changes to understand how the system is supposed to work.</li></ol>
+
+
+
+<h2>Troubleshooting Steps</h2>
+
+
+
+If a site is showing the default home page instead of the expected content:
+
+
+
+<ol><li>Reset your session: <code>/reset_session</code></li></ol>
+
+<ol><li>Enable debug mode: <code>?debug=1</code></li></ol>
+
+<ol><li>Check the logs for domain resolution errors</li></ol>
+
+<ol><li>Verify the domain exists in the <code>sitedomain</code> table</li></ol>
+
+<ol><li>Check that the site's <code>home_view</code> points to a valid controller</li></ol>
+
+<ol><li>Ensure the controller's namespace is correctly set</li></ol>
+
+<ol><li>Verify the controller's index method is properly defined</li></ol>
+
+
+
+<h2>Testing Domain Resolution</h2>
+
+
+
+To verify domain resolution is working correctly:
+
+
+
+<ol><li>Test with a domain that is in the sitedomain table:</li></ol>
+
+   - Should show the correct site-specific theme and content
+
+   - Debug information should show the correct SiteName and ControllerName
+
+
+
+<ol><li>Test with a domain that is not in the sitedomain table (e.g., 127.0.0.1):</li></ol>
+
+   - Should show the default theme with "This site is currently under construction"
+
+   - Debug information should show SiteName as 'default' and ControllerName as 'Root'
+
+   - No site-specific content or styling should be visible
+
+</div>

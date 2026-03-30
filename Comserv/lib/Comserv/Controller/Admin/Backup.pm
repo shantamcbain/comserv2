@@ -49,7 +49,6 @@ Auto method for admin authentication
 
 sub auto :Private {
     my ($self, $c) = @_;
-    
     unless ($self->admin_auth->check_admin_access($c, 'backup_management')) {
         $c->response->redirect($c->uri_for('/login'));
         return 0;
@@ -108,6 +107,7 @@ sub create_backup :Local :Args(0) {
     return unless $self->admin_auth->require_admin_access($c, 'create_backup');
     
     if ($c->req->method eq 'POST') {
+        
         my $backup_type = $c->req->param('backup_type') || 'manual';
         my $description = $c->req->param('description') || 'Manual backup';
         my $username = $c->session->{username} || 'unknown';
@@ -154,6 +154,7 @@ sub restore_backup :Local :Args(0) {
     return unless $self->admin_auth->require_admin_access($c, 'restore_backup');
     
     if ($c->req->method eq 'POST') {
+        
         my $backup_path = $c->req->param('backup_path');
         my $target_file = $c->req->param('target_file');
         
@@ -225,6 +226,7 @@ sub delete_backup :Local :Args(1) {
     return unless $self->admin_auth->require_admin_access($c, 'delete_backup');
     
     if ($c->req->method eq 'POST') {
+        
         my $confirm = $c->req->param('confirm');
         
         if ($confirm eq 'yes') {
@@ -294,6 +296,7 @@ sub create_database_backup :Local :Args(0) {
     return unless $self->admin_auth->require_admin_access($c, 'create_database_backup');
     
     if ($c->req->method eq 'POST') {
+        
         my $backup_type = $c->req->param('database_type') || 'all';  # 'all', 'ency', 'forager'
         my $compress = $c->req->param('compress') ? 1 : 0;
         my $username = $c->session->{username} || 'system';

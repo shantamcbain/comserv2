@@ -329,9 +329,12 @@ kubectl get pods                    # Query Kubernetes resources (if K8s-ready)<
         <div class="col-100">
             <h2 id="recent-changes" style="color: var(--text-color); font-family: var(--header-font);">Recent Changes</h2>
             <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>v1.02 (Mar 10, 2026):</strong> Added NFS Volume Management and Deployment Stability Fixes</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>v1.01 (Jan 1, 2026):</strong> Major consolidation update following Cleanup Agent Phase 3 completion</p>
             </div>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>✅ NFS Volume Management</strong> - Implemented "Recreate NFS Volumes" checkbox in Docker Management UI to resolve stale NFS mount issues by forcefully removing and recreating both log and workshop volumes on production server.</li>
+                <li><strong>✅ Deployment Stability Fixes</strong> - Fixed JSON.parse error in Auto Deploy by stringifying Path::Tiny objects in the Admin controller.</li>
                 <li><strong>✅ Centralized Agent Specifications</strong> - Docker Agent specifications now consolidated in /.zencoder/coding-standards.yaml (agents:docker section) as v1.0-STABLE</li>
                 <li><strong>✅ Removed Deprecated References</strong> - Deprecated .md files (docker-agent-role.md, etc.) removed from codebase Dec 31, 2025</li>
                 <li><strong>✅ Updated Authority References</strong> - This guide now points to coding-standards.yaml as authoritative source for agent specifications</li>
@@ -347,6 +350,7 @@ kubectl get pods                    # Query Kubernetes resources (if K8s-ready)<
             <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
                 <p><strong>Version History:</strong></p>
                 <ul style="color: var(--text-muted-color);">
+                    <li><strong>1.02</strong> (2026-03-10): Added NFS volume recreation feature to Docker UI; fixed JSON deployment error; updated docs.</li>
                     <li><strong>1.01</strong> (2026-01-01): Consolidated references to central coding-standards.yaml (v1.0-STABLE); removed deprecated .md file references; added Recent Changes section; updated agent specifications authority</li>
                     <li><strong>1.00</strong> (2025-12-13): Initial documentation moved from /.zencoder/rules/docker-agent-role.md to Documentation format (.tt file) for human accessibility</li>
                 </ul>

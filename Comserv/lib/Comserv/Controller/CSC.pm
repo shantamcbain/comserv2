@@ -98,6 +98,7 @@ sub email_test :Local :Args(0) {
     
     # If this is a form submission, process it
     if ($c->req->method eq 'POST') {
+        
         my $to = $c->req->params->{to};
         my $subject = $c->req->params->{subject} || 'Test Email from Comserv';
         my $message = $c->req->params->{message} || 'This is a test email from the Comserv system.';

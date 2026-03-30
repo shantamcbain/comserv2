@@ -10,6 +10,17 @@ __PACKAGE__->config(
     PLUGIN_BASE => 'Template::Plugin',
     PLUGINS     => { DateTime => {} },
     ENCODING => 'UTF-8',
+    FILTERS => {
+        js => sub {
+            my $text = shift;
+            $text =~ s/\\/\\\\/g;
+            $text =~ s/'/\\'/g;
+            $text =~ s/"/\\"/g;
+            $text =~ s/\n/\\n/g;
+            $text =~ s/\r/\\r/g;
+            return $text;
+        },
+    },
 );
 # Register the format_time filter
 $Template::Stash::SCALAR_OPS->{format_time} = sub {

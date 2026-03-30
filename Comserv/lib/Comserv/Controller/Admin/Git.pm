@@ -15,6 +15,11 @@ use JSON;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
+sub auto : Private {
+    my ( $self, $c ) = @_;
+    return 1;
+}
+
 =head1 NAME
 
 Comserv::Controller::Admin::Git - Git operations controller
@@ -88,6 +93,7 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
     
     # Check if this is a POST request (user confirmed the git pull)
     if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
+        
         my $selected_branch = $c->req->param('branch') || 'main';
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
@@ -340,6 +346,7 @@ sub safe_git_pull :Path('/admin/safe_git_pull') :Args(0) {
     
     # Check if this is a POST request (user confirmed the operation)
     if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
+        
         my $selected_branch = $c->req->param('branch') || 'main';
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'safe_git_pull', 
