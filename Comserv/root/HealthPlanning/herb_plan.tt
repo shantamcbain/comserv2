@@ -1,0 +1,54 @@
+<h2>Herb Prescription Plan</h2>
+<p><a href="/HealthPlanning/plan/[% plan.id %]">&larr; Back to Plan</a></p>
+
+[% IF plan %]
+<p>Herbs are the core of your healing protocol. Allopathic medicine is noted only as a fallback.</p>
+
+[% IF plan.herb_prescriptions && plan.herb_prescriptions.size %]
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Priority</th>
+            <th>Herb</th>
+            <th>Preparation</th>
+            <th>Dosage</th>
+            <th>Frequency</th>
+            <th>Duration</th>
+            <th>Notes</th>
+        </tr>
+    </thead>
+    <tbody>
+    [% FOREACH h IN plan.herb_prescriptions.sort('priority') %]
+        <tr>
+            <td>[% h.priority %]</td>
+            <td>
+                [% IF h.herb_record_id %]
+                    <a href="/ENCY/herb_detail/[% h.herb_record_id %]">[% h.herb_name | html %]</a>
+                [% ELSE %]
+                    [% h.herb_name | html %]
+                [% END %]
+            </td>
+            <td>[% h.preparation | html %]</td>
+            <td>[% h.dosage | html %]</td>
+            <td>[% h.frequency | html %]</td>
+            <td>[% IF h.duration_weeks %][% h.duration_weeks %] weeks[% END %]</td>
+            <td>[% h.notes | html %]</td>
+        </tr>
+    [% END %]
+    </tbody>
+</table>
+[% ELSE %]
+<p>No herb prescriptions have been added to this plan yet.</p>
+<p>Visit the <a href="/ENCY/BotanicalNameView">ENCY Herb Database</a> to explore herbs for your condition.</p>
+[% END %]
+
+[% IF plan.disease && plan.disease.allopathic_notes %]
+<div class="alert alert-secondary" style="margin-top:20px;">
+    <strong>Allopathic Fallback Notes:</strong><br>
+    [% plan.disease.allopathic_notes | html %]
+</div>
+[% END %]
+
+[% ELSE %]
+<p>Plan not found.</p>
+[% END %]
