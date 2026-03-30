@@ -23,6 +23,29 @@
     background-color: #28a745;
     color: white;
 }
+
+.card-issue-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    font-weight: bold;
+    margin-left: 8px;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+.card-issue-badge.has-issues {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffc107;
+}
+.card-issue-badge.no-issues {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #28a745;
+}
 </style>
 
 <div class="schema-compare-container">
@@ -537,6 +560,16 @@
 </div>
 
 <script>
+// Helper: handle 401/403 auth failures from AJAX calls — auto-redirect to login
+function handleFetchResponse(response) {
+    if (response.status === 401 || response.status === 403) {
+        const loginUrl = '[% c.uri_for("/user/login") %]?destination=' + encodeURIComponent(window.location.href);
+        window.location.href = loginUrl;
+        return Promise.reject(new Error('auth'));
+    }
+    return response.json();
+}
+
 // Function to refresh the comparison data
 function refreshComparison() {
     location.reload();
@@ -614,6 +647,51 @@ function toggleTableComparison(header) {
     }
 }
 
+// Count total comparison issues from a comparison object
+function countComparisonIssues(comparison) {
+    if (!comparison) return 0;
+    let count = 0;
+    if (!comparison.has_result_file) return 1;
+    if (comparison.differences) count += comparison.differences.length;
+    if (comparison.fields) {
+        for (const [, fieldData] of Object.entries(comparison.fields)) {
+            const t = fieldData.table;
+            const r = fieldData.result;
+            if (!t || !r) { count++; continue; }
+            if (
+                formatDataType(t.data_type) !== formatDataType(r.data_type) ||
+                formatSize(t.data_type, t.size) !== formatSize(r.data_type, r.size) ||
+                t.is_nullable !== r.is_nullable ||
+                t.is_auto_increment !== r.is_auto_increment ||
+                t.is_primary_key !== r.is_primary_key ||
+                t.default_value !== r.default_value
+            ) count++;
+        }
+    }
+    return count;
+}
+
+// Update (or insert) the issue-count badge on the card header
+function updateCardHeaderBadge(container, issueCount) {
+    const card = container.closest('.table-comparison-card');
+    if (!card) return;
+    const title = card.querySelector('.table-comparison-title');
+    if (!title) return;
+    let badge = title.querySelector('.card-issue-badge');
+    if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'card-issue-badge';
+        title.appendChild(badge);
+    }
+    if (issueCount > 0) {
+        badge.className = 'card-issue-badge has-issues';
+        badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + issueCount + ' issue' + (issueCount === 1 ? '' : 's');
+    } else {
+        badge.className = 'card-issue-badge no-issues';
+        badge.innerHTML = '<i class="fas fa-check"></i> OK';
+    }
+}
+
 // Load field comparison data via AJAX
 function loadFieldComparison(container, tableName, database) {
     // Check if this is an orphaned result file (no table expected)
@@ -673,19 +751,18 @@ function loadDetailedFieldComparison(container, tableName, database, tableSchema
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Log debug information
             if (data.debug) {
                 console.log('Field comparison debug:', data.debug);
             }
             container.innerHTML = buildFieldComparisonHTML(data.comparison, tableName, database, data.debug_mode);
+            updateCardHeaderBadge(container, countComparisonIssues(data.comparison));
         } else {
-            // Fallback to basic table schema display if field comparison fails
             console.log('Field comparison failed, falling back to basic schema display:', data.error);
             container.innerHTML = buildTableSchemaHTML(tableSchema, tableName, database);
+            updateCardHeaderBadge(container, 1);
         }
     })
     .catch(error => {
-        // Fallback to basic table schema display if field comparison fails
         console.log('Field comparison request failed, falling back to basic schema display:', error);
         container.innerHTML = buildTableSchemaHTML(tableSchema, tableName, database);
     });
@@ -1390,7 +1467,7 @@ function createTableFromResult(resultName, database) {
             database: database
         })
     })
-    .then(response => response.json())
+    .then(handleFetchResponse)
     .then(data => {
         if (data.success) {
             alert('Table created successfully!');
@@ -1400,6 +1477,7 @@ function createTableFromResult(resultName, database) {
         }
     })
     .catch(error => {
+        if (error.message && (error.message.includes('not logged in') || error.message.includes('Access denied'))) return;
         alert('Failed to create table. Please try again.');
     });
 }
@@ -1437,7 +1515,7 @@ function syncMetadataToResult(tableName, database, attribute, value, constraintN
         },
         body: JSON.stringify(body)
     })
-    .then(response => response.json())
+    .then(handleFetchResponse)
     .then(data => {
         if (data.success) {
             alert('Metadata updated in Result file successfully!');
@@ -1447,6 +1525,7 @@ function syncMetadataToResult(tableName, database, attribute, value, constraintN
         }
     })
     .catch(error => {
+        if (error.message && (error.message.includes('not logged in') || error.message.includes('Access denied'))) return;
         alert('Failed to update Result file. Please try again.');
     });
 }
@@ -1482,7 +1561,7 @@ function syncMetadataToTable(tableName, database, attribute, value, constraintNa
         },
         body: JSON.stringify(body)
     })
-    .then(response => response.json())
+    .then(handleFetchResponse)
     .then(data => {
         if (data.success) {
             alert('Table schema updated successfully!');
@@ -1492,6 +1571,7 @@ function syncMetadataToTable(tableName, database, attribute, value, constraintNa
         }
     })
     .catch(error => {
+        if (error.message && (error.message.includes('not logged in') || error.message.includes('Access denied'))) return;
         alert('Failed to update Table. Please try again.');
     });
 }
@@ -1524,9 +1604,7 @@ function createResultFromTable(tableName, database) {
         },
         body: JSON.stringify(requestData)
     })
-    .then(response => {
-        return response.json();
-    })
+    .then(handleFetchResponse)
     .then(data => {
         button.innerHTML = originalText;
         button.disabled = false;
@@ -1542,6 +1620,7 @@ function createResultFromTable(tableName, database) {
         }
     })
     .catch(error => {
+        if (error.message && (error.message.includes('not logged in') || error.message.includes('Access denied'))) return;
         console.error('Request failed:', error);
         button.innerHTML = originalText;
         button.disabled = false;
@@ -1575,7 +1654,7 @@ function syncTableToResult(tableName, database, fieldName, event) {
             database: database
         })
     })
-    .then(response => response.json())
+    .then(handleFetchResponse)
     .then(data => {
         if (button) {
             button.innerHTML = originalText;
@@ -1595,6 +1674,7 @@ function syncTableToResult(tableName, database, fieldName, event) {
             button.innerHTML = originalText;
             button.disabled = false;
         }
+        if (error.message && (error.message.includes('not logged in') || error.message.includes('Access denied'))) return;
         alert('Failed to synchronize field. Please try again.');
     });
 }
@@ -1625,7 +1705,7 @@ function syncResultToTable(tableName, database, fieldName, event) {
             database: database
         })
     })
-    .then(response => response.json())
+    .then(handleFetchResponse)
     .then(data => {
         if (button) {
             button.innerHTML = originalText;
@@ -1645,6 +1725,7 @@ function syncResultToTable(tableName, database, fieldName, event) {
             button.innerHTML = originalText;
             button.disabled = false;
         }
+        if (error.message && (error.message.includes('not logged in') || error.message.includes('Access denied'))) return;
         alert('Failed to synchronize field. Please try again.');
     });
 }

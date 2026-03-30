@@ -220,7 +220,7 @@ my @sql_files = $schema->resultset('CodeSearchIndex')->search({
                     <li><strong>blocks:</strong> Named template blocks (e.g., 'header', 'content', 'footer')</li>
                     <li><strong>macros:</strong> Template macros defined in file</li>
                     <li><strong>variables:</strong> Template variables (from META or definitions)</li>
-                    <li><strong>includes:</strong> Other templates included via [% INCLUDE %]</li>
+                    <li><strong>includes:</strong> Other templates included via &#91;% INCLUDE %&#93;</li>
                 </ul>
 
                 <h3>SQL File Elements</h3>

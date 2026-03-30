@@ -13,7 +13,80 @@
 [% END %]
 
 <div class="container">
-    
+
+[% IF single_conv %]
+    <!-- ── Single conversation detail view ── -->
+    <div class="ai-conversations-header-section">
+        <h1>[% single_conv.title | html %]</h1>
+        <p class="intro">
+            ID: [% single_conv.id %] &nbsp;|&nbsp;
+            Status: [% single_conv.status | html %] &nbsp;|&nbsp;
+            Created: [% single_conv.created_at %]
+        </p>
+        <a href="/ai/conversations" class="button button-secondary">← Back to Conversations</a>
+        <a href="/ai" class="button button-primary">New Chat</a>
+    </div>
+
+    <div class="ai-conversations-messages-section">
+        <div class="ai-conversations-messages-container" id="single-conv-messages">
+        [% FOREACH msg IN messages %]
+        <div class="ai-conversations-message" data-role="[% msg.role | html %]" data-msg-id="[% msg.id %]"
+             [% IF msg.role == 'assistant' && msg.metadata %]data-metadata="[% msg.metadata | html %]"[% END %]>
+            <div class="ai-conversations-message-header">
+                <span class="ai-conversations-message-role">[% msg.role == 'user' ? 'You' : 'AI' %]</span>
+                [% IF msg.model_used && msg.model_used != 'pending' %]
+                <span class="ai-conversations-message-model">([% msg.agent_type | html %] &bull; [% msg.model_used | html %])</span>
+                [% END %]
+                <span class="ai-conversations-message-time">[% USE date; date.format(msg.created_at, '%H:%M:%S') %]</span>
+            </div>
+            <div class="message-content">[% msg.content | html %]</div>
+        </div>
+        [% END %]
+        [% IF messages.size == 0 %]
+        <p>No messages in this conversation.</p>
+        [% END %]
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('#single-conv-messages .ai-conversations-message[data-metadata]').forEach(function(msgEl) {
+        try {
+            var rawMeta = msgEl.getAttribute('data-metadata');
+            if (!rawMeta) return;
+            var meta = JSON.parse(rawMeta);
+            var trace = meta.thinking_trace;
+            if (!trace || !trace.length) return;
+
+            var isError = trace.some(function(s) { return s && s.indexOf('FAILED') !== -1; });
+            var det = document.createElement('details');
+            det.className = 'conv-thinking' + (isError ? ' conv-thinking-error' : '');
+            det.open = true;
+
+            var sum = document.createElement('summary');
+            sum.textContent = (isError ? '⚠️ AI Thinking — Error Trace' : '🔍 AI Thinking') +
+                              ' (' + trace.length + ' steps)';
+            det.appendChild(sum);
+
+            var body = document.createElement('div');
+            body.className = 'conv-thinking-body';
+            trace.forEach(function(step) {
+                var s = document.createElement('div');
+                s.className = 'conv-thinking-step';
+                s.textContent = step;
+                body.appendChild(s);
+            });
+            det.appendChild(body);
+
+            var mc = msgEl.querySelector('.message-content');
+            if (mc) msgEl.insertBefore(det, mc);
+        } catch(e) { console.error('Thinking trace parse error:', e); }
+    });
+});
+</script>
+
+[% ELSE %]
+    <!-- ── Conversation list view ── -->
     <div class="ai-conversations-header-section">
         <h1>[% IF view_all %]All Conversations (Admin)[% ELSE %]My Conversations[% END %]</h1>
         <p class="intro">View and manage [% IF view_all %]all[% ELSE %]your[% END %] saved AI conversations</p>
@@ -125,7 +198,7 @@
                             <h3 class="ai-conversations-messages-title">Conversation Messages</h3>
                             <div class="ai-conversations-messages-container">
                                 [% FOREACH msg IN conv.messages %]
-                                <div class="ai-conversations-message" data-role="[% msg.role %]" data-msg-id="[% msg.id %]">
+                                <div class="ai-conversations-message" data-role="[% msg.role %]" data-msg-id="[% msg.id %]"[% IF msg.role == 'assistant' && msg.metadata %] data-metadata="[% msg.metadata | html %]"[% END %]>
                                     <div class="message-header">
                                         <span class="message-role [% msg.role == 'user' ? 'role-user' : 'role-assistant' %]">
                                             [% msg.role == 'user' ? 'User Prompt' : 'AI Response' %]
@@ -699,6 +772,50 @@
     flex-wrap: wrap;
 }
 
+/* Thinking trace inside conversation history */
+.conv-thinking {
+    margin: var(--spacing-small) 0;
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--link-color);
+    border-radius: 3px;
+    background-color: var(--background-color);
+    font-size: 0.85em;
+}
+
+.conv-thinking summary {
+    padding: 4px 8px;
+    cursor: pointer;
+    color: var(--link-color);
+    font-weight: 600;
+    user-select: none;
+}
+
+.conv-thinking summary:hover {
+    background-color: var(--secondary-color);
+}
+
+.conv-thinking-body {
+    padding: var(--spacing-small);
+    border-top: 1px solid var(--border-color);
+}
+
+.conv-thinking-step {
+    padding: 3px 4px;
+    color: var(--text-color);
+    font-family: monospace;
+    font-size: 0.9em;
+    border-bottom: 1px solid var(--border-color);
+    word-break: break-word;
+}
+
+.conv-thinking-step:last-child {
+    border-bottom: none;
+}
+
+.conv-thinking-error .conv-thinking-step {
+    color: var(--danger-color, #c00);
+}
+
 /* Responsive adjustments */
 @media (max-width: 1024px) {
     .ai-conversations-item-user {
@@ -763,13 +880,48 @@ document.addEventListener('DOMContentLoaded', function() {
             // Format message contents when expanded for the first time
             if (!isExpanded && !details.getAttribute('data-formatted')) {
                 details.querySelectorAll('.message-content').forEach(el => {
-                    // Use a temporary div to get raw text if it was already somewhat processed
                     const rawContent = el.getAttribute('data-raw-content') || el.textContent.trim();
                     if (!el.getAttribute('data-raw-content')) {
                         el.setAttribute('data-raw-content', rawContent);
                     }
                     el.innerHTML = AIUtils.formatMessageContent(rawContent);
                 });
+
+                // Render thinking_trace from metadata for assistant messages
+                details.querySelectorAll('.ai-conversations-message[data-role="assistant"][data-metadata]').forEach(function(msgEl) {
+                    try {
+                        var rawMeta = msgEl.getAttribute('data-metadata');
+                        if (!rawMeta) return;
+                        var meta = JSON.parse(rawMeta);
+                        var trace = meta.thinking_trace;
+                        if (!trace || !trace.length) return;
+
+                        var isError = trace.some(function(s) { return s && s.indexOf('FAILED') !== -1; });
+
+                        var det = document.createElement('details');
+                        det.className = 'conv-thinking' + (isError ? ' conv-thinking-error' : '');
+
+                        var sum = document.createElement('summary');
+                        sum.textContent = (isError ? '⚠️ AI Thinking — Error Trace' : '🔍 AI Thinking') +
+                                          ' (' + trace.length + ' steps)';
+                        det.appendChild(sum);
+
+                        var body = document.createElement('div');
+                        body.className = 'conv-thinking-body';
+                        trace.forEach(function(step) {
+                            var s = document.createElement('div');
+                            s.className = 'conv-thinking-step';
+                            s.textContent = step;
+                            body.appendChild(s);
+                        });
+                        det.appendChild(body);
+
+                        var mc = msgEl.querySelector('.message-content');
+                        if (mc) msgEl.insertBefore(det, mc);
+                        msgEl.removeAttribute('data-metadata');
+                    } catch(e) { }
+                });
+
                 details.setAttribute('data-formatted', 'true');
             }
         });
@@ -786,3 +938,4 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+[% END %]

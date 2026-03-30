@@ -1,0 +1,25 @@
+[% PageVersion = 'Comserv/root/Documentation/Documentation_System.tt,v 1.0 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+// Patch: add note about incremental patch application
+<!-- Patch plan: document incremental updates in a dedicated changelog entry -->
+
+<!-- Documentation System Architecture overview updated to reflect metadata-driven approach -->
+
+[% META title = 'Documentation System Architecture' %]
+
+<div class="documentation-content">
+
+<div class="markdown-content">
+
+# Documentation System Architecture
+
+## Overview
+
+The Comserv Documentation system is a **pure directory-based system** that automatically organizes and serves documentation based on file placement and naming conventions. No JSON configuration files are required for basic operation.
+
+## Core Architecture
+
+### Directory-Based Organization

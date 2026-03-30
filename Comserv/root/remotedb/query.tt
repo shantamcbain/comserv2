@@ -1,4 +1,5 @@
-[% META title = 'Run Query on ' _ conn_name %]
+[% META title = 'Run Query on ' %]
+[% title = 'Run Query on ' _ conn_name %]
 
 <div class="container">
     <h1>Run SQL Query</h1>
