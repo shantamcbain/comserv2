@@ -1,0 +1,131 @@
+[% META
+   title = "Email Send Detail"
+   description = "Per-address delivery report for a workshop email send"
+   roles = "admin,workshop_leader"
+   TemplateType = "Application"
+   category = "WorkShops"
+   page_version = "0.01"
+   last_updated = "2026-03-22"
+%]
+
+[% PageVersion = 'WorkShops/EmailDetail.tt,v 0.01 2026/03/22 AI Exp AI' %]
+[% IF c.session.debug_mode == 1 %]
+    <div class="debug-info">PageVersion: [% PageVersion %]</div>
+[% END %]
+
+<div class="app-container">
+
+    <div class="page-header">
+        <h1>Email Delivery Report</h1>
+        <h2 class="page-subtitle">Workshop: [% workshop.title | html %]</h2>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+
+            [% IF c.flash.error_msg %]
+            <div class="error">[% c.flash.error_msg | html %]</div>
+            [% END %]
+
+            <div class="content-section">
+                <table class="data-table" style="width:auto;">
+                    <tr><th>Subject</th><td>[% email_record.subject | html %]</td></tr>
+                    <tr><th>Sent at</th><td>[% email_record.sent_at %]</td></tr>
+                    <tr><th>Sent by</th><td>[% email_record.sender.username || 'Unknown' | html %]</td></tr>
+                    <tr><th>Status</th><td>
+                        [% IF email_record.status == 'sent' %]
+                            <span class="success">&#10003; Sent</span>
+                        [% ELSIF email_record.status == 'failed' %]
+                            <span class="error">&#10007; Failed</span>
+                        [% ELSIF email_record.status == 'partial' %]
+                            <span class="warning">&#9888; Partial</span>
+                        [% ELSE %]
+                            [% email_record.status | html %]
+                        [% END %]
+                    </td></tr>
+                    <tr><th>Delivered</th><td>[% sent_recipients.size %]</td></tr>
+                    <tr><th>Failed</th><td>[% failed_recipients.size %]</td></tr>
+                </table>
+            </div>
+
+            [% IF sent_recipients.size > 0 %]
+            <div class="content-section">
+                <h3>&#10003; Delivered ([% sent_recipients.size %])</h3>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Name</th>
+                                <th>Email Address</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% n = 0 %]
+                            [% FOREACH r IN sent_recipients %]
+                            [% n = n + 1 %]
+                            <tr>
+                                <td>[% n %]</td>
+                                <td>[% r.name || '—' | html %]</td>
+                                <td>[% r.email | html %]</td>
+                            </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            [% END %]
+
+            [% IF failed_recipients.size > 0 %]
+            <div class="content-section">
+                <h3>&#10007; Failed ([% failed_recipients.size %])</h3>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Name</th>
+                                <th>Email Address</th>
+                                <th>Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% n = 0 %]
+                            [% FOREACH r IN failed_recipients %]
+                            [% n = n + 1 %]
+                            <tr>
+                                <td>[% n %]</td>
+                                <td>[% r.name || '—' | html %]</td>
+                                <td>[% r.email | html %]</td>
+                                <td class="error">[% r.error | html %]</td>
+                            </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            [% END %]
+
+            [% IF sent_recipients.size == 0 && failed_recipients.size == 0 %]
+            <div class="content-section">
+                <p class="empty-state">No per-address delivery data recorded for this send.<br>
+                Only sends made after the delivery tracking upgrade will show individual addresses.</p>
+            </div>
+            [% END %]
+
+            <div class="content-section">
+                <h3>Message Body</h3>
+                <pre style="white-space:pre-wrap;background:#f5f5f5;padding:12px;border:1px solid #ddd;border-radius:4px;">[% email_record.body | html %]</pre>
+            </div>
+
+            <div class="page-footer">
+                <div class="footer-actions">
+                    <a href="/workshop/email_history/[% workshop.id %]" class="btn btn-secondary">Back to Email History</a>
+                    <a href="/workshop/details?id=[% workshop.id %]" class="btn btn-secondary">Back to Workshop</a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>

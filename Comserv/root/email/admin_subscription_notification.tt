@@ -1,0 +1,35 @@
+[% PageVersion = 'email/admin_subscription_notification.tt,v 0.01 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h2>User Mailing List Subscription Changes</h2>
+
+<p>A user has updated their mailing list subscriptions in the [% site_name || 'Comserv' %] system:</p>
+
+<ul>
+    <li><strong>Username:</strong> [% username %]</li>
+    <li><strong>Name:</strong> [% first_name %] [% last_name %]</li>
+    <li><strong>Email:</strong> [% email %]</li>
+    <li><strong>Updated at:</strong> [% updated_at %]</li>
+</ul>
+
+[% IF new_subscriptions && new_subscriptions.size > 0 %]
+<h3>New Subscriptions:</h3>
+<ul>
+    [% FOREACH list_name IN new_subscriptions %]
+    <li>[% list_name | html %]</li>
+    [% END %]
+</ul>
+[% END %]
+
+[% IF removed_subscriptions && removed_subscriptions.size > 0 %]
+<h3>Removed Subscriptions:</h3>
+<ul>
+    [% FOREACH list_name IN removed_subscriptions %]
+    <li>[% list_name | html %]</li>
+    [% END %]
+</ul>
+[% END %]
+
+<p>This is an automated notification. No action is required.</p>

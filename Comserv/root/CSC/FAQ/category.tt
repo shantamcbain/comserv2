@@ -15,32 +15,16 @@
 [% END %]
 
 <div class="faq-container">
-    [% # Define category information based on category_id %]
-    [% 
-        SWITCH category_id;
-            CASE '1';
-                category_name = 'Account Management';
-                category_icon = 'icon-account';
-            CASE '2';
-                category_name = 'Site Configuration';
-                category_icon = 'icon-site';
-            CASE '3';
-                category_name = 'Email System';
-                category_icon = 'icon-mail';
-            CASE '4';
-                category_name = 'Hosting Services';
-                category_icon = 'icon-hosting';
-            CASE '5';
-                category_name = 'Billing & Payments';
-                category_icon = 'icon-billing';
-            CASE '6';
-                category_name = 'Technical Issues';
-                category_icon = 'icon-technical';
-            DEFAULT;
-                category_name = 'Unknown Category';
-                category_icon = 'icon-question';
-        END;
-    %]
+    [%- # Define category information based on category_id -%]
+    [% SWITCH category_id %]
+    [% CASE '1' %][% category_name = 'Account Management';  category_icon = 'icon-account' %]
+    [% CASE '2' %][% category_name = 'Site Configuration';  category_icon = 'icon-site' %]
+    [% CASE '3' %][% category_name = 'Email System';        category_icon = 'icon-mail' %]
+    [% CASE '4' %][% category_name = 'Hosting Services';    category_icon = 'icon-hosting' %]
+    [% CASE '5' %][% category_name = 'Billing & Payments';  category_icon = 'icon-billing' %]
+    [% CASE '6' %][% category_name = 'Technical Issues';    category_icon = 'icon-technical' %]
+    [% CASE    %][% category_name = 'Unknown Category';     category_icon = 'icon-question' %]
+    [% END %]
 
     <div class="category-header">
         <a href="/faq" class="back-link">&larr; Back to All Categories</a>
@@ -157,7 +141,7 @@
                     </div>
                 </div>
                 
-            [% DEFAULT %]
+            [% CASE %]
                 <div class="faq-message">
                     <p>FAQs for this category are coming soon. Please check back later or contact support if you have specific questions.</p>
                 </div>

@@ -163,12 +163,9 @@ sub honey :Path('/BMaster/honey') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'honey', "BMaster honey method called");
     push @{$c->stash->{debug_errors}}, "BMaster honey method called";
 
-    # Set up a placeholder page
     $c->stash(
-        title => 'Honey Production',
-        message => 'The Honey Production system is currently under development. Please check back soon.',
-        template => 'BMaster/placeholder.tt',
-        debug_msg => "Honey Production - Under Development"
+        template => 'BMaster/honey.tt',
+        debug_msg => "Honey Production"
     );
 }
 
@@ -181,12 +178,9 @@ sub environment :Path('/BMaster/environment') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'environment', "BMaster environment method called");
     push @{$c->stash->{debug_errors}}, "BMaster environment method called";
 
-    # Set up a placeholder page
     $c->stash(
-        title => 'Environmental Considerations',
-        message => 'The Environmental Considerations system is currently under development. Please check back soon.',
-        template => 'BMaster/placeholder.tt',
-        debug_msg => "Environmental Considerations - Under Development"
+        template => 'BMaster/environment.tt',
+        debug_msg => "Environmental Considerations"
     );
 }
 
@@ -199,12 +193,9 @@ sub education :Path('/BMaster/education') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'education', "BMaster education method called");
     push @{$c->stash->{debug_errors}}, "BMaster education method called";
 
-    # Set up a placeholder page
     $c->stash(
-        title => 'Education and Collaboration',
-        message => 'The Education and Collaboration system is currently under development. Please check back soon.',
-        template => 'BMaster/placeholder.tt',
-        debug_msg => "Education and Collaboration - Under Development"
+        template => 'BMaster/education.tt',
+        debug_msg => "Education and Collaboration"
     );
 }
 

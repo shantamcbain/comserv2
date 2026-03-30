@@ -30,6 +30,10 @@
 
     <div class="error-actions">
         <a href="[% c.uri_for('/') %]" class="btn btn-primary">Return to Home</a>
+        
+        [% IF c.session.roles.grep('admin').size %]
+        <a href="[% c.uri_for('/admin') %]" class="btn btn-warning">Return to Admin Dashboard</a>
+        [% END %]
 
         [% IF c.session.debug_mode %]
         <a href="javascript:history.back()" class="btn btn-secondary">Go Back</a>
