@@ -19,6 +19,12 @@ branches:
     application_url: "http://workstation.local:4003"
     api_url: "http://api.workstation.local:4003"
 
+  inventory-system-104a:
+    name: "Inventory System"
+    description: "Inventory management system — items, stock levels, suppliers, locations, transactions, purchase orders"
+    application_url: "http://workstation.local:4003"
+    api_url: "http://api.workstation.local:4003"
+
   # Add other branches as needed
   # branch-name:
   #   application_url: "http://workstation.local:PORT"
