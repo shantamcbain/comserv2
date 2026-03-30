@@ -238,6 +238,7 @@ document.addEventListener('DOMContentLoaded', function() {
         [% IF is_admin %]
             [% INCLUDE 'Navigation/admintopmenu.tt' %]
         [% END %]
+        [% INCLUDE 'Navigation/TopDropListPlanning.tt' %]
         [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
         [% INCLUDE 'Navigation/TopDropListWorkshop.tt' %]
         </ul>
