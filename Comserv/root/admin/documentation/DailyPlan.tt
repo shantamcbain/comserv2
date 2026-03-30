@@ -175,6 +175,24 @@
     <div id="today-work" class="tab-content active">
         <div id="today-work-content">
 
+            [%# ── Cross-project blocker alert ── %]
+            [% IF active_blockers && active_blockers.size %]
+            <div style="background:color-mix(in srgb,#dc3545 8%,var(--bg-color));border:1px solid #dc3545;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:0.85em;">
+                <div style="font-weight:bold;color:#dc3545;margin-bottom:6px;">🔒 [% active_blockers.size %] cross-project block[% active_blockers.size > 1 ? 's' : '' %] affecting today's priorities</div>
+                [% FOREACH ab IN active_blockers %]
+                <div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid color-mix(in srgb,#dc3545 20%,var(--bg-color));">
+                    <span style="color:var(--primary-color);font-weight:bold;">[% ab.project_name %]</span>
+                    <span style="color:var(--text-muted-color);">is blocking</span>
+                    <span style="font-weight:bold;">[% ab.depends_on_name %]</span>
+                    [% IF ab.description %]<span style="color:var(--text-muted-color);">— [% ab.description | truncate(60) %]</span>[% END %]
+                </div>
+                [% END %]
+                <div style="margin-top:6px;">
+                    <a href="/project/dependency_form" style="font-size:0.85em;color:#dc3545;">Manage dependencies →</a>
+                </div>
+            </div>
+            [% END %]
+
             [%# ── CURRENT ACTIVE PRIORITIES (DB-driven, role/site/user scoped) ── %]
             <div style="margin-bottom:24px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--primary-color);">
@@ -237,6 +255,11 @@
                             [%# Blocking badge %]
                             [% IF ap.is_blocking %]
                             <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#dc3545;color:#fff;" title="Other tasks depend on this">🔒 BLOCKING</span>
+                            [% END %]
+
+                            [%# Cross-project blocker badge %]
+                            [% IF ap.is_cross_blocker %]
+                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#6f42c1;color:#fff;" title="This project is blocking [% ap.blocking_count %] other project[% ap.blocking_count > 1 ? 's' : '' %] — resolve first">🔗 PROJ-BLOCKER ×[% ap.blocking_count %]</span>
                             [% END %]
 
                             [%# Blocked badge %]
