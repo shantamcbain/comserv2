@@ -58,16 +58,6 @@ __PACKAGE__->add_columns(id => {
         data_type => 'tinyint',
         default_value => 1,
     },
-    display_name => {
-        data_type => 'varchar(255)',
-        size => 255,
-        is_nullable => 1,
-    },
-    email => {
-        data_type => 'varchar(255)',
-        size => 255,
-        is_nullable => 1,
-    }
 );
 
 __PACKAGE__->set_primary_key('id');
