@@ -5696,10 +5696,24 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     }
 
     my $ssh_target   = $c->req->params->{ssh_target}   || 'ubuntu@192.168.1.126';
-    my $ssh_password = $c->req->params->{ssh_password} || '';
+    my $form_password = $c->req->params->{ssh_password} || '';
+
+    my $ssh_password = '';
+    my $creds_file = ($ENV{HOME} || '/home/shanta') . '/.comserv/secrets/ssh_credentials.json';
+    if (-f $creds_file && open my $cf, '<', $creds_file) {
+        local $/;
+        my $json = <$cf>;
+        close $cf;
+        my $creds = eval { decode_json($json) };
+        if ($creds && $creds->{ssh_password}) {
+            $ssh_password = $creds->{ssh_password};
+            $ssh_target   = $creds->{ssh_target} if $creds->{ssh_target};
+        }
+    }
+    $ssh_password ||= $form_password;
 
     if (!$ssh_password) {
-        $c->response->body('{"success": false, "error": "SSH password required to trigger production deploy"}');
+        $c->response->body('{"success": false, "error": "SSH password required — use Test Connection to save credentials first"}');
         $c->response->content_type('application/json');
         return;
     }
