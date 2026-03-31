@@ -1,11 +1,10 @@
 services:
   web-prod:
-    build:
-      context: .
-      dockerfile: Dockerfile
     image: shantamcsbain/comserv-web-prod:latest
-    container_name: comserv-web-prod
+    container_name: comserv2-web-prod
     restart: unless-stopped
+    ports:
+      - "5000:3000"
     environment:
       CATALYST_ENV: production
       CATALYST_DEBUG: 0
@@ -14,15 +13,10 @@ services:
       WORKSHOP_RESOURCES_PATH: /data/nfs
       COMSERV_SESSION_DIR: /tmp/comserv/session
       COMSERV_SESSION_COOKIE: comserv_session
-      DB_HOST: ${DB_HOST:-192.168.1.198}
-      DB_PORT: ${DB_PORT:-3306}
-      DB_NAME: ${DB_NAME:-ency}
-    ports:
-      - "5000:3000"
     volumes:
-      - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
-      - /home/shanta/comserv-logs:/opt/comserv/root/log
-      - /home/shanta/comserv-workshop:/data/nfs:rw
+      - /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro
+      - /home/ubuntu/comserv-logs:/opt/comserv/root/log
+      - /home/ubuntu/comserv-workshop:/data/nfs:rw
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
