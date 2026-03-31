@@ -1682,6 +1682,7 @@ sub network_devices_forward :Path('/admin/network_devices_old') :Args(0) {
 # Database Schema Comparison functionality (with alias)
 sub compare_schema :Path('/admin/compare_schema') :Args(0) {
     my ($self, $c) = @_;
+    $c->stash(template => 'admin/schema_compare.tt');
     $c->forward('schema_compare');
 }
 
