@@ -1,166 +1,99 @@
-[% ViewVersion = 'v 0.03 2024/05/01 /cgi-bin/HTMLTemplates/Shanta/VE7TITHome.ttml,'%]
-[%# ViewVersion = 'v 0.02 2022/11/11 /cgi-bin/HTMLTemplates/Shanta/VE7TITHome.ttml,'%]
-[%# ViewVersion = 'v 0.01 2022/11/07 /cgi-bin/HTMLTemplates/Shanta/VE7TITHome.ttml,'%]
+[% PageVersion = 'Shanta/ve7tit.tt,v 0.04 2026/03/17 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
+<div class="app-container">
 
+    [% IF username == 'Shanta' %]
+    <div class="app-section">
+        <h2>Welcome, [% firstname %]!</h2>
+        <p><a href="/todo">My Todo List</a></p>
+    </div>
+    [% ELSIF username %]
+    <div class="app-section">
+        <h3>Hello [% firstname %] [% lastname %]! Welcome to VE7TIT Shack!</h3>
+    </div>
+    [% END %]
 
-[% IF data.debug == 1 %]
- [%	ViewVersion %]
-[% END %]
+    <div class="app-section">
+        <p>We are proud to sponsor <a href="https://usbm.ca" target="_blank">The Universal School of Biological Life Site</a>.</p>
+    </div>
 
-[% embed('ErrorDisplayView') %]
+    <div class="app-section">
+        <h3>Our Current List of Equipment</h3>
 
+        <h4>Radio Equipment</h4>
+        <ul>
+            <li><a href="/Documentation/FT-897">Yaesu HT/VHF/UHF all mode transceiver FT-897</a></li>
+            <li><a href="/Documentation/FT-891">Yaesu HT/50MHz transceiver FT-891</a></li>
+            <li><a href="/Documentation/Baofeng">Baofeng</a> — only used for back-country work as they transmit too widely and will interfere with another radio on nearby frequencies.</li>
+            <li><a href="/Documentation/IC-2at">ICOM IC-2AT</a></li>
+            <li><a href="/Documentation/IC-H10">ICOM IC-H10</a></li>
+            <li><a href="/Documentation/IC-F3-2">ICOM IC-F3-2</a></li>
+            <li><a href="/Documentation/TaitTP8110B-B100">Tait TP8110B-B100</a></li>
+        </ul>
 
+        <h4>Antenna Equipment</h4>
+        <ul>
+            <li><a href="/Documentation/Z-100Plus">Z-100Plus Autotuner</a></li>
+            <li><a href="/Documentation/WolfriverCoil">Wolfriver Coil Antenna</a></li>
+        </ul>
 
- <table cellpadding="0" cellspacing="0" border="0" align="left" width="100%">
-<tr align="left">
-<td align="left" >
+        <h4>Test Equipment</h4>
+        <ul>
+            <li><a href="/Documentation/NanoVNA">NanoVNA-H Network Analyzer</a></li>
+            <li><a href="/Documentation/HeathkitIM-2410">Heathkit Digital Frequency Counter IM-2410</a></li>
+            <li><a href="/Documentation/Textronixtype422">Tektronix Type 422 Oscilloscope</a></li>
+            <li><a href="/Documentation/BKModle2050">B&amp;K Model 2050 RF Generator</a></li>
+        </ul>
 
-[% IF username == 'Shanta' %]
+        <h4>Modes of Operation</h4>
+        <ul>
+            <li><a href="/Documentation/CW">CW</a></li>
+            <li><a href="/Documentation/DigitalModes">Digital Modes</a>
+                <ul>
+                    <li><a href="/Documentation/SignalinkUSB">SignaLink USB Integrated USB Sound Card</a></li>
+                </ul>
+            </li>
+            <li><a href="/Documentation/Voice">Voice communications</a></li>
+        </ul>
 
-[% embed(todolistview) %]
+        <h4>Electronics</h4>
+        <ul>
+            <li><a href="/Documentation/Electronics">Electronics</a></li>
+        </ul>
 
-<h2>Key navigation links.</h2>
-<ul>
-   	<li><a href="https://usbm.ca/" target="_blank">USBM</a> Universal school of
-   	Biological Life.</li>
-</ul>
+        <h4>Programming</h4>
+        <ul>
+            <li><a href="/Documentation/NodeRedHam">Node-RED</a></li>
+            <li><a href="/Documentation/Perl">Perl</a></li>
+            <li><a href="/Documentation/Python">Python</a></li>
+        </ul>
 
+        <h4>Programs</h4>
+        <ul>
+            <li><a href="/Documentation/WSJTXFieldDays">WSJTX</a></li>
+        </ul>
 
-[% ELSE %]
+        <h4>Activities</h4>
+        <ul>
+            <li><a href="/Documentation/FieldDays">Field Days</a></li>
+        </ul>
 
-	[% IF username %]
+        <h4>Power</h4>
+        <ul>
+            <li><a href="/Documentation/Power">Everything needs Power</a></li>
+        </ul>
 
+        <h4>Restoration Projects</h4>
+        <ul>
+            <li><a href="/Documentation/Hallicrafters-S-40A">Hallicrafters S-40A</a></li>
+            <li><a href="/Documentation/HeathkitVTVMIM-11">Heathkit VTVM IM-11</a></li>
+        </ul>
+    </div>
 
-<h3 > Hello  [% firstname%]  [% lastname%]! Welcome to VE7TIT Shack!</h3>
+    <div class="app-section">
+        <p><a href="https://helpdesk.computersystemconsulting.ca" target="_blank">HelpDesk</a></p>
+        [% IF data.site_last_update %]<p>Last Updated: [% data.site_last_update %]</p>[% END %]
+    </div>
 
-
-	[% END %]
-
-
-
-
-
-<p>We are proud to sponsor <a href="https://usbm.ca" target="_blank" name="Universal School of Biological Life" title="Click here to see details.">The Universal School of Biological Life Site</a>.</p>
-<br>
-<br>
-
-
-
-[% END %]
-<h3>Our Current list of equipment.</h3>
-<h4>Radio Equipment:</h4>
-<ul>
- <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=FT-897"
- >Yaesu HT/VHF/UHF all mode
- transceiver FT-897</a>
- </li>
- <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=FT-891"
- >Yaesu HT/50MHz transceiver FT-891</a>
- </li>
- <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=Baofeg"
- >Baofeng</a> only used for back-country work as they transmit too widely and will interfere with another radio on
- nearby frequency's.
- </li>
-  <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=IC-2at"
- >ICOM IC-2AT </a>
- </li>
- <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=IC-H10"
- >ICOM IC-h10</a>
- </li>
- <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=IC-F3-2"
- >ICOM IC-F3-2 </a>
-  <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=TaitTP8110B-B100"
- >Tait TP8110B-B100</a>
- </li>
-
- </ul>
-<h4>Antenna Equipment:</h4>
-<ul>
-<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=Z-100Plus"
- >Z-100Plus Autotuner </a>
- </li>
-
- <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=WolfriverCoil"
- >Wolfriver Coil Antenna</a>
- </li>
-</ul>
-<h4>Test Equipment:</h4>
-<ul>
-<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=NanoVNA"
- >NanoVNS -H Network Analyzer</a>
- </li>
-<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=HeathkitIM-2410"
- >Heathkit Digital frequency counter IM-2410</a>
- </li> <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=Textronixtype422"
- >Textronix type 422 Oscilloscope</a>
- </li>
-<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=BKModle2050"
- >B&K Model 2050 RF Generator.</a>
-</ul>
-
-
-<h4>Modes of operation:</h4>
-<ul>
- <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=CW">CW</a></li>
- <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=DigitalModes">Digital Modes</a>
-    <ul>
-   <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=SignalinkUSB"
- >SignaLink USB Integrated USB Sound Card</a>
- </li>
-  </ul>
- <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=Voice">Voice communications</a></li>
-</ul>
-
-<h4>Electronics:</h4>
-
-<ul>
- <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=Electronics">Electronics
- .</a></li>
-</ul>
-<h4>Programing:</h4>
-
-<ul>
- <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=NodeRedHam">Nodered</a></li>
- <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=Perl">Perl</a></li>
- <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=Python">Python</a></li>
-</ul>
-
-<h4>Programs:</h4>
-<ul>
-  <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=WSJTXFieldDays">WSJTX</a></li>
-</ul>
-<h4>Activities:</h4>
-<ul>
-  <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=FieldDays">Field Days</a></li>
-</ul>
-<h4>Power:</h4>
-<ul>
-<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=Power">Every thing needs Power</a></li>
-</ul>
-<h4>Restoration projects:</h4>
-<ul>
-<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=Hallicrafters-S-40A">Hallicrafters
- S-40A</a></li>
- <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=HeathkitVTVMIM-11">Heathkit VTVM IM-11</a></li>
-
-</ul>
-<br>
-<br>
-<p>
-<a href="https://helpdesk.computersystemconsulting.ca" target="_Blank" > HelpDesk</a>
-
-<p>Last Updated: [% data.site_last_update %]
-
-
-[% embed('CSCCopyRight') %]
-
-
-
-</td>
-</tr>
-</table>
-
-
-[%# embed(data.page_bottom_view) %]
-
+</div>

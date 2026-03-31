@@ -79,8 +79,8 @@ has 'endpoint' => (
 has 'model' => (
     is => 'rw',
     isa => 'Str',
-    default => 'grok-beta',
-    documentation => 'Grok model to use (default: grok-beta)'
+    default => 'grok-3-mini',
+    documentation => 'Grok model to use (default: grok-3-mini)'
 );
 
 has 'timeout' => (
@@ -184,8 +184,8 @@ sub _load_api_key {
         return $ENV{GROK_API_KEY};
     }
     
-    my $error = "Grok API key not found in K8s secret or GROK_API_KEY env var";
-    $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_load_api_key', $error);
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_load_api_key',
+        "Grok API key not found in K8s secret or GROK_API_KEY env var (expected when key is DB-managed)");
     return '';
 }
 
@@ -306,8 +306,10 @@ sub chat {
         return undef;
     }
     
+    my $use_search = $args{use_search} || 0;
+    
     $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'chat',
-        "Querying Grok Chat API with model: " . $self->model . ", messages: " . scalar(@$messages));
+        "Querying Grok Chat API with model: " . $self->model . ", messages: " . scalar(@$messages) . ", web_search: $use_search");
     
     # Build the request payload
     my $payload = {
@@ -316,6 +318,17 @@ sub chat {
         temperature => $self->temperature,
         max_tokens => $self->max_tokens,
     };
+    
+    # Enable xAI live web search when requested
+    # xAI search_parameters: mode "on" = always search, "auto" = model decides, "off" = never
+    if ($use_search) {
+        $payload->{search_parameters} = {
+            mode            => 'auto',
+            return_citations => JSON::true,
+        };
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'chat',
+            "Web search enabled (mode=auto, return_citations=true)");
+    }
     
     return $self->_send_request($payload, 'chat');
 }
@@ -416,6 +429,12 @@ sub _send_request {
         # Add specific handling for common HTTP errors
         if ($status =~ /401|403/) {
             $error = "Grok API authentication failed. Check your API key.";
+        } elsif ($status =~ /410/) {
+            $error = "Grok model '" . ($payload->{model} || 'unknown') . "' is no longer available (410 Gone). "
+                   . "Please select a different model such as grok-3-mini or grok-3.";
+        } elsif ($status =~ /404/) {
+            $error = "Grok model '" . ($payload->{model} || 'unknown') . "' not found (404). "
+                   . "Please sync models and select an available one.";
         } elsif ($status =~ /429/) {
             $error = "Grok API rate limited. Please try again later.";
         } elsif ($status =~ /503/) {
@@ -441,12 +460,25 @@ sub _send_request {
             }
         }
         
+        # Extract citations if web search was used
+        my @citations;
+        if ($data->{citations} && ref($data->{citations}) eq 'ARRAY') {
+            @citations = @{$data->{citations}};
+        } elsif ($data->{choices} && ref($data->{choices}) eq 'ARRAY' && @{$data->{choices}}) {
+            my $choice = $data->{choices}->[0];
+            if ($choice->{finish_reason} && $choice->{search_results}) {
+                @citations = map { { url => $_->{url}, title => $_->{title} } }
+                    grep { $_->{url} } @{$choice->{search_results}};
+            }
+        }
+        
         $result = {
-            success => 1,
-            response => $response_text,
-            model => $self->model,
+            success    => 1,
+            response   => $response_text,
+            model      => $data->{model} || $self->model,
             created_at => $data->{created_at} || '',
-            usage => $data->{usage} || {},
+            usage      => $data->{usage} || {},
+            citations  => \@citations,
         };
     } catch {
         my $error = "Failed to parse Grok API response: $_";

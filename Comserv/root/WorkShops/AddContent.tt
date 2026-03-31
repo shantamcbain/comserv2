@@ -33,11 +33,8 @@
             [% END %]
             
             <div class="form-container">
-                <form method="POST" action="[% IF content %]/workshop/edit_content[% ELSE %]/workshop/add_content[% END %]" class="app-form">
-                    <input type="hidden" name="workshop_id" value="[% workshop.id %]">
-                    [% IF content %]
-                    <input type="hidden" name="content_id" value="[% content.id %]">
-                    [% END %]
+                <form method="POST" action="[% IF content %]/workshop/edit_content/[% content.id %][% ELSE %]/workshop/add_content/[% workshop.id %][% END %]" class="app-form">
+                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                     
                     <div class="form-section">
                         <h3>Content Information</h3>
@@ -86,7 +83,7 @@
                     
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary">[% IF content %]Update[% ELSE %]Add[% END %] Content</button>
-                        <a href="/workshop/content?workshop_id=[% workshop.id %]" class="btn btn-secondary">Cancel</a>
+                        <a href="/workshop/content/[% workshop.id %]" class="btn btn-secondary">Cancel</a>
                     </div>
                     
                 </form>

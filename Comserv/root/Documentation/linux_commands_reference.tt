@@ -1,0 +1,323 @@
+[% PageVersion = 'Comserv/root/Documentation/linux_commands_reference.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Linux Commands Reference' %]
+
+<!-- Documentation page for linux_commands_reference -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Last Updated:** May 31, 2025  
+
+**Author:** Shanta  
+
+**Status:** Active
+
+
+
+<h2>Overview</h2>
+
+
+
+The Linux Commands Reference is a comprehensive guide to common Linux commands for system administrators and developers. This documentation provides detailed information about the most frequently used Linux commands, their options, and examples of how to use them.
+
+
+
+<h2>Accessing the Linux Commands Reference</h2>
+
+
+
+The Linux Commands Reference can be accessed through the HelpDesk Knowledge Base:
+
+
+
+<ol><li>Navigate to the HelpDesk by clicking on the "HelpDesk" link in the main navigation menu</li></ol>
+
+<ol><li>Click on the "Knowledge Base" button</li></ol>
+
+<ol><li>In the Knowledge Base, find the "System Administration" category</li></ol>
+
+<ol><li>Click on the "Linux Commands Reference" link</li></ol>
+
+
+
+Alternatively, you can access the reference directly at:
+
+<code>/HelpDesk/kb/linux_commands</code>
+
+
+
+<h2>Command Categories</h2>
+
+
+
+The Linux Commands Reference is organized into the following categories:
+
+
+
+<ol><li>**File System Commands**: Commands for navigating and managing the file system</li></ol>
+
+   - <code>ls</code> - List directory contents
+
+   - <code>cd</code> - Change directory
+
+   - <code>pwd</code> - Print working directory
+
+   - <code>mkdir</code> - Make directory
+
+   - <code>rmdir</code> - Remove directory
+
+   - <code>find</code> - Search for files
+
+
+
+<ol><li>**File Operations**: Commands for working with files</li></ol>
+
+   - <code>cp</code> - Copy files and directories
+
+   - <code>mv</code> - Move or rename files
+
+   - <code>rm</code> - Remove files or directories
+
+   - <code>touch</code> - Create empty files or update timestamps
+
+
+
+<ol><li>**Text Processing**: Commands for processing and analyzing text</li></ol>
+
+   - <code>cat</code> - Concatenate and display file contents
+
+   - <code>less</code> - View file contents with pagination
+
+   - <code>head</code> - Display the beginning of a file
+
+   - <code>tail</code> - Display the end of a file
+
+   - <code>grep</code> - Search for patterns in files
+
+   - <code>sed</code> - Stream editor for filtering and transforming text
+
+   - <code>awk</code> - Pattern scanning and processing language
+
+
+
+<ol><li>**System Information**: Commands for viewing system information</li></ol>
+
+   - <code>uname</code> - Print system information
+
+   - <code>df</code> - Report file system disk space usage
+
+   - <code>du</code> - Estimate file space usage
+
+   - <code>free</code> - Display amount of free and used memory
+
+   - <code>top</code> - Display Linux processes
+
+   - <code>htop</code> - Interactive process viewer
+
+
+
+<ol><li>**Process Management**: Commands for managing processes</li></ol>
+
+   - <code>ps</code> - Report process status
+
+   - <code>kill</code> - Terminate processes
+
+   - <code>bg</code> - Put jobs in background
+
+   - <code>fg</code> - Bring jobs to foreground
+
+   - <code>jobs</code> - List active jobs
+
+   - <code>nohup</code> - Run command immune to hangups
+
+
+
+<ol><li>**User Management**: Commands for managing users</li></ol>
+
+   - <code>useradd</code> - Create a new user
+
+   - <code>usermod</code> - Modify user account
+
+   - <code>userdel</code> - Delete a user account
+
+   - <code>passwd</code> - Change user password
+
+   - <code>who</code> - Show who is logged in
+
+   - <code>id</code> - Print user and group information
+
+
+
+<ol><li>**Networking**: Commands for networking operations</li></ol>
+
+   - <code>ping</code> - Send ICMP ECHO_REQUEST to network hosts
+
+   - <code>ifconfig</code> - Configure network interface
+
+   - <code>ip</code> - Show/manipulate routing, devices, policy routing and tunnels
+
+   - <code>netstat</code> - Print network connections, routing tables, interface statistics
+
+   - <code>ss</code> - Another utility to investigate sockets
+
+   - <code>wget</code> - Non-interactive network downloader
+
+   - <code>curl</code> - Transfer data from or to a server
+
+
+
+<ol><li>**Package Management**: Commands for managing packages</li></ol>
+
+   - <code>apt</code> - Advanced Package Tool (Debian/Ubuntu)
+
+   - <code>yum</code> - Yellowdog Updater Modified (RHEL/CentOS/Fedora)
+
+   - <code>dnf</code> - Dandified YUM (Fedora/RHEL 8+)
+
+
+
+<ol><li>**Permissions**: Commands for managing file permissions</li></ol>
+
+   - <code>chmod</code> - Change file mode bits
+
+   - <code>chown</code> - Change file owner and group
+
+   - <code>chgrp</code> - Change group ownership
+
+
+
+10. **Compression**: Commands for compressing and archiving files
+
+    - <code>tar</code> - Tape archive
+
+    - <code>gzip</code> - Compress or expand files
+
+    - <code>zip</code> - Package and compress files
+
+
+
+<h2>Command Format</h2>
+
+
+
+Each command in the reference is presented with:
+
+
+
+<ol><li>**Command Name**: The name of the command</li></ol>
+
+<ol><li>**Description**: A brief description of what the command does</li></ol>
+
+<ol><li>**Examples**: Common usage examples with explanations</li></ol>
+
+<ol><li>**Notes and Warnings**: Important information about using the command</li></ol>
+
+
+
+<h2>Use Cases</h2>
+
+
+
+The Linux Commands Reference is particularly useful for:
+
+
+
+<ol><li>**System Administrators**: Managing servers and systems</li></ol>
+
+<ol><li>**Developers**: Working with Linux development environments</li></ol>
+
+<ol><li>**DevOps Engineers**: Automating deployment and infrastructure</li></ol>
+
+<ol><li>**IT Support Staff**: Troubleshooting Linux-based systems</li></ol>
+
+<ol><li>**Students**: Learning Linux system administration</li></ol>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="#">Server Maintenance Guide</a> - Guide to maintaining Linux servers</li></ul>
+
+<ul><li><a href="#">Backup and Recovery</a> - Procedures for backing up and recovering Linux systems</li></ul>
+
+<ul><li><a href="#">Security Best Practices</a> - Security recommendations for Linux systems</li></ul>
+
+
+
+<h2>Feedback and Contributions</h2>
+
+
+
+If you have suggestions for improving the Linux Commands Reference or would like to contribute additional commands or examples, please contact the documentation team through the HelpDesk contact form.
+
+
+
+<h2>Implementation Details</h2>
+
+
+
+The Linux Commands Reference is implemented as a Template Toolkit (.tt) file that is rendered by the HelpDesk controller. The controller provides a dedicated route for accessing the reference:
+
+
+
+<code></code>`perl
+
+sub linux_commands :Chained('base') :PathPart('kb/linux_commands') :Args(0) {
+
+    my ($self, $c) = @_;
+
+    
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'linux_commands', 
+
+        "Starting linux_commands action");
+
+    
+
+    $c->stash(
+
+        template => 'CSC/HelpDesk/linux_commands.tt',
+
+        title => 'Linux Commands Reference'
+
+    );
+
+    
+
+    # Push debug message to stash
+
+    push @{$c->stash->{debug_msg}}, "Linux Commands Reference loaded";
+
+    
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'linux_commands', 
+
+        "Completed linux_commands action");
+
+    
+
+    # Explicitly forward to the TT view
+
+    $c->forward($c->view('TT'));
+
+}
+
+<code></code>`
+
+
+
+The template file (<code>linux_commands.tt</code>) contains detailed information about each command, formatted with HTML and CSS for optimal readability.
+
+</div>

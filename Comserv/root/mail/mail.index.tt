@@ -1,24 +1,87 @@
 [%# INCLUDE 'layout.tt' %]
-[% PageVersion	= 'user/mail.tt,v 0.01 2024/01/09 shanta Exp shanta '	%]
+[% PageVersion = 'mail/mail.index.tt,v 0.03 2026/02/22 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
- [%	PageVersion %]
+ [% PageVersion %]
     [% "Debugging HostName: " _ HostName %]
     [%# INCLUDE 'debug.tt' %]
 [% END %]
 [% SiteName = c.session.SiteName %]
-  [% IF c.session.username %]
-   <h3> Hello  [% firstname%]&nbsp;  [% lastname%]! Welcome to [% MailServer %]'s Mail page!</h3>
-<p>When you click the mail link, you will be prompted for your username@[% MailServer %] and your mail password. Once you are logged into the mail, you will have access to forwarding and spam control functions. </p>
 
-<p><a href="https://[% MailServerName %]" Target="_blank">Mail</a></p>
-
-
-  [% ELSE %]
-
-  <h3>  Hello!  Welcome to [% MailServer %]'s Mail Page!</h3>
-<h2> We offer to our members one free</a> email address. </h2>
-<p>When you join any of the hosted sites at [% MailServerName %] you will be given an email address based on your
-    username, if available. You may access your mail by either your local mail reader for reading off-line, or you
-    can use the Mail link on our sites. Once you log in, the application will know who you are and take you to your mail.</p>
-<p>To join <a href="https://www.computersystemconsulting.ca/whmcs/cart.php?gid=5" Target="_blank">[% SiteName%]</a> </p>
-  [% END %]
+<!-- Main Application Container -->
+<div class="app-container">
+    
+    <!-- Page Header -->
+    <div class="page-header">
+        <h1>Mail Services</h1>
+        <h2 class="page-subtitle">Welcome to [% MailServer %]'s Mail Page</h2>
+    </div>
+    
+    <!-- Main Content Area -->
+    <div class="content-container">
+        
+        <!-- Primary Content Section -->
+        <div class="content-primary">
+            
+            [% IF is_logged_in %]
+                <!-- Logged In User Section -->
+                <div class="content-section">
+                    <h3>Hello [% c.session.first_name %] [% c.session.last_name %]!</h3>
+                    
+                    <div class="form-actions">
+                        <a href="[% c.uri_for('/user/profile') %]" class="btn btn-primary">View Profile</a>
+                    </div>
+                    
+                    [% IF has_mail_account %]
+                        <div class="content-section">
+                            <p>When you click the mail link, you will be prompted for your username and your mail password. 
+                            Once you are logged into the mail, you will have access to forwarding and spam control functions.</p>
+                            
+                            <div class="form-actions">
+                                <a href="[% c.session.MailServer || 'http://webmail.computersystemconsulting.ca' %]" 
+                                   target="_blank" class="btn btn-primary">Access Your Mail</a>
+                            </div>
+                        </div>
+                        
+                        [% IF is_admin %]
+                            <div class="content-section admin-only">
+                                <h4>Administrative Functions</h4>
+                                <p>Manage mail servers, domains, and accounts.</p>
+                                <div class="form-actions">
+                                    <a href="[% c.uri_for('/mail/mail_admin_dashboard') %]" class="btn btn-secondary">Mail Admin Dashboard</a>
+                                </div>
+                            </div>
+                        [% END %]
+                    [% ELSE %]
+                        <div class="content-section">
+                            <h4>Email Account Not Active</h4>
+                            <p>You do not currently have an active email account. Email accounts are available to members.</p>
+                            <p>Contact an administrator to upgrade your account or purchase an email address.</p>
+                        </div>
+                    [% END %]
+                </div>
+                
+            [% ELSE %]
+                <!-- Not Logged In Section -->
+                <div class="content-section">
+                    <h3>Email Service for Members</h3>
+                    <p>We offer email services to our members. When you join any of the hosted sites, 
+                    you may receive an email address based on your username, if available.</p>
+                    
+                    <p>You may access your mail by either your local mail reader for reading off-line, or you can use the 
+                    Mail link on our sites. Once you log in, the application will know who you are and take you to your mail.</p>
+                    
+                    <div class="form-actions">
+                        <a href="[% c.uri_for('/user/login') %]" class="btn btn-primary">Login</a>
+                        <a href="[% c.uri_for('/user/register') %]" class="btn btn-secondary">Register</a>
+                    </div>
+                    
+                    <p>For more information about membership and services, visit 
+                    <a href="https://www.computersystemconsulting.ca/whmcs/cart.php?gid=5" target="_blank">[% SiteName %]</a></p>
+                </div>
+            [% END %]
+            
+        </div>
+        
+    </div>
+    
+</div>

@@ -4,8 +4,8 @@
    roles = "admin,workshop_leader"
    TemplateType = "Application"
    category = "WorkShops"
-   page_version = "0.02"
-   last_updated = "2026-02-16"
+   page_version = "0.03"
+   last_updated = "2026-02-26"
 %]
 
 [% PageVersion = 'WorkShops/Dashboard.tt,v 0.02 2026/02/16 shanta Exp shanta' %]
@@ -34,6 +34,11 @@
             <div class="form-actions">
                 <a href="/workshop" class="btn btn-secondary">Back to Workshops</a>
                 <a href="/workshop/add" class="btn btn-primary">Create New Workshop</a>
+                <a href="/workshop/resources" class="btn btn-secondary">📁 Resource Library</a>
+                [% IF is_csc_admin %]
+                <a href="/workshop/dashboard?scope=all" class="btn [% dashboard_scope != 'mine' ? 'btn-primary' : 'btn-secondary' %]">CSC: All Workshops</a>
+                <a href="/workshop/dashboard?scope=mine" class="btn [% dashboard_scope == 'mine' ? 'btn-primary' : 'btn-secondary' %]">CSC: Just Mine</a>
+                [% END %]
             </div>
             
             <div class="data-container">
@@ -63,8 +68,48 @@
                                     <small>[% workshop.sitename | html %]</small>
                                 </td>
                                 <td>
-                                    [% workshop.date.split(' ').0 %]<br>
-                                    <small>[% workshop.time %] - [% workshop.end_time %]</small>
+                                    [% IF workshop.date %]
+                                        [% SET date_parts = workshop.date.split('-') %]
+                                        [% SET month_names = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] %]
+                                        [% month_names.${date_parts.1} %] [% date_parts.2 %], [% date_parts.0 %]<br>
+                                    [% ELSE %]
+                                        <em>No date set</em><br>
+                                    [% END %]
+                                    <small>
+                                        [% IF workshop.time %]
+                                            [% 
+                                                SET t_parts = workshop.time.split(':');
+                                                SET hour = t_parts.0 + 0;
+                                                SET min  = t_parts.1;
+                                                IF hour >= 12;
+                                                    SET ampm = 'PM';
+                                                    SET display_hour = (hour == 12) ? 12 : hour - 12;
+                                                ELSE;
+                                                    SET ampm = 'AM';
+                                                    SET display_hour = (hour == 0) ? 12 : hour;
+                                                END;
+                                            %]
+                                            [% display_hour %]:[% min %] [% ampm %]
+                                        [% ELSE %]
+                                            N/A
+                                        [% END %]
+                                        [% IF workshop.end_time %]
+                                            - 
+                                            [% 
+                                                SET et_parts = workshop.end_time.split(':');
+                                                SET hour_end = et_parts.0 + 0;
+                                                SET min_end  = et_parts.1;
+                                                IF hour_end >= 12;
+                                                    SET ampm_end = 'PM';
+                                                    SET display_hour_end = (hour_end == 12) ? 12 : hour_end - 12;
+                                                ELSE;
+                                                    SET ampm_end = 'AM';
+                                                    SET display_hour_end = (hour_end == 0) ? 12 : hour_end;
+                                                END;
+                                            %]
+                                            [% display_hour_end %]:[% min_end %] [% ampm_end %]
+                                        [% END %]
+                                    </small>
                                 </td>
                                 <td>
                                     [% IF workshop.creator && workshop.created_by %]
@@ -95,12 +140,13 @@
                                 <td>[% item.email_count %]</td>
                                 <td>[% item.file_count %]</td>
                                 <td class="action-cell">
-                                    <form action="/workshop/details" method="GET" style="display:inline;">
-                                        <input type="hidden" name="id" value="[% workshop.id %]">
-                                        <button type="submit" class="btn btn-sm">View</button>
-                                    </form>
-                                    <form method="GET" action="/workshop/edit/[% workshop.id %]" style="display:inline;">
-                                        <button type="submit" class="btn btn-sm btn-edit">Edit</button>
+                                    <a href="/workshop/details?id=[% workshop.id %]" class="btn btn-sm">View</a>
+                                    <a href="/workshop/edit/[% workshop.id %]" class="btn btn-sm btn-edit">Edit</a>
+                                    <a href="/workshop/files/[% workshop.id %]" class="btn btn-sm" title="Files">📎 Files</a>
+                                    <a href="/workshop/participants/[% workshop.id %]" class="btn btn-sm" title="Participants">👥 People</a>
+                                    <a href="/workshop/compose_email/[% workshop.id %]" class="btn btn-sm" title="Email">✉️ Email</a>
+                                    <form method="POST" action="/workshop/delete/[% workshop.id %]" onsubmit="return confirm('Delete this workshop? This cannot be undone.');">
+                                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                                     </form>
                                 </td>
                             </tr>

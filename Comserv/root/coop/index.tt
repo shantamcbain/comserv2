@@ -65,6 +65,7 @@
                     <li>Manage knowledge base articles</li>
                     <li>Monitor system status</li>
                     <li><a href="/MCoop/server-room-plan" style="font-weight: bold; color: #006633;">Server Infrastructure</a></li>
+                    <li><a href="/workshop">Workshops</a></li>
                 </ul>
             </div>
 

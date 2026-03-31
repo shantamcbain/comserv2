@@ -1,0 +1,261 @@
+[% PageVersion = 'mail/AdminDashboard.tt,v 0.01 2026/02/22 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+
+<h2>Mail Administration Dashboard</h2>
+
+[% IF c.flash.error_msg %]
+    <p class="error">[% c.flash.error_msg %]</p>
+[% END %]
+
+[% IF c.flash.success_msg %]
+    <p class="success">[% c.flash.success_msg %]</p>
+[% END %]
+
+<div class="admin-stats">
+    <h3>Mail System Statistics</h3>
+    <ul>
+        <li><strong>Total Mail Domains:</strong> [% mail_stats.total_domains %]</li>
+        <li><strong>Total Mail Accounts:</strong> [% mail_stats.total_accounts %]</li>
+        <li><strong>Configured SMTP Servers:</strong> [% mail_stats.active_servers %]</li>
+    </ul>
+</div>
+
+<hr>
+
+<div class="smtp-servers-section">
+    <h3>SMTP Mail Servers</h3>
+    
+    [% IF smtp_servers.size > 0 %]
+        <table class="smtp-servers-table">
+            <thead>
+                <tr>
+                    <th>Site</th>
+                    <th>SMTP Host</th>
+                    <th>Port</th>
+                    <th>Username</th>
+                    <th>From Email</th>
+                    <th>SSL</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                [% FOREACH server IN smtp_servers %]
+                <tr>
+                    <td>
+                        <strong>[% server.site_name || 'Unknown' %]</strong><br>
+                        <small style="color: #666;">ID: [% server.site_id %]</small>
+                    </td>
+                    <td>[% server.smtp_host || 'Not set' %]</td>
+                    <td>[% server.smtp_port || 'Not set' %]</td>
+                    <td>[% server.smtp_user || server.smtp_username || 'Not set' %]</td>
+                    <td>[% server.smtp_from || 'Not set' %]</td>
+                    <td>[% server.smtp_ssl ? 'Yes' : 'No' %]</td>
+                    <td>
+                        <a href="[% c.uri_for('/mail/edit_smtp_config') %]?site_id=[% server.site_id %]" class="btn-small">Edit</a>
+                        <a href="[% c.uri_for('/mail/test_smtp_config') %]?site_id=[% server.site_id %]" class="btn-small btn-test">Test</a>
+                    </td>
+                </tr>
+                [% END %]
+            </tbody>
+        </table>
+    [% ELSE %]
+        <p class="info-message">No SMTP servers configured yet.</p>
+    [% END %]
+    
+    <p style="margin-top: 15px;">
+        <a href="[% c.uri_for('/mail/add_mail_config_form') %]" class="btn btn-primary">Add New SMTP Server</a>
+    </p>
+</div>
+
+<hr>
+
+<div class="admin-functions">
+    <h3>Mail System Management</h3>
+
+    <div class="function-section" style="background:#f0f8ff;border:1px solid #4a90d9;border-radius:6px;padding:16px;margin-bottom:18px;">
+        <h4 style="margin-top:0;">🧪 Send Test Email</h4>
+        <p style="margin:0 0 10px;font-size:0.92em;color:#555;">
+            Sends a real test message through the <strong>full unified mail path</strong> using the site SMTP config (harper.whc.ca:465).
+            Check the <a href="/health/recent_errors">application log</a> for the SMTP transcript if it fails.
+        </p>
+        <form method="get" action="[% c.uri_for('/mail/send_test_email') %]" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="hidden" name="site_id" value="[% c.session.site_id %]">
+            <input type="email" name="to" placeholder="recipient@example.com" required
+                   style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.95em;min-width:240px;">
+            <button type="submit" style="padding:6px 16px;background:#17a2b8;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">
+                Send Test Email
+            </button>
+        </form>
+    </div>
+
+    <div class="function-section" style="border-left-color:#28a745;">
+        <h4>Mailing Lists &amp; Mailouts</h4>
+        <ul>
+            <li><a href="[% c.uri_for('/mail/lists') %]"><strong>Manage Mailing Lists</strong></a> — Create, edit and view subscriber lists for this site</li>
+            <li><a href="[% c.uri_for('/mail/mass_email') %]"><strong>Send a Mailout</strong></a> — Email all site users, paid members, or custom addresses</li>
+        </ul>
+    </div>
+
+    <div class="function-section">
+        <h4>Server Configuration</h4>
+        <ul>
+            <li><a href="[% c.uri_for('/mail/add_mail_config_form') %]">Configure SMTP Settings</a> — Set up outbound mail server</li>
+        </ul>
+    </div>
+    
+    <div class="function-section">
+        <h4>Domain Management</h4>
+        <ul>
+            <li><strong>Manage Mail Domains</strong> - (Coming soon - Add/edit mail domains)</li>
+            <li><strong>DNS Records</strong> - (Coming soon - Manage SPF, DKIM, DMARC records)</li>
+        </ul>
+    </div>
+    
+    <div class="function-section">
+        <h4>Account Management</h4>
+        <ul>
+            <li><a href="[% c.uri_for('/mail/create_mail_account') %]">Create Mail Account</a> - Add new email accounts</li>
+            <li><strong>Manage Mail Accounts</strong> - (Coming soon - View and edit existing accounts)</li>
+        </ul>
+    </div>
+    
+    <div class="function-section">
+        <h4>System Tools</h4>
+        <ul>
+            <li><strong>Mail Logs</strong> - (Coming soon - View mail server logs)</li>
+            <li><strong>Mail Queue</strong> - (Coming soon - Monitor outbound mail queue)</li>
+        </ul>
+    </div>
+</div>
+
+<hr>
+
+<p><a href="[% c.uri_for('/mail') %]" class="btn btn-secondary">Back to Mail</a></p>
+
+<style>
+    .admin-stats {
+        background: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        margin: 20px 0;
+    }
+    
+    .function-section {
+        margin: 20px 0;
+        padding: 15px;
+        border-left: 3px solid #007bff;
+        background: #f9f9f9;
+    }
+    
+    .function-section h4 {
+        margin-top: 0;
+        color: #007bff;
+    }
+    
+    .function-section ul {
+        list-style-type: none;
+        padding-left: 0;
+    }
+    
+    .function-section li {
+        margin: 10px 0;
+    }
+    
+    .error {
+        color: red;
+        padding: 10px;
+        background: #ffe6e6;
+        border: 1px solid red;
+        border-radius: 4px;
+    }
+    
+    .success {
+        color: green;
+        padding: 10px;
+        background: #e6ffe6;
+        border: 1px solid green;
+        border-radius: 4px;
+    }
+    
+    .btn {
+        display: inline-block;
+        padding: 10px 20px;
+        margin: 5px;
+        text-decoration: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    .btn-primary {
+        background: #007bff;
+        color: white;
+    }
+    
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+    
+    .btn-warning {
+        background: #ffc107;
+        color: black;
+    }
+    
+    .smtp-servers-section {
+        margin: 20px 0;
+    }
+    
+    .smtp-servers-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 15px 0;
+    }
+    
+    .smtp-servers-table th,
+    .smtp-servers-table td {
+        border: 1px solid #ddd;
+        padding: 10px;
+        text-align: left;
+    }
+    
+    .smtp-servers-table th {
+        background: #f5f5f5;
+        font-weight: bold;
+    }
+    
+    .smtp-servers-table tr:hover {
+        background: #f9f9f9;
+    }
+    
+    .btn-small {
+        display: inline-block;
+        padding: 5px 10px;
+        margin: 2px;
+        text-decoration: none;
+        border-radius: 3px;
+        background: #007bff;
+        color: white;
+        font-size: 12px;
+    }
+    
+    .btn-small:hover {
+        background: #0056b3;
+    }
+    
+    .btn-test {
+        background: #28a745;
+    }
+    
+    .btn-test:hover {
+        background: #1e7e34;
+    }
+    
+    .info-message {
+        padding: 15px;
+        background: #e7f3ff;
+        border-left: 4px solid #007bff;
+        margin: 15px 0;
+    }
+</style>

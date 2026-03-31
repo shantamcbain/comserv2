@@ -71,6 +71,7 @@ sub index :Path('/admin/infrastructure') :Args(0) {
     
     $c->stash(
         clusters => \@cluster_status,
+        env => $ENV{CATALYST_ENV} || 'development',
         template => 'admin/infrastructure/index.tt'
     );
 }
@@ -98,6 +99,8 @@ sub cluster_add :Path('/admin/infrastructure/cluster/add') :Args(0) {
         $c->forward('View::JSON');
         return;
     }
+    
+    
     
     my $params = $c->req->body_parameters;
     my $cluster_name = $params->{name};
@@ -145,6 +148,8 @@ sub deploy_monitoring :Path('/admin/infrastructure/deploy/monitoring') :Args(1) 
         $c->forward('View::JSON');
         return;
     }
+    
+    
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'deploy_monitoring', 
         "Deploying monitoring stack to cluster: $cluster_name");
@@ -241,6 +246,8 @@ sub exec_kubectl :Path('/admin/infrastructure/kubectl') :Args(0) {
         $c->forward('View::JSON');
         return;
     }
+    
+    
     
     my $params = $c->req->body_parameters;
     my $cluster_name = $params->{cluster};

@@ -122,7 +122,7 @@
             <div class="page-footer">
                 <div class="footer-actions">
                     <a href="/workshop/details?id=[% workshop.id %]" class="btn btn-secondary">Back to Workshop</a>
-                    <a href="/workshop/content?workshop_id=[% workshop.id %]" class="btn btn-secondary">Manage Online Content</a>
+                    <a href="/workshop/content/[% workshop.id %]" class="btn btn-secondary">Manage Online Content</a>
                 </div>
             </div>
             

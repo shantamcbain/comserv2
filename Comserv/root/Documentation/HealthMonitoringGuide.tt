@@ -1,0 +1,86 @@
+[% META
+   title = "Docker Container Health Monitoring Guide"
+   description = "Comprehensive guide for monitoring system health, interpreting alerts, and system identification."
+   roles = "admin"
+   TemplateType = "Documentation"
+   category = "Infrastructure"
+   page_version = "0.01"
+   last_updated = "2026-03-11"
+%]
+[% PageVersion = 'Documentation/HealthMonitoringGuide.tt,v 0.01 2026/03/11 AI Assistant Exp AI Assistant ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>[% title | html %]</h1>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+            
+            <section class="content-section">
+                <h2>Overview</h2>
+                <p>The Comserv Health Monitoring system provides real-time tracking of the production environment's viability. It monitors critical resources, database connectivity, and system logs to ensure high availability and proactive failure detection.</p>
+            </section>
+
+            <section class="content-section">
+                <h2>System Identification</h2>
+                <p>To distinguish between multiple environments (e.g., Production, Workstation 2, Laptop), the system uses a <strong>System Identifier</strong>. This identifier is included in all logs and alert emails.</p>
+                <div class="data-container">
+                    <table class="data-table">
+                        <tr>
+                            <th>Environment Variable</th>
+                            <td><code>SYSTEM_IDENTIFIER</code></td>
+                        </tr>
+                        <tr>
+                            <th>Default</th>
+                            <td>The server's hostname</td>
+                        </tr>
+                    </table>
+                </div>
+                <p>You can set this in your <code>.env</code> file or Docker configuration:</p>
+                <pre><code>SYSTEM_IDENTIFIER=Production</code></pre>
+            </section>
+
+            <section class="content-section">
+                <h2>Automated Monitoring</h2>
+                <p>A background service (<code>ContainerHealthMonitor.pl</code>) runs inside the Docker container, managed by Supervisor. It performs the following checks every 60 seconds:</p>
+                <ul>
+                    <li><strong>MySQL Connectivity</strong>: Pings the primary database.</li>
+                    <li><strong>Disk Space</strong>: Alerts if usage exceeds 90% on root or NFS mounts.</li>
+                    <li><strong>Memory Usage</strong>: Warns if available memory drops below 5%.</li>
+                </ul>
+                <p>Failures are logged to the <code>SystemLog</code> table and trigger immediate email notifications to the CSC Admin.</p>
+            </section>
+
+            <section class="content-section">
+                <h2>Real-time UI Alerts</h2>
+                <p>For administrative users, a persistent health banner will appear at the top of the browser if issues are detected. This banner is updated every 30 seconds via AJAX polling.</p>
+                <ul>
+                    <li><span class="status-pending">⚠️ WARNING</span>: Triggered by recent error logs or high resource usage.</li>
+                    <li><span class="status-completed" style="background:#dc3545;color:white;">🔴 CRITICAL</span>: Triggered by database downtime or severe system deterioration.</li>
+                </ul>
+                <p>Desktop notifications will also be triggered if browser permissions are granted.</p>
+            </section>
+
+            <section class="content-section">
+                <h2>Configuration</h2>
+                <p>Monitoring thresholds can be tuned via environment variables in the Docker container:</p>
+                <ul>
+                    <li><code>HEALTH_CHECK_INTERVAL</code>: Interval between checks in seconds (default: 60).</li>
+                    <li><code>HEALTH_DISK_THRESHOLD</code>: Percentage threshold for disk alerts (default: 90).</li>
+                    <li><code>HEALTH_MEM_THRESHOLD</code>: Percentage threshold for memory warnings (default: 95).</li>
+                </ul>
+            </section>
+
+        </div>
+    </div>
+
+    <div class="page-footer">
+        <div class="footer-actions">
+            <a href="[% c.uri_for('/admin/documentation') %]" class="btn btn-secondary">Back to Documentation</a>
+        </div>
+    </div>
+</div>

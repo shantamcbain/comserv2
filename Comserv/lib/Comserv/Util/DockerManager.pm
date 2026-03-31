@@ -668,4 +668,54 @@ sub stop_container {
     };
 }
 
+sub down_container {
+    my ($self, $service) = @_;
+
+    if ($self->in_docker_container) {
+        return {
+            success => 0,
+            stdout => '',
+            stderr => 'Cannot down containers from within a Docker container',
+            timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
+        };
+    }
+
+    my $compose_file = $self->_find_compose_file_for_service($service);
+    unless ($compose_file) {
+        return {
+            success => 0,
+            stdout => '',
+            stderr => "Service '$service' not found in any docker-compose file",
+            timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
+        };
+    }
+
+    unless (-f $compose_file) {
+        return {
+            success => 0,
+            stdout => '',
+            stderr => "docker-compose file not found: $compose_file",
+            timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
+        };
+    }
+
+    my @cmd = (
+        @{$self->docker_compose_cmd},
+        '--project-directory', $self->project_root,
+        '-f', $compose_file,
+        'rm', '-f', '-s', $service
+    );
+
+    my ($out, $err);
+    my $success = run \@cmd, \undef, \$out, \$err;
+
+    return {
+        success => $success,
+        stdout => $out // '',
+        stderr => $err // '',
+        timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
+        command => join(' ', @cmd),
+    };
+}
+
 1;

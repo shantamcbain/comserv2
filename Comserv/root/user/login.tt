@@ -1,35 +1,93 @@
-[% PageVersion = 'login.tt,v 0.01 2023/09/01 shanta Exp shanta ' %]
+[% META
+   title = "Login"
+   description = "Sign in to your account"
+   roles = ""
+   TemplateType = "Application"
+   category = "User"
+   page_version = "0.03"
+   last_updated = "2026-02-24"
+%]
+[% PageVersion = 'user/login.tt,v 0.03 2026/02/24 AI Assistant Exp AI Assistant ' %]
 [% IF debug_mode == 1 %]
   [% PageVersion %]
-    [%# INCLUDE 'debug.tt' %]
-[% END %]
-[% IF c.session.success_msg %]
-    <p class="success">[% c.session.success_msg %]</p>
-[% END %]
-[% IF c.flash.success_msg %]
-    <p class="success">[% c.flash.success_msg %]</p>
-[% END %]
-<!-- Display error message if it exists -->
-[% IF c.stash.error_msg %]
-    <p class="error">[% c.stash.error_msg %]</p>
 [% END %]
 
-<!-- root/src/login.tt2 -->
-<form method="post" action="/user/do_login">
-    <label for="username">Username</label>
-    <input type="text" id="username" name="username" required>
+<div class="app-container">
 
-    <label for="password">Password</label>
-    <input type="password" id="password" name="password" required>
+    <div class="page-header">
+        <h1>Sign In</h1>
+        <h2 class="page-subtitle">Enter your credentials to access [% c.stash.SiteName || 'your account' %]</h2>
+    </div>
 
-    <!-- Add a hidden field to help with debugging -->
-    <input type="hidden" name="form_source" value="login_form">
+    <div class="content-container">
 
-    <input type="submit" value="Login">
-</form>
+        <div class="content-primary">
 
-<!-- Add a Register button that links to the register page -->
-<a href="/user/register" class="register-button">Register</a>
+            [% IF c.session.success_msg %]
+                <div class="success">[% c.session.success_msg | html %]</div>
+            [% END %]
+            [% IF c.flash.success_msg %]
+                <div class="success">[% c.flash.success_msg | html %]</div>
+            [% END %]
+            [% IF c.flash.error_msg %]
+                <div class="error">[% c.flash.error_msg | html %]</div>
+            [% END %]
+            [% IF c.stash.error_msg %]
+                <div class="error">[% c.stash.error_msg | html %]</div>
+            [% END %]
 
-<!-- Add a Change Password button that links to the change_password page -->
-<a href="/user/change_password_request" class="change-password-button">Change Password</a>
+            <div class="form-container">
+                <form method="POST" action="/user/do_login" class="app-form" id="login-form">
+                    <input type="hidden" name="form_source" value="login_form">
+                    <input type="hidden" name="return_to" value="[% return_to | html %]">
+
+                    <div class="form-section">
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="username">Username or Email</label>
+                                <input type="text" id="username" name="username" class="form-input"
+                                       value="[% prefill_username | html %]" required autofocus autocomplete="username">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="password">Password or Verification Code</label>
+                                <input type="password" id="password" name="password" class="form-input"
+                                       autocomplete="current-password">
+                                <small style="color: var(--text-muted-color, #666); display: block; margin-top: 4px;">
+                                    New user? Enter your <strong>6-digit verification code</strong> here to continue registration.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Sign In</button>
+                        <a href="/user/register" class="btn btn-secondary">Create Account</a>
+                    </div>
+
+                    <div style="margin-top: 12px; text-align: center;">
+                        <a href="#" id="forgot-pw-link">Forgot your password?</a>
+                    </div>
+
+                </form>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+document.getElementById('forgot-pw-link').addEventListener('click', function(e) {
+    e.preventDefault();
+    var val = document.getElementById('username').value.trim();
+    var url = '/user/forgot_password';
+    if (val) {
+        url += '?email=' + encodeURIComponent(val);
+    }
+    window.location.href = url;
+});
+</script>

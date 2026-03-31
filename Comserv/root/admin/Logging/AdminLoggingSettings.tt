@@ -1,0 +1,77 @@
+[% META
+   title = "Logging Settings"
+   description = "Configure application logging and alert levels"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Admin"
+   page_version = "0.01"
+   last_updated = "2026-03-08"
+%]
+[% PageVersion = 'admin/Logging/AdminLoggingSettings.tt,v 0.01 2026/03/08 Zencoder Exp Zencoder' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>Logging Settings</h1>
+    </div>
+
+    [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+
+    <div class="content-container">
+        <div class="content-primary">
+            
+            <div class="form-container">
+                <form method="post" action="[% c.uri_for('/admin/logging/settings') %]" class="app-form">
+                    
+                    <div class="form-section">
+                        <h3>Alert Threshold</h3>
+                        <p class="help-text">Select the minimum log level that should trigger an email notification to administrators.</p>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="email_threshold">Alert Level (Email/System):</label>
+                                <select name="email_threshold" id="email_threshold" class="form-input">
+                                    [% FOREACH level IN levels %]
+                                        <option value="[% level | html %]" [% IF level == current_threshold %]selected[% END %]>[% level | html %]</option>
+                                    [% END %]
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>NFS Log Directory</h3>
+                        <p class="help-text">Specify the path to the NFS shared directory for centralized logging.</p>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="nfs_dir">NFS Path:</label>
+                                <input type="text" name="nfs_dir" id="nfs_dir" value="[% current_nfs_dir | html %]" class="form-input" placeholder="/mnt/nfs/comserv/logs">
+                                <small>Environment variable: <code>[% env_nfs_dir | html %]</code> (Current fallback)</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save Settings</button>
+                        <a href="[% c.uri_for('/admin/logging') %]" class="btn btn-secondary">Cancel</a>
+                    </div>
+                    
+                </form>
+            </div>
+
+            <div class="content-section">
+                <h3>Notes</h3>
+                <ul>
+                    <li>Alerts are sent to the CSC Admin and Site Admin (if different).</li>
+                    <li>These settings are stored in the database (<code>site_config</code> table) and persist across restarts.</li>
+                    <li>NFS logging is optional for redundant history. If configured and writable, the application will maintain a physical log file there.</li>
+                    <li>The Database is the primary source for the Logging Administration search and filter features.</li>
+                </ul>
+            </div>
+
+        </div>
+    </div>
+</div>

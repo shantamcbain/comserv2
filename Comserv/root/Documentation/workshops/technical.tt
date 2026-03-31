@@ -1,0 +1,737 @@
+[% PageVersion = 'Documentation/workshops/technical.tt,v 0.01 2024/06/10 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+
+<div class="documentation-container">
+    <h1>Workshop System: Technical Documentation</h1>
+    
+    <div class="toc">
+        <h2>Table of Contents</h2>
+        <ul>
+            <li><a href="#architecture">System Architecture</a></li>
+            <li><a href="#controllers">Controllers</a>
+                <ul>
+                    <li><a href="#workshop-controller">WorkShop Controller</a></li>
+                    <li><a href="#controller-methods">Controller Methods</a></li>
+                </ul>
+            </li>
+            <li><a href="#models">Models</a></li>
+            <li><a href="#templates">Templates</a></li>
+            <li><a href="#database">Database Schema</a></li>
+            <li><a href="#routing">Routing</a></li>
+            <li><a href="#integration">Integration Points</a></li>
+        </ul>
+    </div>
+    
+    <div id="architecture" class="section">
+        <h2>System Architecture</h2>
+        <p>The Workshop System follows the Model-View-Controller (MVC) architecture of the Catalyst framework:</p>
+        <ul>
+            <li><strong>Models</strong>: Handle data retrieval and business logic</li>
+            <li><strong>Views</strong>: Template Toolkit (.tt) files for rendering HTML</li>
+            <li><strong>Controllers</strong>: Process requests and coordinate between models and views</li>
+        </ul>
+        <p>The system is designed to be modular, with each component responsible for a specific aspect of workshop management.</p>
+    </div>
+    
+    <div id="controllers" class="section">
+        <h2>Controllers</h2>
+        
+        <div id="workshop-controller" class="subsection">
+            <h3>WorkShop Controller</h3>
+            <p>The primary controller for the Workshop System is <code>Comserv::Controller::WorkShop</code>, located at:</p>
+            <pre>/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/WorkShop.pm</pre>
+            
+            <p>This controller handles all workshop-related operations, including listing, creating, editing, and displaying workshops, as well as managing presentation materials.</p>
+            
+            <p>The controller implements Catalyst's chain-based dispatching to handle various URL patterns and request methods.</p>
+        </div>
+        
+        <div id="controller-methods" class="subsection">
+            <h3>Controller Methods</h3>
+            
+            <div class="method">
+                <h4>index :Path :Args(0)</h4>
+                <p><strong>Purpose:</strong> Display the main workshop listing page</p>
+                <p><strong>URL:</strong> /workshop</p>
+                <p><strong>Actions:</strong></p>
+                <ul>
+                    <li>Retrieves active workshops from the database using the WorkShop model</li>
+                    <li>Converts workshop objects to hashref format for use in the template</li>
+                    <li>Retrieves associated files for each workshop</li>
+                    <li>Renders the workshops.tt template with the workshop data</li>
+                </ul>
+                <p><strong>Code Snippet:</strong></p>
+<pre>
+sub index :Path :Args(0) {
+    my ( $self, $c ) = @_;
+
+    # Try to get the active workshops and catch any exceptions
+    my ($workshops, $error);
+    ($workshops, $error) = $c->model('WorkShop')->get_active_workshops($c);
+
+    # Get the file for each workshop and convert each workshop to a hash
+    my @workshops_hash;
+    for my $workshop (@$workshops) {
+        my @file = $c->model('DBEncy::File')->search({ workshop_id => $workshop->id });
+
+        # Convert the workshop object to a hash
+        my %workshop_hash = $workshop->get_columns;
+        $workshop_hash{file} = \@file;
+
+        push @workshops_hash, \%workshop_hash;
+    }
+
+    # Pass the workshops and the error message to the view
+    $c->stash(
+        workshops => \@workshops_hash,
+        error => $error,
+        sitename => $c->session->{SiteName},
+        template => 'WorkShops/workshops.tt',
+    );
+    if ($@) {
+        $c->stash(error => "Error fetching active workshops: $@");
+    }
+}
+</pre>
+            </div>
+            
+            <div class="method">
+                <h4>add :Local</h4>
+                <p><strong>Purpose:</strong> Display the form for adding a new workshop</p>
+                <p><strong>URL:</strong> /workshop/add</p>
+                <p><strong>Actions:</strong></p>
+                <ul>
+                    <li>Sets the template to addworkshop.tt</li>
+                </ul>
+                <p><strong>Code Snippet:</strong></p>
+<pre>
+sub add :Local {
+    my ( $self, $c ) = @_;
+
+    # Set the TT template to use
+    $c->stash->{template} = 'WorkShops/addworkshop.tt';
+}
+</pre>
+            </div>
+            
+            <div class="method">
+                <h4>addworkshop :Local</h4>
+                <p><strong>Purpose:</strong> Process the form submission for adding a new workshop</p>
+                <p><strong>URL:</strong> /workshop/addworkshop</p>
+                <p><strong>Actions:</strong></p>
+                <ul>
+                    <li>Retrieves form data from the request</li>
+                    <li>Validates the form data</li>
+                    <li>Creates a new workshop record in the database</li>
+                    <li>Redirects to the workshop listing on success</li>
+                    <li>Displays error messages if validation or creation fails</li>
+                </ul>
+                <p><strong>Code Snippet:</strong></p>
+<pre>
+sub addworkshop :Local {
+    my ( $self, $c ) = @_;
+
+    # Retrieve the form data from the request
+    my $params = $c->request->parameters;
+
+    # Validate the form data
+    my ($is_valid, $errors) = validate_form_data($params);
+    if (!$is_valid) {
+        # If validation fails, return to the form with errors
+        $c->stash->{error_msg} = 'Invalid form data: ' . join(', ', map { "$_: $errors->{$_}" } keys %$errors);
+        $c->stash->{form_data} = $params; # Add the form data to the stash
+        $c->stash->{template} = 'WorkShops/addworkshop.tt';
+        return;
+    }
+
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Get a DBIx::Class::ResultSet object
+    my $rs = $schema->resultset('WorkShop');
+
+    # Get the start_time from the form data
+    my $start_time_str = $params->{time};
+
+    # Create a DateTime::Format::Strptime object for parsing the time strings
+    my $strp = DateTime::Format::Strptime->new(
+        pattern   => '%H:%M',
+        time_zone => 'local',
+    );
+
+    # Convert the start_time string to a DateTime object
+    my $time = $strp->parse_datetime($start_time_str);
+
+    # Try to create a new workshop record
+    my $workshop;
+    eval {
+        $workshop = $rs->create({
+            sitename         => $params->{sitename},
+            title            => $params->{title},
+            description      => $params->{description},
+            date             => $params->{dateOfWorkshop},
+            location         => $params->{location},
+            instructor       => $params->{instructor},
+            max_participants => $params->{maxMinAttendees},
+            share            => $params->{share},
+            end_time         => $params->{end_time},
+            time             => $time,
+        });
+    };
+
+    if ($@) {
+        # If creation fails, return to the form with an error message
+        $c->stash->{error_msg} = 'Failed to create workshop: ' . $@;
+        $c->stash->{form_data} = $params; # Add the form data to the stash
+        $c->stash->{template} = 'WorkShops/addworkshop.tt';
+        return;
+    }
+
+    # Redirect the user to the index action on success
+    $c->response->redirect($c->uri_for($self->action_for('index')));
+}
+</pre>
+            </div>
+            
+            <div class="method">
+                <h4>details :Path('/workshop/details') :Args(0)</h4>
+                <p><strong>Purpose:</strong> Display detailed information about a specific workshop</p>
+                <p><strong>URL:</strong> /workshop/details?id=X</p>
+                <p><strong>Actions:</strong></p>
+                <ul>
+                    <li>Retrieves the workshop ID from the request parameters</li>
+                    <li>Finds the workshop in the database</li>
+                    <li>Formats the date for display</li>
+                    <li>Renders the details.tt template with the workshop data</li>
+                </ul>
+                <p><strong>Code Snippet:</strong></p>
+<pre>
+sub details :Path('/workshop/details') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Retrieve the ID from query parameters
+    my $id = $c->request->params->{id};
+
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Get a DBIx::Class::ResultSet object for the 'WorkShop' table
+    my $rs = $schema->resultset('WorkShop');
+
+    # Try to find the workshop by its ID
+    my $workshop;
+    eval {
+        $workshop = $rs->find($id);
+    };
+
+    if ($@ || !$workshop) {
+        $c->stash->{error_msg} = 'Failed to find workshop: ' . ($@ || 'Workshop not found');
+        $c->stash->{template} = 'WorkShops/error.tt'; # Ensure you have an error template
+        return;
+    }
+
+    # Assuming $workshop->date is a DateTime object
+    my $formatted_date = $workshop->date->strftime('%Y-%m-%d');
+
+    # Pass the workshop to the view
+    $c->stash(
+        workshop => $workshop,
+        formatted_date => $formatted_date,
+        template => 'WorkShops/details.tt',
+    );
+}
+</pre>
+            </div>
+            
+            <div class="method">
+                <h4>edit :Path('/workshop/edit') :Args(1)</h4>
+                <p><strong>Purpose:</strong> Display and process the form for editing a workshop</p>
+                <p><strong>URL:</strong> /workshop/edit/X</p>
+                <p><strong>Actions:</strong></p>
+                <ul>
+                    <li>Handles both GET and POST requests</li>
+                    <li>For GET: Displays the edit form with workshop data</li>
+                    <li>For POST: Processes form submission and updates the workshop</li>
+                    <li>Redirects to the workshop listing on successful update</li>
+                </ul>
+                <p><strong>Code Snippet:</strong></p>
+<pre>
+sub edit :Path('/workshop/edit') :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    # Find the workshop in the database
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+
+    # For GET requests, display the edit form
+    if ($c->request->method eq 'GET') {
+        if (!$workshop) {
+            $c->stash->{error_msg} = 'Workshop not found';
+            $c->stash->{template} = 'WorkShops/error.tt';
+            return;
+        }
+
+        # Format the date to 'YYYY-MM-DD'
+        my $formatted_date = $workshop->date->strftime('%Y-%m-%d');
+
+        $c->stash(
+            workshop => $workshop,
+            formatted_date => $formatted_date,
+            template => 'WorkShops/edit.tt'
+        );
+        return;
+    }
+
+    # Handle POST request for updates
+    if ($c->request->method eq 'POST') {
+        my $params = $c->request->body_parameters;
+        eval {
+            $workshop->update({
+                title            => $params->{title},
+                description      => $params->{description},
+                date             => $params->{date},
+                time             => $params->{time},
+                end_time         => $params->{end_time},
+                location         => $params->{location},
+                instructor       => $params->{instructor},
+                max_participants => $params->{max_participants},
+                share            => $params->{share},
+            });
+        };
+
+        if ($@) {
+            $c->stash->{error_msg} = 'Failed to update workshop: ' . $@;
+        } else {
+            $c->flash->{success_msg} = 'Workshop updated successfully.';
+            $c->res->redirect($c->uri_for($self->action_for('index')));
+            return;
+        }
+    }
+}
+</pre>
+            </div>
+            
+            <div class="method">
+                <h4>presentation :Path('/workshop/presentation') :Args(0)</h4>
+                <p><strong>Purpose:</strong> Display presentation details and download options</p>
+                <p><strong>URL:</strong> /workshop/presentation</p>
+                <p><strong>Actions:</strong></p>
+                <ul>
+                    <li>Retrieves the presentation name from the request parameters</li>
+                    <li>Loads presentation details from a predefined hash</li>
+                    <li>Renders the presentation.tt template with the presentation data</li>
+                </ul>
+                <p><strong>Code Snippet:</strong></p>
+<pre>
+sub presentation :Path('/workshop/presentation') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Get the presentation name from the query parameters
+    my $presentation_name = $c->request->params->{name} || 'feedthepolinatores';
+    
+    # Define the presentation details
+    my %presentations = (
+        'feedthepolinatores' => {
+            title => 'Feed the Pollinators',
+            description => 'A workshop on how to create gardens that support pollinators',
+            author => 'Shanta',
+            date => '2024-06-10',
+            filename => 'feedthepolinatores.odp',
+            html_version => '', # Will be populated when HTML version is created
+            summary => '...' # Summary content
+        }
+    );
+    
+    # Check if the requested presentation exists
+    unless (exists $presentations{$presentation_name}) {
+        $c->stash(
+            error => "Presentation not found",
+            template => 'WorkShops/error.tt'
+        );
+        return;
+    }
+    
+    # Stash the presentation details
+    $c->stash(
+        presentation => $presentations{$presentation_name},
+        template => 'WorkShops/presentation.tt'
+    );
+}
+</pre>
+            </div>
+            
+            <div class="method">
+                <h4>download :Path('/workshop/download') :Args(0)</h4>
+                <p><strong>Purpose:</strong> Handle file downloads for presentations</p>
+                <p><strong>URL:</strong> /workshop/download?file=X</p>
+                <p><strong>Actions:</strong></p>
+                <ul>
+                    <li>Retrieves the file name from the request parameters</li>
+                    <li>Validates the file name to prevent directory traversal</li>
+                    <li>Sets appropriate content type based on file extension</li>
+                    <li>Serves the file as a download</li>
+                </ul>
+                <p><strong>Code Snippet:</strong></p>
+<pre>
+sub download :Path('/workshop/download') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Get the file name from the query parameters
+    my $file = $c->request->params->{file};
+    
+    # Validate the file name to prevent directory traversal
+    if ($file =~ /[\/\\]/) {
+        $c->response->body('Invalid file name');
+        $c->response->status(400);
+        return;
+    }
+    
+    # Set the path to the file
+    my $file_path = $c->path_to('root', 'WorkShops', $file);
+    
+    # Check if the file exists
+    unless (-e $file_path) {
+        $c->response->body('File not found');
+        $c->response->status(404);
+        return;
+    }
+    
+    # Set the content type based on the file extension
+    my $content_type = 'application/vnd.oasis.opendocument.presentation';
+    if ($file =~ /\.pdf$/i) {
+        $content_type = 'application/pdf';
+    } elsif ($file =~ /\.html?$/i) {
+        $content_type = 'text/html';
+    }
+    
+    # Send the file to the client
+    $c->response->content_type($content_type);
+    $c->response->header('Content-Disposition' => "attachment; filename=$file");
+    $c->response->body($file_path->slurp);
+}
+</pre>
+            </div>
+            
+            <div class="method">
+                <h4>view :Path('/workshop/view') :Args(0)</h4>
+                <p><strong>Purpose:</strong> Display HTML versions of presentations in the browser</p>
+                <p><strong>URL:</strong> /workshop/view?file=X</p>
+                <p><strong>Actions:</strong></p>
+                <ul>
+                    <li>Retrieves the file name from the request parameters</li>
+                    <li>Validates the file name to prevent directory traversal</li>
+                    <li>Serves the HTML file for in-browser viewing</li>
+                </ul>
+                <p><strong>Code Snippet:</strong></p>
+<pre>
+sub view :Path('/workshop/view') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Get the file name from the query parameters
+    my $file = $c->request->params->{file};
+    
+    # Validate the file name to prevent directory traversal
+    if ($file =~ /[\/\\]/) {
+        $c->response->body('Invalid file name');
+        $c->response->status(400);
+        return;
+    }
+    
+    # Set the path to the file
+    my $file_path = $c->path_to('root', 'WorkShops', $file);
+    
+    # Check if the file exists
+    unless (-e $file_path) {
+        $c->response->body('HTML version not available yet');
+        $c->response->status(404);
+        return;
+    }
+    
+    # Send the file to the client for viewing in browser
+    $c->response->content_type('text/html');
+    $c->response->body($file_path->slurp);
+}
+</pre>
+            </div>
+        </div>
+    </div>
+    
+    <div id="models" class="section">
+        <h2>Models</h2>
+        <p>The Workshop System uses the following models:</p>
+        
+        <div class="model">
+            <h3>Comserv::Model::WorkShop</h3>
+            <p><strong>File:</strong> /home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/WorkShop.pm</p>
+            <p><strong>Purpose:</strong> Provides business logic for workshop operations</p>
+            <p><strong>Key Methods:</strong></p>
+            <ul>
+                <li><code>get_active_workshops</code>: Retrieves workshops that haven't yet occurred</li>
+                <li><code>get_workshop_by_id</code>: Retrieves a specific workshop by ID</li>
+            </ul>
+        </div>
+        
+        <div class="model">
+            <h3>Comserv::Model::Schema::Ency::Result::WorkShop</h3>
+            <p><strong>File:</strong> /home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result/WorkShop.pm</p>
+            <p><strong>Purpose:</strong> Defines the database schema for workshop records</p>
+            <p><strong>Schema:</strong> Defines columns, relationships, and constraints for the workshop table</p>
+        </div>
+    </div>
+    
+    <div id="templates" class="section">
+        <h2>Templates</h2>
+        <p>The Workshop System uses the following Template Toolkit templates:</p>
+        
+        <table class="templates-table">
+            <tr>
+                <th>Template</th>
+                <th>Purpose</th>
+                <th>Path</th>
+            </tr>
+            <tr>
+                <td>workshops.tt</td>
+                <td>Main workshop listing page</td>
+                <td>/Comserv/root/WorkShops/workshops.tt</td>
+            </tr>
+            <tr>
+                <td>addworkshop.tt</td>
+                <td>Form for adding new workshops</td>
+                <td>/Comserv/root/WorkShops/addworkshop.tt</td>
+            </tr>
+            <tr>
+                <td>details.tt</td>
+                <td>Workshop details page</td>
+                <td>/Comserv/root/WorkShops/details.tt</td>
+            </tr>
+            <tr>
+                <td>edit.tt</td>
+                <td>Form for editing workshops</td>
+                <td>/Comserv/root/WorkShops/edit.tt</td>
+            </tr>
+            <tr>
+                <td>presentation.tt</td>
+                <td>Presentation details and download page</td>
+                <td>/Comserv/root/WorkShops/presentation.tt</td>
+            </tr>
+            <tr>
+                <td>error.tt</td>
+                <td>Error display page</td>
+                <td>/Comserv/root/WorkShops/error.tt</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div id="database" class="section">
+        <h2>Database Schema</h2>
+        <p>The Workshop System uses the following database tables:</p>
+        
+        <div class="table-schema">
+            <h3>workshop</h3>
+            <p><strong>Purpose:</strong> Stores information about workshops</p>
+            <pre>
+CREATE TABLE workshop (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sitename TEXT,
+    title TEXT,
+    description TEXT,
+    date DATETIME,
+    time TIME,
+    end_time TIME,
+    location TEXT,
+    instructor TEXT,
+    max_participants INTEGER,
+    share BOOLEAN
+);
+            </pre>
+        </div>
+        
+        <div class="table-schema">
+            <h3>file</h3>
+            <p><strong>Purpose:</strong> Stores files associated with workshops</p>
+            <pre>
+CREATE TABLE file (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    workshop_id INTEGER,
+    filename TEXT,
+    filepath TEXT,
+    filetype TEXT,
+    filesize INTEGER,
+    upload_date DATETIME,
+    FOREIGN KEY(workshop_id) REFERENCES workshop(id)
+);
+            </pre>
+        </div>
+    </div>
+    
+    <div id="routing" class="section">
+        <h2>Routing</h2>
+        <p>The Workshop System uses the following URL routes:</p>
+        
+        <table class="routes-table">
+            <tr>
+                <th>URL</th>
+                <th>Controller Method</th>
+                <th>Purpose</th>
+            </tr>
+            <tr>
+                <td>/workshop</td>
+                <td>index</td>
+                <td>Display workshop listing</td>
+            </tr>
+            <tr>
+                <td>/workshop/add</td>
+                <td>add</td>
+                <td>Display form for adding workshops</td>
+            </tr>
+            <tr>
+                <td>/workshop/addworkshop</td>
+                <td>addworkshop</td>
+                <td>Process form submission for new workshops</td>
+            </tr>
+            <tr>
+                <td>/workshop/details?id=X</td>
+                <td>details</td>
+                <td>Display workshop details</td>
+            </tr>
+            <tr>
+                <td>/workshop/edit/X</td>
+                <td>edit</td>
+                <td>Edit workshop</td>
+            </tr>
+            <tr>
+                <td>/workshop/presentation</td>
+                <td>presentation</td>
+                <td>Display presentation details</td>
+            </tr>
+            <tr>
+                <td>/workshop/download?file=X</td>
+                <td>download</td>
+                <td>Download presentation files</td>
+            </tr>
+            <tr>
+                <td>/workshop/view?file=X</td>
+                <td>view</td>
+                <td>View HTML presentations in browser</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div id="integration" class="section">
+        <h2>Integration Points</h2>
+        <p>The Workshop System integrates with other Comserv systems in the following ways:</p>
+        
+        <ul>
+            <li><strong>Authentication System</strong>: Uses session data to determine user roles for access control</li>
+            <li><strong>File System</strong>: Stores and serves presentation files</li>
+            <li><strong>Database</strong>: Stores workshop and file data</li>
+            <li><strong>Theme System</strong>: Uses the application's theming for consistent look and feel</li>
+        </ul>
+    </div>
+</div>
+
+<style>
+    .documentation-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+    }
+    
+    .toc {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 30px;
+    }
+    
+    .toc ul {
+        list-style-type: none;
+        padding-left: 20px;
+    }
+    
+    .section {
+        margin-bottom: 40px;
+    }
+    
+    .subsection {
+        margin-bottom: 30px;
+        padding-left: 20px;
+    }
+    
+    .method, .model, .table-schema {
+        background-color: #f9f9f9;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+        border-left: 4px solid #3498db;
+    }
+    
+    h1 {
+        color: #2c3e50;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 10px;
+    }
+    
+    h2 {
+        color: #2c3e50;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 5px;
+    }
+    
+    h3 {
+        color: #3498db;
+    }
+    
+    h4 {
+        color: #2c3e50;
+        margin-bottom: 10px;
+    }
+    
+    pre {
+        background-color: #f0f0f0;
+        border: 1px solid #ddd;
+        border-radius: 3px;
+        padding: 10px;
+        overflow-x: auto;
+        font-size: 14px;
+    }
+    
+    code {
+        background-color: #f0f0f0;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-family: monospace;
+    }
+    
+    a {
+        color: #3498db;
+        text-decoration: none;
+    }
+    
+    a:hover {
+        text-decoration: underline;
+    }
+    
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+    }
+    
+    th, td {
+        padding: 10px;
+        border: 1px solid #ddd;
+        text-align: left;
+    }
+    
+    th {
+        background-color: #f5f5f5;
+    }
+    
+    tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+</style>

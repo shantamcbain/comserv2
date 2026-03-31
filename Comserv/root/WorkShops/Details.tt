@@ -4,11 +4,11 @@
    roles = "admin,user"
    TemplateType = "Application"
    category = "WorkShops"
-   page_version = "0.05"
-   last_updated = "2026-02-19"
+   page_version = "0.06"
+   last_updated = "2026-02-27"
 %]
 
-[% PageVersion = 'WorkShops/Details.tt,v 0.05 2026/02/19 shanta Exp shanta' %]
+[% PageVersion = 'WorkShops/Details.tt,v 0.06 2026/02/27 shanta Exp shanta' %]
 [% IF debug_mode == 1 %]
  [% PageVersion %]
 [% END %]
@@ -81,7 +81,13 @@
                                 [% 
                                     current = workshop.current_participants || 0;
                                     max = workshop.max_participants || 0;
-                                    is_full = max > 0 && current >= max;
+                                    
+                                    # Set is_full variable for use in Register button below
+                                    IF max > 0 && current >= max;
+                                        is_full = 1;
+                                    ELSE;
+                                        is_full = 0;
+                                    END;
                                 %]
                                 [% IF max > 0 %]
                                     [% IF is_full %]
@@ -140,17 +146,31 @@
                 </div>
             </div>
             
+            <!-- Debug: Registration button visibility -->
+            [% IF c.request.params.debug == 1 %]
+            <div class="debug-info">
+                <p><strong>Registration Debug:</strong></p>
+                <ul>
+                    <li>c.user_exists: [% c.user_exists ? 'YES' : 'NO' %]</li>
+                    <li>is_user_registered: [% is_user_registered ? 'YES' : 'NO' %]</li>
+                    <li>workshop.status: [% workshop.status %]</li>
+                    <li>is_full: [% is_full ? 'YES' : 'NO' %]</li>
+                    <li>Condition for Register button: [% IF c.user_exists && !is_user_registered && workshop.status == 'published' %]TRUE[% ELSE %]FALSE[% END %]</li>
+                </ul>
+            </div>
+            [% END %]
+            
             [% IF c.user_exists && !is_user_registered && workshop.status == 'published' %]
             <div class="data-container">
                 <div class="form-actions">
                     [% IF is_full %]
-                    <form action="/workshop/register" method="POST" style="display:inline;">
+                    <form action="/workshop/register" method="POST">
                         <input type="hidden" name="workshop_id" value="[% workshop.id %]">
                         <button type="submit" class="btn btn-warning">Join Waitlist</button>
                         <p class="help-text">This workshop is currently full. You will be added to the waitlist and notified if a spot becomes available.</p>
                     </form>
                     [% ELSE %]
-                    <form action="/workshop/register" method="POST" style="display:inline;">
+                    <form action="/workshop/register" method="POST">
                         <input type="hidden" name="workshop_id" value="[% workshop.id %]">
                         <button type="submit" class="btn btn-primary">Register for Workshop</button>
                         <p class="help-text">Click to register for this workshop.</p>
@@ -164,7 +184,7 @@
                     <p>✓ You are registered for this workshop.</p>
                 </div>
                 <div class="form-actions">
-                    <form action="/workshop/unregister" method="POST" style="display:inline;">
+                    <form action="/workshop/unregister" method="POST">
                         <input type="hidden" name="workshop_id" value="[% workshop.id %]">
                         <button type="submit" class="btn btn-secondary">Cancel Registration</button>
                     </form>
@@ -172,7 +192,7 @@
             </div>
             [% END %]
             
-            [% IF c.user_exists && (is_user_registered || c.session.roles.match('admin')) %]
+            [% IF workshop_files.size > 0 || workshop_content.size > 0 %]
             <div class="data-container">
                 <h2>Workshop Materials</h2>
                 
@@ -181,22 +201,31 @@
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>File Name</th>
-                                <th>File Type</th>
-                                <th>File Size</th>
-                                <th>Uploaded</th>
+                                <th>File</th>
+                                <th>Type</th>
+                                <th>Size</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             [% FOREACH file IN workshop_files %]
+                            [% SET fsize_raw = file.file_size > 0 ? file.file_size / 1024 : 0 %]
+                            [% SET fsize_kb  = fsize_raw.int %]
+                            [% SET fsize_mb_raw = fsize_kb > 1024 ? fsize_kb / 1024 : 0 %]
+                            [% SET fsize_mb  = fsize_mb_raw.int %]
+                            [% SET fsize_label = fsize_kb > 1024 ? fsize_mb _ ' MB' : fsize_kb > 0 ? fsize_kb _ ' KB' : '—' %]
                             <tr>
-                                <td>[% file.file_name | html %]</td>
-                                <td>[% file.file_type | html %]</td>
-                                <td>[% file.file_size | html %] bytes</td>
-                                <td>[% file.upload_date || 'N/A' | html %]</td>
+                                <td><strong>[% file.file_name | html %]</strong></td>
+                                <td><code>[% file.file_type | upper | html %]</code></td>
+                                <td>[% fsize_label %]</td>
                                 <td class="action-cell">
-                                    <a href="/workshop/download/[% file.id %]" class="btn btn-sm btn-primary">Download</a>
+                                    [% IF file.external_url %]
+                                        <a href="[% file.external_url | html %]" target="_blank" class="btn btn-sm btn-primary">🔗 Open Link</a>
+                                    [% ELSIF file.source == 'workshop_resource' %]
+                                        <a href="/workshop/resource_download/[% file.id %]" class="btn btn-sm btn-primary">⬇️ Download</a>
+                                    [% ELSE %]
+                                        <a href="/workshop/download/[% file.id %]" class="btn btn-sm btn-primary">⬇️ Download</a>
+                                    [% END %]
                                 </td>
                             </tr>
                             [% END %]
@@ -228,12 +257,30 @@
             </div>
             [% END %]
             
+            <!-- Debug: Show button visibility check -->
+            [% IF c.session.debug_mode == 1 %]
+            <div class="debug-info">
+                <p><strong>Button Visibility Debug:</strong></p>
+                <ul>
+                    <li>c.user_exists: [% c.user_exists ? 'YES' : 'NO' %]</li>
+                    <li>username: [% c.session.username || 'NOT SET' %]</li>
+                    <li>user_id: [% c.session.user_id || 'NOT SET' %]</li>
+                    <li>is_admin: [% is_admin ? 'YES' : 'NO' %]</li>
+                    <li>is_workshop_leader: [% is_workshop_leader ? 'YES' : 'NO' %]</li>
+                    <li>workshop.created_by: [% workshop.created_by || 'NOT SET' %]</li>
+                </ul>
+            </div>
+            [% END %]
+            
             <div class="form-actions">
-                [% IF c.user_exists && (c.session.roles.match('admin') || is_workshop_leader) %]
-                    <a href="/workshop/edit/[% workshop.id %]" class="btn btn-edit">Edit Workshop</a>
-                    <a href="/workshop/participants?workshop_id=[% workshop.id %]" class="btn btn-secondary">Manage Participants</a>
-                    <a href="/workshop/files?workshop_id=[% workshop.id %]" class="btn btn-secondary">Manage Files</a>
-                    <a href="/workshop/compose_email?workshop_id=[% workshop.id %]" class="btn btn-secondary">Email Participants</a>
+                [% IF c.user_exists %]
+                    [% IF is_admin || is_workshop_leader %]
+                        <a href="/workshop/edit/[% workshop.id %]" class="btn btn-edit">Edit Workshop</a>
+                        <a href="/workshop/participants/[% workshop.id %]" class="btn btn-secondary">Manage Participants</a>
+                        <a href="/workshop/files/[% workshop.id %]" class="btn btn-secondary">Manage Files</a>
+                        <a href="/workshop/content/[% workshop.id %]" class="btn btn-secondary">Manage Content</a>
+                        <a href="/workshop/compose_email/[% workshop.id %]" class="btn btn-secondary">Email Participants</a>
+                    [% END %]
                 [% END %]
                 <a href="/workshop" class="btn btn-secondary">Back to Workshops</a>
             </div>

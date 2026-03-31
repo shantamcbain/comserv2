@@ -157,6 +157,277 @@ if ($ENV{CATALYST_DEBUG}) {
     }
 }
 
+# Prevent dev auto-restart loops caused by log file writes.
+# If -r/--restart is used without an explicit restart regex, enforce one that
+# excludes any path under log/logs directories.
+sub _apply_safe_restart_defaults {
+    my @args = @_;
+
+    my $has_restart       = 0;
+    my $has_restart_regex = 0;
+    my $has_fork          = 0;
+
+    for (my $i = 0; $i < @args; $i++) {
+        my $arg = $args[$i];
+
+        if ($arg eq '-r' || $arg eq '--restart') {
+            $has_restart = 1;
+        }
+
+        if ($arg eq '-rr' || $arg eq '--restart_regex') {
+            $has_restart_regex = 1;
+            $i++ if $i + 1 < @args;
+            next;
+        }
+
+        if ($arg =~ /^-rr=/ || $arg =~ /^--restart_regex=/) {
+            $has_restart_regex = 1;
+        }
+
+        if ($arg eq '-f' || $arg eq '--fork') {
+            $has_fork = 1;
+        }
+    }
+
+    if ($has_restart && !$has_restart_regex) {
+        my $safe_restart_regex =
+            '^(?!.*(?:^|[\\/])logs?(?:[\\/]|$)).*\\.(?:pm|pl|psgi|tt|tt2|tmpl|yml|yaml|conf|css|js)$';
+        push @args, ('--restart_regex', $safe_restart_regex);
+    }
+
+    # --fork caused session race-conditions: the pre-login session cookie would
+    # persist after login because concurrent forked child processes (e.g. the
+    # AI AJAX poll) could overwrite the newly-created login session file before
+    # the redirect response reached the browser.
+    # --fork is therefore NO LONGER added automatically.  Pass -f/--fork on the
+    # command line if you explicitly need it (e.g. for AI/Ollama testing), or
+    # set CATALYST_FORCE_FORK=1 in the environment.
+    if (!$has_fork && $ENV{CATALYST_FORCE_FORK}) {
+        push @args, '--fork';
+    }
+
+    return @args;
+}
+
+@ARGV = _apply_safe_restart_defaults(@ARGV);
+
+# =========================================================================
+# Health Evaluation Daemon
+#
+# Only comserv_server.pl runs health evaluation.  A background child process
+# is forked here so it survives across Starman worker restarts.
+# It periodically:
+#   1. Evaluates unevaluated application_log records by importance score.
+#   2. Sends CSC admin email alerts when health degrades.
+#   3. Prunes evaluated records to keep the table manageable.
+# =========================================================================
+
+sub _start_health_evaluator {
+    my $pid = fork();
+    return unless defined $pid;   # fork failed - skip silently
+
+    if ($pid == 0) {
+        # --- child process ---
+        eval {
+            require Comserv::Util::HealthLogger;
+            require Comserv::Model::RemoteDB;
+            require Comserv::Util::Logging;
+
+            my $logger = Comserv::Util::Logging->instance;
+
+            # Build a direct DB connection without Catalyst context
+            my $remote_db  = Comserv::Model::RemoteDB->new();
+            my $conn_info  = $remote_db->get_connection_info('ency');
+            my $conn       = $conn_info->{config};
+            my $db_type    = $conn->{db_type} || 'mysql';
+
+            my $dsn;
+            my ($db_user, $db_pass) = ('', '');
+            if ($db_type eq 'sqlite') {
+                $dsn = "dbi:SQLite:dbname=" . $conn->{database_path};
+            } else {
+                my $driver = 'MariaDB';
+                eval { require DBD::MariaDB };
+                $driver = 'mysql' if $@;
+                $dsn     = "dbi:$driver:database=" . $conn->{database}
+                           . ";host=" . $conn->{host}
+                           . ";port=" . $conn->{port};
+                $db_user = $conn->{username} // '';
+                $db_pass = $conn->{password} // '';
+            }
+
+            require DBIx::Class::Schema;
+            require Comserv::Model::Schema::Ency;
+
+            my $schema = Comserv::Model::Schema::Ency->connect(
+                $dsn, $db_user, $db_pass,
+                { RaiseError => 1, PrintError => 0, AutoCommit => 1 }
+            );
+
+            $logger->log_with_details(undef, 'info', __FILE__, __LINE__,
+                '_start_health_evaluator',
+                "Health evaluator daemon started (PID=$$)"
+            );
+
+            my $eval_interval_sec  = $ENV{HEALTH_EVAL_INTERVAL}  // 300;  # 5 min
+            my $prune_interval_sec = $ENV{HEALTH_PRUNE_INTERVAL}  // 3600; # 1 hr
+            my $alert_threshold    = $ENV{HEALTH_ALERT_THRESHOLD} // 60;   # score < 60 = alert
+            my $last_prune = time();
+            my $last_alert_status = 'OK';
+
+            while (1) {
+                sleep($eval_interval_sec);
+
+                eval {
+                    # Evaluate recent records and build summary
+                    my $summary = Comserv::Util::HealthLogger->evaluate_records(
+                        $schema, $eval_interval_sec / 60
+                    );
+
+                    # Compute overall health score
+                    my $health = Comserv::Util::HealthLogger->compute_health_score(
+                        $schema, $eval_interval_sec / 60
+                    );
+
+                    my $score  = $health->{score};
+                    my $status = $health->{status};
+
+                    $logger->log_with_details(undef, 'info', __FILE__, __LINE__,
+                        'health_eval_loop',
+                        sprintf("Health evaluation: status=%s score=%d events=%d",
+                            $status, $score, scalar(@$summary))
+                    );
+
+                    # Log Docker container health to system_log so all servers are visible
+                    eval {
+                        my $containers = Comserv::Util::HealthLogger->get_docker_health();
+                        for my $ct (@$containers) {
+                            my $lvl = ($ct->{health} eq 'healthy') ? 'info'
+                                    : ($ct->{health} eq 'unhealthy') ? 'warn'
+                                    : 'debug';
+                            $logger->log_with_details(undef, $lvl, __FILE__, __LINE__,
+                                'docker_health',
+                                sprintf('[HEALTH][DOCKER_STATUS] container=%s health=%s status=%s last_check=%s',
+                                    $ct->{name}, $ct->{health}, $ct->{status_str},
+                                    $ct->{last_output} || 'ok')
+                            );
+                        }
+                    };
+
+                    # Alert CSC admin if health has deteriorated
+                    if ($score < $alert_threshold && $last_alert_status eq 'OK') {
+                        _send_health_alert($schema, $health, $summary, $logger);
+                    }
+                    $last_alert_status = $status;
+
+                    # Prune old records periodically
+                    if (time() - $last_prune >= $prune_interval_sec) {
+                        my $deleted = Comserv::Util::HealthLogger->prune_old_records(
+                            $schema,
+                            debug_days    => $ENV{HEALTH_DEBUG_DAYS}    // 1,
+                            info_days     => $ENV{HEALTH_INFO_DAYS}     // 2,
+                            warn_days     => $ENV{HEALTH_WARN_DAYS}     // 7,
+                            error_days    => $ENV{HEALTH_ERROR_DAYS}    // 30,
+                            critical_days => $ENV{HEALTH_CRITICAL_DAYS} // 90,
+                            max_records   => $ENV{HEALTH_MAX_RECORDS}   // 10000,
+                        );
+                        $logger->log_with_details(undef, 'info', __FILE__, __LINE__,
+                            'health_prune',
+                            "Pruned $deleted old application_log records"
+                        );
+                        $last_prune = time();
+                    }
+                };
+                if ($@) {
+                    warn "[HealthEvaluator] Error in eval loop: $@\n";
+                }
+            }
+        };
+        if ($@) {
+            warn "[HealthEvaluator] Fatal startup error: $@\n";
+        }
+        exit(0);
+    }
+    # parent continues
+    return $pid;
+}
+
+sub _send_health_alert {
+    my ($schema, $health, $summary, $logger) = @_;
+
+    my $admin_email = $ENV{CSC_ADMIN_EMAIL} // $ENV{ADMIN_EMAIL} // '';
+    return unless $admin_email;
+
+    my $status      = $health->{status};
+    my $score       = $health->{score};
+    my $issues_text = join("\n", @{ $health->{summary} // [] });
+
+    my $top_events = '';
+    my $n = 0;
+    for my $ev (@{ $summary // [] }) {
+        last if ++$n > 10;
+        $top_events .= sprintf(
+            "  [%s][%s] %s x%d (score=%d)\n",
+            $ev->{lvl} // '',
+            $ev->{cat} // '',
+            $ev->{rec}->message // '',
+            $ev->{count},
+            $ev->{score},
+        );
+    }
+
+    my $body = <<"EMAIL";
+COMSERV SERVER HEALTH ALERT
+============================
+Status : $status
+Score  : $score / 100
+Time   : @{[ scalar localtime ]}
+Instance: @{[ Comserv::Util::HealthLogger::_get_app_instance() ]}
+
+Health Issues:
+$issues_text
+
+Top Problem Events:
+$top_events
+
+ACTION REQUIRED: The Docker container may need attention or restarting.
+Check /health/app_health and /health/recent_errors for details.
+EMAIL
+
+    eval {
+        require Net::SMTP;
+        my $smtp_host = $ENV{ALERT_SMTP_HOST} // 'localhost';
+        my $smtp_port = $ENV{ALERT_SMTP_PORT} // 25;
+        my $from      = $ENV{ALERT_FROM_EMAIL} // 'comserv@localhost';
+
+        my $smtp = Net::SMTP->new($smtp_host, Port => $smtp_port, Timeout => 15);
+        if ($smtp) {
+            $smtp->mail($from);
+            $smtp->to($admin_email);
+            $smtp->data();
+            $smtp->datasend("From: $from\n");
+            $smtp->datasend("To: $admin_email\n");
+            $smtp->datasend("Subject: [COMSERV ALERT] Server Health $status (score=$score)\n");
+            $smtp->datasend("\n");
+            $smtp->datasend($body);
+            $smtp->dataend();
+            $smtp->quit();
+            $logger->log_with_details(undef, 'info', __FILE__, __LINE__,
+                '_send_health_alert',
+                "Health alert email sent to $admin_email (status=$status score=$score)"
+            );
+        }
+    };
+    if ($@) {
+        $logger->log_with_details(undef, 'error', __FILE__, __LINE__,
+            '_send_health_alert',
+            "Failed to send health alert email to $admin_email: $@"
+        );
+    }
+}
+
+_start_health_evaluator();
+
 Catalyst::ScriptRunner->run('Comserv', 'Server');
 
 1;
@@ -209,4 +480,3 @@ This library is free software. You can redistribute it and/or modify
 it under the same terms as Perl itself.
 
 =cut
-

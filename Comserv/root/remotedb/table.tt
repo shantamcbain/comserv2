@@ -1,4 +1,5 @@
-[% META title = 'Table: ' _ table_name _ ' in ' _ conn_name %]
+[% META title = 'Remote Database Table' %]
+[% title = 'Table: ' _ table_name _ ' in ' _ conn_name %]
 
 <div class="container">
     <h1>Table: [% table_name %]</h1>
