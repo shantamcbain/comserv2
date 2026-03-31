@@ -1,0 +1,130 @@
+[% PageVersion = '/mail/EditSmtpConfig.tt,v 0.01 2026/02/22 shanta Exp shanta ' %]
+[% META title = 'Edit SMTP Configuration' %]
+[% IF c.session.debug_mode == 1 %]
+  [% PageVersion %]
+  [% INCLUDE 'debug.tt' %]
+[% END %]
+
+<h1>Edit SMTP Configuration</h1>
+
+<h2>Site: [% site_name %] (ID: [% site_id %])</h2>
+
+[% IF error_msg %]
+    <p class="error">[% error_msg %]</p>
+[% END %]
+
+[% IF c.flash.error_msg %]
+    <p class="error">[% c.flash.error_msg %]</p>
+[% END %]
+
+[% IF status_msg %]
+    <p class="success">[% status_msg %]</p>
+[% END %]
+
+[% IF c.flash.success_msg %]
+    <p class="success">[% c.flash.success_msg %]</p>
+[% END %]
+
+<form method="POST" action="/mail/edit_smtp_config?site_id=[% site_id %]">
+    <input type="hidden" name="site_id" value="[% site_id %]">
+    
+    <label for="smtp_host">SMTP Host:</label>
+    <input type="text" id="smtp_host" name="smtp_host" value="[% smtp_config.smtp_host || '' %]" required><br>
+    
+    <label for="smtp_port">SMTP Port:</label>
+    <select id="smtp_port" name="smtp_port" required>
+        <option value="465" [% smtp_config.smtp_port == 465 ? 'selected' : '' %]>465 (SSL/TLS — harper.whc.ca)</option>
+        <option value="587" [% smtp_config.smtp_port == 587 ? 'selected' : '' %]>587 (STARTTLS)</option>
+        <option value="25" [% smtp_config.smtp_port == 25 ? 'selected' : '' %]>25 (Plain — LAN relay only)</option>
+        <option value="2525" [% smtp_config.smtp_port == 2525 ? 'selected' : '' %]>2525 (Alternative)</option>
+    </select><br>
+    
+    <label for="smtp_user">SMTP Username:</label>
+    <input type="text" id="smtp_user" name="smtp_user" value="[% smtp_config.smtp_user || smtp_config.smtp_username || '' %]"><br>
+    
+    <label for="smtp_password">SMTP Password:</label>
+    <input type="password" id="smtp_password" name="smtp_password" placeholder="Leave blank to keep current password">
+    <small style="display: block; margin-left: 150px; color: #666;">Enter new password only if you want to change it</small><br>
+    
+    <label for="smtp_from">From Email:</label>
+    <input type="email" id="smtp_from" name="smtp_from" value="[% smtp_config.smtp_from || '' %]"><br>
+    
+    <label for="smtp_ssl">Use SSL:</label>
+    <input type="checkbox" id="smtp_ssl" name="smtp_ssl" value="ssl" [% smtp_config.smtp_ssl ? 'checked' : '' %]>
+    <small style="color:#666;"> (required for port 465)</small><br>
+    
+    <div style="margin-top: 20px;">
+        <input type="submit" value="Update Configuration">
+        <a href="[% c.uri_for('/mail/mail_admin_dashboard') %]" class="btn-cancel">Cancel</a>
+    </div>
+</form>
+
+<p style="margin-top: 30px;"><a href="[% c.uri_for('/mail/mail_admin_dashboard') %]">Back to Mail Admin Dashboard</a></p>
+
+<style>
+    .error {
+        color: red;
+        font-weight: bold;
+        padding: 10px;
+        background: #ffe6e6;
+        border: 1px solid red;
+        border-radius: 4px;
+        margin-bottom: 15px;
+    }
+    
+    .success {
+        color: green;
+        font-weight: bold;
+        padding: 10px;
+        background: #e6ffe6;
+        border: 1px solid green;
+        border-radius: 4px;
+        margin-bottom: 15px;
+    }
+    
+    form {
+        max-width: 500px;
+    }
+    
+    label {
+        display: inline-block;
+        width: 150px;
+        margin-top: 10px;
+    }
+    
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    select {
+        width: 300px;
+        padding: 5px;
+    }
+    
+    input[type="submit"] {
+        margin-top: 15px;
+        padding: 10px 20px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    input[type="submit"]:hover {
+        background: #0056b3;
+    }
+    
+    .btn-cancel {
+        display: inline-block;
+        margin-left: 10px;
+        padding: 10px 20px;
+        background: #6c757d;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+    }
+    
+    .btn-cancel:hover {
+        background: #5a6268;
+    }
+</style>

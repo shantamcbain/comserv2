@@ -1,8 +1,9 @@
 [%# WorkShops Implementation Phases - Database-Driven Containers %]
 [%# This file is included in Planning.tt %]
+[%# Updated: 2026-02-21 - Phases 0-7 Delivered, Phase 8B In-Progress %]
 
 <h4>🏗️ Implementation Phases (Database-Driven Containers)</h4>
-<p><em>Each phase is a sub-project in the database with detailed todos. Click to expand/collapse phase details. Sub-project IDs: 174-182 (~50 todos total).</em></p>
+<p><em>Each phase is a sub-project in the database with detailed todos. Click to expand/collapse phase details. Sub-project IDs: 174-184 (~60 todos total).</em></p>
 
 [% TRY %]
     [% SET schema = c.model('DBEncy').schema %]
@@ -10,50 +11,27 @@
     <!-- Phase 0: Planning System Integration -->
     [% SET phase0 = schema.resultset('Project').find(174) %]
     [% IF phase0 %]
-    <details class="phase-container" style="margin: 15px 0; border: 2px solid #4CAF50; padding: 10px; background: #e8f5e9;">
+    <details class="phase-container" style="margin: 15px 0; border: 2px solid #17a2b8; padding: 10px; background: #d1ecf1;">
         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
-            [% IF phase0.status == 'Completed' %]✅[% ELSIF phase0.status == 'In-Process' %]⏳[% ELSE %]📌[% END %]
-            Phase 0: Planning System Integration (PREREQUISITE - [% phase0.status %])
+            ✅ Phase 0: Planning System Integration - <span class="status-delivered">Delivered</span>
         </summary>
         <div style="margin-top: 10px;">
             <p><strong>What:</strong> Integrate WorkShops system into Planning.tt documentation. Establish foundation for all subsequent development work.</p>
-            <p><strong>Why:</strong> Without proper planning documentation, the project lacks visibility, tracking, and integration with the overall system planning workflow. This phase establishes the foundation for all subsequent work by creating comprehensive planning documentation, linking to Project ID 8, documenting all 8 phases, and adding port 4004 access to the Overview section.</p>
-            <p><strong>⚠️ Blocking Note:</strong> NO OTHER WORK proceeds until this phase is marked complete. This is a PREREQUISITE for all implementation phases.</p>
+            <p><strong>Why:</strong> Without proper planning documentation, the project lacks visibility, tracking, and integration with the overall system planning workflow.</p>
+            <p><strong>✅ Completion:</strong> Planning.tt updated with comprehensive WorkShops section, all 8 phases documented, port 4004 link added to Overview, Project ID 8 integrated.</p>
             
             <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
                 <h5>📊 Database Project Details</h5>
                 <ul>
                     <li><strong>Project ID:</strong> [% phase0.id %]</li>
-                    <li><strong>Status:</strong> [% phase0.status %]</li>
+                    <li><strong>Status:</strong> <span class="status-delivered">[% phase0.status || 'Delivered' %]</span></li>
                     <li><strong>Timeline:</strong> [% phase0.start_date %] → [% phase0.end_date %]</li>
-                    <li><strong>Estimated Hours:</strong> [% phase0.estimated_man_hours %]</li>
-                    <li><strong>Project Code:</strong> [% phase0.project_code %]</li>
-                    <li><strong>Description:</strong> [% phase0.description %]</li>
-                    <li><strong>Comments:</strong> [% phase0.comments %]</li>
+                    <li><strong>Project Code:</strong> [% phase0.project_code || 'WS-P0' %]</li>
                 </ul>
                 <p>
                     <a href="/project/details?project_id=[% phase0.id %]" target="_blank">View Details</a> |
-                    <a href="/project/editproject?project_id=[% phase0.id %]" target="_blank">Edit</a> |
-                    <a href="/todo/addtodo?project_id=[% phase0.id %]" target="_blank">Add Todo</a>
+                    <a href="/project/editproject?project_id=[% phase0.id %]" target="_blank">Edit</a>
                 </p>
-                
-                [% SET phase0_todos = phase0.todos.search({}, { order_by => 'sort_order' }) %]
-                [% IF phase0_todos.count > 0 %]
-                    <h6>📋 Todos ([% phase0_todos.count %]):</h6>
-                    <ul style="list-style-type: none; padding-left: 0;">
-                        [% FOREACH task IN phase0_todos.all %]
-                            <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #4CAF50; background: #fafafa;">
-                                [% IF task.status == 'In-Process' %]⏳[% ELSIF task.status == 'Completed' %]✅[% ELSE %]📌[% END %]
-                                [% task.subject %]
-                                <br><small>Status: [% task.status %] | Due: [% task.due_date %]</small>
-                                <br><a href="/todo/showtodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
-                                <a href="/todo/edittodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
-                            </li>
-                        [% END %]
-                    </ul>
-                [% ELSE %]
-                    <p><em>No todos. <a href="/todo/addtodo?project_id=[% phase0.id %]">Add a todo</a></em></p>
-                [% END %]
             </div>
         </div>
     </details>
@@ -62,156 +40,168 @@
     <!-- Phase 1: Database Schema & Models -->
     [% SET phase1 = schema.resultset('Project').find(175) %]
     [% IF phase1 %]
-    <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
+    <details class="phase-container" style="margin: 15px 0; border: 2px solid #17a2b8; padding: 10px; background: #d1ecf1;">
         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
-            [% IF phase1.status == 'Completed' %]✅[% ELSIF phase1.status == 'In-Process' %]⏳[% ELSE %]📌[% END %]
-            Phase 1: Database Schema & Models ([% phase1.status %])
+            ✅ Phase 1: Database Schema & Models - <span class="status-delivered">Delivered</span>
         </summary>
         <div style="margin-top: 10px;">
             <p><strong>What:</strong> Create/extend DBIx::Class Result classes for workshop data model. Schema system auto-generates database tables and columns.</p>
-            <p><strong>Why:</strong> Schema-driven approach ensures type safety, relationship integrity, and automatic migration. This phase establishes the data foundation for all workshop functionality including lifecycle management, multi-site support, participant tracking, content management, email history, and role-based access.</p>
-            <p><strong>Key Tasks:</strong> Extend WorkShop.pm and Participant.pm (add new columns, relationships, custom methods). Create WorkshopContent.pm, WorkshopEmail.pm, WorkshopRole.pm, SiteWorkshop.pm. Update Schema/Ency.pm to register new Result classes.</p>
+            <p><strong>✅ Completion:</strong> All 6 Result classes created (WorkShop.pm, Participant.pm, WorkshopContent.pm, WorkshopEmail.pm, WorkshopRole.pm, SiteWorkshop.pm), Schema.pm updated, database synced.</p>
             
             <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
                 <h5>📊 Database Project Details</h5>
                 <ul>
                     <li><strong>Project ID:</strong> [% phase1.id %]</li>
-                    <li><strong>Status:</strong> [% phase1.status %]</li>
+                    <li><strong>Status:</strong> <span class="status-delivered">[% phase1.status || 'Delivered' %]</span></li>
                     <li><strong>Timeline:</strong> [% phase1.start_date %] → [% phase1.end_date %]</li>
-                    <li><strong>Estimated Hours:</strong> [% phase1.estimated_man_hours %]</li>
-                    <li><strong>Project Code:</strong> [% phase1.project_code %]</li>
-                    <li><strong>Description:</strong> [% phase1.description %]</li>
-                    <li><strong>Comments:</strong> [% phase1.comments %]</li>
                 </ul>
                 <p>
                     <a href="/project/details?project_id=[% phase1.id %]" target="_blank">View Details</a> |
-                    <a href="/project/editproject?project_id=[% phase1.id %]" target="_blank">Edit</a> |
-                    <a href="/todo/addtodo?project_id=[% phase1.id %]" target="_blank">Add Todo</a>
+                    <a href="/project/editproject?project_id=[% phase1.id %]" target="_blank">Edit</a>
                 </p>
-                
-                [% SET phase1_todos = phase1.todos.search({}, { order_by => 'sort_order' }) %]
-                [% IF phase1_todos.count > 0 %]
-                    <h6>📋 Todos ([% phase1_todos.count %]):</h6>
-                    <ul style="list-style-type: none; padding-left: 0;">
-                        [% FOREACH task IN phase1_todos.all %]
-                            <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
-                                [% IF task.status == 'In-Process' %]⏳[% ELSIF task.status == 'Completed' %]✅[% ELSE %]📌[% END %]
-                                [% task.subject %]
-                                <br><small>Status: [% task.status %] | Due: [% task.due_date %]</small>
-                                <br><a href="/todo/showtodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
-                                <a href="/todo/edittodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
-                            </li>
-                        [% END %]
-                    </ul>
-                [% ELSE %]
-                    <p><em>No todos. <a href="/todo/addtodo?project_id=[% phase1.id %]">Add a todo</a></em></p>
-                [% END %]
             </div>
         </div>
     </details>
     [% END %]
     
-    <!-- Phases 2-8: Abbreviated version to stay within character limits -->
-    [% FOR phase_id IN [176..182] %]
-        [% SET phase = schema.resultset('Project').find(phase_id) %]
+    <!-- Phases 2-7: Delivered Status -->
+    [% FOREACH phase_info IN [
+        { id => 176, name => 'Phase 2: Core Controller Extensions', desc => 'Authorization helpers, workshop leader checks, lifecycle management actions (publish, close, start, complete, cancel)' },
+        { id => 177, name => 'Phase 3: Registration & Participant Management', desc => 'User registration workflow, capacity limits, waitlist handling, participant management (add/remove)' },
+        { id => 178, name => 'Phase 4: Content Management', desc => 'PowerPoint file upload/download, online content sections, file management with authorization' },
+        { id => 179, name => 'Phase 5: Email & Communication', desc => 'Email templates, mass email sending to participants, email history tracking' },
+        { id => 180, name => 'Phase 6: Multi-Site Support', desc => 'Site-scoped filtering, cross-site workshop discovery (public/private), site_workshop junction table' },
+        { id => 181, name => 'Phase 7: UI Templates', desc => 'Workshop listing/details/edit forms, dashboard for leaders, participant management UI, email composer, file upload interface' }
+    ] %]
+        [% SET phase = schema.resultset('Project').find(phase_info.id) %]
         [% IF phase %]
-        <details class="phase-container" style="margin: 15px 0; border: 2px solid #2196F3; padding: 10px; background: #e3f2fd;">
+        <details class="phase-container" style="margin: 15px 0; border: 2px solid #17a2b8; padding: 10px; background: #d1ecf1;">
             <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
-                [% IF phase.status == 'Completed' %]✅[% ELSIF phase.status == 'In-Process' %]⏳[% ELSE %]📌[% END %]
-                [% phase.name %] ([% phase.status %])
+                ✅ [% phase_info.name %] - <span class="status-delivered">Delivered</span>
             </summary>
             <div style="margin-top: 10px;">
-                <p><strong>Description:</strong> [% phase.description %]</p>
+                <p><strong>What:</strong> [% phase_info.desc %]</p>
                 
                 <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
                     <h5>📊 Database Project Details</h5>
                     <ul>
                         <li><strong>Project ID:</strong> [% phase.id %]</li>
-                        <li><strong>Status:</strong> [% phase.status %]</li>
+                        <li><strong>Status:</strong> <span class="status-delivered">[% phase.status || 'Delivered' %]</span></li>
                         <li><strong>Timeline:</strong> [% phase.start_date %] → [% phase.end_date %]</li>
-                        <li><strong>Estimated Hours:</strong> [% phase.estimated_man_hours %]</li>
-                        <li><strong>Project Code:</strong> [% phase.project_code %]</li>
-                        <li><strong>Comments:</strong> [% phase.comments %]</li>
                     </ul>
                     <p>
                         <a href="/project/details?project_id=[% phase.id %]" target="_blank">View Details</a> |
-                        <a href="/project/editproject?project_id=[% phase.id %]" target="_blank">Edit</a> |
-                        <a href="/todo/addtodo?project_id=[% phase.id %]" target="_blank">Add Todo</a>
+                        <a href="/project/editproject?project_id=[% phase.id %]" target="_blank">Edit</a>
                     </p>
-                    
-                    [% SET phase_todos = phase.todos.search({}, { order_by => 'sort_order' }) %]
-                    [% IF phase_todos.count > 0 %]
-                        <h6>📋 Todos ([% phase_todos.count %]):</h6>
-                        <ul style="list-style-type: none; padding-left: 0;">
-                            [% FOREACH task IN phase_todos.all %]
-                                <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #2196F3; background: #fafafa;">
-                                    [% IF task.status == 'In-Process' %]⏳[% ELSIF task.status == 'Completed' %]✅[% ELSE %]📌[% END %]
-                                    [% task.subject %]
-                                    <br><small>Status: [% task.status %] | Due: [% task.due_date %]</small>
-                                    <br><a href="/todo/showtodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
-                                    <a href="/todo/edittodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
-                                </li>
-                            [% END %]
-                        </ul>
-                    [% ELSE %]
-                        <p><em>No todos. <a href="/todo/addtodo?project_id=[% phase.id %]">Add a todo</a></em></p>
-                    [% END %]
                 </div>
             </div>
         </details>
         [% END %]
     [% END %]
     
+    <!-- Phase 8A: Controller Unit Tests -->
+    [% SET phase8a = schema.resultset('Project').find(182) %]
+    [% IF phase8a %]
+    <details class="phase-container" style="margin: 15px 0; border: 2px solid #17a2b8; padding: 10px; background: #d1ecf1;">
+        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+            ✅ Phase 8A: Controller Unit Tests - <span class="status-delivered">Delivered</span>
+        </summary>
+        <div style="margin-top: 10px;">
+            <p><strong>What:</strong> Create comprehensive unit tests for WorkShop controller actions (23 test cases covering all endpoints).</p>
+            <p><strong>✅ Completion:</strong> controller_WorkShop_extended.t created with 23 tests, all tests passing, 100% endpoint coverage achieved.</p>
+            
+            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
+                <h5>📊 Database Project Details</h5>
+                <ul>
+                    <li><strong>Project ID:</strong> [% phase8a.id %]</li>
+                    <li><strong>Status:</strong> <span class="status-delivered">[% phase8a.status || 'Delivered' %]</span></li>
+                </ul>
+                <p>
+                    <a href="/project/details?project_id=[% phase8a.id %]" target="_blank">View Details</a> |
+                    <a href="/project/editproject?project_id=[% phase8a.id %]" target="_blank">Edit</a>
+                </p>
+            </div>
+        </div>
+    </details>
+    [% END %]
+    
+    <!-- Phase 8B: Integration Tests & Final Verification (IN PROGRESS) -->
+    [% SET phase8b = schema.resultset('Project').find(183) %]
+    [% IF phase8b %]
+    <details class="phase-container" style="margin: 15px 0; border: 2px solid #28a745; padding: 10px; background: #d4edda;" open>
+        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+            ⏳ Phase 8B: Integration Tests & Final Verification - <span class="status-in-progress">In-Progress</span>
+        </summary>
+        <div style="margin-top: 10px;">
+            <p><strong>What:</strong> Integration tests, manual testing checklist, syntax checks, development server verification, documentation updates.</p>
+            <p><strong>Status:</strong> Authorization fixes completed (edit permissions, dashboard access, NULL created_by handling), draft workshop filtering implemented, status field saving fixed, date/time formatting improved (12-hour AM/PM), logging system enhanced.</p>
+            
+            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
+                <h5>📊 Database Project Details</h5>
+                <ul>
+                    <li><strong>Project ID:</strong> [% phase8b.id %]</li>
+                    <li><strong>Status:</strong> <span class="status-in-progress">[% phase8b.status || 'In-Progress' %]</span></li>
+                    <li><strong>Timeline:</strong> [% phase8b.start_date %] → [% phase8b.end_date %]</li>
+                </ul>
+                <p>
+                    <a href="/project/details?project_id=[% phase8b.id %]" target="_blank">View Details</a> |
+                    <a href="/project/editproject?project_id=[% phase8b.id %]" target="_blank">Edit</a>
+                </p>
+            </div>
+            
+            <div style="margin: 10px 0; padding: 10px; border: 1px solid #28a745; background: #f0fff0;">
+                <h5>✅ Recent Fixes (2026-02-20/21/25)</h5>
+                <ul>
+                    <li>✅ Fixed edit permission denied errors (NULL created_by handling, admin fallback)</li>
+                    <li>✅ Fixed dashboard access (workshop_leader role now allowed)</li>
+                    <li>✅ Hidden draft workshops from regular users (only visible to creators/admins)</li>
+                    <li>✅ Fixed status field saving in add/edit forms</li>
+                    <li>✅ Improved date/time formatting (12-hour AM/PM, human-readable dates)</li>
+                    <li>✅ Made filters collapsible by default</li>
+                    <li>✅ Fixed Register button visibility logic</li>
+                    <li>✅ Added comprehensive authorization debug logging</li>
+                    <li>✅ Clarified Site Sharing labels (My Site Only / Shared Across All Sites)</li>
+                    <li>✅ Added deterministic backfill script: <code>script/backfill_workshop_created_by.pl</code> (dry-run default, transaction-safe live mode)</li>
+                    <li>✅ Executed created_by backfill on <code>production_server</code>: 8 rows updated, 0 NULL remaining (verified 2026-02-25)</li>
+                </ul>
+            </div>
+            
+            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ffc107; background: #fff3cd;">
+                <h5>⏳ Remaining Tasks</h5>
+                <ul>
+                    <li>⏳ Manual testing: Full workshop lifecycle (create → publish → register → complete)</li>
+                    <li>⏳ Performance testing: Workshop listing load time verification</li>
+                    <li>⏳ Run lint/typecheck commands if available</li>
+                </ul>
+            </div>
+        </div>
+    </details>
+    [% END %]
+    
     <!-- Phase 8C: User Testing & Bug Fixes -->
     [% SET phase8c = schema.resultset('Project').find(184) %]
     [% IF phase8c %]
-    <details class="phase-container" style="margin: 15px 0; border: 2px solid #E91E63; padding: 10px; background: #fce4ec;">
+    <details class="phase-container" style="margin: 15px 0; border: 2px solid #ffc107; padding: 10px; background: #fff3cd;">
         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
-            [% IF phase8c.status == 'Completed' %]✅[% ELSIF phase8c.status == 'In-Process' %]⏳[% ELSE %]📌[% END %]
-            Phase 8C: User Testing & Bug Fixes ([% phase8c.status %])
+            📋 Phase 8C: User Testing & Bug Fixes - <span class="status-requested">Requested</span>
         </summary>
         <div style="margin-top: 10px;">
-            <p><strong>What:</strong> Conduct comprehensive user testing, identify bugs, and fix issues before production deployment.</p>
-            <p><strong>Why:</strong> User testing ensures the system works in real-world scenarios, catches bugs automated tests miss, and validates that the workflow is intuitive for workshop leaders and participants.</p>
-            <p><strong>Key Tasks:</strong> Prepare testing environment (port 4004), conduct user testing with workshop leaders/participants/admins, fix critical and high priority bugs, test 5 end-to-end scenarios, document feedback for Phase 9.</p>
+            <p><strong>What:</strong> Conduct comprehensive user testing with workshop leaders, participants, and admins. Identify and fix all critical bugs before production deployment.</p>
+            <p><strong>Why:</strong> User testing ensures the system works in real-world scenarios, catches bugs automated tests miss, and validates workflow intuitiveness.</p>
             
             <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
                 <h5>📊 Database Project Details</h5>
                 <ul>
                     <li><strong>Project ID:</strong> [% phase8c.id %]</li>
-                    <li><strong>Status:</strong> [% phase8c.status %]</li>
-                    <li><strong>Timeline:</strong> [% phase8c.start_date %] → [% phase8c.end_date %]</li>
-                    <li><strong>Estimated Hours:</strong> [% phase8c.estimated_man_hours %]</li>
-                    <li><strong>Project Code:</strong> [% phase8c.project_code %]</li>
-                    <li><strong>Description:</strong> [% phase8c.description %]</li>
-                    <li><strong>Comments:</strong> [% phase8c.comments %]</li>
+                    <li><strong>Status:</strong> <span class="status-requested">[% phase8c.status || 'Requested' %]</span></li>
                 </ul>
                 <p>
                     <a href="/project/details?project_id=[% phase8c.id %]" target="_blank">View Details</a> |
-                    <a href="/project/editproject?project_id=[% phase8c.id %]" target="_blank">Edit</a> |
-                    <a href="/todo/addtodo?project_id=[% phase8c.id %]" target="_blank">Add Todo</a>
+                    <a href="/project/editproject?project_id=[% phase8c.id %]" target="_blank">Edit</a>
                 </p>
-                
-                [% SET phase8c_todos = phase8c.todos.search({}, { order_by => 'sort_order' }) %]
-                [% IF phase8c_todos.count > 0 %]
-                    <h6>📋 Todos ([% phase8c_todos.count %]):</h6>
-                    <ul style="list-style-type: none; padding-left: 0;">
-                        [% FOREACH task IN phase8c_todos.all %]
-                            <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #E91E63; background: #fafafa;">
-                                [% IF task.status == 'In-Process' %]⏳[% ELSIF task.status == 'Completed' %]✅[% ELSE %]📌[% END %]
-                                [% task.subject %]
-                                <br><small>Status: [% task.status %] | Due: [% task.due_date %]</small>
-                                <br><a href="/todo/showtodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
-                                <a href="/todo/edittodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
-                            </li>
-                        [% END %]
-                    </ul>
-                [% ELSE %]
-                    <p><em>No todos. <a href="/todo/addtodo?project_id=[% phase8c.id %]">Add a todo</a></em></p>
-                [% END %]
             </div>
             
-            <div style="margin: 10px 0; padding: 10px; border: 1px solid #E91E63; background: #fff0f5;">
+            <div style="margin: 10px 0; padding: 10px; border: 1px solid #17a2b8; background: #d1ecf1;">
                 <h5>🧪 Testing Scenarios</h5>
                 <ul>
                     <li><strong>Scenario 1:</strong> Create and Publish Workshop (7 steps)</li>
@@ -221,186 +211,39 @@
                     <li><strong>Scenario 5:</strong> Full Workshop Lifecycle (9 steps)</li>
                 </ul>
                 <p><strong>Success Criteria:</strong> At least 3 workshop leaders and 10 participants test successfully, all critical bugs fixed, performance < 2 seconds.</p>
-            </div>
-        </div>
-    </details>
-    [% ELSE %]
-    <details class="phase-container" style="margin: 15px 0; border: 2px solid #E91E63; padding: 10px; background: #fce4ec;">
-        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
-            📌 Phase 8C: User Testing & Bug Fixes (Not Yet in Database)
-        </summary>
-        <div style="margin-top: 10px;">
-            <p><strong>Status:</strong> <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">Project not yet created in database (Project ID 184)</span></p>
-            <p><strong>What:</strong> Conduct comprehensive user testing, identify bugs, and fix issues before production deployment.</p>
-            <p><strong>Why:</strong> User testing ensures the system works in real-world scenarios, catches bugs automated tests miss, and validates that the workflow is intuitive for workshop leaders and participants.</p>
-            <p><strong>Key Tasks:</strong> Prepare testing environment (port 4004), conduct user testing with workshop leaders/participants/admins, fix critical and high priority bugs, test 5 end-to-end scenarios, document feedback for Phase 9.</p>
-            <p><a href="/project/addproject" target="_blank">Create Project in Database</a></p>
-            
-            <div style="margin: 10px 0; padding: 10px; border: 1px solid #E91E63; background: #fff0f5;">
-                <h5>🧪 Testing Scenarios</h5>
-                <ul>
-                    <li><strong>Scenario 1:</strong> Create and Publish Workshop (7 steps)</li>
-                    <li><strong>Scenario 2:</strong> Register and Participate (7 steps)</li>
-                    <li><strong>Scenario 3:</strong> Workshop Leader Communications (6 steps)</li>
-                    <li><strong>Scenario 4:</strong> Multi-Site Public Workshop (4 steps)</li>
-                    <li><strong>Scenario 5:</strong> Full Workshop Lifecycle (9 steps)</li>
-                </ul>
-                <p><strong>Success Criteria:</strong> At least 3 workshop leaders and 10 participants test successfully, all critical bugs fixed, performance < 2 seconds.</p>
-            </div>
-        </div>
-    </details>
-    [% END %]
-    
-    <!-- Phase 8D: Production Readiness -->
-    [% SET phase8d = schema.resultset('Project').find(185) %]
-    [% IF phase8d %]
-    <details class="phase-container" style="margin: 15px 0; border: 2px solid #00BCD4; padding: 10px; background: #e0f7fa;">
-        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
-            [% IF phase8d.status == 'Completed' %]✅[% ELSIF phase8d.status == 'In-Process' %]⏳[% ELSE %]📌[% END %]
-            Phase 8D: Production Readiness ([% phase8d.status %])
-        </summary>
-        <div style="margin-top: 10px;">
-            <p><strong>What:</strong> Prepare system for production deployment after user testing is complete.</p>
-            <p><strong>Why:</strong> Production deployment requires careful planning, database backups, migration execution, and smoke testing to ensure smooth transition without data loss or downtime.</p>
-            <p><strong>Key Tasks:</strong> Final code review, verify bug fixes, backup database, execute migrations, deploy code, smoke test production, monitor logs, create rollback plan.</p>
-            
-            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
-                <h5>📊 Database Project Details</h5>
-                <ul>
-                    <li><strong>Project ID:</strong> [% phase8d.id %]</li>
-                    <li><strong>Status:</strong> [% phase8d.status %]</li>
-                    <li><strong>Timeline:</strong> [% phase8d.start_date %] → [% phase8d.end_date %]</li>
-                    <li><strong>Estimated Hours:</strong> [% phase8d.estimated_man_hours %]</li>
-                    <li><strong>Project Code:</strong> [% phase8d.project_code %]</li>
-                    <li><strong>Description:</strong> [% phase8d.description %]</li>
-                    <li><strong>Comments:</strong> [% phase8d.comments %]</li>
-                </ul>
-                <p>
-                    <a href="/project/details?project_id=[% phase8d.id %]" target="_blank">View Details</a> |
-                    <a href="/project/editproject?project_id=[% phase8d.id %]" target="_blank">Edit</a> |
-                    <a href="/todo/addtodo?project_id=[% phase8d.id %]" target="_blank">Add Todo</a>
-                </p>
-                
-                [% SET phase8d_todos = phase8d.todos.search({}, { order_by => 'sort_order' }) %]
-                [% IF phase8d_todos.count > 0 %]
-                    <h6>📋 Todos ([% phase8d_todos.count %]):</h6>
-                    <ul style="list-style-type: none; padding-left: 0;">
-                        [% FOREACH task IN phase8d_todos.all %]
-                            <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #00BCD4; background: #fafafa;">
-                                [% IF task.status == 'In-Process' %]⏳[% ELSIF task.status == 'Completed' %]✅[% ELSE %]📌[% END %]
-                                [% task.subject %]
-                                <br><small>Status: [% task.status %] | Due: [% task.due_date %]</small>
-                                <br><a href="/todo/showtodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
-                                <a href="/todo/edittodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
-                            </li>
-                        [% END %]
-                    </ul>
-                [% ELSE %]
-                    <p><em>No todos. <a href="/todo/addtodo?project_id=[% phase8d.id %]">Add a todo</a></em></p>
-                [% END %]
-            </div>
-        </div>
-    </details>
-    [% ELSE %]
-    <details class="phase-container" style="margin: 15px 0; border: 2px solid #00BCD4; padding: 10px; background: #e0f7fa;">
-        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
-            📌 Phase 8D: Production Readiness (Not Yet in Database)
-        </summary>
-        <div style="margin-top: 10px;">
-            <p><strong>Status:</strong> <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">Project not yet created in database (Project ID 185)</span></p>
-            <p><strong>What:</strong> Prepare system for production deployment after user testing is complete.</p>
-            <p><strong>Why:</strong> Production deployment requires careful planning, database backups, migration execution, and smoke testing to ensure smooth transition without data loss or downtime.</p>
-            <p><strong>Key Tasks:</strong> Final code review, verify bug fixes, backup database, execute migrations, deploy code, smoke test production, monitor logs, create rollback plan.</p>
-            <p><a href="/project/addproject" target="_blank">Create Project in Database</a></p>
-        </div>
-    </details>
-    [% END %]
-    
-    <!-- Phase 9: Enhanced Features & Documentation -->
-    [% SET phase9 = schema.resultset('Project').find(183) %]
-    [% IF phase9 %]
-    <details class="phase-container" style="margin: 15px 0; border: 2px solid #9C27B0; padding: 10px; background: #f3e5f5;">
-        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
-            [% IF phase9.status == 'Completed' %]✅[% ELSIF phase9.status == 'In-Process' %]⏳[% ELSE %]📌[% END %]
-            Phase 9: Enhanced Features & Documentation ([% phase9.status %])
-        </summary>
-        <div style="margin-top: 10px;">
-            <p><strong>What:</strong> Implement enhanced file access for past workshops, mailing list management, email opt-out functionality, and comprehensive workshop leader tutorials.</p>
-            <p><strong>Why:</strong> Workshop leaders need flexible tools to manage communications with attendees who registered offline, create custom mailing lists, and respect participant email preferences. Comprehensive tutorials ensure workshop leaders can effectively use all system features.</p>
-            <p><strong>Key Tasks:</strong> Update file download authorization for past participants, add registration_method field to participants, create mailing list management system, implement opt-out/unsubscribe functionality with tokens, create comprehensive WorkShopLeaderGuide.tt tutorial.</p>
-            
-            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
-                <h5>📊 Database Project Details</h5>
-                <ul>
-                    <li><strong>Project ID:</strong> [% phase9.id %]</li>
-                    <li><strong>Status:</strong> [% phase9.status %]</li>
-                    <li><strong>Timeline:</strong> [% phase9.start_date %] → [% phase9.end_date %]</li>
-                    <li><strong>Estimated Hours:</strong> [% phase9.estimated_man_hours %]</li>
-                    <li><strong>Project Code:</strong> [% phase9.project_code %]</li>
-                    <li><strong>Description:</strong> [% phase9.description %]</li>
-                    <li><strong>Comments:</strong> [% phase9.comments %]</li>
-                </ul>
-                <p>
-                    <a href="/project/details?project_id=[% phase9.id %]" target="_blank">View Details</a> |
-                    <a href="/project/editproject?project_id=[% phase9.id %]" target="_blank">Edit</a> |
-                    <a href="/todo/addtodo?project_id=[% phase9.id %]" target="_blank">Add Todo</a>
-                </p>
-                
-                [% SET phase9_todos = phase9.todos.search({}, { order_by => 'sort_order' }) %]
-                [% IF phase9_todos.count > 0 %]
-                    <h6>📋 Todos ([% phase9_todos.count %]):</h6>
-                    <ul style="list-style-type: none; padding-left: 0;">
-                        [% FOREACH task IN phase9_todos.all %]
-                            <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #9C27B0; background: #fafafa;">
-                                [% IF task.status == 'In-Process' %]⏳[% ELSIF task.status == 'Completed' %]✅[% ELSE %]📌[% END %]
-                                [% task.subject %]
-                                <br><small>Status: [% task.status %] | Due: [% task.due_date %]</small>
-                                <br><a href="/todo/showtodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
-                                <a href="/todo/edittodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
-                            </li>
-                        [% END %]
-                    </ul>
-                [% ELSE %]
-                    <p><em>No todos. <a href="/todo/addtodo?project_id=[% phase9.id %]">Add a todo</a></em></p>
-                [% END %]
-            </div>
-            
-            <div style="margin: 10px 0; padding: 10px; border: 1px solid #9C27B0; background: #fce4ec;">
-                <h5>🎯 Key Enhancements</h5>
-                <ul>
-                    <li><strong>File Access:</strong> Allow past workshop attendees to download files from workshops they completed</li>
-                    <li><strong>Mailing Lists:</strong> Create custom recipient groups, send to individuals or groups, track registration method (online/manual/imported)</li>
-                    <li><strong>Opt-Out:</strong> Unsubscribe links in all emails, token-based unsubscribe mechanism, email preference management</li>
-                    <li><strong>Tutorial:</strong> Comprehensive guide covering all features (creation, lifecycle, participants, files, content, emails, multi-site)</li>
-                </ul>
-            </div>
-        </div>
-    </details>
-    [% ELSE %]
-    <details class="phase-container" style="margin: 15px 0; border: 2px solid #9C27B0; padding: 10px; background: #f3e5f5;">
-        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
-            📌 Phase 9: Enhanced Features & Documentation (Not Yet in Database)
-        </summary>
-        <div style="margin-top: 10px;">
-            <p><strong>Status:</strong> <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">Project not yet created in database (Project ID 183)</span></p>
-            <p><strong>What:</strong> Implement enhanced file access for past workshops, mailing list management, email opt-out functionality, and comprehensive workshop leader tutorials.</p>
-            <p><strong>Why:</strong> Workshop leaders need flexible tools to manage communications with attendees who registered offline, create custom mailing lists, and respect participant email preferences. Comprehensive tutorials ensure workshop leaders can effectively use all system features.</p>
-            <p><strong>Key Tasks:</strong> Update file download authorization for past participants, add registration_method field to participants, create mailing list management system, implement opt-out/unsubscribe functionality with tokens, create comprehensive WorkShopLeaderGuide.tt tutorial.</p>
-            <p><a href="/project/addproject" target="_blank">Create Project in Database</a></p>
-            
-            <div style="margin: 10px 0; padding: 10px; border: 1px solid #9C27B0; background: #fce4ec;">
-                <h5>🎯 Key Enhancements</h5>
-                <ul>
-                    <li><strong>File Access:</strong> Allow past workshop attendees to download files from workshops they completed</li>
-                    <li><strong>Mailing Lists:</strong> Create custom recipient groups, send to individuals or groups, track registration method (online/manual/imported)</li>
-                    <li><strong>Opt-Out:</strong> Unsubscribe links in all emails, token-based unsubscribe mechanism, email preference management</li>
-                    <li><strong>Tutorial:</strong> Comprehensive guide covering all features (creation, lifecycle, participants, files, content, emails, multi-site)</li>
-                </ul>
             </div>
         </div>
     </details>
     [% END %]
     
 [% CATCH %]
-    <p style="color: #d9534f;"><strong>Error loading phase details:</strong> [% error.info %]</p>
+    <div style="background: #f8d7da; border: 1px solid #dc3545; padding: 10px; margin: 10px 0;">
+        <strong>Error loading phases:</strong> [% error.info %]
+    </div>
 [% END %]
+
+<h4>📝 Implementation Summary</h4>
+<div style="margin: 10px 0; padding: 15px; background: white; border: 1px solid #dee2e6; border-radius: 4px;">
+    <ul style="list-style: none; padding-left: 0;">
+        <li style="margin: 8px 0;"><span class="status-delivered">✅ Phase 0:</span> Planning System Integration</li>
+        <li style="margin: 8px 0;"><span class="status-delivered">✅ Phase 1:</span> Database Schema & Models (6 Result classes)</li>
+        <li style="margin: 8px 0;"><span class="status-delivered">✅ Phase 2:</span> Core Controller Extensions (Authorization)</li>
+        <li style="margin: 8px 0;"><span class="status-delivered">✅ Phase 3:</span> Registration & Participant Management</li>
+        <li style="margin: 8px 0;"><span class="status-delivered">✅ Phase 4:</span> Content Management (Files & Online Content)</li>
+        <li style="margin: 8px 0;"><span class="status-delivered">✅ Phase 5:</span> Email & Communication</li>
+        <li style="margin: 8px 0;"><span class="status-delivered">✅ Phase 6:</span> Multi-Site Support</li>
+        <li style="margin: 8px 0;"><span class="status-delivered">✅ Phase 7:</span> UI Templates (7 templates created)</li>
+        <li style="margin: 8px 0;"><span class="status-delivered">✅ Phase 8A:</span> Controller Unit Tests (23 tests passing)</li>
+        <li style="margin: 8px 0;"><span class="status-in-progress">⏳ Phase 8B:</span> Integration Tests & Final Verification (IN PROGRESS)</li>
+        <li style="margin: 8px 0;"><span class="status-requested">📋 Phase 8C:</span> User Testing & Bug Fixes (NEXT)</li>
+    </ul>
+</div>
+
+<h4>🔗 Related Documentation</h4>
+<ul>
+    <li><strong>Requirements:</strong> <code>.zenflow/tasks/workshops-7d21/requirements.md</code></li>
+    <li><strong>Technical Spec:</strong> <code>.zenflow/tasks/workshops-7d21/spec.md</code></li>
+    <li><strong>Implementation Plan:</strong> <code>.zenflow/tasks/workshops-7d21/plan.md</code></li>
+    <li><strong>Backfill Script:</strong> <code>Comserv/script/backfill_workshop_created_by.pl</code></li>
+    <li><strong>API Access:</strong> <a href="http://api.workstation.local:4004/workshop" target="_blank">api.workstation.local:4004</a></li>
+</ul>

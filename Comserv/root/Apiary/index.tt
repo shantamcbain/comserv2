@@ -1,0 +1,68 @@
+[% META
+   title = "Apiary Management System"
+   description = "Manage your beekeeping operation: yards, hives, queens, and health monitoring"
+%]
+[% PageVersion = 'Apiary/index.tt,v 0.01 2026/03/17 shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+
+    <div class="page-header">
+        <h1>Apiary Management System</h1>
+        <p class="page-subtitle">Manage your beekeeping operation from yards to hives to queens.</p>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+
+            <div class="app-section">
+                <h2>Your Operation</h2>
+                <p>Use the sections below to navigate your apiary. Start with your yards, drill down to hives, then track queens and health.</p>
+            </div>
+
+            <div class="app-section">
+                <h2>Apiary Sections</h2>
+                <div class="content-section">
+                    <h3><a href="/Apiary/QueenRearing">Queen Rearing System</a></h3>
+                    <p>Plan and track your queen rearing program. Schedule grafts, monitor emergence, and manage mating nucs with our graft calendar.</p>
+                </div>
+
+                <div class="content-section">
+                    <h3><a href="/Apiary/HiveManagement">Hive Management</a></h3>
+                    <p>Track hive inspections, seasonal management tasks, and hive records. Monitor brood patterns, food stores, and equipment.</p>
+                </div>
+
+                <div class="content-section">
+                    <h3><a href="/Apiary/BeeHealth">Bee Health Monitoring</a></h3>
+                    <p>Monitor your colonies for Varroa mites, diseases, and pests. Access treatment options and preventative practice guides.</p>
+                </div>
+
+                <div class="content-section">
+                    <h3><a href="/BMaster/add_yard">Add a Yard</a></h3>
+                    <p>Register a new bee yard location for your operation.</p>
+                </div>
+            </div>
+
+            [% IF c.check_user_roles('admin', 'developer') %]
+            <div class="app-section admin-only">
+                <h2>Administration</h2>
+                <div class="content-section">
+                    <ul>
+                        <li><a href="/Apiary/yards_for_site/[% c.session.SiteName %]">View Yards for [% c.session.SiteName || 'this site' %]</a></li>
+                    </ul>
+                </div>
+            </div>
+            [% END %]
+
+            <div class="page-footer">
+                <div class="footer-actions">
+                    <a href="/BMaster" class="btn btn-secondary">Back to BMaster Home</a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>

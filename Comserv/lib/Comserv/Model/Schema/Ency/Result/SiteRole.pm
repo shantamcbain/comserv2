@@ -37,11 +37,6 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key('id');
 __PACKAGE__->add_unique_constraint(['sitename', 'role_name']);
 
-__PACKAGE__->has_many(
-    'user_site_roles' => 'Comserv::Model::Schema::Ency::Result::UserSiteRole',
-    'role_id',
-    { cascade_delete => 1 }
-);
 
 sub is_admin_role {
     my $self = shift;

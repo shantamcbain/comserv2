@@ -39,11 +39,6 @@ __PACKAGE__->config(
     encoding => 'UTF-8',
     debug => $ENV{CATALYST_DEBUG} // 0,
     default_view => 'TT',
-    use_request_uri_for_path => 1,  # Use the request URI for path matching
-    use_hash_path_suffix => 1,      # Use hash path suffix for better URL handling
-    # Configure URI generation to not include port
-    using_frontend_proxy => 1,
-    ignore_frontend_proxy_port => 1,
     'Plugin::Log::Dispatch' => {
         dispatchers => [
             {
@@ -85,13 +80,35 @@ __PACKAGE__->config(
         },
     },
     'Plugin::Session' => {
-        expires => 3600,
-        cookie_name => 'comserv_session',
+        expires => 86400,
+        storage => do {
+            my $port = $ENV{COMSERV_PORT} || $ENV{CATALYST_PORT} || do {
+                my $p = '3001';
+                for my $i (0 .. $#ARGV) {
+                    if ($ARGV[$i] =~ /^-p(\d+)$/)         { $p = $1; last }
+                    elsif ($ARGV[$i] eq '-p' && $ARGV[$i+1] && $ARGV[$i+1] =~ /^\d+$/) { $p = $ARGV[$i+1]; last }
+                    elsif ($ARGV[$i] =~ /^--port=(\d+)$/)  { $p = $1; last }
+                    elsif ($ARGV[$i] eq '--port' && $ARGV[$i+1] && $ARGV[$i+1] =~ /^\d+$/) { $p = $ARGV[$i+1]; last }
+                }
+                $p;
+            };
+            $ENV{COMSERV_SESSION_DIR} || "/tmp/comserv/session_$port";
+        },
+        cookie_name => do {
+            my $port = $ENV{COMSERV_PORT} || $ENV{CATALYST_PORT} || do {
+                my $p = '3001';
+                for my $i (0 .. $#ARGV) {
+                    if ($ARGV[$i] =~ /^-p(\d+)$/)         { $p = $1; last }
+                    elsif ($ARGV[$i] eq '-p' && $ARGV[$i+1] && $ARGV[$i+1] =~ /^\d+$/) { $p = $ARGV[$i+1]; last }
+                    elsif ($ARGV[$i] =~ /^--port=(\d+)$/)  { $p = $1; last }
+                    elsif ($ARGV[$i] eq '--port' && $ARGV[$i+1] && $ARGV[$i+1] =~ /^\d+$/) { $p = $ARGV[$i+1]; last }
+                }
+                $p;
+            };
+            $ENV{COMSERV_SESSION_COOKIE} || "comserv_session_$port";
+        },
         cookie_secure => 0,
         cookie_httponly => 1,
-    },
-    'Plugin::Session::Store::File' => {
-        dir => '/tmp/session_data',
     },
     'Model::ThemeConfig' => {
         # Theme configuration model
@@ -116,12 +133,39 @@ sub psgi_app {
     my $self = shift;
 
     my $app = $self->SUPER::psgi_app(@_);
+    my $request_count = 0;
 
     return sub {
         my $env = shift;
 
         $self->config->{enable_catalyst_header} = $ENV{CATALYST_HEADER} // 1;
         $self->config->{debug} = $ENV{CATALYST_DEBUG} // 0;
+
+        # Periodic memory monitoring (every 100 requests)
+        $request_count++;
+        if ($request_count % 100 == 0) {
+            eval {
+                if (-f "/proc/self/status") {
+                    open my $fh, '<', "/proc/self/status";
+                    while (<$fh>) {
+                        if (/^VmRSS:\s+(\d+)\s+kB/) {
+                            my $rss_kb = $1;
+                            # If RSS > 512MB, log an ERROR to notify admins
+                            if ($rss_kb > 512 * 1024) {
+                                my $rss_mb = sprintf("%.2f", $rss_kb / 1024);
+                                Comserv::Util::Logging->instance->log_with_details(
+                                    undef, 'ERROR', __FILE__, __LINE__, 'psgi_app_monitor',
+                                    "CRITICAL MEMORY ALERT: Worker process $$ using $rss_mb MB RSS. " .
+                                    "Requests handled: $request_count. Starman will soon recycle this worker."
+                                );
+                            }
+                            last;
+                        }
+                    }
+                    close $fh;
+                }
+            };
+        }
 
         return $app->($env);
     };
@@ -167,44 +211,58 @@ warn "Email functionality may not work correctly.\n";
 # LAYER 3: Global Application Error Handler
 # Catches exceptions that escape individual controller error handling
 around 'finalize_error' => sub {
-    my ($orig, $self, $c) = @_;
-    
+    my ($orig, $c) = @_;
+
     # Log all unhandled errors with context
-    if ($c->error && @{$c->error}) {
-        my $error = $c->error->[0];
-        my $error_msg = ref $error ? $error->message : $error;
-        my $logger = Comserv::Util::Logging->instance;
-        $logger->log_with_details($c, 'error', __FILE__, __LINE__, 'global_error_handler',
-            "[GLOBAL ERROR] Unhandled exception: $error_msg");
-    }
-    
-    # If error.tt hasn't been rendered yet, render it now
-    unless ($c->response->body) {
-        $c->response->status(500) unless $c->response->status;
-        
-        # Set up error template stash if not already set
-        $c->stash->{error_title} ||= 'Application Error';
-        $c->stash->{error_msg} ||= 'An unexpected error occurred.';
-        $c->stash->{technical_details} ||= join(', ', @{$c->error});
-        $c->stash->{template} = 'error.tt';
-        
-        # Try to render error page
-        eval {
-            my $view = $c->view('TT');
-            $view->process($c);
-        };
-        
-        # If that fails, send a plain text error response
-        if ($@) {
-            $c->response->content_type('text/plain; charset=utf-8');
-            $c->response->body("Internal Server Error\n\n" . 
-                               "An error occurred and we were unable to render the error page.\n" .
-                               "Please contact the system administrator.");
+    eval {
+        if ($c && $c->error && @{$c->error}) {
+            my $error = $c->error->[0];
+            my $error_msg = ref $error ? $error->message : "$error";
+            my $logger = Comserv::Util::Logging->instance;
+            my $session_id = $c->sessionid // 'no-session';
+            my $user_id = $c->session->{user_id} // 'no-user';
+            my $path = $c->req->path;
+
+            my %req = Comserv::Util::Logging::extract_request_info($c);
+            my $ip       = $req{ip_address}    // '-';
+            my $req_type = $req{request_type}  // '-';
+            my $method   = $req{request_method}// '-';
+            my $ua       = substr($req{user_agent} // '-', 0, 120);
+            my $referer  = $req{referer}        // '-';
+
+            $logger->log_with_details($c, 'error', __FILE__, __LINE__, 'global_error_handler',
+                "[GLOBAL ERROR] Unhandled exception: $error_msg"
+                . " (Session: $session_id, User: $user_id, Path: $path,"
+                . " IP: $ip, Type: $req_type, Method: $method, Referer: $referer, UA: $ua)");
+
+            $logger->log_access($c, 500);
         }
-    }
-    
+    };
+
+    # If error.tt hasn't been rendered yet, render it now
+    eval {
+        if ($c && !$c->response->body) {
+            $c->response->status(500) unless $c->response->status;
+
+            $c->stash->{error_title} ||= 'Application Error';
+            $c->stash->{error_msg}   ||= 'An unexpected error occurred.';
+            $c->stash->{technical_details} ||= join(', ', @{$c->error // []});
+            $c->stash->{template} = 'error.tt';
+
+            eval {
+                my $view = $c->view('TT');
+                $view->process($c);
+            };
+
+            if ($@) {
+                $c->response->content_type('text/plain; charset=utf-8');
+                $c->response->body("Internal Server Error\n\nAn error occurred and we were unable to render the error page.\nPlease contact the system administrator.");
+            }
+        }
+    };
+
     # Call the original finalize_error to complete response processing
-    $self->$orig($c);
+    $c->$orig();
 };
 
 __PACKAGE__->_initialize_database_config();

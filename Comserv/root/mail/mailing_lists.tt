@@ -1,0 +1,361 @@
+[% PageVersion = 'Comserv/root/mail/mailing_lists.tt,v 3.0 2026/03/26 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[% META title = 'Mailing Lists' %]
+
+<style>
+.ml-section-title {
+    margin: 24px 0 8px;
+    padding: 8px 14px;
+    border-radius: 5px 5px 0 0;
+    font-size: 1.1em;
+    font-weight: bold;
+    color: #fff;
+}
+.ml-section-title.green  { background: #28a745; }
+.ml-section-title.blue   { background: #007bff; }
+
+details.ml-box {
+    border: 1px solid #ddd;
+    border-radius: 0 0 5px 5px;
+    margin-bottom: 8px;
+    background: #fff;
+}
+details.ml-box + details.ml-box { border-top: none; border-radius: 0; }
+details.ml-box:last-child { border-radius: 0 0 5px 5px; }
+
+summary.ml-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    background: #f9f9f9;
+}
+summary.ml-summary::-webkit-details-marker { display: none; }
+summary.ml-summary:hover { background: #f0f4ff; }
+
+.ml-summary-left   { display:flex; align-items:center; gap:10px; }
+.ml-badge          { background:#e0e7ff; color:#3730a3; border-radius:12px; padding:2px 10px; font-size:0.85em; }
+.ml-chevron        { font-size:0.8em; color:#888; transition: transform 0.2s; }
+details[open] .ml-chevron { transform: rotate(90deg); }
+
+.ml-body { padding: 14px 16px; border-top: 1px solid #eee; }
+
+.ml-member-list {
+    max-height: 260px;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    margin-bottom: 12px;
+}
+.ml-member-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 0.92em;
+}
+.ml-member-row:last-child { border-bottom: none; }
+.ml-member-row:hover { background: #f9fafb; }
+.ml-member-name { flex: 1; }
+.ml-member-email { color: #6b7280; font-size: 0.9em; }
+
+.ml-select-all-row {
+    padding: 5px 10px;
+    background: #f3f4f6;
+    font-size: 0.85em;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.ml-compose {
+    border: 1px solid #d1d5db;
+    border-radius: 5px;
+    padding: 12px;
+    background: #fafafa;
+    display: none;
+}
+.ml-compose.open { display: block; }
+.ml-compose label { display:block; margin-bottom:4px; font-weight:bold; font-size:0.9em; }
+.ml-compose input[type=text], .ml-compose textarea {
+    width: 100%; padding: 6px 8px; border: 1px solid #d1d5db;
+    border-radius: 4px; font-size: 0.92em; box-sizing: border-box;
+}
+.ml-compose textarea { resize: vertical; min-height: 120px; }
+.ml-compose-actions { margin-top: 10px; display:flex; gap:8px; align-items:center; }
+
+.btn-compose-send {
+    background: #2563eb; color: #fff; border: none; padding: 8px 18px;
+    border-radius: 4px; cursor: pointer; font-size: 0.95em; font-weight: bold;
+}
+.btn-compose-send:disabled { background: #9ca3af; cursor: not-allowed; }
+.btn-toggle-compose {
+    background: #f3f4f6; border: 1px solid #d1d5db; padding: 6px 14px;
+    border-radius: 4px; cursor: pointer; font-size: 0.88em;
+}
+.ml-actions-bar { display:flex; gap:8px; margin-bottom:10px; align-items:center; }
+.ml-count-label { font-size:0.88em; color:#6b7280; margin-left:auto; }
+
+.empty-state { color:#9ca3af; text-align:center; padding:20px; }
+.admin-actions { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+</style>
+
+<div class="admin-content">
+    <div class="admin-header">
+        <h1>Mailing Lists</h1>
+        <div class="admin-actions">
+            <a href="[% c.uri_for('/mail/lists/create') %]" class="btn btn-primary">+ Create Custom List</a>
+            <a href="[% c.uri_for('/mail/mail_admin_dashboard') %]" class="btn btn-secondary">Mail Admin</a>
+        </div>
+    </div>
+
+    [% IF c.flash.success_msg %]<div class="alert alert-success">[% c.flash.success_msg | html %]</div>[% END %]
+    [% IF c.flash.error_msg   %]<div class="alert alert-danger">[% c.flash.error_msg   | html %]</div>[% END %]
+
+    <!-- DEFAULT LISTS -->
+    <div class="ml-section-title green">Default Lists &nbsp;<small style="font-weight:normal;font-size:0.8em;">(auto-synced from site data)</small></div>
+
+    [% IF default_lists.size %]
+        [% FOREACH list IN default_lists %]
+        [% list_key = "def_" _ list.id %]
+        <details class="ml-box" id="box_[% list.id %]">
+            <summary class="ml-summary">
+                <span class="ml-summary-left">
+                    <span class="ml-chevron">▶</span>
+                    <strong>[% list.name | html %]</strong>
+                    <span class="ml-badge">[% list.subscriber_count %] members</span>
+                </span>
+                <span style="font-size:0.82em;color:#6b7280;">[% list.description.replace('^\[auto\] ', '') | html %]</span>
+            </summary>
+
+            <div class="ml-body">
+                [% IF list.subscribers.size %]
+                <div class="ml-actions-bar">
+                    <button type="button" class="btn-toggle-compose"
+                            onclick="toggleCompose('[% list.id %]', this)">
+                        Compose &amp; Send to Selected
+                    </button>
+                    <span class="ml-count-label" id="sel_count_[% list.id %]">
+                        0 of [% list.subscriber_count %] selected
+                    </span>
+                </div>
+
+                <div class="ml-member-list" id="members_[% list.id %]">
+                    <div class="ml-select-all-row">
+                        <label style="cursor:pointer;">
+                            <input type="checkbox" onchange="toggleAll('[% list.id %]', this)"> Select all
+                        </label>
+                    </div>
+                    [% FOREACH sub IN list.subscribers %]
+                    <div class="ml-member-row">
+                        <input type="checkbox" class="ml-chk" data-list="[% list.id %]"
+                               value="[% sub.email | html %]"
+                               onchange="updateSelCount('[% list.id %]')">
+                        <span class="ml-member-name">
+                            [% IF sub.first_name || sub.last_name %]
+                                [% sub.first_name | html %] [% sub.last_name | html %]
+                                [% IF sub.username %]<span style="color:#9ca3af;">([% sub.username | html %])</span>[% END %]
+                                [% IF !sub.user_id %]<span style="color:#f59e0b;font-size:0.8em;" title="No system account">&#9993;</span>[% END %]
+                            [% ELSIF sub.username %]
+                                [% sub.username | html %]
+                            [% ELSE %]
+                                <span style="color:#6b7280;">[email only]</span>
+                            [% END %]
+                        </span>
+                        <span class="ml-member-email">[% sub.email | html %]</span>
+                    </div>
+                    [% END %]
+                </div>
+
+                <div class="ml-compose" id="compose_[% list.id %]">
+                    <form method="POST" action="[% c.uri_for('/mail/send_mass_email') %]"
+                          onsubmit="return prepareSubmit('[% list.id %]', this)">
+                        <input type="hidden" name="group" value="custom">
+                        <input type="hidden" name="custom_addresses" id="addrs_[% list.id %]" value="">
+                        <input type="hidden" name="confirm_send" value="1">
+                        <div style="margin-bottom:8px;">
+                            <label>Subject</label>
+                            <input type="text" name="subject" required placeholder="Subject line">
+                        </div>
+                        <div>
+                            <label>Message
+                                <small style="font-weight:normal;color:#6b7280;">
+                                    — tags: [FIRST_NAME] [LAST_NAME] [EMAIL] [USERNAME]
+                                </small>
+                            </label>
+                            <textarea name="body" required placeholder="Write your message…"></textarea>
+                        </div>
+                        <div class="ml-compose-actions">
+                            <button type="submit" class="btn-compose-send" id="send_btn_[% list.id %]" disabled>
+                                Send to Selected
+                            </button>
+                            <button type="button" class="btn-toggle-compose"
+                                    onclick="toggleCompose('[% list.id %]', null)">Cancel</button>
+                            <span id="send_lbl_[% list.id %]" style="font-size:0.85em;color:#6b7280;"></span>
+                        </div>
+                    </form>
+                </div>
+
+                [% ELSE %]
+                <p class="empty-state">No members in this list yet.</p>
+                [% END %]
+            </div>
+        </details>
+        [% END %]
+    [% ELSE %]
+    <div style="padding:14px;color:#6b7280;border:1px solid #e5e7eb;border-radius:0 0 5px 5px;">
+        Default lists are being created — <strong>restart the server</strong> and reload this page.
+    </div>
+    [% END %]
+
+    <!-- CUSTOM LISTS -->
+    <div class="ml-section-title blue" style="margin-top:28px;">Custom Lists</div>
+
+    [% IF custom_lists.size %]
+        [% FOREACH list IN custom_lists %]
+        <details class="ml-box" id="box_[% list.id %]">
+            <summary class="ml-summary">
+                <span class="ml-summary-left">
+                    <span class="ml-chevron">▶</span>
+                    <strong>[% list.name | html %]</strong>
+                    <span class="ml-badge">[% list.subscriber_count %] subscribers</span>
+                </span>
+                <span>
+                    <a href="[% c.uri_for('/mail/lists', list.id, 'edit') %]" class="btn-small"
+                       onclick="event.stopPropagation()">Edit</a>
+                    <a href="[% c.uri_for('/mail/lists', list.id, 'delete') %]" class="btn-small btn-danger"
+                       onclick="event.stopPropagation(); return confirm('Delete this list?')">Delete</a>
+                </span>
+            </summary>
+
+            <div class="ml-body">
+                [% IF list.subscribers.size %]
+                <div class="ml-actions-bar">
+                    <button type="button" class="btn-toggle-compose"
+                            onclick="toggleCompose('[% list.id %]', this)">
+                        Compose &amp; Send to Selected
+                    </button>
+                    <span class="ml-count-label" id="sel_count_[% list.id %]">
+                        0 of [% list.subscriber_count %] selected
+                    </span>
+                </div>
+
+                <div class="ml-member-list" id="members_[% list.id %]">
+                    <div class="ml-select-all-row">
+                        <label style="cursor:pointer;">
+                            <input type="checkbox" onchange="toggleAll('[% list.id %]', this)"> Select all
+                        </label>
+                    </div>
+                    [% FOREACH sub IN list.subscribers %]
+                    <div class="ml-member-row">
+                        <input type="checkbox" class="ml-chk" data-list="[% list.id %]"
+                               value="[% sub.email | html %]"
+                               onchange="updateSelCount('[% list.id %]')">
+                        <span class="ml-member-name">
+                            [% IF sub.first_name || sub.last_name %]
+                                [% sub.first_name | html %] [% sub.last_name | html %]
+                                [% IF sub.username %]<span style="color:#9ca3af;">([% sub.username | html %])</span>[% END %]
+                                [% IF !sub.user_id %]<span style="color:#f59e0b;font-size:0.8em;" title="No system account">&#9993;</span>[% END %]
+                            [% ELSIF sub.username %]
+                                [% sub.username | html %]
+                            [% ELSE %]
+                                <span style="color:#6b7280;">[email only]</span>
+                            [% END %]
+                        </span>
+                        <span class="ml-member-email">[% sub.email | html %]</span>
+                    </div>
+                    [% END %]
+                </div>
+
+                <div class="ml-compose" id="compose_[% list.id %]">
+                    <form method="POST" action="[% c.uri_for('/mail/send_mass_email') %]"
+                          onsubmit="return prepareSubmit('[% list.id %]', this)">
+                        <input type="hidden" name="group" value="custom">
+                        <input type="hidden" name="custom_addresses" id="addrs_[% list.id %]" value="">
+                        <input type="hidden" name="confirm_send" value="1">
+                        <div style="margin-bottom:8px;">
+                            <label>Subject</label>
+                            <input type="text" name="subject" required placeholder="Subject line">
+                        </div>
+                        <div>
+                            <label>Message</label>
+                            <textarea name="body" required placeholder="Write your message…"></textarea>
+                        </div>
+                        <div class="ml-compose-actions">
+                            <button type="submit" class="btn-compose-send" id="send_btn_[% list.id %]" disabled>
+                                Send to Selected
+                            </button>
+                            <button type="button" class="btn-toggle-compose"
+                                    onclick="toggleCompose('[% list.id %]', null)">Cancel</button>
+                            <span id="send_lbl_[% list.id %]" style="font-size:0.85em;color:#6b7280;"></span>
+                        </div>
+                    </form>
+                </div>
+
+                [% ELSE %]
+                <p class="empty-state">No subscribers on this list yet.</p>
+                [% END %]
+            </div>
+        </details>
+        [% END %]
+    [% ELSE %]
+    <div style="padding:20px;text-align:center;color:#9ca3af;border:1px solid #e5e7eb;border-radius:0 0 5px 5px;">
+        <p>No custom lists yet.</p>
+        <a href="[% c.uri_for('/mail/lists/create') %]" class="btn btn-primary">Create Your First List</a>
+    </div>
+    [% END %]
+</div>
+
+<script>
+function getChecked(listId) {
+    return Array.from(document.querySelectorAll(
+        '.ml-chk[data-list="' + listId + '"]:checked'
+    )).map(cb => cb.value);
+}
+
+function updateSelCount(listId) {
+    var checked = getChecked(listId);
+    var total   = document.querySelectorAll('.ml-chk[data-list="' + listId + '"]').length;
+    var lbl     = document.getElementById('sel_count_' + listId);
+    var btn     = document.getElementById('send_btn_' + listId);
+    var sendLbl = document.getElementById('send_lbl_' + listId);
+    if (lbl) lbl.textContent = checked.length + ' of ' + total + ' selected';
+    if (btn) btn.disabled = (checked.length === 0);
+    if (sendLbl) sendLbl.textContent = checked.length
+        ? 'Will send to ' + checked.length + ' recipient(s)'
+        : '';
+}
+
+function toggleAll(listId, masterCb) {
+    document.querySelectorAll('.ml-chk[data-list="' + listId + '"]')
+        .forEach(cb => { cb.checked = masterCb.checked; });
+    updateSelCount(listId);
+}
+
+function toggleCompose(listId, btn) {
+    var compose = document.getElementById('compose_' + listId);
+    var members = document.getElementById('members_' + listId);
+    if (!compose) return;
+    var isOpen = compose.classList.contains('open');
+    compose.classList.toggle('open', !isOpen);
+    if (btn) btn.textContent = isOpen ? 'Compose & Send to Selected' : 'Cancel';
+    if (members) members.style.display = isOpen ? '' : 'block';
+    // Make sure the parent <details> is open
+    var box = document.getElementById('box_' + listId);
+    if (box && !isOpen) box.open = true;
+}
+
+function prepareSubmit(listId, form) {
+    var addrs = getChecked(listId);
+    if (addrs.length === 0) {
+        alert('Please select at least one recipient.');
+        return false;
+    }
+    document.getElementById('addrs_' + listId).value = addrs.join(',');
+    var btn = document.getElementById('send_btn_' + listId);
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+    return true;
+}
+</script>

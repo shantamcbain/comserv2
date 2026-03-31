@@ -146,17 +146,11 @@
     <h1>Documentation Configuration Management</h1>
 
     [% IF c.req.param('msg') == 'saved' %]
-        <div style="padding: 15px; background: #d4edda; color: #155724; border-radius: 4px; margin-bottom: 20px;">
-            Configuration saved successfully!
-        </div>
+        <div class="alert alert-success">Configuration saved successfully!</div>
     [% ELSIF c.req.param('msg') == 'error' %]
-        <div style="padding: 15px; background: #f8d7da; color: #721c24; border-radius: 4px; margin-bottom: 20px;">
-            Error saving configuration!
-        </div>
+        <div class="alert alert-danger">Error saving configuration!</div>
     [% ELSIF c.req.param('msg') == 'reloaded' %]
-        <div style="padding: 15px; background: #d4edda; color: #155724; border-radius: 4px; margin-bottom: 20px;">
-            Configuration reloaded successfully!
-        </div>
+        <div class="alert alert-success">Configuration reloaded successfully!</div>
     [% END %]
 
     <!-- Search Section -->

@@ -44,8 +44,12 @@
 
     [% IF !docker_available %]
     <div class="alert alert-warning" role="alert">
-        <strong>Notice:</strong> Docker container management is not available from within a Docker container. 
-        This feature must be accessed from the host system.
+        <strong>Notice:</strong> Docker container management is not available from within a Docker container.
+        Use the host development server:
+        <a href="http://workstation.local:3001/admin/docker-containers" style="font-weight:bold;">
+            Open Docker Management on port 3001 →
+        </a>
+        <br><small style="color:#666;">You will need to log in separately at port 3001 (sessions are per-port).</small>
     </div>
     [% ELSE %]
     
@@ -182,7 +186,12 @@
                     </h4>
                     <p style="margin: 0; color: #856404;">
                         This will export the Docker container, copy it to production server via SSH, stop the running container,
-                        load the new image, and start it. Automatic rollback on failure.
+                        load the new image, and start it. Always verify the image ID matches the local :latest tag before restart.
+                        Automatic rollback on failure.
+                    </p>
+                    <p style="margin: 8px 0 0 0; color: #856404;">
+                        Reminder: On production, always <strong>cd /opt/comserv/Comserv</strong> before running any
+                        <code>docker compose</code> commands so the correct compose file and mounts are used.
                     </p>
                 </div>
 
@@ -244,9 +253,16 @@
                         <label for="production-directory" style="display: block; margin-bottom: 8px; font-weight: bold;">
                             Production Directory:
                         </label>
-                        <input type="text" id="production-directory" value="~/PycharmProjects/comserv2" 
+                        <input type="text" id="production-directory" value="/opt/comserv/Comserv" 
                                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
                         <small style="color: #666;">Path where docker-compose.yml is located on production server</small>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 10px; grid-column: 1 / -1;">
+                        <input type="checkbox" id="recreate-volumes" style="width: 18px; height: 18px; cursor: pointer;">
+                        <label for="recreate-volumes" style="font-weight: bold; cursor: pointer; color: #dc3545;">
+                            Recreate NFS Volumes (CAUTION: Removes and recreates log and workshop volumes)
+                        </label>
                     </div>
                 </div>
 
@@ -266,12 +282,14 @@
                     </div>
 
                     <button onclick="saveDockerImage()" 
-                        style="padding: 10px 20px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        style="padding: 10px 20px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;"
+                        title="Saves image to local tar file for manual backup">
                         <i class="fas fa-save"></i> Save Image
                     </button>
                     
                     <button onclick="deployToProduction()" 
-                        style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;"
+                        title="FULL PROCESS: Saves, transfers, backups, and restarts on production">
                         <i class="fas fa-rocket"></i> Auto Deploy
                     </button>
 
@@ -286,6 +304,38 @@
                         <i class="fas fa-info-circle"></i> Manual Deployment Commands (Copy to SSH Terminal):
                     </h5>
                     <div id="quick-commands" style="font-size: 13px; font-family: monospace; background-color: #2d2d2d; color: #00ff00; padding: 12px; border-radius: 4px; margin-top: 10px;">
+
+                        <div style="margin-bottom: 12px; padding: 10px; background-color: #1a3a1a; border: 2px solid #28a745; border-radius: 4px; color: #fff;">
+                            <div style="color: #28a745; font-weight: bold; font-size: 1.05em; margin-bottom: 6px;">
+                                ℹ️ Deployment Workflow: Build Locally → Save → Load on Production → Run
+                            </div>
+                            <div style="color: #ccc; font-size: 0.9em;">
+                                All changes (templates, Perl, CSS) are baked into the image on the workstation.
+                                Production never builds — it only receives the saved image via <code>docker save/load</code>.
+                                <br><strong style="color:#ffc107">Step 0 below (local rebuild) is REQUIRED whenever any file has changed.</strong>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 8px; color: #28a745; font-weight: bold;">→ Step 0: LOCAL REBUILD — Run on Workstation (not production)</div>
+                        <div style="margin-left: 15px; margin-bottom: 4px; color: #ccc; font-size: 0.88em;">Rebuild dev first, test, then rebuild prod:</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('cd /home/shanta/PycharmProjects/comserv2/Comserv && docker compose -f docker-compose.dev.yml build')" title="Click to copy">
+                            cd /home/shanta/PycharmProjects/comserv2/Comserv &amp;&amp; docker compose -f docker-compose.dev.yml build
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 4px; color: #ccc; font-size: 0.88em;">Restart dev container to load the new image, then test:</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('cd /home/shanta/PycharmProjects/comserv2/Comserv && docker compose -f docker-compose.dev.yml up -d --force-recreate')" title="Click to copy">
+                            cd /home/shanta/PycharmProjects/comserv2/Comserv &amp;&amp; docker compose -f docker-compose.dev.yml up -d --force-recreate
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; color: #ccc; font-size: 0.88em;">
+                            Test at <strong>http://workstation.local:3000</strong> — verify membership pages, login, etc.<br>
+                            ⚠ The running container uses the OLD image until restarted. Always test after restart, not after build alone.
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 4px; color: #ccc; font-size: 0.88em;">Once dev is confirmed working, rebuild prod image:</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('cd /home/shanta/PycharmProjects/comserv2/Comserv && docker compose -f docker-compose.prod.yml build')" title="Click to copy">
+                            cd /home/shanta/PycharmProjects/comserv2/Comserv &amp;&amp; docker compose -f docker-compose.prod.yml build
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 8px; color: #ffaa00; font-size: 11px;">
+                            ⚠ docker save reads from the IMAGE not the running container — no restart needed before saving/transferring.
+                        </div>
 
                         <div style="margin-bottom: 8px; color: #fff; font-weight: bold;">→ Step 1: On Production - Check Disk Space</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('df -h /')" title="Click to copy">
@@ -305,6 +355,9 @@
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rm comserv2-web-prod-old 2>/dev/null || echo &quot;No old container to remove&quot;')" title="Click to copy">
                             sudo docker rm comserv2-web-prod-old 2>/dev/null || echo "No old container to remove"
                         </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker volume rm comserv2_comserv-workshop 2>/dev/null || echo &quot;No stale volume to remove&quot;')" title="Click to copy">
+                            sudo docker volume rm comserv2_comserv-workshop 2>/dev/null || echo "No stale volume to remove"
+                        </div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker image prune -f')" title="Click to copy">
                             sudo docker image prune -f  # Remove dangling images only (safe)
                         </div>
@@ -312,60 +365,56 @@
                             ⚠ Do NOT run docker system prune -v — it removes named volumes (logs/workshop data)
                         </div>
 
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 3: Transfer Image via SSH Pipe (Run from Workstation Terminal)</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker save comserv2-web-prod:latest | ssh ubuntu@192.168.1.126 &quot;sudo docker load&quot;')" title="Click to copy">
-                            docker save comserv2-web-prod:latest | ssh ubuntu@192.168.1.126 "sudo docker load"
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 3: Verify Local Image Tag + Capture Image ID (Run from Workstation Terminal)</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker image inspect comserv-web-prod:latest --format &quot;{{.Id}}&quot;')" title="Click to copy">
+                            docker image inspect comserv-web-prod:latest --format "{{.Id}}"
                         </div>
                         <div style="margin-left: 15px; margin-bottom: 10px; color: #ffaa00; font-size: 11px;">
-                            ⚠ Run from WORKSTATION terminal — not on production server
+                            ✅ Image is named <strong>comserv-web-prod:latest</strong> (built from Comserv/docker-compose.prod.yml). Keep ID to verify on production after load.
                         </div>
 
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 4: Backup Current Container (Creates Rollback Tag)</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker commit comserv2-web-prod comserv2-web-prod:backup-$(date +%s)')" title="Click to copy">
-                            sudo docker commit comserv2-web-prod comserv2-web-prod:backup-$(date +%s)
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 4: Transfer Image via SSH Pipe (Run from Workstation Terminal)</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker save comserv-web-prod | ssh ubuntu@192.168.1.126 &quot;docker load&quot;')" title="Click to copy">
+                            docker save comserv-web-prod | ssh ubuntu@192.168.1.126 "docker load"
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 10px; color: #ffaa00; font-size: 11px;">
+                            ⚠ Run from WORKSTATION terminal — not on production server. No sudo needed for docker load.
                         </div>
 
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 5: Rename Old Container</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rename comserv2-web-prod comserv2-web-prod-old')" title="Click to copy">
-                            sudo docker rename comserv2-web-prod comserv2-web-prod-old
-                        </div>
-
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 6: Stop Old Container</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker stop comserv2-web-prod-old')" title="Click to copy">
-                            sudo docker stop comserv2-web-prod-old
-                        </div>
-
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 6b: Test NFS Reachability (Optional)</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('showmount -e 192.168.1.175 2>/dev/null && echo &quot;NFS OK&quot; || echo &quot;NFS NOT REACHABLE - use local bind mount instead&quot;')" title="Click to copy">
-                            showmount -e 192.168.1.175 2>/dev/null &amp;&amp; echo "NFS OK" || echo "NFS NOT REACHABLE - use local bind mount instead"
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 5: On Production - Verify New Image Loaded</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker image inspect comserv-web-prod:latest --format &quot;{{.Id}}&quot;')" title="Click to copy">
+                            sudo docker image inspect comserv-web-prod:latest --format "{{.Id}}"
                         </div>
                         <div style="margin-left: 15px; margin-bottom: 5px; color: #ffaa00; font-size: 11px;">
-                            If NFS OK → use Step 7a. If NFS NOT REACHABLE → use Step 7b.
+                            ⚠ Image is now named <strong>comserv-web-prod:latest</strong> (built from Comserv/ dir). Container stays named comserv2-web-prod.
                         </div>
 
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 7a: Start New Container WITH NFS Volumes</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker volume create --driver local --opt type=nfs --opt o=addr=192.168.1.175,rw,nfsvers=3,soft --opt device=:/mnt/data/comserv/logs comserv-logs 2>/dev/null || true')" title="Click to copy">
-                            sudo docker volume create --driver local --opt type=nfs --opt o=addr=192.168.1.175,rw,nfsvers=3,soft --opt device=:/mnt/data/comserv/logs comserv-logs 2>/dev/null || true
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 6: Backup — Commit Running Container as backup-prev</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker images comserv-web-prod --format &quot;{{.Tag}}&quot; | grep &quot;^backup-&quot; | xargs -I{} sudo docker rmi comserv-web-prod:{} 2>/dev/null || true')" title="Click to copy">
+                            sudo docker images comserv-web-prod --format "{{.Tag}}" | grep "^backup-" | xargs -I{} sudo docker rmi comserv-web-prod:{} 2>/dev/null || true
                         </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker volume create --driver local --opt type=nfs --opt o=addr=192.168.1.175,rw,nfsvers=3,soft --opt device=:/mnt/data/comserv/workshop_files comserv-workshop 2>/dev/null || true')" title="Click to copy">
-                            sudo docker volume create --driver local --opt type=nfs --opt o=addr=192.168.1.175,rw,nfsvers=3,soft --opt device=:/mnt/data/comserv/workshop_files comserv-workshop 2>/dev/null || true
-                        </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 --log-opt max-size=50m --log-opt max-file=5 -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v comserv-logs:/opt/comserv/root/log -v comserv-workshop:/data/nfs comserv2-web-prod:latest')" title="Click to copy">
-                            sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 --log-opt max-size=50m --log-opt max-file=5 -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v comserv-logs:/opt/comserv/root/log -v comserv-workshop:/data/nfs comserv2-web-prod:latest
+                        <div style="margin-left: 15px; margin-bottom: 3px; color: #ccc; font-size: 0.85em;">Commit current running container as single rollback backup:</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker commit comserv2-web-prod comserv-web-prod:backup-prev')" title="Click to copy">
+                            sudo docker commit comserv2-web-prod comserv-web-prod:backup-prev
                         </div>
 
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 7b: Start New Container WITHOUT NFS (Local Bind Mount Fallback)</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('mkdir -p /home/ubuntu/comserv-logs /home/ubuntu/comserv-workshop')" title="Click to copy">
-                            mkdir -p /home/ubuntu/comserv-logs /home/ubuntu/comserv-workshop
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 7: Stop and Remove Old Container</div>
+                        <div style="margin-left: 15px; margin-bottom: 3px; color: #ccc; font-size: 0.85em;">
+                            Do NOT rename — just stop and remove. The new container reuses the same name.
                         </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 --log-opt max-size=50m --log-opt max-file=5 -e WORKSHOP_RESOURCES_PATH=/data/nfs -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v /home/ubuntu/comserv-logs:/opt/comserv/root/log -v /home/ubuntu/comserv-workshop:/data/nfs comserv2-web-prod:latest')" title="Click to copy">
-                            sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 --log-opt max-size=50m --log-opt max-file=5 -e WORKSHOP_RESOURCES_PATH=/data/nfs -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v /home/ubuntu/comserv-logs:/opt/comserv/root/log -v /home/ubuntu/comserv-workshop:/data/nfs comserv2-web-prod:latest
-                        </div>
-                        <div style="margin-left: 15px; margin-bottom: 10px; color: #ffaa00; font-size: 11px;">
-                            ⚠ --log-opt limits Docker's own log files. Logs also written to bind-mounted /home/ubuntu/comserv-logs/
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker stop comserv2-web-prod && sudo docker rm comserv2-web-prod')" title="Click to copy">
+                            sudo docker stop comserv2-web-prod &amp;&amp; sudo docker rm comserv2-web-prod
                         </div>
 
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 8: Verify New Container is Healthy</div>
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 8: Start New Container (same name, new image)</div>
+                        <div style="margin-left: 15px; margin-bottom: 3px; color: #ccc; font-size: 0.85em;">
+                            Container name stays <code>comserv2-web-prod</code>. Image is now <code>comserv-web-prod:latest</code>.
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 --log-opt max-size=50m --log-opt max-file=5 -e WORKSHOP_RESOURCES_PATH=/data/nfs -e COMSERV_SESSION_DIR=/tmp/comserv/session -e COMSERV_SESSION_COOKIE=comserv_session -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v /home/ubuntu/comserv-logs:/opt/comserv/root/log -v /home/ubuntu/comserv-workshop:/data/nfs comserv-web-prod:latest')" title="Click to copy">
+                            sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 --log-opt max-size=50m --log-opt max-file=5 -e WORKSHOP_RESOURCES_PATH=/data/nfs -e COMSERV_SESSION_DIR=/tmp/comserv/session -e COMSERV_SESSION_COOKIE=comserv_session -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v /home/ubuntu/comserv-logs:/opt/comserv/root/log -v /home/ubuntu/comserv-workshop:/data/nfs comserv-web-prod:latest
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 9: Verify Container is Healthy</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker ps')" title="Click to copy">
                             sudo docker ps
                         </div>
@@ -376,23 +425,17 @@
                             curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/
                         </div>
 
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 9: If Successful - Remove Old Container &amp; Cleanup</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rm comserv2-web-prod-old 2>/dev/null || echo &quot;No old container to remove&quot;')" title="Click to copy">
-                            sudo docker rm comserv2-web-prod-old 2>/dev/null || echo "No old container to remove"
-                        </div>
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 10: Cleanup Dangling Images</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker image prune -f')" title="Click to copy">
-                            sudo docker image prune -f  # Remove dangling images
+                            sudo docker image prune -f
                         </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker images | grep comserv2-web-prod')" title="Click to copy">
-                            sudo docker images | grep comserv2-web-prod  # List remaining images
-                        </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rmi $(sudo docker images -q --filter &quot;reference=comserv2-web-prod&quot; --filter &quot;dangling=false&quot; | tail -n +2) 2>/dev/null || true')" title="Click to copy">
-                            sudo docker rmi $(sudo docker images -q --filter "reference=comserv2-web-prod" --filter "dangling=false" | tail -n +2) 2>/dev/null || true  # Remove old backup tags (keep latest)
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker images | grep comserv')" title="Click to copy">
+                            sudo docker images | grep comserv
                         </div>
 
                         <div style="margin: 12px 0 8px 0; color: #ff5555; font-weight: bold;">→ ROLLBACK (If New Container Fails):</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker stop comserv2-web-prod 2>/dev/null; sudo docker rm comserv2-web-prod 2>/dev/null; sudo docker rename comserv2-web-prod-old comserv2-web-prod; sudo docker start comserv2-web-prod')" title="Click to copy">
-                            sudo docker stop comserv2-web-prod 2>/dev/null; sudo docker rm comserv2-web-prod 2>/dev/null; sudo docker rename comserv2-web-prod-old comserv2-web-prod; sudo docker start comserv2-web-prod
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker stop comserv2-web-prod 2>/dev/null; sudo docker rm comserv2-web-prod 2>/dev/null; sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 -e COMSERV_SESSION_COOKIE=comserv_session -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v /home/ubuntu/comserv-logs:/opt/comserv/root/log -v /home/ubuntu/comserv-workshop:/data/nfs comserv-web-prod:backup-prev')" title="Click to copy">
+                            sudo docker stop comserv2-web-prod 2>/dev/null; sudo docker rm comserv2-web-prod 2>/dev/null; sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 -e COMSERV_SESSION_COOKIE=comserv_session -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v /home/ubuntu/comserv-logs:/opt/comserv/root/log -v /home/ubuntu/comserv-workshop:/data/nfs comserv-web-prod:backup-prev
                         </div>
 
                         <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Quick Commands:</div>
@@ -533,7 +576,7 @@
         }
     }
 
-    // Auto-expand Container Status Overview on page load
+    // Auto-expand Container Status and Volume Status on page load
     window.addEventListener('DOMContentLoaded', function() {
         const statusSection = document.getElementById('container-status');
         const statusChevron = document.getElementById('chevron-container-status');
@@ -541,11 +584,11 @@
             statusSection.classList.add('expanded');
             statusChevron.classList.add('expanded');
         }
-        const volumesSection = document.getElementById('volumes-status');
-        const volumesChevron = document.getElementById('chevron-volumes-status');
-        if (volumesSection && volumesChevron) {
-            volumesSection.classList.add('expanded');
-            volumesChevron.classList.add('expanded');
+        const volSection = document.getElementById('volumes-status');
+        const volChevron = document.getElementById('chevron-volumes-status');
+        if (volSection && volChevron) {
+            volSection.classList.add('expanded');
+            volChevron.classList.add('expanded');
         }
     });
 </script>
@@ -559,6 +602,24 @@
         const timestamp = new Date().toLocaleTimeString();
         outputBox.textContent += `[${timestamp}] ${message}\n`;
         outputBox.scrollTop = outputBox.scrollHeight;
+    }
+
+    // Wrapper for all admin AJAX calls.
+    // Handles: session expiry (302 → login page HTML), server errors (5xx HTML), network errors.
+    function safeFetch(url, options) {
+        const opts = Object.assign({ credentials: 'same-origin', redirect: 'manual' }, options || {});
+        return fetch(url, opts).then(function(response) {
+            if (response.type === 'opaqueredirect' || response.status === 0 ||
+                (response.status >= 300 && response.status < 400)) {
+                appendOutput('✗ Session expired — reload the page (Ctrl+Shift+R) and log in again.');
+                return Promise.reject(new Error('session-expired'));
+            }
+            if (!response.ok) {
+                appendOutput(`✗ Server error (HTTP ${response.status}) — check server logs.`);
+                return Promise.reject(new Error(`HTTP ${response.status}`));
+            }
+            return response;
+        });
     }
 
     function clearOutput() {
@@ -608,16 +669,24 @@
     function refreshContainers() {
         containersList.innerHTML = '<p style="color: #666; text-align: center;">Loading container information...</p>';
 
-        fetch('/admin/docker-list')
-            .then(response => response.json())
+        fetch('/admin/docker-list', { credentials: 'same-origin', redirect: 'manual' })
+            .then(function(response) {
+                if (response.type === 'opaqueredirect' || response.status === 0 || (response.status >= 300 && response.status < 400)) {
+                    containersList.innerHTML = '<p style="color: #dc3545; text-align: center;">Session expired — please <a href="/user/login">log in again</a>.</p>';
+                    return null;
+                }
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
             .then(data => {
+                if (!data) return;
                 if (!data.success) {
                     containersList.innerHTML = `<p style="color: #dc3545; text-align: center;">Error: ${data.error}</p>`;
                     return;
                 }
 
                 containersData = data.containers;
-                displayContainers(data.containers);
+                displayContainers(data.containers, data.host);
                 updateServiceDropdown(data.containers);
             })
             .catch(error => {
@@ -629,9 +698,17 @@
         const volumesList = document.getElementById('volumes-list');
         volumesList.innerHTML = '<p style="color: #666; text-align: center;">Loading volume information...</p>';
 
-        fetch('/admin/docker-volumes')
-            .then(response => response.json())
+        fetch('/admin/docker-volumes', { credentials: 'same-origin', redirect: 'manual' })
+            .then(function(response) {
+                if (response.type === 'opaqueredirect' || response.status === 0 || (response.status >= 300 && response.status < 400)) {
+                    volumesList.innerHTML = '<p style="color: #dc3545; text-align: center;">Session expired — please <a href="/user/login">log in again</a>.</p>';
+                    return null;
+                }
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
             .then(data => {
+                if (!data) return;
                 if (!data.success) {
                     volumesList.innerHTML = `<p style="color: #dc3545; text-align: center;">Error: ${data.error}</p>`;
                     return;
@@ -675,37 +752,38 @@
 
             html += `
                 <div style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; background-color: #fff;">
-                    <div style="display: flex; justify-content: space-between; align-items: start;">
-                        <div style="flex: 1;">
-                            <h4 style="margin: 0 0 6px 0; color: #333;">
-                                ${typeIcon}
-                                <span style="margin-left: 6px;">${vol.name}</span>
-                                <span style="margin-left: 8px; background-color: ${typeColor}; color: white; padding: 2px 8px; border-radius: 3px; font-size: 0.75em;">${typeLabel}</span>
-                                <span style="margin-left: 6px; color: #999; font-size: 0.75em;">${vol.scope || ''}</span>
-                            </h4>
-                            <div style="font-size: 12px; color: #666; margin-bottom: 4px;"><strong>Driver:</strong> ${vol.driver || 'local'}</div>
-                            ${nfsDetail}
-                            ${mountDisplay}
-                            ${labelsDisplay}
-                        </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <strong style="font-size: 14px;">${typeIcon} ${vol.name}</strong>
+                        <span style="background-color: ${typeColor}; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px;">${typeLabel}</span>
                     </div>
+                    ${nfsDetail}
+                    ${mountDisplay}
+                    ${labelsDisplay}
+                    <div style="font-size: 11px; color: #999;"><strong>Scope:</strong> ${vol.scope || 'local'}</div>
                 </div>`;
         });
 
         volumesList.innerHTML = html;
     }
 
-    function displayContainers(containers) {
+    function displayContainers(containers, host) {
         if (!containers || containers.length === 0) {
             containersList.innerHTML = '<p style="color: #666; text-align: center;">No containers found</p>';
             return;
         }
 
-        let html = '';
+        const hostLabel = host ? `<div style="margin-bottom:10px;padding:6px 10px;background:#e9ecef;border-radius:4px;font-size:13px;"><strong>Server:</strong> ${host}</div>` : '';
+        let html = hostLabel;
         containers.forEach(container => {
             const stateColor = getStateColor(container.state);
             const stateIcon = getStateIcon(container.state);
-            const isRunning = ['running', 'up'].includes(container.state.toLowerCase());
+            const isRunning = ['running', 'up'].includes((container.state||'').toLowerCase());
+            const displayName = container.name || container.id || '(unnamed)';
+            const healthBadge = container.status && container.status.includes('healthy') && !container.status.includes('unhealthy')
+                ? '<span style="background:#28a745;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;margin-left:6px;">healthy</span>'
+                : container.status && container.status.includes('unhealthy')
+                ? '<span style="background:#dc3545;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;margin-left:6px;">unhealthy</span>'
+                : '';
 
             html += `
                 <div style="border: 1px solid #ddd; border-radius: 4px; padding: 15px; background-color: #fff;">
@@ -713,66 +791,47 @@
                         <div style="flex: 1;">
                             <h4 style="margin: 0 0 5px 0; color: #333;">
                                 <span style="color: ${stateColor}; margin-right: 8px;">${stateIcon}</span>
-                                ${container.service}
+                                ${displayName}${healthBadge}
                             </h4>
-                            <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
-                                <strong>Container:</strong> ${container.name}
+                            <div style="font-size: 12px; color: #666; margin-bottom: 3px;">
+                                <strong>Image:</strong> ${container.image || ''}
                             </div>
-                            ${container.description ? `
-                                <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
-                                    <strong>Description:</strong> ${container.description}
-                                </div>
-                            ` : ''}
-                            ${container.image ? `
-                                <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
-                                    <strong>Image:</strong> ${container.image}
-                                </div>
-                            ` : ''}
-                            ${container.ports && container.ports.length > 0 ? `
-                                <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
-                                    <strong>Ports:</strong> ${container.ports.join(', ')}
-                                </div>
-                            ` : ''}
+                            <div style="font-size: 12px; color: #666; margin-bottom: 3px;">
+                                <strong>ID:</strong> <code>${container.id || ''}</code>
+                                &nbsp;|&nbsp;<strong>Status:</strong> ${container.status || container.state || ''}
+                            </div>
+                            ${container.ports ? `<div style="font-size:12px;color:#666;margin-bottom:3px;"><strong>Ports:</strong> ${container.ports}</div>` : ''}
                             <div style="font-size: 12px;">
                                 <span style="background-color: ${stateColor}; color: white; padding: 2px 8px; border-radius: 3px; font-weight: bold;">
-                                    ${container.state.toUpperCase()}
+                                    ${(container.state||'unknown').toUpperCase()}
                                 </span>
-                                <span style="color: #666; margin-left: 10px;">${container.status}</span>
                             </div>
                         </div>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
                             ${container.state === 'not_created' ? `
-                                <button onclick="createContainerDirect('${container.service}')"
+                                <button onclick="createContainerDirect('${container.name}')"
                                     style="padding: 6px 12px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     🚀 Create & Start
                                 </button>
                             ` : isRunning ? `
-                                <button onclick="stopContainerDirect('${container.service}')"
+                                <button onclick="stopContainerDirect('${container.name}')"
                                     style="padding: 6px 12px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     ■ Stop
                                 </button>
-                                <button onclick="restartContainerDirect('${container.service}')"
+                                <button onclick="restartContainerDirect('${container.name}')"
                                     style="padding: 6px 12px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     ↻ Restart
                                 </button>
-                                <button onclick="rebuildContainerDirect('${container.service}')"
-                                    style="padding: 6px 12px; background-color: #ffc107; color: #333; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                                    🔨 Rebuild
-                                </button>
-                                <button onclick="viewLogsDirect('${container.service}')"
+                                <button onclick="viewLogsDirect('${container.name}')"
                                     style="padding: 6px 12px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     📋 Logs
                                 </button>
                             ` : `
-                                <button onclick="startContainerDirect('${container.service}')"
+                                <button onclick="startContainerDirect('${container.name}')"
                                     style="padding: 6px 12px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     ▶ Start
                                 </button>
-                                <button onclick="rebuildContainerDirect('${container.service}')"
-                                    style="padding: 6px 12px; background-color: #ffc107; color: #333; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                                    🔨 Rebuild
-                                </button>
-                                <button onclick="viewLogsDirect('${container.service}')"
+                                <button onclick="viewLogsDirect('${container.name}')"
                                     style="padding: 6px 12px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     📋 Logs
                                 </button>
@@ -795,8 +854,8 @@
 
         containers.forEach(container => {
             const option = document.createElement('option');
-            option.value = container.service;
-            option.textContent = container.service;
+            option.value = container.name;
+            option.textContent = container.name;
             select.appendChild(option);
         });
     }
@@ -804,7 +863,7 @@
     function createContainerDirect(service) {
         appendOutput(`Creating and starting ${service}...`);
 
-        fetch(`/admin/docker-up/${service}`)
+        safeFetch(`/admin/docker-up/${service}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -822,7 +881,7 @@
     function startContainerDirect(service) {
         appendOutput(`Starting ${service}...`);
 
-        fetch(`/admin/docker-start/${service}`)
+        safeFetch(`/admin/docker-start/${service}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -844,7 +903,7 @@
 
         appendOutput(`Stopping ${service}...`);
 
-        fetch(`/admin/docker-stop/${service}`)
+        safeFetch(`/admin/docker-stop/${service}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -866,7 +925,7 @@
 
         appendOutput(`Restarting ${service}...`);
 
-        fetch(`/admin/docker-restart/${service}?force=0`)
+        safeFetch(`/admin/docker-restart/${service}?force=0`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -887,7 +946,7 @@
 
         appendOutput(`Getting logs for ${service} (last ${lines} lines)...`);
 
-        fetch(`/admin/docker-logs/${service}?lines=${parseInt(lines) || 50}`)
+        safeFetch(`/admin/docker-logs/${service}?lines=${parseInt(lines) || 50}`)
             .then(response => response.json())
             .then(data => {
                 if (data.output || data.error === '') {
@@ -914,7 +973,7 @@
         // Disable rebuild buttons during rebuild
         disableRebuildButtons();
 
-        fetch(`/admin/docker-rebuild/${service}`)
+        safeFetch(`/admin/docker-rebuild/${service}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -926,7 +985,7 @@
                     appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
                     appendOutput(`⏳ Starting ${service}...\n`);
                     // Auto-start after rebuild
-                    return fetch(`/admin/docker-up/${service}`);
+                    return safeFetch(`/admin/docker-up/${service}`);
                 } else {
                     appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
                     appendOutput(`✗ Failed to rebuild ${service}:\n`);
@@ -983,7 +1042,7 @@
         
         disableRebuildButtons();
 
-        fetch(`/admin/docker-rebuild/${service}`)
+        safeFetch(`/admin/docker-rebuild/${service}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -1016,7 +1075,7 @@
 
         appendOutput(`⏳ Cleaning up Docker system...\n`);
 
-        fetch('/admin/docker-prune')
+        safeFetch('/admin/docker-prune')
             .then(response => response.json())
             .then(data => {
                 if (data.success || data.output) {
@@ -1035,7 +1094,7 @@
     function showDiskUsage() {
         appendOutput(`⏳ Fetching Docker disk usage...\n`);
 
-        fetch('/admin/docker-system-df')
+        safeFetch('/admin/docker-system-df')
             .then(response => response.json())
             .then(data => {
                 if (data.success || data.output) {
@@ -1060,7 +1119,7 @@
 
         const url = service === 'all' ? '/admin/docker-status/all' : `/admin/docker-status/${service}`;
 
-        fetch(url)
+        safeFetch(url)
             .then(response => response.json())
             .then(data => {
                 if (data.success || data.output) {
@@ -1088,7 +1147,7 @@
 
         const url = `/admin/docker-restart/${service}?force=${force ? 1 : 0}`;
 
-        fetch(url)
+        safeFetch(url)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -1114,7 +1173,7 @@
 
         const url = `/admin/docker-logs/${service}?lines=${parseInt(lines) || 50}`;
 
-        fetch(url)
+        safeFetch(url)
             .then(response => response.json())
             .then(data => {
                 if (data.output || data.error === '') {
@@ -1139,7 +1198,7 @@
 
         appendOutput(`⏳ Saving Docker image: ${service}...\n`);
 
-        fetch(`/admin/docker-save-image/${service}`)
+        safeFetch(`/admin/docker-save-image/${service}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -1242,7 +1301,7 @@
         formData.append('ssh_password', sshPassword);
         formData.append('save_credentials', 'yes');
 
-        fetch('/admin/docker-test-ssh', {
+        safeFetch('/admin/docker-test-ssh', {
             method: 'POST',
             body: new URLSearchParams(formData)
         })
@@ -1472,17 +1531,18 @@
         appendOutput(`OPTION 1: Direct Copy via SSH Pipe (Recommended - No temp files)\n`);
         appendOutput(`═══════════════════════════════════════════════════════════════════\n\n`);
 
-        appendOutput(`# Step 1: Verify image exists locally\n`);
+        appendOutput(`# Step 1: Verify local image tag + capture image ID\n`);
+        appendOutput(`docker image inspect ${imageName}:latest --format '{{.Id}}'\n`);
         appendOutput(`docker images | grep ${imageName}\n\n`);
 
-        appendOutput(`# Step 2: Transfer image directly via SSH pipe\n`);
-        appendOutput(`docker save ${imageName} | ssh ${sshTarget} "docker load"\n\n`);
+        appendOutput(`# Step 2: Transfer image directly via SSH pipe (latest tag)\n`);
+        appendOutput(`docker save ${imageName}:latest | ssh ${sshTarget} "docker load"\n\n`);
 
-        appendOutput(`# Step 3: SSH to production and run container\n`);
+        appendOutput(`# Step 3: SSH to production and verify image ID matches local\n`);
         appendOutput(`ssh ${sshTarget}\n\n`);
-
         appendOutput(`# On production server:\n`);
-        appendOutput(`cd ~/PycharmProjects/comserv2\n\n`);
+        appendOutput(`docker image inspect ${imageName}:latest --format '{{.Id}}'\n`);
+        appendOutput(`cd /opt/comserv/Comserv\n\n`);
 
         appendOutput(`# Stop old container\n`);
         appendOutput(`docker compose stop ${service}\n\n`);
@@ -1498,18 +1558,18 @@
         appendOutput(`OPTION 2: File Transfer Method (If SSH pipe fails)\n`);
         appendOutput(`═══════════════════════════════════════════════════════════════════\n\n`);
 
-        appendOutput(`# Step 1: Save image to tar file\n`);
-        appendOutput(`docker save -o /tmp/${imageName}.tar ${imageName}\n\n`);
+        appendOutput(`# Step 1: Save image to tar file (latest tag)\n`);
+        appendOutput(`docker save -o /tmp/${imageName}.tar ${imageName}:latest\n\n`);
 
         appendOutput(`# Step 2: Copy to production server\n`);
         appendOutput(`scp /tmp/${imageName}.tar ${sshTarget}:/tmp/\n\n`);
 
-        appendOutput(`# Step 3: SSH to production\n`);
+        appendOutput(`# Step 3: SSH to production and verify image ID matches local\n`);
         appendOutput(`ssh ${sshTarget}\n\n`);
-
         appendOutput(`# On production server:\n`);
         appendOutput(`docker load -i /tmp/${imageName}.tar\n`);
-        appendOutput(`cd ~/PycharmProjects/comserv2\n`);
+        appendOutput(`docker image inspect ${imageName}:latest --format '{{.Id}}'\n`);
+        appendOutput(`cd /opt/comserv/Comserv\n`);
         appendOutput(`docker compose stop ${service}\n`);
         appendOutput(`docker compose up -d --force-recreate ${service}\n`);
         appendOutput(`docker compose ps\n\n`);
@@ -1521,8 +1581,9 @@
         appendOutput(`BACKUP & ROLLBACK\n`);
         appendOutput(`═══════════════════════════════════════════════════════════════════\n\n`);
 
-        appendOutput(`# Before deployment, create backup:\n`);
-        appendOutput(`ssh ${sshTarget} "docker commit comserv-${service} ${imageName}:backup-$(date +%s)"\n\n`);
+        appendOutput(`# Before deployment, remove old backup then create new one (keeps only 1):\n`);
+        appendOutput(`ssh ${sshTarget} "docker images ${imageName} --format '{{.Tag}}' | grep '^backup-' | xargs -I{} docker rmi ${imageName}:{} 2>/dev/null || true"\n`);
+        appendOutput(`ssh ${sshTarget} "docker commit comserv2-web-prod ${imageName}:backup-prev"\n\n`);
 
         appendOutput(`# If deployment fails, rollback:\n`);
         appendOutput(`ssh ${sshTarget}\n`);
@@ -1542,6 +1603,7 @@
         const sshPassword = document.getElementById('ssh-password').value;
         const productionDir = document.getElementById('production-directory').value.trim();
         const service = document.getElementById('deploy-service-select').value;
+        const recreateVolumes = document.getElementById('recreate-volumes').checked;
 
         if (!sshTarget) {
             alert('Please enter SSH target (user@host)');
@@ -1558,18 +1620,24 @@
             return;
         }
 
-        const confirmMsg = `⚠️ PRODUCTION DEPLOYMENT\n\n` +
+        let confirmMsg = `⚠️ PRODUCTION DEPLOYMENT\n\n` +
                           `Service: ${service}\n` +
                           `Target: ${sshTarget}:${sshPort}\n` +
-                          `Directory: ${productionDir}\n\n` +
-                          `This will:\n` +
-                          `1. Export Docker image\n` +
-                          `2. Copy to production server via SSH\n` +
-                          `3. Backup existing container\n` +
-                          `4. Stop production container\n` +
-                          `5. Load and start new container\n` +
-                          `6. Rollback automatically if health check fails\n\n` +
-                          `Continue?`;
+                          `Directory: ${productionDir}\n\n`;
+        
+        if (recreateVolumes) {
+            confirmMsg += `❗ ALERT: RECREATE VOLUMES IS ENABLED\n` +
+                          `This will remove and recreate your NFS volumes on the production server.\n\n`;
+        }
+
+        confirmMsg += `This will:\n` +
+                      `1. Export Docker image\n` +
+                      `2. Copy to production server via SSH\n` +
+                      `3. Backup existing container\n` +
+                      `4. Stop production container\n` +
+                      `5. Load and start new container\n` +
+                      `6. Rollback automatically if health check fails\n\n` +
+                      `Continue?`;
 
         if (!confirm(confirmMsg)) {
             return;
@@ -1581,6 +1649,9 @@
         appendOutput(`Service: ${service}\n`);
         appendOutput(`Target: ${sshTarget}:${sshPort}\n`);
         appendOutput(`Time: ${new Date().toLocaleString()}\n`);
+        if (recreateVolumes) {
+            appendOutput(`⚠️ MODE: RECREATE VOLUMES ENABLED\n`);
+        }
         appendOutput(`${'='.repeat(80)}\n\n`);
 
         const formData = new FormData();
@@ -1589,25 +1660,26 @@
         formData.append('ssh_password', sshPassword);
         formData.append('production_directory', productionDir);
         formData.append('service', service);
+        if (recreateVolumes) {
+            formData.append('recreate_volumes', '1');
+        }
 
-        fetch('/admin/docker-deploy-to-production', {
+        safeFetch('/admin/docker-deploy-to-production', {
             method: 'POST',
             body: new URLSearchParams(formData)
         })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    appendOutput(`\n${'='.repeat(80)}\n`);
-                    appendOutput(`✅ DEPLOYMENT SUCCESSFUL\n`);
-                    appendOutput(`${'='.repeat(80)}\n`);
-                    appendOutput(data.output || '');
+                    appendOutput(`🚀 Deployment started in background...\n`);
+                    startPollingDeploymentStatus();
                 } else {
                     appendOutput(`\n${'='.repeat(80)}\n`);
-                    appendOutput(`❌ DEPLOYMENT FAILED\n`);
+                    appendOutput(`❌ DEPLOYMENT FAILED TO START\n`);
                     appendOutput(`${'='.repeat(80)}\n`);
-                    appendOutput(data.output || data.error || 'Unknown error');
+                    appendOutput(data.error || 'Unknown error');
+                    appendOutput(`\n${'='.repeat(80)}\n`);
                 }
-                appendOutput(`\n${'='.repeat(80)}\n`);
             })
             .catch(error => {
                 appendOutput(`\n${'='.repeat(80)}\n`);
@@ -1616,6 +1688,45 @@
                 appendOutput(`Error: ${error.message}\n`);
                 appendOutput(`${'='.repeat(80)}\n`);
             });
+    }
+
+    let deploymentPollingInterval = null;
+    let lastLogContent = '';
+
+    function startPollingDeploymentStatus() {
+        if (deploymentPollingInterval) clearInterval(deploymentPollingInterval);
+        lastLogContent = '';
+        
+        deploymentPollingInterval = setInterval(() => {
+            safeFetch('/admin/docker-deploy-status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.output && data.output !== lastLogContent) {
+                            // Find only new content
+                            const newContent = data.output.substring(lastLogContent.length);
+                            if (newContent) {
+                                // Add to output box without timestamps (since they are in the log already)
+                                outputBox.textContent += newContent;
+                                outputBox.scrollTop = outputBox.scrollHeight;
+                                lastLogContent = data.output;
+                            }
+                        }
+                        
+                        if (!data.is_running) {
+                            clearInterval(deploymentPollingInterval);
+                            deploymentPollingInterval = null;
+                            appendOutput(`\n${'='.repeat(80)}\n`);
+                            appendOutput(`✅ DEPLOYMENT FINISHED\n`);
+                            appendOutput(`${'='.repeat(80)}\n`);
+                            setTimeout(refreshContainers, 2000);
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error polling deployment status:', error);
+                });
+        }, 1000);
     }
 
     function openSSHTerminal() {
@@ -1685,11 +1796,11 @@
         appendOutput(`Target: ${sshTarget}\n\n`);
     }
 
-    // Initialize - load containers and volumes on page load
+    // Initialize - load containers on page load
     document.addEventListener('DOMContentLoaded', function() {
         refreshContainers();
         refreshVolumes();
-        
+
         // Auto-check SSH terminal service status
         checkSSHTerminalService();
     });

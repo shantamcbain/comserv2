@@ -1,0 +1,157 @@
+[% PageVersion = 'Comserv/root/Documentation/TODO_SYSTEM_CHANGELOG.tt,v 0.01 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'TODO System Enhancement Changelog' %]
+
+<!-- Documentation page for TODO_SYSTEM_CHANGELOG -->
+<div class="documentation-content">
+
+<div class="markdown-content">
+
+# TODO System Enhancement Changelog
+
+## Version 2.0 - Enhanced Integration (2025-01-15)
+
+### 🎯 Major Enhancements
+
+#### Enhanced TODO Controller (`Comserv/lib/Comserv/Controller/Todo.pm`)
+- **Added overdue todo detection** with `get_overdue_todos()` method
+- **Enhanced project integration** with prefetch relationships
+- **Fixed database ambiguity errors** by adding table aliases (`me.sitename`, `me.status`, etc.)
+- **Enhanced month view** to include logs data alongside todos
+- **Fixed week view date calculations** by moving DateTime parsing from template to controller
+
+#### Enhanced Templates
+- **Main TODO Template** (`Comserv/root/todo/todo.tt`)
+  - Added prominent overdue todos section with warning styling
+  - Enhanced table to show project names instead of just IDs
+  - Improved status display (New/In Progress/Completed)
+  - Added project information and quick action links
+
+- **Month Calendar Template** (`Comserv/root/todo/month.tt`)
+  - Integrated logs display alongside todos in calendar cells
+  - Added visual indicators for due vs. start dates
+  - Enhanced tooltips with project information
+  - Added click handlers for navigation to todo/log details
+
+- **Week View Template** (`Comserv/root/todo/week.tt`)
+  - Fixed Template Toolkit parsing errors
+  - Moved date calculations to controller for proper MVC separation
+  - Enhanced day-by-day todo display
+
+#### Enhanced Styling (`Comserv/root/static/css/todo.css`)
+- **Added unified todo system styles** to existing CSS file
+- **Enhanced overdue section styling** with warning colors
+- **Added calendar item styling** for todos and logs with visual indicators
+- **Improved project badge and status badge styling**
+- **Added responsive design** for mobile devices
+- **Enhanced visual hierarchy** with proper color coding
+
+### 🔧 Technical Improvements
+
+#### Database Integration
+- **Fixed column ambiguity issues** when joining todo and projects tables
+- **Enhanced search conditions** with proper table aliases
+- **Improved query performance** with strategic prefetching
+- **Added logs integration** in month view queries
+
+#### Template System Compliance
+- **Moved complex logic from templates to controllers** (proper MVC pattern)
+- **Fixed Template Toolkit parsing errors** by avoiding Perl object method calls in templates
+- **Enhanced data preparation** in controllers for template consumption
+- **Maintained existing template structure** and patterns
+
+#### Project Integration
+- **Enhanced project name display** throughout todo system
+- **Added project filtering** capabilities
+- **Improved project badge styling** for better visual identification
+- **Maintained backward compatibility** with existing project relationships
+
+### 🎨 User Experience Improvements
+
+#### Visual Enhancements
+- **Overdue todos prominently displayed** with warning styling and count
+- **Enhanced status indicators** with clear labels and color coding
+- **Improved calendar visual hierarchy** with distinct todo and log styling
+- **Added hover effects** and interactive elements
+- **Enhanced mobile responsiveness**
+
+#### Navigation Improvements
+- **Added click handlers** for seamless navigation between todos and logs
+- **Enhanced calendar item tooltips** with comprehensive information
+- **Improved action buttons** with consistent styling
+- **Added quick access links** for common actions
+
+#### Integration Features
+- **Unified view** of Projects, TODOs, and Logs
+- **Cross-system navigation** between related items
+- **Enhanced filtering** with project integration
+- **Improved data relationships** display
+
+### 🐛 Bug Fixes
+
+#### Database Issues
+- **Fixed "Column 'sitename' in WHERE is ambiguous"** error
+- **Fixed "Column 'status' in WHERE is ambiguous"** error
+- **Resolved all table join ambiguity issues** with proper aliasing
+
+#### Template Issues
+- **Fixed "unexpected token (DateTime::Format::ISO8601)"** in week.tt
+- **Resolved Template Toolkit parsing errors** by moving logic to controllers
+- **Fixed date calculation issues** in calendar views
+
+#### Integration Issues
+- **Resolved project name display issues** in todo lists
+- **Fixed status display inconsistencies** across views
+- **Enhanced error handling** for missing relationships
+
+### 📁 Files Modified
+
+#### Controllers
+- `Comserv/lib/Comserv/Controller/Todo.pm` - Enhanced with overdue detection, project integration, and bug fixes
+
+#### Templates
+- `Comserv/root/todo/todo.tt` - Added overdue section and enhanced project display
+- `Comserv/root/todo/month.tt` - Integrated logs and enhanced visual design
+- `Comserv/root/todo/week.tt` - Fixed parsing errors and improved date handling
+
+#### Styling
+- `Comserv/root/static/css/todo.css` - Added comprehensive styling enhancements
+
+#### Documentation
+- `Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt` - Updated with task progress
+- `Comserv/root/Documentation/TODO_SYSTEM_CHANGELOG.tt` - Created comprehensive changelog
+
+### 🔄 Backward Compatibility
+
+- **All existing functionality preserved** during enhancements
+- **Existing URLs and routes maintained** without changes
+- **Database schema unchanged** - only query improvements
+- **Template structure maintained** with additive enhancements
+- **CSS additions only** - no existing styles modified
+
+### 🚀 Next Steps
+
+#### Identified Issues for Future Development
+1. **Month view display optimization** - Investigate logs vs todos prominence
+2. **Performance optimization** for large datasets
+3. **Additional filtering options** for enhanced user experience
+4. **Mobile app integration** considerations
+
+#### Recommended Enhancements
+1. **Drag-and-drop calendar functionality** for todo scheduling
+2. **Bulk operations** for todo management
+3. **Advanced reporting** features
+4. **Email notifications** for overdue todos
+
+---
+
+**Version:** 2.0  
+**Release Date:** 2025-01-15  
+**Developer:** AI Development Team  
+**Status:** Production Ready
+
+</div>
+</div>

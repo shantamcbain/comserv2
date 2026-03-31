@@ -1,89 +1,100 @@
 ---
-description: Repository Information & Zencoder Enforcement Rules
+description: Repository Information Overview
+globs: []
 alwaysApply: true
-version: "2.2"
-last_updated: "2026-01-24"
-enforcement_status: "🔴 CRITICAL - Mandatory for all Zencoder agents"
 ---
 
-# Comserv Application & Zencoder Standards (MANDATORY)
+# Comserv Project Information
 
-## ⚠️ CRITICAL ENFORCEMENT NOTICE
+## Summary
+Comserv is a comprehensive web-based system for managing business operations, projects, and documentation. It's built using the Catalyst Perl web framework and provides features for project management, theme customization, and user authentication.
 
-**This document is MANDATORY reading for ALL Zencoder agents.** Non-compliance results in:
-- 🔴 Work HALTED by validation_step0.pl
-- 🔴 Chat continuation BLOCKED
-- 🔴 /chathandoff execution REQUIRED
-- 🔴 Violation escalation to human review
+## Structure
+- `Comserv/`: Main application directory containing the core application code
+  - `lib/`: Application code and models
+  - `docs/`: Documentation files
+  - `root/`: Static assets and templates
+  - `script/`: Utility scripts for server management and database operations
+  - `t/`: Test files
+- `app/`: Additional application components
+- `data/`: Data files including pricing information
+- `proxmox/`: Proxmox VE integration components
 
----
+## Language & Runtime
+**Language**: Perl
+**Version**: 5.x (compatible with Perl 5.40.0)
+**Framework**: Catalyst 5.90130
+**Build System**: Module::Install
+**Package Manager**: CPAN
 
-## Part 1: Repository Information
+## Dependencies
+**Main Dependencies**:
+- Catalyst::Runtime (5.90130)
+- Moose
+- DBIx::Class
+- Template (Template Toolkit)
+- JSON/JSON::MaybeXS
+- Log::Log4perl
+- DateTime
+- File::Slurp
 
-**NOTE**: Detailed repository structure, language specifications, and dependencies have been migrated to the **SINGLE SOURCE OF TRUTH**.
+**Development Dependencies**:
+- Test::More (0.88+)
+- Test::Pod
+- Test::Pod::Coverage
+- Test::WWW::Mechanize::Catalyst
+- Catalyst::Devel
 
-### 📌 PRIMARY REFERENCE: `/.zencoder/coding-standards.yaml`
+## Build & Installation
+```bash
+cd Comserv
+perl Makefile.PL
+make
+make test
+make install
+```
 
-See **REPOSITORY OVERVIEW** (lines 14-48) in `coding-standards.yaml` for:
-- Full directory structure
-- Language & Runtime (Perl 5.40.0, Catalyst)
-- Docker & Containerization details
-- Database & Caching specifications
-- Build, Installation, and Testing guides
-- Main Entry Points and Configuration files
+## Database
+**Type**: MySQL
+**Setup**: 
+```bash
+mysql -u root -p < database_initialization_script.sql
+```
+**Schema Management**: DBIx::Class::Schema::Loader
 
----
+## Testing
+**Framework**: Test::More
+**Test Location**: Comserv/t/
+**Run Command**:
+```bash
+cd Comserv
+prove -l t/
+```
 
-## Part 2: ZENCODER MANDATORY STANDARDS (All Agents) - CONSOLIDATED REFERENCE
+## Server Execution
+**Development Server**:
+```bash
+cd Comserv
+script/comserv_server.pl
+```
+**Production Deployment**:
+```bash
+cd Comserv
+script/comserv_fastcgi.pl
+# or
+starman --port 5000 --workers 5 comserv.psgi
+```
 
-### ⚠️ CONSOLIDATION NOTICE (2026-01-16)
+## Authentication & Authorization
+- Session-based authentication
+- Role-based access control
+- Multiple authentication realms
+- Support for user groups and site-specific permissions
 
-**EFFECTIVE IMMEDIATELY**: All Zencoder enforcement rules (formerly Rules Z1-Z4 below) have been **consolidated into a single source of truth** in:
-
-### 📌 PRIMARY REFERENCE: `/.zencoder/coding-standards.yaml`
-
-All agents MUST read the following sections from coding-standards.yaml:
-
-| Zencoder Standard | Location | Coverage |
-|---|---|---|
-| **CRITICAL SETTINGS** | Lines 51-93 | Documentation paths (PascalCase filenames, /Documentation/ URL format) |
-| **GLOBAL ENFORCEMENT PROTOCOL** | Lines 95-115 | Automatic validation gates (ask_questions, /updateprompt enforcement) |
-| **GLOBAL RULES 1-10** | Lines 117-1230 | ask_questions(), /updateprompt, startup protocol, keyword execution, role tag conflicts, bilateral audit trail, PascalCase, RoleSpec integrity, Documentation standards |
-| **KEYWORDS** | Lines 1231-1393 | /chathandoff, /sessionhandoff, /validatett definitions and protocols |
-| **AGENTS SECTION** | Lines 1395+ | Consolidated agent specifications (Cleanup Agent, Docker Agent, others) |
-
-### Legacy Rules Z1-Z4 (All Content Merged into coding-standards.yaml)
-
-| Legacy Rule | Mapped To | Description |
-|---|---|---|
-| **Rule Z1: Tool Responsibility Boundaries** | Rule 6: External Role Tag Conflict Resolution (lines 599-659) + Rule 8: PascalCase Filenames (lines 780-1011) | Tool scope, file management, constraints |
-| **Rule Z2: Reference Consolidation** | Rule 4: Startup Protocol (lines 516-554) + metadata section (lines 1-11) | Single source of truth, enforcement hierarchy |
-| **Rule Z3: Compliance Protocol** | Rule 2: /updateprompt Workflow Gate (lines 244-496) + Rule 1: ask_questions (lines 153-242) + Rule 7: Bilateral Audit Trail (lines 660-778) | Phase sequence, execution workflow, audit logging |
-| **Rule Z4: Documentation Centralization** | Rule 8: PascalCase Filename Convention (lines 780-1011) + CRITICAL SETTINGS (lines 51-93) | File creation, path format, consolidation requirement |
-
-### ✅ What This Means for Agents
-
-1. **STOP referencing repo.md for rules** - Use coding-standards.yaml instead
-2. **Repository context (Part 1 above)** - Still available in this file for quick reference
-3. **All enforcement** - Now centralized in coding-standards.yaml with unified numbering system (Rules 1-8)
-4. **Deprecated .md files** - Archived with redirect stubs (see table below)
-
-### ARCHIVED FILES WITH REDIRECTS
-
-The following files are ARCHIVED effective 2026-01-15. Redirect stubs created at original locations:
-
-| File | Reason | Archive Location | Redirect Status |
-|------|--------|------------------|---|
-| `zencoder-context-configuration.md` | Content merged into coding-standards.yaml | `.zencoder/rules/archive/` | ✅ Redirect stub |
-| `keywords.md` v1.0 | Refactored into modular structure | `.zencoder/rules/archive/` | ✅ Redirect stub |
-| `CRITICAL_AGENT_BOUNDARIES.md` | Content merged into coding-standards.yaml Rule 6 | `.zencoder/rules/archive/` | ✅ Redirect stub |
-| `DAILY_PLAN_AUTOMATOR_*.md` (variants) | Specs moved to coding-standards.yaml agents section | `.zencoder/rules/archive/` | ✅ Redirect stubs |
-| `documentation-synchronization-agent.md` | Specs consolidated into coding-standards.yaml | `.zencoder/rules/archive/` | ✅ Redirect stub |
-
-**See also**: `/Comserv/root/Documentation/session_history/AI_ASSISTANTS_IDE_INTEGRATION_AUDIT.md` for consolidation history and audit trail.
-
----
-
-**CONSOLIDATED ON**: 2026-01-16 by Cleanup Agent (Chat 64, Prompt 103)  
-**STATUS**: ✅ All Rules unified in coding-standards.yaml  
-**NEXT STEP**: Update all external references to point to coding-standards.yaml lines (see table above)
+## Features
+- Project management system
+- Theme customization system
+- Email integration
+- PDF generation
+- Proxmox VE integration
+- Multi-site support

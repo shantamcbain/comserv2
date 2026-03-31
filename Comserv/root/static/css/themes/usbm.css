@@ -1,5 +1,4 @@
-/* Generated CSS for theme: usbm */
-
+/* Theme: usbm */
 :root {
   --accent-color: #FFCC66;
   --background-color: #009933;
@@ -25,61 +24,9 @@
   --table-header-bg: #e6e6e6;
   --text-color: black;
   --warning-color: red;
+  --doc-header-bg: #006622;
+  --doc-header-color: #ffffff;
+  --doc-header-hover-bg: #004d19;
+  --doc-content-bg: #f0f0f0;
+  --doc-content-color: #111111;
 }
-
-.LeftNavTableStyle {
-  background: #FFCC66;
-  border: 0;
-  width: 150%;
-}
-
-.NavtableHeaderCellStyle {
-  background: #FF9900;
-  color: black;
-  text-align: center;
-  vertical-align: top;
-}
-
-.applicationSubMenuStyle {
-  background: white;
-  color: black;
-  font-family: Verdana, Helvetica, sans-serif;
-  font-size: 15px;
-}
-
-.day_title_header {
-  background: #FFCC66;
-  color: black;
-  font-family: Verdana, Helvetica, sans-serif;
-  text-align: center;
-  vertical-align: top;
-}
-
-.month_title_header {
-  background: #FFCC66;
-  color: black;
-  font-family: Verdana, Helvetica, sans-serif;
-  text-align: center;
-  vertical-align: top;
-}
-
-.month_wday_header {
-  background: #FF9900;
-  color: black;
-  font-family: Verdana, Helvetica, sans-serif;
-  font-size: 20px;
-  text-align: center;
-  vertical-align: top;
-}
-
-.warning {
-  background: #E5E5E5;
-  border: medium green;
-  border-style: dashed;
-  color: red;
-  font-family: Verdana, Helvetica, sans-serif;
-  font-size: 18px;
-  text-align: center;
-  vertical-align: top;
-}
-
