@@ -1,0 +1,1117 @@
+[% META
+   title = "Admin File Browser"
+   description = "Browse NFS directories and manage files as admin"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "FileManagement"
+   page_version = "0.03"
+   last_updated = "2026-03-01"
+%]
+[% PageVersion = 'file/AdminBrowser.tt,v 0.03 2026/03/01 AI Exp AI ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<style>
+/* ── File Browser Layout ───────────────────────────────────────── */
+.fb-layout    { display:grid; grid-template-columns:220px 1fr; gap:0; min-height:60vh; border:1px solid #ddd; border-radius:4px; overflow:hidden; }
+.fb-sidebar   { background:#f5f5f5; border-right:1px solid #ddd; padding:0; overflow-y:auto; }
+.fb-sidebar h4 { margin:0; padding:8px 12px; background:#e8e8e8; font-size:0.8rem; text-transform:uppercase; letter-spacing:.05em; color:#555; border-bottom:1px solid #ddd; }
+.fb-alloc-list { list-style:none; margin:0; padding:0; }
+.fb-alloc-list li a { display:block; padding:7px 12px 7px 14px; font-size:0.85rem; color:#333; text-decoration:none; border-bottom:1px solid #eee; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fb-alloc-list li a:hover, .fb-alloc-list li a.active { background:#d0e8ff; color:#1565c0; }
+.fb-alloc-list li a .fb-site-label { font-size:0.7rem; color:#888; display:block; }
+
+.fb-main      { background:#fff; padding:0; overflow:hidden; }
+.fb-toolbar   { display:flex; align-items:center; gap:8px; padding:8px 12px; background:#fafafa; border-bottom:1px solid #ddd; flex-wrap:wrap; }
+.fb-toolbar .fb-path-input { flex:1; min-width:200px; font-family:monospace; font-size:0.82rem; }
+.fb-breadcrumb { padding:6px 12px; background:#fff; border-bottom:1px solid #eee; font-size:0.82rem; color:#666; display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.fb-breadcrumb a { color:#1565c0; text-decoration:none; }
+.fb-breadcrumb a:hover { text-decoration:underline; }
+.fb-breadcrumb .sep { color:#bbb; }
+
+.fb-listing   { overflow-y:auto; max-height:calc(100vh - 280px); }
+.fb-table     { width:100%; border-collapse:collapse; font-size:0.875rem; }
+.fb-table thead th { position:sticky; top:0; background:#f0f0f0; padding:6px 10px; text-align:left; font-weight:600; border-bottom:2px solid #ddd; white-space:nowrap; }
+.fb-table tbody tr { border-bottom:1px solid #f0f0f0; }
+.fb-table tbody tr:hover { background:#f0f5ff; }
+.fb-table td   { padding:5px 10px; vertical-align:middle; }
+.fb-table td.fb-name { white-space:nowrap; }
+.fb-table td.fb-size, .fb-table td.fb-date { white-space:nowrap; color:#666; font-size:0.8rem; }
+
+.fb-row-actions { display:flex; gap:4px; align-items:center; flex-wrap:wrap; }
+.fb-row-actions .btn { padding:2px 7px; font-size:0.75rem; white-space:nowrap; }
+
+/* ── File type badges ─────────────────────────────────────────── */
+.fb-ext { display:inline-block; min-width:32px; padding:1px 5px; border-radius:2px;
+          font-size:0.62rem; font-weight:bold; color:#fff !important; text-align:center;
+          vertical-align:middle; margin-right:5px; letter-spacing:.02em;
+          text-decoration:none !important; }
+.fb-ext-folder  { background:#d4881a; }
+.fb-ext-pdf     { background:#c62828; }
+.fb-ext-doc,  .fb-ext-docx  { background:#1565c0; }
+.fb-ext-xls,  .fb-ext-xlsx, .fb-ext-csv { background:#2e7d32; }
+.fb-ext-ppt,  .fb-ext-pptx  { background:#e65100; }
+.fb-ext-jpg, .fb-ext-jpeg, .fb-ext-png, .fb-ext-gif,
+.fb-ext-webp, .fb-ext-svg,  .fb-ext-bmp  { background:#6a1b9a; }
+.fb-ext-mp4, .fb-ext-avi, .fb-ext-mov, .fb-ext-mkv, .fb-ext-webm { background:#b71c1c; }
+.fb-ext-mp3, .fb-ext-wav, .fb-ext-ogg, .fb-ext-flac { background:#00695c; }
+.fb-ext-zip, .fb-ext-tar, .fb-ext-gz, .fb-ext-bz2, .fb-ext-7z, .fb-ext-rar { background:#f57f17; }
+.fb-ext-pl, .fb-ext-pm, .fb-ext-py, .fb-ext-js, .fb-ext-ts,
+.fb-ext-sh, .fb-ext-rb, .fb-ext-php, .fb-ext-java, .fb-ext-css { background:#0277bd; }
+.fb-ext-txt, .fb-ext-md, .fb-ext-rst, .fb-ext-log { background:#546e7a; }
+.fb-ext-html, .fb-ext-htm { background:#546e7a; }
+.fb-ext-other { background:#78909c; }
+
+/* Image thumbnail in listing */
+.fb-thumb { width:28px; height:28px; object-fit:cover; border-radius:2px; vertical-align:middle; }
+
+/* ── Preview Modal ─────────────────────────────────────────────── */
+.fb-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:1000; }
+.fb-modal         { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+                    z-index:1001; background:#fff; border-radius:6px; box-shadow:0 8px 40px rgba(0,0,0,.4);
+                    max-width:90vw; max-height:90vh; overflow:hidden; flex-direction:column; }
+.fb-modal.open    { display:flex; }
+.fb-modal-header  { display:flex; align-items:center; justify-content:space-between;
+                    padding:10px 16px; border-bottom:1px solid #ddd; background:#f5f5f5; }
+.fb-modal-header h3 { margin:0; font-size:0.95rem; word-break:break-all; }
+.fb-modal-close   { background:none; border:none; font-size:1.4rem; cursor:pointer; color:#555; line-height:1; padding:0 4px; }
+.fb-modal-body    { flex:1; overflow:auto; padding:0; display:flex; align-items:center; justify-content:center; min-width:300px; min-height:200px; }
+.fb-modal-body img  { max-width:85vw; max-height:80vh; object-fit:contain; display:block; }
+.fb-modal-body iframe { width:85vw; height:80vh; border:none; }
+.fb-modal-body pre  { margin:0; padding:16px; font-size:0.8rem; white-space:pre-wrap; word-break:break-all; min-width:60vw; max-height:78vh; overflow:auto; background:#1e1e1e; color:#d4d4d4; }
+.fb-modal-body audio, .fb-modal-body video { max-width:80vw; }
+.fb-modal-footer  { display:flex; gap:8px; padding:8px 16px; border-top:1px solid #ddd; background:#f5f5f5; }
+
+/* ── Buttons — force override any global theme rules ─────────────── */
+.btn {
+    display:inline-block !important; padding:5px 10px !important; border:none !important;
+    border-radius:4px !important; cursor:pointer !important; font-size:0.85rem !important;
+    text-decoration:none !important; line-height:1.4 !important;
+    vertical-align:middle !important; font-weight:500 !important;
+}
+.btn:hover { opacity:.85 !important; text-decoration:none !important; }
+.btn-sm        { padding:2px 8px !important; font-size:0.75rem !important; }
+.btn-primary   { background-color:#007bff !important; color:#fff !important; }
+.btn-secondary { background-color:#6c757d !important; color:#fff !important; }
+.btn-edit      { background-color:#fd7e14 !important; color:#fff !important; }
+.btn-delete    { background-color:#dc3545 !important; color:#fff !important; }
+
+/* ── Rename inline form ────────────────────────────────────────── */
+.fb-rename-row { display:none; }
+.fb-rename-row td { padding:4px 10px; }
+.fb-rename-form { display:flex; gap:6px; align-items:center; }
+.fb-rename-form input { flex:1; font-size:0.85rem; }
+</style>
+
+<div class="app-container">
+
+  <div class="page-header">
+    <h1>&#128193; File Browser</h1>
+  </div>
+
+  [% IF error_msg %]
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c">
+    <strong>Error:</strong> [% error_msg | html %]
+  </div>
+  [% END %]
+  [% IF c.flash.error_msg %]
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c">
+    <strong>Error:</strong> [% c.flash.error_msg | html %]
+  </div>
+  [% END %]
+  [% IF c.flash.success_msg %]
+  <div style="background:#e8f5e9;border:1px solid #81c784;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#1b5e20">
+    <strong>Done:</strong> [% c.flash.success_msg | html %]
+  </div>
+  [% END %]
+
+  [%# ── Quick action bar ─────────────────────────────────────── %]
+  <div class="content-section">
+    <div class="form-actions">
+      <a href="[% c.uri_for('/file/list') %]" class="btn btn-secondary">
+        <i class="fas fa-database"></i> DB File List
+      </a>
+      <a href="[% c.uri_for('/file/upload_file', { dir_path => current_directory }) %]" class="btn btn-primary">
+        &#8679; Upload to DB
+      </a>
+      <a href="[% c.uri_for('/file/duplicates') %]" class="btn btn-secondary">
+        <i class="fas fa-copy"></i> Duplicates
+      </a>
+      <a href="[% c.uri_for('/file/dir_sync', { dir_path => current_directory }) %]" class="btn btn-secondary"
+         title="Scan this directory and bulk-import new files into the database">
+        &#8635; Sync Dir to DB
+      </a>
+      [% IF is_csc %]
+      <a href="[% c.uri_for('/file/nfs_allocations') %]" class="btn btn-secondary">
+        <i class="fas fa-network-wired"></i> NFS Allocations
+      </a>
+      [% END %]
+    </div>
+  </div>
+
+  [%# ── Two-panel file browser ───────────────────────────────── %]
+  <div class="content-section" style="padding:0">
+    <div class="fb-layout">
+
+      [%# LEFT: sidebar — allocated directories ──────────────── %]
+      <div class="fb-sidebar">
+        <h4>&#128190; Directories</h4>
+        <ul class="fb-alloc-list">
+          [% IF is_csc %]
+          <li>
+            <a href="[% c.uri_for('/file/admin_browser', { dir_path => nfs_root }) %]"
+               class="[% 'active' IF current_directory == nfs_root %]">
+              <span class="fb-ext fb-ext-folder">DIR</span> [NFS Root]
+              <span class="fb-site-label">[% nfs_root | html %]</span>
+            </a>
+          </li>
+          [% END %]
+          [% FOREACH alloc IN allocated_dirs %]
+          [% SET dir_exists = alloc.nfs_path.defined %]
+          <li>
+            <a href="[% c.uri_for('/file/admin_browser', { dir_path => alloc.nfs_path }) %]"
+               class="[% 'active' IF current_directory == alloc.nfs_path %]"
+               title="[% alloc.sitename | html %]: [% alloc.nfs_path | html %]">
+              <span class="fb-ext fb-ext-folder">DIR</span> [% alloc.sitename | html %]
+              <span class="fb-site-label">[% alloc.nfs_path | html %]</span>
+              [% IF alloc.description %]
+              <span class="fb-site-label" style="font-style:italic">[% alloc.description | html %]</span>
+              [% END %]
+            </a>
+          </li>
+          [% END %]
+          [% IF !allocated_dirs.size && !is_csc %]
+          <li><a href="#">No directories allocated</a></li>
+          [% END %]
+        </ul>
+
+        [%# ── Disk Usage ─────────────────────────────────── %]
+        [% IF disk_usage && disk_usage.total_fmt %]
+        <div style="padding:10px 12px;border-top:1px solid #ddd;font-size:.78rem">
+          <div style="font-weight:600;margin-bottom:6px;color:#555">&#128190; Disk Usage</div>
+          <div style="background:#e0e0e0;border-radius:3px;height:8px;margin-bottom:5px;overflow:hidden">
+            <div style="background:[% disk_usage.pct > 85 ? '#c62828' : disk_usage.pct > 70 ? '#e65100' : '#1565c0' %];height:100%;width:[% disk_usage.pct %]%"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+            <span style="color:#666">Used:</span><span style="font-weight:600">[% disk_usage.used_fmt | html %]</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+            <span style="color:#666">Free:</span><span style="font-weight:600">[% disk_usage.avail_fmt | html %]</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="color:#666">Total:</span><span>[% disk_usage.total_fmt | html %]</span>
+          </div>
+          <div style="color:[% disk_usage.pct > 85 ? '#c62828' : '#888' %];margin-top:4px;text-align:right">[% disk_usage.pct | html %]% used</div>
+        </div>
+        [% END %]
+
+      </div>
+
+      [%# RIGHT: main file listing area ─────────────────────── %]
+      <div class="fb-main">
+
+        [%# Toolbar: path input, hidden toggle, mkdir ───────── %]
+        <div class="fb-toolbar">
+          <form method="get" action="[% c.uri_for('/file/admin_browser') %]"
+                style="display:flex;gap:6px;align-items:center;flex:1">
+            [% IF is_csc %]
+            <input type="text" name="dir_path" value="[% current_directory | html %]"
+                   class="form-input fb-path-input" placeholder="Enter path…">
+            [% ELSE %]
+            <input type="text" name="dir_path" value="[% current_directory | html %]"
+                   class="form-input fb-path-input" readonly>
+            [% END %]
+            <label style="font-size:.8rem;white-space:nowrap">
+              <input type="checkbox" name="show_hidden" value="1"
+                [% 'checked' IF show_hidden %]> Hidden
+            </label>
+            <button type="submit" class="btn btn-primary btn-sm">Go</button>
+          </form>
+
+          [%# mkdir inline ─────────────────────────────────── %]
+          <form method="post" action="[% c.uri_for('/file/fs_mkdir') %]"
+                style="display:flex;gap:6px;align-items:center">
+            <input type="hidden" name="parent_dir" value="[% current_directory | html %]">
+            <input type="text" name="dir_name" placeholder="New folder…"
+                   class="form-input" style="width:130px;font-size:.82rem">
+            <button type="submit" class="btn btn-sm btn-secondary">
+              <i class="fas fa-folder-plus"></i> Create
+            </button>
+          </form>
+        </div>
+
+        [%# Breadcrumb — CSC admin sees full path; others only see below nav_root %]
+        <div class="fb-breadcrumb">
+          [% IF parent_dir %]
+          <a href="[% c.uri_for('/file/admin_browser', { dir_path => parent_dir }) %]">&#8593; Up</a>
+          <span class="sep">/</span>
+          [% END %]
+          [% IF is_csc %]
+            [% SET crumb_path = '' %]
+            [% FOREACH part IN current_directory.split('/') %]
+              [% IF part %]
+                [% SET crumb_path = crumb_path _ '/' _ part %]
+                <a href="[% c.uri_for('/file/admin_browser', { dir_path => crumb_path }) %]">[% part | html %]</a>
+                <span class="sep">/</span>
+              [% END %]
+            [% END %]
+          [% ELSE %]
+            [%# Show only path segments at/below nav_root %]
+            [% SET nav_root_shown = 0 %]
+            [% SET crumb_path = '' %]
+            [% FOREACH part IN current_directory.split('/') %]
+              [% IF part %]
+                [% SET crumb_path = crumb_path _ '/' _ part %]
+                [% IF crumb_path == nav_root || nav_root_shown %]
+                  [% SET nav_root_shown = 1 %]
+                  <a href="[% c.uri_for('/file/admin_browser', { dir_path => crumb_path }) %]">[% part | html %]</a>
+                  <span class="sep">/</span>
+                [% END %]
+              [% END %]
+            [% END %]
+          [% END %]
+        </div>
+
+        [%# File/dir listing table ─────────────────────────── %]
+        <div class="fb-listing">
+          [% IF directories.size OR files.size %]
+          <table class="fb-table">
+            <thead>
+              <tr>
+                <th style="width:28px"></th>
+                <th>Name</th>
+                <th>Size</th>
+                <th>Modified</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="fb-tbody">
+
+              [%# ── Directories ─────────────────────────────── %]
+              [% FOREACH dir IN directories %]
+              [% SET dir_full = current_directory _ '/' _ dir.name %]
+              [% SET dir_esc  = dir.name | html %]
+              [% SET rid = 'd' _ loop.count %]
+              <tr id="row-[% rid %]">
+                <td><span class="fb-ext fb-ext-folder">DIR</span></td>
+                <td class="fb-name">
+                  <a href="[% c.uri_for('/file/admin_browser', { dir_path => dir_full }) %]">
+                    [% dir.name | html %]
+                  </a>
+                </td>
+                <td class="fb-size">—</td>
+                <td class="fb-date">[% USE date; date.format(dir.mtime, '%Y-%m-%d %H:%M') %]</td>
+                <td>
+                  <div class="fb-row-actions">
+                    <a href="[% c.uri_for('/file/admin_browser', { dir_path => dir_full }) %]"
+                       class="btn btn-sm btn-primary" title="Open directory">Open</a>
+                    <button type="button" class="btn btn-sm btn-edit"
+                            onclick="fbRenameShow('[% rid %]','[% dir_full | html %]','[% dir_esc %]','[% current_directory | html %]')"
+                            title="Rename">Rename</button>
+                    <button type="button" class="btn btn-sm btn-secondary"
+                            onclick="fbOpenMove('[% dir_full | html %]','[% dir_esc %]','[% current_directory | html %]')"
+                            title="Move directory to another location">Move</button>
+                    <a href="[% c.uri_for('/file/dir_sync', { dir_path => dir_full }) %]"
+                       class="btn btn-sm btn-secondary"
+                       title="Scan this directory and bulk-import files into the database">+DB</a>
+                    <form method="post" action="[% c.uri_for('/file/fs_delete') %]" style="display:inline"
+                          onsubmit="return confirm('Delete empty folder [% dir_esc %]?')">
+                      <input type="hidden" name="path" value="[% dir_full | html %]">
+                      <input type="hidden" name="dir"  value="[% current_directory | html %]">
+                      <button type="submit" class="btn btn-sm btn-delete" title="Delete (empty directories only)">Del</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              <tr id="rename-row-[% rid %]" class="fb-rename-row">
+                <td></td>
+                <td colspan="4">
+                  <form method="post" action="[% c.uri_for('/file/fs_rename') %]" class="fb-rename-form">
+                    <input type="hidden" name="old_path" id="rp-[% rid %]" value="">
+                    <input type="hidden" name="dir"      value="[% current_directory | html %]">
+                    <input type="text"   name="new_name" id="rn-[% rid %]" class="form-input"
+                           value="[% dir.name | html %]">
+                    <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                    <button type="button" class="btn btn-sm btn-secondary"
+                            onclick="fbRenameHide('[% rid %]')">Cancel</button>
+                  </form>
+                </td>
+              </tr>
+              [% END %]
+
+              [%# ── Files ───────────────────────────────────── %]
+              [% FOREACH f IN files %]
+              [% SET full_path = current_directory _ '/' _ f.name %]
+              [% SET fname_esc = f.name | html %]
+              [% SET fid = 'f' _ loop.count %]
+              [% SET is_img = (f.ext == 'jpg' || f.ext == 'jpeg' || f.ext == 'png' || f.ext == 'gif' || f.ext == 'webp') %]
+              [% SET is_text = (f.ext == 'txt' || f.ext == 'md' || f.ext == 'pl' || f.ext == 'pm' || f.ext == 'py' || f.ext == 'js' || f.ext == 'sh' || f.ext == 'css' || f.ext == 'html' || f.ext == 'htm' || f.ext == 'rst') %]
+              [% SET is_pdf  = (f.ext == 'pdf') %]
+              [% SET is_vid  = (f.ext == 'mp4' || f.ext == 'webm' || f.ext == 'mov') %]
+              [% SET is_aud  = (f.ext == 'mp3' || f.ext == 'ogg' || f.ext == 'wav') %]
+              [% SET can_preview = (is_img || is_text || is_pdf || is_vid || is_aud) %]
+              [% SET is_archive = (f.ext == 'zip' || f.ext == 'tar' || f.ext == 'tgz' || f.ext == 'gz' || f.ext == 'tbz2' || f.ext == 'txz' || f.name.match('\.tar\.(gz|bz2|xz|zst)$')) %]
+
+              [% SET ext_badge = f.ext ? f.ext.upper : '?' %]
+              [% SET ext_css = f.ext ? 'fb-ext-' _ f.ext : 'fb-ext-other' %]
+
+              <tr id="row-[% fid %]">
+                <td style="white-space:nowrap">
+                  [% IF is_img %]
+                  <img class="fb-thumb"
+                       src="[% c.uri_for('/file/fs_preview', { path => full_path }) %]"
+                       alt="[% fname_esc %]"
+                       onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block'">
+                  <span class="fb-ext [% ext_css %]" style="display:none">[% ext_badge | html %]</span>
+                  [% ELSE %]
+                  <span class="fb-ext [% ext_css %]">[% ext_badge | html %]</span>
+                  [% END %]
+                </td>
+                <td class="fb-name">
+                  [% IF can_preview %]
+                  <a href="#" onclick="fbPreview('[% full_path | url %]','[% fname_esc %]','[% f.ext %]');return false">
+                    [% f.name | html %]
+                  </a>
+                  [% ELSIF is_archive %]
+                  <a href="#" onclick="fbOpenArchive('[% full_path | html %]','[% fname_esc %]');return false">
+                    [% f.name | html %]
+                  </a>
+                  [% ELSE %]
+                  [% f.name | html %]
+                  [% END %]
+                </td>
+                <td class="fb-size">[% f.size_fmt || f.size | html %]</td>
+                <td class="fb-date">[% USE date; date.format(f.mtime, '%Y-%m-%d %H:%M') %]</td>
+                <td>
+                  <div class="fb-row-actions">
+                    [% IF can_preview %]
+                    <button type="button" class="btn btn-sm btn-primary"
+                            onclick="fbPreview('[% full_path | url %]','[% fname_esc %]','[% f.ext %]')"
+                            title="Preview / View">View</button>
+                    [% ELSIF is_archive %]
+                    <button type="button" class="btn btn-sm btn-primary"
+                            onclick="fbOpenArchive('[% full_path | html %]','[% fname_esc %]')"
+                            title="Browse archive contents">Contents</button>
+                    [% END %]
+                    <a href="[% c.uri_for('/file/fs_download', { path => full_path }) %]"
+                       class="btn btn-sm btn-secondary" title="Download">&#8595; DL</a>
+                    <button type="button" class="btn btn-sm btn-edit"
+                            onclick="fbRenameShow('[% fid %]','[% full_path | html %]','[% fname_esc %]','[% current_directory | html %]')"
+                            title="Rename">Rename</button>
+                    <button type="button" class="btn btn-sm btn-secondary"
+                            onclick="fbOpenMove('[% full_path | html %]','[% fname_esc %]','[% current_directory | html %]')"
+                            title="Move file to another directory">Move</button>
+                    <button type="button" class="btn btn-sm btn-secondary"
+                            onclick="fbOpenDbImport('[% full_path | html %]','[% fname_esc %]','[% current_directory | html %]')"
+                            title="Add to database so other users can find and use this file">+DB</button>
+                    <form method="post" action="[% c.uri_for('/file/fs_delete') %]" style="display:inline"
+                          onsubmit="return fbConfirmDelete('[% fname_esc %]',this)">
+                      <input type="hidden" name="path"    value="[% full_path | html %]">
+                      <input type="hidden" name="dir"     value="[% current_directory | html %]">
+                      <input type="hidden" name="also_db" value="0" id="also_db_[% fid %]">
+                      <button type="submit" class="btn btn-sm btn-delete" title="Delete">Del</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              <tr id="rename-row-[% fid %]" class="fb-rename-row">
+                <td></td>
+                <td colspan="4">
+                  <form method="post" action="[% c.uri_for('/file/fs_rename') %]" class="fb-rename-form">
+                    <input type="hidden" name="old_path" id="rp-[% fid %]" value="">
+                    <input type="hidden" name="dir"      value="[% current_directory | html %]">
+                    <input type="text"   name="new_name" id="rn-[% fid %]" class="form-input"
+                           value="[% f.name | html %]">
+                    <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                    <button type="button" class="btn btn-sm btn-secondary"
+                            onclick="fbRenameHide('[% fid %]')">Cancel</button>
+                  </form>
+                </td>
+              </tr>
+              [% END %]
+
+            </tbody>
+          </table>
+          [% ELSE %]
+          <p class="empty-state" style="padding:20px">Directory is empty or inaccessible.</p>
+          [% END %]
+        </div>
+
+      </div>[%# end fb-main %]
+    </div>[%# end fb-layout %]
+  </div>
+
+  [%# ── Local Drive Import (admin only, collapsible) ─────────── %]
+  [% IF is_admin %]
+  <div class="content-section">
+    <details id="local-upload-section">
+      <summary style="cursor:pointer;padding:6px 0;font-weight:600">
+        &#128190; Import files from your computer
+      </summary>
+      <div class="form-section" style="margin-top:10px">
+        <p style="margin:0 0 10px;font-size:.875rem">Files are uploaded from your <strong>local computer</strong> to the server's NFS storage.</p>
+
+        [%# ── Target directory ─── %]
+        [% IF allocated_dirs.size %]
+        <div class="form-row">
+          <div class="form-field">
+            <label for="local_target_dir">Upload to:</label>
+            <select id="local_target_dir" class="form-input" onchange="fbSyncTarget()">
+              [% FOREACH alloc IN allocated_dirs %]
+              <option value="nfsid:[% alloc.id | html %]" data-path="[% alloc.nfs_path | html %]">
+                [% alloc.sitename | html %]: [% alloc.nfs_path | html %]
+              </option>
+              [% END %]
+            </select>
+          </div>
+        </div>
+        [% ELSIF is_csc %]
+        <div class="form-row">
+          <div class="form-field">
+            <label for="local_target_path">Server directory path:</label>
+            <input type="text" id="local_target_path" class="form-input"
+                   value="[% current_directory | html %]"
+                   placeholder="e.g. /home/user/nfs/sitename"
+                   style="font-family:monospace" onchange="fbSyncTarget()">
+          </div>
+        </div>
+        [% ELSE %]
+        <p class="empty-state">No NFS directories allocated. Ask CSC admin to create an allocation.</p>
+        [% END %]
+
+        [%# ── Mode tabs + file picker ─── %]
+        [% IF allocated_dirs.size || is_csc %]
+        <div class="form-row" style="gap:8px;align-items:center;margin-top:6px">
+          <button type="button" class="btn btn-sm btn-secondary" id="mode-files-btn"
+                  onclick="fbSetMode('files')" style="font-weight:bold">&#128196; Files</button>
+          <button type="button" class="btn btn-sm btn-secondary" id="mode-dir-btn"
+                  onclick="fbSetMode('dir')">&#128193; Folder</button>
+          <span style="font-size:.8rem;color:#666" id="mode-hint">Select individual files</span>
+        </div>
+        <div class="form-row" style="margin-top:4px">
+          <input type="file" id="local_files_input" multiple class="form-input"
+                 onchange="fbShowLocalList(this)" style="flex:1">
+        </div>
+
+        <div id="local-file-list" style="margin:8px 0"></div>
+
+        <div id="local-upload-progress" style="display:none;margin:8px 0">
+          <div style="background:#eee;border-radius:4px;height:18px;overflow:hidden;margin-bottom:4px">
+            <div id="local-prog-bar" style="background:#1565c0;height:100%;width:0;transition:width .3s"></div>
+          </div>
+          <span id="local-prog-text" style="font-size:.8rem;color:#555"></span>
+        </div>
+
+        <div id="local-upload-errors" style="display:none;margin-top:6px"></div>
+
+        <div class="form-actions" style="margin-top:8px">
+          <button type="button" class="btn btn-primary" id="local-upload-btn"
+                  style="display:none" onclick="fbStartUpload()">
+            &#8679; Upload to Server
+          </button>
+        </div>
+        [% END %]
+      </div>
+    </details>
+  </div>
+  [% END %]
+
+</div>
+
+[%# ── Preview Modal ─────────────────────────────────────────────── %]
+<div class="fb-modal-overlay" id="fb-overlay" onclick="fbClosePreview()"></div>
+<div class="fb-modal" id="fb-modal">
+  <div class="fb-modal-header">
+    <h3 id="fb-modal-title">Preview</h3>
+    <button class="fb-modal-close" onclick="fbClosePreview()" title="Close">&times;</button>
+  </div>
+  <div class="fb-modal-body" id="fb-modal-body"></div>
+  <div class="fb-modal-footer">
+    <a id="fb-modal-dl-link" href="#" class="btn btn-primary" download>
+      <i class="fas fa-download"></i> Download
+    </a>
+    <button type="button" class="btn btn-secondary" onclick="fbClosePreview()">Close</button>
+  </div>
+</div>
+
+[%# ── DB Import modal ───────────────────────────────────────────── %]
+<div class="fb-modal-overlay" id="fb-db-overlay" onclick="fbCancelDbImport()"></div>
+<div class="fb-modal" id="fb-db-modal" style="max-width:560px">
+  <div class="fb-modal-header">
+    <h3>Add / Update File in Database</h3>
+    <button class="fb-modal-close" onclick="fbCancelDbImport()">&times;</button>
+  </div>
+  <div class="fb-modal-body" style="padding:16px 20px;display:block;overflow-y:auto;max-height:75vh">
+    <p style="font-weight:bold;margin-bottom:4px;word-break:break-all" id="fb-db-import-name"></p>
+    <p style="font-size:.78rem;color:#777;margin-bottom:12px">
+      Creates a database record so users can search, download and reference this file through the application.
+      The file stays on the NFS server.
+    </p>
+    <form id="fb-db-import-form" method="post" action="[% c.uri_for('/file/db_import_file') %]">
+      <input type="hidden" id="fb-db-path" name="file_path" value="">
+      <input type="hidden" id="fb-db-dir"  name="dir"       value="">
+
+      [%# ── Description ── %]
+      <div style="margin-bottom:10px">
+        <label for="fb-db-desc" style="font-weight:600;display:block;margin-bottom:3px">Description:</label>
+        <textarea id="fb-db-desc" name="description" class="form-input" rows="2"
+                  style="width:100%;resize:vertical;font-size:.85rem"
+                  placeholder="Brief description of the file and its purpose"></textarea>
+      </div>
+
+      [%# ── Access Level ── %]
+      <div style="margin-bottom:10px">
+        <label for="fb-db-access" style="font-weight:600;display:block;margin-bottom:3px">Visibility / Access:</label>
+        <select id="fb-db-access" name="access_level" class="form-input">
+          <option value="site_only">Site users only (default)</option>
+          <option value="public">Public — visible to all sites</option>
+          [% IF is_admin %]
+          <option value="private">Private — owner only</option>
+          <option value="workshop">Workshop — via workshop attachment</option>
+          [% END %]
+        </select>
+        <p style="font-size:.75rem;color:#888;margin-top:3px">
+          Controls which users can see this file in the application.
+          Workshop leaders: choose <em>Site users only</em> or <em>Workshop</em>.
+        </p>
+      </div>
+
+      [%# ── File Status (admin only) ── %]
+      [% IF is_admin %]
+      <div style="margin-bottom:10px">
+        <label for="fb-db-status" style="font-weight:600;display:block;margin-bottom:3px">Status:</label>
+        <select id="fb-db-status" name="file_status" class="form-input">
+          <option value="active">Active — visible and downloadable</option>
+          <option value="inactive">Inactive — hidden from users</option>
+          <option value="archived">Archived — read-only reference</option>
+        </select>
+      </div>
+
+      [%# ── SiteName (CSC admin only) ── %]
+      [% IF is_csc && sites.size %]
+      <div style="margin-bottom:10px">
+        <label for="fb-db-sitename" style="font-weight:600;display:block;margin-bottom:3px">Assign to Site:</label>
+        <select id="fb-db-sitename" name="sitename" class="form-input">
+          <option value="">— auto-detect from path —</option>
+          [% FOREACH site IN sites %]
+          <option value="[% site.name | html %]">[% site.name | html %]</option>
+          [% END %]
+        </select>
+      </div>
+      [% END %]
+      [% END %]
+
+      [%# ── Workshop attachment ── %]
+      [% IF workshops.size %]
+      <div style="margin-bottom:10px">
+        <label for="fb-db-workshop" style="font-weight:600;display:block;margin-bottom:3px">
+          Attach to Workshop: <span style="font-weight:normal;color:#888">(optional)</span>
+        </label>
+        <select id="fb-db-workshop" name="workshop_id" class="form-input">
+          <option value="">— none —</option>
+          [% FOREACH ws IN workshops %]
+          <option value="[% ws.id | html %]">
+            [% ws.title | html %][% IF is_csc %] ([% ws.sitename | html %])[% END %]
+          </option>
+          [% END %]
+        </select>
+        <p style="font-size:.75rem;color:#888;margin-top:3px">
+          Attaching makes this file available within that workshop session.
+          Set <em>Visibility</em> to <em>Workshop</em> to restrict access to workshop participants only.
+        </p>
+      </div>
+      [% END %]
+
+    </form>
+  </div>
+  <div class="fb-modal-footer">
+    <button type="button" class="btn btn-primary" onclick="document.getElementById('fb-db-import-form').submit()">
+      Add to Database
+    </button>
+    <button type="button" class="btn btn-secondary" onclick="fbCancelDbImport()">Cancel</button>
+  </div>
+</div>
+
+[%# ── Move modal ─────────────────────────────────────────────────── %]
+<div class="fb-modal-overlay" id="fb-mv-overlay" onclick="fbCancelMove()"></div>
+<div class="fb-modal" id="fb-mv-modal" style="max-width:560px">
+  <div class="fb-modal-header">
+    <h3>Move</h3>
+    <button class="fb-modal-close" onclick="fbCancelMove()">&times;</button>
+  </div>
+  <div class="fb-modal-body" style="padding:14px 18px;display:block">
+    <p style="font-weight:bold;margin-bottom:2px;word-break:break-all" id="fb-mv-filename"></p>
+    <p style="font-size:.78rem;color:#777;margin-bottom:10px">
+      From: <code id="fb-mv-current" style="font-size:.75rem"></code>
+    </p>
+
+    <form id="fb-mv-form" method="post" action="[% c.uri_for('/file/fs_move') %]">
+      <input type="hidden" id="fb-mv-old-path" name="old_path" value="">
+      <input type="hidden" id="fb-mv-dir"      name="dir"      value="">
+      <input type="hidden" id="fb-mv-dest"      name="dest_dir" value="">
+
+      [%# ── Directory picker ─── %]
+      <div style="margin-bottom:8px">
+        <label style="font-weight:600;font-size:.85rem;display:block;margin-bottom:4px">Select destination:</label>
+
+        [% IF allocated_dirs.size %]
+        <div style="margin-bottom:6px">
+          <select class="form-input" style="font-size:.82rem"
+                  onchange="if(this.value)fbMvNavTo(this.value)">
+            <option value="">— jump to allocated directory —</option>
+            [% FOREACH alloc IN allocated_dirs %]
+            <option value="[% alloc.nfs_path | html %]">
+              [% alloc.sitename | html %]: [% alloc.nfs_path | html %]
+            </option>
+            [% END %]
+          </select>
+        </div>
+        [% END %]
+
+        <div style="border:1px solid #ccc;border-radius:4px;overflow:hidden">
+          <div id="fb-mv-picker-path"
+               style="background:#f5f5f5;padding:5px 8px;font-family:monospace;font-size:.78rem;
+                      border-bottom:1px solid #ccc;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <button type="button" class="btn btn-sm btn-secondary" id="fb-mv-up-btn"
+                    onclick="fbMvGoUp()" title="Go up one level">&#8593; Up</button>
+            <span id="fb-mv-picker-path-text" style="flex:1;word-break:break-all"></span>
+          </div>
+          <div id="fb-mv-dir-list"
+               style="max-height:200px;overflow-y:auto;padding:4px 0;background:#fff;min-height:60px">
+            <p style="color:#aaa;font-size:.8rem;padding:8px 12px;margin:0">Loading…</p>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#e8f4ff;border:1px solid #90caf9;border-radius:4px;padding:7px 10px;font-size:.82rem;margin-bottom:6px">
+        <strong>Move to:</strong>
+        <span id="fb-mv-selected-label" style="font-family:monospace;margin-left:6px;color:#1565c0;word-break:break-all">
+          (navigate above to select)
+        </span>
+      </div>
+
+      <div style="margin-bottom:6px">
+        <label style="font-size:.78rem;color:#666;display:block;margin-bottom:2px">
+          Or type path directly:
+        </label>
+        <input type="text" id="fb-mv-manual" class="form-input"
+               placeholder="/path/to/destination"
+               style="font-family:monospace;font-size:.82rem"
+               oninput="fbMvSetDest(this.value)"
+               autocomplete="off">
+      </div>
+
+      <p style="font-size:.75rem;color:#888;margin:0">
+        File is physically moved on the NFS filesystem. Any database record path is updated automatically.
+        Browser navigates to the destination after the move.
+      </p>
+    </form>
+  </div>
+  <div class="fb-modal-footer">
+    <button type="button" class="btn btn-primary" onclick="fbSubmitMove()">Move Here</button>
+    <button type="button" class="btn btn-secondary" onclick="fbCancelMove()">Cancel</button>
+  </div>
+</div>
+
+[%# ── Archive contents modal ──────────────────────────────────────── %]
+<div class="fb-modal-overlay" id="fb-arc-overlay" onclick="fbCancelArchive()"></div>
+<div class="fb-modal" id="fb-arc-modal" style="max-width:640px">
+  <div class="fb-modal-header">
+    <h3>&#128230; Contents: <span id="fb-arc-name" style="font-weight:normal;font-size:.85rem"></span></h3>
+    <button class="fb-modal-close" onclick="fbCancelArchive()">&times;</button>
+  </div>
+  <div class="fb-modal-body" style="padding:0;display:block;max-height:70vh;overflow-y:auto">
+    <div id="fb-arc-content" style="padding:10px 14px;font-size:.82rem">
+      <p style="color:#aaa">Loading&#8230;</p>
+    </div>
+  </div>
+  <div class="fb-modal-footer">
+    <span id="fb-arc-count" style="font-size:.8rem;color:#777;flex:1"></span>
+    <button type="button" class="btn btn-secondary" onclick="fbCancelArchive()">Close</button>
+  </div>
+</div>
+
+[%# ── Delete confirmation modal ─────────────────────────────────── %]
+<div class="fb-modal-overlay" id="fb-del-overlay"></div>
+<div class="fb-modal" id="fb-del-modal" style="max-width:440px">
+  <div class="fb-modal-header">
+    <h3>Delete File</h3>
+    <button class="fb-modal-close" onclick="fbCancelDelete()">&times;</button>
+  </div>
+  <div class="fb-modal-body" style="padding:20px;display:block">
+    <p id="fb-del-filename" style="font-weight:bold;margin-bottom:12px;word-break:break-all"></p>
+    <label style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <input type="checkbox" id="fb-del-also-db"> Also remove from database
+    </label>
+    <p style="font-size:.8rem;color:#888">Disk file will be permanently deleted. This cannot be undone.</p>
+  </div>
+  <div class="fb-modal-footer">
+    <button type="button" class="btn btn-delete" id="fb-del-confirm-btn">Delete</button>
+    <button type="button" class="btn btn-secondary" onclick="fbCancelDelete()">Cancel</button>
+  </div>
+</div>
+
+<script>
+var _fbDelForm = null;
+
+function fbPreview(encodedPath, name, ext) {
+    var previewUrl = '[% c.uri_for('/file/fs_preview') %]?path=' + encodedPath;
+    var dlUrl      = '[% c.uri_for('/file/fs_download') %]?path=' + encodedPath;
+    var body = document.getElementById('fb-modal-body');
+    var modal = document.getElementById('fb-modal');
+    var overlay = document.getElementById('fb-overlay');
+    var title = document.getElementById('fb-modal-title');
+    var dlLink = document.getElementById('fb-modal-dl-link');
+
+    title.textContent = name;
+    dlLink.href = dlUrl;
+    body.innerHTML = '';
+
+    var images = ['jpg','jpeg','png','gif','webp','svg'];
+    var texts  = ['txt','md','pl','pm','py','js','sh','css','html','htm','rst'];
+    var pdfs   = ['pdf'];
+    var videos = ['mp4','webm','mov'];
+    var audios = ['mp3','ogg','wav'];
+
+    if (images.indexOf(ext) >= 0) {
+        var img = document.createElement('img');
+        img.src = previewUrl;
+        img.alt = name;
+        body.appendChild(img);
+    } else if (pdfs.indexOf(ext) >= 0) {
+        window.open(previewUrl, '_blank', 'noopener');
+        fbClosePreview();
+        return;
+    } else if (videos.indexOf(ext) >= 0) {
+        var vid = document.createElement('video');
+        vid.controls = true;
+        vid.style.maxWidth = '80vw';
+        var src = document.createElement('source');
+        src.src = previewUrl;
+        vid.appendChild(src);
+        body.appendChild(vid);
+    } else if (audios.indexOf(ext) >= 0) {
+        var aud = document.createElement('audio');
+        aud.controls = true;
+        var src = document.createElement('source');
+        src.src = previewUrl;
+        aud.appendChild(src);
+        body.appendChild(aud);
+    } else if (texts.indexOf(ext) >= 0) {
+        body.innerHTML = '<pre>Loading…</pre>';
+        fetch(previewUrl).then(function(r){ return r.text(); }).then(function(t){
+            var pre = document.createElement('pre');
+            pre.textContent = t;
+            body.innerHTML = '';
+            body.appendChild(pre);
+        }).catch(function(){ body.innerHTML = '<pre>Could not load file.</pre>'; });
+    }
+
+    overlay.style.display = 'block';
+    modal.classList.add('open');
+}
+
+function fbClosePreview() {
+    document.getElementById('fb-overlay').style.display = 'none';
+    document.getElementById('fb-modal').classList.remove('open');
+    document.getElementById('fb-modal-body').innerHTML = '';
+}
+
+function fbRenameShow(id, fullPath, currentName, dir) {
+    document.getElementById('row-' + id).style.display = 'none';
+    var rrow = document.getElementById('rename-row-' + id);
+    rrow.style.display = 'table-row';
+    document.getElementById('rp-' + id).value = fullPath;
+    var nameInput = document.getElementById('rn-' + id);
+    nameInput.value = currentName;
+    nameInput.focus();
+    nameInput.select();
+}
+
+function fbRenameHide(id) {
+    document.getElementById('row-' + id).style.display = '';
+    document.getElementById('rename-row-' + id).style.display = 'none';
+}
+
+function fbConfirmDelete(name, form) {
+    _fbDelForm = form;
+    document.getElementById('fb-del-filename').textContent = name;
+    document.getElementById('fb-del-also-db').checked = false;
+    document.getElementById('fb-del-overlay').style.display = 'block';
+    document.getElementById('fb-del-modal').classList.add('open');
+    document.getElementById('fb-del-confirm-btn').onclick = function() {
+        var also = document.getElementById('fb-del-also-db').checked ? '1' : '0';
+        _fbDelForm.querySelector('input[name=also_db]').value = also;
+        fbCancelDelete();
+        _fbDelForm.submit();
+    };
+    return false;
+}
+
+function fbCancelDelete() {
+    document.getElementById('fb-del-overlay').style.display = 'none';
+    document.getElementById('fb-del-modal').classList.remove('open');
+}
+
+function fbOpenDbImport(filePath, fileName, dir) {
+    document.getElementById('fb-db-path').value = filePath;
+    document.getElementById('fb-db-dir').value  = dir;
+    document.getElementById('fb-db-import-name').textContent = fileName;
+    document.getElementById('fb-db-access').value = 'site_only';
+    document.getElementById('fb-db-overlay').style.display = 'block';
+    document.getElementById('fb-db-modal').classList.add('open');
+}
+
+function fbCancelDbImport() {
+    document.getElementById('fb-db-overlay').style.display = 'none';
+    document.getElementById('fb-db-modal').classList.remove('open');
+}
+
+var _fbMvListDirsUrl = '[% c.uri_for('/file/fs_list_dirs') %]';
+var _fbMvCurrentPicker = '';
+var _fbMvParentPicker  = '';
+
+function fbOpenMove(filePath, fileName, dir) {
+    document.getElementById('fb-mv-old-path').value = filePath;
+    document.getElementById('fb-mv-dir').value      = dir;
+    document.getElementById('fb-mv-dest').value     = '';
+    document.getElementById('fb-mv-filename').textContent = fileName;
+    document.getElementById('fb-mv-current').textContent  = filePath;
+    document.getElementById('fb-mv-selected-label').textContent = '(navigate below to select)';
+    document.getElementById('fb-mv-manual').value   = '';
+    document.getElementById('fb-mv-overlay').style.display = 'block';
+    document.getElementById('fb-mv-modal').classList.add('open');
+    fbMvNavTo(dir);
+}
+
+function fbCancelMove() {
+    document.getElementById('fb-mv-overlay').style.display = 'none';
+    document.getElementById('fb-mv-modal').classList.remove('open');
+}
+
+function fbMvSetDest(path) {
+    path = path.trim();
+    document.getElementById('fb-mv-dest').value = path;
+    document.getElementById('fb-mv-selected-label').textContent = path || '(none)';
+}
+
+function fbMvNavTo(path) {
+    var list = document.getElementById('fb-mv-dir-list');
+    list.innerHTML = '<p style="color:#aaa;font-size:.8rem;padding:8px 12px;margin:0">Loading\u2026</p>';
+    fetch(_fbMvListDirsUrl + '?path=' + encodeURIComponent(path))
+        .then(function(r){ return r.json(); })
+        .then(function(data) {
+            if (data.error) {
+                list.innerHTML = '<p style="color:#c00;font-size:.8rem;padding:8px 12px;margin:0">' + data.error + '</p>';
+                return;
+            }
+            _fbMvCurrentPicker = data.path;
+            _fbMvParentPicker  = data.parent;
+            document.getElementById('fb-mv-picker-path-text').textContent = data.path;
+            document.getElementById('fb-mv-up-btn').disabled = !data.can_go_up;
+
+            fbMvSetDest(data.path);
+            document.getElementById('fb-mv-manual').value = data.path;
+
+            if (!data.dirs || data.dirs.length === 0) {
+                list.innerHTML = '<p style="color:#aaa;font-size:.8rem;padding:8px 12px;margin:0">No subdirectories here.</p>';
+                return;
+            }
+            var html = '';
+            data.dirs.forEach(function(d) {
+                var fullPath = data.path.replace(/\/+$/, '') + '/' + d;
+                html += '<div onclick="fbMvNavTo(\'' + fullPath.replace(/'/g, "\\'") + '\')"'
+                      + ' style="padding:5px 12px;cursor:pointer;font-size:.83rem;border-bottom:1px solid #f0f0f0;'
+                      + 'display:flex;align-items:center;gap:6px" '
+                      + ' onmouseover="this.style.background=\'#f0f5ff\'" '
+                      + ' onmouseout="this.style.background=\'\'">'
+                      + '<span style="color:#d4881a;font-size:.7rem;font-weight:bold;background:#f5f5f5;'
+                      + 'border-radius:2px;padding:1px 4px">DIR</span>'
+                      + '<span>' + d.replace(/</g,'&lt;') + '</span>'
+                      + '<span style="margin-left:auto;font-size:.72rem;color:#aaa">&#9654;</span>'
+                      + '</div>';
+            });
+            list.innerHTML = html;
+        })
+        .catch(function(e) {
+            list.innerHTML = '<p style="color:#c00;font-size:.8rem;padding:8px 12px;margin:0">Error loading directories.</p>';
+        });
+}
+
+function fbMvGoUp() {
+    if (_fbMvParentPicker) fbMvNavTo(_fbMvParentPicker);
+}
+
+function fbSubmitMove() {
+    var dest = document.getElementById('fb-mv-dest').value.trim();
+    if (!dest) { alert('Please select or type a destination directory.'); return; }
+    var name = document.getElementById('fb-mv-filename').textContent;
+    if (!confirm('Move "' + name + '" to:\n' + dest + '\n\nProceed?')) return;
+    document.getElementById('fb-mv-form').submit();
+}
+
+var _fbMode = 'files';
+var _fbUploadUrl = '[% c.uri_for('/file/fs_upload_tree') %]';
+
+function fbGetTargetDir() {
+    var sel = document.getElementById('local_target_dir');
+    if (sel) {
+        var opt = sel.options[sel.selectedIndex];
+        return opt ? (opt.getAttribute('data-path') || '') : '';
+    }
+    var inp = document.getElementById('local_target_path');
+    return inp ? inp.value.trim() : '';
+}
+
+function fbSyncTarget() {}
+
+function fbSetMode(mode) {
+    _fbMode = mode;
+    var inp = document.getElementById('local_files_input');
+    var hint = document.getElementById('mode-hint');
+    var fb = document.getElementById('mode-files-btn');
+    var db = document.getElementById('mode-dir-btn');
+    if (mode === 'dir') {
+        inp.setAttribute('webkitdirectory', '');
+        inp.setAttribute('multiple', '');
+        inp.removeAttribute('accept');
+        hint.textContent = 'Select a folder — all files inside will be uploaded';
+        fb.style.fontWeight = ''; db.style.fontWeight = 'bold';
+    } else {
+        inp.removeAttribute('webkitdirectory');
+        inp.setAttribute('multiple', '');
+        hint.textContent = 'Select individual files';
+        fb.style.fontWeight = 'bold'; db.style.fontWeight = '';
+    }
+    inp.value = '';
+    document.getElementById('local-file-list').innerHTML = '';
+    document.getElementById('local-upload-btn').style.display = 'none';
+}
+
+function fbShowLocalList(input) {
+    var files = Array.from(input.files);
+    var list  = document.getElementById('local-file-list');
+    var btn   = document.getElementById('local-upload-btn');
+    if (!files.length) { list.innerHTML = ''; btn.style.display = 'none'; return; }
+    var rows = files.map(function(f) {
+        var rel = f.webkitRelativePath || f.name;
+        return '<tr><td style="font-size:.8rem">' + rel + '</td><td style="font-size:.8rem;white-space:nowrap">' + (f.size/1024).toFixed(1) + ' KB</td></tr>';
+    }).join('');
+    list.innerHTML = '<table class="data-table" style="font-size:.8rem"><thead><tr><th>File</th><th>Size</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    btn.style.display = 'inline-block';
+}
+
+function fbStartUpload() {
+    var input  = document.getElementById('local_files_input');
+    var files  = Array.from(input.files);
+    if (!files.length) { alert('No files selected.'); return; }
+    var target = fbGetTargetDir();
+    if (!target) { alert('Please specify a target directory.'); return; }
+
+    var btn     = document.getElementById('local-upload-btn');
+    var progDiv = document.getElementById('local-upload-progress');
+    var progBar = document.getElementById('local-prog-bar');
+    var progTxt = document.getElementById('local-prog-text');
+    var errDiv  = document.getElementById('local-upload-errors');
+    btn.disabled = true;
+    progDiv.style.display = 'block';
+    errDiv.style.display  = 'none';
+    errDiv.innerHTML = '';
+
+    var done = 0, errors = [];
+
+    function uploadNext(i) {
+        if (i >= files.length) {
+            progBar.style.width = '100%';
+            progTxt.textContent = done + ' file(s) uploaded.' + (errors.length ? ' ' + errors.length + ' error(s).' : '');
+            btn.disabled = false;
+            if (errors.length) {
+                errDiv.style.display = 'block';
+                errDiv.innerHTML = '<div style="color:#b71c1c;font-size:.8rem"><strong>Errors:</strong><br>' + errors.map(function(e){return e;}).join('<br>') + '</div>';
+            }
+            return;
+        }
+        var f = files[i];
+        var rel = f.webkitRelativePath || f.name;
+        var pct = Math.round(i * 100 / files.length);
+        progBar.style.width = pct + '%';
+        progTxt.textContent = 'Uploading ' + (i+1) + '/' + files.length + ': ' + rel;
+
+        var fd = new FormData();
+        fd.append('target_dir', target);
+        fd.append('rel_path',   rel);
+        fd.append('file',       f);
+
+        fetch(_fbUploadUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(j) {
+                if (j.ok) { done++; } else { errors.push(rel + ': ' + (j.error || 'unknown error')); }
+                uploadNext(i + 1);
+            })
+            .catch(function(e) { errors.push(rel + ': network error'); uploadNext(i + 1); });
+    }
+    uploadNext(0);
+}
+
+var _fbArcListUrl = '[% c.uri_for('/file/fs_list_archive') %]';
+
+function fbOpenArchive(filePath, fileName) {
+    document.getElementById('fb-arc-name').textContent = fileName;
+    document.getElementById('fb-arc-content').innerHTML = '<p style="color:#aaa">Loading\u2026</p>';
+    document.getElementById('fb-arc-count').textContent = '';
+    document.getElementById('fb-arc-overlay').style.display = 'block';
+    document.getElementById('fb-arc-modal').classList.add('open');
+
+    fetch(_fbArcListUrl + '?path=' + encodeURIComponent(filePath))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) {
+                document.getElementById('fb-arc-content').innerHTML =
+                    '<p style="color:#c00">' + data.error.replace(/</g,'&lt;') + '</p>';
+                return;
+            }
+            document.getElementById('fb-arc-count').textContent =
+                data.count + ' file' + (data.count === 1 ? '' : 's');
+
+            if (!data.entries || data.entries.length === 0) {
+                document.getElementById('fb-arc-content').innerHTML = '<p style="color:#aaa">Empty archive.</p>';
+                return;
+            }
+
+            var html = '<table style="width:100%;border-collapse:collapse;font-size:.82rem">'
+                + '<thead><tr>'
+                + '<th style="text-align:left;padding:4px 8px;background:#f0f0f0;border-bottom:2px solid #ddd">Name</th>'
+                + '<th style="text-align:right;padding:4px 8px;background:#f0f0f0;border-bottom:2px solid #ddd;white-space:nowrap">Size</th>'
+                + '</tr></thead><tbody>';
+
+            data.entries.forEach(function(e, i) {
+                var bg = (i % 2 === 1) ? 'background:#fafafa' : '';
+                var name = e.name.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                var isDir = e.name.slice(-1) === '/';
+                var icon  = isDir ? '&#128193; ' : '';
+                var sz = '';
+                if (!isDir && e.size > 0) {
+                    if      (e.size >= 1073741824) sz = (e.size/1073741824).toFixed(1) + ' GB';
+                    else if (e.size >= 1048576)    sz = (e.size/1048576).toFixed(1) + ' MB';
+                    else if (e.size >= 1024)        sz = (e.size/1024).toFixed(1) + ' KB';
+                    else                            sz = e.size + ' B';
+                }
+                html += '<tr style="' + bg + '">'
+                    + '<td style="padding:3px 8px;word-break:break-all;color:' + (isDir ? '#d4881a' : '#333') + '">' + icon + name + '</td>'
+                    + '<td style="padding:3px 8px;text-align:right;color:#666;white-space:nowrap">' + sz + '</td>'
+                    + '</tr>';
+            });
+            html += '</tbody></table>';
+            document.getElementById('fb-arc-content').innerHTML = html;
+        })
+        .catch(function() {
+            document.getElementById('fb-arc-content').innerHTML = '<p style="color:#c00">Error loading archive.</p>';
+        });
+}
+
+function fbCancelArchive() {
+    document.getElementById('fb-arc-overlay').style.display = 'none';
+    document.getElementById('fb-arc-modal').classList.remove('open');
+}
+</script>

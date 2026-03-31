@@ -399,7 +399,7 @@
                 </p>
                 <ul>
                     <li><strong>localhost:11434</strong> - Local development/testing</li>
-                    <li><strong>192.168.1.171:11434</strong> - Network AI server (production)</li>
+                    <li><strong>192.168.1.199:11434</strong> - Network AI server (production)</li>
                 </ul>
                 
                 <h3>Server Configuration Methods</h3>

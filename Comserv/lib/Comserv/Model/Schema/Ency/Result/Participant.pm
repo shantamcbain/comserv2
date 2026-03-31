@@ -20,6 +20,16 @@ __PACKAGE__->add_columns(
         data_type => 'varchar',
         size => 255,
     },
+    first_name => {
+        data_type => 'varchar',
+        size => 255,
+        is_nullable => 1,
+    },
+    last_name => {
+        data_type => 'varchar',
+        size => 255,
+        is_nullable => 1,
+    },
     email => {
         data_type => 'varchar',
         size => 255,
@@ -40,6 +50,11 @@ __PACKAGE__->add_columns(
         extra => {
             list => ['registered', 'waitlist', 'attended', 'cancelled']
         },
+    },
+    email_opt_out => {
+        data_type     => 'tinyint',
+        default_value => 0,
+        is_nullable   => 0,
     },
 );
 

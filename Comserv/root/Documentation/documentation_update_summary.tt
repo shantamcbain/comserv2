@@ -1,0 +1,121 @@
+[% META title = 'Documentation Update Summary' %]
+[% PageVersion = 'Comserv/root/Documentation/documentation_update_summary.tt,v 0.04 2025/01/16 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<!-- Documentation Update Summary Template -->
+<!-- This template guides AI agents in documenting code changes and maintaining doc/code synchronization -->
+
+<div class="documentation-content">
+    <h1><i class="fas fa-sync-alt"></i> Documentation Update Summary</h1>
+    
+    [% IF c.session.roles.grep('developer|admin').size %]
+    <div class="alert alert-info">
+        <strong>Developer/Admin View:</strong> This template provides a structured format for documenting code changes and ensuring documentation stays synchronized with implementation.
+    </div>
+    [% END %]
+
+    <h2><i class="fas fa-file-sync"></i> Documentation Sync Update Summary Template</h2>
+
+    <div class="alert alert-warning">
+        <strong>Instructions for AI Agents:</strong> Fill out each section completely before committing changes.
+    </div>
+
+    <h3><i class="fas fa-git-alt"></i> Git Status Overview</h3>
+    <div class="row">
+        <div class="col-md-6">
+            <h4><i class="fas fa-edit"></i> Modified Files (M)</h4>
+            <p><strong>Count:</strong> [Number of files with uncommitted changes]</p>
+            <p><strong>Key Categories:</strong> [Controllers/Models/Templates/Documentation/Config]</p>
+            <textarea class="form-control" rows="4" placeholder="List critical modified files that need attention...">[List of modified files requiring documentation updates]</textarea>
+        </div>
+        <div class="col-md-6">
+            <h4><i class="fas fa-plus-circle"></i> Added Files (A)</h4>
+            <p><strong>Count:</strong> [Number of newly added files]</p>
+            <textarea class="form-control" rows="4" placeholder="List new files and their purpose...">[List of added files and brief descriptions]</textarea>
+        </div>
+    </div>
+
+    <h3><i class="fas fa-question-circle"></i> Untracked Files Cleanup</h3>
+    <div class="alert alert-info">
+        <strong>Purpose:</strong> Identify files that should be committed, moved, or removed from the repository.
+    </div>
+    <div class="row">
+        <div class="col-md-4">
+            <h4><i class="fas fa-check"></i> Files to Commit</h4>
+            <textarea class="form-control" rows="6" placeholder="Untracked files that should be added to git...">[List files that need git add]</textarea>
+        </div>
+        <div class="col-md-4">
+            <h4><i class="fas fa-arrows-alt"></i> Files to Relocate</h4>
+            <textarea class="form-control" rows="6" placeholder="Files in wrong location that need moving...">[List files to move and their target locations]</textarea>
+        </div>
+        <div class="col-md-4">
+            <h4><i class="fas fa-trash"></i> Files to Remove</h4>
+            <textarea class="form-control" rows="6" placeholder="Obsolete or duplicate files to delete...">[List files for deletion with reasons]</textarea>
+        </div>
+    </div>
+
+    <h3><i class="fas fa-search"></i> Change Scope</h3>
+    <p><strong>Brief Description:</strong> [Summarize what surface area was touched and the intent of changes]</p>
+    <p><strong>Git Diff Summary:</strong> [High-level overview of changes from git diff --stat]</p>
+
+    <h3><i class="fas fa-code"></i> Current Implementation State</h3>
+    <p><strong>What the code currently does:</strong> [Document the actual behavior implemented in the codebase]</p>
+    <p><strong>Working Features:</strong> [List what is functional and tested]</p>
+    <p><strong>Known Issues:</strong> [Document current problems or limitations]</p>
+
+    <h3><i class="fas fa-project-diagram"></i> Planned Implementation</h3>
+    <p><strong>Intended changes:</strong> [Document what the plan calls for - the target state]</p>
+    <p><strong>Success Criteria:</strong> [How we'll know implementation is complete]</p>
+
+    <h3><i class="fas fa-tasks"></i> Implementation Gap Analysis</h3>
+    <p><strong>Remaining work:</strong> [List what still needs to be done to complete the planned implementation]</p>
+    <p><strong>Blocked Items:</strong> [Issues preventing progress]</p>
+    <p><strong>Next Actions:</strong> [Immediate next steps to take]</p>
+
+    <h3><i class="fas fa-users"></i> Role-Specific Information</h3>
+    <ul>
+        <li><strong><i class="fas fa-user"></i> Normal Users:</strong> [How these changes affect end user experience and interface]</li>
+        <li><strong><i class="fas fa-user-cog"></i> Administrators:</strong> [Configuration, management, or troubleshooting implications]</li>
+        <li><strong><i class="fas fa-code"></i> Developers:</strong> [Technical details, API changes, code structure impacts]</li>
+    </ul>
+
+    <h3><i class="fas fa-globe"></i> Site Impact Assessment</h3>
+    <p><strong>Sites Affected:</strong> [all/MCOOP/specific sites - document deployment scope]</p>
+    <p><strong>Deployment Risk:</strong> [Low/Medium/High with justification]</p>
+    <p><strong>Rollback Plan:</strong> [How to revert changes if needed]</p>
+
+    <h3><i class="fas fa-file-code"></i> File Update Tracking</h3>
+    <p><strong>PageVersions Updated:</strong> [List all .tt and .md files with updated PageVersion headers]</p>
+    <p><strong>Config Files Modified:</strong> [List configuration files that changed]</p>
+    <p><strong>Documentation Links:</strong> [New or updated documentation references]</p>
+
+    <h3><i class="fas fa-code-branch"></i> Code Changes Summary</h3>
+    <p><strong>Diff Summary:</strong> Please attach the unified diff in the PR description as a code block.</p>
+    <p><strong>Lines Changed:</strong> [+additions/-deletions from git diff --stat]</p>
+    <p><strong>Complexity Score:</strong> [Simple/Moderate/Complex based on change scope]</p>
+
+    <h3><i class="fas fa-clipboard-check"></i> Pre-Commit Checklist</h3>
+    <div class="row">
+        <div class="col-md-6">
+            <ul class="list-unstyled">
+                <li><i class="fas fa-square"></i> All modified files reviewed</li>
+                <li><i class="fas fa-square"></i> Documentation updated to match code</li>
+                <li><i class="fas fa-square"></i> PageVersion headers incremented</li>
+                <li><i class="fas fa-square"></i> Untracked files categorized</li>
+                <li><i class="fas fa-square"></i> Obsolete files identified for removal</li>
+            </ul>
+        </div>
+        <div class="col-md-6">
+            <ul class="list-unstyled">
+                <li><i class="fas fa-square"></i> Configuration files validated</li>
+                <li><i class="fas fa-square"></i> No debugging code left in production files</li>
+                <li><i class="fas fa-square"></i> Commit message prepared</li>
+                <li><i class="fas fa-square"></i> Ready for peer review</li>
+                <li><i class="fas fa-square"></i> Deployment plan confirmed</li>
+            </ul>
+        </div>
+    </div>
+
+</div>

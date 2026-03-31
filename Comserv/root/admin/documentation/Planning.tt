@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.70' %]
-[% date_iso = '2026/02/15' %]
-[% formatted_date = 'February 15, 2026' %]
-[% time = '17:08:00' %]
-[% change_log = 'WorkShops: Phase 1 COMPLETED - All Result classes created/extended, Schema.pm updated, database tables synced via schema_compare. Project 175 and 8 todos marked complete.' %]
+[% version = '0.75' %]
+[% date_iso = '2026/03/20' %]
+[% formatted_date = 'March 20, 2026' %]
+[% time = '16:30:00' %]
+[% change_log = 'Planning System Migration: DB-driven model now live for all sites via DailyPlan.tt. Non-CSC sites see DB plans only. CSC sees DB plans + this legacy text section. SiteName-based access controls implemented. Plan creation form live at /admin/plan/create. Normal/user/editor roles now have planning access. NEXT: migrate remaining text groups below into DB records, then remove text section entirely.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -140,7 +140,87 @@ last_updated = '2026/02/08'
 </style>
 
 <div class="container">
-    <h1>Planning </h1>
+    <h1>Planning (CSC — Legacy Text View)</h1>
+
+    <!-- YOU ARE HERE banner -->
+    <div style="background:#cce5ff;border:1px solid #004085;border-radius:6px;padding:10px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:0.9em;">
+            <strong>📍 YOU ARE HERE:</strong>
+            Step 3 of 7 — <em>Refactor MasterPlanCoordination to coordinator-only role</em> &nbsp;·&nbsp;
+            <a href="#anchor-planning-system-project" style="color:#004085;font-weight:bold;">View full plan status ↓</a>
+        </span>
+        <span style="font-size:0.82em;color:#004085;">
+            Branch: <code>planningsystem-59ae</code> &nbsp;·&nbsp;
+            <a href="/Documentation/DailyPlan#planning" style="color:#004085;">Back to DB view</a>
+        </span>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         MIGRATION STATUS — March 2026
+         This section is ONLY visible to CSC users. All other sites now
+         see the DB-driven plan list at the top of the PLANNING tab.
+         Goal: migrate all groups below into DB records, then delete this file.
+    ═══════════════════════════════════════════════════════════════ -->
+    <div style="background:#fff3cd;border:2px solid #ffc107;border-radius:6px;padding:14px 18px;margin-bottom:18px;">
+        <strong>⚠️ LEGACY TEXT PLANNING — BEING MIGRATED</strong>
+        <p style="margin:6px 0 0;">This text-based planning view is <strong>CSC-admin-only</strong> and is being replaced by the DB-driven plan list above.
+        Non-CSC sites (BMaster, Shanta, etc.) no longer see this section — they use the database model only.
+        The goal is to enter each project/plan below into the database, then remove this entire section.</p>
+        <p style="margin:6px 0 0;">
+            <strong>Current migration progress:</strong>
+            <span style="background:#28a745;color:#fff;padding:1px 7px;border-radius:3px;font-size:0.85em;">DB Model LIVE ✓</span>
+            <span style="background:#ffc107;color:#333;padding:1px 7px;border-radius:3px;font-size:0.85em;">Migrating projects ⏳</span>
+            <span style="background:#6c757d;color:#fff;padding:1px 7px;border-radius:3px;font-size:0.85em;">Remove text view 🔜</span>
+        </p>
+        <p style="margin:8px 0 0;font-size:0.9em;">
+            <strong>What "Start Next Step" means:</strong>
+            The Zenflow task listed for each group has phases. "Start Next Step" = the next unchecked phase box in that group's task plan.
+            Before starting, verify: (1) all previous phase boxes are ✅, (2) no blocking dependencies are open,
+            (3) the feature branch for that task is active (check port assignments in Active Zenflow Workflows below).
+        </p>
+    </div>
+
+    <!-- HOW TO ADD A PLAN (Plan vs Project) -->
+    <details style="background:var(--secondary-color);border:1px solid var(--border-color);border-radius:6px;padding:0;margin-bottom:18px;">
+        <summary style="padding:12px 16px;cursor:pointer;font-weight:bold;">📖 How to Add a Plan — Plan vs Project (click to expand)</summary>
+        <div style="padding:14px 16px;font-size:0.93em;line-height:1.6;">
+            <h4 style="margin-top:0;">Plan vs Project — what's the difference?</h4>
+            <table style="border-collapse:collapse;width:100%;font-size:0.92em;">
+                <thead>
+                    <tr style="background:var(--primary-color);color:#fff;">
+                        <th style="padding:8px 12px;text-align:left;">Concept</th>
+                        <th style="padding:8px 12px;text-align:left;">Plan</th>
+                        <th style="padding:8px 12px;text-align:left;">Project</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">What it is</td>
+                        <td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">A time-boxed focus sprint or theme (e.g. "Q2 Hive Expansion")</td>
+                        <td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">A deliverable system or feature (e.g. "Planning System", "AI Chat")</td></tr>
+                    <tr><td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">Answers</td>
+                        <td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">"What are we focusing on right now?"</td>
+                        <td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">"What are we building?"</td></tr>
+                    <tr><td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">Scoped to</td>
+                        <td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">SiteName, has priority + status + dates</td>
+                        <td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">Has project code, developer, todos</td></tr>
+                    <tr><td style="padding:6px 12px;">Linked via</td>
+                        <td style="padding:6px 12px;" colspan="2">Many-to-many <code>daily_plan_projects</code> join table — one plan can span multiple projects</td></tr>
+                </tbody>
+            </table>
+            <h4 style="margin-top:14px;">Steps to add a Plan (DB-driven):</h4>
+            <ol style="margin:0;padding-left:20px;">
+                <li>Click <strong>+ New Plan</strong> at the top of the PLANNING tab (or go to <a href="/admin/plan/create">/admin/plan/create</a>).</li>
+                <li>Fill in: <strong>Plan Name</strong> (required), Description, Status (active/paused/completed), Priority (1=highest), Start Date, Due Date.</li>
+                <li>The plan is automatically scoped to your <strong>SiteName</strong> — CSC admins can see all sites; other admins see only their own.</li>
+                <li>After saving, add <strong>Todos</strong> to the plan via the Todo System (<a href="/todo/addtodo">/todo/addtodo</a>) — link the todo to the plan.</li>
+                <li>To add a <strong>Project</strong> to the plan, use the project DB (<a href="/project">/project</a>) and associate via <code>daily_plan_projects</code>.</li>
+            </ol>
+            <p style="margin:10px 0 0;font-size:0.88em;color:var(--text-muted-color);">
+                <strong>Routes:</strong> Admin access via <code>/admin</code> | User profile &amp; role info at <code>/user/profile</code> |
+                Roles with planning access: admin, developer, devops, editor, user, normal (all above member).
+            </p>
+        </div>
+    </details>
 
     <div class="row">
         <div class="col-12">
@@ -148,13 +228,21 @@ last_updated = '2026/02/08'
             <details class="nav-jump" open>
                 <summary>🎯 Quick Jump to Priority (Click to Toggle)</summary>
                 <div class="jump-links-container">
+                    <div class="jump-line" style="background:#d4edda;padding:4px 8px;border-radius:3px;margin-bottom:6px;">
+                        <strong>📅 <a href="/Documentation/DailyPlan#planning" class="jump-link">DB-Driven Plans (live)</a></strong>:
+                        <a href="/admin/plan/create" class="jump-link">+ New Plan</a> |
+                        <a href="/Documentation/DailyPlan#planning" class="jump-link">View All Plans</a> |
+                        <a href="/todo" class="jump-link">Todo System</a> |
+                        <a href="/todo/addtodo" class="jump-link">+ Add Todo</a>
+                    </div>
                     <div class="jump-line">
                         <strong><a href="#group-docker-k8s" class="jump-link">🐳 Docker and K8s Management</a></strong>:
                         <a href="#anchor-project-config-test" class="jump-link">ProjectConfig</a>
                     </div>
                     <div class="jump-line">
                         <strong><a href="#group-docker-k8s" class="jump-link">✅ Docker Bug (COMPLETED)</a></strong>:
-                        <a href="#anchor-dockerbug-completed" class="jump-link">DockerBugFix</a>
+                        <a href="#anchor-dockerbug-completed" class="jump-link">DockerBugFix</a> |
+                        <a href="#anchor-env-vars-admin" class="jump-link">EnvVarsAdmin</a>
                     </div>
                     <div class="jump-line">
                         <strong><a href="#group-arch" class="jump-link">🏗️ Architecture & Infrastructure</a></strong>:
@@ -167,17 +255,16 @@ last_updated = '2026/02/08'
                         <a href="#anchor-priority-3" class="jump-link">UpdateFormat</a>
                     </div>
                     <div class="jump-line">
-                        <strong><a href="#group-planning" class="jump-link">📅 Planning System</a></strong>:
-                        <a href="#planning-system-project" class="jump-link">ProjectDetails</a> |
-                        <a href="#all-projects-list" class="jump-link">AllProjects</a> |
-                        <a href="#anchor-phase0-complete" class="jump-link">Phase0</a> |
-                        <a href="#anchor-phase1" class="jump-link">Phase1</a> |
-                        <a href="#anchor-phase2" class="jump-link">Phase2</a> |
-                        <a href="#anchor-dailyplan-improvements" class="jump-link">DailyPlanUI</a> |
-                        <a href="#anchor-dynamic-daily" class="jump-link">DynamicDailyView</a> |
-                        <a href="#anchor-priority-12" class="jump-link">ThemeSync</a> |
-                        <a href="#anchor-priority-5" class="jump-link">CriticalFlagging</a> |
-                        <a href="#anchor-priority-6" class="jump-link">IntegrateTodo</a>
+                        <strong><a href="#group-planning" class="jump-link">📅 Planning System</a></strong>
+                        <span style="background:#28a745;color:#fff;padding:0 5px;border-radius:3px;font-size:0.8em;">DB LIVE</span>:
+                        <a href="#anchor-planning-system-project" class="jump-link">ProjectDetails</a> |
+                        <a href="#anchor-all-projects-list" class="jump-link">AllProjects</a> |
+                        <a href="#anchor-phase1" class="jump-link">DBEnvMgmt⏳</a> |
+                        <a href="#anchor-phase2" class="jump-link">SchemaModels🔜</a> |
+                        <a href="#anchor-priority-5" class="jump-link">PlanController🔜</a> |
+                        <a href="#anchor-dailyplan-improvements" class="jump-link">DailyPlanUI🔜</a> |
+                        <a href="#anchor-priority-6" class="jump-link">IntegrateTodo🔜</a> |
+                        <a href="/Documentation/DailyPlan" class="jump-link">DynamicView↗</a>
                     </div>
                     <div class="jump-line">
                         <strong><a href="#group-sync" class="jump-link">🔄 Synchronization & Standards</a></strong>:
@@ -188,8 +275,18 @@ last_updated = '2026/02/08'
                         <a href="#anchor-priority-9" class="jump-link">AutomatedSync</a>
                     </div>
                     <div class="jump-line">
+                        <strong><a href="#group-file-mgmt" class="jump-link">📁 File Management System</a></strong>:
+                        <a href="#group-file-mgmt" class="jump-link">Overview</a> |
+                        Phase: <a href="#group-file-mgmt" class="jump-link">0✓</a>
+                        1 2 3 4 5 6 (Pending)
+                    </div>
+                    <div class="jump-line">
                         <strong><a href="#group-workshops" class="jump-link">🎓 WorkShops System</a></strong>:
                         <a href="#anchor-workshops-project" class="jump-link">WorkShopsProject</a>
+                    </div>
+                    <div class="jump-line">
+                        <strong><a href="#group-users" class="jump-link">👥 Users System</a></strong>:
+                        <a href="#anchor-users-project" class="jump-link">UsersProject</a>
                     </div>
                     <div class="jump-line">
                         <strong><a href="#group-ai" class="jump-link">🤖 AI Systems</a></strong>:
@@ -230,7 +327,10 @@ last_updated = '2026/02/08'
                 <li><strong>SchemaManagement:</strong> <a href="[% base_url %]4002/Documentation/DailyPlan" target="_blank">schema-management-system-7eb3</a> <em>(port 4002)</em> - Database Schema Management</li>
                 <li><strong>InfrastructureHA:</strong> <a href="[% base_url %]4003/Documentation/DailyPlan" target="_blank">new-task-9cf1</a> <em>(port 4003)</em> - High Availability & Disaster Recovery</li>
                 <li><strong>WorkShops:</strong> <a href="[% base_url %]4004/workshop" target="_blank">workshops-7d21</a> <em>(port 4004)</em> - Workshop Advertising System with Multi-Site Support</li>
+                <li><strong>Users:</strong> <a href="[% base_url %]4005/user/dashboard" target="_blank">users-e5b8</a> <em>(port 4005)</em> - User & Admin Management System with Email Verification and Role Management</li>
                 <li><strong>ProjectConfig:</strong> <a href="[% base_url %]3000/Documentation/DailyPlan" target="_blank">set-up-project-config-d327</a> <em>(ports 3000, 5000)</em> - Zenflow Project Configuration & Docker Container Testing</li>
+                <li><strong>FileManagement:</strong> <a href="[% base_url %]4006/admin/planning" target="_blank">new-task-bb05</a> <em>(port 4006)</em> - NFS-backed File Management System with multi-tier access control, duplicate detection, and workshop file sharing across SiteNames</li>
+                <li><strong>UnifiedMailSystem:</strong> <a href="[% base_url %]4007/Documentation/DailyPlan" target="_blank">unified-mail-system-site-managed-2c53</a> <em>(port 4007)</em> - Unified Mail System — Site-Managed SMTP with PMG + Harper Integration</li>
             </ul>
             
             <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 10px; margin-top: 10px;">
@@ -238,14 +338,6 @@ last_updated = '2026/02/08'
             </div>
         </div>
     </details>
-
-    <div id="anchor-dynamic-daily" class="nav-anchor"></div>
-    <div id="dynamic-daily" class="doc-section">
-        <h2>Dynamic Daily Tasks</h2>
-        <div class="dynamic-container">
-            [% INCLUDE 'todo/day.tt' %]
-        </div>
-    </div>
 
     <div id="planning" class="doc-section">
         <h2>Planning lists</h2>
@@ -401,6 +493,31 @@ last_updated = '2026/02/08'
                     </div>
                 </details>
 
+                <!-- Sub-project: Environment Variables Admin UI (DELIVERED) -->
+                <div id="anchor-env-vars-admin" class="nav-anchor"></div>
+                <details id="env-vars-admin" class="priority-container">
+                    <summary class="priority-summary">✅ Environment Variables Admin UI - DELIVERED (Feb 2026)</summary>
+                    <div class="priority-content">
+                        <div style="background: #d4edda; border: 1px solid #28a745; border-radius: 4px; padding: 10px; margin: 10px 0;">
+                            <p><strong>✅ DELIVERED:</strong> Administrators can now manage the <code>.env</code> file via the web UI at
+                            <a href="/admin/environment_variables">/admin/environment_variables</a> without needing SSH or direct file access.</p>
+                        </div>
+                        <p><strong>Features delivered:</strong></p>
+                        <ul>
+                            <li>List all <code>.env</code> variables with secret masking (PASSWORD, SECRET, TOKEN, KEY, PASS patterns)</li>
+                            <li>Create, edit, and delete variables through the browser</li>
+                            <li>Export the full <code>.env</code> file for backup or transfer</li>
+                            <li>Automatic backup before each write operation</li>
+                            <li>All actions logged at INFO level with admin identity</li>
+                            <li><code>CATALYST_SERVER_IP</code> override — fixes Docker containers showing internal IP (e.g. <code>172.20.0.2</code>) in the admin debug bar instead of the host LAN IP</li>
+                        </ul>
+                        <p><strong>Related fixes:</strong> Admin debug bar now shows a single <strong>"Server: &lt;workflow&gt; (&lt;ip&gt;)"</strong> field instead of the duplicate "Catalyst Server" + "Server IP" that were both showing the DB host IP.</p>
+                        <p><strong>Documentation:</strong> <a href="/Documentation/EnvironmentVariablesManagement" target="_blank">Environment Variables Management Tutorial</a></p>
+                        <p><strong>Controller:</strong> <code>Comserv/lib/Comserv/Controller/Admin/EnvironmentVariables.pm</code><br>
+                           <strong>Utility:</strong> <code>Comserv/lib/Comserv/Util/EnvFileManager.pm</code></p>
+                    </div>
+                </details>
+
                 <!-- Sub-project 3: Infrastructure Resilience & HA Architecture (ACTIVE) -->
                 <div id="anchor-priority-ha" class="nav-anchor"></div>
                 <details id="priority-ha-infrastructure" class="priority-container" open>
@@ -522,10 +639,103 @@ last_updated = '2026/02/08'
             </details>
 
             <div id="anchor-priority-schema" class="nav-anchor"></div>
-            <details id="priority-schema-system" class="priority-container">
-                <summary class="priority-summary">📊 Schema System Plan & Enhancements</summary>
+            <details id="priority-schema-system" class="priority-container" open>
+                <summary class="priority-summary">📊 Schema Management System Enhancement</summary>
                 <div class="priority-content">
-                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span></p>
+                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Current Step:</strong> Requirements ✅ Complete</p>
+                    <p><strong>Overall Progress:</strong> 25% (1 of 4 workflow steps complete)</p>
+                    
+                    <h4>🎯 Project Overview</h4>
+                    <p>Enhance the existing database schema management system to provide comprehensive tools for managing all databases used by the Comserv application. Fix critical bugs, add missing features (API, CLI, table renaming, multi-site support, Result file editor), and improve navigation and documentation.</p>
+                    
+                    <h4>📋 Workflow Steps</h4>
+                    <ul>
+                        <li>✅ <strong>Step 1: Requirements</strong> - COMPLETED (2026-02-05)
+                            <ul>
+                                <li>Created comprehensive PRD at <code>.zenflow/tasks/schema-managment-system-7eb3/requirements.md</code></li>
+                                <li>Analyzed existing codebase (SchemaComparison.pm, RemoteDB.pm, schema_compare.tt)</li>
+                                <li>Documented 5 critical bugs to fix and 6 major features to add</li>
+                                <li>Added workflow tracking requirements (Section 3.6)</li>
+                            </ul>
+                        </li>
+                        <li>🔄 <strong>Step 2: Technical Specification</strong> - PENDING
+                            <ul>
+                                <li>Define implementation approach</li>
+                                <li>Design API endpoints and CLI tool architecture</li>
+                                <li>Plan database schema changes if needed</li>
+                                <li>Deliverable: <code>spec.md</code></li>
+                            </ul>
+                        </li>
+                        <li>⏭️ <strong>Step 3: Planning</strong> - NOT STARTED
+                            <ul>
+                                <li>Break down work into concrete implementation tasks</li>
+                                <li>Estimate time and dependencies</li>
+                                <li>Create detailed task list</li>
+                            </ul>
+                        </li>
+                        <li>⏭️ <strong>Step 4: Implementation</strong> - NOT STARTED
+                            <ul>
+                                <li>Execute planned tasks</li>
+                                <li>Run tests and validation</li>
+                                <li>Update documentation</li>
+                            </ul>
+                        </li>
+                    </ul>
+                    
+                    <h4>🔧 Problems to Fix (Critical Bugs)</h4>
+                    <ul>
+                        <li><strong>P1:</strong> Creating field in Result file shows "no result file" until manual refresh (DBIx::Class schema reload issue)</li>
+                        <li><strong>P2:</strong> System shows "Total Databases: 2" but only displays one (192.168.1.198) - missing configured servers</li>
+                        <li><strong>P3:</strong> Missing pages (Result editor, table manager, API explorer, CLI interface)</li>
+                        <li><strong>P4:</strong> Poor navigation in admin interface</li>
+                        <li><strong>P5:</strong> Insufficient documentation in /Documentation/ system</li>
+                    </ul>
+                    
+                    <h4>✨ Features to Add</h4>
+                    <ul>
+                        <li><strong>F1:</strong> REST API and CLI tool for AI/automation</li>
+                        <li><strong>F2:</strong> Table renaming with automatic relationship updates</li>
+                        <li><strong>F3:</strong> Create database tables from Result files</li>
+                        <li><strong>F4:</strong> Multi-site database isolation (private copies per site)</li>
+                        <li><strong>F5:</strong> Browser-based Result file editor with syntax highlighting</li>
+                        <li><strong>F6:</strong> Workflow tracking in DailyPlan.tt and Planning.tt (this document)</li>
+                    </ul>
+                    
+                    <h4>📁 Artifacts & Links</h4>
+                    <ul>
+                        <li><a href="/Documentation/AI_ASSISTANTS_IDE_INTEGRATION_AUDIT.md">Requirements Document (PRD)</a> - <code>.zenflow/tasks/schema-managment-system-7eb3/requirements.md</code></li>
+                        <li><a href="/admin/schema_compare">Current Schema Compare Interface</a> - Working baseline</li>
+                        <li>Source: <code>Comserv/lib/Comserv/Controller/Admin/SchemaComparison.pm</code> (1816 lines, extensive sync logic)</li>
+                        <li>Template: <code>Comserv/root/admin/schema_compare.tt</code> (1716 lines, field comparison UI)</li>
+                        <li>DB Config: <code>Comserv/db_config.template.json</code> (multi-server support)</li>
+                    </ul>
+                    
+                    <h4>🔗 Code Reuse Strategy</h4>
+                    <p>Maximum leverage of existing code from SchemaComparison.pm:</p>
+                    <ul>
+                        <li><code>sync_table_to_result</code>, <code>sync_result_to_table</code> - Bidirectional sync</li>
+                        <li><code>create_result_from_table</code>, <code>create_table_from_result</code> - Creation operations</li>
+                        <li><code>get_all_result_files</code> - Result file scanning</li>
+                        <li>RemoteDB.pm - Multi-server connection management</li>
+                    </ul>
+                    
+                    <h4>⏱️ Timeline Estimate</h4>
+                    <ul>
+                        <li>Requirements: ✅ Complete (2 hours actual)</li>
+                        <li>Technical Spec: 3-4 hours (estimated)</li>
+                        <li>Planning: 2-3 hours (estimated)</li>
+                        <li>Implementation: 20-30 hours (estimated, depends on feature prioritization)</li>
+                    </ul>
+                    
+                    <h4>🎯 Success Criteria</h4>
+                    <ul>
+                        <li>All 5 critical bugs fixed and validated</li>
+                        <li>API endpoints functional and documented (OpenAPI/Swagger)</li>
+                        <li>CLI tool working with basic commands</li>
+                        <li>Multi-site support tested with 2+ sites</li>
+                        <li>Result file editor saves without errors</li>
+                        <li>Documentation complete in /Documentation/ system</li>
+                    </ul>
                 </div>
             </details>
 
@@ -645,12 +855,12 @@ last_updated = '2026/02/08'
                                 <li>⏳ Verify database entries and Planning.tt rendering</li>
                             </ul>
                         </li>
-                        <li><strong>Phase 1: Domain Detection Middleware</strong> (ID 159) - <span class="status-pending">PENDING</span>
+                        <li><strong>Phase 1: Domain Detection Middleware</strong> (ID 159) - <span class="status-completed">COMPLETED</span>
                             <ul>
-                                <li>Create domain configuration file</li>
-                                <li>Implement ApiDomainDetector middleware</li>
-                                <li>Register middleware in Catalyst</li>
-                                <li>Write unit tests</li>
+                                <li>✅ Create domain configuration file (<code>Comserv/config/api_domains.json</code>)</li>
+                                <li>✅ Implement <code>ApiDomainDetector</code> utility (<code>Comserv/Util/ApiDomainDetector.pm</code>)</li>
+                                <li>✅ No Catalyst registration needed — utility pattern (like ApiTokenValidator)</li>
+                                <li>✅ Write unit tests (<code>t/util/api_domain_detector.t</code>)</li>
                             </ul>
                         </li>
                         <li><strong>Phase 2: Controller Refactoring</strong> (ID 160) - <span class="status-pending">PENDING</span>
@@ -668,11 +878,13 @@ last_updated = '2026/02/08'
                                 <li>Test external access</li>
                             </ul>
                         </li>
-                        <li><strong>Phase 4: CLI Tool Development</strong> (ID 162) - <span class="status-pending">PENDING</span>
+                        <li><strong>Phase 4: CLI Tool Development</strong> (ID 162) - <span class="status-inprogress">IN PROGRESS</span>
                             <ul>
-                                <li>Create CLI script structure</li>
-                                <li>Implement CLI commands</li>
-                                <li>Add authentication support</li>
+                                <li>✅ Create <code>~/.comserv/credentials</code> (chmod 600) with API token + api_url</li>
+                                <li>✅ Create <code>Comserv::Util::ApiCredentials</code> — reads credentials file with env var overrides</li>
+                                <li>✅ Generate CLI Development Token (DB id=1, expires 2027-03-24)</li>
+                                <li>Create CLI script (<code>Comserv/script/comserv-api-cli</code>)</li>
+                                <li>Implement CLI commands (todos list, todo create/get/update, project get)</li>
                                 <li>Implement output formatting and error handling</li>
                                 <li>Test all CLI commands</li>
                             </ul>
@@ -751,9 +963,108 @@ last_updated = '2026/02/08'
             <summary class="group-header">📅 Planning System</summary>
             <div class="priority-content">
 
-            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0 COMPLETE</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
-            <p><strong>Zenflow Task:</strong> <code>new-task-3cda</code> (port 4000) | <strong>Branch:</strong> <code>new-task-3cda</code></p>
-            <p><em>Note: Planning System project not yet created in database. Create project record and update this section with project ID.</em></p>
+            <!-- ═══════════════════════════════════════
+                 PROJECT DETAILS & CURRENT PLAN STATUS
+                 Mirrors plan.md (planningsystem-59ae)
+            ═══════════════════════════════════════ -->
+            <div id="anchor-planning-system-project" class="nav-anchor"></div>
+            <div style="background:var(--bg-secondary);border:1px solid var(--primary-color);border-radius:6px;padding:16px;margin-bottom:18px;">
+                <h3 style="margin:0 0 8px;font-size:1.1em;">📋 Planning System — Project Summary</h3>
+                <p style="margin:0 0 10px;font-size:0.92em;">
+                    <strong>Goal:</strong> Migrate all planning from text-based .tt files to a fully DB-driven system with SiteName-based access controls,
+                    role-based visibility, developer time logging, and a points-based payment system. Each SiteName gets its own plan view.
+                    CSC retains access to this legacy text section during migration; all other sites see DB plans only.
+                </p>
+                <p style="margin:0 0 6px;font-size:0.88em;">
+                    <strong>Zenflow task:</strong> <code>planningsystem-59ae</code> |
+                    <strong>Branch:</strong> <code>planningsystem-59ae</code> (port 4001) |
+                    <strong>Priority:</strong> HIGH |
+                    <a href="/Documentation" style="color:var(--primary-color);">All Docs</a> |
+                    <a href="/Documentation/MasterPlanCoordination" style="color:var(--primary-color);">Master Plan</a>
+                </p>
+
+                <!-- BRANCHES TO CONSOLIDATE -->
+                <details style="margin:10px 0 0;">
+                    <summary style="cursor:pointer;font-size:0.88em;font-weight:bold;color:var(--text-muted-color);">🔀 Branch Consolidation Status</summary>
+                    <div style="font-size:0.85em;padding:8px 0 0;line-height:2;">
+                        <span style="background:#28a745;color:#fff;padding:1px 6px;border-radius:3px;">merged</span> <code>cssthemes-9195</code> — CSS themes<br>
+                        <span style="background:#ffc107;color:#333;padding:1px 6px;border-radius:3px;">coordinate</span> <code>membership-1304</code> — roles/membership (needed for role-based access docs step)<br>
+                        <span style="background:#ffc107;color:#333;padding:1px 6px;border-radius:3px;">coordinate</span> <code>aichatsystem-ef4e</code> — AI chat (port 4001 originally)<br>
+                        <span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">handoff</span> pointsystem (new branch) — Developer points &amp; payments step<br>
+                        <span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">handoff</span> <code>api-bc05</code> — API work (independent)<br>
+                    </div>
+                </details>
+
+                <!-- CURRENT PLAN STEPS (mirrors plan.md planningsystem-59ae) -->
+                <h4 style="margin:16px 0 8px;font-size:0.95em;">📌 Plan Steps — Current State</h4>
+                <table style="width:100%;border-collapse:collapse;font-size:0.88em;">
+                    <thead>
+                        <tr style="background:var(--primary-color);color:#fff;">
+                            <th style="padding:6px 10px;text-align:left;width:30%;">Step</th>
+                            <th style="padding:6px 10px;text-align:left;width:15%;">Status</th>
+                            <th style="padding:6px 10px;text-align:left;">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom:1px solid var(--border-color);">
+                            <td style="padding:6px 10px;font-weight:bold;">1. Implementation</td>
+                            <td style="padding:6px 10px;"><span style="background:#28a745;color:#fff;padding:1px 6px;border-radius:3px;">✅ DONE</span></td>
+                            <td style="padding:6px 10px;">SiteName access gates, DB plan list in DailyPlan.tt, 'normal' role, plan create form, UserSiteRole login merge</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border-color);background:var(--bg-secondary);">
+                            <td style="padding:6px 10px;font-weight:bold;">2. Migrate DailyPlan.tt to DB coordinator</td>
+                            <td style="padding:6px 10px;"><span style="background:#28a745;color:#fff;padding:1px 6px;border-radius:3px;">✅ DONE</span></td>
+                            <td style="padding:6px 10px;">
+                                ✅ SiteName routing, CSC-only tabs wrapped<br>
+                                ✅ DB active_priorities live (replaces hardcoded lists)<br>
+                                ✅ Gantt tab added (all sites); | json filter fixed<br>
+                                ✅ Stale text tabs removed; Phase 0 collapsed with DB migration note<br>
+                                ✅ Hash→tab JS: quick links now auto-switch to correct tab<br>
+                                ✅ Sub-project accordion in Planning tab (todo 510)<br>
+                                ✅ Plan-project link form + /admin/plan/link_project route (todo 511)
+                            </td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border-color);">
+                            <td style="padding:6px 10px;">3. Refactor MasterPlanCoordination</td>
+                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
+                            <td style="padding:6px 10px;">Coordinator-only role; link to DB records. Blocked by: step 2 complete.</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border-color);background:var(--bg-secondary);">
+                            <td style="padding:6px 10px;">4. Role-Based Access Documentation</td>
+                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
+                            <td style="padding:6px 10px;">Role matrix: CSC admin → all, SiteName admin → own site. Coordinate with <code>membership-1304</code>.</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border-color);">
+                            <td style="padding:6px 10px;">5. DB Schema verification</td>
+                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
+                            <td style="padding:6px 10px;">Verify <code>dailyplan</code>, <code>dailyplan_entry</code> tables in production. Update DocumentationConfig.json.</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border-color);background:var(--bg-secondary);">
+                            <td style="padding:6px 10px;">6. Developer Points &amp; Payments</td>
+                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
+                            <td style="padding:6px 10px;">4 new DB tables, PointsLedger utility, hooks into Todo/Plan create. Handoff to <code>pointsystem-XXXX</code> branch.</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border-color);">
+                            <td style="padding:6px 10px;">7. Test &amp; Verify</td>
+                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
+                            <td style="padding:6px 10px;">Manual tests: CSC text+DB, non-CSC DB-only, plan creation, role access, points system.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div style="margin-top:12px;padding:10px 14px;background:#d4edda;border:1px solid #28a745;border-radius:4px;font-size:0.9em;">
+                    <strong>▶ Next: Step 3 — Refactor MasterPlanCoordination</strong>
+                    <ul style="margin:6px 0 0;padding-left:18px;line-height:1.8;">
+                        <li>Remove inline task detail from <code>MasterPlanCoordination.tt</code></li>
+                        <li>Replace with links to individual plan files / DB records</li>
+                        <li>Add dependency list (#11 Architecture Phase 2 as blocker)</li>
+                        <li>Coordinate with <code>membership-1304</code> branch for role definitions</li>
+                    </ul>
+                </div>
+            </div>
+
+            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS — Step 3 of 7 (Step 2 DONE)</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
+            <p><strong>Zenflow Task:</strong> <code>planningsystem-59ae</code> (port 4001) | <strong>Branch:</strong> <code>planningsystem-59ae</code></p>
 
             <p><strong>Objective:</strong> Migrate planning system from text-based files to database-driven dynamic system with role-based access control, audit trails, and integration with project management.</p>
 
@@ -897,12 +1208,17 @@ last_updated = '2026/02/08'
                 <p style="color: #d9534f;"><strong>Error:</strong> Unable to fetch Planning System project from database. [% error.info %]</p>
             [% END %]
 
-            <h4>🚀 Implementation Workflow: Phases P0-P14 (Text-Based Detail View)</h4>
-            <p><em>Note: These text-based phase details are maintained for reference. Once Planning System project is created in database, the container above will show the database-driven version alongside these details.</em></p>
+            <h4>🚀 Implementation Workflow: Phases P0-P14 (Text Reference — being migrated to DB)</h4>
+            <p style="background:#d4edda;border:1px solid #28a745;border-radius:4px;padding:8px 12px;font-size:0.9em;">
+                <strong>📊 DB-tracked:</strong> These phases are now tracked as DB todos 502–516 under
+                <a href="/project/details?project_id=138" style="color:#155724;">Planning System project (id=138)</a> →
+                sub-projects 186–190. View them via the <a href="/Documentation/DailyPlan#planning" style="color:#155724;">PLANNING tab</a>.
+                As each phase is completed and verified in DB, its text section below will be removed.
+            </p>
 
             <div id="anchor-phase0-complete" class="nav-anchor"></div>
             <!-- Phase 0: Planning System Analysis & Integration Mapping -->
-            <details class="phase-container" style="margin: 15px 0; border: 2px solid #4CAF50; padding: 10px; background: #e8f5e9;" open>
+            <details class="phase-container" style="margin: 15px 0; border: 2px solid #4CAF50; padding: 10px; background: #e8f5e9;">
                         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
                             ✅ Phase 0: Planning System Analysis & Integration Mapping (COMPLETE)
                         </summary>
@@ -1031,6 +1347,7 @@ last_updated = '2026/02/08'
                     </details>
 
                     <!-- Phase 5: Plan Controller -->
+                    <div id="anchor-priority-5" class="nav-anchor"></div>
                     <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
                         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
                             ⏳ Phase 5: Plan Controller (PENDING)
@@ -1055,6 +1372,7 @@ last_updated = '2026/02/08'
                     </details>
 
                     <!-- Phase 6: Daily Plan Template -->
+                    <div id="anchor-dailyplan-improvements" class="nav-anchor"></div>
                     <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
                         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
                             ⏳ Phase 6: Daily Plan Template (PENDING)
@@ -1167,6 +1485,7 @@ last_updated = '2026/02/08'
                     </details>
 
                     <!-- Phase 11: Todo Controller Integration -->
+                    <div id="anchor-priority-6" class="nav-anchor"></div>
                     <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
                         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
                             ⏳ Phase 11: Todo Controller Integration (PENDING)
@@ -1685,6 +2004,477 @@ last_updated = '2026/02/08'
             </div>
         </details>
 
+        <!-- Group 3.7: Users System -->
+        <div id="anchor-users-system" class="nav-anchor"></div>
+        <details id="group-users" class="priority-group-container" open>
+            <summary class="group-header">👥 User & Admin Management System</summary>
+            <div class="priority-content">
+
+            <div id="anchor-users-project" class="nav-anchor"></div>
+            <details id="users-project" class="priority-container" open>
+                <summary class="priority-summary">👥 User & Admin Management System</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 1 Complete, Phase 2 Started</span> | <strong>Priority:</strong> <span class="status-in-progress">HIGH</span></p>
+                    <p><strong>Zenflow Task:</strong> <code>users-e5b8</code> (port 4005) | <strong>Branch:</strong> <code>users-e5b8</code></p>
+
+                    <p><strong>Objective:</strong> Comprehensive user and admin management system with email verification, password reset, role management, and site-based access control.</p>
+
+                    <h4>📋 Overview</h4>
+                    <p>Enhance existing user management with complete self-service and administrative capabilities:</p>
+                    <ul>
+                        <li>Self-registration with email verification (3-step process)</li>
+                        <li>Admin-created accounts with invitation workflow</li>
+                        <li>Password management (change, reset via email)</li>
+                        <li>Enhanced login (email OR username, password OR verification code)</li>
+                        <li>User dashboard (profile view/edit, site roles)</li>
+                        <li>Admin dashboard (user list, filters, search)</li>
+                        <li>Role management (assign/remove roles per site)</li>
+                        <li>Account suspension/activation</li>
+                        <li>Site-based access control (CSC admin vs site admin)</li>
+                        <li>Audit logging for all user/admin actions</li>
+                    </ul>
+
+                    <h4>📊 Users Project from Database</h4>
+                    [% TRY %]
+                        [% SET schema = c.model('DBEncy').schema %]
+                        [% SET users_project = schema.resultset('Project').find(184) %]
+
+                        [% IF users_project %]
+                            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                                    <h3>[% users_project.name %] (Project ID: [% users_project.id %])</h3>
+                                    <ul>
+                                        <li><strong>Description:</strong> [% users_project.description || 'User and Admin Management System with email verification and role management' %]</li>
+                                        <li><strong>Start Date:</strong> [% users_project.start_date || '2026-02-18' %]</li>
+                                        <li><strong>End Date:</strong> [% users_project.end_date || 'TBD' %]</li>
+                                        <li><strong>Status:</strong> [% users_project.status || 'In-Process' %]</li>
+                                        <li><strong>Project Code:</strong> [% users_project.project_code || 'USERS' %]</li>
+                                        <li><strong>Project Size:</strong> [% users_project.project_size || 'Medium' %]</li>
+                                        <li><strong>Estimated Man Hours:</strong> [% users_project.estimated_man_hours || '80' %]</li>
+                                        <li><strong>Developer Name:</strong> [% users_project.developer_name || 'Development Team' %]</li>
+                                        <li><strong>Client Name:</strong> [% users_project.client_name || 'Internal' %]</li>
+                                        <li><strong>Comments:</strong> [% users_project.comments || 'User management system with email verification, role management, and site-based access control' %]</li>
+                                    </ul>
+
+                                    <p>
+                                        <a href="/project/details?project_id=[% users_project.id %]" target="_blank" style="color: #007bff;">View Details</a> |
+                                        <a href="/project/editproject?project_id=[% users_project.id %]" target="_blank" style="color: #007bff;">Edit Project</a>
+                                    </p>
+
+                                    [% SET users_todos = users_project.todos.search({}, { order_by => 'sort_order' }) %]
+                                    [% IF users_todos.count > 0 %]
+                                        <h4>📋 Todos for [% users_project.name %] ([% users_todos.count %])</h4>
+                                        <ul style="list-style-type: none; padding-left: 0;">
+                                            [% FOREACH todo IN users_todos.all %]
+                                                <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #007bff; background: #fafafa;">
+                                                    [% IF todo.status == 'In-Process' %]⏳[% ELSIF todo.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                                    [% todo.subject %]
+                                                    <br><small style="color: #666;">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
+                                                    <br><a href="/todo/showtodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
+                                                    <a href="/todo/edittodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
+                                                </li>
+                                            [% END %]
+                                        </ul>
+                                    [% ELSE %]
+                                        <p>No todos found for this project. <a href="/todo/addtodo?project_id=[% users_project.id %]">Add a todo</a></p>
+                                    [% END %]
+                            </div>
+                        [% ELSE %]
+                            <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px; margin: 10px 0;">
+                                <strong>Note:</strong> Project ID 184 not found in database. Please ensure the project record exists.
+                                <a href="/project/addproject" style="color: #007bff;">Create Project</a>
+                            </div>
+                        [% END %]
+                    [% CATCH %]
+                        <div style="background: #f8d7da; border: 1px solid #dc3545; padding: 10px; margin: 10px 0;">
+                            <strong>Error loading project:</strong> [% error.info %]
+                        </div>
+                    [% END %]
+
+                    <h4>🎯 Current Phase: Phase 2 - User Self-Service Features</h4>
+                    <ul>
+                        <li>✅ Requirements document created</li>
+                        <li>✅ Technical specification complete</li>
+                        <li>✅ Implementation plan created (23 steps across 5 phases)</li>
+                        <li>✅ EmailVerificationCode Result file created</li>
+                        <li>✅ PasswordResetToken Result file created</li>
+                        <li>✅ User Result file modified (8 new columns, 4 relationships)</li>
+                        <li>✅ Fixed schema_compare bugs (CURRENT_TIMESTAMP, JSON serialization)</li>
+                        <li>✅ Database schema changes verified (all 3 tables created/modified, DBIx::Class relationships active)</li>
+                        <li>✅ UserVerification utility module created (SHA256 hashing, code/token generation, 24h expiry)</li>
+                        <li>✅ 3-step self-registration workflow implemented (refactored existing code, PascalCase templates)</li>
+                        <li>⏳ **NEXT**: Enhance login with email/username support</li>
+                    </ul>
+
+                    <h4>🔧 Issues Resolved</h4>
+                    <ul>
+                        <li>✅ Fixed duplicate User.pm files (<code>User.pm</code> vs <code>User/User.pm</code>)</li>
+                        <li>✅ Updated package references in Documentation.pm and Content.pm</li>
+                        <li>✅ Added <code>check_password()</code> and <code>display_name()</code> methods to User.pm</li>
+                        <li>✅ Fixed schema_compare CURRENT_TIMESTAMP handling (was generating <code>SCALAR(0x...)</code>)</li>
+                        <li>✅ Fixed schema_compare JSON serialization (scalar reference dereferencing)</li>
+                        <li>✅ Fixed regex in <code>parse_result_file_columns()</code> to capture last column</li>
+                    </ul>
+
+                    <h4>🔨 Latest Implementation: 3-Step Self-Registration Workflow</h4>
+                    <div style="padding: 10px; background: #d4edda; border: 1px solid #28a745; border-radius: 4px; margin: 10px 0;">
+                        <p><strong>Status:</strong> ✅ COMPLETE - Ready for testing</p>
+                        <p><strong>Access:</strong> <a href="http://workstation.local:4005/user/register" target="_blank">http://workstation.local:4005/user/register</a></p>
+
+                        <p><strong>Implementation Approach:</strong></p>
+                        <ul style="margin-top: 5px;">
+                            <li><strong>Reused Existing Code:</strong> Refactored <code>register</code> action and <code>register.tt</code> template instead of creating duplicates</li>
+                            <li><strong>Followed PascalCase:</strong> New templates named <code>VerifyEmail.tt</code> and <code>CompleteProfile.tt</code></li>
+                            <li><strong>Clean URLs:</strong> <code>/user/register</code> (not /register_step1), <code>/user/verify_email</code>, <code>/user/complete_profile</code></li>
+                            <li><strong>Deleted Orphans:</strong> Removed duplicate templates (<code>create_account.tt</code>, <code>register_step1.tt</code>) and orphaned actions</li>
+                            <li><strong>Backward Compatible:</strong> <code>/user/create_account</code> redirects to <code>/user/register</code></li>
+                        </ul>
+
+                        <p><strong>Workflow (3 Steps):</strong></p>
+                        <ol style="margin-top: 5px;">
+                            <li><strong>Step 1 - Register (<code>/user/register</code>):</strong>
+                                <ul style="font-size: 0.9em; margin-top: 3px;">
+                                    <li>User enters username + email</li>
+                                    <li>Validates uniqueness (username & email)</li>
+                                    <li>Creates user with <code>status='pending_verification'</code></li>
+                                    <li>Generates 6-digit code (SHA256 hashed)</li>
+                                    <li>Stores in <code>email_verification_codes</code> table</li>
+                                    <li>Displays code in session for testing (placeholder for email)</li>
+                                    <li>Redirects to Step 2</li>
+                                </ul>
+                            </li>
+                            <li><strong>Step 2 - Verify Email (<code>/user/verify_email</code>):</strong>
+                                <ul style="font-size: 0.9em; margin-top: 3px;">
+                                    <li>User enters 6-digit code</li>
+                                    <li>Validates against hashed value</li>
+                                    <li>Checks 24-hour expiry via <code>UserVerification::is_expired()</code></li>
+                                    <li>Marks <code>verified_at</code> timestamp</li>
+                                    <li>Redirects to Step 3</li>
+                                </ul>
+                            </li>
+                            <li><strong>Step 3 - Complete Profile (<code>/user/complete_profile</code>):</strong>
+                                <ul style="font-size: 0.9em; margin-top: 3px;">
+                                    <li>User enters first name, last name, password (2x)</li>
+                                    <li>Validates password length (≥8 chars) and match</li>
+                                    <li>Hashes password with SHA256</li>
+                                    <li>Updates user: <code>status='active'</code>, <code>email_verified_at</code>, name, password</li>
+                                    <li>Clears session verification data</li>
+                                    <li>Redirects to login with success message</li>
+                                </ul>
+                            </li>
+                        </ol>
+
+                        <p><strong>Files Modified/Created:</strong></p>
+                        <ul style="margin-top: 5px;">
+                            <li>✅ <code>User.pm</code> - Refactored <code>do_create_account</code> for Step 1, added <code>verify_email</code> and <code>complete_profile</code> actions</li>
+                            <li>✅ <code>register.tt</code> - Refactored to show only username + email (removed password, name fields)</li>
+                            <li>✅ <code>VerifyEmail.tt</code> - Created (PascalCase) with code entry form and testing helper</li>
+                            <li>✅ <code>CompleteProfile.tt</code> - Created (PascalCase) with name + password form</li>
+                            <li>❌ Deleted: <code>create_account.tt</code>, <code>register_step1.tt</code> (duplicates)</li>
+                        </ul>
+
+                        <p><strong>Security Features:</strong></p>
+                        <ul style="margin-top: 5px;">
+                            <li>✅ SHA256 hashing for verification codes (never stored plain text)</li>
+                            <li>✅ SHA256 hashing for passwords</li>
+                            <li>✅ 24-hour expiry on verification codes</li>
+                            <li>✅ Server-side validation (username uniqueness, email format, password strength)</li>
+                            <li>✅ Session-based workflow (prevents skipping steps)</li>
+                        </ul>
+
+                        <p><strong>Testing Notes:</strong></p>
+                        <ul style="margin-top: 5px;">
+                            <li>⚠️ <strong>Database schema must be applied</strong> via schema_compare before testing</li>
+                            <li>📧 Email sending is placeholder (code displayed on screen for testing)</li>
+                            <li>🔧 Syntax verified with <code>perl -Ilib -c</code></li>
+                            <li>🔄 Server restart required after schema changes</li>
+                        </ul>
+
+                        <p><strong>Next Step:</strong> Enhance login to accept email OR username (currently username only)</p>
+                    </div>
+
+                    <h4>🚀 Implementation Phases (6 weeks)</h4>
+                    <p><strong>Phase 1: Database Schema (Week 1) - ✅ COMPLETE</strong></p>
+                    <ul>
+                        <li>✅ Create EmailVerificationCode Result file</li>
+                        <li>✅ Create PasswordResetToken Result file</li>
+                        <li>✅ Modify User Result file (add 8 columns: email_notifications, status, email_verified_at, created_by, creation_context, created_at, updated_at; add relationships)</li>
+                        <li>✅ Database schema changes verified
+                            <ul>
+                                <li>✅ <code>email_verification_codes</code> table created (6 columns)</li>
+                                <li>✅ <code>password_reset_tokens</code> table created (6 columns)</li>
+                                <li>✅ <code>users</code> table modified (7 new columns added)</li>
+                                <li>✅ All DBIx::Class relationships active and functional</li>
+                                <li>✅ Schema validation confirmed via DBIx::Class queries</li>
+                            </ul>
+                        </li>
+                    </ul>
+
+                    <p><strong>Phase 2: User Self-Service (Week 2-3) - ⏳ IN PROGRESS</strong></p>
+                    <ul>
+                        <li>✅ UserVerification utility (code/token generation and validation)
+                            <ul style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                                <li>Moose-based utility class with SHA256 hashing</li>
+                                <li>6-digit verification codes & 32-char hex reset tokens</li>
+                                <li>24-hour expiry for all codes/tokens</li>
+                                <li>Methods: generate_verification_code(), create_verification_code(), verify_code(), generate_reset_token(), create_reset_token(), verify_reset_token(), is_expired()</li>
+                                <li>Full integration with DBIx::Class relationships (EmailVerificationCode, PasswordResetToken)</li>
+                            </ul>
+                        </li>
+                        <li>✅ 3-step registration (email → verify code → complete profile)
+                            <ul style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                                <li>Refactored existing register.tt and do_create_account (reuse over new)</li>
+                                <li>Created VerifyEmail.tt and CompleteProfile.tt (PascalCase naming)</li>
+                                <li>Clean URLs: /user/register, /user/verify_email, /user/complete_profile</li>
+                                <li>Session-based workflow prevents step skipping</li>
+                                <li>Full validation: username/email uniqueness, password strength, code expiry</li>
+                                <li>Deleted orphaned duplicates: create_account.tt, register_step1.tt</li>
+                            </ul>
+                        </li>
+                        <li>⏳ **NEXT**: Enhanced login (email/username, password/code)</li>
+                        <li>Password management (change, reset)</li>
+                        <li>Profile view/edit</li>
+                        <li>Email templates (verification, reset, welcome)</li>
+                    </ul>
+
+                    <p><strong>Phase 3: Admin Features (Week 4-5)</strong></p>
+                    <ul>
+                        <li>Admin dashboard (user list, filters, search)</li>
+                        <li>Admin user creation (with invitation email)</li>
+                        <li>User edit/suspend/activate</li>
+                        <li>Role management (assign/remove UserSiteRole)</li>
+                        <li>Site role management (SiteRole CRUD)</li>
+                    </ul>
+
+                    <p><strong>Phase 4: Integration & Polish (Week 6)</strong></p>
+                    <ul>
+                        <li>Project registration via API</li>
+                        <li>Comprehensive audit logging</li>
+                        <li>Manual testing of all workflows</li>
+                        <li>Production deployment</li>
+                    </ul>
+
+                    <h4>📁 Documentation & Resources</h4>
+                    <ul>
+                        <li>Zenflow Task: <code>users-e5b8</code></li>
+                        <li>Requirements: <a href="/.zenflow/tasks/users-e5b8/requirements.md" target="_blank">requirements.md</a></li>
+                        <li>Technical Spec: <a href="/.zenflow/tasks/users-e5b8/spec.md" target="_blank">spec.md</a></li>
+                        <li>Implementation Plan: <a href="/.zenflow/tasks/users-e5b8/plan.md" target="_blank">plan.md</a></li>
+                        <li>API Access: <a href="http://api.workstation.local:4005/user/dashboard" target="_blank">api.workstation.local:4005</a></li>
+                    </ul>
+
+                    <h4>🗄️ Database Schema Changes</h4>
+                    <details open>
+                        <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>New Tables & Modifications</strong></summary>
+                        <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                            <p><strong>User Table Modifications:</strong></p>
+                            <ul>
+                                <li><code>username</code> - Change to nullable (admin-created accounts)</li>
+                                <li><code>status</code> - New field (pending_verification, pending_setup, active, suspended)</li>
+                                <li><code>email_verified_at</code> - Timestamp</li>
+                                <li><code>created_by</code> - User ID of creator (for admin-created accounts)</li>
+                                <li><code>creation_context</code> - self_registration, workshop_invitation, admin_created</li>
+                            </ul>
+                            <p><strong>New Tables:</strong></p>
+                            <ul>
+                                <li><code>email_verification_codes</code> - Email verification workflow</li>
+                                <li><code>password_reset_tokens</code> - Password reset workflow</li>
+                            </ul>
+                            <p><strong>Existing Tables (No Changes):</strong></p>
+                            <ul>
+                                <li><code>user_site_roles</code> - Links users to roles and sites</li>
+                                <li><code>site_roles</code> - Defines available roles per site</li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <h4>🔌 Key Features</h4>
+                    <details open>
+                        <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>User Self-Service</strong></summary>
+                        <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                            <ul style="list-style: none; padding-left: 0;">
+                                <li style="margin-bottom: 8px;">
+                                    <strong>Self-Registration</strong>
+                                    <br><small style="color: #666;">3-step process: Enter username+email → Verify 6-digit code → Complete profile with password</small>
+                                </li>
+                                <li style="margin-bottom: 8px;">
+                                    <strong>Enhanced Login</strong>
+                                    <br><small style="color: #666;">Accepts email OR username, password OR verification code (for admin-created accounts)</small>
+                                </li>
+                                <li style="margin-bottom: 8px;">
+                                    <strong>Password Management</strong>
+                                    <br><small style="color: #666;">Change password (while logged in) | Reset via email link with 24-hour token</small>
+                                </li>
+                                <li style="margin-bottom: 8px;">
+                                    <strong>Profile Management</strong>
+                                    <br><small style="color: #666;">View profile with site roles | Edit name and email | Username read-only</small>
+                                </li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <details open>
+                        <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>Admin Features</strong></summary>
+                        <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                            <ul style="list-style: none; padding-left: 0;">
+                                <li style="margin-bottom: 8px;">
+                                    <strong>User Dashboard</strong>
+                                    <br><small style="color: #666;">List all users | Filter by site, role, status | Search by username, email | CSC admins see all, site admins see their site only</small>
+                                </li>
+                                <li style="margin-bottom: 8px;">
+                                    <strong>User Creation</strong>
+                                    <br><small style="color: #666;">Admin creates account with email only | Sends invitation email with verification code | User sets own username and password</small>
+                                </li>
+                                <li style="margin-bottom: 8px;">
+                                    <strong>User Management</strong>
+                                    <br><small style="color: #666;">Edit user details | Suspend/activate accounts | View audit logs</small>
+                                </li>
+                                <li style="margin-bottom: 8px;">
+                                    <strong>Role Management</strong>
+                                    <br><small style="color: #666;">Assign/remove roles per site | Manage site-specific role list | Standard roles: normal, editor, developer, WorkshopLeader, admin</small>
+                                </li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <h4>🔒 Security Features</h4>
+                    <ul>
+                        <li>All passwords hashed with SHA256 (existing pattern)</li>
+                        <li>Verification codes and reset tokens hashed before storage</li>
+                        <li>24-hour expiry enforced on all tokens</li>
+                        <li>Single-use tokens for password reset</li>
+                        <li>Site-based access control (AdminAuth utility)</li>
+                        <li>Comprehensive audit logging (Logging utility)</li>
+                    </ul>
+
+                    <h4>🔗 Related Systems</h4>
+                    <ul>
+                        <li><a href="/user/login" target="_blank">Login Page</a></li>
+                        <li><a href="/user/profile" target="_blank">User Profile</a></li>
+                        <li><a href="/user/dashboard" target="_blank">Admin Dashboard (Admin Only)</a></li>
+                        <li><a href="/user/create_account" target="_blank">Create Account</a></li>
+                        <li><a href="/user/forgot_password" target="_blank">Password Reset</a></li>
+                    </ul>
+                </div>
+            </details>
+            </div>
+        </details>
+
+        <!-- Group: File Management System -->
+        <details id="group-file-mgmt" class="priority-group-container" open>
+            <summary class="group-header">📁 File Management System</summary>
+            <div class="priority-content">
+
+            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0 COMPLETE</span> | <strong>Priority:</strong> <span class="status-pending">HIGH</span></p>
+            <p><strong>Zenflow Task:</strong> <code>new-task-bb05</code> | <strong>Branch:</strong> <code>new-task-bb05</code></p>
+
+            <p><strong>Objective:</strong> Production-ready NFS-backed file management system with multi-tier access control, duplicate detection, file renaming, and workshop file sharing across SiteNames.</p>
+
+            <h4>📋 Overview</h4>
+            <ul>
+                <li>CSC Admin manages NFS directory allocations per SiteName (<code>nfs_directory</code> table)</li>
+                <li>SiteName Admins browse and manage files scoped to their allocated directories</li>
+                <li>All files tracked in the <code>files</code> DB table (already exists)</li>
+                <li>Duplicate detection by file name + size on upload and NFS sync</li>
+                <li>Atomic file rename: filesystem + DB updated together, DB rolled back on FS failure</li>
+                <li>Workshop file sharing across SiteNames via <code>WorkshopResource.access_level</code></li>
+                <li>Server-room services (Proxmox etc.) tracked read-only via NFS sync</li>
+            </ul>
+
+            <h4>🗺️ Delivery Phases</h4>
+
+            <details class="priority-container" open>
+                <summary><strong>Phase 0 — Navigation &amp; Admin Dashboard</strong> <span class="status-completed">COMPLETE</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li>File Management dropdown expanded in admin top menu (<code>admintopmenu.tt</code>)</li>
+                        <li>File Management section added to <a href="/admin">/admin</a> dashboard</li>
+                        <li>This Planning entry added to <code>admin/documentation/Planning.tt</code></li>
+                        <li><code>/admin/planning</code> route added to <code>Controller/Admin.pm</code></li>
+                    </ul>
+                    <p><strong>New nav links:</strong>
+                        <a href="/file/admin_browser">Admin Browser</a> |
+                        <a href="/file/list">File List</a> |
+                        <a href="/file/duplicates">Duplicates</a> |
+                        <a href="/file/nfs_allocations">NFS Allocations (CSC)</a>
+                    </p>
+                </div>
+            </details>
+
+            <details class="priority-container">
+                <summary><strong>Phase 1 — Fixes &amp; Foundation</strong> <span class="status-pending">PENDING</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li>Fix bare <code>some_criteria</code> syntax error in <code>Model/File.pm</code> <code>get_top_files</code></li>
+                        <li>Remove debug <code>sleep()</code> / <code>print</code> calls from <code>Controller/File.pm</code></li>
+                        <li>Create <code>Result/NfsDirectory.pm</code> (DBIx::Class Result class only — table created by DBA, no .sql files)</li>
+                        <li>Add <code>_resolve_roles</code> helper to controller</li>
+                        <li>Add <code>get_files_filtered</code>, <code>get_file_by_id</code>, <code>check_duplicate</code> to model</li>
+                    </ul>
+                </div>
+            </details>
+
+            <details class="priority-container">
+                <summary><strong>Phase 2 — Admin Browser &amp; File List</strong> <span class="status-pending">PENDING</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li><a href="/file/admin_browser">Admin Browser</a> — NFS directory tree scoped by role + <code>AdminBrowser.tt</code></li>
+                        <li><a href="/file/list">File List</a> — filterable DB file table + <code>FileList.tt</code></li>
+                        <li>Update <code>index</code> action redirect</li>
+                    </ul>
+                </div>
+            </details>
+
+            <details class="priority-container">
+                <summary><strong>Phase 3 — View, Edit &amp; Rename</strong> <span class="status-pending">PENDING</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li>File detail view <code>/file/view/:id</code> + <code>FileView.tt</code></li>
+                        <li>Metadata edit <code>/file/edit/:id</code> (description, status, access_level) + <code>FileEdit.tt</code></li>
+                        <li>Atomic rename: <code>rename()</code> on NFS + DB update, rollback on FS failure</li>
+                    </ul>
+                </div>
+            </details>
+
+            <details class="priority-container">
+                <summary><strong>Phase 4 — Upload &amp; Download</strong> <span class="status-pending">PENDING</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li><a href="/file/upload_file">Upload</a> — writes to NFS dir, duplicate-checks, creates <code>files</code> record</li>
+                        <li>Download <code>/file/download/:id</code> — streams file with correct Content-Type header</li>
+                    </ul>
+                </div>
+            </details>
+
+            <details class="priority-container">
+                <summary><strong>Phase 5 — NFS Allocation Management (CSC Admin)</strong> <span class="status-pending">PENDING</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li><a href="/file/nfs_allocations">NFS Allocations</a> — create/edit/deactivate per-SiteName NFS paths</li>
+                        <li>Admin Browser scoped to allocated dirs for SiteName admins</li>
+                    </ul>
+                </div>
+            </details>
+
+            <details class="priority-container">
+                <summary><strong>Phase 6 — Duplicate Management</strong> <span class="status-pending">PENDING</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li><a href="/file/duplicates">Duplicate Files</a> — view pairs, resolve (keep/delete/unmark)</li>
+                        <li>Duplicate check wired into upload and NFS sync</li>
+                    </ul>
+                </div>
+            </details>
+
+            <h4>📚 Reference</h4>
+            <ul>
+                <li>Spec: <code>.zenflow/tasks/new-task-bb05/spec.md</code></li>
+                <li>PRD: <code>.zenflow/tasks/new-task-bb05/requirements.md</code></li>
+                <li>Key files: <code>Controller/File.pm</code>, <code>Model/File.pm</code>, <code>Result/File.pm</code></li>
+            </ul>
+
+            </div>
+        </details>
+
         <!-- Group 4: Maintenance & Improvements -->
         <details id="group-maint" class="priority-group-container" open>
             <summary class="group-header">🛠️ Maintenance & Improvements</summary>
@@ -1778,15 +2568,15 @@ last_updated = '2026/02/08'
                                 </div>
                             </div>
                             
-                            <div class="project-description" style="background: #fff; padding: 15px; border-left: 4px solid #007bff; margin-bottom: 15px;">
-                                <h4 style="margin-top: 0;">Project Description</h4>
-                                <div style="white-space: pre-wrap; font-family: monospace; font-size: 0.9em; line-height: 1.6;">
+                            <div class="project-description content-section">
+                                <h4>Project Description</h4>
+                                <div class="code-block" style="white-space: pre-wrap; line-height: 1.6;">
 [% project.description %]
                                 </div>
                             </div>
                             
                             [% IF project.comments %]
-                            <div class="project-comments" style="background: #fffbea; padding: 10px; border-left: 4px solid #ffc107; margin-bottom: 15px; font-size: 0.9em;">
+                            <div class="project-comments alert alert-warning" style="font-size: 0.9em;">
                                 <strong>📝 Notes:</strong> [% project.comments %]
                             </div>
                             [% END %]

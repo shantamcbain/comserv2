@@ -1,0 +1,72 @@
+[% META
+   title = "Complete Profile"
+   description = "Complete your profile to finish registration - Step 3 of 3"
+   roles = ""
+   TemplateType = "Application"
+   category = "User"
+   page_version = "0.03"
+   last_updated = "2026-02-23"
+%]
+[% PageVersion = 'user/CompleteProfile.tt,v 0.03 2026/02/23 AI Assistant Exp AI Assistant ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    
+    <div class="page-header">
+        <h1>Create Account - Step 3 of 3</h1>
+        <h2 class="page-subtitle">Complete your profile to finish registration</h2>
+    </div>
+    
+    <div class="content-container">
+        
+        <div class="content-primary">
+            
+            [% IF c.stash.error_msg %]
+                <div class="error">[% c.stash.error_msg %]</div>
+            [% END %]
+
+            <div class="form-container">
+                <form method="post" action="[% c.uri_for('/user/complete_profile') %]" class="app-form">
+                    <div class="form-section">
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="first_name">First Name</label>
+                                <input type="text" id="first_name" name="first_name" class="form-input" value="[% first_name | html %]" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="last_name">Last Name</label>
+                                <input type="text" id="last_name" name="last_name" class="form-input" value="[% last_name | html %]" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="password">Password (minimum 8 characters)</label>
+                                <input type="password" id="password" name="password" class="form-input" minlength="8" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="password_confirm">Confirm Password</label>
+                                <input type="password" id="password_confirm" name="password_confirm" class="form-input" minlength="8" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Complete Registration</button>
+                    </div>
+                </form>
+            </div>
+            
+        </div>
+        
+    </div>
+    
+</div>

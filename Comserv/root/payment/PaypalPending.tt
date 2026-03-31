@@ -1,0 +1,30 @@
+[% META
+   title = "PayPal — Coming Soon"
+   description = "PayPal integration is being configured"
+   roles = "guest,user,admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-03-18"
+%]
+<div class="app-container">
+  <div class="page-header">
+    <h1>PayPal Payment</h1>
+  </div>
+  <div class="content-container">
+    <div class="content-primary">
+      <div class="content-section">
+        <div class="info-box" style="padding:2em;border:1px solid #f0ad4e;border-radius:8px;background:#fffde7">
+          <h2>PayPal Integration Coming Soon</h2>
+          <p>PayPal payments are being configured. In the meantime, please use <strong>Site Credits (Coins)</strong> to activate your membership.</p>
+          <p>Existing site clients have been granted <strong>100 coins</strong> — more than enough for a free month of Basic membership.</p>
+          <div class="form-actions">
+            <a href="[% c.uri_for('/payment/internal/checkout', { plan_id => plan_id, billing_cycle => billing_cycle, promo_code => promo_code }) %]"
+               class="btn btn-primary">Use Coins Instead</a>
+            <a href="[% c.uri_for('/membership') %]" class="btn btn-secondary">← Back to Plans</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

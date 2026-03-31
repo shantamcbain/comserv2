@@ -23,12 +23,13 @@
         
         <div class="content-primary">
             
-            [% IF error_msg %]
-                <div class="error">[% error_msg %]</div>
-            [% END %]
+            [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+            [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+            [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
             
             <div class="form-container">
                 <form method="POST" action="/workshop/addworkshop" class="app-form">
+                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                     
                     <div class="form-section">
                         <h3>Workshop Information</h3>
@@ -100,12 +101,12 @@
                         
                         <div class="form-row">
                             <div class="form-field">
-                                <label for="share">Visibility:</label>
+                                <label for="share">Site Sharing:</label>
                                 <select id="share" name="share" class="form-input">
-                                    <option value="private" [% IF (form_data.share || 'private') == 'private' %]selected[% END %]>Private (My Site Only)</option>
-                                    <option value="public" [% IF form_data.share == 'public' %]selected[% END %]>Public (All Sites)</option>
+                                    <option value="private" [% IF (form_data.share || 'private') == 'private' %]selected[% END %]>My Site Only</option>
+                                    <option value="public" [% IF form_data.share == 'public' %]selected[% END %]>Shared Across All Sites</option>
                                 </select>
-                                <small>Private workshops will only be visible to your site.</small>
+                                <small>Choose whether to share this workshop with other sites. Note: Workshop must be "Published" to be visible to participants.</small>
                             </div>
                             
                             <div class="form-field">

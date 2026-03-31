@@ -1,0 +1,37 @@
+[% PageVersion = 'Navigation/TopDropListWorkshop.tt,v 0.02 2026/03/12 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+    [%# PageVersion %]
+[% END %]
+
+<li class="horizontal-dropdown">
+    <a href="/workshop" class="dropbtn"><i class="icon-workshop"></i>Workshops</a>
+    <div class="dropdown-content">
+        <a href="/workshop" class="menu-item"><i class="icon-home"></i>Workshops Home</a>
+        <a href="/workshop/add" class="menu-item"><i class="icon-add"></i>Add Workshop</a>
+
+        [% IF c.session.username %]
+        <div class="dropdown-divider"></div>
+        <a href="/workshop/dashboard" class="menu-item"><i class="icon-dashboard"></i>My Dashboard</a>
+        [% END %]
+
+        [% IF c.session.username && (c.session.roles.grep('admin').size || c.session.roles.grep('workshop_leader').size) %]
+        <div class="dropdown-divider"></div>
+        <a href="/workshop/resources" class="menu-item"><i class="icon-resources"></i>Resources</a>
+        [% END %]
+
+        [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
+        <div class="dropdown-divider"></div>
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-folder"></i>Admin</span>
+            <div class="submenu">
+                <a href="/file/list" class="submenu-link"><i class="icon-files"></i>File Management</a>
+                <a href="/file/duplicates" class="submenu-link"><i class="icon-duplicate"></i>Duplicate Files</a>
+                <a href="/Shares" class="submenu-link"><i class="icon-cloud"></i>File Shares</a>
+                <a href="/media" class="submenu-link"><i class="icon-image"></i>Media Server</a>
+                <a href="/cloud" class="submenu-link"><i class="icon-sync"></i>Cloud Sync</a>
+            </div>
+        </div>
+        [% END %]
+    </div>
+</li>

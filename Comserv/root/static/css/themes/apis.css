@@ -1,5 +1,4 @@
-/* Generated CSS for theme: apis */
-
+/* Theme: apis */
 :root {
   --accent-color: #FF9900;
   --background-color: #f9f06b;
@@ -36,24 +35,3 @@
 body {
   background-image: url(../images/BMaster/honey2.jpg);
 }
-
-.dropdown-content {
-  background-color: #f9f9f9;
-}
-
-.dropdown-content a {
-  color: black;
-}
-
-.nav {
-  background-color: #ccffff;
-}
-
-.submenu {
-  background-color: #f9f9f9;
-}
-
-.submenu a {
-  color: black;
-}
-

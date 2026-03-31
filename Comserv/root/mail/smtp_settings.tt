@@ -1,0 +1,64 @@
+[% META title = 'SMTP Settings' %]
+
+<h1>SMTP Settings[% IF site_name %] — [% site_name | html %][% END %]</h1>
+
+[% IF c.flash.status_msg %]
+  <div class="alert alert-success">[% c.flash.status_msg | html %]</div>
+[% END %]
+[% IF c.flash.error_msg %]
+  <div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
+[% END %]
+[% IF error_msg %]
+  <div class="alert alert-danger">[% error_msg | html %]</div>
+[% END %]
+
+<form method="POST" action="/mail/save_smtp_settings">
+  <input type="hidden" name="site_name" value="[% site_name | html %]">
+
+  <table class="table table-bordered" style="max-width:600px;">
+    <tr>
+      <th>SMTP Host</th>
+      <td><input type="text" name="smtp_host" value="[% smtp_config.smtp_host | html %]" class="form-control" placeholder="harper.whc.ca" required></td>
+    </tr>
+    <tr>
+      <th>SMTP Port</th>
+      <td><input type="number" name="smtp_port" value="[% smtp_config.smtp_port | html %]" class="form-control" placeholder="465" required></td>
+    </tr>
+    <tr>
+      <th>SSL Mode</th>
+      <td>
+        <select name="smtp_ssl" class="form-control">
+          <option value=""[% IF !smtp_config.smtp_ssl %] selected[% END %]>None (plain)</option>
+          <option value="ssl"[% IF smtp_config.smtp_ssl == 'ssl' %] selected[% END %]>SSL (implicit, port 465)</option>
+          <option value="starttls"[% IF smtp_config.smtp_ssl == 'starttls' %] selected[% END %]>STARTTLS (port 587)</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th>SMTP User</th>
+      <td><input type="text" name="smtp_user" value="[% smtp_config.smtp_user | html %]" class="form-control" placeholder="user@example.com"></td>
+    </tr>
+    <tr>
+      <th>SMTP Password</th>
+      <td><input type="password" name="smtp_password" value="[% smtp_config.smtp_password | html %]" class="form-control" autocomplete="new-password"></td>
+    </tr>
+    <tr>
+      <th>From Address</th>
+      <td><input type="email" name="smtp_from" value="[% smtp_config.smtp_from | html %]" class="form-control" placeholder="noreply@example.com"></td>
+    </tr>
+  </table>
+
+  <button type="submit" class="btn btn-primary">Save Settings</button>
+</form>
+
+<hr>
+
+<h2>Send Test Email</h2>
+<form method="POST" action="/mail/test_send">
+  <input type="hidden" name="site_name" value="[% site_name | html %]">
+  <div class="form-group" style="max-width:400px;">
+    <label for="test_to">Send test to:</label>
+    <input type="email" id="test_to" name="test_to" value="[% c.session.email | html %]" class="form-control" placeholder="you@example.com" required>
+  </div>
+  <button type="submit" class="btn btn-secondary">Send Test Email</button>
+</form>

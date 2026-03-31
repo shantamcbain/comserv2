@@ -6,6 +6,7 @@ use DBI;
 use Try::Tiny;
 use File::Path qw(make_path);
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -97,6 +98,13 @@ sub auto :Private {
 sub setup :Path('/setup') :Args(0) {
     my ($self, $c) = @_;
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'setup')) {
+        $c->flash->{error_msg} = 'You must be an administrator to access the setup page.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup',
         "Setup page accessed - " . $c->req->method . " request");
     

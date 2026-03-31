@@ -93,6 +93,13 @@ mkdir -p ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME
 chmod 755 ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /var/log/supervisor
 chown -R comserv:comserv ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups
 
+# Ensure Catalyst Session::Store::File directory exists and is writable by comserv user.
+# COMSERV_SESSION_DIR is the session FILES directory (e.g. /tmp/comserv/session).
+SESSION_DIR="${COMSERV_SESSION_DIR:-/tmp/comserv/session}"
+mkdir -p "$SESSION_DIR"
+chmod 700 "$SESSION_DIR"
+chown comserv:comserv "$SESSION_DIR" 2>/dev/null || true
+
 # Create base supervisord.conf if missing or empty
 if [ ! -s /etc/supervisor/supervisord.conf ]; then
     mkdir -p /etc/supervisor/conf.d
@@ -131,16 +138,47 @@ else
   echo "⚠ Warning: cron not available - log rotation disabled"
 fi
 
-# Create workshop files directory if NFS mount exists
-WORKSHOP_DIR="/data/apis/workshop_files"
-if [ -d "/data/apis" ]; then
-  echo "Creating workshop files directory: $WORKSHOP_DIR"
-  mkdir -p "$WORKSHOP_DIR"
-  chmod 755 "$WORKSHOP_DIR"
-  echo "✓ Workshop files directory ready at $WORKSHOP_DIR"
+# Create workshop files directory on shared volume
+if [ "${SKIP_NFS_SETUP}" != "1" ]; then
+  WORKSHOP_DIR="/data/nfs/workshop_files"
+  if [ -d "/data/nfs" ]; then
+    echo "✓ Using existing NFS mount at /data/nfs"
+    if [ ! -d "$WORKSHOP_DIR" ]; then
+        echo "Creating workshop files directory: $WORKSHOP_DIR"
+        mkdir -p "$WORKSHOP_DIR"
+        chmod 775 "$WORKSHOP_DIR" 2>/dev/null || true
+        chown comserv:comserv "$WORKSHOP_DIR" 2>/dev/null || true
+    fi
+  else
+    echo "⚠ Warning: Workshop volume /data/nfs not available - workshop file uploads will use fallback directory"
+  fi
 else
-  echo "⚠ Warning: NFS mount /data/apis not available - workshop file uploads will use fallback directory"
+  echo "✓ Skipping NFS setup (SKIP_NFS_SETUP=1) - using existing NFS mount"
 fi
+
+# Configure log rotation to prevent disk space issues
+echo "Configuring log rotation..."
+cat > /etc/logrotate.d/catalyst <<'LOGROTATE_EOF'
+/opt/comserv/root/log/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    maxsize 100M
+}
+
+/opt/comserv/root/Documentation/session_history/*.log {
+    weekly
+    rotate 4
+    compress
+    delaycompress
+    missingok
+    notifempty
+}
+LOGROTATE_EOF
+echo "✓ Log rotation configured"
 
 # Log the port configuration
 PORT=${WEB_PORT:-3000}

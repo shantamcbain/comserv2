@@ -1,0 +1,293 @@
+[% PageVersion = 'Comserv/root/Documentation/documentation_system_overview.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation System Overview' %]
+
+<!-- Documentation page for documentation_system_overview -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Introduction</h2>
+
+
+
+The Comserv Documentation System provides a comprehensive framework for organizing, categorizing, and displaying documentation for different user roles and sites. This document provides an overview of the system architecture, key components, and best practices.
+
+
+
+<h2>System Architecture</h2>
+
+
+
+The documentation system consists of:
+
+
+
+<ol><li>**Controller**: <code>Comserv::Controller::Documentation</code> handles routing and access control</li></ol>
+
+<ol><li>**Templates**: Located in <code>root/Documentation/</code> directory</li></ol>
+
+<ol><li>**Content Files**: Markdown (.md) and Template Toolkit (.tt) files</li></ol>
+
+<ol><li>**Categories**: Predefined categories for organizing documentation</li></ol>
+
+<ol><li>**Access Control**: Role-based permissions for viewing documentation</li></ol>
+
+
+
+<h2>Routes</h2>
+
+
+
+The system supports both uppercase and lowercase routes:
+
+
+
+<ul><li><code>/Documentation</code> - Main documentation index (uppercase)</li></ul>
+
+<ul><li><code>/documentation</code> - Alternative route (lowercase)</li></ul>
+
+<ul><li><code>/Documentation/[page]</code> - View specific documentation page</li></ul>
+
+<ul><li><code>/documentation/[page]</code> - Alternative route for specific page</li></ul>
+
+
+
+<h3>Special Routes</h3>
+
+
+
+<ul><li><code>/Documentation/documentation_system_overview</code> - This overview</li></ul>
+
+<ul><li><code>/Documentation/documentation_filename_issue</code> - Information about the filename/package mismatch issue</li></ul>
+
+<ul><li><code>/Documentation/logging_best_practices</code> - Best practices for logging</li></ul>
+
+<ul><li><code>/Documentation/ai_guidelines</code> - Guidelines for AI assistants</li></ul>
+
+<ul><li><code>/Documentation/controller_routing_guidelines</code> - Guidelines for controller routing</li></ul>
+
+<ul><li><code>/Documentation/controllers</code> - Documentation for controllers</li></ul>
+
+<ul><li><code>/Documentation/documentation_update_summary</code> - Summary of documentation updates</li></ul>
+
+<ul><li><code>/Documentation/linux_commands</code> - Linux Commands Reference (redirects to HelpDesk controller)</li></ul>
+
+
+
+<h2>Logging</h2>
+
+
+
+The documentation system uses comprehensive logging to track access and troubleshoot issues:
+
+
+
+<code></code>`perl
+
+$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name',
+
+    "Detailed message with relevant information");
+
+<code></code>`
+
+
+
+This ensures that:
+
+<ol><li>The log level is properly set</li></ol>
+
+<ol><li>File and line information is captured</li></ol>
+
+<ol><li>The method name is recorded</li></ol>
+
+<ol><li>A detailed message is provided</li></ol>
+
+
+
+<h2>Categories</h2>
+
+
+
+Documentation is organized into the following categories:
+
+
+
+<ol><li>**User Guides**: For end users of the system</li></ol>
+
+<ol><li>**Admin Guides**: For system administrators</li></ol>
+
+<ol><li>**Developer Guides**: For developers</li></ol>
+
+<ol><li>**Tutorials**: Step-by-step guides for common tasks</li></ol>
+
+<ol><li>**Site-Specific**: Documentation specific to a particular site</li></ol>
+
+<ol><li>**Modules**: Documentation for specific system modules</li></ol>
+
+<ol><li>**Controllers**: Documentation for system controllers</li></ol>
+
+<ol><li>**Models**: Documentation for system models</li></ol>
+
+<ol><li>**Changelog**: System changes and updates</li></ol>
+
+10. **General**: Complete list of all documentation files
+
+
+
+<h2>Access Control</h2>
+
+
+
+Access to documentation is controlled by:
+
+
+
+<ol><li>**User Role**: Different roles (normal, editor, admin, developer) have access to different categories</li></ol>
+
+<ol><li>**Site**: Site-specific documentation is only shown to users of that site</li></ol>
+
+<ol><li>**Admin Override**: Administrators can access all documentation regardless of role or site restrictions</li></ol>
+
+
+
+<h2>File Types</h2>
+
+
+
+The system supports multiple file types:
+
+
+
+<ol><li>**Markdown (.md)**: For content-focused documentation</li></ol>
+
+<ol><li>**Template Toolkit (.tt)**: For interactive or complex documentation</li></ol>
+
+<ol><li>**HTML (.html)**: For static HTML content</li></ol>
+
+<ol><li>**Text (.txt)**: For plain text documentation</li></ol>
+
+
+
+<h2>Best Practices</h2>
+
+
+
+<h3>File Naming</h3>
+
+
+
+<ol><li>Use lowercase with underscores for filenames</li></ol>
+
+<ol><li>Include the category in the filename when appropriate</li></ol>
+
+<ol><li>Use descriptive names that indicate the content</li></ol>
+
+
+
+Example: <code>user_guide_login.md</code>, <code>admin_installation.tt</code>
+
+
+
+<h3>Content Organization</h3>
+
+
+
+<ol><li>Place files in appropriate subdirectories based on category</li></ol>
+
+<ol><li>Use consistent formatting within documentation files</li></ol>
+
+<ol><li>Include a title and description at the top of each file</li></ol>
+
+
+
+<h3>Metadata</h3>
+
+
+
+Each documentation file has metadata including:
+
+
+
+<ol><li>**Title**: Formatted from the filename</li></ol>
+
+<ol><li>**Path**: Relative path to the file</li></ol>
+
+<ol><li>**Roles**: User roles that can access the file</li></ol>
+
+<ol><li>**Site**: Site specificity (all or site name)</li></ol>
+
+<ol><li>**File Type**: Template, markdown, or other</li></ol>
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+Common issues and solutions:
+
+
+
+<ol><li>**Page Not Found**: Check that the file exists and is properly categorized</li></ol>
+
+<ol><li>**Access Denied**: Verify user role has permission to view the documentation</li></ol>
+
+<ol><li>**Rendering Issues**: Check the file type and corresponding template</li></ol>
+
+
+
+<h2>Important Note on File Naming</h2>
+
+
+
+**⚠️ WARNING**: Ensure that controller filenames match their package declarations. A mismatch between filename and package name can cause route failures.
+
+
+
+Example of correct naming:
+
+<ul><li>File: <code>Documentation.pm</code></li></ul>
+
+<ul><li>Package: <code>Comserv::Controller::Documentation</code></li></ul>
+
+
+
+For more details on a previous issue with filename mismatch, see <a href="/Documentation/documentation_filename_issue">Documentation Filename Issue</a>.
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/Documentation/documentation_filename_issue">Documentation Filename Issue</a></li></ul>
+
+<ul><li><a href="/Documentation/logging_best_practices">Logging Best Practices</a></li></ul>
+
+<ul><li><a href="/Documentation/ai_guidelines">AI Guidelines</a></li></ul>
+
+<ul><li><a href="/Documentation/controller_routing_guidelines">Controller Routing Guidelines</a></li></ul>
+
+<ul><li><a href="/Documentation/controllers">Controllers Documentation</a></li></ul>
+
+<ul><li><a href="/Documentation/documentation_update_summary">Documentation Update Summary</a></li></ul>
+
+<ul><li><a href="/Documentation/linux_commands">Linux Commands Reference</a></li></ul>
+
+<ul><li><a href="/Documentation/mail_system.md">Mail System Documentation</a></li></ul>
+
+<ul><li><a href="/Documentation/mail_configuration_guide.md">Mail Configuration Guide</a></li></ul>
+
+<ul><li><a href="/Documentation/mail_troubleshooting.md">Mail Troubleshooting Guide</a></li></ul>
+
+</div>
