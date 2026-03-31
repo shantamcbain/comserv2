@@ -19,6 +19,7 @@ use File::Spec;
 use Digest::SHA qw(sha256_hex);
 use File::Find;
 use Module::Load;
+use POSIX qw(_exit);
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -5676,10 +5677,10 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
 
 sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Args(0) {
     my ($self, $c) = @_;
-    
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_deploy_to_production',
-        "Docker deploy to production requested");
-    
+        "Docker Hub build+push+deploy requested");
+
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'docker_deploy_to_production')) {
         $c->response->status(403);
@@ -5693,52 +5694,134 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         $c->response->content_type('application/json');
         return;
     }
-    
-    my $ssh_target = $c->req->params->{ssh_target} || '';
-    my $ssh_port = $c->req->params->{ssh_port} || 22;
+
+    my $ssh_target   = $c->req->params->{ssh_target}   || 'ubuntu@192.168.1.126';
     my $ssh_password = $c->req->params->{ssh_password} || '';
-    my $production_directory = $c->req->params->{production_directory} || '~/PycharmProjects/comserv2';
-    my $service = $c->req->params->{service} || 'web-prod';
-    
-    if (!$ssh_target) {
-        $c->response->body('{"success": false, "error": "SSH target not specified"}');
-        $c->response->content_type('application/json');
-        return;
-    }
-    
+
     if (!$ssh_password) {
-        $c->response->body('{"success": false, "error": "SSH password required"}');
+        $c->response->body('{"success": false, "error": "SSH password required to trigger production deploy"}');
         $c->response->content_type('application/json');
         return;
     }
-    
-    # Parse user@host format - validate safe characters only
-    my ($user, $host) = $ssh_target =~ /^([a-zA-Z0-9_\-]+)\@([a-zA-Z0-9_\-\.]+)$/;
-    unless ($user && $host) {
-        $c->response->body('{"success": false, "error": "SSH target must be in format: user@hostname (alphanumeric only)"}');
+
+    my ($ssh_user, $ssh_host) = $ssh_target =~ /^([a-zA-Z0-9_\-]+)\@([a-zA-Z0-9_\-\.]+)$/;
+    unless ($ssh_user && $ssh_host) {
+        $c->response->body('{"success": false, "error": "SSH target must be user\@hostname"}');
         $c->response->content_type('application/json');
         return;
     }
-    
-    $ssh_port = int($ssh_port);
-    $ssh_port = 22 unless $ssh_port > 0 && $ssh_port <= 65535;
-    $service =~ s/[^a-zA-Z0-9_\-]//g;
-    $production_directory =~ s/[^a-zA-Z0-9_\-\/\.~]//g;
-    
-    my $script_path = "$FindBin::Bin/deploy_docker_to_production.pl";
-    local $ENV{SSHPASS} = $ssh_password;
-    my $cmd = "perl $script_path --host=$host --user=$user --port=$ssh_port --service=$service --directory='$production_directory' 2>&1";
-    
-    my $output = `$cmd`;
-    my $exit_code = $? >> 8;
-    
-    my $result = {
-        success => $exit_code == 0 ? \1 : \0,
-        output => $output,
-        exit_code => $exit_code
-    };
-    
-    $c->response->body(encode_json($result));
+
+    my $log_file = '/tmp/comserv-hub-deploy.log';
+    my $pid_file = '/tmp/comserv-hub-deploy.pid';
+    unlink $log_file;
+    unlink $pid_file;
+
+    my $home        = $ENV{HOME} || '/home/shanta';
+    my $comserv_dir = "$home/PycharmProjects/comserv2/Comserv";
+    my $prod_compose = 'docker-compose.prod.yml';
+
+    my $pid = fork();
+    if (!defined $pid) {
+        $c->response->body('{"success": false, "error": "Failed to fork background process"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    if ($pid == 0) {
+        open(STDOUT, '>', $log_file) or _exit(1);
+        open(STDERR, '>&STDOUT')     or _exit(1);
+        $| = 1;
+
+        print "=== Comserv Production Deploy via Docker Hub ===\n";
+        print "Started: " . scalar(localtime) . "\n\n";
+
+        print "--- Step 1: Building production image ---\n";
+        my $build_exit = system('docker', 'compose',
+            '-f', "$comserv_dir/$prod_compose",
+            '--project-directory', $comserv_dir,
+            'build', '--progress=plain');
+        $build_exit >>= 8;
+        if ($build_exit != 0) {
+            print "\n❌ BUILD FAILED (exit $build_exit)\n";
+            _exit(1);
+        }
+        print "\n✅ Build complete\n\n";
+
+        print "--- Step 2: Pushing to Docker Hub (shantamcsbain/comserv-web-prod) ---\n";
+        my $push_exit = system('docker', 'compose',
+            '-f', "$comserv_dir/$prod_compose",
+            '--project-directory', $comserv_dir,
+            'push');
+        $push_exit >>= 8;
+        if ($push_exit != 0) {
+            print "\n❌ PUSH FAILED (exit $push_exit)\n";
+            print "Ensure you are logged in: docker login (username: shantamcsbain)\n";
+            _exit(1);
+        }
+        print "\n✅ Push to Docker Hub complete\n\n";
+
+        print "--- Step 3: Triggering deploy on $ssh_target ---\n";
+        local $ENV{SSHPASS} = $ssh_password;
+        my $ssh_exit = system('sshpass', '-e', 'ssh',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            $ssh_target,
+            '/opt/comserv/Comserv/deploy.sh');
+        $ssh_exit >>= 8;
+        if ($ssh_exit != 0) {
+            print "\n❌ SSH TRIGGER FAILED (exit $ssh_exit)\n";
+            print "Note: Production cron will auto-deploy within 10 minutes anyway.\n";
+            _exit(1);
+        }
+        print "\n✅ Production server deployment triggered\n\n";
+
+        print "=== DEPLOYMENT COMPLETE at " . scalar(localtime) . " ===\n";
+        _exit(0);
+    }
+
+    if (open my $fh, '>', $pid_file) {
+        print $fh $pid;
+        close $fh;
+    }
+
+    $c->response->body(encode_json({ success => \1, message => 'Deployment started in background' }));
+    $c->response->content_type('application/json');
+}
+
+sub docker_deploy_status :Path('/admin/docker-deploy-status') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_deploy_status')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my $log_file = '/tmp/comserv-hub-deploy.log';
+    my $pid_file = '/tmp/comserv-hub-deploy.pid';
+
+    my $output = '';
+    if (-f $log_file && open my $fh, '<', $log_file) {
+        local $/;
+        $output = <$fh>;
+        close $fh;
+    }
+
+    my $is_running = 0;
+    if (-f $pid_file && open my $fh, '<', $pid_file) {
+        my $pid = <$fh>;
+        close $fh;
+        chomp($pid // '');
+        $is_running = 1 if $pid && $pid =~ /^\d+$/ && kill(0, $pid);
+    }
+
+    $c->response->body(encode_json({
+        success    => \1,
+        output     => $output,
+        is_running => $is_running ? \1 : \0,
+    }));
     $c->response->content_type('application/json');
 }
 
