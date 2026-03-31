@@ -5675,6 +5675,35 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
     $c->response->content_type('application/json');
 }
 
+sub docker_load_credentials :Path('/admin/docker-load-credentials') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_load_credentials')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my $creds_file = ($ENV{HOME} || '/home/shanta') . '/.comserv/secrets/ssh_credentials.json';
+    my $creds = {};
+    if (-f $creds_file && open my $fh, '<', $creds_file) {
+        local $/;
+        my $json = <$fh>;
+        close $fh;
+        $creds = eval { decode_json($json) } || {};
+    }
+
+    $c->response->body(encode_json({
+        success      => \1,
+        ssh_target   => $creds->{ssh_target}   || 'ubuntu@192.168.1.126',
+        ssh_port     => $creds->{ssh_port}     || 22,
+        ssh_password => $creds->{ssh_password} || '',
+    }));
+    $c->response->content_type('application/json');
+}
+
 sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Args(0) {
     my ($self, $c) = @_;
 

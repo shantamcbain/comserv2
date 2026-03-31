@@ -641,6 +641,23 @@
         return stateIcons[state.toLowerCase()] || '?';
     }
 
+    function loadSavedCredentials() {
+        fetch('/admin/docker-load-credentials', { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.ssh_password) {
+                    document.getElementById('ssh-password').value = data.ssh_password;
+                    document.getElementById('production-host').value = data.ssh_target || 'ubuntu@192.168.1.126';
+                    document.getElementById('ssh-port').value = data.ssh_port || 22;
+                    if (document.getElementById('ssh-terminal-target'))
+                        document.getElementById('ssh-terminal-target').value = data.ssh_target || 'ubuntu@192.168.1.126';
+                    if (document.getElementById('ssh-terminal-password'))
+                        document.getElementById('ssh-terminal-password').value = data.ssh_password;
+                }
+            })
+            .catch(() => {});
+    }
+
     function refreshContainers() {
         containersList.innerHTML = '<p style="color: #666; text-align: center;">Loading container information...</p>';
 
@@ -1729,6 +1746,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         refreshContainers();
         refreshVolumes();
+        loadSavedCredentials();
 
         // Auto-check SSH terminal service status
         checkSSHTerminalService();
