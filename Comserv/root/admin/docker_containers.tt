@@ -1576,11 +1576,6 @@
         const sshTarget   = document.getElementById('production-host').value.trim() || 'ubuntu@192.168.1.126';
         const sshPassword = document.getElementById('ssh-password').value;
 
-        if (!sshPassword) {
-            alert('Please enter SSH password for the production server (ubuntu@192.168.1.126)');
-            return;
-        }
-
         const confirmMsg =
             `⚠️ AUTO DEPLOY TO PRODUCTION\n\n` +
             `This will run automatically:\n` +
