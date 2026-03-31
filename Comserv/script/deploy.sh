@@ -37,6 +37,12 @@ echo "New version detected. Starting deployment..."
 echo "1. Pulling latest image..."
 docker compose -f "$COMPOSE_FILE" pull
 
+VERSION_INFO=$(docker inspect --format='{{index .Config.Labels "app.version"}}' "$IMAGE" 2>/dev/null || true)
+if [ -z "$VERSION_INFO" ]; then
+    VERSION_INFO=$(docker run --rm --entrypoint cat "$IMAGE" /opt/comserv/version.json 2>/dev/null || echo '{}')
+fi
+echo "   Version: $VERSION_INFO"
+
 echo "2. Stopping and removing old container..."
 docker stop "$CONTAINER" 2>/dev/null || true
 docker rm -f "$CONTAINER" 2>/dev/null || true
@@ -75,7 +81,7 @@ fi
 docker ps --filter "name=$CONTAINER" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
 if command -v mail >/dev/null 2>&1; then
-    echo -e "Comserv Production Deployment Report\n\nServer    : $HOSTNAME_VAL\nTime      : $(date)\nImage     : $IMAGE\nContainer : $CONTAINER\nStatus    : $STATUS_MSG\nNew digest: ${REMOTE_DIGEST:0:72}" \
+    echo -e "Comserv Production Deployment Report\n\nServer    : $HOSTNAME_VAL\nTime      : $(date)\nImage     : $IMAGE\nContainer : $CONTAINER\nStatus    : $STATUS_MSG\nVersion   : $VERSION_INFO\nNew digest: ${REMOTE_DIGEST:0:72}" \
         | mail -s "$SUBJECT" "$EMAIL"
     echo "Notification sent to $EMAIL"
 fi
