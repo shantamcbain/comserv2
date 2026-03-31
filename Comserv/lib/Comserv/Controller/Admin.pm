@@ -5813,7 +5813,7 @@ sub docker_deploy_status :Path('/admin/docker-deploy-status') :Args(0) {
     if (-f $pid_file && open my $fh, '<', $pid_file) {
         my $pid = <$fh>;
         close $fh;
-        chomp($pid // '');
+        chomp $pid if defined $pid;
         $is_running = 1 if $pid && $pid =~ /^\d+$/ && kill(0, $pid);
     }
 
