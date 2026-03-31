@@ -5760,8 +5760,26 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     unlink $pid_file;
 
     my $home        = $ENV{HOME} || '/home/shanta';
-    my $comserv_dir = "$home/PycharmProjects/comserv2/Comserv";
+    my $repo_dir    = "$home/PycharmProjects/comserv2";
+    my $comserv_dir = "$repo_dir/Comserv";
     my $prod_compose = 'docker-compose.prod.yml';
+
+    my $git_commit = `cd '$repo_dir' && git rev-parse --short HEAD 2>/dev/null`; chomp $git_commit;
+    my $git_branch = `cd '$repo_dir' && git rev-parse --abbrev-ref HEAD 2>/dev/null`; chomp $git_branch;
+    my @t = gmtime(); my $build_date = sprintf('%04d-%02d-%02dT%02d:%02d:%02dZ',
+        $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
+    my $build_host = `hostname 2>/dev/null`; chomp $build_host;
+
+    my $version_data = {
+        commit     => $git_commit  || 'unknown',
+        branch     => $git_branch  || 'unknown',
+        build_date => $build_date,
+        build_host => $build_host  || 'workstation',
+    };
+    if (open my $vf, '>', "$comserv_dir/version.json") {
+        print $vf encode_json($version_data);
+        close $vf;
+    }
 
     my $pid = fork();
     if (!defined $pid) {
@@ -5776,7 +5794,8 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         $| = 1;
 
         print "=== Comserv Production Deploy via Docker Hub ===\n";
-        print "Started: " . scalar(localtime) . "\n\n";
+        print "Started: " . scalar(localtime) . "\n";
+        print "Version : $git_commit ($git_branch) built $build_date\n\n";
 
         print "--- Step 1: Building production image ---\n";
         my $build_exit = system('docker', 'compose',
