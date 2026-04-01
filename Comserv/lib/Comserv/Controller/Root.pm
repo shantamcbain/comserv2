@@ -2044,7 +2044,7 @@ sub default :Path {
         return;
     }
 
-    my $log_level = ($req_type eq 'scanner') ? 'error'
+    my $log_level = ($req_type eq 'scanner') ? 'warn'
                   : ($req_type eq 'bot')     ? 'info'
                   :                            'warn';
 
