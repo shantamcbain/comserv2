@@ -13,10 +13,13 @@
 .dd-table th { background:#f0f0f0; text-align:left; padding:6px 10px; border-bottom:2px solid #ccc; white-space:nowrap; }
 .dd-table td { padding:5px 10px; border-bottom:1px solid #eee; vertical-align:middle; }
 .dd-table tr:hover { background:#fafafa; }
-.dd-bar-wrap { width:120px; background:#e8e8e8; border-radius:3px; height:10px; display:inline-block; vertical-align:middle; }
-.dd-bar      { height:10px; border-radius:3px; background:#2196f3; }
-.dd-bar.warn { background:#ff9800; }
-.dd-bar.crit { background:#f44336; }
+.dd-bar-wrap { width:120px; background:#e8e8e8; border-radius:3px; height:14px; display:inline-block; vertical-align:middle; position:relative; }
+.dd-bar      { height:14px; border-radius:3px; background:#2196f3; }
+.dd-bar-lbl  { position:absolute; right:4px; top:0; line-height:14px; font-size:.72em; color:#fff; font-weight:bold; mix-blend-mode:difference; white-space:nowrap; pointer-events:none; }
+.dd-table th.sortable { cursor:pointer; user-select:none; }
+.dd-table th.sortable:hover { background:#e0e0e0; }
+.dd-sort-asc::after  { content:' ▲'; font-size:.75em; }
+.dd-sort-desc::after { content:' ▼'; font-size:.75em; }
 .dd-actions  { display:flex; gap:6px; flex-wrap:wrap; }
 .dd-btn      { font-size:.78em; padding:2px 8px; border:1px solid #ccc; border-radius:3px; cursor:pointer; background:#fff; white-space:nowrap; }
 .dd-btn-del  { border-color:#f44336; color:#f44336; }
@@ -70,18 +73,17 @@
 <table class="dd-table" id="dd-tbl">
 <thead>
   <tr>
-    <th>Name</th>
-    <th style="text-align:right;">Size</th>
-    <th style="min-width:130px;"></th>
-    <th>Type</th>
+    <th class="sortable dd-sort-asc" data-col="0" onclick="sortTable(0)">Name</th>
+    <th class="sortable" data-col="1" style="text-align:right;" onclick="sortTable(1)">Size</th>
+    <th style="min-width:160px;">% of largest</th>
+    <th class="sortable" data-col="3" onclick="sortTable(3)">Type</th>
     <th>Actions</th>
   </tr>
 </thead>
 <tbody>
 [% FOR e IN entries %]
 [%  pct = max_bytes > 0 ? e.bytes / max_bytes * 100 : 0; pct = pct.int %]
-[%  bar_class = pct > 90 ? 'crit' : pct > 60 ? 'warn' : '' %]
-<tr id="row-[% loop.index %]" [% IF e.is_net %]style="background:#f0f4ff;opacity:.85;"[% END %]>
+<tr id="row-[% loop.index %]" data-bytes="[% e.bytes %]" [% IF e.is_net %]style="background:#f0f4ff;opacity:.85;"[% END %]>
   <td>
     [% IF e.is_net %]
     &#127760; <a href="/admin/hardware_monitor/disk_diagnose?hostname=[% hostname | uri %]&amp;path=[% e.path | uri %]">[% e.name | html %]</a>
@@ -99,10 +101,11 @@
   </td>
   <td>
     [% IF e.is_net %]
-    <div class="dd-bar-wrap"><div class="dd-bar" style="width:0%;background:#90caf9;"></div></div>
+    <div class="dd-bar-wrap"><div class="dd-bar" style="width:0%;background:#90caf9;"></div><span class="dd-bar-lbl" style="color:#1976d2;">network</span></div>
     [% ELSE %]
     <div class="dd-bar-wrap">
-      <div class="dd-bar [% bar_class %]" style="width:[% pct %]%;"></div>
+      <div class="dd-bar" style="width:[% pct %]%; background:[% pct >= 80 ? '#e53935' : pct >= 50 ? '#fb8c00' : '#2196f3' %];"></div>
+      <span class="dd-bar-lbl">[% pct %]%</span>
     </div>
     [% END %]
   </td>
@@ -157,5 +160,35 @@ function showConfirm(idx, action, path) {
 }
 function hideConfirm(idx) {
     document.getElementById('confirm-' + idx).style.display = 'none';
+}
+
+var _sortCol = 0, _sortAsc = true;
+function sortTable(col) {
+    var tbl = document.getElementById('dd-tbl');
+    var tbody = tbl.querySelector('tbody');
+    var rows = Array.from(tbody.querySelectorAll('tr'));
+    if (_sortCol === col) { _sortAsc = !_sortAsc; } else { _sortCol = col; _sortAsc = true; }
+
+    rows.sort(function(a, b) {
+        var av, bv;
+        if (col === 1) {
+            av = parseFloat(a.dataset.bytes || 0);
+            bv = parseFloat(b.dataset.bytes || 0);
+        } else {
+            av = (a.cells[col] ? a.cells[col].textContent.trim().toLowerCase() : '');
+            bv = (b.cells[col] ? b.cells[col].textContent.trim().toLowerCase() : '');
+        }
+        if (av < bv) return _sortAsc ? -1 : 1;
+        if (av > bv) return _sortAsc ? 1 : -1;
+        return 0;
+    });
+
+    rows.forEach(function(r) { tbody.appendChild(r); });
+
+    tbl.querySelectorAll('th.sortable').forEach(function(th) {
+        th.classList.remove('dd-sort-asc', 'dd-sort-desc');
+    });
+    var th = tbl.querySelector('th[data-col="' + col + '"]');
+    if (th) th.classList.add(_sortAsc ? 'dd-sort-asc' : 'dd-sort-desc');
 }
 </script>
