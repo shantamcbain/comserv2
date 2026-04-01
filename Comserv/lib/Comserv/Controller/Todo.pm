@@ -1274,6 +1274,14 @@ sub day :Path('/todo/day') :Args {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
         "Separated into " . scalar(@overdue_todos) . " overdue and " . scalar(@today_todos) . " today todos");
 
+    my %proj_name_map;
+    eval {
+        my @prows = $c->model('DBEncy')->resultset('Project')->search(
+            {}, { columns => [qw(id name)] }
+        )->all;
+        %proj_name_map = map { $_->id => $_->name } @prows;
+    };
+
     # Add the todos to the stash
     $c->stash(
         todos => \@today_todos,
@@ -1282,6 +1290,7 @@ sub day :Path('/todo/day') :Args {
         date => $date,
         previous_date => $previous_date,
         next_date => $next_date,
+        proj_name_map => \%proj_name_map,
         template => 'todo/day.tt',
     );
 
@@ -1337,6 +1346,14 @@ sub week :Path('/todo/week') :Args {
         ($a->start_date // '') cmp ($b->start_date // '')
     } @$filtered_todos;
 
+    my %week_proj_map;
+    eval {
+        my @prows = $c->model('DBEncy')->resultset('Project')->search(
+            {}, { columns => [qw(id name)] }
+        )->all;
+        %week_proj_map = map { $_->id => $_->name } @prows;
+    };
+
     # Add the todos to the stash
     $c->stash(
         todos => \@sorted_todos,
@@ -1346,6 +1363,7 @@ sub week :Path('/todo/week') :Args {
         prev_week_date => $prev_week_date,
         next_week_date => $next_week_date,
         week_dates => \@week_dates,
+        proj_name_map => \%week_proj_map,
         template => 'todo/week.tt',
     );
 
