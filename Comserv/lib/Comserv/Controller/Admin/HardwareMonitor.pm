@@ -93,7 +93,12 @@ sub index :Path('/admin/hardware_monitor') :Args(0) {
         } } @rows;
 
         # Chart data: separate unlimited query for graphable metrics only
-        my @graph_metric_names = (@GRAPH_METRICS, $rs->search(
+        my @disk_pct_metrics = $rs->search(
+            { metric_name => { -like => 'disk_used_pct%' }, %search },
+            { columns => ['metric_name'], distinct => 1 }
+        )->get_column('metric_name')->all;
+
+        my @graph_metric_names = (@GRAPH_METRICS, @disk_pct_metrics, $rs->search(
             { metric_name => { -like => '%_temp' }, %search },
             { columns => ['metric_name'], distinct => 1 }
         )->get_column('metric_name')->all);

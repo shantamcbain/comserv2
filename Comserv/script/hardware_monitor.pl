@@ -171,7 +171,8 @@ sub _disk {
         chomp;
         my ($dev, $total_k, $used_k, $avail_k, $pct_str, $mount) = split /\s+/, $_, 6;
         next unless defined $mount;
-        next if $dev =~ /^(tmpfs|devtmpfs|udev|overlay|shm|squashfs|none|loop)/;
+        next if $dev  =~ /^(tmpfs|devtmpfs|udev|overlay|shm|squashfs|none|loop)/;
+        next if $mount =~ m{^(/sys|/proc|/dev/pts|/run/|/snap/)};
         (my $pct = $pct_str) =~ s/%//;
         next unless looks_like_number($pct);
         (my $safe = $mount) =~ s{/}{_}g;

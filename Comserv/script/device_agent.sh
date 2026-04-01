@@ -15,7 +15,7 @@
 # ---------------------------------------------------------------------------
 # Configuration — override via environment or edit here
 # ---------------------------------------------------------------------------
-INGEST_URL="${INGEST_URL:-http://192.168.1.199:3001/admin/hardware_monitor/ingest}"
+INGEST_URL="${INGEST_URL:-http://comserv.computersystemconsulting.ca/admin/hardware_monitor/ingest}"
 INGEST_TOKEN="${INGEST_TOKEN:-changeme}"
 HOSTNAME_OVERRIDE="${HOSTNAME_OVERRIDE:-}"    # leave blank to auto-detect
 
@@ -48,6 +48,7 @@ while IFS= read -r line; do
     read -r dev total_k used_k avail_k pct_str mount <<< "$line"
     [ -z "$mount" ] && continue
     [[ "$dev" =~ ^(tmpfs|devtmpfs|udev|overlay|shm|squashfs|none|loop) ]] && continue
+    [[ "$mount" =~ ^(/sys|/proc|/dev/pts|/run/|/snap/) ]] && continue
     pct="${pct_str//%/}"
     [[ "$pct" =~ ^[0-9]+$ ]] || continue
     safe="${mount//\//_}"
