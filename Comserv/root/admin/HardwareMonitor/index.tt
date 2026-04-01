@@ -179,14 +179,27 @@
     <details style="margin-bottom:16px;">
         <summary style="cursor:pointer;font-size:.88em;color:#888;padding:4px 0;">&#128268; Remote agent setup — add any server-room device (one cron line per machine)</summary>
         <div style="margin-top:8px;background:#f8f9fa;border:1px solid #ddd;border-radius:4px;padding:12px;font-size:.85em;">
-            <p style="margin:0 0 6px;"><strong>&#9989; No script copy needed</strong> — the agent is on the shared NFS mount at:</p>
-            <pre style="background:#222;color:#eee;padding:6px 10px;border-radius:4px;overflow-x:auto;margin:0 0 10px;">/home/shanta/nfs/comserv/scripts/device_agent.sh</pre>
-            <p style="margin:0 0 6px;">The script <strong>auto-detects the hostname</strong> of whichever machine runs it — no per-machine edits required.</p>
-            <p style="margin:0 0 6px;"><strong>On each machine</strong>, add one line to <code>/etc/cron.d/comserv_agent</code>:</p>
-            <pre style="background:#222;color:#eee;padding:8px;border-radius:4px;overflow-x:auto;margin:0 0 10px;">*/5 * * * * root INGEST_URL="[% ingest_url | html %]" INGEST_TOKEN="[% ingest_token | html %]" /home/shanta/nfs/comserv/scripts/device_agent.sh</pre>
-            <p style="margin:0 0 4px;color:#555;"><strong>Requirements:</strong> NFS mount at <code>/home/shanta/nfs</code> (already set up on server-room machines) + <code>curl</code> or <code>wget</code>.</p>
-            <p style="margin:0 0 4px;color:#888;">&#128274; Change the token from <code>changeme</code> by setting <code>HW_INGEST_TOKEN=yourtoken</code> in the application environment and updating the cron lines.</p>
-            <p style="margin:0;color:#888;">&#9881; To override the URL permanently, set <code>HW_INGEST_BASE_URL=http://192.168.1.199:3001</code> in the application environment.</p>
+
+            <p style="margin:0 0 8px;font-weight:bold;font-size:1.05em;">How it works</p>
+            <p style="margin:0 0 6px;">The agent script lives on the NFS server (<strong>192.168.1.175</strong>) and is readable by any machine that mounts the NFS share — no per-machine script copy needed. Each machine runs the script from <em>its own</em> NFS mount point and POSTs metrics to the Comserv app server (<strong>192.168.1.199</strong>).</p>
+
+            <p style="margin:8px 0 4px;font-weight:bold;">Step 1 — Mount the NFS share (if not already done)</p>
+            <p style="margin:0 0 4px;">Add to <code>/etc/fstab</code> on the remote machine, then run <code>mount -a</code>:</p>
+            <pre style="background:#222;color:#eee;padding:8px;border-radius:4px;overflow-x:auto;margin:0 0 10px;">192.168.1.175:/mnt/data   /mnt/nfs_data   nfs   defaults,_netdev,nofail   0 0</pre>
+            <p style="margin:0 0 6px;color:#555;">After mounting, the agent script is at: <code>/mnt/nfs_data/comserv/scripts/device_agent.sh</code></p>
+
+            <p style="margin:8px 0 4px;font-weight:bold;">Step 2 — Add the cron job</p>
+            <p style="margin:0 0 4px;">Create <code>/etc/cron.d/comserv_agent</code> on the remote machine:</p>
+            <pre style="background:#222;color:#eee;padding:8px;border-radius:4px;overflow-x:auto;margin:0 0 10px;">*/5 * * * * root INGEST_URL="[% ingest_url | html %]" INGEST_TOKEN="[% ingest_token | html %]" /mnt/nfs_data/comserv/scripts/device_agent.sh</pre>
+            <p style="margin:0 0 6px;color:#555;">The script auto-detects the hostname of whichever machine runs it — no edits required. Metrics arrive here within 5 minutes.</p>
+
+            <p style="margin:8px 0 4px;font-weight:bold;">Reference — what each server uses</p>
+            <table style="border-collapse:collapse;font-size:.9em;width:100%;">
+                <tr style="background:#e9ecef;"><th style="padding:4px 8px;text-align:left;border:1px solid #ddd;">Machine</th><th style="padding:4px 8px;text-align:left;border:1px solid #ddd;">IP</th><th style="padding:4px 8px;text-align:left;border:1px solid #ddd;">Script path (from that machine)</th></tr>
+                <tr><td style="padding:4px 8px;border:1px solid #ddd;">workstation (this server)</td><td style="padding:4px 8px;border:1px solid #ddd;">192.168.1.199</td><td style="padding:4px 8px;border:1px solid #ddd;font-family:monospace;">/home/shanta/nfs/comserv/scripts/device_agent.sh</td></tr>
+                <tr><td style="padding:4px 8px;border:1px solid #ddd;">proxmox720, proxmoxt210, comservproduction1, DB server, etc.</td><td style="padding:4px 8px;border:1px solid #ddd;">varies</td><td style="padding:4px 8px;border:1px solid #ddd;font-family:monospace;">/mnt/nfs_data/comserv/scripts/device_agent.sh</td></tr>
+            </table>
+            <p style="margin:8px 0 0;color:#888;">&#128274; Change token: set <code>HW_INGEST_TOKEN=yourtoken</code> in the app environment + update cron lines.<br>&#9881; Override ingest URL: set <code>HW_INGEST_BASE_URL=http://192.168.1.199:3001</code> in the app environment.</p>
         </div>
     </details>
     [% END %]
