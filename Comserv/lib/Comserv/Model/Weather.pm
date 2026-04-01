@@ -25,7 +25,33 @@ has 'logging' => (
 
 sub _get_schema {
     my $self = shift;
-    return Comserv::Model::DBEncy->new->schema;
+    require Comserv::Model::RemoteDB;
+    require Comserv::Model::Schema::Ency;
+
+    my $remote_db = Comserv::Model::RemoteDB->new();
+    my $connection_info = $remote_db->get_connection_info('ency');
+
+    die "Weather: Cannot get ency database connection from RemoteDB\n"
+        unless $connection_info;
+
+    my $conn    = $connection_info->{config};
+    my $db_type = $conn->{db_type} || 'mysql';
+
+    my $dsn;
+    my %opts = (RaiseError => 1, PrintError => 0, AutoCommit => 1);
+
+    if ($db_type eq 'sqlite') {
+        $dsn = "dbi:SQLite:dbname=" . $conn->{database_path};
+        return Comserv::Model::Schema::Ency->connect($dsn, '', '', \%opts);
+    }
+
+    my $driver = 'MariaDB';
+    eval { require DBD::MariaDB; 1 } or do { $driver = 'mysql' };
+    $dsn = "dbi:$driver:database=$conn->{database};host=$conn->{host};port=$conn->{port}";
+
+    return Comserv::Model::Schema::Ency->connect(
+        $dsn, $conn->{username}, $conn->{password}, \%opts
+    );
 }
 
 =head1 METHODS
