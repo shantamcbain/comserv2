@@ -78,7 +78,7 @@
 </thead>
 <tbody>
 [% FOR e IN entries %]
-[%  pct = max_bytes > 0 ? (e.bytes / max_bytes * 100).int : 0 %]
+[%  pct = max_bytes > 0 ? e.bytes / max_bytes * 100 : 0; pct = pct.int %]
 [%  bar_class = pct > 90 ? 'crit' : pct > 60 ? 'warn' : '' %]
 <tr id="row-[% loop.index %]">
   <td>
