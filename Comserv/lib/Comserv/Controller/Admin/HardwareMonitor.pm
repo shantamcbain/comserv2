@@ -217,13 +217,33 @@ sub index :Path('/admin/hardware_monitor') :Args(0) {
         };
     }
 
+    # Build set of NFS/network client mount points so we can exclude them from charts
+    my %net_mounts;
+    if (open my $dfh, '-|', 'df', '-PT') {
+        while (my $line = <$dfh>) {
+            chomp $line;
+            next if $line =~ /^Filesystem/;
+            my ($fs, $type, undef, undef, undef, undef, $mnt) = split /\s+/, $line;
+            if ($type && $mnt && $type =~ /^(nfs|nfs4|cifs|smbfs|sshfs|fuse\.sshfs|davfs|glusterfs)$/) {
+                $net_mounts{$mnt} = 1;
+            }
+        }
+        close $dfh;
+    }
+    my $is_net_mount = sub {
+        my $metric = shift;
+        (my $mnt = $metric) =~ s/^disk_used_pct//;
+        $mnt =~ s{^_}{/}; $mnt =~ s{_}{/}g;
+        return $net_mounts{$mnt} ? 1 : 0;
+    };
+
     my %in_order   = map { $_ => 1 } @GRAPH_METRICS;
     my @ordered    = grep { exists $chart_data{$_} } @GRAPH_METRICS;
     push @ordered, grep {
         /^disk_used_pct/ && !$in_order{$_} && exists $chart_data{$_} && do {
             (my $mnt = $_) =~ s/^disk_used_pct//;
             $mnt =~ s{^_}{/}; $mnt =~ s{_}{/}g;
-            $mnt !~ m{^(/sys|/proc|/run/|/dev/pts|/snap/)};
+            $mnt !~ m{^(/sys|/proc|/run/|/dev/pts|/snap/)} && !$net_mounts{$mnt};
         }
     } sort keys %chart_data;
     push @ordered, grep { /$TEMP_METRIC_RE/ && !$in_order{$_} } sort keys %chart_data;
