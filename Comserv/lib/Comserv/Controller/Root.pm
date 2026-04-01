@@ -13,7 +13,7 @@ use Comserv::Util::SystemInfo;
 # Configure static file serving
 __PACKAGE__->config(
     'Plugin::Static::Simple' => {
-        dirs => ['static'],
+        dirs => ['static', 'LegacyStaticPages'],
         include_path => [qw( root )],
     });
 
