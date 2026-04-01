@@ -1,0 +1,129 @@
+[%
+   title        = "Disk Explorer — " _ mount
+   description  = "Browse directory sizes on this host"
+   roles        = "admin"
+   TemplateType = "Application"
+   category     = "Admin"
+%]
+<style>
+.de-table { width:100%; border-collapse:collapse; margin-top:12px; font-size:.9em; }
+.de-table th { background:#f0f0f0; text-align:left; padding:6px 10px; border-bottom:2px solid #ccc; }
+.de-table td { padding:5px 10px; border-bottom:1px solid #eee; vertical-align:middle; }
+.de-table tr:hover { background:#fafafa; }
+.de-bar-wrap { width:140px; background:#e8e8e8; border-radius:4px; height:12px; display:inline-block; vertical-align:middle; margin-left:6px; }
+.de-bar      { height:12px; border-radius:4px; background:#2196f3; }
+.de-warn     { background:#ff9800; }
+.de-crit     { background:#f44336; }
+.de-move-form { display:none; background:#f8f8f8; border:1px solid #ddd; border-radius:6px; padding:12px; margin-top:8px; }
+.de-move-form input[type=text] { width:60%; padding:4px 6px; font-size:.9em; }
+.de-note { font-size:.8em; color:#888; margin-top:4px; }
+</style>
+
+<div style="margin-bottom:12px;">
+  <a href="/admin/hardware_monitor">&larr; Hardware Monitor</a>
+</div>
+
+<h2>&#128193; Disk Explorer: <code>[% mount | html %]</code></h2>
+<p class="de-note">Showing direct children of the mount, sorted by size (largest first). Only available for paths accessible to this server process.</p>
+
+[% IF error %]
+<div class="alert alert-error" style="color:#c00;background:#fff0f0;border:1px solid #f99;padding:10px;border-radius:4px;margin-bottom:12px;">
+  Error: [% error | html %]
+</div>
+[% END %]
+
+[% IF move_result %]
+<div class="alert" style="color:#155724;background:#d4edda;border:1px solid #c3e6cb;padding:10px;border-radius:4px;margin-bottom:12px;">
+  [% move_result | html %]
+</div>
+[% END %]
+
+[% IF entries.size %]
+
+[%# Compute max bytes for bar scaling — approximate from human size strings %]
+[% max_kb = 1 %]
+[% FOR e IN entries %]
+  [% size = e.size %]
+  [%# crude parse: extract leading number and suffix %]
+[% END %]
+
+<table class="de-table" id="de-tbl">
+<thead>
+  <tr>
+    <th>Name</th>
+    <th>Size</th>
+    <th style="min-width:160px;">Usage</th>
+    <th>Path</th>
+    <th></th>
+  </tr>
+</thead>
+<tbody>
+[% FOR e IN entries %]
+<tr>
+  <td>
+    [% IF e.path.match('\.') %]&#128196;[% ELSIF e.path == mount _ '/' _ e.name %]&#128193;[% ELSE %]&#128193;[% END %]
+    <a href="/admin/hardware_monitor/disk_explorer?mount=[% e.path | uri %]">[% e.name | html %]</a>
+  </td>
+  <td><strong>[% e.size | html %]</strong></td>
+  <td>
+    <div class="de-bar-wrap" title="[% e.size | html %]">
+      <div class="de-bar js-bar" data-size="[% e.size | html %]" style="width:0%"></div>
+    </div>
+  </td>
+  <td><code style="font-size:.8em;color:#555;">[% e.path | html %]</code></td>
+  <td>
+    <button onclick="toggleMove(this)" data-path="[% e.path | html %]" type="button" style="font-size:.8em;padding:2px 8px;">Move…</button>
+  </td>
+</tr>
+<tr class="de-move-row" style="display:none;">
+  <td colspan="5">
+    <form class="de-move-form" method="post" action="/admin/hardware_monitor/disk_explorer" style="display:block;">
+      <input type="hidden" name="action" value="move">
+      <input type="hidden" name="mount"  value="[% mount | html %]">
+      <input type="hidden" name="src"    value="[% e.path | html %]">
+      <label>Move <strong>[% e.path | html %]</strong> to:</label><br>
+      <input type="text" name="dest" placeholder="/destination/path" style="margin-top:6px;">
+      <button type="submit" style="margin-left:8px;">Move</button>
+      <p class="de-note">Enter the full destination path. The server user must have write access to that location.</p>
+    </form>
+  </td>
+</tr>
+[% END %]
+</tbody>
+</table>
+
+[% ELSE %]
+<p style="color:#888;">No entries found (directory may be empty or unreadable).</p>
+[% END %]
+
+<script>
+function toggleMove(btn) {
+    var row = btn.closest('tr').nextElementSibling;
+    if (row && row.classList.contains('de-move-row')) {
+        row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+    }
+}
+
+// Draw relative usage bars
+(function() {
+    var bars = document.querySelectorAll('.js-bar');
+    var sizes = [];
+    bars.forEach(function(b){ sizes.push(parseSize(b.dataset.size)); });
+    var maxVal = Math.max.apply(null, sizes) || 1;
+    bars.forEach(function(b, i) {
+        var pct = Math.round(sizes[i] / maxVal * 100);
+        b.style.width = pct + '%';
+        if (pct > 90) b.classList.add('de-crit');
+        else if (pct > 60) b.classList.add('de-warn');
+    });
+
+    function parseSize(s) {
+        if (!s) return 0;
+        var m = s.match(/^([\d.]+)([KMGTP]?)/i);
+        if (!m) return 0;
+        var n = parseFloat(m[1]);
+        var mult = {K:1024,M:1048576,G:1073741824,T:1099511627776,P:1125899906842624};
+        return n * (mult[m[2].toUpperCase()] || 1);
+    }
+})();
+</script>

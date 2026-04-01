@@ -287,6 +287,74 @@ sub _ingest_url {
 }
 
 # ---------------------------------------------------------------------------
+# GET /admin/hardware_monitor/disk_explorer
+# Shows directory sizes for a local mount path, with optional file move.
+# ---------------------------------------------------------------------------
+sub disk_explorer :Path('/admin/hardware_monitor/disk_explorer') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $role = $c->session->{role} // '';
+    unless ($role eq 'admin' || $role eq 'superadmin') {
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $mount  = $c->req->param('mount')  // '/';
+    my $action = $c->req->param('action') // '';
+
+    # Sanitise mount: must be absolute, no shell metacharacters
+    $mount =~ s/[^A-Za-z0-9_.\/\-]//g;
+    $mount = '/' unless $mount =~ m{^/};
+
+    my @entries;
+    my $error;
+    my $move_result;
+
+    if ($action eq 'move' && $c->req->method eq 'POST') {
+        my $src  = $c->req->param('src')  // '';
+        my $dest = $c->req->param('dest') // '';
+        $src  =~ s/[^A-Za-z0-9_.\/\-]//g;
+        $dest =~ s/[^A-Za-z0-9_.\/\-]//g;
+        if (-e $src && $dest && $src ne $dest) {
+            my $ret = system('mv', '--', $src, $dest);
+            $move_result = $ret == 0 ? "Moved: $src → $dest" : "Move failed (exit $ret)";
+        } else {
+            $move_result = "Invalid source or destination.";
+        }
+    }
+
+    # Run du -sh on direct children of $mount
+    eval {
+        open my $fh, '-|', 'du', '-sh', '--', glob("$mount/*") or die "Cannot run du: $!";
+        while (<$fh>) {
+            chomp;
+            if (/^(\S+)\s+(.+)$/) {
+                my ($size, $path) = ($1, $2);
+                push @entries, { size => $size, path => $path, name => (split '/', $path)[-1] };
+            }
+        }
+        close $fh;
+        # Sort: convert size to bytes for numeric sort
+        my $to_bytes = sub {
+            my $s = shift // '0';
+            my %mul = (K=>1024, M=>1024**2, G=>1024**3, T=>1024**4);
+            $s =~ /^([\d.]+)([KMGT])?/i;
+            return ($1 // 0) * ($mul{uc($2//'B')//'B'} // 1);
+        };
+        @entries = sort { $to_bytes->($b->{size}) <=> $to_bytes->($a->{size}) } @entries;
+    };
+    $error = $@ if $@;
+
+    $c->stash(
+        template    => 'admin/HardwareMonitor/disk_explorer.tt',
+        mount       => $mount,
+        entries     => \@entries,
+        error       => $error,
+        move_result => $move_result,
+    );
+}
+
+# ---------------------------------------------------------------------------
 # POST /admin/hardware_monitor/ingest
 # Remote device agents POST JSON metrics here.
 # Auth: X-Ingest-Token header (or ?token= param) must match HW_INGEST_TOKEN.
