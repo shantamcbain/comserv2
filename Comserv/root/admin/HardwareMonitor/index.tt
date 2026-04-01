@@ -296,7 +296,7 @@
         });
     }
 
-    function makeChart(canvas, hostMap, unit) {
+    function makeChart(canvas, hostMap, unit, onClickCb) {
         var datasets = makeDatasets(hostMap);
         new Chart(canvas, {
             type: 'line',
@@ -320,6 +320,7 @@
                         }
                     }
                 },
+                onClick: onClickCb || null,
                 scales: {
                     x: {
                         type: 'time',
@@ -332,53 +333,20 @@
         });
     }
 
-    function addDiskChart(title, hostMap, unit, mountPoint) {
-        var box = document.createElement('div');
-        box.className = 'hw-chart-box';
-        box.style.cursor = 'pointer';
-        box.title = 'Click to open drive detail page';
-        var h4 = document.createElement('h4');
-        var driveIcon = '\ud83d\udcc2 ';
-        var clickHint = '<span style="color:#1976d2;font-size:.75em;">&#128065; click to explore</span>';
-        h4.innerHTML = driveIcon + title + clickHint;
-        box.appendChild(h4);
-        var wrap = document.createElement('div');
-        wrap.className = 'hw-chart-wrap';
-        var canvas = document.createElement('canvas');
-        wrap.appendChild(canvas);
-        box.appendChild(wrap);
-        container.appendChild(box);
-
-        var hosts = Object.keys(hostMap);
-        var firstHost = hosts.length === 1 ? hosts[0] : '';
-
-        box.addEventListener('click', function(e) {
-            var clickedHost = firstHost;
-            if (!clickedHost && hosts.length > 0) {
-                clickedHost = hosts[0];
-            }
-            var url = '[% c.uri_for("/admin/hardware_monitor/drive_detail") %]'
-                + '?host=' + encodeURIComponent(clickedHost)
-                + '&mount=' + encodeURIComponent(mountPoint);
-            window.location.href = url;
-        });
-
-        makeChart(canvas, hostMap, unit, 0);
-    }
-
-    function addChart(title, hostMap, unit) {
+    function addChart(title, hostMap, unit, onClickCb) {
         var box = document.createElement('div');
         box.className = 'hw-chart-box';
         var h4 = document.createElement('h4');
         h4.innerHTML = title + '<span>drag bottom edge to resize</span>';
         box.appendChild(h4);
+        if (onClickCb) { box.style.cursor = 'pointer'; }
         var wrap = document.createElement('div');
         wrap.className = 'hw-chart-wrap';
         var canvas = document.createElement('canvas');
         wrap.appendChild(canvas);
         box.appendChild(wrap);
         container.appendChild(box);
-        makeChart(canvas, hostMap, unit, 0);
+        makeChart(canvas, hostMap, unit, onClickCb);
     }
 
     function addSplitCard(title, topHostMap, topUnit, topLabel, botHostMap, botUnit, botLabel) {
@@ -439,19 +407,39 @@
         if (metric === 'ipmi_ps1_current' || metric === 'ipmi_ps2_current') return;
         if (metric.match(/_temp$/)) return;
 
-        if (metric.match(/^disk_used_pct/)) {
-            var mountPart = metric.replace(/^disk_used_pct/, '') || '_';
-            var mountLabel = mountPart.replace(/^_/, '/').replace(/_/g, '/') || '/';
-            addDiskChart('Disk % \u2014 ' + mountLabel, hostMap, '%', mountLabel);
-            rendered++;
-            return;
-        }
+        if (metric.match(/^disk_used_pct/)) return;
         if (metric.match(/^disk_/)) return;
 
         var unit = METRIC_UNITS[metric] || '';
         addChart(METRIC_LABELS[metric] || metric, hostMap, unit);
         rendered++;
     });
+
+    var diskCombined = {};
+    rawData.forEach(function(entry) {
+        if (!entry.metric.match(/^disk_used_pct/) || !entry.hosts) return;
+        var mountPart = entry.metric.replace(/^disk_used_pct/, '') || '_';
+        var mountLabel = mountPart.replace(/^_/, '/').replace(/_/g, '/') || '/';
+        Object.keys(entry.hosts).forEach(function(host) {
+            var shortHost = host.replace(/\.computersystemconsulting\.ca$/, '').replace(/\..*$/, '');
+            diskCombined[shortHost + ' \u2014 ' + mountLabel] = entry.hosts[host];
+        });
+    });
+    if (Object.keys(diskCombined).length) {
+        var diskClickHandler = function(evt, items) {
+            if (!items || !items.length) return;
+            var dsIdx = items[0].datasetIndex;
+            var label = Object.keys(diskCombined).sort()[dsIdx] || '';
+            var parts = label.split(' \u2014 ');
+            var host  = parts[0] ? parts[0].trim() : 'workstation';
+            var mount = parts[1] ? parts[1].trim() : '/';
+            window.location.href = '/admin/hardware_monitor/disk_diagnose'
+                + '?hostname=' + encodeURIComponent(host)
+                + '&path='     + encodeURIComponent(mount);
+        };
+        addChart('Disk Usage % \u2014 <span style="font-size:.78em;font-weight:normal;color:#2196f3;margin-left:8px;">click a series to diagnose</span>', diskCombined, '%', diskClickHandler);
+        rendered++;
+    }
 
     var combinedTemps = {};
     rawData.forEach(function(entry) {
