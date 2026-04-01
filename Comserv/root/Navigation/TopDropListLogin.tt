@@ -137,6 +137,9 @@
                 <a href="/admin" class="menu-item">
                     <i class="icon-tachometer-alt"></i> Admin Dashboard
                 </a>
+                <a href="/admin/hardware_monitor" class="menu-item">
+                    <i class="icon-server"></i> Hardware Monitor
+                </a>
                 <a href="/admin/logging" class="menu-item">
                     <i class="icon-log"></i> Logging Administration
                 </a>
