@@ -1814,18 +1814,21 @@ sub search :Path('/documentation/search') :Args(0) {
     $self->_ensure_scanned($c);
     
     # Get user role (same logic as index method)
-    my $user_role = 'normal';
+    my $user_role = 'guest';
     my $is_admin = 0;
-    
-    if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
+
+    my $session_username_s = $c->session->{username} // '';
+    my $is_authenticated = ($session_username_s && $session_username_s ne 'anonymous');
+
+    if ($is_authenticated && $c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
         if (grep { lc($_) eq 'admin' } @{$c->session->{roles}}) {
             $user_role = 'admin';
             $is_admin = 1;
         } else {
             $user_role = $c->session->{roles}->[0];
         }
-    } elsif ($c->controller('Root')->user_exists($c)) {
-        $user_role = $c->session->{roles} || 'normal';
+    } elsif ($is_authenticated && $c->controller('Root')->user_exists($c)) {
+        $user_role = $c->session->{roles} || 'user';
         $is_admin = 1 if lc($user_role) eq 'admin';
     }
     
@@ -1869,7 +1872,7 @@ sub search :Path('/documentation/search') :Args(0) {
                             $has_role = 1;
                             last;
                         }
-                    } elsif ($role eq 'normal' && $user_role) {
+                    } elsif ($role eq 'normal' && $is_authenticated) {
                         $has_role = 1;
                         last;
                     }
