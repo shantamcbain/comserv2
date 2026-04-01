@@ -45,7 +45,7 @@ sub index :Path('/log') :Args(0) {
     unless ($admin_auth->check_admin_access($c, 'log_index')) {
         $c->flash->{error_msg} = 'You must be an administrator to view logs.';
         $c->response->redirect($c->uri_for('/user/login'));
-        return;
+        $c->detach();
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Accessed log index");
@@ -86,7 +86,7 @@ sub details :Path('/log/details') :Args(0) {
     unless ($admin_auth->check_admin_access($c, 'log_details')) {
         $c->flash->{error_msg} = 'You must be an administrator to view log details.';
         $c->response->redirect($c->uri_for('/user/login'));
-        return;
+        $c->detach();
     }
 
     my $record_id = $c->request->body_parameters->{record_id};
@@ -116,7 +116,7 @@ sub update :Path('/log/update') :Args(0) {
     unless ($admin_auth->check_admin_access($c, 'log_update')) {
         $c->flash->{error_msg} = 'You must be an administrator to update log entries.';
         $c->response->redirect($c->uri_for('/user/login'));
-        return;
+        $c->detach();
     }
 
     # Get the record_id from the form data
@@ -242,7 +242,7 @@ sub log_form :Path('/log/log_form') :Args() {
 
     unless ($c->session->{username} && $c->session->{username} ne 'anonymous') {
         $c->response->redirect($c->uri_for('/user/login'));
-        return;
+        $c->detach();
     }
 
     my $schema = $c->model('DBEncy');

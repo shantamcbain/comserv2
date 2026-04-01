@@ -1,0 +1,69 @@
+[% PageVersion = 'Inventory/items/edit.tt,v 0.01 2026/03/30 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Edit Item: [% item.name %]</h1>
+
+[% IF error_msg %]<p class="error">[% error_msg %]</p>[% END %]
+
+<form method="POST" action="/Inventory/item/edit/[% item.id %]">
+  <table>
+    <tr>
+      <th><label for="sku">SKU *</label></th>
+      <td><input type="text" id="sku" name="sku" required maxlength="100" value="[% item.sku %]"></td>
+    </tr>
+    <tr>
+      <th><label for="name">Name *</label></th>
+      <td><input type="text" id="name" name="name" required maxlength="255" value="[% item.name %]"></td>
+    </tr>
+    <tr>
+      <th><label for="category">Category</label></th>
+      <td><input type="text" id="category" name="category" maxlength="100" value="[% item.category %]"></td>
+    </tr>
+    <tr>
+      <th><label for="description">Description</label></th>
+      <td><textarea id="description" name="description" rows="3" cols="40">[% item.description %]</textarea></td>
+    </tr>
+    <tr>
+      <th><label for="unit_of_measure">Unit of Measure</label></th>
+      <td>
+        <select id="unit_of_measure" name="unit_of_measure">
+          [% FOREACH u IN ['each', 'box', 'case', 'kg', 'lb', 'litre', 'metre', 'hour'] %]
+          <option value="[% u %]" [% IF item.unit_of_measure == u %]selected[% END %]>[% u %]</option>
+          [% END %]
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="unit_cost">Unit Cost</label></th>
+      <td><input type="number" id="unit_cost" name="unit_cost" step="0.01" min="0" value="[% item.unit_cost %]"></td>
+    </tr>
+    <tr>
+      <th><label for="reorder_point">Reorder Point</label></th>
+      <td><input type="number" id="reorder_point" name="reorder_point" min="0" value="[% item.reorder_point %]"></td>
+    </tr>
+    <tr>
+      <th><label for="reorder_quantity">Reorder Quantity</label></th>
+      <td><input type="number" id="reorder_quantity" name="reorder_quantity" min="0" value="[% item.reorder_quantity %]"></td>
+    </tr>
+    <tr>
+      <th><label for="status">Status</label></th>
+      <td>
+        <select id="status" name="status">
+          [% FOREACH s IN ['active', 'inactive', 'discontinued'] %]
+          <option value="[% s %]" [% IF item.status == s %]selected[% END %]>[% s %]</option>
+          [% END %]
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="notes">Notes</label></th>
+      <td><textarea id="notes" name="notes" rows="3" cols="40">[% item.notes %]</textarea></td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <input type="submit" value="Save Changes">
+        <a href="/Inventory/item/view/[% item.id %]">Cancel</a>
+      </td>
+    </tr>
+  </table>
+</form>

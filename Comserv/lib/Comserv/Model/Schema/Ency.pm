@@ -54,5 +54,14 @@ __PACKAGE__->register_class('PaymentTransaction', 'Comserv::Model::Schema::Ency:
 __PACKAGE__->register_class('InternalCurrencyAccount', 'Comserv::Model::Schema::Ency::Result::InternalCurrencyAccount');
 __PACKAGE__->register_class('InternalCurrencyTransaction', 'Comserv::Model::Schema::Ency::Result::InternalCurrencyTransaction');
 
+# Register Inventory system classes
+__PACKAGE__->register_class('InventoryItem', 'Comserv::Model::Schema::Ency::Result::InventoryItem');
+__PACKAGE__->register_class('InventorySupplier', 'Comserv::Model::Schema::Ency::Result::InventorySupplier');
+__PACKAGE__->register_class('InventoryLocation', 'Comserv::Model::Schema::Ency::Result::InventoryLocation');
+__PACKAGE__->register_class('InventoryStockLevel', 'Comserv::Model::Schema::Ency::Result::InventoryStockLevel');
+__PACKAGE__->register_class('InventoryTransaction', 'Comserv::Model::Schema::Ency::Result::InventoryTransaction');
+__PACKAGE__->register_class('InventoryAssignment', 'Comserv::Model::Schema::Ency::Result::InventoryAssignment');
+__PACKAGE__->register_class('InventoryItemSupplier', 'Comserv::Model::Schema::Ency::Result::InventoryItemSupplier');
+
 __PACKAGE__->meta->make_immutable(inline_constructor => 0);
 1;

@@ -289,8 +289,8 @@
                     
                     <button onclick="deployToProduction()" 
                         style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;"
-                        title="FULL PROCESS: Saves, transfers, backups, and restarts on production">
-                        <i class="fas fa-rocket"></i> Auto Deploy
+                        title="Build image → Push to Docker Hub → SSH trigger deploy.sh on production server">
+                        <i class="fas fa-rocket"></i> Auto Deploy (Hub)
                     </button>
 
                     <button onclick="showDeploymentCommands()" 
@@ -307,37 +307,67 @@
 
                         <div style="margin-bottom: 12px; padding: 10px; background-color: #1a3a1a; border: 2px solid #28a745; border-radius: 4px; color: #fff;">
                             <div style="color: #28a745; font-weight: bold; font-size: 1.05em; margin-bottom: 6px;">
-                                ℹ️ Deployment Workflow: Build Locally → Save → Load on Production → Run
+                                ℹ️ Deployment Workflow: Build → Push to Docker Hub → Production auto-pulls via cron
                             </div>
                             <div style="color: #ccc; font-size: 0.9em;">
-                                All changes (templates, Perl, CSS) are baked into the image on the workstation.
-                                Production never builds — it only receives the saved image via <code>docker save/load</code>.
-                                <br><strong style="color:#ffc107">Step 0 below (local rebuild) is REQUIRED whenever any file has changed.</strong>
+                                All changes (templates, Perl, CSS) are baked into the image on the workstation, pushed to
+                                <strong style="color:#7ec8e3">hub.docker.com/r/shantamcsbain/comserv-web-prod</strong>,
+                                then the production server's <code>deploy.sh</code> cron checks every 10 minutes and pulls automatically.
+                                <br><strong style="color:#ffc107">Step 0 (local rebuild + push) is REQUIRED whenever any file has changed.</strong>
                             </div>
                         </div>
 
-                        <div style="margin-bottom: 8px; color: #28a745; font-weight: bold;">→ Step 0: LOCAL REBUILD — Run on Workstation (not production)</div>
-                        <div style="margin-left: 15px; margin-bottom: 4px; color: #ccc; font-size: 0.88em;">Rebuild dev first, test, then rebuild prod:</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('cd /home/shanta/PycharmProjects/comserv2/Comserv && docker compose -f docker-compose.dev.yml build')" title="Click to copy">
-                            cd /home/shanta/PycharmProjects/comserv2/Comserv &amp;&amp; docker compose -f docker-compose.dev.yml build
-                        </div>
-                        <div style="margin-left: 15px; margin-bottom: 4px; color: #ccc; font-size: 0.88em;">Restart dev container to load the new image, then test:</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('cd /home/shanta/PycharmProjects/comserv2/Comserv && docker compose -f docker-compose.dev.yml up -d --force-recreate')" title="Click to copy">
-                            cd /home/shanta/PycharmProjects/comserv2/Comserv &amp;&amp; docker compose -f docker-compose.dev.yml up -d --force-recreate
+                        <div style="margin-bottom: 8px; color: #28a745; font-weight: bold;">→ Step 0: LOCAL REBUILD + PUSH — Run on Workstation</div>
+                        <div style="margin-left: 15px; margin-bottom: 4px; color: #ccc; font-size: 0.88em;">1. Build and test dev container first:</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('cd /home/shanta/PycharmProjects/comserv2 && docker compose build web-dev && docker compose up -d --force-recreate web-dev')" title="Click to copy">
+                            cd /home/shanta/PycharmProjects/comserv2 &amp;&amp; docker compose build web-dev &amp;&amp; docker compose up -d --force-recreate web-dev
                         </div>
                         <div style="margin-left: 15px; margin-bottom: 5px; color: #ccc; font-size: 0.88em;">
-                            Test at <strong>http://workstation.local:3000</strong> — verify membership pages, login, etc.<br>
-                            ⚠ The running container uses the OLD image until restarted. Always test after restart, not after build alone.
+                            Test at <strong>http://workstation.local:3000</strong> — verify pages, login, etc.
                         </div>
-                        <div style="margin-left: 15px; margin-bottom: 4px; color: #ccc; font-size: 0.88em;">Once dev is confirmed working, rebuild prod image:</div>
+                        <div style="margin-left: 15px; margin-bottom: 4px; color: #ccc; font-size: 0.88em;">2. Once dev confirmed working, build prod image and push to Docker Hub:</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('cd /home/shanta/PycharmProjects/comserv2/Comserv && docker compose -f docker-compose.prod.yml build')" title="Click to copy">
                             cd /home/shanta/PycharmProjects/comserv2/Comserv &amp;&amp; docker compose -f docker-compose.prod.yml build
                         </div>
-                        <div style="margin-left: 15px; margin-bottom: 8px; color: #ffaa00; font-size: 11px;">
-                            ⚠ docker save reads from the IMAGE not the running container — no restart needed before saving/transferring.
+                        <div style="margin-left: 15px; margin-bottom: 4px; color: #ccc; font-size: 0.88em;">3. Login to Docker Hub (one time — token stored by Docker):</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker login')" title="Click to copy">
+                            docker login  # username: shantamcsbain — use access token not password
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 4px; color: #ccc; font-size: 0.88em;">4. Push to Docker Hub:</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('cd /home/shanta/PycharmProjects/comserv2/Comserv && docker compose -f docker-compose.prod.yml push')" title="Click to copy">
+                            cd /home/shanta/PycharmProjects/comserv2/Comserv &amp;&amp; docker compose -f docker-compose.prod.yml push
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 8px; color: #28a745; font-size: 11px;">
+                            ✅ After push, the production cron will detect the new digest within 10 minutes and auto-deploy.
+                            Email notification sent to csc@computersystemconsulting.ca on successful deployment.
                         </div>
 
-                        <div style="margin-bottom: 8px; color: #fff; font-weight: bold;">→ Step 1: On Production - Check Disk Space</div>
+                        <div style="margin: 14px 0 8px 0; padding: 8px; background-color: #1a1a3a; border: 1px solid #5588cc; border-radius: 4px; color: #aad4ff; font-size: 12px;">
+                            <strong>One-time setup on production server</strong> (only needed once per server):
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 4px; color: #ccc; font-size: 0.88em;">Copy deploy files to server (run from workstation):</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('ssh ubuntu@192.168.1.126 &quot;sudo mkdir -p /opt/comserv/Comserv&quot;')" title="Click to copy">
+                            ssh ubuntu@192.168.1.126 "sudo mkdir -p /opt/comserv/Comserv"
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('scp /home/shanta/PycharmProjects/comserv2/Comserv/script/docker-compose.server.yml ubuntu@192.168.1.126:/opt/comserv/Comserv/docker-compose.prod.yml')" title="Click to copy">
+                            scp Comserv/script/docker-compose.server.yml ubuntu@192.168.1.126:/opt/comserv/Comserv/docker-compose.prod.yml
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('scp /home/shanta/PycharmProjects/comserv2/Comserv/script/deploy.sh ubuntu@192.168.1.126:/opt/comserv/Comserv/deploy.sh')" title="Click to copy">
+                            scp Comserv/script/deploy.sh ubuntu@192.168.1.126:/opt/comserv/Comserv/deploy.sh
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 4px; color: #ccc; font-size: 0.88em;">On production server — make executable, install mail, add cron:</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('chmod +x /opt/comserv/Comserv/deploy.sh && sudo apt install -y mailutils')" title="Click to copy">
+                            chmod +x /opt/comserv/Comserv/deploy.sh &amp;&amp; sudo apt install -y mailutils
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('( crontab -l 2>/dev/null; echo &quot;*/10 * * * * /opt/comserv/Comserv/deploy.sh >> /var/log/comserv-deploy.log 2>&1&quot; ) | crontab -')" title="Click to copy">
+                            ( crontab -l 2>/dev/null; echo "*/10 * * * * /opt/comserv/Comserv/deploy.sh >> /var/log/comserv-deploy.log 2>&1" ) | crontab -
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 10px; color: #aad4ff; font-size: 11px;">
+                            Production server pulls from <strong>hub.docker.com/r/shantamcsbain/comserv-web-prod</strong>.
+                            No docker save/load needed. Log: <code>tail -f /var/log/comserv-deploy.log</code>
+                        </div>
+
+                        <div style="margin-bottom: 8px; color: #fff; font-weight: bold;">→ Production - Check Disk Space</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('df -h /')" title="Click to copy">
                             df -h /
                         </div>
@@ -348,89 +378,34 @@
                             sudo docker system df -v  # Verbose: shows container sizes
                         </div>
 
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 2: Cleanup Old Containers and Images</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker ps -a | grep comserv')" title="Click to copy">
-                            sudo docker ps -a | grep comserv  # List all comserv containers
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Production - Manual Trigger (force immediate deploy)</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('ssh ubuntu@192.168.1.126 &quot;/opt/comserv/Comserv/deploy.sh&quot;')" title="Click to copy">
+                            ssh ubuntu@192.168.1.126 "/opt/comserv/Comserv/deploy.sh"
                         </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rm comserv2-web-prod-old 2>/dev/null || echo &quot;No old container to remove&quot;')" title="Click to copy">
-                            sudo docker rm comserv2-web-prod-old 2>/dev/null || echo "No old container to remove"
-                        </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker volume rm comserv2_comserv-workshop 2>/dev/null || echo &quot;No stale volume to remove&quot;')" title="Click to copy">
-                            sudo docker volume rm comserv2_comserv-workshop 2>/dev/null || echo "No stale volume to remove"
-                        </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker image prune -f')" title="Click to copy">
-                            sudo docker image prune -f  # Remove dangling images only (safe)
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('ssh ubuntu@192.168.1.126 &quot;tail -50 /var/log/comserv-deploy.log&quot;')" title="Click to copy">
+                            ssh ubuntu@192.168.1.126 "tail -50 /var/log/comserv-deploy.log"  # view deploy log
                         </div>
                         <div style="margin-left: 15px; margin-bottom: 10px; color: #ffaa00; font-size: 11px;">
                             ⚠ Do NOT run docker system prune -v — it removes named volumes (logs/workshop data)
                         </div>
 
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 3: Verify Local Image Tag + Capture Image ID (Run from Workstation Terminal)</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker image inspect comserv-web-prod:latest --format &quot;{{.Id}}&quot;')" title="Click to copy">
-                            docker image inspect comserv-web-prod:latest --format "{{.Id}}"
-                        </div>
-                        <div style="margin-left: 15px; margin-bottom: 10px; color: #ffaa00; font-size: 11px;">
-                            ✅ Image is named <strong>comserv-web-prod:latest</strong> (built from Comserv/docker-compose.prod.yml). Keep ID to verify on production after load.
-                        </div>
-
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 4: Transfer Image via SSH Pipe (Run from Workstation Terminal)</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker save comserv-web-prod | ssh ubuntu@192.168.1.126 &quot;docker load&quot;')" title="Click to copy">
-                            docker save comserv-web-prod | ssh ubuntu@192.168.1.126 "docker load"
-                        </div>
-                        <div style="margin-left: 15px; margin-bottom: 10px; color: #ffaa00; font-size: 11px;">
-                            ⚠ Run from WORKSTATION terminal — not on production server. No sudo needed for docker load.
-                        </div>
-
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 5: On Production - Verify New Image Loaded</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker image inspect comserv-web-prod:latest --format &quot;{{.Id}}&quot;')" title="Click to copy">
-                            sudo docker image inspect comserv-web-prod:latest --format "{{.Id}}"
-                        </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; color: #ffaa00; font-size: 11px;">
-                            ⚠ Image is now named <strong>comserv-web-prod:latest</strong> (built from Comserv/ dir). Container stays named comserv2-web-prod.
-                        </div>
-
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 6: Backup — Commit Running Container as backup-prev</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker images comserv-web-prod --format &quot;{{.Tag}}&quot; | grep &quot;^backup-&quot; | xargs -I{} sudo docker rmi comserv-web-prod:{} 2>/dev/null || true')" title="Click to copy">
-                            sudo docker images comserv-web-prod --format "{{.Tag}}" | grep "^backup-" | xargs -I{} sudo docker rmi comserv-web-prod:{} 2>/dev/null || true
-                        </div>
-                        <div style="margin-left: 15px; margin-bottom: 3px; color: #ccc; font-size: 0.85em;">Commit current running container as single rollback backup:</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker commit comserv2-web-prod comserv-web-prod:backup-prev')" title="Click to copy">
-                            sudo docker commit comserv2-web-prod comserv-web-prod:backup-prev
-                        </div>
-
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 7: Stop and Remove Old Container</div>
-                        <div style="margin-left: 15px; margin-bottom: 3px; color: #ccc; font-size: 0.85em;">
-                            Do NOT rename — just stop and remove. The new container reuses the same name.
-                        </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker stop comserv2-web-prod && sudo docker rm comserv2-web-prod')" title="Click to copy">
-                            sudo docker stop comserv2-web-prod &amp;&amp; sudo docker rm comserv2-web-prod
-                        </div>
-
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 8: Start New Container (same name, new image)</div>
-                        <div style="margin-left: 15px; margin-bottom: 3px; color: #ccc; font-size: 0.85em;">
-                            Container name stays <code>comserv2-web-prod</code>. Image is now <code>comserv-web-prod:latest</code>.
-                        </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 --log-opt max-size=50m --log-opt max-file=5 -e WORKSHOP_RESOURCES_PATH=/data/nfs -e COMSERV_SESSION_DIR=/tmp/comserv/session -e COMSERV_SESSION_COOKIE=comserv_session -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v /home/ubuntu/comserv-logs:/opt/comserv/root/log -v /home/ubuntu/comserv-workshop:/data/nfs comserv-web-prod:latest')" title="Click to copy">
-                            sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 --log-opt max-size=50m --log-opt max-file=5 -e WORKSHOP_RESOURCES_PATH=/data/nfs -e COMSERV_SESSION_DIR=/tmp/comserv/session -e COMSERV_SESSION_COOKIE=comserv_session -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v /home/ubuntu/comserv-logs:/opt/comserv/root/log -v /home/ubuntu/comserv-workshop:/data/nfs comserv-web-prod:latest
-                        </div>
-
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 9: Verify Container is Healthy</div>
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Production - Verify Container Status</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker ps')" title="Click to copy">
                             sudo docker ps
                         </div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker inspect --format=&quot;{{.State.Health.Status}}&quot; comserv2-web-prod')" title="Click to copy">
                             sudo docker inspect --format="{{.State.Health.Status}}" comserv2-web-prod
                         </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('curl -s -o /dev/null -w &quot;%{http_code}&quot; http://localhost:3000/')" title="Click to copy">
-                            curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker images | grep shantamcsbain')" title="Click to copy">
+                            sudo docker images | grep shantamcsbain
                         </div>
 
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 10: Cleanup Dangling Images</div>
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Production - Cleanup Old Images</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker image prune -f')" title="Click to copy">
-                            sudo docker image prune -f
+                            sudo docker image prune -f  # Remove dangling images only (safe)
                         </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker images | grep comserv')" title="Click to copy">
-                            sudo docker images | grep comserv
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rm $(sudo docker ps -a -q -f status=exited) 2>/dev/null || echo &quot;No stopped containers&quot;')" title="Click to copy">
+                            sudo docker rm $(sudo docker ps -a -q -f status=exited) 2>/dev/null || echo "No stopped containers"
                         </div>
 
                         <div style="margin: 12px 0 8px 0; color: #ff5555; font-weight: bold;">→ ROLLBACK (If New Container Fails):</div>
@@ -548,6 +523,10 @@
                 </h3>
             </div>
             <div id="output-console-section" class="card-body collapsible-content" style="padding: 20px;">
+                <div id="last-deploy-banner" style="display:none; margin-bottom: 10px; padding: 8px 12px; background-color: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 4px; font-size: 12px; font-family: monospace;">
+                    <strong>Last deploy log:</strong> <span id="last-deploy-file" style="color:#333;"></span>
+                    <button onclick="loadHistoryIntoOutput()" style="margin-left: 12px; padding: 2px 8px; font-size: 11px; background-color:#0066cc; color:white; border:none; border-radius:3px; cursor:pointer;">Show in Output</button>
+                </div>
                 <div id="output-box" style="background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; padding: 15px; 
                     font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;">
                     Ready for commands...
@@ -664,6 +643,46 @@
             'unknown': '?'
         };
         return stateIcons[state.toLowerCase()] || '?';
+    }
+
+    let _lastDeployContent = '';
+
+    function loadDeployHistory() {
+        fetch('/admin/docker-deploy-history', { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.latest_file) {
+                    _lastDeployContent = data.latest_content || '';
+                    const fname = data.latest_file.split('/').pop();
+                    document.getElementById('last-deploy-file').textContent = fname;
+                    document.getElementById('last-deploy-banner').style.display = 'block';
+                }
+            })
+            .catch(() => {});
+    }
+
+    function loadHistoryIntoOutput() {
+        if (_lastDeployContent) {
+            outputBox.textContent = '=== Last Deploy Log ===\n' + _lastDeployContent;
+            outputBox.scrollTop = outputBox.scrollHeight;
+        }
+    }
+
+    function loadSavedCredentials() {
+        fetch('/admin/docker-load-credentials', { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.ssh_password) {
+                    document.getElementById('ssh-password').value = data.ssh_password;
+                    document.getElementById('production-host').value = data.ssh_target || 'ubuntu@192.168.1.126';
+                    document.getElementById('ssh-port').value = data.ssh_port || 22;
+                    if (document.getElementById('ssh-terminal-target'))
+                        document.getElementById('ssh-terminal-target').value = data.ssh_target || 'ubuntu@192.168.1.126';
+                    if (document.getElementById('ssh-terminal-password'))
+                        document.getElementById('ssh-terminal-password').value = data.ssh_password;
+                }
+            })
+            .catch(() => {});
     }
 
     function refreshContainers() {
@@ -1598,95 +1617,57 @@
     }
 
     function deployToProduction() {
-        const sshTarget = document.getElementById('production-host').value.trim();
-        const sshPort = document.getElementById('ssh-port').value;
+        const sshTarget   = document.getElementById('production-host').value.trim() || 'ubuntu@192.168.1.126';
         const sshPassword = document.getElementById('ssh-password').value;
-        const productionDir = document.getElementById('production-directory').value.trim();
-        const service = document.getElementById('deploy-service-select').value;
-        const recreateVolumes = document.getElementById('recreate-volumes').checked;
 
-        if (!sshTarget) {
-            alert('Please enter SSH target (user@host)');
-            return;
-        }
+        const confirmMsg =
+            `⚠️ AUTO DEPLOY TO PRODUCTION\n\n` +
+            `This will run automatically:\n` +
+            `  1. Build production image  (docker compose -f docker-compose.prod.yml build)\n` +
+            `  2. Push to Docker Hub       (shantamcsbain/comserv-web-prod:latest)\n` +
+            `  3. SSH trigger deploy.sh    (${sshTarget})\n\n` +
+            `The production server will pull the new image and restart the container.\n` +
+            `Email notification sent to csc@computersystemconsulting.ca on completion.\n\n` +
+            `Continue?`;
 
-        if (!sshPassword) {
-            alert('Please enter SSH password for deployment');
-            return;
-        }
-
-        if (!productionDir) {
-            alert('Please enter production directory path');
-            return;
-        }
-
-        let confirmMsg = `⚠️ PRODUCTION DEPLOYMENT\n\n` +
-                          `Service: ${service}\n` +
-                          `Target: ${sshTarget}:${sshPort}\n` +
-                          `Directory: ${productionDir}\n\n`;
-        
-        if (recreateVolumes) {
-            confirmMsg += `❗ ALERT: RECREATE VOLUMES IS ENABLED\n` +
-                          `This will remove and recreate your NFS volumes on the production server.\n\n`;
-        }
-
-        confirmMsg += `This will:\n` +
-                      `1. Export Docker image\n` +
-                      `2. Copy to production server via SSH\n` +
-                      `3. Backup existing container\n` +
-                      `4. Stop production container\n` +
-                      `5. Load and start new container\n` +
-                      `6. Rollback automatically if health check fails\n\n` +
-                      `Continue?`;
-
-        if (!confirm(confirmMsg)) {
-            return;
-        }
+        if (!confirm(confirmMsg)) return;
 
         appendOutput(`\n${'='.repeat(80)}\n`);
-        appendOutput(`🚀 PRODUCTION DEPLOYMENT STARTED\n`);
+        appendOutput(`🚀 AUTO DEPLOY STARTED — Docker Hub workflow\n`);
         appendOutput(`${'='.repeat(80)}\n`);
-        appendOutput(`Service: ${service}\n`);
-        appendOutput(`Target: ${sshTarget}:${sshPort}\n`);
+        appendOutput(`Target: ${sshTarget}\n`);
         appendOutput(`Time: ${new Date().toLocaleString()}\n`);
-        if (recreateVolumes) {
-            appendOutput(`⚠️ MODE: RECREATE VOLUMES ENABLED\n`);
-        }
+        appendOutput(`Steps: Build → Push to Docker Hub → SSH trigger deploy.sh\n`);
         appendOutput(`${'='.repeat(80)}\n\n`);
-
-        const formData = new FormData();
-        formData.append('ssh_target', sshTarget);
-        formData.append('ssh_port', sshPort);
-        formData.append('ssh_password', sshPassword);
-        formData.append('production_directory', productionDir);
-        formData.append('service', service);
-        if (recreateVolumes) {
-            formData.append('recreate_volumes', '1');
-        }
+        appendOutput(`⏳ Building... this may take several minutes. Output will stream below.\n\n`);
 
         safeFetch('/admin/docker-deploy-to-production', {
             method: 'POST',
-            body: new URLSearchParams(formData)
+            body: new URLSearchParams({ ssh_target: sshTarget, ssh_password: sshPassword })
         })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    appendOutput(`🚀 Deployment started in background...\n`);
+                    appendOutput(`✅ Background process started\n`);
+                    if (data.image) appendOutput(`   Image : ${data.image}\n`);
+                    if (data.log_file) {
+                        appendOutput(`   Log   : ${data.log_file}\n`);
+                        const fname = data.log_file.split('/').pop();
+                        document.getElementById('last-deploy-file').textContent = fname + ' (in progress)';
+                        document.getElementById('last-deploy-banner').style.display = 'block';
+                    }
+                    appendOutput(`\nStreaming output...\n\n`);
                     startPollingDeploymentStatus();
                 } else {
                     appendOutput(`\n${'='.repeat(80)}\n`);
-                    appendOutput(`❌ DEPLOYMENT FAILED TO START\n`);
+                    appendOutput(`❌ FAILED TO START\n`);
                     appendOutput(`${'='.repeat(80)}\n`);
-                    appendOutput(data.error || 'Unknown error');
-                    appendOutput(`\n${'='.repeat(80)}\n`);
+                    appendOutput((data.error || 'Unknown error') + '\n');
+                    appendOutput(`${'='.repeat(80)}\n`);
                 }
             })
             .catch(error => {
-                appendOutput(`\n${'='.repeat(80)}\n`);
-                appendOutput(`❌ DEPLOYMENT ERROR\n`);
-                appendOutput(`${'='.repeat(80)}\n`);
-                appendOutput(`Error: ${error.message}\n`);
-                appendOutput(`${'='.repeat(80)}\n`);
+                appendOutput(`\n❌ REQUEST ERROR: ${error.message}\n`);
             });
     }
 
@@ -1719,6 +1700,12 @@
                             appendOutput(`\n${'='.repeat(80)}\n`);
                             appendOutput(`✅ DEPLOYMENT FINISHED\n`);
                             appendOutput(`${'='.repeat(80)}\n`);
+                            if (data.log_file) {
+                                const fname = data.log_file.split('/').pop();
+                                _lastDeployContent = data.output || '';
+                                document.getElementById('last-deploy-file').textContent = fname;
+                                document.getElementById('last-deploy-banner').style.display = 'block';
+                            }
                             setTimeout(refreshContainers, 2000);
                         }
                     }
@@ -1800,6 +1787,8 @@
     document.addEventListener('DOMContentLoaded', function() {
         refreshContainers();
         refreshVolumes();
+        loadSavedCredentials();
+        loadDeployHistory();
 
         // Auto-check SSH terminal service status
         checkSSHTerminalService();
