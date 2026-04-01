@@ -45,8 +45,9 @@
         border: 1px solid var(--border-color, #ddd);
         border-radius: 4px;
         background-color: var(--background-color, white);
-        overflow: hidden;
+        overflow: visible; /* Must be visible so position:fixed popups are not clipped */
         min-width: 0; /* Allow columns to shrink */
+        position: relative;
     }
     
     .week-day-header {
