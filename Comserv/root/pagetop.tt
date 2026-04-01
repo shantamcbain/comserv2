@@ -159,7 +159,7 @@ header h1 {
         Domain: <strong>[% c.req.uri.host %]</strong> | 
         Client IP: <strong>[% c.req.address %]</strong> | 
         Server: <strong>[% system_identifier || app_workflow %]</strong> | Branch: [% app_workflow %] ([% c.forward('/get_server_ip') %]) |
-        [% IF app_version %]Build: <strong title="Branch: [% app_version.branch %] | Host: [% app_version.build_host %]">[% app_version.commit %]</strong> <span style="color:#888;font-size:0.9em;">([% app_version.build_date | replace('T',' ') | replace('Z',' UTC') %])</span> | [% END %]
+        [% IF app_version %]Build: <strong title="Commit: [% app_version.commit %] | Branch: [% app_version.branch %] | Host: [% app_version.build_host %]" style="cursor:help;">[% app_version.build_date | replace('T',' ') | replace(':\d\dZ','') %] UTC</strong> | [% END %]
         Databases: [% IF db_connections && db_connections.size > 0 %][% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% ELSE %]<em>none configured</em>[% END %] |
         DB Env: <span class="db-env-indicator db-env-[% active_db_environment || 'production' %]">[% SET env = active_db_environment || 'production' %][% env.upper %]</span>
         [% IF c.session.debug_mode == 1 %] | [% END %] |
