@@ -1847,7 +1847,7 @@ sub chat :Local :Args(0) {
             }
 
             # Use a longer timeout for cold starts (model not in memory)
-            my $chat_running = eval { $fast_check->get_running_models() } || [];
+            my $chat_running = eval { $avail_check->get_running_models() } || [];
             my $chat_cold = !grep { ($_ && ref $_ ? $_->{name} : $_) eq $chat_use_model } @$chat_running;
             my $chat_timeout = $chat_cold ? 600 : 300;
             push @chat_trace, $chat_cold
