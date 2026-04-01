@@ -2,6 +2,7 @@ package Comserv::Controller::Admin::HardwareMonitor;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
 use JSON ();
 use Scalar::Util qw(looks_like_number);
 
@@ -303,8 +304,8 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
 
     $c->stash(template => 'admin/HardwareMonitor/disk_diagnose.tt');
 
-    my $role = $c->session->{role} // '';
-    unless ($role eq 'admin' || $role eq 'superadmin') {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->get_admin_type($c) ne 'none') {
         $c->response->redirect($c->uri_for('/'));
         return;
     }
@@ -545,7 +546,8 @@ sub drive_detail :Path('/admin/hardware_monitor/drive_detail') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'drive_detail',
         "Drive detail requested: host=$host mount=$mount");
 
-    unless ($c->session->{roles} && grep { $_ eq 'admin' } @{ $c->session->{roles} || [] }) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->get_admin_type($c) ne 'none') {
         $c->flash->{error_msg} = 'Access denied.';
         $c->response->redirect($c->uri_for('/'));
         return;
