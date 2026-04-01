@@ -353,6 +353,29 @@ sub bee_pasture_view :Path('/ENCY/BeePastureView') :Args(0) {
     );
 }
 
+sub legacy : Path('/ENCY/legacy') : Args(1) {
+    my ($self, $c, $filename) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'legacy',
+        "Legacy page request: $filename");
+
+    $filename =~ s|[^A-Za-z0-9._-]||g;
+
+    my %migrations = (
+    );
+
+    if (my $new_url = $migrations{lc($filename)}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'legacy',
+            "Redirecting migrated page $filename -> $new_url");
+        $c->response->redirect($c->uri_for($new_url), 301);
+        return;
+    }
+
+    $c->response->redirect(
+        $c->uri_for('/LegacyStaticPages/ency/' . $filename)
+    );
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
