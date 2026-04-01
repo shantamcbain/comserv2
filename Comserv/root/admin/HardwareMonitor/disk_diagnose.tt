@@ -1,0 +1,147 @@
+[%
+   title        = "Disk Diagnose — " _ hostname _ " " _ path
+   description  = "Find and remedy disk space usage"
+   roles        = "admin"
+   TemplateType = "Application"
+   category     = "Admin"
+%]
+<style>
+.dd-crumb   { font-size:.9em; color:#555; margin-bottom:10px; }
+.dd-crumb a { color:#2196f3; text-decoration:none; }
+.dd-crumb a:hover { text-decoration:underline; }
+.dd-table   { width:100%; border-collapse:collapse; font-size:.9em; }
+.dd-table th { background:#f0f0f0; text-align:left; padding:6px 10px; border-bottom:2px solid #ccc; white-space:nowrap; }
+.dd-table td { padding:5px 10px; border-bottom:1px solid #eee; vertical-align:middle; }
+.dd-table tr:hover { background:#fafafa; }
+.dd-bar-wrap { width:120px; background:#e8e8e8; border-radius:3px; height:10px; display:inline-block; vertical-align:middle; }
+.dd-bar      { height:10px; border-radius:3px; background:#2196f3; }
+.dd-bar.warn { background:#ff9800; }
+.dd-bar.crit { background:#f44336; }
+.dd-actions  { display:flex; gap:6px; flex-wrap:wrap; }
+.dd-btn      { font-size:.78em; padding:2px 8px; border:1px solid #ccc; border-radius:3px; cursor:pointer; background:#fff; white-space:nowrap; }
+.dd-btn-del  { border-color:#f44336; color:#f44336; }
+.dd-btn-del:hover { background:#f44336; color:#fff; }
+.dd-btn-nfs  { border-color:#4caf50; color:#4caf50; }
+.dd-btn-nfs:hover { background:#4caf50; color:#fff; }
+.dd-btn-zip  { border-color:#9c27b0; color:#9c27b0; }
+.dd-btn-zip:hover { background:#9c27b0; color:#fff; }
+.dd-confirm  { display:none; background:#fff8e1; border:1px solid #ffe082; border-radius:4px; padding:8px 12px; margin-top:6px; font-size:.85em; }
+.dd-result   { padding:10px 14px; border-radius:4px; margin-bottom:12px; font-size:.9em; }
+.dd-ok       { background:#d4edda; border:1px solid #c3e6cb; color:#155724; }
+.dd-err      { background:#f8d7da; border:1px solid #f5c6cb; color:#721c24; }
+.dd-ssh-hint { font-family:monospace; background:#222; color:#eee; padding:8px; border-radius:4px; font-size:.85em; margin-top:6px; overflow-x:auto; }
+</style>
+
+<div style="margin-bottom:10px;">
+  <a href="/admin/hardware_monitor">&larr; Hardware Monitor</a>
+</div>
+
+<h2>&#128202; Disk Diagnose: <code>[% hostname | html %]</code></h2>
+
+[%# Breadcrumb %]
+<div class="dd-crumb">
+  <a href="/admin/hardware_monitor/disk_diagnose?hostname=[% hostname | uri %]&amp;path=/">/</a>
+  [% FOR crumb IN crumb_parts %]
+  / <a href="/admin/hardware_monitor/disk_diagnose?hostname=[% hostname | uri %]&amp;path=[% crumb.path | uri %]">[% crumb.label | html %]</a>
+  [% END %]
+</div>
+
+[% IF action_result %]
+<div class="dd-result [% action_result.match('^(Deleted|Moved|Compressed)') ? 'dd-ok' : 'dd-err' %]">
+  [% action_result | html %]
+</div>
+[% END %]
+
+[% IF error %]
+<div class="dd-result dd-err">
+  <strong>Error:</strong> [% error | html %]
+  [% IF ssh_hint %]
+  <p style="margin:6px 0 2px;">You can run this manually:</p>
+  <div class="dd-ssh-hint">[% ssh_hint | html %]</div>
+  [% END %]
+</div>
+[% ELSIF entries.size == 0 %]
+<p style="color:#888;">Directory is empty or not accessible.</p>
+[% ELSE %]
+
+[%# Compute max bytes for relative bars %]
+[% max_bytes = entries.0.bytes || 1 %]
+
+<table class="dd-table" id="dd-tbl">
+<thead>
+  <tr>
+    <th>Name</th>
+    <th style="text-align:right;">Size</th>
+    <th style="min-width:130px;"></th>
+    <th>Actions</th>
+  </tr>
+</thead>
+<tbody>
+[% FOR e IN entries %]
+[%  pct = max_bytes > 0 ? (e.bytes / max_bytes * 100).int : 0 %]
+[%  bar_class = pct > 90 ? 'crit' : pct > 60 ? 'warn' : '' %]
+<tr id="row-[% loop.index %]">
+  <td>
+    [% IF e.is_dir %]
+    &#128193; <a href="/admin/hardware_monitor/disk_diagnose?hostname=[% hostname | uri %]&amp;path=[% e.path | uri %]">[% e.name | html %]</a>
+    [% ELSE %]
+    &#128196; [% e.name | html %]
+    [% END %]
+    <div style="font-size:.75em;color:#aaa;">[% e.path | html %]</div>
+  </td>
+  <td style="text-align:right;font-weight:bold;white-space:nowrap;">[% e.size | html %]</td>
+  <td>
+    <div class="dd-bar-wrap">
+      <div class="dd-bar [% bar_class %]" style="width:[% pct %]%;"></div>
+    </div>
+  </td>
+  <td>
+    <div class="dd-actions">
+      [% IF e.path != '/' %]
+      <button type="button" class="dd-btn dd-btn-del" onclick="showConfirm([% loop.index %],'delete','[% e.path | html %]')">&#128465; Delete</button>
+      <button type="button" class="dd-btn dd-btn-nfs" onclick="showConfirm([% loop.index %],'move_to_nfs','[% e.path | html %]')">&#128190; Move to NFS</button>
+      [% IF e.is_dir %]
+      <button type="button" class="dd-btn dd-btn-zip" onclick="showConfirm([% loop.index %],'compress','[% e.path | html %]')">&#128230; Compress</button>
+      [% END %]
+      [% END %]
+    </div>
+    <div class="dd-confirm" id="confirm-[% loop.index %]">
+      <form method="post" action="/admin/hardware_monitor/disk_diagnose">
+        <input type="hidden" name="hostname" value="[% hostname | html %]">
+        <input type="hidden" name="path"     value="[% path | html %]">
+        <input type="hidden" name="target"   value="[% e.path | html %]">
+        <input type="hidden" name="action"   id="act-[% loop.index %]" value="">
+        <strong id="confirm-label-[% loop.index %]"></strong>
+        <code style="font-size:.85em;">[% e.path | html %]</code>
+        &nbsp;<button type="submit" class="dd-btn" style="background:#333;color:#fff;border-color:#333;">Confirm</button>
+        <button type="button" class="dd-btn" onclick="hideConfirm([% loop.index %])">Cancel</button>
+      </form>
+    </div>
+  </td>
+</tr>
+[% END %]
+</tbody>
+</table>
+
+[% END %]
+
+[% IF !is_local %]
+<p style="margin-top:16px;font-size:.85em;color:#888;">
+  &#128274; Remote host — actions require SSH key access for user
+  <code>[% ENV.HW_SSH_USER || 'root' %]</code> to <code>[% hostname | html %]</code>.
+  Set <code>HW_SSH_USER</code> in the app environment to change the SSH user.
+</p>
+[% END %]
+
+<script>
+function showConfirm(idx, action, path) {
+    document.getElementById('act-' + idx).value = action;
+    var labels = { delete: '&#128465; Confirm delete:', move_to_nfs: '&#128190; Move to NFS:', compress: '&#128230; Compress:' };
+    document.getElementById('confirm-label-' + idx).innerHTML = (labels[action] || action) + ' ';
+    var el = document.getElementById('confirm-' + idx);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+function hideConfirm(idx) {
+    document.getElementById('confirm-' + idx).style.display = 'none';
+}
+</script>
