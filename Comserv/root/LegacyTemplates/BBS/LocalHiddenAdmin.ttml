@@ -1,3 +1,0 @@
-[% FOR field = ['forum','parent_id','thread_id'] %]
-        <INPUT TYPE=hidden NAME="[% field %]" VALUE="[% data.cgi_object.param(field) %]">
-[% END %]
