@@ -523,6 +523,10 @@
                 </h3>
             </div>
             <div id="output-console-section" class="card-body collapsible-content" style="padding: 20px;">
+                <div id="last-deploy-banner" style="display:none; margin-bottom: 10px; padding: 8px 12px; background-color: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 4px; font-size: 12px; font-family: monospace;">
+                    <strong>Last deploy log:</strong> <span id="last-deploy-file" style="color:#333;"></span>
+                    <button onclick="loadHistoryIntoOutput()" style="margin-left: 12px; padding: 2px 8px; font-size: 11px; background-color:#0066cc; color:white; border:none; border-radius:3px; cursor:pointer;">Show in Output</button>
+                </div>
                 <div id="output-box" style="background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; padding: 15px; 
                     font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;">
                     Ready for commands...
@@ -639,6 +643,29 @@
             'unknown': '?'
         };
         return stateIcons[state.toLowerCase()] || '?';
+    }
+
+    let _lastDeployContent = '';
+
+    function loadDeployHistory() {
+        fetch('/admin/docker-deploy-history', { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.latest_file) {
+                    _lastDeployContent = data.latest_content || '';
+                    const fname = data.latest_file.split('/').pop();
+                    document.getElementById('last-deploy-file').textContent = fname;
+                    document.getElementById('last-deploy-banner').style.display = 'block';
+                }
+            })
+            .catch(() => {});
+    }
+
+    function loadHistoryIntoOutput() {
+        if (_lastDeployContent) {
+            outputBox.textContent = '=== Last Deploy Log ===\n' + _lastDeployContent;
+            outputBox.scrollTop = outputBox.scrollHeight;
+        }
     }
 
     function loadSavedCredentials() {
@@ -1621,7 +1648,15 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    appendOutput(`✅ Background process started — streaming output...\n\n`);
+                    appendOutput(`✅ Background process started\n`);
+                    if (data.image) appendOutput(`   Image : ${data.image}\n`);
+                    if (data.log_file) {
+                        appendOutput(`   Log   : ${data.log_file}\n`);
+                        const fname = data.log_file.split('/').pop();
+                        document.getElementById('last-deploy-file').textContent = fname + ' (in progress)';
+                        document.getElementById('last-deploy-banner').style.display = 'block';
+                    }
+                    appendOutput(`\nStreaming output...\n\n`);
                     startPollingDeploymentStatus();
                 } else {
                     appendOutput(`\n${'='.repeat(80)}\n`);
@@ -1665,6 +1700,12 @@
                             appendOutput(`\n${'='.repeat(80)}\n`);
                             appendOutput(`✅ DEPLOYMENT FINISHED\n`);
                             appendOutput(`${'='.repeat(80)}\n`);
+                            if (data.log_file) {
+                                const fname = data.log_file.split('/').pop();
+                                _lastDeployContent = data.output || '';
+                                document.getElementById('last-deploy-file').textContent = fname;
+                                document.getElementById('last-deploy-banner').style.display = 'block';
+                            }
                             setTimeout(refreshContainers, 2000);
                         }
                     }
@@ -1747,6 +1788,7 @@
         refreshContainers();
         refreshVolumes();
         loadSavedCredentials();
+        loadDeployHistory();
 
         // Auto-check SSH terminal service status
         checkSSHTerminalService();
