@@ -104,6 +104,19 @@
     <a href="/todo/addtodo" style="margin-left: auto;">Add New Todo</a>
 </div>
 
+[%# ── Project id→name lookup ── %]
+[% SET proj_name = {} %]
+[% IF projects && projects.size > 0 %]
+    [% FOREACH _p IN projects %]
+        [% proj_name.${_p.id} = _p.name %]
+        [% IF _p.sub_projects && _p.sub_projects.size > 0 %]
+            [% FOREACH _sp IN _p.sub_projects %]
+                [% proj_name.${_sp.id} = _sp.name %]
+            [% END %]
+        [% END %]
+    [% END %]
+[% END %]
+
 [%# ── Priority label map ── %]
 [% SET pri_label = {
     '1'  => 'Critical',
@@ -236,7 +249,7 @@
 
         [%# Compact meta %]
         [% IF task.project_id %]
-        <span class="todo-meta">📁 [% task.project_id %]</span>
+        <span class="todo-meta">📁 [% proj_name.${task.project_id} || task.project_id %]</span>
         [% END %]
         [% IF task.due_date %]
         <span class="todo-meta" [% IF is_overdue && st_cls != 'status-done' %]style="color:#dc3545;font-weight:bold"[% END %]>📅 [% task.due_date %]</span>
