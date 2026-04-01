@@ -35,7 +35,6 @@
         [% IF allocated_dirs && allocated_dirs.size > 0 %]
         <form method="post" action="[% c.uri_for('/file/upload_file') %]"
               enctype="multipart/form-data" class="app-form">
-          <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
 
           <div class="form-section">
             <div class="form-row">
@@ -71,7 +70,6 @@
         <p style="margin-bottom:12px">No NFS directory allocations exist yet. As CSC admin you can upload directly to a server path:</p>
         <form method="post" action="[% c.uri_for('/file/upload_file') %]"
               enctype="multipart/form-data" class="app-form">
-          <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
           <div class="form-section">
             <div class="form-row">
               <div class="form-field">

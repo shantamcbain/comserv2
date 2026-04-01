@@ -1,0 +1,21 @@
+[Unit]
+Description=Comserv Workstation Development Server (port 3001)
+After=network-online.target mysqld.service mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=shanta
+WorkingDirectory=/home/shanta/PycharmProjects/comserv2/Comserv
+Environment=CATALYST_DEBUG=1
+Environment=COMSERV_LOG_DIR=/home/shanta/PycharmProjects/comserv2/Comserv/logs
+ExecStart=/home/shanta/perl5/perlbrew/perls/perl-5.40.0/bin/perl script/comserv_server.pl -p3001
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/home/shanta/PycharmProjects/comserv2/Comserv/logs/workstation-stdout.log
+StandardError=append:/home/shanta/PycharmProjects/comserv2/Comserv/logs/workstation-stderr.log
+TimeoutStartSec=120
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

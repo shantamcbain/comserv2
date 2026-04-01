@@ -3,7 +3,7 @@
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
  [% END %]
-[% INCLUDE 'ENCY/ImageHelper.tt' %]
+[% PROCESS 'ENCY/ImageHelper.tt' %]
 
 
 [% IF error_message %]
@@ -13,7 +13,6 @@
 
 
 <form method="POST" action="/ENCY/add_herb">
-    <input type="hidden" name="csrf_token" value="[% c.session.csrf_token %]" />
     <label for="botanical_name">Botanical Name:</label><br>
     <input type="text" id="botanical_name" name="botanical_name" required><br>
 

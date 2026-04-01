@@ -1,0 +1,132 @@
+[% META
+   title = "Log Benefactor Contribution"
+   description = "Record a benefactor expense payment or labour contribution"
+   roles = "admin,site_admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-03-18"
+%]
+[% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Log Benefactor Contribution</h1>
+    <p>Record money paid by the benefactor or labour hours donated to the platform.
+       Credits are issued to the benefactor's internal coin account (1 coin = 1 CAD).</p>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <a href="[% c.uri_for('/membership/admin/cost_tracking') %]" class="btn btn-secondary">← Back to Cost Tracking</a>
+      </div>
+
+      <div class="content-section">
+        <h2>New Contribution</h2>
+        <form method="post" action="[% c.uri_for('/membership/admin/benefactor_contribution') %]">
+
+          <div class="form-row">
+            <div class="form-field">
+              <label for="user_id">Benefactor *</label>
+              <select id="user_id" name="user_id" required>
+                <option value="">-- Select User --</option>
+                [% FOREACH u IN users %]
+                <option value="[% u.id %]">[% u.username | html %] — [% u.first_name | html %] [% u.last_name | html %]</option>
+                [% END %]
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="contribution_type">Type *</label>
+              <select id="contribution_type" name="contribution_type" required
+                      onchange="toggleFields(this.value)">
+                <option value="">-- Select --</option>
+                <optgroup label="Expense Paid">
+                  <option value="expense_paid">Expense Paid (domains, ISP, hardware, etc.)</option>
+                </optgroup>
+                <optgroup label="Labour Donated">
+                  <option value="labor_programming">Programming / Development</option>
+                  <option value="labor_sysadmin">System Administration</option>
+                  <option value="labor_design">Design / UX</option>
+                  <option value="labor_support">Customer Support</option>
+                </optgroup>
+                <optgroup label="Assets">
+                  <option value="hardware_donated">Hardware Donated</option>
+                </optgroup>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="contribution_date">Date *</label>
+              <input type="date" id="contribution_date" name="contribution_date" required
+                     value="[% USE date; date.format(date.now, '%Y-%m-%d') %]">
+            </div>
+          </div>
+
+          <div id="expense-fields" class="form-row">
+            <div class="form-field">
+              <label for="amount_cad">Amount Paid (CAD)</label>
+              <input type="number" id="amount_cad" name="amount_cad" step="0.01" min="0" value="0">
+              <small>Enter for direct expense payments. Leave 0 for pure labour.</small>
+            </div>
+          </div>
+
+          <div id="labour-fields" class="form-row" style="display:none;">
+            <div class="form-field">
+              <label for="hours">Hours Worked</label>
+              <input type="number" id="hours" name="hours" step="0.25" min="0" value="0">
+            </div>
+            <div class="form-field">
+              <label for="hourly_rate_cad">Hourly Rate (CAD)</label>
+              <input type="number" id="hourly_rate_cad" name="hourly_rate_cad" step="0.01" min="0" value="75">
+              <small>Industry rate: programmer $75–125/hr, sysadmin $65–100/hr</small>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="description">Description *</label>
+            <textarea id="description" name="description" rows="3" required
+              placeholder="e.g. Paid Enom renewal for 6 .com domains ($299.70 CAD) — or — Programming session: membership controller refactor"></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-field">
+              <label for="cost_tracking_id">Link to Cost Entry (optional)</label>
+              <input type="number" id="cost_tracking_id" name="cost_tracking_id" min="1"
+                     placeholder="Cost entry ID">
+              <small>Links this contribution to an existing system cost entry.</small>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Record Contribution &amp; Credit Coins</button>
+            <a href="[% c.uri_for('/membership/admin/cost_tracking') %]" class="btn btn-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+
+      <div class="content-section">
+        <h3>About Coin Credits</h3>
+        <ul style="font-size:0.9em;line-height:1.9;">
+          <li>1 CSC coin = 1 CAD in value</li>
+          <li>Labour hours are valued at the hourly rate you enter</li>
+          <li>Credits are permanent and visible in the benefactor's account</li>
+          <li>Coins can be used to pay for membership, workshops, hosting, or services</li>
+          <li>The total contribution history is shown on the Cost Tracking page</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleFields(type) {
+    var labour = ['labor_programming','labor_sysadmin','labor_design','labor_support'];
+    var isLabour = labour.indexOf(type) !== -1;
+    document.getElementById('labour-fields').style.display = isLabour ? 'flex' : 'none';
+}
+</script>

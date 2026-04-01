@@ -52,12 +52,17 @@ sub check_admin_access {
     my $has_valid_session = 0;
     if ($username && $username ne 'unknown') {
         $has_valid_session = 1;
-    } elsif ($roles && ((ref($roles) eq 'ARRAY' && @$roles > 0) || ($roles ne '' && $roles ne 'none'))) {
-        # If we have roles but no username, try to get username from user object or use user_id
-        $username = ($c->user ? $c->user->username : undef) || "user_id_$user_id" || 'session_user';
+    } elsif (ref($roles) eq 'ARRAY' && @$roles > 0) {
+        # If we have actual roles but no username, try to get username from user object
+        $username = ($c->user ? $c->user->username : undef) || "user_id_$user_id";
+        if ($username && $username ne 'user_id_none') {
+            $has_valid_session = 1;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_admin_access',
+                "Using fallback username '$username' for $action_name (roles exist but username missing)");
+        }
+    } elsif (!ref($roles) && $roles && $roles ne 'none') {
+        # String roles (legacy format)
         $has_valid_session = 1;
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_admin_access',
-            "Using fallback username '$username' for $action_name (roles exist but username missing)");
     }
     
     unless ($has_valid_session) {

@@ -1,0 +1,53 @@
+[% PageVersion = 'Inventory/locations/edit.tt,v 0.01 2026/03/30 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Edit Location: [% location.name %]</h1>
+
+[% IF error_msg %]<p class="error">[% error_msg %]</p>[% END %]
+
+<form method="POST" action="/Inventory/location/edit/[% location.id %]">
+  <table>
+    <tr>
+      <th><label for="name">Name *</label></th>
+      <td><input type="text" id="name" name="name" required maxlength="255" value="[% location.name %]"></td>
+    </tr>
+    <tr>
+      <th><label for="location_type">Type</label></th>
+      <td>
+        <select id="location_type" name="location_type">
+          [% FOREACH t IN ['warehouse', 'shelf', 'bin', 'room', 'vehicle', 'offsite', 'other'] %]
+          <option value="[% t %]" [% IF location.location_type == t %]selected[% END %]>[% t %]</option>
+          [% END %]
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="description">Description</label></th>
+      <td><textarea id="description" name="description" rows="3" cols="40">[% location.description %]</textarea></td>
+    </tr>
+    <tr>
+      <th><label for="address">Address</label></th>
+      <td><textarea id="address" name="address" rows="3" cols="40">[% location.address %]</textarea></td>
+    </tr>
+    <tr>
+      <th><label for="status">Status</label></th>
+      <td>
+        <select id="status" name="status">
+          [% FOREACH s IN ['active', 'inactive'] %]
+          <option value="[% s %]" [% IF location.status == s %]selected[% END %]>[% s %]</option>
+          [% END %]
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="notes">Notes</label></th>
+      <td><textarea id="notes" name="notes" rows="3" cols="40">[% location.notes %]</textarea></td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <input type="submit" value="Save Changes">
+        <a href="/Inventory/locations">Cancel</a>
+      </td>
+    </tr>
+  </table>
+</form>
