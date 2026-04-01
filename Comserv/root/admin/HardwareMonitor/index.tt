@@ -183,9 +183,10 @@
             <pre style="background:#222;color:#eee;padding:6px 10px;border-radius:4px;overflow-x:auto;margin:0 0 10px;">/home/shanta/nfs/comserv/scripts/device_agent.sh</pre>
             <p style="margin:0 0 6px;">The script <strong>auto-detects the hostname</strong> of whichever machine runs it — no per-machine edits required.</p>
             <p style="margin:0 0 6px;"><strong>On each machine</strong>, add one line to <code>/etc/cron.d/comserv_agent</code>:</p>
-            <pre style="background:#222;color:#eee;padding:8px;border-radius:4px;overflow-x:auto;margin:0 0 10px;">*/5 * * * * root INGEST_URL="[% c.uri_for('/admin/hardware_monitor/ingest') | html %]" INGEST_TOKEN="[% ingest_token | html %]" /home/shanta/nfs/comserv/scripts/device_agent.sh</pre>
+            <pre style="background:#222;color:#eee;padding:8px;border-radius:4px;overflow-x:auto;margin:0 0 10px;">*/5 * * * * root INGEST_URL="[% ingest_url | html %]" INGEST_TOKEN="[% ingest_token | html %]" /home/shanta/nfs/comserv/scripts/device_agent.sh</pre>
             <p style="margin:0 0 4px;color:#555;"><strong>Requirements:</strong> NFS mount at <code>/home/shanta/nfs</code> (already set up on server-room machines) + <code>curl</code> or <code>wget</code>.</p>
-            <p style="margin:0;color:#888;">&#128274; Change the token from <code>changeme</code> by setting <code>HW_INGEST_TOKEN=yourtoken</code> in the application environment and updating the cron lines.</p>
+            <p style="margin:0 0 4px;color:#888;">&#128274; Change the token from <code>changeme</code> by setting <code>HW_INGEST_TOKEN=yourtoken</code> in the application environment and updating the cron lines.</p>
+            <p style="margin:0;color:#888;">&#9881; To override the URL permanently, set <code>HW_INGEST_BASE_URL=http://192.168.1.199:3001</code> in the application environment.</p>
         </div>
     </details>
     [% END %]
