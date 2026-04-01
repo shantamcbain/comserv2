@@ -176,6 +176,68 @@
     </div>
     [% END %]
 
+    <details style="margin-bottom:12px;">
+        <summary style="cursor:pointer;font-weight:bold;font-size:.92em;padding:4px 0;list-style:none;display:flex;align-items:center;gap:6px;color:#555;">
+            &#128200; Disk Usage Trends <span style="font-size:.85em;font-weight:normal;color:#888;">(historical % per mount)</span>
+        </summary>
+        <div id="disk-charts-container" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px;margin-top:10px;"></div>
+        <script>
+        (function() {
+            var diskData = [% disk_chart_json %];
+            var container = document.getElementById('disk-charts-container');
+            if (!Array.isArray(diskData) || !diskData.length) {
+                container.innerHTML = '<p style="color:#aaa;font-size:.85em;">No historical data yet — data accumulates over cron runs.</p>';
+                return;
+            }
+            var COLORS = ['#2196f3','#f44336','#4caf50','#ff9800','#9c27b0','#00bcd4','#795548','#607d8b'];
+            function hostColor(h) {
+                var s = h.replace(/\.computersystemconsulting\.ca$/,'').replace(/\..*$/,'');
+                var n = 0; for (var i=0;i<s.length;i++) n+=s.charCodeAt(i);
+                return COLORS[n % COLORS.length];
+            }
+            diskData.forEach(function(entry) {
+                var mountPart = entry.metric.replace(/^disk_used_pct/,'') || '_';
+                var mountLabel = mountPart.replace(/^_/,'/').replace(/_/g,'/') || '/';
+                var box = document.createElement('div');
+                box.className = 'hw-chart-box';
+                box.style.height = '180px';
+                var title = document.createElement('h4');
+                title.textContent = mountLabel;
+                var wrap = document.createElement('div');
+                wrap.className = 'hw-chart-wrap';
+                var canvas = document.createElement('canvas');
+                wrap.appendChild(canvas);
+                box.appendChild(title);
+                box.appendChild(wrap);
+                container.appendChild(box);
+                var hosts = Object.keys(entry.hosts || {}).sort();
+                var datasets = hosts.map(function(h) {
+                    var c = hostColor(h);
+                    var shortH = h.replace(/\.computersystemconsulting\.ca$/,'');
+                    return {
+                        label: shortH,
+                        data: (entry.hosts[h]||[]).map(function(pt){ return {x: new Date(pt[0].replace(' ','T')).getTime(), y: pt[1]}; }),
+                        borderColor: c, backgroundColor: c+'22',
+                        tension: 0.3, fill: false, pointRadius: 2, spanGaps: true
+                    };
+                });
+                new Chart(canvas, {
+                    type: 'line',
+                    data: { datasets: datasets },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+                        scales: {
+                            x: { type: 'time', time: { unit: 'minute', tooltipFormat: 'HH:mm', displayFormats: { minute: 'HH:mm' } }, ticks: { maxTicksLimit: 8, font: { size: 10 } } },
+                            y: { min: 0, max: 100, ticks: { callback: function(v){ return v+'%'; }, font: { size: 10 } } }
+                        }
+                    }
+                });
+            });
+        })();
+        </script>
+    </details>
+
     <details style="margin-bottom:16px;">
         <summary style="cursor:pointer;font-size:.88em;color:#888;padding:4px 0;">&#128268; Remote agent setup — add any server-room device (one cron line per machine)</summary>
         <div style="margin-top:8px;background:#f8f9fa;border:1px solid #ddd;border-radius:4px;padding:12px;font-size:.85em;">
@@ -459,14 +521,7 @@
         }
         if (metric === 'ipmi_ps1_current' || metric === 'ipmi_ps2_current') return;
         if (metric.match(/_temp$/)) return;
-
-        if (metric.match(/^disk_used_pct/)) {
-            var mountPart = metric.replace(/^disk_used_pct/, '') || '_';
-            var mountLabel = mountPart.replace(/^_/, '/').replace(/_/g, '/') || '/';
-            addChart('Disk % — ' + mountLabel, hostMap, '%');
-            rendered++;
-            return;
-        }
+        if (metric.match(/^disk_/)) return;
 
         var unit = METRIC_UNITS[metric] || '';
         addChart(METRIC_LABELS[metric] || metric, hostMap, unit);
