@@ -122,62 +122,6 @@
         </div>
     </form>
 
-    [%# ── Drive Space section ──────────────────────────────────────────────── %]
-    [% IF disk_hosts.size %]
-    <h3>&#128190; Drive Space — All Devices</h3>
-    <style>
-    .ds-host       { margin-bottom:18px; border:1px solid #ddd; border-radius:6px; overflow:hidden; }
-    .ds-host-head  { display:flex; align-items:center; gap:10px; padding:8px 14px;
-                     background:var(--bg-secondary,#f8f9fa); border-bottom:1px solid #ddd; font-weight:bold; }
-    .ds-mounts     { padding:8px 14px; display:flex; flex-direction:column; gap:6px; }
-    .ds-mount      { display:grid; grid-template-columns:130px 1fr 90px 120px; gap:8px; align-items:center; font-size:.88em; }
-    .ds-bar-wrap   { background:#e9ecef; border-radius:4px; height:14px; overflow:hidden; }
-    .ds-bar        { height:100%; border-radius:4px; transition:width .3s; }
-    .ds-bar.lvl-info     { background:#4caf50; }
-    .ds-bar.lvl-warn     { background:#ff9800; }
-    .ds-bar.lvl-error    { background:#f44336; }
-    .ds-bar.lvl-critical { background:#b71c1c; }
-    .ds-pct        { text-align:right; font-weight:bold; min-width:38px; }
-    .ds-sizes      { color:#888; font-size:.82em; white-space:nowrap; }
-    .ds-ts         { color:#aaa; font-size:.75em; }
-    @media(max-width:600px){
-        .ds-mount  { grid-template-columns:100px 1fr 60px; }
-        .ds-sizes  { display:none; }
-    }
-    </style>
-    [% FOR dh IN disk_hosts %]
-    <div class="ds-host">
-        <div class="ds-host-head">
-            <span class="badge-[% dh.worst_level %]">[% dh.worst_level | upper %]</span>
-            &#128187; [% dh.hostname | html %]
-            <span style="font-size:.8em;font-weight:normal;color:#888;">[% dh.mounts.size %] mount[% dh.mounts.size != 1 ? 's' : '' %]</span>
-        </div>
-        <div class="ds-mounts">
-        [% FOR d IN dh.mounts %]
-        [% NEXT IF d.mount.match('^/(sys|proc|run/|dev/pts|snap/)') %]
-        <div class="ds-mount">
-            <span style="font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="[% d.device | html %]">[% d.mount | html %]</span>
-            [% SET _pct = d.pct | format('%.0f') %]
-            <div class="ds-bar-wrap" title="[% _pct %]% used">
-                <div class="ds-bar lvl-[% d.level %]" style="width:[% _pct %]%;"></div>
-            </div>
-            <span class="ds-pct" style="[% IF d.level == 'critical' %]color:#b71c1c[% ELSIF d.level == 'warn' %]color:#e65100[% END %]">[% _pct %]%</span>
-            <span class="ds-sizes">
-                [% IF d.free_mb.defined %]
-                    [% SET _free = d.free_mb %]
-                    [% SET _tot  = d.total_mb %]
-                    [% IF _free >= 1024 %][% _free / 1024 | format('%.1f') %]&thinsp;GB free[% ELSE %][% _free %]&thinsp;MB free[% END %]
-                    [% IF _tot.defined %] /
-                        [% IF _tot >= 1024 %][% _tot / 1024 | format('%.0f') %]&thinsp;GB[% ELSE %][% _tot %]&thinsp;MB[% END %]
-                    [% END %]
-                [% END %]
-            </span>
-        </div>
-        [% END %]
-        </div>
-    </div>
-    [% END %]
-
     <details style="margin-bottom:16px;">
         <summary style="cursor:pointer;font-size:.88em;color:#888;padding:4px 0;">&#128268; Remote agent setup — add any server-room device (one cron line per machine)</summary>
         <div style="margin-top:8px;background:#f8f9fa;border:1px solid #ddd;border-radius:4px;padding:12px;font-size:.85em;">
