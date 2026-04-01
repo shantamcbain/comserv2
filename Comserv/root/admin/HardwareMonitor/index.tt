@@ -7,8 +7,8 @@
    page_version = "0.02"
    last_updated = "2026-03-16"
 %]
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="/static/js/chart.umd.min.js"></script>
+<script src="/static/js/chartjs-adapter-date-fns.bundle.min.js"></script>
 <style>
 .hw-filter-row   { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-bottom:16px; }
 .hw-filter-row label { font-size:.85em; font-weight:bold; display:block; margin-bottom:2px; }
