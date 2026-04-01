@@ -5708,7 +5708,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     my ($self, $c) = @_;
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_deploy_to_production',
-        "Docker Hub build+push+deploy requested");
+        "Docker Hub build+push+deploy requested by " . ($c->user ? $c->user->username : 'unknown'));
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'docker_deploy_to_production')) {
@@ -5724,11 +5724,12 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         return;
     }
 
-    my $ssh_target   = $c->req->params->{ssh_target}   || 'ubuntu@192.168.1.126';
+    my $ssh_target    = $c->req->params->{ssh_target}   || 'ubuntu@192.168.1.126';
     my $form_password = $c->req->params->{ssh_password} || '';
 
     my $ssh_password = '';
-    my $creds_file = ($ENV{HOME} || '/home/shanta') . '/.comserv/secrets/ssh_credentials.json';
+    my $home     = $ENV{HOME} || '/home/shanta';
+    my $creds_file = "$home/.comserv/secrets/ssh_credentials.json";
     if (-f $creds_file && open my $cf, '<', $creds_file) {
         local $/;
         my $json = <$cf>;
@@ -5754,15 +5755,26 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         return;
     }
 
-    my $log_file = '/tmp/comserv-hub-deploy.log';
-    my $pid_file = '/tmp/comserv-hub-deploy.pid';
-    unlink $log_file;
-    unlink $pid_file;
-
-    my $home        = $ENV{HOME} || '/home/shanta';
-    my $repo_dir    = "$home/PycharmProjects/comserv2";
-    my $comserv_dir = "$repo_dir/Comserv";
+    my $repo_dir     = "$home/PycharmProjects/comserv2";
+    my $comserv_dir  = "$repo_dir/Comserv";
     my $prod_compose = 'docker-compose.prod.yml';
+    my $hub_image    = 'shantamcsbain/comserv-web-prod:latest';
+
+    my $deploy_log_dir = "$repo_dir/deploy-logs";
+    mkdir $deploy_log_dir unless -d $deploy_log_dir;
+
+    my @t_stamp = localtime();
+    my $ts = sprintf('%04d%02d%02d-%02d%02d%02d',
+        $t_stamp[5]+1900, $t_stamp[4]+1, $t_stamp[3],
+        $t_stamp[2], $t_stamp[1], $t_stamp[0]);
+    my $log_file     = "$deploy_log_dir/deploy-$ts.log";
+    my $latest_link  = "$deploy_log_dir/latest.log";
+    my $pid_file     = '/tmp/comserv-hub-deploy.pid';
+    my $logpath_file = '/tmp/comserv-hub-deploy.logpath';
+
+    unlink $logpath_file;
+    unlink $pid_file;
+    if (open my $lp, '>', $logpath_file) { print $lp $log_file; close $lp; }
 
     my $git_commit = `cd '$repo_dir' && git rev-parse --short HEAD 2>/dev/null`; chomp $git_commit;
     my $git_branch = `cd '$repo_dir' && git rev-parse --abbrev-ref HEAD 2>/dev/null`; chomp $git_branch;
@@ -5781,8 +5793,13 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         close $vf;
     }
 
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_deploy_to_production',
+        "Starting deploy: commit=$git_commit branch=$git_branch image=$hub_image target=$ssh_target log=$log_file");
+
     my $pid = fork();
     if (!defined $pid) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'docker_deploy_to_production',
+            "Failed to fork background deploy process");
         $c->response->body('{"success": false, "error": "Failed to fork background process"}');
         $c->response->content_type('application/json');
         return;
@@ -5794,10 +5811,34 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         $| = 1;
 
         print "=== Comserv Production Deploy via Docker Hub ===\n";
-        print "Started: " . scalar(localtime) . "\n";
-        print "Version : $git_commit ($git_branch) built $build_date\n\n";
+        print "Started   : " . scalar(localtime) . "\n";
+        print "Commit    : $git_commit ($git_branch)\n";
+        print "Build date: $build_date\n";
+        print "Image     : $hub_image\n";
+        print "SSH target: $ssh_target\n";
+        print "Log file  : $log_file\n";
+        print "=" x 60 . "\n\n";
 
-        print "--- Step 1: Building production image ---\n";
+        print "--- Pre-flight: Checking Docker Hub login ---\n";
+        my $docker_info = `docker info 2>/dev/null`;
+        if ($docker_info =~ /Username:\s*(\S+)/) {
+            print "✅ Logged in to Docker Hub as: $1\n\n";
+        } else {
+            print "⚠️  Not logged in to Docker Hub (no active session in docker info)\n";
+            print "   Attempting to verify via manifest inspect...\n";
+            my $manifest_check = system('docker', 'manifest', 'inspect', $hub_image);
+            $manifest_check >>= 8;
+            if ($manifest_check != 0) {
+                print "   Run: docker login -u shantamcsbain\n";
+                print "   (deploy will attempt push anyway — may fail if credentials expired)\n";
+            } else {
+                print "   Manifest accessible — credentials appear valid\n";
+            }
+            print "\n";
+        }
+
+        print "--- Step 1: Building production image ($hub_image) ---\n";
+        print "    compose: $comserv_dir/$prod_compose\n\n";
         my $build_exit = system('docker', 'compose',
             '-f', "$comserv_dir/$prod_compose",
             '--project-directory', $comserv_dir,
@@ -5809,7 +5850,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         }
         print "\n✅ Build complete\n\n";
 
-        print "--- Step 2: Pushing to Docker Hub (shantamcsbain/comserv-web-prod) ---\n";
+        print "--- Step 2: Pushing to Docker Hub ($hub_image) ---\n";
         my $push_exit = system('docker', 'compose',
             '-f', "$comserv_dir/$prod_compose",
             '--project-directory', $comserv_dir,
@@ -5817,12 +5858,14 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         $push_exit >>= 8;
         if ($push_exit != 0) {
             print "\n❌ PUSH FAILED (exit $push_exit)\n";
-            print "Ensure you are logged in: docker login (username: shantamcsbain)\n";
+            print "Fix: run 'docker login -u shantamcsbain' on the workstation terminal\n";
+            print "     then click Auto Deploy again\n";
             _exit(1);
         }
-        print "\n✅ Push to Docker Hub complete\n\n";
+        print "\n✅ Push to Docker Hub complete — $hub_image updated\n\n";
 
         print "--- Step 3: Triggering deploy on $ssh_target ---\n";
+        print "    Running: /opt/comserv/Comserv/deploy.sh\n";
         local $ENV{SSHPASS} = $ssh_password;
         my $ssh_exit = system('sshpass', '-e', 'ssh',
             '-o', 'StrictHostKeyChecking=no',
@@ -5831,22 +5874,34 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
             '/opt/comserv/Comserv/deploy.sh');
         $ssh_exit >>= 8;
         if ($ssh_exit != 0) {
-            print "\n❌ SSH TRIGGER FAILED (exit $ssh_exit)\n";
-            print "Note: Production cron will auto-deploy within 10 minutes anyway.\n";
-            _exit(1);
+            print "\n⚠️  SSH TRIGGER FAILED (exit $ssh_exit)\n";
+            print "Production cron will auto-deploy within 10 minutes anyway.\n";
+            print "Manual: ssh $ssh_target '/opt/comserv/Comserv/deploy.sh'\n";
+        } else {
+            print "\n✅ Production server deploy triggered successfully\n";
         }
-        print "\n✅ Production server deployment triggered\n\n";
+        print "\n";
 
         print "=== DEPLOYMENT COMPLETE at " . scalar(localtime) . " ===\n";
-        _exit(0);
+        print "Log saved: $log_file\n";
+
+        unlink $latest_link if -l $latest_link;
+        symlink $log_file, $latest_link;
+
+        _exit($ssh_exit != 0 ? 2 : 0);
     }
 
-    if (open my $fh, '>', $pid_file) {
-        print $fh $pid;
-        close $fh;
-    }
+    if (open my $fh, '>', $pid_file) { print $fh $pid; close $fh; }
 
-    $c->response->body(encode_json({ success => \1, message => 'Deployment started in background' }));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_deploy_to_production',
+        "Background deploy forked: pid=$pid log=$log_file");
+
+    $c->response->body(encode_json({
+        success  => \1,
+        message  => 'Deployment started in background',
+        log_file => $log_file,
+        image    => $hub_image,
+    }));
     $c->response->content_type('application/json');
 }
 
@@ -5861,11 +5916,17 @@ sub docker_deploy_status :Path('/admin/docker-deploy-status') :Args(0) {
         return;
     }
 
-    my $log_file = '/tmp/comserv-hub-deploy.log';
-    my $pid_file = '/tmp/comserv-hub-deploy.pid';
+    my $logpath_file = '/tmp/comserv-hub-deploy.logpath';
+    my $pid_file     = '/tmp/comserv-hub-deploy.pid';
+
+    my $log_file = '';
+    if (-f $logpath_file && open my $lp, '<', $logpath_file) {
+        chomp($log_file = <$lp>);
+        close $lp;
+    }
 
     my $output = '';
-    if (-f $log_file && open my $fh, '<', $log_file) {
+    if ($log_file && -f $log_file && open my $fh, '<', $log_file) {
         local $/;
         $output = <$fh>;
         close $fh;
@@ -5883,6 +5944,55 @@ sub docker_deploy_status :Path('/admin/docker-deploy-status') :Args(0) {
         success    => \1,
         output     => $output,
         is_running => $is_running ? \1 : \0,
+        log_file   => $log_file,
+    }));
+    $c->response->content_type('application/json');
+}
+
+sub docker_deploy_history :Path('/admin/docker-deploy-history') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_deploy_history')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my $home         = $ENV{HOME} || '/home/shanta';
+    my $deploy_log_dir = "$home/PycharmProjects/comserv2/deploy-logs";
+    my $latest_link    = "$deploy_log_dir/latest.log";
+
+    my @logs = ();
+    if (-d $deploy_log_dir) {
+        opendir my $dh, $deploy_log_dir or do {};
+        my @files = sort { $b cmp $a }
+                    grep { /^deploy-\d{8}-\d{6}\.log$/ }
+                    readdir $dh;
+        closedir $dh;
+        @logs = map { "$deploy_log_dir/$_" } @files[0..4];
+        @logs = grep { -f $_ } @logs;
+    }
+
+    my $latest_content = '';
+    my $latest_file    = '';
+    if (-f $latest_link && -l $latest_link) {
+        $latest_file = readlink($latest_link) || '';
+    } elsif (@logs) {
+        $latest_file = $logs[0];
+    }
+    if ($latest_file && -f $latest_file && open my $fh, '<', $latest_file) {
+        local $/;
+        $latest_content = <$fh>;
+        close $fh;
+    }
+
+    $c->response->body(encode_json({
+        success        => \1,
+        latest_file    => $latest_file,
+        latest_content => $latest_content,
+        log_files      => \@logs,
     }));
     $c->response->content_type('application/json');
 }
