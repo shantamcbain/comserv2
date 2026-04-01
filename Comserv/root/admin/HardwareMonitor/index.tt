@@ -181,7 +181,7 @@
         <div style="margin-top:8px;background:#f8f9fa;border:1px solid #ddd;border-radius:4px;padding:12px;font-size:.85em;">
 
             <p style="margin:0 0 8px;font-weight:bold;font-size:1.05em;">How it works</p>
-            <p style="margin:0 0 6px;">The agent script lives on the NFS server (<strong>192.168.1.175</strong>) and is readable by any machine that mounts the NFS share — no per-machine script copy needed. Each machine runs the script from <em>its own</em> NFS mount point and POSTs metrics to the Comserv app server (<strong>192.168.1.199</strong>).</p>
+            <p style="margin:0 0 6px;">The agent script lives on the NFS server (<strong>192.168.1.175</strong>) and is readable by any machine that mounts the NFS share — no per-machine script copy needed. Each machine runs the script from <em>its own</em> NFS mount point and POSTs metrics to the <strong>production Comserv server</strong> (<code>comserv.computersystemconsulting.ca</code>) which runs 24/7 in Docker — not the dev workstation, which is only up when in use.</p>
 
             <p style="margin:8px 0 4px;font-weight:bold;">Step 1 — Mount the NFS share (if not already done)</p>
             <p style="margin:0 0 4px;">Add to <code>/etc/fstab</code> on the remote machine, then run <code>mount -a</code>:</p>
@@ -205,72 +205,84 @@
     [% END %]
 
     [% IF latest.size || power_cards.size %]
-    <h3>Current Status</h3>
-    <div class="hw-summary-grid">
-        [% FOR pc IN power_cards %]
-        <div class="hw-card level-[% pc.worst_level %]">
-            <h4>[% pc.hostname | html %] &mdash; IPMI / Power</h4>
-            [% IF pc.ipmi_power_consumption %]
-            <div class="value">[% pc.ipmi_power_consumption.metric_value %]&thinsp;W</div>
+    <details style="margin-bottom:12px;">
+        <summary style="cursor:pointer;font-weight:bold;font-size:1.05em;padding:6px 0;list-style:none;display:flex;align-items:center;gap:8px;">
+            &#128202; Current Status <span style="font-size:.8em;font-weight:normal;color:#888;">(latest readings per host)</span>
+        </summary>
+        <div class="hw-summary-grid" style="margin-top:10px;">
+            [% FOR pc IN power_cards %]
+            <div class="hw-card level-[% pc.worst_level %]">
+                <h4>[% pc.hostname | html %] &mdash; IPMI / Power</h4>
+                [% IF pc.ipmi_power_consumption %]
+                <div class="value">[% pc.ipmi_power_consumption.metric_value %]&thinsp;W</div>
+                [% END %]
+                <div class="meta" style="margin-top:4px;line-height:1.8;">
+                    [% IF pc.ipmi_ps1_current %]PS1: [% pc.ipmi_ps1_current.metric_value %]&thinsp;A&emsp;[% END %]
+                    [% IF pc.ipmi_ps2_current %]PS2: [% pc.ipmi_ps2_current.metric_value %]&thinsp;A[% END %]
+                    [% IF pc.ipmi_ps1_status %]<br>PS1: [% pc.ipmi_ps1_status.metric_text | html %]&emsp;[% END %]
+                    [% IF pc.ipmi_ps2_status %]PS2: [% pc.ipmi_ps2_status.metric_text | html %][% END %]
+                    [% IF pc.ipmi_ps_redundancy %]<br>Redundancy: [% pc.ipmi_ps_redundancy.metric_text | html %][% END %]
+                    [% IF pc.ipmi_inlet_temp %]<br>Inlet: [% pc.ipmi_inlet_temp.metric_value %]&thinsp;&deg;C[% END %]
+                </div>
+                <div class="meta"><span class="badge-[% pc.worst_level %]">[% pc.worst_level | upper %]</span></div>
+            </div>
             [% END %]
-            <div class="meta" style="margin-top:4px;line-height:1.8;">
-                [% IF pc.ipmi_ps1_current %]PS1: [% pc.ipmi_ps1_current.metric_value %]&thinsp;A&emsp;[% END %]
-                [% IF pc.ipmi_ps2_current %]PS2: [% pc.ipmi_ps2_current.metric_value %]&thinsp;A[% END %]
-                [% IF pc.ipmi_ps1_status %]<br>PS1: [% pc.ipmi_ps1_status.metric_text | html %]&emsp;[% END %]
-                [% IF pc.ipmi_ps2_status %]PS2: [% pc.ipmi_ps2_status.metric_text | html %][% END %]
-                [% IF pc.ipmi_ps_redundancy %]<br>Redundancy: [% pc.ipmi_ps_redundancy.metric_text | html %][% END %]
-                [% IF pc.ipmi_inlet_temp %]<br>Inlet: [% pc.ipmi_inlet_temp.metric_value %]&thinsp;&deg;C[% END %]
+            [% FOR m IN latest %]
+            <div class="hw-card level-[% m.level %]">
+                <h4>[% m.hostname | html %] &mdash; [% m.metric_name | html %]</h4>
+                <div class="value">
+                    [% IF m.metric_value.defined %][% m.metric_value %][% IF m.unit %]&thinsp;[% m.unit | html %][% END %]
+                    [% ELSIF m.metric_text %][% m.metric_text | html %]
+                    [% ELSE %]&mdash;[% END %]
+                </div>
+                <div class="meta">
+                    <span class="badge-[% m.level %]">[% m.level | upper %]</span>
+                    &nbsp;[% m.timestamp | html %]
+                </div>
             </div>
-            <div class="meta"><span class="badge-[% pc.worst_level %]">[% pc.worst_level | upper %]</span></div>
+            [% END %]
         </div>
-        [% END %]
-        [% FOR m IN latest %]
-        <div class="hw-card level-[% m.level %]">
-            <h4>[% m.hostname | html %] &mdash; [% m.metric_name | html %]</h4>
-            <div class="value">
-                [% IF m.metric_value.defined %][% m.metric_value %][% IF m.unit %]&thinsp;[% m.unit | html %][% END %]
-                [% ELSIF m.metric_text %][% m.metric_text | html %]
-                [% ELSE %]&mdash;[% END %]
-            </div>
-            <div class="meta">
-                <span class="badge-[% m.level %]">[% m.level | upper %]</span>
-                &nbsp;[% m.timestamp | html %]
-            </div>
-        </div>
-        [% END %]
-    </div>
+    </details>
     [% END %]
 
-    <h3>Trend Graphs</h3>
-    <div class="hw-charts-grid" id="charts-container">
-        <p class="muted" id="charts-loading">Loading charts&hellip;</p>
-    </div>
+    <details style="margin-bottom:12px;">
+        <summary style="cursor:pointer;font-weight:bold;font-size:1.05em;padding:6px 0;list-style:none;display:flex;align-items:center;gap:8px;">
+            &#128200; Trend Graphs <span style="font-size:.8em;font-weight:normal;color:#888;">(CPU, memory, disk % over time)</span>
+        </summary>
+        <div class="hw-charts-grid" id="charts-container" style="margin-top:10px;">
+            <p class="muted" id="charts-loading">Loading charts&hellip;</p>
+        </div>
+    </details>
 
-    <h3>History ([% metrics.size %] records)</h3>
-    [% IF metrics.size %]
-    <div class="log-scroll">
-    <table class="data-table">
-        <thead>
-            <tr><th>Timestamp</th><th>Host</th><th>Metric</th><th>Value</th><th>Level</th><th>Message</th></tr>
-        </thead>
-        <tbody>
-        [% FOR m IN metrics %]
-            <tr class="level-[% m.level %]">
-                <td class="nowrap">[% m.timestamp | html %]</td>
-                <td>[% m.hostname | html %]</td>
-                <td>[% m.metric_name | html %]</td>
-                <td>[% IF m.metric_value.defined %][% m.metric_value %][% IF m.unit %] [% m.unit | html %][% END %]
-                    [% ELSIF m.metric_text %][% m.metric_text | html %][% ELSE %]&mdash;[% END %]</td>
-                <td><span class="badge-[% m.level %]">[% m.level | upper %]</span></td>
-                <td>[% m.message | html %]</td>
-            </tr>
+    <details style="margin-bottom:12px;">
+        <summary style="cursor:pointer;font-weight:bold;font-size:1.05em;padding:6px 0;list-style:none;display:flex;align-items:center;gap:8px;">
+            &#128203; History <span style="font-size:.8em;font-weight:normal;color:#888;">([% metrics.size %] records in window)</span>
+        </summary>
+        [% IF metrics.size %]
+        <div class="log-scroll" style="margin-top:10px;">
+        <table class="data-table">
+            <thead>
+                <tr><th>Timestamp</th><th>Host</th><th>Metric</th><th>Value</th><th>Level</th><th>Message</th></tr>
+            </thead>
+            <tbody>
+            [% FOR m IN metrics %]
+                <tr class="level-[% m.level %]">
+                    <td class="nowrap">[% m.timestamp | html %]</td>
+                    <td>[% m.hostname | html %]</td>
+                    <td>[% m.metric_name | html %]</td>
+                    <td>[% IF m.metric_value.defined %][% m.metric_value %][% IF m.unit %] [% m.unit | html %][% END %]
+                        [% ELSIF m.metric_text %][% m.metric_text | html %][% ELSE %]&mdash;[% END %]</td>
+                    <td><span class="badge-[% m.level %]">[% m.level | upper %]</span></td>
+                    <td>[% m.message | html %]</td>
+                </tr>
+            [% END %]
+            </tbody>
+        </table>
+        </div>
+        [% ELSE %]
+        <p class="muted" style="margin-top:10px;">No records found. Ensure the migration has been applied and <code>script/hardware_monitor.pl</code> has run at least once.</p>
         [% END %]
-        </tbody>
-    </table>
-    </div>
-    [% ELSE %]
-    <p class="muted">No records found. Ensure the migration has been applied and <code>script/hardware_monitor.pl</code> has run at least once.</p>
-    [% END %]
+    </details>
 </div>
 
 <script>
@@ -447,6 +459,14 @@
         }
         if (metric === 'ipmi_ps1_current' || metric === 'ipmi_ps2_current') return;
         if (metric.match(/_temp$/)) return;
+
+        if (metric.match(/^disk_used_pct/)) {
+            var mountPart = metric.replace(/^disk_used_pct/, '') || '_';
+            var mountLabel = mountPart.replace(/^_/, '/').replace(/_/g, '/') || '/';
+            addChart('Disk % — ' + mountLabel, hostMap, '%');
+            rendered++;
+            return;
+        }
 
         var unit = METRIC_UNITS[metric] || '';
         addChart(METRIC_LABELS[metric] || metric, hostMap, unit);
