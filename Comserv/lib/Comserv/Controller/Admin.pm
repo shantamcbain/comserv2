@@ -5819,23 +5819,43 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         print "Log file  : $log_file\n";
         print "=" x 60 . "\n\n";
 
-        print "--- Pre-flight: Checking Docker Hub login ---\n";
-        my $docker_info = `docker info 2>/dev/null`;
-        if ($docker_info =~ /Username:\s*(\S+)/) {
-            print "✅ Logged in to Docker Hub as: $1\n\n";
-        } else {
-            print "⚠️  Not logged in to Docker Hub (no active session in docker info)\n";
-            print "   Attempting to verify via manifest inspect...\n";
-            my $manifest_check = system('docker', 'manifest', 'inspect', $hub_image);
-            $manifest_check >>= 8;
-            if ($manifest_check != 0) {
-                print "   Run: docker login -u shantamcsbain\n";
-                print "   (deploy will attempt push anyway — may fail if credentials expired)\n";
+        print "--- Pre-flight: Checking Docker Hub credentials ---\n";
+
+        my $logged_in     = 0;
+        my $creds_method  = 'unknown';
+        my $docker_cfg    = ($ENV{HOME} || '/home/shanta') . '/.docker/config.json';
+        if (open my $dcf, '<', $docker_cfg) {
+            local $/; my $raw = <$dcf>; close $dcf;
+            my $dcfg = eval { decode_json($raw) } || {};
+            my $creds_store = $dcfg->{credsStore} || '';
+            my $auths       = $dcfg->{auths}       || {};
+
+            if ($creds_store) {
+                $creds_method = "credential helper (credsStore: $creds_store)";
+                my $helper = "docker-credential-$creds_store";
+                my $cred_out = `echo 'https://index.docker.io/v1/' | $helper get 2>/dev/null`;
+                if ($cred_out && $cred_out =~ /"Username"\s*:\s*"([^"]+)"/) {
+                    print "✅ Logged in via $creds_method as: $1\n\n";
+                    $logged_in = 1;
+                } else {
+                    print "⚠️  Credential helper ($helper) did not return credentials\n";
+                }
+            } elsif (exists $auths->{'https://index.docker.io/v1/'}) {
+                $creds_method = 'config.json auth entry';
+                print "✅ Docker Hub auth entry found in config.json\n\n";
+                $logged_in = 1;
             } else {
-                print "   Manifest accessible — credentials appear valid\n";
+                print "⚠️  No Docker Hub credentials found in $docker_cfg\n";
             }
-            print "\n";
+        } else {
+            print "⚠️  Cannot read $docker_cfg\n";
         }
+
+        unless ($logged_in) {
+            print "   Push may fail — run: docker login -u shantamcsbain\n";
+            print "   (continuing anyway)\n";
+        }
+        print "\n";
 
         print "--- Step 1: Building production image ($hub_image) ---\n";
         print "    compose: $comserv_dir/$prod_compose\n\n";
