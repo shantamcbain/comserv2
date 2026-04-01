@@ -1,0 +1,25 @@
+ [% password = 'pwxx88' %]
+[%# password =  'herbs2'   %]
+[%# username = 'forager'   %]
+[%# username = 'root'  %]
+
+[%# USE DBI( data_source = 'dbi:mysql:shanta_forager',
+                username = 'shanta',
+                password =  'nvidia2' )
+    %]
+  
+[% IF username %]                                
+  &nbsp;<a href="/cgi-bin/URL/url.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;site_name=[% SiteName %]&amp;category=Header_links&amp;subject=Nav_link&amp;Nav_link=1" name="Add page link" title="Add New Link">Add</a>
+
+  [% END %]
+ 
+[% FOREACH link = DBI.query("SELECT * FROM internal_links_tb
+                                  WHERE  category = 'Top_links'
+                                  AND (sitename =  '$SiteName' OR sitename =  'All') ORDER BY link_order
+                                    ")%]    
+
+<a href="[% link.url %]?site=[% SiteName %]&amp;[% session_string %]&amp;view=[% link.view_name %]" name="Contact" target="[% link.target %]" title=" [% link.name %] "><font   class="HeaderBarNavStyle">[% link.name %]</font></a>
+&nbsp;
+
+  [% END %]
+

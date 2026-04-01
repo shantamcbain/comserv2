@@ -1,0 +1,32 @@
+ 
+             <tr class='NavtableHeaderCellStyle'>
+
+<td >Management title</td>
+  <td >[% link.item_name %]</td>
+  <td>[% link.url %]
+
+                     
+                                  
+<tr>
+<td>status</td>   
+<td>Start Date</td>
+<td>End Date</td>   
+
+</tr>
+<tr>
+
+<td>[% link.status  %]</td>   
+<td>[% link.start_date %]</td>
+<td>[% link.end_date %]</td>
+
+</tr>
+<tr>
+
+<td>Category</td>
+   <td>[% link.category %]</td>
+</tr>
+<tr>
+
+<td>Description</td>
+<td>[% link.description %]</td>
+      </tr>

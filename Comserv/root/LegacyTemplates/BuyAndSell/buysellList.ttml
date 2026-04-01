@@ -1,0 +1,20 @@
+ <table>
+
+<tr><td>the call</td></tr>
+ [% FOREACH link = DBI.query("SELECT * FROM buy_sell_tb
+                                  WHERE (sitename =  'All' )
+                                  ORDER BY category
+                                  ")%]    
+                                  
+                                  <tr></tr>
+                                   <tr>
+<td class="NavTableCellStyle"> [% link.category %]  </td>
+<td class="NavTableCellStyle"> [% link.item_name %]  </td>
+<td class="NavTableCellStyle"> [% link.description %]  </td>
+<td class="NavTableCellStyle"> [% link.url %]  </td>
+<td class="NavTableCellStyle">        
+  <a href="/cgi-bin/BuySell/buy.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %][% link.item_name %]" name="Contact" target="[% link.target %]" title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+     </td>
+   </tr> 
+
+ </table>

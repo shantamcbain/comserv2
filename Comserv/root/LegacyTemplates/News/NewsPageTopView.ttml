@@ -1,0 +1,60 @@
+[% 
+
+# this template generates the top of HTML,
+
+# if -PAGE_TITLE is defined, it gets used in the <title>
+
+# if -SCRIPT_DISPLAY_NAME is defined, it gets used in the <title>
+
+# if -CSS_VIEW_URL is defined, the CSS link is created.
+
+# if -APPLICATION_SUB_MENU_VIEW_NAME is defined, the corresponding
+# template gets embedded
+
+# also see various other logo values below
+
+%]
+
+    <HTML>
+    <HEAD>
+    <TITLE>[% data.script_display_name %]: [% data.page_title %]</TITLE>
+[% IF data.css_view_url %]
+    <LINK REL = "stylesheet" TYPE = "text/css" 
+          HREF = "[% data.css_view_url %]">
+[% END %]
+
+    <SCRIPT LANGUAGE="JavaScript">
+    <!--
+    var clicks = 0;
+
+    function submitOnce() {
+        clicks ++;
+        if (clicks < 2) {
+            return true;
+        } else {
+            // alert("You have already clicked the submit button. " + clicks + " clicks");
+            return false;
+        }
+    }
+    //-->
+    </SCRIPT>
+
+    </HEAD>
+    <BODY>
+
+    <CENTER>
+    <TABLE WIDTH = "95%" BORDER = "1"
+           CELLSPACING = "0" CELLPADDING = "2">
+
+    <TR>
+    <TD VALIGN = "TOP" ALIGN = "LEFT">
+    <IMG SRC = "[% data.image_root_url %]/[% data.application_logo %]"
+         WIDTH = "[% data.application_logo_width %]"
+         HEIGHT = "[% data.application_logo_height %]"
+         BORDER = "0" ALT = "[% data.application_logo_alt %]">
+    </TD>
+    </TR>
+    
+    
+    </TABLE>
+    </CENTER>

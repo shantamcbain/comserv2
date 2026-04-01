@@ -1,0 +1,232 @@
+[%
+#	$Id: TopFrameView.ttml,v 1.2 2002/09/12 20:37:31 shanta Exp $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it doesn't rely on any
+# variables from outside.
+
+%]
+
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+[% group    = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% IF data.session_object.getAttribute('-KEY','SiteName') %]
+[% site = data.site_name %]
+ [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+[% ELSE %]
+
+[% SiteName = data.SiteName %]
+	
+
+[% END %]
+    <HTML>
+    <HEAD>
+    <TITLE>[% data.script_display_name %]: [% data.page_title %]</TITLE>
+[% IF data.css_view_url %]
+    <LINK REL = "stylesheet" TYPE = "text/css" 
+          HREF = "[% data.css_view_url %]">
+[% END %]
+
+    <SCRIPT LANGUAGE="JavaScript">
+    <!--
+    var clicks = 0;
+
+    function submitOnce() {
+        clicks ++;
+        if (clicks < 2) {
+            return true;
+        } else {
+            // alert("You have already clicked the submit button. " + clicks + " clicks");
+            return false;
+        }
+    }
+    //-->
+    </SCRIPT>
+
+<!-- Call SideBarHeadScript Site name [% SiteName %] First Name [% firstname%] -->
+[% embed('SideBarHeadScript') %] 
+[% IF SiteName == 'ECF'  %]
+
+[% ELSIF SiteName == 'CSC'  %]
+<!-- Call CSCSideBarScript -->
+[% embed('CSCSideBarScript') %] 
+[% ELSIF SiteName == 'ENCY' OR 'VitaVic'  %] 
+<!-- Call  ENCYJavaScriptHeads-->
+[% embed('ENCYJavaScriptHeads') %] 
+[% ELSIF SiteName == 'Apis'  %] 
+<!-- Call ApisJavaScriptHeads -->
+[% embed('ApisJavaScriptHeads') %] 
+[% ELSE %]
+
+	
+No site defined Please fix Header Definitions. Session = [% sitename %] from stetup [% site %]
+[% END %]
+
+    </HEAD>
+    <BODY>
+
+    <CENTER>
+    <TABLE WIDTH = "95%" BORDER = "0"
+           CELLSPACING = "0" CELLPADDING = "2">
+
+    <TR>
+    <TD VALIGN = "TOP" ALIGN = "LEFT">
+[% IF SiteName == 'Apis'  %]
+    <IMG SRC = "[% data.application_logo %]"
+         WIDTH = "[% data.application_logo_width %]"
+         HEIGHT = "[% data.application_logo_height %]"
+         BORDER = "0" ALT = "[% data.application_logo_alt %]"
+    >
+[% ELSIF SiteName == 'CAP'  %]
+    <IMG SRC = "[% data.application_logo %]"
+         WIDTH = "[% data.application_logo_width %]"
+         HEIGHT = "[% data.application_logo_height %]"
+         BORDER = "0" ALT = "[% data.application_logo_alt %]"
+    >
+[% ELSIF SiteName == 'VitalVic'  %]
+    <IMG SRC = "[% data.application_logo %]"
+         WIDTH = "[% data.application_logo_width %]"
+         HEIGHT = "[% data.application_logo_height %]"
+         BORDER = "0" ALT = "[% data.application_logo_alt %]"
+    >
+[% ELSIF SiteName == 'ECF'  %]
+    <IMG SRC = "[% data.application_logo %]"
+         WIDTH = "[% data.application_logo_width %]"
+         HEIGHT = "[% data.application_logo_height %]"
+         BORDER = "0" ALT = "[% data.application_logo_alt %]"
+    >
+[% ELSE %]
+    <IMG SRC = "[% data.image_root_url %]/[% data.application_logo %]"
+         WIDTH = "[% data.application_logo_width %]"
+         HEIGHT = "[% data.application_logo_height %]"
+         BORDER = "0" ALT = "[% data.application_logo_alt %]"
+    >
+[% END %]
+    </TD>
+    <td>
+[% IF SiteName == 'Forager'  %]
+[% embed('ForagerRightHead') %] 
+[% ELSIF SiteName == 'CSC'  %]
+[% embed('CSCRightHead') %] 
+[% ELSIF SiteName == 'Apis'  %]
+[% embed('ApisRightHead') %] 
+[% ELSIF SiteName == 'ECF'  %]
+[% embed('ECFRightHead') %] 
+[% ELSIF SiteName == 'CAP'  %]
+[% embed('CAPRightHead') %] 
+[% ELSIF SiteName == 'CS'  %]
+ <H2>Country Stores.</H2>
+A CityShop on line store demo.
+<br>
+Put this store to work for you.  
+[% ELSIF SiteName  == 'VitalVic'  %]
+ <H1>Vital Victoria's Encyclopaedia of Biological life.</H1>
+Your home for Health information that grows with you.
+<br>
+Add this resource to your site.  
+[% ELSIF SiteName == 'ENCY'  %]
+ <H1>The Encyclopaedia of Biological life.</H1>
+Your home for Health information that grows with you.
+<br>
+Add this resource to your site.  
+[% ELSIF SiteName  == 'VitalVic'  %]
+ <H1>Vital Victoria's Encyclopaedia of Biological life.</H1>
+Your home for Health information that grows with you.
+<br>
+Add this resource to your site.  
+[% ELSE %]
+
+	
+
+	<a href="http://www.x10.com/friends/refer.cgi?x10\@computersystemconsulting.ca"><img src="http://www.x10.com/friends/images/banner.gif" border="0" width="468" height="60" alt="Click here for a $15 Gift Certificate!"></a>
+
+[% END %]
+		      
+    </td>
+ 
+    </TR>
+
+    </TABLE>
+    </CENTER>
+
+             
+[%  IF SiteName == 'CSC'  %]
+<!-- Call CSCTopNavBarView  [% SiteName %]  [% fname %]-->
+<TABLE>
+<tr>
+<td colspan="2">
+[% embed('CSCTopNavBarView') %] 
+ [% ELSIF SiteName  == 'Apis' OR
+          SiteName  == 'ECF'
+           %]
+<!-- Call ApisTopNavBarView  [% SiteName %]  [% fname %]-->
+<TABLE>
+<tr>
+<td colspan="2">
+ 
+[% embed('ApisTopNavBarView') %] 
+    </TD>
+    </TR>
+    </TABLE>
+[% ELSIF SiteName  == 'CAP'  %]
+<!-- Call CAPTopNavBarView  [% SiteName %]  [% fname %]-->
+<TABLE>
+<tr>
+<td colspan="2">
+ 
+[% embed('CAPTopNavBarView') %] 
+    </TD>
+    </TR>
+    </TABLE>
+[% ELSIF SiteName  == 'ECF'  %]
+<!-- Call ApisTopNavBarView  [% SiteName %]  [% fname %]-->
+<TABLE>
+<tr>
+<td colspan="2">
+ 
+[% embed('ECFTopNavBarView') %] 
+    </TD>
+    </TR>
+    </TABLE>
+[% ELSIF SiteName == 'ENCY' OR 'VitalVic'  %]
+<!-- Call ENCYTopNavBarView  [% SiteName %]  [% fname %]-->
+<TABLE>
+<tr>
+<td colspan="2">
+ 
+[% embed('ENCYTopNavBarView') %] 
+    </TD>
+    </TR>
+    </TABLE>
+[% ELSE %]
+<TABLE>
+<tr>
+<td colspan="2">
+No Site Nav defined Session = [% sitename %] from stetup [% site %]
+    </TD>
+    </TR>
+
+    </TABLE>
+    </CENTER>
+
+	
+
+[% END %]  
+</body>
+</html>

@@ -1,0 +1,139 @@
+[% set_headers(data.http_header_params) %]
+
+[% SET user_list_display = data.user_list.join("<BR>\n") IF data.user_list.size %]
+
+[% IF user_list_display %]
+
+	[% IF data.page_top_name %]
+	
+		[% embed(data.page_top_view, ['-PAGE_TITLE','User Found']) %]
+	
+	[% ELSE %]
+	
+	    <HTML>
+    	    <HEAD>
+                <TITLE>User Found</TITLE>
+    	    </HEAD>
+    	    <BODY>
+	
+	[% END %]
+	
+	    <FORM METHOD = "POST">
+	      <P>[% embed('AuthManager/CGI/FormData2Hidden') %]</P>	
+              <CENTER>
+              <TABLE WIDTH = "480" BORDER = "0" 
+                	CELLSPACING = "2" CELLPADDING = "4">
+
+                <TR>
+	            <TD COLSPAN = "2" HEIGHT = "50">
+                </TR>
+
+                <TR> 
+                    <TD BGCOLOR = [% data.header_bg_color %] COLSPAN = "2"> 
+   	    		<FONT FACE = [% data.page_font_face %] COLOR = [% data.header_font_color %]>
+            		Search Found Users
+            		</FONT> 
+                    </TD>
+                </TR>
+
+                <TR>
+                    <TD BGCOLOR = [% data.table_bg_color_1 %] WIDTH = "20">
+            		List Of Users:
+            	    </TD>
+
+                    <TD BGCOLOR = [% data.table_bg_color_2 %]">
+            		[% user_list_display %]
+            		
+            	    </TD>
+                </TR>
+
+                <TR>
+                    <TD COLSPAN = "2" HEIGHT = "10">
+                </TR>
+
+	        <TR>
+	            <TD COLSPAN = "2" ALIGN = "CENTER">
+	    	        <INPUT TYPE = "SUBMIT" NAME = "auth_submit_logon_request" 
+	                			VALUE = "Return to Logon Screen">
+    	            </TD>
+	        </TR>
+	      </TABLE>
+	    </FORM>
+	    
+	[% IF (data.page_bottom_view) %]
+	    
+		[% embed(data.page_bottom_view) %]
+	    	
+	[% ELSE %]
+	    
+    		</BODY>
+		</HTML>
+                
+        [% END %]
+		        	
+[% ELSE %]
+
+	[% IF (data.page_top_view) %]	
+	
+		[% embed(data.page_top_view, ['-PAGE_TITLE','No Users Found']) %]
+		
+	[% ELSE %]
+	
+	    <HTML>
+    	    <HEAD>
+            <TITLE>No Users Found</TITLE>
+    	    </HEAD>
+   	    <BODY>	
+        
+        [% END %]
+        
+            <FORM METHOD = "POST">
+                <P>[% embed('AuthManager/CGI/FormData2Hidden') %]</P>	
+	        <CENTER>
+                <TABLE WIDTH = "480" BORDER = "0" 
+                	CELLSPACING = "2" CELLPADDING = "4">
+
+   	    	    <TR>
+	    	        <TD COLSPAN = "2" HEIGHT = "50">
+	    	    </TR>
+
+            	    <TR> 
+            	        <TD BGCOLOR = [% data.header_bg_color %] COLSPAN = "2"> 
+	    		    <FONT FACE = [% data.page_font_face %] COLOR = [% data.header_font_color %]>
+  	    		        Sorry, No Users Found
+	    		    </FONT> 
+	                </TD>
+                    </TR>
+
+	            <TR>
+	                <TD BGCOLOR = "#E5E5E5" COLSPAN = "2">
+	    		    Sorry, No users were found that matched your email address
+	    		   
+	                </TD>
+	            </TR>
+
+	    	    <TR>
+	                <TD COLSPAN = "2" HEIGHT = "10">
+	            </TR>	
+
+  	            <TR>
+	                <TD COLSPAN = "2" ALIGN = "CENTER">
+	                    <INPUT TYPE = "SUBMIT" NAME = "auth_submit_logon_request" 
+                                  VALUE = "Return to Logon Screen">
+	                </TD>
+	           </TR>
+	       </TABLE>
+	    </FORM>
+	    
+        [% IF (data.page_bottom_view) %]
+	    
+	    [% embed(data.page_bottom_view) %]
+	    
+        [% ELSE %]
+	    
+            </BODY>
+            </HTML>
+                
+        [% END %]
+
+[% END %]

@@ -1,0 +1,11 @@
+[%
+#	$Id: CSCCopyRight.ttml,v 1.1 2002/02/19 19:17:07 shanta Exp $	
+
+
+%]
+<p>Designed and maintained  By<a href="http://computersystemconsulting.ca"> Computer System Consulting.ca</a>.
+</p>
+<p>Application is under <a href="/cgi-bin/CSC/csc.cgi?site=[% SiteName %]&amp;view=OpensourceView&amp;[% session_string %]"target="_blank">GNU General Public License</a>  &amp; Copy; 1996  
+</p>
+
+ 

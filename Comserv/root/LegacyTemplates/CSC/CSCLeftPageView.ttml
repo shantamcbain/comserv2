@@ -1,0 +1,227 @@
+[%
+
+# the Left Page template
+#	$Id: LeftPageView.ttml,v 1.16 2002/11/11 14:44:14 shanta Exp shanta $	
+
+%]
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+ [% IF SiteName == 'CAP' || SiteName == 'CS' %]
+[% embed('SubTopFrameView.ttml') %]
+
+[% END %]
+ <!--This is the current CSCLeftPageView.ttml
+ The fallowing code is what gets displayed on the left nave bar -->
+
+<table  class ="LeftTableView">
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+ <tr>  
+  <td >
+[% embed('LogOnLeftView.ttml') %]
+    </td>
+    </tr>
+ [% IF username == 'Shanta'
+  %]
+ <tr>
+  <td>
+[%# embed('PersonalLeftLinksView.ttml') %]
+
+    </td>
+    </tr>
+ <tr>  
+   <td>           <A HREF="http://webcthelpdesk.com/cgi-bin/sql-ledger/login.pl"  TARGET = "[% data.link_target %]" ><font   class="LeftSideBarNavStyle">ACC.</A> </font></a><br>
+</td>
+ </tr>
+ <tr>  
+   <td>           <A HREF="http://24.71.38.219"  TARGET = "[% data.link_target %]" ><font   class="LeftSideBarNavStyle">ecf.forager.com</A> </font></a><br>
+</td>
+ </tr>
+ <tr>  
+   <td>           <A HREF="https://24.77.220.62:10000"  TARGET = "[% data.link_target %]" ><font   class="LeftSideBarNavStyle">ecf.forager.com admin</A> </font></a><br>
+</td>
+ </tr>
+[%# embed('SubTopFrameView.ttml') %]
+[% END %]
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+ [%# IF SiteName == 'Apis' %]
+[%# embed('ApisLeftPageView.ttml') %]
+[%# END %]
+ [%# IF SiteName == 'ECF' %]
+[%# embed('ApisLeftPageView.ttml') %]
+[%# END %]
+ [%# IF SiteName == 'BCHPA' %]
+[%# embed('BCHPALeftPageLinksView.ttml') %]
+[%# END %]
+
+ [% #IF SiteName == 'rv' %]
+[%# embed('rvLeftLinksView.ttml') %]
+[%# END %]
+ 
+[%# IF SiteName == 'Brew' %]
+
+[%# embed('BrewLeftLinksView.ttml') %]
+
+[%# END %]
+
+ [%# IF SiteName == 'CS' %]
+[%# embed('CSLeftLinksView.ttml') %]
+[%# END %]
+ [%# IF SiteName == 'OKAI' OR
+       SiteName == 'MARTS'
+ %]
+[%# embed('OKAILeftPageLinksView.ttml') %]
+[%# END %]
+ [%# IF SiteName == 'Shanta' %]
+[%# embed('ShantaLeftLinksView.ttml') %]
+[%# END %]
+ [%# IF data.script_name == '/cgi-bin/CSC/cs.cgi' %]
+       [%# embed('CSLeftLinksView.ttml') %]
+ [%# END %]
+ [%# IF SiteName == 'CSC' %]
+[% embed('CSCLeftLinksView.ttml') %]
+[%# END %]
+ [%# IF SiteName == 'CSPS' %]
+[%# embed('CSPSLeftLinksView.ttml') %]
+[%# END %]
+ [%# IF SiteName == 'SSOPS' %]
+<!-- Call SSOPS links -->
+[%# embed('SSOPSLeftLinksView.ttml') %]
+<!-- End Call Linux Tut links -->
+[% #END %]
+ [%# IF SiteName == 'eXtropia' %]
+[%# embed('ExtropiaLeftLinksView.ttml') %]
+
+[%# END %]
+ [% #IF SiteName == 'VitalVic' %]
+[%# embed('VitalVicLeftLinks.ttml') %]
+
+[% #END %]
+ [%# IF SiteName == 'ENCY' %]
+[%# embed('ENCYLeftLinksView.ttml') %]
+
+[%# END %]
+</tr>
+[% IF group ==  'Alegro_admin' OR
+      group ==  'Apis_admin' OR 
+      group ==  'CS_admin' OR
+      group ==  'CSC_admin' OR
+      group ==  'CSPS_admin' OR 
+      group ==  'ECF_admin' OR 
+      group ==  'ENCY_admin' OR 
+      group ==  'Forager_admin' OR 
+      group ==  'eXtropia_admin' OR 
+      group ==  'NOWD_admin' OR 
+      group ==  'News_admin' OR  
+      group ==  'Shanta_admin' OR 
+      group ==  'Brew_admin' OR 
+      group ==  'VitalVic_admin' OR
+	  username == 'Shanta'
+ %]
+   <tr>  
+
+   <td >
+   <!--embed AdminToolsLeftPage.ttml-->
+[% embed('AdminToolsLeftPage.ttml') %]
+ 
+    [% IF group ==  'Apis_admin'OR
+      group ==  'ECF_admin'  %]
+
+   <tr>  
+   <td >
+           <A HREF="yards.cgi?[% session_string %]"  TARGET = "[% data.link_target %]" ><font   class="LeftSideBarNavStyle">Yards.</A> </font></a><br>
+    </td>
+    </tr>
+    [% END %]
+
+     [% IF group ==  'CSC_admin' %]
+
+   <tr>  
+   <td >
+           <A HREF="/cgi-bin/CSC/csc_log.cgi?[% session_string %]"  TARGET = "[% data.link_target %]" ><font   class="LeftSideBarNavStyle">Log Admin.</A> </font></a><br>
+    </td>
+    </tr>
+
+  <tr>  
+
+   <td >
+           <A HREF="faqsl_manager.cgi?[% session_string %]"  TARGET = "[% data.link_target %]" ><font   class="LeftSideBarNavStyle">SL FAQ Manager.</A> </font></a><br>
+    </td>
+    </tr>
+  <tr>  
+
+   <tr>  
+   <td >
+	<tr>  
+
+   	<td >	
+           <A HREF="/cgi-bin/CSC/todo_admin.cgi?[% session_string %]"  TARGET = "[% data.link_target %]" ><font   class="LeftSideBarNavStyle"> todo admin.</A> </font></a><br>
+    	</td>
+    	</tr>
+    [% END %]
+
+
+[% END %]
+
+ <tr>  
+      	      	<td Class='LeftSideBarNavLinkStyle'>
+
+	<A HREF ="http://computersystemconsulting.ca/cgi-bin/CSC/helpdesk.cgi?&view=HelpDeskHomeView&site=[% SiteName %]" Target ="blank"> <font   class="LeftSideBarNavStyle">HelpHesk </font></a>
+	
+      	</td>
+ </tr>      	
+
+ <tr>
+  <td>
+[% embed('TabBarIconView.ttml') %]
+
+    </td>
+    </tr>
+
+ [% IF SiteName == 'CSC' || SiteName == 'Brew'|| SiteName == 'Apis' || SiteName == 'CSPS'|| SiteName == 'Shanta' || SiteName == 'BCAF' || SiteName == 'CS'|| SiteName == 'ENCY' %]
+ <tr>  
+   <td>
+ 
+<p>
+ <a href="http://jigsaw.w3.org/css-validator/">
+  <img style="border:0;width:88px;height:31px"
+       src="http://jigsaw.w3.org/css-validator/images/vcss" 
+       alt="Valid CSS!">
+ </a>
+</p>
+
+</td>
+ </tr>
+[% END %]
+
+
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+<tr>    
+          			<td width="100%">&nbsp;<img SRC="http://d2earth.net/msfree.gif" ALT="100% Micro\$oft free!">
+
+</td>
+</tr>
+<tr>    
+          			<td width="100%">&nbsp;<img SRC="http://24.71.38.219/images/poweredbymysql-125.png" ALT="Powered By MySQL">
+
+</td>
+</tr>
+
+
+</table>
+<!--This is the end of LeftPageView.ttml-->

@@ -1,0 +1,14 @@
+ 
+[% FOREACH link = DBI.query("SELECT * FROM url_tb
+                                  WHERE  category = 'Main_links'
+                                  AND (site_name =  'Shanta' OR site_name =  'All')
+                                  ORDER BY link_order
+                                  ")%]    
+                                  
+                                  <tr>
+   <td class="NavTableCellStyle">
+       <a href="[% link.url %]?site=[% SiteName %]&amp;[% session_string %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title=" [% link.name %] "><font   class="LeftSideBarNavStyle">[% link.name %]</font></a>
+     </td>
+   </tr>
+   [% END %]
+

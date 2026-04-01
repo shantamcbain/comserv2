@@ -1,0 +1,18 @@
+ <table>
+
+
+ [% FOREACH link = DBI.query("SELECT * FROM log_tb
+                                  WHERE (sitename =  '$SiteName' and 
+                                         status != '3'  )
+                                  ORDER BY project_code
+                                  ")%]    
+                                  <tr>
+ <td class="NavTableCellStyle"> [% link.project_code %]  </td>
+<td class="NavTableCellStyle"> [% link.abstract %]  </td>
+<td class="NavTableCellStyle"> [% link.details %]  </td>
+<td class="NavTableCellStyle">     
+  <a href="/cgi-bin/ToDo/log.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view.x&amp;record_id=[% link.record_id %]" name="Contact" target="[% link.target %]" title="details"><font   class="LeftSideBarNavStyle">Details</font></a>
+     </td>
+   </tr>
+ [% END %]
+</table>

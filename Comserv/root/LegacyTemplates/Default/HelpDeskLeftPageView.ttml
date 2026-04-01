@@ -1,0 +1,116 @@
+[%
+
+# the Left Page template
+#	$Id: HelpDeskLeftPageView.ttml,v 1.1 2001/12/02 00:29:54 shanta Exp shanta $	
+
+%]
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[%# page_left_view = data.page_left_view  %]
+
+
+<table width="100%" border="0" cellspacing="0" cellpadding="0">
+ <tr>  
+  <td >
+[% embed('LogOnLeftView.ttml') %]
+    </td>
+    </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+ <tr>  
+   <td >
+ 
+    <font   class="LeftSideBarHeaderStyle"> HelpDesk</font>
+</td>
+ </tr>
+ <tr>  
+ <td >
+ 
+       <font   class="LeftSideBarHeaderStyle"> Key Helpers</font><br>
+</td>
+ </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+  <tr>  
+   <td >
+          <a href="/cgi-bin/CSC/csc.cgi?view=CSCHomeView&[% session_string %]" > <font   class="LeftSideBarNavStyle">Tech Support Home</font></a><br>
+    </td>
+    </tr>
+  <tr>  
+   <td >
+           <a href="/cgi-bin/CSC/faq.cgi?[% session_string %]&site=[% SiteName %]&page_left_view=HelpDeskLeftPageView" ><font   class="LeftSideBarNavStyle"> Our FAQ,s </font></a><br>
+
+
+    </td>
+    </tr>
+  <tr>  
+   <td >
+ [% IF SiteName == 'Apis' OR
+       SiteName == 'ECF'  OR
+	   SiteName == 'BCHPA'
+	    %]
+<A HREF="/cgi-bin/Apis/faq.cgi?[% session_string %]&first_record_to_display=0&records_per_page=10&page_left_view=HelpDeskLeftPageView" ><font   class="LeftSideBarNavStyle">[% SiteName %]  FAQ </font>.
+</A>
+[% ELSE %]
+<A HREF="/cgi-bin/[% SiteName %]/faq.cgi?[% session_string %]&first_record_to_display=0&records_per_page=10&page_left_view=HelpDeskLeftPageView" ><font   class="LeftSideBarNavStyle">[% SiteName %]  FAQ </font>.
+</A>
+
+[% END %]
+
+	</td>
+    </tr>
+  <tr>  
+   <td >
+           <a href="/cgi-bin/CSC/csr.cgi?[% session_string %]&site=[% SiteName %]&page_left_view=HelpDeskLeftPageView"><font   class="LeftSideBarNavStyle"> Service Request form. </font></a><br>
+
+
+    </td>
+    </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+  <tr>  
+   <td >
+   
+       <font class="LeftSideBarHeaderStyle" >Resources and Tools</font><br>
+    </td>
+    </tr>
+    
+  <tr>  
+   <td>&nbsp;</td>
+ </tr>
+ <tr>  
+  <td >
+	   <a href="../CSC/csc_kb.cgi?view=BasicDataView&[% session_string %]" target="_Blank" ><font class="LeftSideBarNavStyle" > Knowledge Base</font></a><br>
+           <a href="csc_url.cgi?[% session_string %]" ><font class="LeftSideBarNavStyle" >URL DB </font></a><br>
+</td>
+    </tr>
+ 
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+ <tr>
+  <td >
+   
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+<tr>    
+          			<td width="1">&nbsp;<img SRC="http://d2earth.net/msfree.gif" ALT="100% Micro\$oft free!">
+
+</td>
+</tr>
+
+
+</table>

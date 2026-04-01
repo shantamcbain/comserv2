@@ -1,0 +1,74 @@
+<!-- Main Links -->	  
+	 [% IF 
+	       group    ==  'Apis_admin' OR
+	       group    ==  'BCHPA_admin' OR
+	       group    ==  'Brew_admin' OR
+	       SiteName    ==  'BMaster' OR
+	       SiteName    ==  'CS' OR
+	       SiteName    ==  'CSC' OR
+	       group    ==  'CSPS_admin' OR
+	       SiteName    ==  'cylkecykles'OR
+	       SiteName    ==  'ECF' OR
+	       group    ==  'Forager_admin' OR
+	       group    ==  'eXtropia_admin' OR
+	       SiteName    ==  'HE' OR
+	       SiteName    ==  'Bazaar' OR
+	       group    ==  'Bazaar_admin' OR
+	       group    ==  'News_admin' OR
+	       SiteName     == 'HoneyDo' OR
+	       SiteName    ==  'IM' OR
+	       group    ==  'MW_admin'OR
+	       SiteName    ==  'Organic' OR
+	       group    ==  'Shanta_admin' OR
+	       group    ==  'VitalVic_admin' OR
+	       group    ==  'MW_admin' OR
+	       group    == 'MJB_Admin' OR
+	       SiteName ==  'Skye' OR
+	       SiteName ==  'ShantaWorkShop' OR
+	       username == 'Shanta' OR
+	       group    == 'Demo_admin'
+	 %]
+	 
+	 [% StoreName %]
+<table cellpadding="1" cellspacing="0" border="0" width="100%" class="LeftNavTableStyle">
+	   <tr>
+	   <td class='NavtableHeaderCellStyle'><font class="NavtableHeaderCellStyle">
+	       Our Store
+	  [% IF username  == 'Shanta' OR
+            group     == 'Alegro_admin' OR
+	        group     == 'Apis_Admin' OR
+	        group     == 'BCHPA_Admin' OR
+	        group     == 'BMast_Admin' OR
+	        group     == 'BMast_Co-op_Admin' OR
+            group     == 'CSC_Admin' OR
+	        group     == 'CS_Admin' OR
+	        group     == 'ECF_Admin' OR
+	        group     == 'HoneyDo_Admin' OR
+	        group     == 'HE_Admin' OR
+	        group     == 'IM_Admin' OR
+	        group     == 'Orgainc_Admin' OR
+	        group     == 'DarmaFarmsAdmin' OR
+	        group     == 'MARTS_Admin' OR
+	        group     == 'VitalVic_Admin' OR
+	        group     == 'ENCY_Admin' OR
+	        group     == 'USBM_Admin' OR
+	        group     == 'Shanta_Admin' OR
+	        group     == 'RV_Admin' OR
+	        group     == 'Brew_Admin' OR
+	        group     == 'Demo_admin' OR
+	        group    ==  'WB_admin' OR
+	        group     == 'MJB_Admin'        %]
+
+	   &nbsp;<a href="http://[% StoreName %]/cgi-bin/URL/url.cgi?site=[% SiteName %]&amp;droplist=1&amp;[% session_string %]&amp;display_add_form=on&amp;site_name=[% SiteName %]&amp;category=Main_links&amp;subject=Nav_link&amp;Nav_link=1" name="Add page link"  title="Add New Link" style="AddButtonStyle">Add</a>
+	
+	   [% END %]
+	
+	</font>
+	   </td>
+	   </tr>
+</table>	
+<!-- store SQL Call  -->               
+	  [% embed ('SQL_Store') %]
+	<!-- store SQL Call ended  -->               
+<!-- end store Links -->	  	
+[% END %]

@@ -1,0 +1,33 @@
+ [% FOREACH link = DBI.query("SELECT * FROM page_tb
+                                  WHERE  (status  = 2 AND
+                                         page_code = 'Artical' AND
+                                         sitename = 'BeeTalk' )
+                                  ORDER BY sitename
+                                  ")%]    
+                [% PROCESS pagefields.ttml %]
+               
+       [% END %]    
+       
+            <h3>    [% PageName  %]</h3>  
+            <p> [% body %]   </p> 
+              
+ <h3> Past articles </h3>  
+<table>                   
+[% FOREACH link = DBI.query("SELECT * FROM page_tb
+                                  WHERE (sitename =  'BeeTalk' AND 
+                                         page_code = 'Artical' )
+                                  ORDER BY lastupdate
+                                  ")%]    
+                                  
+                                  
+                                   <tr>
+<td class="NavTableCellStyle"> [% link.view_name %]  </td>
+<td class="NavTableCellStyle"> [% link.description %]  </td>
+<td class="NavTableCellStyle">     
+    
+  <a href="/cgi-bin/page.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view.x&amp;record_id=[% link.record_id %]&" name="Contact" target="[% link.target %]" title="details "><font   class="LeftSideBarNavStyle">Read this article.</font></a>
+  </td>
+</tr><tr>
+
+[% END %]
+</table>

@@ -1,0 +1,70 @@
+
+[% IF SiteName == 'Telmark'OR
+	      SiteName == 'Aktiv' OR
+	      SiteName == 'Brew' OR
+	      SiteName == 'CSPS' %]
+		[% HostName = 'forager.com' %]
+		
+[% ELSIF SiteName == 'Forager	' 
+	      %]
+		[% HostName = 'forager.com' %]
+
+	[% ELSIF SiteName == 'OKBee'OR
+	      SiteName == 'Apis'		
+	       OR
+	      SiteName == 'CertBee' OR
+	      SiteName == 'ECF' OR
+	      SiteName == 'BMaster' OR
+	      SiteName == 'BMasterDev'OR
+	      SiteName == 'BeeCoop' 
+	      %]
+		[% HostName = 'beemaster.ca' %]
+		[% StoreName = 'ecf.countrystores.ca' %]
+	[% ELSIF   SiteName == 'Skye' 
+	       
+	      %]
+		[% HostName = 'computersystemconsulting.ca' %]
+		
+		[% StoreName = 'skye.countrystores.ca' %]
+		
+	[% ELSIF 
+	      SiteName == 'HE'
+	       
+	      %]
+		[% HostName = 'computersystemconsulting.ca' %]
+		[% StoreName = 'he.countrystores.ca' %]
+		
+	[% ELSIF SiteName == 'Organic' OR
+	         SiteName == 'Noop' OR
+	         SiteName == 'AmberRose'
+	      %]
+		[% HostName = 'computersystemconsulting.ca' %]
+
+	[% ELSIF SiteName == 'CS		
+	C' OR
+             SiteName == 'CSCDev' OR
+	         SiteName == 'Extropia'
+	      %]
+		[% HostName = 'computersystemconsulting.ca' %]
+		[% StoreName = 'csc.countrystores.ca' %]
+	
+	[% ELSIF SiteName == 'HoneyDo'
+	      %] 
+		[% HostName = 'honeydosmallengine.com' %]
+
+		[% StoreName = 'honeydo.countrystores.ca' %] 
+	[% ELSIF SiteName == 'MW'
+	      %] 
+		[% HostName = 'macdonaldwatersystems.com' %]
+		[% StoreName = 'mw.countrystores.ca' %]
+		
+ 	[% ELSIF SiteName == 'WW'
+	      %] 
+		[% HostName = 'wisewomancentre.com' %]
+		[% StoreName = 'ww.countrystores.ca' %]
+    [% ELSE %]
+   [% StoreName = 'countrystores.ca' %]
+
+	[% HostName = 'computersystemconsulting.ca' %]
+	[% MailName = username %]
+	[% END %]

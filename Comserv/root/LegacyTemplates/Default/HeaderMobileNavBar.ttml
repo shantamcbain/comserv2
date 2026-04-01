@@ -1,0 +1,142 @@
+[% #	$Id: HeaderMobileNavBarView.ttml,v 0.02 2002/11/10 22:59:04 shanta Exp $	
+
+%]
+
+
+<!-- This is HeaderNavBar of each page. v 0.02 /home/www/cgi-bin-->
+
+[% # this template generates the top of HTML,
+
+# if -PAGE_TITLE is defined, it gets used in the <title>
+
+# if -SCRIPT_DISPLAY_NAME is defined, it gets used in the <title>
+
+# if -CSS_VIEW_URL is defined, the CSS link is created.
+
+# if -APPLICATION_SUB_MENU_VIEW_NAME is defined, the corresponding
+# template gets embedded
+
+# also see various other logo values below
+
+#Set needed values
+
+%]
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% END %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+
+
+  <TABLE>
+    <tr>    
+    <td  class="TopMobileHeaderBarNavStyle">
+
+
+			[% IF SiteName == 'Skye' OR
+			      SiteName == 'Noop' %]
+				<A HREF ="?[% session_string %]&amp;view=[% data.home_view %]&amp;site=[% SiteName %]">[% HostName %]?</A>
+				 
+			[% END %]  
+</td>
+   <td class="TopMobileHeaderBarNavStyle">
+
+	[% embed('AffiliateLinkView') %]
+   </td>
+   <td class="TopMobileHeaderBarNavStyle">
+   <a href="http://www.computersystemconsulting.ca/whmcs/cart.php?a=add&domain=register" target="_blank"title="Domain registration services.">Domains</a>
+   </td>
+   <td class="TopMobileHeaderBarNavStyle">
+	        
+				
+		<!-- embed JobLinkView -->
+		[% embed('JobLinkView') %]
+		<!-- end JobLinkView -->
+		[% IF group == 'Dev_admin' OR
+                      group == 'CSC_Developer'OR
+                      username  == 'Shanta' %]
+			[% IF data.debug == "1" %]
+				<A HREF ="?site=[% SiteName %]&amp;debug=0&amp;[% session_string %]">NonDebug</A>
+  
+         [% ELSE %]
+
+				<A HREF ="?site=[% SiteName %]&amp;debug=1&amp;[% session_string %]">Debug</A> 
+   	[% END %]
+   </td>
+ 
+		[% END %]
+   <td class="TopMobileHeaderBarNavStyle">
+	  <A  HREF ="?site=[% SiteName %]&amp;[% session_string %]&amp;view=MailView">Mail</a>		   
+	    </td>
+   <td class="TopMobileHeaderBarNavStyle"> 
+
+			[% embed('SQLHeaderNav') %]
+  </td>
+   <td class="TopTopMobileHeaderBarNavStyle">
+		
+		<!-- -->		
+		 				
+		   <A HREF ="/cgi-bin/WebCal/webcal.cgi?&amp;site=[% SiteName%]&amp;[% session_string %]" Target ="_Blank">[% fname%]  Cal</a>
+						 
+				 
+				  </td>
+   <td class="TopMobileHeaderBarNavStyle">
+ 		<A HREF ="/cgi-bin/URL/url.cgi?[% session_string %]&amp;site=[% SiteName%]" target="_Blank" ><font   class="HeaderBarNavStyle">Links </font></a> 
+				[% IF fname %]	
+		<a href="http://dev.[% HostName %]/cgi-bin/CSC/csc.cgi?site=[% SiteName %]Dev&amp;[% session_string %]" name="DevSite" title="DevSite See what we are working on." Target ="_Blank"><font   class="HeaderBarNavStyle">Dev.</font></a>
+   </td>
+   <td class="TopMobileHeaderBarNavStyle">
+		
+		
+	 [% END %]
+	<!-- embed onleftview -->
+		[% embed('LogOnTopView.ttml') %]
+		<!-- end logonleftview -->
+		
+  </td>
+   <td class="TopMobileHeaderBarNavStyle">
+			[% embed('HelpDeskLinkView') %]
+	
+		
+
+    </TD>
+    </TR>	  
+     <tr>
+	  [% FOREACH link = DBI.query("SELECT * FROM internal_links_tb
+	                                  WHERE  category = 'Mobile_Head_links'
+	                                  AND (sitename =  '$SiteName' OR sitename =  'All')
+	                                  ORDER BY link_order
+	                                  ")%]    
+	   <td class="TopMobileNavTableCellStyle">
+	       <a href="[% link.url %]?site=[% SiteName %]&amp;[% session_string %]&amp;view=[% link.view_name %]" name="Contact" target="[% link.target %]" title=" [% link.name %] "><font   class="topBarNavStyle">[% link.name %]</font></a>  
+	   </TD>
+	[% END %]
+	[% IF username %]  <td class="TopMobileHeaderBarNavStyle">                              
+  &nbsp;<a href="/cgi-bin/URL/url.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;site_name=[% SiteName %]&amp;category=Header_links&amp;subject=Nav_link&amp;Nav_link=1" name="Add page link" title="Add New Link">Add</a>
+	   </TD>
+	[% END %]
+
+
+
+ 	   </tr>
+ [%#   <tr align="left">
+	      
+	   <td class="TopMobileNavTableCellStyle">
+[% embed('JavaMenu') %]
+ [%#    </TD>
+    </TR>	  
+%]
+
+  </TABLE>
+   
+
+<!--This is the end of TopNavBarView.ttml-->
+
+ 

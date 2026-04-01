@@ -1,0 +1,151 @@
+[% #CSC CSCTopNavBarView
+#	$Id: CSCTopNavBarView.ttml,v 1.2 2002/05/11 23:23:17 shanta Exp $	
+
+# this template generates the top of HTML,
+
+# if -PAGE_TITLE is defined, it gets used in the <title>
+
+# if -SCRIPT_DISPLAY_NAME is defined, it gets used in the <title>
+
+# if -CSS_VIEW_URL is defined, the CSS link is created.
+
+# if -APPLICATION_SUB_MENU_VIEW_NAME is defined, the corresponding
+# template gets embedded
+
+# also see various other logo values below
+
+#Set needed values
+
+%]
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+
+[%IF SiteName == 'Forager'  %]
+<!-- Call ForagerTopNavBarView  [% SiteName %]  [% fname %]-->
+<TABLE>
+<tr>
+<td colspan="2">
+[% embed('ForagerTopNavBarView') %] 
+    </TD>
+    </TR>
+    </TABLE>
+[%  ELSIF SiteName == 'CSC'  %]
+<!-- Call CSCTopNavBarView  [% SiteName %]  [% fname %]-->
+<TABLE>
+<tr>
+<td colspan="2">
+[% embed('CSCTopNavBarView') %] 
+[%  ELSIF SiteName == 'BCAF'  %]
+<!-- Call BCAFTopNavBarView  [% SiteName %]  [% fname %]-->
+<TABLE>
+<tr>
+<td colspan="2">
+[% embed('BCAFTopNavBarView') %] 
+ [% ELSIF SiteName  == 'Apis'  %]
+<!-- Call ApisTopNavBarView  [% SiteName %]  [% fname %]-->
+<TABLE>
+<tr>
+<td colspan="2">
+ 
+[% embed('ApisTopNavBarView') %] 
+    </TD>
+    </TR>
+    </TABLE>
+[% ELSIF SiteName  == 'CAP'  %]
+<!-- Call CAPTopNavBarView  [% SiteName %]  [% fname %]-->
+<TABLE>
+<tr>
+<td colspan="2">
+ 
+[% embed('CAPTopNavBarView') %] 
+    </TD>
+    </TR>
+    </TABLE>
+[% ELSIF SiteName  == 'CS'  %]
+<!-- Call CSTopNavBarView  [% SiteName %]  [% fname %]-->
+<TABLE>
+<tr>
+<td colspan="2">
+ 
+[% embed('CSTopNavBarView') %] 
+    </TD>
+    </TR>
+    </TABLE>
+[% ELSIF SiteName  == 'SSOPS'  %]
+<!-- Call SSOPSTopNavBarView  [% SiteName %]  [% fname %]-->
+<TABLE>
+<tr>
+<td colspan="2">
+[% embed('SSOPSTopNavBarView') %] 
+    </TD>
+    </TR>
+    </TABLE>
+[% ELSIF SiteName  == 'ECF'  %]
+<!-- Call ApisTopNavBarView  [% SiteName %]  [% fname %]-->
+<TABLE>
+<tr>
+<td colspan="2">
+[% embed('ENCYTopNavBarView') %] 
+    </TD>
+    </TR>
+    </TABLE>
+[% ELSIF SiteName  == 'eXtropia'  %]
+<!-- Call eXtropiaTopNavBarView  [% SiteName %]  [% fname %]-->
+<TABLE>
+<tr>
+<td colspan="2">
+[% embed('ExtropiaTopNavBarView') %] 
+    </TD>
+    </TR>
+    </TABLE>
+[% ELSIF SiteName == 'MARTS'  %]
+<!-- Call MARTSTopNavBarView  [% SiteName %]  [% fname %]-->
+<TABLE>
+<tr>
+<td colspan="2">
+ 
+[%# embed('ENCYTopNavBarView') %] 
+    </TD>
+    </TR>
+    </TABLE>
+ 
+[% ELSIF SiteName  == 'ECF'  %]
+<!-- Call ECFTopNavBarView  [% SiteName %]  [% fname %]-->
+<TABLE>
+<tr>
+<td colspan="2">
+[% embed('ECFTopNavBarView') %] 
+    </TD>
+    </TR>
+    </TABLE>
+[% ELSIF SiteName == 'ENCY' OR 'VitalVic'  %]
+<!-- Call ENCYTopNavBarView  [% SiteName %]  [% fname %]-->
+<TABLE>
+<tr>
+<td colspan="2">
+ 
+[% ELSE %]
+<TABLE>
+<tr>
+<td colspan="2">
+No Site Nav defined Session = [% sitename %] from stetup [% site %]
+    </TD>
+    </TR>
+
+    </TABLE>
+    </CENTER>
+
+
+
+[% END %] 
+
+ 

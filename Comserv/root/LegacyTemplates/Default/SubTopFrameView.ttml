@@ -1,0 +1,94 @@
+[%
+#	$Id: SubTopFrameView.ttml,v 1.2 2002/09/12 20:35:25 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it doesn't rely on any
+# variables from outside.
+
+%]
+
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+[% group    = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% IF data.session_object.getAttribute('-KEY','SiteName') %]
+[% site = data.site_name %]
+ [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+[% ELSE %]
+
+[% SiteName = data.SiteName %]
+	
+
+[% END %]
+    <HTML>
+    <HEAD>
+    <TITLE>[% data.script_display_name %]: [% data.page_title %]</TITLE>
+    <META HTTP-EQUIV ="REFRESH" CONTENT="60">
+[% IF data.css_view_url %]
+    <LINK REL = "stylesheet" TYPE = "text/css" 
+          HREF = "[% data.css_view_url %]">
+[% END %]
+
+    <SCRIPT LANGUAGE="JavaScript">
+    <!--
+    var clicks = 0;
+
+    function submitOnce() {
+        clicks ++;
+        if (clicks < 2) {
+            return true;
+        } else {
+            // alert("You have already clicked the submit button. " + clicks + " clicks");
+            return false;
+        }
+    }
+    //-->
+    </SCRIPT>
+
+<!-- Call SideBarHeadScript Site name [% SiteName %] First Name [% firstname%] -->
+[% embed('SideBarHeadScript') %] 
+[% IF SiteName == 'ECF'  %]
+[% ELSIF SiteName == 'CSC'  %]
+<!-- Call CSCSideBarScript -->
+[% embed('CSCSideBarScript') %] 
+[% ELSIF SiteName == 'ENCY' OR 'VitaVic'  %] 
+<!-- Call  ENCYJavaScriptHeads-->
+[% embed('ENCYJavaScriptHeads') %] 
+[% ELSIF SiteName == 'Apis'  %] 
+<!-- Call ApisJavaScriptHeads -->
+[% embed('ApisJavaScriptHeads') %] 
+[% ELSE %]
+
+	
+No site defined Please fix Header Definitions. Session = [% sitename %] from stetup [% site %]
+[% END %]
+
+    </HEAD>
+    <BODY>
+[% IF data.application_sub_menu_view_name %]
+<table>
+    <TR>
+    <TD colspan='2'>
+    [%  embed(data.application_sub_menu_view_name) %]
+    </TD>
+    </TR>  
+</table>    
+[% END %]
+
+</body>
+</html>

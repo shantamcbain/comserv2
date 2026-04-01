@@ -1,0 +1,92 @@
+[%
+#	$Id: OrganicHomeView.ttml,v 1.4 2002/05/31 13:40:30 shanta Exp $
+
+
+%][% embed(data.page_top_view,['-PAGE_TITLE','Home']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+       [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+  
+		<A NAME="PageTop"></A>
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+
+		<tr>
+		<td >
+			[% IF username %]
+
+		<h3> Hello  [% firstname%]&nbsp;  [% lastname%]! Welcome to the Organic Farming site!</h3>
+		
+			[% IF  group == 'normal'%]
+
+<p>As a guest you may view the FAQ, Plant and other database . Contribute to Forums, Calendar of announcements, Buy and Sell, and Links.
+</p>
+<p>Members may contribute to the sites contend and Join committees monitor content of the different databases hosted on the site. Create logs that certification organizations need to access to maintain certification. Available logs will vary according to the need of your certification organization. 
+	</p>	[% ELSE %]
+<p>Member home</p>
+			[% END %]
+
+	[% ELSE %]
+
+			 		<h2>Explore the world of organic farming. </h2>
+ 	
+<p><font size="-2">To get the most from this application you will need to create an account.</font>
+<A HREF = "[% data.script_name %]?session_id=[% session_id %]&amp;submit_logon=on&amp;site=[%SiteName%]"
+                 TARGET = "[% data.link_target %]">Logon</A> 
+                 
+                 
+               <a href="/cgi-bin/FAQ/faq.cgi?site=[%SiteName%]&amp;[% session_string %]&amp;sort_field1=category &amp;sort_field2=fname &amp;first_record_to_display=0&amp;records_per_page= &amp;record_id=2&amp;columns_to_view=category &amp;columns_to_view=question&amp;display_details_view.x=8 &amp;display_details_view.y=9&amp;display_details_view=on" onmousedown="click Here for info on what we collect">Why should I create an account</a>
+    
+		
+		</td >
+		</tr>
+		<tr>
+		<td >
+
+		
+
+
+		<p>We have Forums, Links list, FAQ's, Procedures, Plant Databases, How to's all contributed by users..
+		</p>
+					
+					
+					
+					
+				<p>This is a user contributed site. All content of this site is a result of user contributions. It will evolve to fit your needs. The First step is to create an account. <A HREF = "[% data.script_name %]?session_id=[% session_id %]&amp;submit_logon=on&amp;site=[%SiteName%]" 
+                 TARGET = "[% data.link_target %]">Guest Accounts</A> are Free. 	<A HREF = "[% data.script_name %]?session_id=[% session_id %]&amp;view=MemberShipView&amp;site=[%SiteName%]" 
+                 TARGET = "[% data.link_target %]">Register</A> Click register button.
+</p> 
+				
+			[% END %]
+           <p>Although the sites focus is sustainable organic farming in Canada.
+           <br>The application that it runs on has a world view  of organic farming. 
+           <br>
+           </p>
+
+				
+<a href="/cgi-bin/Organic/organic.cgi?site=Organic&amp;view=WebAppView&amp;[% session_string %]" name="WebAppView" title="Click here for details of this application">How can the Organic Farming Application help your organization?</a>
+</td>
+</tr>
+</table>
+<br>
+<br>
+<br>
+<p>
+
+[% embed('CSCCopyRight') %]
+
+[% embed(data.page_bottom_view) %]
+

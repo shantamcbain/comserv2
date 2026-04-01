@@ -1,0 +1,156 @@
+[% raw_search = data.cgi_object.param('raw_search') %]
+
+[% IF data.session_object %]
+
+    [% session_id=data.session_id %]
+    
+[% END %]
+
+[% total_records = data.total_records %]
+
+[% IF data.cgi_object.param('columns_to_view') %]
+
+    [% columns_to_view = data.cgi_object.param('columns_to_view') %]
+
+[% ELSE %]
+
+    [% columns_to_view = data.selected_display_fields %]
+    
+[% END %]
+
+[% columns_to_view_string = columns_to_view.join("&columns_to_view=") %]
+
+[% IF data.first_record_on_page + data.max_records_per_page < total_records %]
+
+    [% last_record_on_page = data.first_record_on_page + data.max_records_per_page %]
+    
+[% ELSE %]
+
+    [% last_record_on_page = total_records %]
+        
+[% END %]
+
+[% #previous_page_link = PROCESS generatePreviousPageLink %]
+     
+[% #next_page_link =  PROCESS generateNextPageLink %]
+        
+[% first_record_on_page_human_readable = data.first_record_on_page + 1 %] 
+
+        <TABLE WIDTH = "400">
+        <TR>
+        <TD COLSPAN = "3" CLASS = "tableHeaderStyle" ALIGN = "CENTER">
+        [% PROCESS generatePreviousPageLink %]
+        [% PROCESS generateNextPageLink %]
+        &nbsp;
+        </TD>
+        </TR>
+        </TABLE>
+
+
+[% BLOCK generatePreviousPageLink %]
+
+    [% columns_to_view_string = columns_to_view.join("&columns_to_view=") %]
+    
+    [% IF data.first_record_on_page == 0 %]
+       
+       [% RETURN %]
+       
+    [% END %]
+
+    [% IF data.cgi_object.param('submit_power_search') %]
+        
+        [% power_search_string = "submit_power_search=on" %]
+        
+        [% FOREACH field= columns_to_view %]
+            
+            [% IF data.cgi_object.param(field) %]
+            
+            	[% power_search_string = "$power_search_string&$field=data.cgi_object.param($field)" %]
+                
+            [% END %]
+        
+        [% END %]
+        
+        [% IF raw_search %]
+        
+                [% power_search_string = "$power_search_string&raw_search=$raw_search" %]
+        
+        [% END %]
+    
+    [% ELSIF data.cgi_object.param('simple_search_string') %]
+    
+    	[% simple_search_string = data.cgi_object.param('simple_search_string') %]
+    
+    [% END %]
+        
+    [% first_record_on_previous_page = data.first_record_on_page - data.max_records_per_page %]
+    
+    <A HREF="[% data.script_name %]?records_per_page= [% data.max_records_per_page %]&columns_to_view=[% columns_to_view_string %]&simple_search_string=[% data.simple_search_string %]&sort_field1=[% data.sort_field1 %]&sort_field2=[% data.sort_field2 %]&first_record_to_display=[% first_record_on_previous_page %]&session_id=[% session_id %]&view=BasicDataView&[% power_search_string %]"
+           TARGET = "[% data.link_target %]">Previous [% data.max_records_per_page %]</A>
+   
+[% END %]
+
+
+
+
+    
+       
+[% BLOCK generateNextPageLink %]    
+
+    [% columns_to_view_string = columns_to_view.join("&columns_to_view=") %]
+    
+    [% IF data.first_record_on_page + data.max_records_per_page> total_records %]
+    
+        [% RETURN %]
+    
+    [% END %]
+    
+    [% first_record_on_next_page = data.first_record_on_page + data.max_records_per_page %]
+
+    [% remaining_records = total_records - (data.first_record_on_page + data.max_records_per_page) %]
+        
+    [% IF data.cgi_object.param('submit_power_search') %]
+    
+        [% power_search_string = "submit_power_search=on" %]
+        
+        [% FOREACH field= data.cgi_object.param() %]
+        
+            [% IF data.cgi_object.param(field) && field.search("search") %]
+            
+                [% power_search_string = "power_search_string&$field=data.cgi_object.param($field)" %]
+                
+            [% END %]
+            
+        [% END %]
+        
+        [% IF raw_search %] 
+        
+            [% power_search_string = "power_search_string&raw_search=$raw_search" %]
+        
+        [% END %]
+    
+    [% ELSIF data.cgi_object.param('simple_search_string') %]
+    
+    	[% simple_search_string = data.cgi_object.param('simple_search_string') %]
+    
+    [% END %]
+    
+    [% IF remaining_records <= 0 %]
+    
+        [% RETURN %]
+        
+    [% ELSIF remaining_records < data.max_records_per_page %]
+
+       <A HREF ="[% data.script_name %]?records_per_page=[% data.max_records_per_page %]&columns_to_view=[% columns_to_view_string %]&simple_search_string=[% simple_search_string %]&sort_field1=[% data.sort_field1 %]&sort_field2=[% data.sort_field2 %]&first_record_to_display=[% first_record_on_next_page %]&session_id=[% session_id %]&view=BasicDataView&[% power_search_string %]"
+               TARGET = "[% data.link_target %]">Next [% remaining_records %]</A>
+        
+    [% ELSE %]
+        
+        <A HREF ="[% data.script_name %]?records_per_page=[% data.max_records_per_page %]&columns_to_view=[% columns_to_view_string %]&simple_search_string=[% simple_search_string %]&sort_field1=[% data.sort_field1 %]&sort_field2=[% data.sort_field2 %]&first_record_to_display=[% first_record_on_next_page %]&session_id=[% session_id %]&view=BasicDataView&[% power_search_string %]"
+               TARGET = "[% data.link_target %]">Next [% data.max_records_per_page %]</A> 
+        
+    [% END %]   
+    
+    [% RETURN %]
+[% END %] 
+

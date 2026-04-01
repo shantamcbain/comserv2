@@ -1,0 +1,81 @@
+[% #CSC PageTopView
+#	$Id: CSCAddListView.ttml,v 1.3 2002/07/22 22:25:40 shanta Exp $	
+
+# this template generates the top of HTML,
+
+# if -PAGE_TITLE is defined, it gets used in the <title>
+
+# if -SCRIPT_DISPLAY_NAME is defined, it gets used in the <title>
+
+# if -CSS_VIEW_URL is defined, the CSS link is created.
+
+# if -APPLICATION_SUB_MENU_VIEW_NAME is defined, the corresponding
+# template gets embedded
+
+# also see various other logo values below
+
+#Set needed values
+
+%]
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+
+
+
+
+<style type="text/css">
+<!--
+
+.combobox {
+background-color: #FFFFFF;
+color: #808080;
+font-size: 10pt;
+font-family: arial;
+font-weight: bold;
+}
+
+-->
+</style>
+
+
+
+
+
+
+<form>
+
+<select class="combobox" name="SiteMap" onchange="if(options[selectedIndex].value){location = options[selectedIndex].value}" size="1">
+<option selected>Add Forms  </option>
+<option value="url_cat.cgi?display_add_form=on&[%session_string%]">Category</option>
+<option value="client.cgi?display_add_form=on&[%session_string%]">Client</option>
+<option value="/cgi-bin/CSC/droplist.cgi?display_add_form=on&[%session_string%]">DropList category</option>
+<option value="/cgi-bin/CSC/csc_kb.cgi?display_add_form=on&[%session_string%]">KB</option>
+<option value="/log.cgi?display_add_form=on&[%session_string%]">Log</option>
+<option value="/cgi-bin/News/news_manager.cgi?display_add_form=on&[%session_string%]">News</option>
+<option value="/CSC/site_news_manager.cgi?display_add_form=on&[%session_string%]">Site News</option>
+<option value="/Projects/project_tracker.cgi?[%session_string%]&display_add_form=on">Project</option>
+<option value="http://computersystemconsulting.ca/cgi-bin/CSC/csc_url_sub.cgi?display_add_form=on&[%session_string%]">Subject</option>
+<option value="/cgi-bin/ToDo/todo.cgi?display_add_form=on&[%session_string%]">ToDo</option>
+<option value="/cgi-bin/CSC/csc_url_admin.cgi?display_add_form=on&[%session_string%]">URL</option>
+<option value="http://computersystemconsulting.ca/cgi-bin/Extropia/extropia_kb.cgi?display_add_form=on&[%session_string%]">Extropia kb</option>
+<option value="http://computersystemconsulting.ca/cgi-bin/Extropia/extropia_methouds.cgi?display_add_form=on&[%session_string%]">Extropia Methouds</option>
+</select>
+</form>
+
+
+
+
+
+     	 
+		  
+[% #Target ="_Blank">%]
+

@@ -1,0 +1,222 @@
+[% RAWPERL %]
+
+use strict;
+
+use Extropia::Core::Base qw(_rearrange);
+my @required = (
+        -SCRIPT_NAME,
+        -ERROR_MESSAGES,
+        -CGI_OBJECT,
+        -KEY_FIELD,
+        -DISPLAY_FIELDS,
+        -FIELD_NAME_MAPPINGS,
+        -IMAGE_ROOT_URL,
+        -SELECTED_DISPLAY_FIELDS,
+        -RECORDS,
+        -TOTAL_RECORDS,
+        -TABLE_HEADER,
+        -ALLOW_MODIFICATIONS_FLAG,
+        -ALLOW_DELETIONS_FLAG,
+        -REQUIRE_MATCHING_USERNAME_FOR_MODIFICATIONS_FLAG,
+        -REQUIRE_MATCHING_GROUP_FOR_MODIFICATIONS_FLAG,
+        -REQUIRE_MATCHING_USERNAME_FOR_DELETIONS_FLAG,
+        -REQUIRE_MATCHING_GROUP_FOR_DELETIONS_FLAG,
+            );
+
+my $view_obj = $stash->get('view_obj');
+my $rh_data  = $view_obj->get_data;
+
+exists $rh_data->{$_} or die "$_ is not set" for @required;
+
+my $session                                     = $rh_data->{-SESSION_OBJECT}; 
+my $script_name                                 = $rh_data->{-SCRIPT_NAME};
+my $errors                                      = $rh_data->{-ERROR_MESSAGES};
+my $cgi                                         = $rh_data->{-CGI_OBJECT};
+my $key_field                                   = $rh_data->{-KEY_FIELD};
+my $default_display_fields_ref                  = $rh_data->{-DISPLAY_FIELDS} || [];
+my $display_confirmation_on_delete_flag         = $rh_data->{-DISPLAY_CONFIRMATION_ON_DELETE_FLAG};
+my $field_name_mappings                         = $rh_data->{-FIELD_NAME_MAPPINGS};
+my $image_root_url                              = $rh_data->{-IMAGE_ROOT_URL};
+my $selected_display_fields                     = $rh_data->{-SELECTED_DISPLAY_FIELDS};
+my @records                                     = @{ $rh_data->{-RECORDS} || []};
+my $total_records                               = $rh_data->{-TOTAL_RECORDS};
+my $allow_modifications_flag                    = $rh_data->{-ALLOW_MODIFICATIONS_FLAG};
+my $allow_deletions_flag                        = $rh_data->{-ALLOW_DELETIONS_FLAG};
+my $require_matching_username_for_modifications = $rh_data->{-REQUIRE_MATCHING_USERNAME_FOR_MODIFICATIONS_FLAG};
+my $require_matching_group_for_modifications    = $rh_data->{-REQUIRE_MATCHING_GROUP_FOR_MODIFICATIONS_FLAG};
+my $require_matching_username_for_deletions     = $rh_data->{-REQUIRE_MATCHING_USERNAME_FOR_DELETIONS_FLAG};
+my $require_matching_group_for_deletions        = $rh_data->{-REQUIRE_MATCHING_GROUP_FOR_DELETIONS_FLAG};
+
+my $http_header_params                          = $rh_data->{-HTTP_HEADER_PARAMS} || [];
+my $hidden_admin_fields_view_name               = $rh_data->{-HIDDEN_ADMIN_FIELDS_VIEW_NAME};
+my $url_encoded_admin_fields_view_name          = $rh_data->{-URL_ENCODED_ADMIN_FIELDS_VIEW_NAME};
+my $page_top_view_name                          = $rh_data->{-PAGE_TOP_VIEW};
+my $page_bottom_view_name                       = $rh_data->{-PAGE_BOTTOM_VIEW};
+my $link_target                                 = $rh_data->{-LINK_TARGET};
+my $session_id                                  = $rh_data->{-SESSION_ID};
+my $username                                    = $rh_data->{-AUTH_USERNAME};
+my $groups                                      = $rh_data->{-AUTH_GROUPS};
+my $table_header                                = $rh_data->{-TABLE_HEADER};
+my $display_type                                = $rh_data->{-DISPLAY_TYPE} || "";
+
+my $sort_field1          = $cgi->param('sort_field1') || "";
+my $sort_field2          = $cgi->param('sort_field2') || "";
+
+my $rh_record = $records[0]; 
+
+my $record_id = $rh_record->{$key_field};
+my $username_of_poster;
+my $group_of_poster = '';
+if ($require_matching_username_for_modifications ||
+    $require_matching_username_for_deletions) {
+    $username_of_poster = $rh_record->{'username_of_poster'} || '';
+    $group_of_poster    = $rh_record->{'group_of_poster'}    || '';
+}
+
+my @columns_to_view = $cgi->param('columns_to_view') 
+    ? $cgi->param('columns_to_view')
+    : @$selected_display_fields;
+
+my $columns_to_view_string = join "&columns_to_view=",@columns_to_view;
+
+    $output .=  qq[
+        <CENTER>
+        <TABLE WIDTH = "90%" BORDER = "0" CELLSPACING = "2" CELLPADDING = "0">
+        <TR>
+        <TD CLASS = "sectionHeaderStyle" COLSPAN = "2">
+            $table_header
+        </TD>
+        </TR>
+    ];
+
+unless ($total_records){
+    $output .=  qq[
+        <TR>
+        <TD COLSPAN = "2">
+        Sorry, no records were returned.
+        </TD>
+        </TR>
+        </TABLE>
+        </CENTER>
+    ];
+
+    return;
+}
+
+foreach my $field (@$default_display_fields_ref) {
+#    my $field_name = $field_name_mappings->{$field} || $field;
+    $output .= qq[
+        <TR>
+        <TH CLASS = "tableColumnHeaderStyle" WIDTH = "25%">
+        &nbsp;$field_name&nbsp;
+        </TH>
+
+        <TD CLASS = "tableRowStyle">
+    ];
+
+    my $field_value = $rh_record->{$field};
+
+    if ($field_value) {
+        # make sure that the session id carries to the script
+        # if the URL includes a session id tag: %SESSION_ID%
+        $field_value =~ s/%SESSION_ID%/$session_id/;
+
+        # format the value
+        $field_value = $view_obj->embed('PageRenderTextField',
+                                        {-WIDGET_NAME  => $field,
+                                         -WIDGET_VALUE => $field_value,
+                                         -RH_RECORD    => $rh_record,
+                                        }
+                                       );
+    }
+
+    $output .= qq[
+        &nbsp;$field_value&nbsp;
+        </TD>
+        </TR>
+    ];
+}
+
+if ($allow_modifications_flag || $allow_deletions_flag) {
+    $output .= qq[
+        <TR>
+        <TD ALIGN = "RIGHT" CLASS = "tableRowStyle" COLSPAN = "2">
+                 ];
+}
+
+# don't display modify/delete options if we are in confirmation mode
+# used for example for deletion confirmation
+unless ($display_type eq 'CONFIRM') {
+
+    my $url_encoded_admin_variables = $view_obj->embed
+        ($url_encoded_admin_fields_view_name,
+         [-RECORD_ID => $record_id]);
+
+
+    if ($allow_deletions_flag) {
+        my $poster_in_group_of_user = 0;
+        my $group;
+
+        foreach $group (split(",", $groups)) {
+            if ($group and $group eq $group_of_poster) {
+                $poster_in_group_of_user = 1;
+                last;
+            }
+        }
+
+        if ((!$require_matching_username_for_deletions ||
+             $username eq $username_of_poster) &&
+            (!$require_matching_group_for_deletions ||
+             $poster_in_group_of_user)) {
+
+            if ($display_confirmation_on_delete_flag) {
+                $output .= qq[
+                              <A HREF = "$script_name?$url_encoded_admin_variables&display_delete_record_confirmation=on&record_id=$record_id"
+                              TARGET = "$link_target">Delete</A>
+                             ];
+            } else {
+                $output .= qq[
+                              <A HREF = "$script_name?$url_encoded_admin_variables&submit_delete_record=on&record_id=$record_id"
+                              TARGET = "$link_target">Delete</A>
+                             ];
+            }
+        }
+    }
+
+
+
+    if ($allow_modifications_flag) {
+        my $poster_in_group_of_user = 0;
+        foreach my $group (split(",", $groups)) {
+            if ($group and $group eq $group_of_poster) {
+                $poster_in_group_of_user = 1;
+                last;
+            }
+        }
+
+        if ((!$require_matching_username_for_modifications || $username eq $username_of_poster) 
+            &&
+            (!$require_matching_group_for_modifications    ||  $poster_in_group_of_user)) {
+            $output .= qq[
+                          | <A HREF = "$script_name?$url_encoded_admin_variables&display_modification_form=on&record_id=$record_id"
+                          TARGET = "$link_target">Modify</A>
+                         ];
+        }
+    }
+
+
+    if ($allow_modifications_flag || $allow_deletions_flag) {
+        $output .= qq[
+                      </TD>
+                      </TR>
+                     ];
+    }
+
+}
+
+$output .=  qq[
+        </TABLE>
+        </CENTER>
+              ];
+
+[% END %]

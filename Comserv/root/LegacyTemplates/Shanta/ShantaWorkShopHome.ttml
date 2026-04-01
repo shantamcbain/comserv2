@@ -1,0 +1,54 @@
+[%
+#	$Id: ShantaHome.ttml,v 1.1 2001/12/16 03:45:30 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it doesn't rely on any
+# variables from outside.
+
+%]
+
+[%# embed(data.page_top_view,['-PAGE_TITLE',' Home page.']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+
+
+[% IF username == 'Shanta' %]
+<h3>Things you need to do.</h3>
+[% embed(todolistview) %]
+[% END %]
+
+
+
+<p>Here  we create things with wood and learn how to do it.
+
+<a href="http://usbm.ca" target="_Blank" >USBM</a>. We are proud to sponsor The Universal School of Biological Life Site.
+<br>
+<br>                      <script type=" text/javascript" src="/cgi-bin/News/news.cgi?embed=1&amp;site=Shanta&amp;simple_search_string=Shanta&amp;records_per_page=20">
+</script>
+
+<br>
+<br>
+<br>
+<p>
+
+
+
+
+
+
+

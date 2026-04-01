@@ -1,0 +1,44 @@
+[% #/HTMLTemplates/Default/EmbedPageTopView.ttml
+#	$Id: PageTopView.ttml,v 1.14 2002/10/23 21:35:03 shanta Exp $#
+#Servers this page used by.
+# csc.ca, bcaf, forager.com shanta.org webcthelpdesk.com
+
+# this template generates the top of HTML,
+
+# if -PAGE_TITLE is defined, it gets used in the <title>
+
+# if -SCRIPT_DISPLAY_NAME is defined, it gets used in the <title>
+
+# if -CSS_VIEW_URL is defined, the CSS link is created.
+
+# if -APPLICATION_SUB_MENU_VIEW_NAME is defined, the corresponding
+# template gets embedded
+
+# also see various other logo values below
+
+%]
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% site = data.site_name %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group    = data.session_object.getAttribute('-KEY','auth_groups') %]
+ 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+[% IF data.session_object.getAttribute('-KEY','SiteName') %]
+
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+[% ELSE %]
+
+[% SiteName = data.SiteName %]
+[% PageTop = data.page_top_view %]
+	
+
+[% END %]
+

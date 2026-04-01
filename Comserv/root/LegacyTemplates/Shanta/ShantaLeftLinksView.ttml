@@ -1,0 +1,46 @@
+[%
+
+# the Left Page template
+#	$Id: ShantaLeftLinksView.ttml,v 1.1 2002/10/29 16:01:32 shanta Exp shanta $	
+
+%]
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+ <tr>
+  <td>
+<script language = "javascript"
+ src="/cgi-bin/CSC/todo.cgi?embed=1&site=Shanta">
+</script>
+</td>
+ </tr>
+ <tr>
+  <td>
+<A HREF="/shanta/ham.htm"  ><font class="LeftSideBarNavStyle">Ham Radio</font></A><br>
+<A HREF="/shanta/newhistory.htm" ><font class="LeftSideBarNavStyle">History  of Shanta's</font></A><br>
+<br>
+<br>   <A HREF="/shanta/smres.htm"  ><font class="LeftSideBarNavStyle">Resume</font></A><br>
+<A HREF="/shanta/shantas.html"  ><font class="LeftSideBarNavStyle">Other Shantas</font></A><br>
+<A HREF="/cgi-bin/Shanta/tree.cgi?site=Genealogy"  ><font class="LeftSideBarNavStyle">Family Tree</font></A><br>
+</td>
+ </tr>
+  <tr>  
+   <td >
+[% embed('FindAnswerContents') %]
+   </td>
+    </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+[% embed('NewsLinksView') %]

@@ -1,0 +1,97 @@
+[% set_headers(data.http_header_params) %]
+  [% PROCESS DefaultDbi.ttml %]
+ 
+[% SET logon_message = data.error_list.join("<BR>\n") IF data.error_list.size %]
+
+[% embed(data.page_top_view) %]
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+	<FORM ACTION="[% data.script_name %]" METHOD="POST">	
+	<CENTER>
+        <TABLE WIDTH="100%" BORDER="0" 
+               CELLSPACING="2" CELLPADDING="0">
+
+	<TR>
+	<TD COLSPAN="2" HEIGHT="50">
+	</TR>
+
+        <TR> 
+        <TD CLASS ="sectionHeaderStyle" COLSPAN ="2">
+	Logon
+	</TD>
+        </TR>
+
+	<TR>
+	<TD COLSPAN="2" BGCOLOR="#E5E5E5">
+	[% logon_message %]
+        [% embed('AuthManager/CGI/FormData2Hidden') %]
+	</TD>
+	</TR>
+
+	<TR> 
+        <TD CLASS = "tableRowHeaderStyle" ALIGN="LEFT" VALIGN="TOP" WIDTH="25%"> 
+	Username
+	</TD>
+            
+	<TD CLASS = "tableRowStyle" ALIGN="LEFT" VALIGN="TOP"> 
+	<INPUT TYPE="TEXT" NAME="auth_username" 
+               SIZE="37" VALUE="[% data.username %]">
+	</TD>
+        </TR>
+
+	<TR> 
+        <TD CLASS = "tableRowHeaderStyle" ALIGN="CENTER" VALIGN="TOP"  WIDTH="25%">
+	Password
+	</TD>
+            
+	<TD CLASS = "tableRowStyle"  ALIGN="LEFT" VALIGN="TOP"> 
+	<INPUT TYPE="PASSWORD" NAME="auth_password" SIZE="37">
+	</TD>
+        </TR>
+
+	<TR>
+	<TD COLSPAN="2" HEIGHT="10">
+	</TR>
+
+	<TR>
+	<TD COLSPAN="2" ALIGN="CENTER">
+	<INPUT TYPE="SUBMIT" NAME="auth_submit_logon" 
+               VALUE="      Logon      ">
+          <INPUT TYPE="HIDDEN" NAME="site"
+               VALUE = "[% SiteName %]">
+
+[% IF data.allow_registration %]
+        <INPUT TYPE="SUBMIT" NAME="auth_submit_registration_request"
+               VALUE="     Register     ">
+         <INPUT TYPE="HIDDEN" NAME="site"
+               VALUE = "[% SiteName %]">
+[% END %]
+
+[% IF data.allow_user_search %]
+        <INPUT TYPE="SUBMIT" NAME="auth_submit_search_request"
+               VALUE="Search for Account">
+        <INPUT TYPE="TEXT"   NAME="simple_search_string"
+               VALUE="[% data.simple_search_string %]">
+         <INPUT TYPE="HIDDEN" NAME="site"
+               VALUE = "[% SiteName %]">
+[% END %]
+
+	</TD>
+	</TR>
+	</TABLE>
+	</CENTER>
+	</FORM>
+
+[% embed(data.page_bottom_view) %]
+

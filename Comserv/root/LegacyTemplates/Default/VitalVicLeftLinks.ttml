@@ -1,0 +1,112 @@
+[%
+#	$Id: VitalVicLeftLinks.ttml,v 1.1 2002/08/24 23:29:31 shanta Exp $	
+
+# the Left Page template
+#location /cgi-bin/HTMLTemplates/Mitegone
+%]
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username         = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group            = data.session_object.getAttribute('-KEY','auth_group') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+
+  <tr>  
+     <td Class='LeftSideBarNavLinkStyle'><a  href="/cgi-bin/VitalVic/vitalvic.cgi?[% session_string %]&view=VitalVicHomeView" ><font   class="LeftSideBarNavStyle"> Vital Victria Home </font></a>
+     </td>
+    </tr>
+
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+ <tr> 
+  <td>	<A HREF = "/cgi-bin/VitalVic/bbs.cgi?[% session_string %]&view=ForumsView" target="_content"><font   class="LeftSideBarNavStyle"> Forums </font></a>
+  </td>
+ </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+
+ <tr> 
+  <td>	<A HREF = "/cgi-bin/ENCY/ency.cgi?site=VitalVic&[% session_string %]" target="_content"><font   class="LeftSideBarNavStyle"> ENCY </font></a>
+  </td>
+ </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+ <tr>  
+
+   <td Class='LeftSideBarNavLinkStyle'>
+           <A HREF=""/cgi-bin/VitalVic/faq.cgi?[% session_string %]&first_record_to_display=0&records_per_page=10" ><font   class="LeftSideBarNavStyle"> FAQ.</A> </font></a><br>
+    </td>
+    </tr>
+
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+
+ <tr>  
+	<td Class='LeftSideBarNavLinkStyle'>
+
+	<A HREF ="/cgi-bin/VitalVic/url.cgi?[% session_string %]&first_record_to_display=0&records_per_page=10&submit_power_search=on&simple_search_string=Apis" Target ="Blank"><font   class="LeftSideBarNavStyle"> Links </font></a>
+	
+      	</td>
+ </tr>      	
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+      	      	<td Class='LeftSideBarNavLinkStyle'>
+
+	<A HREF ="/cgi-bin/VitalVic/webcal.cgi?[% session_string %]&view=MonthView&submit_power_search=on&simple_search_string=[% username  %]" Target ="Blank"><font   class="LeftSideBarNavStyle">Calendar</font></a>
+	
+      	</td
+ </tr>      	
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+ <tr>  
+
+   <td Class='LeftSideBarNavLinkStyle'>
+           <A HREF="/cgi-bin/VitalVic/vitalvic.cgi?view=VitalVicProductView&[% session_string %]&first_record_to_display=0&records_per_page=10" ><font   class="LeftSideBarNavStyle"> Products</A> </font></a><br>
+    </td>
+    </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+ <tr>  
+   <td>&nbsp;</td>
+  </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+
+
+[% IF group == 'CSC_admin' OR username == 'Shanta' OR group == 'VitalVicAdmin' %]
+  <tr>  
+   <td >
+   
+       <font class="LeftSideBarHeaderStyle" >Admin Tools</font><br>
+    </td>
+    </tr>
+ <tr>  
+
+   <td >
+           <A HREF="faq_manager.cgi?[% session_string %]&first_record_to_display=0&records_per_page=10" ><font   class="LeftSideBarNavStyle"> Apis FAQ Admin.</A> </font></a><br>
+    </td>
+    </tr>
+ <tr>  
+
+   <td >
+
+[% embed('VitalVicAdminHeadLinks.ttml') %]
+    </td>
+    </tr>
+  
+
+[% END %]
+

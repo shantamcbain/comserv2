@@ -1,0 +1,97 @@
+[% RAWPERL %]
+
+#
+# renders the passed text according to the rules extracted via widget
+# name and returns the converted text. optionally you can pass a ref
+# to the record needed for some templates. 
+# META: this shouldn't be optionally! Should be required!
+#
+#    $widget_value = $view_obj->embed('RenderTextField',
+#                                     {-WIDGET_NAME  => $widget_name,
+#                                      -WIDGET_VALUE => $widget_value,
+#                                      -RH_RECORD    => $rh_record,
+#                                     }
+#                                    );
+# or in template:
+#
+#     embed('RenderTextField',
+#             {'-WIDGET_NAME'  => $widget_name,
+#              '-WIDGET_VALUE' => $widget_value,
+#              '-RH_RECORD'    => $rh_record,
+#             }); 
+#    
+#
+
+use strict;
+
+my @required = qw(
+                  -WIDGET_NAME
+                  -WIDGET_VALUE
+                 );
+my $view_obj = $stash->get('view_obj');
+my $rh_data  = $view_obj->get_data;
+exists $rh_data->{$_} or die "$_ is not set" for @required;
+
+my $name  = $rh_data->{-WIDGET_NAME};
+my $value = $rh_data->{-WIDGET_VALUE};
+my $cgi   = $rh_data->{-CGI_OBJECT};
+
+my $link_target = $rh_data->{-LINK_TARGET}|| '';
+my $rh_record   = $rh_data->{-RH_RECORD} || $rh_data->{-RECORDS}->[0] || '';
+
+my %email_fields = 
+    map {$_ => 1} @{$rh_data->{-FIELDS_TO_BE_DISPLAYED_AS_EMAIL_LINKS}||[]};
+my %image_fields   = 
+    map {$_ => 1} @{$rh_data->{-FIELDS_TO_BE_DISPLAYED_AS_IMAGES}||[]};
+my %multi_line_text_fields   = 
+    map {$_ => 1} @{$rh_data->{-FIELDS_TO_BE_DISPLAYED_AS_MULTI_LINE_TEXT}||[]};
+my @url_fields = @{$rh_data->{-FIELDS_TO_BE_DISPLAYED_AS_LINKS}||[]};
+
+return unless $name and defined $value;
+
+# if()'s are non-exclusive, since a few rules my apply to the same
+# column.
+
+if ($email_fields{$name}) {
+    $value = qq[<A CLASS = "events" HREF = "mailto:$value">$value</A>];
+}
+
+if ($image_fields{$name}) {
+    $value = qq[<IMG SRC = "$value">];
+}
+
+# add <BR> if it's not there yet
+# later may want to make it better....(like POD)
+if ($multi_line_text_fields{$name}) {
+    $value =~ s/(?:<BR>)?\n/<BR>/g;
+}
+
+foreach my $url_field (@url_fields) {
+    if (!ref $url_field) {
+        if ($url_field eq $name) {
+            if ($value !~ m|^http://|) {
+                $value =
+                    qq[<A CLASS="events" HREF="http://$value" TARGET="$link_target">$value</A>];
+            } else {
+                $value =
+                    qq[<A CLASS="events" HREF="$value" TARGET="$link_target">$value</A>];
+            }
+            last;
+        }
+    } else {
+        my $url_display_field = $url_field->[1] || '';
+        my $url_field = $url_field->[0] || '';
+
+        if ($url_field eq $name) {
+            my $display_value =
+                $rh_record->{$url_display_field};
+            $value =
+                qq[<A CLASS = "events"  HREF = "$value" TARGET="_blank">$display_value</A>];
+            last;
+        }
+    }
+}
+
+$output .= $value;
+
+[% END %]

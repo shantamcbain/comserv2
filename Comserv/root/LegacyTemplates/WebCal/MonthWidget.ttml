@@ -1,0 +1,103 @@
+[%
+# It uses a ref to a matrix hash data.sel_day_data with the fillout of
+# the cells (refer to
+# WebCal::DisplayDayViewAction::get_data_of_sel_day for more
+# info). The number of columns is precalculated and the last column
+# number is located in data.last_col (count starts from 0); Finally
+# the array with a range of hours to display is in data.display_hours.
+
+ url_encoded_admin_variables = embed(data.url_encoded_admin_fields_view_name);
+ day_view_url = "$data.script_name?site=$data.site_name&amp;session_id=$data.session_id&DisplayDayViewAction=on";
+ event_url = "$data.script_name?site=$data.site_name&amp;session_id=$data.session_id&";
+
+ # reduce the indirection
+ month = data.selected_date_data
+
+ colors = ["#EEEEEE","#FFFFFF"];
+ # assign local defaults
+ wdays = ['Monday', 'Tuesday', 'Wednesday', 'Thurday', 'Friday', 'Saterday', 'Sunday'];
+
+-%]
+
+<!-- START DAY BY HOUR -->
+
+<TABLE WIDTH=100%>
+  <TR BGCOLOR="#EEEEEE"> 
+    <TD ALIGN=left COLSPAN=2>
+      All [% data.selected_date_data.mon_str %] [% data.selected_date_data.year %] Events:
+    </TD> 
+  </TR>
+    &nbsp; &nbsp; &nbsp;
+</TABLE>
+
+
+
+<TABLE CELLSPACING="1" CELLPADDING="1" WIDTH="100%" BORDER="0">
+
+  <!-- header -->
+  <TR>
+    [% FOR wday =  wdays %]
+      <TD WIDTH="14%" CLASS="month_wday_header">
+      <B><FONT SIZE=-1>[% wday %]</FONT></B>
+      </TD>
+    [% END %]
+  </TR>
+
+  <!-- rows -->
+  [% count = 0 %]
+  [% FOR row = [1..6] %]
+    <TR>
+      [% day_count = count %]
+      [% FOR wday_ind = [1..7] %]
+          [% count = (count || (wday_ind == month.month_begin_wday)) ? count + 1 : 0 %]
+          [% IF count && count <= month.days_in_month %]
+            [% 
+             date = subs.sprintf("%04d-%02d-%02d",month.year,month.mon,count);
+            -%]
+             <TD CLASS="month_view_day_header">
+                  <A HREF="[% "$day_view_url&amp;date=$date" %]">[% count %]</A>
+             </TD>
+          [% ELSE %]
+             <TD WIDTH="14%" >
+               &nbsp;<P>
+             </TD>
+          [% END %]
+
+      [% END %]
+    </TR>
+
+    <TR>
+      [% # restore the count for the data row %]
+      [% count = day_count %]
+      [% FOR wday_ind = [1..7] %]
+          [% count = (count || (wday_ind == month.month_begin_wday)) ? count + 1 : 0 %]
+          [% IF count && count <= month.days_in_month %]
+            [% selected = month.mday == count ? 1 : 0; %]
+            [% mday = count + 1 %]
+            [% IF data.sel_mon_data.$mday.size %]
+                <TD BGCOLOR=lightgreen CLASS="[% selected ? "month_day_cell_selected" : "month_day_cell" %]">
+                  [% FOR event = data.sel_mon_data.$mday %]
+                      <li><A HREF="[% "$event_url&amp;display_details_view=on&amp;date=$day.date&amp;record_id=$event.record_id" %]">[% event.note %]</A>
+                  [% END %]
+                </TD>
+            [% ELSE %]
+                <TD CLASS="[% selected ? "month_day_cell_selected" : "month_day_cell" %]">
+                 &nbsp;<BR>
+                 &nbsp;<BR>
+                 &nbsp;<BR>
+                </TD>
+            [% END %]
+          [% ELSE %]
+             <TD WIDTH="14%" >
+               &nbsp;<P>
+             </TD>
+          [% END %]
+      [% END %]
+    </TR>
+    [% LAST IF count >= month.days_in_month %]
+  [% END %]
+
+</TABLE>
+
+
+

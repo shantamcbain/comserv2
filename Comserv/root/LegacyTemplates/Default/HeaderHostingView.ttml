@@ -1,0 +1,11 @@
+[%# /HTMLTemplates/Default/HeaderHostingView.ttml %]
+[%# 	$Id: HeaderHostingView.ttml,v 0.01 2003/11/29 06:33:25 shanta Exp shanta $	%]
+				
+	[% IF SiteName == 'CSC' %]
+	  <a href="/cgi-bin/index.cgi?&amp;site=[%SiteName%]&amp;session_id=[% session_id %]&amp;view=HostingView&m=[% data.mobile %]" title="Host with us.">Hosting</a>
+
+	[% ELSE %]
+
+				 by <a href="/cgi-bin/index.cgi?&amp;site=[%SiteName%]&amp;session_id=[% session_id %]&amp;view=HostingView&m=[% data.mobile %] " title="Host with us.">[% HostName %]</a>
+	[% END %]
+<!--HeaderHostingView.ttml  -->				

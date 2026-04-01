@@ -1,0 +1,94 @@
+[%
+#	$Id: ApisProductView.ttml,v 0.02 2002/05/01 15:47:05 shanta Exp $
+
+
+%]
+
+[% embed('ErrorDisplayView') %] 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% IF data.view == 
+ApisProductView# %]
+	[%# embed(data.page_top_view,['-PAGE_TITLE','Products page.']) %]
+[% END %] 
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td >
+	[%# SiteName  %]
+
+
+	  
+
+	[% IF SiteName == 'ECF' %]
+
+	<h3>These are our Products And Services! Please log in for better service.</h3
+	[% ELSE %]
+	<h3>  Hello! These are  Products And Services Provided by Beekeepers!
+<p> Please log in for better service.</h3
+	[% END %]
+
+
+
+[% IF SiteName == 'ECF' %]
+
+[% embed('ECFProductView') %]
+	[% ELSE %]
+<h2>Products Provided by Beekeepers</h2>
+
+Products may be ordered online for pickup at participating Participating bee keepers.
+<ul>
+	<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=ApisHoneyView#Honey" title="Learn more about honey!">Honey</a>.
+        <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=ApisPollenView" title="Learn more about Pollen!">Pollen</a>.
+	<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=ApisWaxView" title="Learn more about Wax!">Wax</a>.
+     	<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=ApisBeesView">Bees</a>.
+        <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=ApisQueensView">Queens</a>.
+	<li>MiteGone <a href="http://mitegone.com" > Check out their site</a>
+        <li>Want to sell bee products our <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=ApisWholesaleView">Wholesale</a>.
+
+</ul></li>
+</ul>
+
+<h2>Services Provided by Beekeepers</h2>
+<ul>
+	<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=ApisPolinatorsView"title="Learn more about Pollination!">Pollination</a>
+	<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=ApisManagementView">Operation management services</a>.
+ 	<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=ApisMentoringView">Online Mentoring </a>Small and beginner beekeeping consulting.
+        <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=ApisSwarmsView">Swarm catching</a>.
+</ul>
+Apis at shanta.org provides online services to Bee Keepers. They include
+<ul>
+	<li>Individual memberships.
+	<li>Club and Organisation <a href="http://store.beemaster.ca/cgi-bin/store/store.cgi?&amp;L=eng&amp;P=ApisHosted">hosting.</a>
+	<li>Company Web site <a href="http:/store.beemaster.ca/cgi-bin/store/store.cgi?&shop=csc&amp;L=eng&amp;P=ApisHosted">hosting.</a>
+	<li>Store capabilities to accompany your site
+
+          <ul>
+	      <li>Online Stores are secure sites that requires you create a login account. Accounts are free and are for the site to know who you are. This is to protect your information. Please click register to create an account. You may use your Apis account information if you like. As with all site hosted on our server your information is confidential and not sold to others sites.  For more information on login accounts please click HelpDesk and search the FAQ for Login.
+	      <li><a href="http://countrystores.ca/cgi-bin/store/store.cgi?shop=cs">Retail</a>  
+	      <li><a href="http://countrystores.ca/cgi-bin/store/store.cgi?shop=apis">Wholesale</a>
+	      <li><a href="http://countrystores.ca/cgi-bin/store/store.cgi?shop=csc&amp;L=eng&amp;P=ApisStoreAppHosting">Add store application.</a>
+          </ul>
+</ul>
+<div ALIGN="CENTER">
+	[% END %]
+
+
+
+
+
+
+
+[% embed(data.page_bottom_view) %]
+

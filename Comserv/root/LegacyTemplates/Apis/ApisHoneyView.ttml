@@ -1,0 +1,52 @@
+[%
+#	$Id: ApisQueensView.ttml,v 1.1 2003/11/29 06:42:47 shanta Exp shanta $	%]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Queens']) %]
+
+[% embed('ErrorDisplayView') %]
+
+ [% PROCESS DefaultDbi.ttml %]
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+  
+
+ 
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td >
+<h3>This is our Honey view.</h3>
+<p>Learn about and find honey
+<p>Honey Comes in many types do the almost infinitive combinations of nectar and pollens.</p>
+
+
+<h2>beemaster.ca honey Member List </h2>
+
+<ol>
+	<li><a href="http://ecf.beemaster.ca/cgi-bin/index.cgi?site=[% ECF %]&amp;[% session_string %]&amp;view=ProductView#Honey" title="Learn more about honey!">Eagle Creek Farms</a></li>
+	<li></li>
+	<li></li>
+</ol>
+
+
+</td>
+</tr>
+</table>
+
+
+
+
+
+[% embed(data.page_bottom_view) %]
+

@@ -1,0 +1,56 @@
+[% PROCESS DefaultDbi.ttml %]
+[% url_encoded_admin_variables =
+   embed(data.url_encoded_admin_fields_view_name); 
+   day_view_url = "$data.script_name?site=$data.site_name&amp;$url_encoded_admin_variables";
+
+ # reduce the indirection
+ sel = data.selected_date_data
+
+ mdays   = [1..31];
+ months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+ years = [2001..2025];
+
+-%]
+
+<TABLE CELLSPACING="2" CELLPADDING="1" WIDTH="100%" BORDER="0">
+  <!-- small navbar -->
+  <TR>
+      <TD WIDTH="14%" COLSPAN=2 CLASS="month_title_header">
+      Add Event
+      </TD>
+  </TR>
+
+  <FORM>
+  <TR>
+      <TD VALIGN=MIDDLE CLASS="month_day_cell">
+        <SELECT NAME="mday">
+          [% FOR mday = mdays %]
+            <OPTION  VALUE="[% mday %]"[% " SELECTED" IF mday == sel.mday %]>[% mday %]
+          [% END %]
+        </SELECT>
+
+        <SELECT NAME="mon">
+          [% count = 0 %]
+          [% FOR mon = months %]
+            [% count = count + 1 %]
+            <OPTION  VALUE="[% count %]"[% " SELECTED" IF count == sel.mon %]>[% mon %]
+          [% END %]
+        </SELECT>
+
+        <SELECT NAME="year">
+          [% FOR year = years %]
+            <OPTION  VALUE="[% year %]"[% " SELECTED" IF year == sel.year %]>[% year %]
+          [% END %]
+        </SELECT>
+      </TD>
+      <TD VALIGN=MIDDLE CLASS="month_day_cell">
+    <INPUT TYPE=HIDDEN NAME="site" VALUE="[% data.site_name %]">
+    <INPUT TYPE=HIDDEN NAME="view_mode" VALUE="[% data.view_mode %]">
+    <INPUT TYPE=SUBMIT NAME="display_add_form" VALUE="Add">
+    <INPUT TYPE=HIDDEN NAME="session_id" VALUE="[% data.session_id %]">
+     </TD>
+  </TR>
+  </FORM>
+
+</TABLE>

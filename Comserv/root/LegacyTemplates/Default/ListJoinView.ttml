@@ -1,0 +1,365 @@
+[%
+#	$Id: ListJoinView.ttml,v 1.4 2002/05/31 13:40:30 shanta Exp $
+
+
+%][%# embed(data.page_top_view,['-PAGE_TITLE','Join our mailing lists']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+       [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+
+		<tr>
+		<td >
+		<div align="center"
+		
+		<h3>[% data.site_display_name %]</h3>
+			[% IF username %]
+
+		<h3>[% firstname%]! Our Lists!</h3>
+
+
+			[% ELSE %]
+
+			<h3> These are our Lists!</h3
+<p>To get the most from this application you will need to create an account. 
+
+<p><A HREF = "[% data.script_name %]?session_id=[% session_id %]&amp;submit_logon=on&amp;site=[%SiteName%]"
+                 TARGET = "[% data.link_target %]">Logon</A> 
+                 
+                 
+               <a href="/cgi-bin/FAQ/faq.cgi?site=[%SiteName%]&amp;[% session_string %]&amp;sort_field1=category &amp;sort_field2=fname &amp;first_record_to_display=0&amp;records_per_page= &amp;record_id=2&amp;columns_to_view=category &amp;columns_to_view=question&amp;display_details_view.x=8 &amp;display_details_view.y=9&amp;display_details_view=on" onmousedown="click Here for info on what we collect">Why should I create an account</a>
+    
+			[% END %]
+		</div>
+		</td >
+		</tr>
+		<tr>
+		<td >
+
+		<A NAME="PageTop"></A>
+
+
+
+[% IF SiteName == 'Apis' OR
+         SiteName == 'BMaster' %]
+         
+     [% IF username == 'Shanta' OR
+           group == 'BMaster_member' OR
+           group == 'Apis_Admin'  OR
+           group == 'BMaster_Admin'   
+     %] 
+ 
+     
+     Your E-mail address: <INPUT type="Text" name="email" size="30" value="[% email %]"><br>
+ Your Name (optional): <INPUT type="Text" name="fullname" size="30" value="[% firstname %]&nbsp; [% lastname%]"><br><br>
+ You may enter a privacy password below. This provides only mild security, but should<br>
+ prevent others from messing with your subscription. <b>Do not use a valuable password</b> as it<br>'
+ will occasionally be emailed back to you in cleartext.<br><br>
+ If you choose not to enter a password, one will be automatically generated for you, and it will<br>
+ be sent to you once you've confirmed your subscription. You can always request a mail-back<br>
+ of your password when you edit your personal options.<br><br>
+ Password choice: <INPUT type="Password" name="pw" size="15"><BR>
+ Confirm Password: <INPUT type="Password" name="pw-conf" size="15"><BR><BR>
+ Would you like to receive list mail batched in a daily digest? (You may choose NoMail after you join.)<BR><br>
+ <input type=radio name="digest" value="0" CHECKED> No <input type=radio name="digest" value="1"> Yes<br><br>
+ <INPUT type="Submit" name="email-button" value="Subscribe">
+ </FORM>
+
+
+	     <div style="text-align:center;height:34px;width:300px;font-size:12px"><a href="http://www.frappr.com/beemaster">beemaster</a> | <a href="http://www.frappr.com/beemaster">Add yourself!</a><br><a href="http://www.frappr.com/beemaster/photos">Photos</a> | <a href="http://www.frappr.com/beemaster/forums">Forums</a></div>
+	<EMBED allowScriptAccess="never" src="http://www.frappr.com/ajax/ygroupmap.swf?host=http://www.frappr.com/&gid=36575&zoom=13&lat=49.882423&lon=-119.467428" quality=high height=300 width=300
+	NAME="frapprGroupMap" TYPE="application/x-shockwave-flash"
+	PLUGINSPAGE="http://www.macromedia.com/go/getflashplayer">
+	</EMBED>
+	
+	     [% ELSE %]   
+	Bee keeping is a complex art/industry. Bee keepers need all the help they can get to do the best for their charges within the confines of the law in any given area and or philosophy of management. We encouraged Organic Certification were possible. This is not easy due to the 5K rule from a know polluter or GMO crop.
+	
+	This site need your help to serve beekeepers better. There for we have on ofter annual memberships. Your membership helps to offset the cost of operation which includes Server costs, programing, Site development and data entry. 
+	
+	For your membership we offer the fallowing benefits.
+	
+		
+
+[% END %]
+<H2><B>Join Our Beemaster Announcement list</b></H2>
+ 
+          
+          <a href="http://maillists.beemaster.ca/?p=subscribe&id=1">Join our General announcements list</A>
+          
+   <div class="content"><h3>Subscribe to our Announcement list</h3> 
+
+<div class="error"><span class="required">required fields are marked red</span></div>
+
+
+<script language="Javascript" type="text/javascript">
+
+function checkform()
+{
+  for (i=0;i<fieldstocheck.length;i++) {
+    if (eval("document.subscribeform.elements['"+fieldstocheck[i]+"'].type") == "checkbox") {
+      if (document.subscribeform.elements[fieldstocheck[i]].checked) {
+      } else {
+        alert("Please enter your "+fieldnames[i]);
+        eval("document.subscribeform.elements['"+fieldstocheck[i]+"'].focus()");
+
+        return false;
+      }
+    } else {
+      if (eval("document.subscribeform.elements['"+fieldstocheck[i]+"'].value") == "") {
+        alert("Please enter your "+fieldnames[i]);
+        eval("document.subscribeform.elements['"+fieldstocheck[i]+"'].focus()");
+
+        return false;
+      }
+    }
+  }
+  for (i=0;i<groupstocheck.length;i++) {
+    if (!checkGroup(groupstocheck[i],groupnames[i])) {
+      return false;
+    }
+  }
+  
+  if (! compareEmail()) {
+    alert("Email addresses you entered do not match");
+
+    return false;
+  }
+
+  return true;
+}
+
+var fieldstocheck = new Array();
+var fieldnames = new Array();
+function addFieldToCheck(value,name)
+{
+  fieldstocheck[fieldstocheck.length] = value;
+  fieldnames[fieldnames.length] = name;
+}
+var groupstocheck = new Array();
+var groupnames = new Array();
+function addGroupToCheck(value,name)
+{
+  groupstocheck[groupstocheck.length] = value;
+  groupnames[groupnames.length] = name;
+}
+
+function compareEmail()
+{
+  return (document.subscribeform.elements["email"].value == document.subscribeform.elements["emailconfirm"].value);
+}
+function checkGroup(name,value)
+{
+  option = -1;
+  for (i=0;i<document.subscribeform.elements[name].length;i++) {
+    if (document.subscribeform.elements[name][i].checked) {
+      option = i;
+    }
+  }
+  if (option == -1) {
+    alert ("Please enter your "+value);
+
+    return false;
+  }
+
+  return true;
+}
+
+</script><form method="post" action="" name="subscribeform"><input type="hidden" name="formtoken" value="4f45aee1159fde5a5aff0f5bcaa4df8e" /><div class="adminmessage"><p><b>You are logged in as administrator (shanta) of this phpList system</b></p><p>You are therefore offered the following choice, which your subscribers will not see when they load this page.</p><p><a href="/admin" class="button">Go back to admin area</a></p><p><b>Please choose</b>: <br/><input type=radio name="makeconfirmed" value="1"> Make this subscriber confirmed immediately
+      <br/><input type=radio name="makeconfirmed" value="0" checked> Send this subscriber a request for confirmation email </p></div><table border=0>
+  <tr><td><div class="required">Email address</div></td>
+  <td class="attributeinput"><input type=text name=email value="" size="40" />
+  <script language="Javascript" type="text/javascript">addFieldToCheck("email","Email address");</script></td></tr>
+  <tr><td><div class="required">Confirm your email address</div></td>
+  <td class="attributeinput"><input type=text name=emailconfirm value="" size="40" />
+  <script language="Javascript" type="text/javascript">addFieldToCheck("emailconfirm","Confirm your email address");</script></td></tr><tr><td colspan="2">
+        <span class="attributeinput"><input type="checkbox" name="htmlemail" value="1"  /></span>
+        <span class="attributename">I prefer to receive emails in HTML format</span></td></tr>
+</table><input type="hidden" name="list[2]" value="signup" /><input type="hidden" name="listname[2]" value="newsletter"/><div style="display:none"><input type="text" name="VerificationCodeX" value="" size="20"></div><p><input type=submit name="subscribe" value="Subscribe to the selected newsletters" onClick="return checkform();"></p>
+    </form><br/><br/><p><a href="http://maillists.beemaster.ca/?p=unsubscribe&id=1">Unsubscribe</a></p><p class="poweredby"><a href="http://www.phplist.com/poweredby?utm_source=pl3.0.6&amp;utm_medium=poweredhostedimg&amp;utm_campaign=phpList" title="visit the phpList website" ><img src="http://powered.phplist.com/images/3.0.6/power-phplist.png" width="70" height="30" title="powered by phpList version 3.0.6, &copy; phpList ltd" alt="powered by phpList 3.0.6, &copy; phpList ltd" border="0" /></a></p></div>
+  
+  <p>start embed
+ [%# embed("http://maillists.beemaster.ca/?p=subscribe&id=1") %]
+ 
+ <p>    end embed     
+          <a href="http://maillists.beemaster.ca/?p=subscribe&id=1">Join our General announcements list</A>
+          
+   <div class="content"><h3>Subscribe to our Announcement list</h3> 
+
+<div class="error"><span class="required">required fields are marked red</span></div>
+
+
+<script language="Javascript" type="text/javascript">
+
+function checkform()
+{
+  for (i=0;i<fieldstocheck.length;i++) {
+    if (eval("document.subscribeform.elements['"+fieldstocheck[i]+"'].type") == "checkbox") {
+      if (document.subscribeform.elements[fieldstocheck[i]].checked) {
+      } else {
+        alert("Please enter your "+fieldnames[i]);
+        eval("document.subscribeform.elements['"+fieldstocheck[i]+"'].focus()");
+
+        return false;
+      }
+    } else {
+      if (eval("document.subscribeform.elements['"+fieldstocheck[i]+"'].value") == "") {
+        alert("Please enter your "+fieldnames[i]);
+        eval("document.subscribeform.elements['"+fieldstocheck[i]+"'].focus()");
+
+        return false;
+      }
+    }
+  }
+  for (i=0;i<groupstocheck.length;i++) {
+    if (!checkGroup(groupstocheck[i],groupnames[i])) {
+      return false;
+    }
+  }
+  
+  if (! compareEmail()) {
+    alert("Email addresses you entered do not match");
+
+    return false;
+  }
+
+  return true;
+}
+
+var fieldstocheck = new Array();
+var fieldnames = new Array();
+function addFieldToCheck(value,name)
+{
+  fieldstocheck[fieldstocheck.length] = value;
+  fieldnames[fieldnames.length] = name;
+}
+var groupstocheck = new Array();
+var groupnames = new Array();
+function addGroupToCheck(value,name)
+{
+  groupstocheck[groupstocheck.length] = value;
+  groupnames[groupnames.length] = name;
+}
+
+function compareEmail()
+{
+  return (document.subscribeform.elements["email"].value == document.subscribeform.elements["emailconfirm"].value);
+}
+function checkGroup(name,value)
+{
+  option = -1;
+  for (i=0;i<document.subscribeform.elements[name].length;i++) {
+    if (document.subscribeform.elements[name][i].checked) {
+      option = i;
+    }
+  }
+  if (option == -1) {
+    alert ("Please enter your "+value);
+
+    return false;
+  }
+
+  return true;
+}
+
+</script><form method="post" action="" name="subscribeform"><table border=0>
+  <tr><td><div class="required">Email address</div></td>
+  <td class="attributeinput"><input type=text name=email value="" size="40" />
+  <script language="Javascript" type="text/javascript">addFieldToCheck("email","Email address");</script></td></tr>
+  <tr><td><div class="required">Confirm your email address</div></td>
+  <td class="attributeinput"><input type=text name=emailconfirm value="" size="40" />
+  <script language="Javascript" type="text/javascript">addFieldToCheck("emailconfirm","Confirm your email address");</script></td></tr><tr><td colspan="2">
+        <span class="attributeinput"><input type="checkbox" name="htmlemail" value="1"  /></span>
+        <span class="attributename">I prefer to receive emails in HTML format</span></td></tr>
+</table><input type="hidden" name="list[2]" value="signup" /><input type="hidden" name="listname[2]" value="newsletter"/><div style="display:none"><input type="text" name="VerificationCodeX" value="" size="20"></div><p><input type=submit name="subscribe" value="Subscribe to the selected newsletters" onClick="return checkform();"></p>
+    </form><br/><br/><p><a href="http://maillists.beemaster.ca/?p=unsubscribe&id=1">Unsubscribe</a></p><p class="poweredby"><a href="http://www.phplist.com/poweredby?utm_source=pl3.0.6&amp;utm_medium=poweredhostedimg&amp;utm_campaign=phpList" title="visit the phpList website" ><img src="http://powered.phplist.com/images/3.0.6/power-phplist.png" width="70" height="30" title="powered by phpList version 3.0.6, &copy; phpList ltd" alt="powered by phpList 3.0.6, &copy; phpList ltd" border="0" /></a></p></div>
+</div>
+
+
+
+[% ELSIF SiteName == 'GrindrodBC' %]
+<H2><B>Join Our Grindrod Discussion and Announcement list</b></H2>
+ <FORM Method=POST ACTION="http://beemaster.ca/mailman/subscribe/grindrod_talk_grindrodbc.com"><br>
+[% ELSIF SiteName == 'GPMarket' %]
+<H2><B>Join Our Grindrod Park Market Discussion and Announcement list</b></H2>
+ <FORM Method=POST ACTION="http://beemaster.ca/mailman/subscribe/grindrod_park_market_grindrodbc.com"><br>
+[% ELSIF SiteName == 'GrindrodProject' %]
+<H2><B>Join Our Grindrod Project list</b></H2>
+ <FORM Method=POST ACTION="http://beemaster.ca/mailman/subscribe/grindrodproject_grindrodbc.com"><br>
+[% ELSIF SiteName == 'Kamasket' %]
+ <FORM Method=POST ACTION="http://beemaster.ca/mailman/subscribe/grindrodproject-grindrodbc.com"><br>
+<H2><B>Join Our Kamasket Volunteers list</b></H2>
+ <FORM Method=POST ACTION="http://beemaster.ca/mailman/subscribe/kamasketvalunteers_beemaster.ca"><br>
+[% ELSIF SiteName == 'LTrust' OR
+         SiteName == 'DevLTrust' %]
+[% embed('LtrustMembershipsView') %]
+
+[% ELSIF SiteName == 'HE' %]
+<H2><B>Join Our Helpfull Earth Announcement list</b></H2>
+ <FORM Method=POST ACTION="http://helpfullearth.com/mailman/subscribe/announce_helpfullearth.com"><br>
+
+  [% ELSIF SiteName == 'USBM' %]
+<H2><B>Join Our Universal School of Biological Life Announcement list</b></H2>
+ <FORM Method=POST ACTION="http://helpfullearth.com/mailman/subscribe/usbm_discussion_usbm.ca"><br>
+       
+[% ELSE%]
+No List
+[% END %]
+
+ Your E-mail address: <INPUT type="Text" name="email" size="30" value="[% email %]"><br>
+ Your Name (optional): <INPUT type="Text" name="fullname" size="30" value="[% firstname %]&nbsp; [% lastname%]"><br><br>
+ You may enter a privacy password below. This provides only mild security, but should<br>
+ prevent others from messing with your subscription. <b>Do not use a valuable password</b> as it<br>
+ will occasionally be emailed back to you in cleartext.<br><br>
+ If you choose not to enter a password, one will be automatically generated for you, and it will<br>
+ be sent to you once you've confirmed your subscription. You can always request a mail-back<br>
+ of your password when you edit your personal options.<br><br>
+ Password choice: <INPUT type="Password" name="pw" size="15"><BR>
+ Confirm Password: <INPUT type="Password" name="pw-conf" size="15"><BR><BR>
+ Would you like to receive list mail batched in a daily digest? (You may choose NoMail after you join.)<BR><br>
+ <input type=radio name="digest" value="0" CHECKED> No <input type=radio name="digest" value="1"> Yes<br><br>
+ <INPUT type="Submit" name="email-button" value="Subscribe">
+ </FORM>
+
+	 [% IF group    ==  'GPMarket_admin' or
+               group    ==  'normal'   %]
+<H2><B>Join Our Grindrod Park Market committy list</b></H2>
+<p> this list is a closed list and monitored</>
+ <FORM Method=POST ACTION="http://beemaster.ca/mailman/subscribe/commity_market.grindrodbc.com"><br>
+ Your E-mail address: <INPUT type="Text" name="email" size="30" value="[% email %]"><br>
+ Your Name (optional): <INPUT type="Text" name="fullname" size="30" value="[% firstname %]&nbsp; [% lastname%]"><br><br>
+ You may enter a privacy password below. This provides only mild security, but should<br>
+ prevent others from messing with your subscription. <b>Do not use a valuable password</b> as it<br>'
+ will occasionally be emailed back to you in cleartext.<br><br>
+ If you choose not to enter a password, one will be automatically generated for you, and it will<br>
+ be sent to you once you've confirmed your subscription. You can always request a mail-back<br>
+ of your password when you edit your personal options.<br><br>
+ Password choice: <INPUT type="Password" name="pw" size="15"><BR>
+ Confirm Password: <INPUT type="Password" name="pw-conf" size="15"><BR><BR>
+ Would you like to receive list mail batched in a daily digest? (You may choose NoMail after you join.)<BR><br>
+ <input type=radio name="digest" value="0" CHECKED> No <input type=radio name="digest" value="1"> Yes<br><br>
+ <INPUT type="Submit" name="email-button" value="Subscribe">
+ </FORM>
+[% END %]
+
+
+		</td>
+			</tr>
+		</table>
+</DIV>
+[%# embed(data.page_bottom_view) %] 

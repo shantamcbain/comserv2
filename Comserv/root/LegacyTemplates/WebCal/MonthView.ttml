@@ -1,0 +1,39 @@
+[% PROCESS DefaultDbi.ttml %]
+[% embed(data.page_top_view,['-PAGE_TITLE','Month View']) %]
+[%
+    data.url_encoded_admin_variables =
+        embed(data.url_encoded_admin_fields_view_name);
+%]
+<TABLE WIDTH=100%>
+  <TR>
+    <TD>
+  <TR>
+    <TD>
+            [% embed('TabSelectWidget') %]
+     </TD>
+  </TR>
+ 
+      <TABLE WIDTH=100%>
+        <TR>
+  
+          <TD WIDTH="20%" VALIGN="TOP">
+[% IF  data.page_top_view == 'PrintPageTopView'  %]
+[% ELSE %]
+            [% embed('NavBarWidget') %]
+[% END %]
+          </TD>
+  
+          <TD ROWSPAN="2" WIDTH="80%" VALIGN="TOP">
+            [% embed('MonthWidget') %]
+          </TD>
+  
+        </TR>
+      </TABLE>
+  
+    </TD>
+  </TR>
+  
+</TABLE>
+
+[% embed(data.page_bottom_view) -%]
+

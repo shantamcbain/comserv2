@@ -1,0 +1,116 @@
+[% #	$Id:JavaMenu.ttmlv 0.01 2011/09/11 06:33:25 shanta Exp shanta $	%]
+
+
+<script type="text/javascript" src="tinydropdown.js"></script>
+
+</script>
+
+<div class="nav">
+
+    <ul id="menu" class="menu">
+
+        <li class="nodiv"><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;m=1">Home</a></li>
+
+        <li><a href="#">One</a>
+
+            <ul>
+
+                <li><a href="#">One</a></li>
+
+                <li><a href="#">Two</a></li>
+
+                <li class="submenu">
+
+                    <a href="#">Three</a>
+
+                    <ul>
+
+                        <li class="noborder"><a href="#">One</a></li>
+
+                        <li><a href="#">Two</a></li>
+
+                        <li><a href="#">Three</a></li>
+
+                    </ul>
+
+                </li>      
+
+            </ul>
+
+        </li>
+
+        <li><span>Two</span>
+
+            <ul>
+
+                <li><a href="#">One</a></li>
+
+                <li><a href="#">Two</a></li>
+
+                <li><a href="#">Three</a></li>
+
+                <li class="submenu">
+
+					<span>No Link</span><ul>
+
+                		<li class="noborder"><a href="#">One</a></li>
+
+                		<li><a href="#">Two</a></li>
+
+                		<li><a href="#">Three</a></li>
+
+                		<li><a href="#">Four</a></li>
+
+                		<li><a href="#">Five</a></li>
+
+					</ul>
+
+				</li>
+
+                <li><a href="#">Five</a></li>
+
+                <li><a href="#">Six</a></li>
+
+            </ul>
+
+        </li>
+
+        <li><a href="#">Three</a>
+
+            <ul>
+
+                <li><a href="#">One</a></li>
+
+                <li><a href="#">Two</a></li>
+
+                <li><a href="#">Three</a></li>
+
+            </ul>
+
+        </li>
+
+        <li><a href="#">Four</a>
+
+            <ul id="info">
+
+				<li>
+
+                	<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce justo nulla, malesuada in porta vitae, fermentum ac nulla.</p>
+
+				</li>
+
+            </ul>
+
+        </li>
+
+    </ul>
+
+</div>
+
+<script type="text/javascript">
+
+[%# var dropdown=new TINY.dropdown.init("dropdown", {id:'menu', active:'menuhover'});%]
+
+
+
+

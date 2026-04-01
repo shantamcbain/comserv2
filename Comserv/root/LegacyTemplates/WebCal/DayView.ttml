@@ -1,0 +1,32 @@
+[% PROCESS DefaultDbi.ttml %]
+[% embed(data.page_top_view,['-PAGE_TITLE','Day View']) %]
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD>
+  <TR>
+    <TD>
+            [% embed('TabSelectWidget') %]
+     </TD>
+  </TR>
+
+      <TABLE WIDTH=100%>
+        <TR>
+
+          <TD WIDTH="20%" VALIGN="TOP">
+        [% embed('NavBarWidget') %]
+          </TD>
+
+          <TD ROWSPAN="2" WIDTH="80%" VALIGN="TOP">
+            [% embed('DayWidget') %]
+          </TD>
+
+        </TR>
+      </TABLE>
+
+    </TD>
+  </TR>
+
+</TABLE>
+
+[% embed(data.page_bottom_view) -%]

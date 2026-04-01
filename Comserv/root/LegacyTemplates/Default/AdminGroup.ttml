@@ -1,0 +1,26 @@
+group    ==  'Alegro_admin' OR
+	       group    ==  'Apis_admin' OR
+	       group    ==  'BCHPA_admin' OR
+	       group    ==  'Brew_admin' OR
+	       group    ==  'CS_admin' OR
+	       group    ==  'CSC_admin' OR
+	       group    ==  'CSPS_admin' OR
+	       group    ==  'ENCY_admin' OR
+	       group    ==  'Forager_admin' OR
+	       group    ==  'eXtropia_admin' OR
+	       group    ==  'GPMarket_admin' OR
+	       group    ==  'HE_admin' OR
+	       group    ==  'CSCDev_admin' OR
+	       group    ==  'News_admin' OR
+	       group    ==  'OKB_admin'OR
+	       group    ==  'Organic_admin' OR
+	       group     == 'DarmaFarmsAdmin' OR
+	       group    ==  'Shanta_admin' OR
+	       group    ==  'Stawns_admin' OR
+	       group    ==  'VitalVic_admin' OR
+	       group    ==  'rv_admin' OR
+	       group    == 'MJB_Admin' OR
+	       group    ==  'WB_admin' OR
+	       username == 'Shanta' OR
+	      group    == 'Demo_admin'
+

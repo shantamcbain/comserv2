@@ -1,0 +1,62 @@
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% Tab = data.session_object.getAttribute('-KEY','tab') %]
+[% PrintMode = data.session_object.getAttribute('-KEY','PrintMode') %]
+
+
+<TABLE WIDTH="100%">
+<!-- <tr><td>mode [% PrintMode %]</td></tr>
+ --> 
+ [% IF PrintMode == 'print'%]
+  <TR>
+    <TD>
+     <a href="/cgi-bin/WebCal/webcal.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;mode=off&amp;tab=[% Tab %]&amp;view=monthview">Non Print View</a> 
+    </TD>
+  </TR>
+ [% END %]
+[% IF PrintMode != 'print'%]
+  <TR>
+    <TD>
+      [% embed('NavModeSelectWidget') %]
+    </TD>
+  </TR>
+ [% END %]
+ <TR>
+    <TD>
+
+      [% embed('DayNavWidget') %]
+    </TD>
+  </TR>
+
+  <TR>
+    <TD>
+      [% embed('MonthNavWidget') %]
+    </TD>
+  </TR>
+ [% IF PrintMode != 'print'%]
+ <TR>
+    <TD>
+      [% embed('YearNavWidget') %]
+    </TD>
+  </TR>
+ [% END %]
+ [% IF PrintMode != 'print'%]
+  <TR>
+    <TD>
+      [% embed('AddEventWidget') %]
+    </TD>
+  </TR>
+ [% END %]
+
+  <TR>
+    <TD>
+      [% embed('ToDoListWidget') %]
+    </TD>
+  </TR>
+
+</TABLE>

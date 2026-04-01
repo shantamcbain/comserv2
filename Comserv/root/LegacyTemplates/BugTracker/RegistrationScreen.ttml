@@ -1,0 +1,72 @@
+[% set_headers(data.http_header_params) %]
+
+[% SET logon_message = data.error_list.join("<BR>\n") IF data.error_list.size %]
+
+[% embed(data.page_top_view) %]
+
+<FORM METHOD = "POST"><CENTER>
+    [% embed('AuthManager/CGI/FormData2Hidden') %]
+    <TABLE WIDTH = "90%" BORDER = "0" CELLSPACING = "2" CELLPADDING = "1">
+        <TR>
+            <TD CLASS = "sectionHeaderStyle" COLSPAN = "2"> 
+                Enter Your Registration Information
+            </TD>
+        </TR>
+        <TR> 
+            <TD COLSPAN = "2"> 
+                [% logon_message %]
+            </TD>
+        </TR>
+        [% FOREACH user_field = data.user_fields %]
+            [% IF user_field == data.password_field %]
+                [% IF !data.generate_password %]
+                    <TR> 
+                        <TD CLASS = "tableRowHeaderStyle">Password</TD>
+                        <TD CLASS = "tableRowStyle">
+                        <INPUT TYPE="PASSWORD" SIZE = "23"
+                                NAME="[% user_field %]" 
+                                VALUE="[% data.user_field_name_to_value_mapping.$user_field %]">
+                        </TD>
+                    </TR>
+                    <TR> 
+                        <TD CLASS = "tableRowHeaderStyle">Confirm Password</TD>
+                        <TD CLASS = "tableRowStyle">
+                            <INPUT TYPE="PASSWORD" SIZE = "23"
+                                NAME="[% user_field %]2"
+                                VALUE="[% data.user_field_name_to_value_mapping.$user_field %]">
+                        </TD>
+                    </TR>
+                [% END %]
+            [% ELSIF user_field == 'auth_developer_status' %]
+            <TR> 
+                <TD CLASS = "tableRowHeaderStyle">[% data.user_field_name_mappings.$user_field %]</TD>
+                <TD CLASS = "tableRowStyle">
+                    <SELECT NAME="auth_developer_status">
+                        <OPTION VALUE = "1">Yes
+                        <OPTION VALUE = "0">No
+                    </SELECT>
+                </TD>
+            </TR>
+            [% ELSIF user_field != data.group_field %]
+                <TR> 
+                    <TD CLASS = "tableRowHeaderStyle">[% data.user_field_name_mappings.$user_field %]</TD>
+                    <TD CLASS = "tableRowStyle">
+                        <INPUT TYPE="TEXT" SIZE = "23"
+                            NAME="[% user_field %]" 
+                            VALUE="[% data.user_field_name_to_value_mapping.$user_field %]">
+                    </TD>
+                </TR>
+            [% END %]
+        [% END %]
+        <TR> 
+            <TD COLSPAN = "2"> 
+                <INPUT TYPE="SUBMIT" NAME="auth_submit_registration" VALUE="Submit Information">
+                <INPUT TYPE="SUBMIT" NAME="auth_submit_logon_request" VALUE="Return to Logon Screen">
+            </TD>
+        </TR>
+        
+[% IF password_message_html %]
+    Your password will be automatically generated and sent to you via your e-mail address.
+[% END %]
+</TABLE></CENTER></FORM>
+[% embed(data.page_bottom_view) %]

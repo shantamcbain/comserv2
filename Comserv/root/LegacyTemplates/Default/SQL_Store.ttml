@@ -1,0 +1,65 @@
+ 
+	  [%# FOREACH link = DBI.query("SELECT * FROM internal_links_tb
+	                                  WHERE  category = 'Store_link'
+	                                  AND (sitename =  '$SiteName' OR sitename =  'All')
+	                                  ORDER BY link_order
+	                                  ")%]    
+		   <tr>
+		   <td class="NavTableCellStyle">
+		       <a href="[% link.url %]?shop=[% SiteName %]&amp;[% session_string %]&amp;view=[% link.view_name %]" name="Contact" target="[% link.target %]" title=" [% link.name %] "><font   class="LeftSideBarNavStyle">[% link.name %]</font></a>
+		   </td>
+		   </tr>
+    	[%# END %]
+ 
+               [% IF SiteName    == 'ShantaWorkShop' OR
+                     SiteName    == 'BMaster' %]
+                    [%  ShopName	=  'CS' %]
+                     
+                [% ELSE %]
+                   [%  ShopName	= SiteName %]
+                [% END %]   
+ 		   <tr>
+		   <td class="NavTableCellStyle">
+ 	 <a href="http://[% data.store_url %]/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=StoreView"  name="Contact"  title=" [% link.name %]"><font   class="LeftSideBarNavStyle">Our Store</font></a>
+ <!-- <a href="http://[% data.store_url %]/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=StoreView"  name="Contact"  title=" [% link.name %]"><font   class="LeftSideBarNavStyle">Store</font></a>--> 
+	[% data.store_url %]	   </td>
+		   </tr>
+
+ 
+      
+		   <td class="NavTableCellStyle">
+			<!-- 											       <a href="http://[% data.store_url %]/cgi-bin/store/manager.cgi?shop=[% ShopName %]&amp;[% session_string %]" target="_blank" name="Contact"  title=" [% link.name %]"><font   class="LeftSideBarNavStyle">Store Manager</font></a> --> 
+		   </td>
+		   </tr>
+	  [% IF username  == 'Shanta' OR
+ 	       SiteName    ==  'Bazaar' OR
+           group     == 'Alegro_admin' OR
+	        group     == 'Apis_Admin' OR
+	        group     == 'BMast_Admin' OR
+	        group     == 'BMast_Co-op_Admin' OR
+            group     == 'CSC_Admin' OR
+	        group     == 'CS_Admin' OR
+	        group     == 'ECF_Admin' OR
+	        group     == 'HoneyDo_Admin' OR
+	        group     == 'HE_Admin' OR
+	        group     == 'IM_Admin' OR
+	        group     == 'Orgainc_Admin' OR
+	        group     == 'DarmaFarmsAdmin' OR
+	        group     == 'MARTS_Admin' OR
+	        group     == 'VitalVic_Admin' OR
+	        group     == 'ENCY_Admin' OR
+	        group     == 'USBM_Admin' OR
+	        group     == 'Shanta_Admin' OR
+	        group     == 'RV_Admin' OR
+	        group     == 'Brew_Admin' OR
+	        group     == 'Demo_admin' OR
+	        group    ==  'WB_admin' OR
+	        group     == 'MJB_Admin'        %]		   
+	        <tr>
+		   <td class="NavTableCellStyle">
+														       <a href="http://[% data.store_url %]/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=ShopManagerView"  name="Contact"  title=" [% link.name %]"><font   class="LeftSideBarNavStyle">CS Shop Manager</font></a>
+		   </td>
+		   </tr>
+	[% END %]
+
+<!-- end start mainSQL -->

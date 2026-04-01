@@ -1,0 +1,70 @@
+[% RAWPERL %]
+
+use strict;
+
+my @required = ( );
+my $view_obj = $stash->get('view_obj');
+my $rh_data  = $view_obj->get_data;
+exists $rh_data->{$_} or die "$_ is not set" for @required;
+
+my $sort_field1             = $rh_data->{-SORT_FIELD1} || '';
+my $remove_sort_field1      = $rh_data->{-REMOVE_SORT_FIELD1} || 0;
+my $sort_field2             = $rh_data->{-SORT_FIELD2} || '';
+my $simple_search_string    = $rh_data->{-SIMPLE_SEARCH_STRING} || '';
+my $first_record_on_page    = $rh_data->{-FIRST_RECORD_ON_PAGE} || 0;
+my $max_records_to_retrieve = $rh_data->{-MAX_RECORDS_PER_PAGE} || 10;
+my $session                 = $rh_data->{-SESSION_OBJECT} || '';
+my $record_id               = $rh_data->{-RECORD_ID} || '';
+my $selected_display_fields = $rh_data->{-SELECTED_DISPLAY_FIELDS} || '';
+my $total_records           = $rh_data->{-TOTAL_RECORDS} || '';
+my $script_name             = $rh_data->{-SCRIPT_NAME} || '';
+my $cgi                     = $rh_data->{-CGI_OBJECT};
+
+my $session_id = $session ? $session->getId() : "";
+
+my $raw_search = $cgi->param('raw_search') || '';
+
+my @columns_to_view;
+
+my @columns_to_view = $cgi->param('columns_to_view') 
+    ? $cgi->param('columns_to_view')
+    : @$selected_display_fields;
+
+my $columns_to_view_string = join "&columns_to_view=",@columns_to_view;
+
+$output .= "sort_field1=$sort_field1" unless $remove_sort_field1;
+$output .= "&session_id=$session_id" if $session_id;
+$output .= "&sort_field2=$sort_field2";
+$output .= "&simple_search_string=$simple_search_string";
+$output .= "&first_record_to_display=$first_record_on_page";
+$output .= "&records_per_page=$max_records_to_retrieve";
+
+$output .= "&forum=".($cgi->param('forum') || '');
+
+if ($cgi->param('view_records_for_user')) {
+    my $user = $cgi->param('user') || '';
+    $output .= "&view_records_for_user=on&user=$user";
+}
+
+if ($cgi->param('submit_power_search')) {
+    $output .= "&submit_power_search=on";
+
+    my $field;
+    foreach $field (@columns_to_view) {
+        if ($cgi->param($field) && $field =~ /^search_/) {
+            my $search_name = 'search_' . $field;
+            my $value = $cgi->param($search_name) || '';
+            $output .= "&search_$field=$value";
+        }
+    }
+
+    $output .= "&raw_search=$raw_search" if $raw_search;
+}
+
+my $field;
+foreach $field (@columns_to_view) {
+    $output .= "&columns_to_view=$field";
+}
+
+
+[% END %]

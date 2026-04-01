@@ -1,0 +1,51 @@
+[%
+#	$Id: CSCDevHomeView.ttml,v 1.9 2002/11/08 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dozen't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dozen't rely on any
+# variables from outside.
+
+%]
+
+
+[% embed('ErrorDisplayView') %]
+<A NAME="PageTop"></A>
+
+[% IF data.debug == 1 %]
+CSCDevHomeView.ttml
+[% embed('InheretedVariablesView') %]
+[% END %]
+
+<table>
+<tr>
+	<td>
+	      [% IF data.session_object.getAttribute('-KEY','Developer') == 1 %]
+	      <a href="?site=[% SiteName %]&amp;view=DeveloperView &amp;[% session_string %]" target="_blank" title="CSC Developer page">[% FirstName %]'s Developer Home</a>
+	      [% ELSE %]
+	      <a href="?site=[% SiteName %]&amp;view=JobView&amp;[% session_string %]" target="_blank" title="CSC Developer page">Join our team</a>
+	      [% END %]
+<p>
+
+ <a href="http://dev.computersystemconsulting.ca/cgi-bin/page.cgi?site=[% SiteName %]&[% session_string %]&display_modification_form=on&record_id=3" target="_blank">edit page</a>
+You can modify anything from here to the last update. You may use Html code in this area.
+ 	   
+	[% embed('LiveEditAdmin') %]
+
+ [% FOREACH link = DBI.query("SELECT * FROM page_tb
+                                  WHERE  (status  = 2 AND
+                                         page_code = 'CSC_DevHome_View' )
+                                  ORDER BY sitename
+                                  ")%]    
+      [% link.body %]
+  [% END %]
+ 
+
+[% embed('CSCProListView.ttml')%]
+	
+		
+</td>
+</p></tr>
+</table>

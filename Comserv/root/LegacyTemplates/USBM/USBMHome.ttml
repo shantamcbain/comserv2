@@ -1,0 +1,38 @@
+[%# the ENCY template
+#	$Id: USBMHome.ttml,v 1.1 2012/09/21 19:25:15 shanta Exp $	
+#file location/cgi-bin/HTMLTemplates/USBM
+%]
+
+[%# embed(data.page_top_view,['-PAGE_TITLE', Home page.']) %]
+
+[%# embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% LastUpdate = data.last_update %]
+   [% SiteLastUpdate = data.site_last_update %]
+
+
+
+</div>
+<div ALIGN="center">
+<A NAME="PageTop"></A>
+</div>
+<h2>Our Virtual School House</h2>
+
+  <p> Our <a href="/cgi-bin/ENCY/ency.cgi?site=USBM&[% session_string %]">Encyclopidia of life </a></p>
+  <p>   <a href="/cgi-bin/index.cgi?site=[% SiteName %]&[% session_string %]&view=BotanicalNameView">Herbs by botanical name</a></p>
+<a href="http://helpdesk.computersystemc"onsulting.ca" target="_Blank" > HelpDesk</a>
+
+[%# embed('CSCCopyRight') %]
+[%# embed(data.page_bottom_view) %]
+

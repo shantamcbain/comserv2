@@ -1,0 +1,91 @@
+[%
+
+# the home  Page template
+#	$Id: RegistrationView.ttml,v 0.1 2011/08/10 22:01:26 shanta Exp $
+
+%] 
+[% PROCESS DefaultDbi.ttml %]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Registration']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% Username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% IF SiteName == 'ECF' %]
+  [% SiteDisplayName = 'Eagle Creek Farms: Apis '%]
+[% ELSE %]
+ [% SiteDisplayName = SiteName %]
+[% END %] 
+
+ [% script_name = data.app_name %]
+ 
+    [%# USE DBI( data_source = 'dbi:mysql:forager',
+                username = 'forager',
+                password = 'pwxx88' )
+    %]
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<div align="center"><h2>[% SiteDisplayName %]'s Registration System.</h2>
+</div><br>
+<br>
+<br>
+<br>
+[% IF SiteName == 'ECF' %]
+  <p>Here at  [% SiteDisplayName %] we are dedicated to helping
+  beekeepers become better beekeepers. We endorse sharing of
+  knowlage. </p>
+ [%  IF username == 'Shanta' OR
+       group == 'ECF_mentor' OR
+       group == 'ECF_admin'
+       %]
+  <p>      Mentor area. As mentoring customer you get access to our  online resources. This area is under development so there will be changes to the system to meet your needs.
+  </p>      
+ [% ELSE %]
+        <p>Our mentoring program is designed to help you obtain a basic understanding of bees and keekeeping and address some of the problems of small scale beekeeping. </p>
+        <p>Over the course of a season of beekeeping you will be guided through the process of creating a wintering unit. A wintering unit is 4 2 box main hives and 4 nuc which are your next years mains. The nuc is placed on the top of your main with a spectial bottom board and the whole unit packed for winter.</p>
+        <p>You will learn brood evaluation, data recording on the site, how to evaluate the data both in the yard as your doing the work and online for planning your next trip to the yard. This system is designed to give you a history of each queens production for the year. We developed the system to track our queens for breading perposes. This was done because we feel that we need to track our queens before and after they leave our yards. This gives a better picture of the value of our queens.</p>
+        <p>We will guide you through the building of your 8 hives to 2 box honey produces. Deal with <a href="/cgi-bin/Apis/apis.cgi?site=[% SiteName %]&amp;view=SwarmControlView&amp;[% session_string %]" target="_blank" name="SwarControl" tile="Click here for more info">swarm control</a>. In mid August we will deal with mites and early prep for winter. In Sept we will work with preparing your hives for winter.</p>
+        
+ Here  at [% SiteDisplayName %] we provide both a <a href="http://countrystores.ca/cgi-bin/store/store.cgi?shop=apis&L=eng&P=OnlineMentoring" target="_blank" title="Click here to order online." name="Order Online" onmouseover="Click here to order online.">online</a> service as well as hands on in the <a href="http://www.forager.com/cgi-bin/store/store.cgi?shop=apis&L=eng&P=LiveMentoring" target="_blank" title="Click here to order online." name="Order Online" onmouseover="Click here to order online.">yards</a>.
+  
+ To join our program you must become a <a href="http://countrystores.ca/cgi-bin/store/store.cgi?shop=apis&L=eng&P=OnlineMentoring" target="_blank" title="Click here to order online." name="Order Online" onmouseover="Click here to order online.">online mentor member</a>. Our annual fee gives you access to our site as an [% SiteDisplayName %] menotoring customer. This gives you access to the tools that you need to track your queens. The online logs give you access to changes going on in your yards to help you.
+ 
+ Yard mentoring is on an hourly basis and in the Central and North Okanagan BC. Other Canadaian areas avaible on request.
+ [% END %]
+[% ELSIF SiteName == 'HE' %]
+<a href="http://countrystores.ca/cgi-bin/store/store.cgi?&shop=HE&L=eng&Category=WorkShops" target="_blank" name="order online">Click here to order.</a>
+
+[% ELSE %]
+
+<p>
+
+[%  SiteDisplayName %] dose not have a mentoring program.  Please submit a Customer Service Request in the HelpDesk system to make a request for mentoring.
+</p>
+
+[% END %]
+    [% FOREACH user = DBI.query('SELECT * FROM address_book_tb WHERE  comments = "Site_Contact"') %]
+        [% user.fname %]&nbsp; [% user.lname %]&nbsp; Website &nbsp;<a href="http://[% user.url %]" name="Contact" target="_blank" title="Site Contact">[% user.url %]</a> <br>
+    [% END %]
+
+    [% FOREACH record_id = DBI.query('SELECT * FROM address_book_tb WHERE username = "Shanta"') %]
+      [% address_book_tb.fname %]  [% address_book_tb.lname %]
+    [% END %]
+ [% DBI.disconnect %]
+ <br>
+<br>
+[% embed(data.page_bottom_view) %]
+

@@ -1,0 +1,122 @@
+[%
+#	$Id: SQL_Ledger_Support_View.ttml,v 1.9 2002/11/08 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dozen't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dozen't rely on any
+# variables from outside.
+
+%]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','CSC.ca SQL_Ledger Support page.']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+        [% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+	[% LastUpdate = data.last_update %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<div align="center">
+[% IF username %]
+
+<h3 >  [% firstname%]! This is CSC's SQL_ledger support page!</h3>
+
+
+	[% ELSE %]
+
+	<h3>   This is CSC's SQL_ledger support page!</h3
+<p>
+Here we provide support for SQL_ledger users. You may Join our service <a href="<a href="http://forager.com/cgi-bin/store/store.cgi?shop=csc" target="_Blank" >here</a>" target="_blank">here</a>.
+</p>
+	[% END %]
+</div></div>
+<A NAME="PageTop"></A>
+<br>
+<br>
+<h4> New At Computer System Consulting.ca </h4>
+
+
+[% IF username == "Shanta" or group == "SQL_suport"%]
+
+First Search the <a href="/cgi-bin/FAQ/faq.cgi?site=SQL_Ledger&amp;submit_power_search=on&amp;simple_search_string=SQL_Ledger&amp;[% session_string %]" target="_blank">FAQ</a>
+
+[% END %]
+[% IF  group != "SQL_suport"%]
+<h4>None member view.</h4>
+<p>
+Join us <a href="http://forager.com/cgi-bin/store/store.cgi?&amp;shop=csc&amp;L=eng&amp;P=CityShopAdmin"  >SQL Ledger support</a></li>
+ </p>  
+ <p>Services available  are
+	<ul>
+	   <li><p>FAQ.
+	       <ul>
+                   <li><a href="http://forager.com/cgi-bin/store/store.cgi?&amp;shop=csc&amp;L=eng&amp;P=ApisStoreAppHosting"  >CityShop Setup</a></li>
+		</ul></li>
+        <li><p>HelpDesk.
+	       <ul>
+                  <li>Online Help system.</li>
+                  <li><a href="csc.cgi?view=CityShopAdminView&amp;[% session_string %]"  >CityShop Admin</a></li>
+		</ul></li>
+	   <li>Hosting</li>
+		<ul>
+		   <li><a href="http://forager.com/cgi-bin/store/store.cgi?&amp;shop=csc&amp;L=eng&amp;P=DomainHosting"  >Domain Hosting</a></li>
+		   <li>Application Hosting</a>
+		   Our web applictions are desinged to Help you run your organization on the web. 
+		     <ul><li>Apis: This application devoted to Beekeeping
+		         </li>
+               <li>Brew Brew house management.
+		         </li>
+		     		<li>Organic Farming
+		         </li>
+		     		<li>Marts Dojo club and organization system. <a href="http://forager.com/cgi-bin/store/store.cgi?&amp;shop=csc&amp;L=eng&amp;P=AppHost"  >
+		         </li>
+		     </ul>
+		     </li>
+		
+		</ul></li>
+       <li>Administration
+		<ul>
+		   <li>Data Conversion</li>
+		   <li>MySQL Setup</li>
+		   <li>Store Instalation</li>
+		   <li>Store Setup</li>
+		   <li>Shop Custom Programming.</li>
+		</ul></li>
+	</ul>
+
+
+[% END %]
+
+[% embed (data.page_list_view) %]
+
+
+<br>
+<br>
+<br>
+<p>
+<p>Last Update [% LastUpdate %]
+<br>
+
+[% embed('CSCCopyRight') %]
+<br>
+
+
+
+
+[% embed(data.page_bottom_view) %]
+

@@ -1,0 +1,48 @@
+[%
+
+#
+# this template renders the page with a single record details and
+# provides links for modification and deletion of that record if
+# appropriate
+#
+
+-%]
+[%
+
+  record = data.records.0;
+  url_encoded_admin_variables = embed(data.url_encoded_admin_fields_view_name);
+
+  username_of_poster = record.username_of_poster || '';
+  group_of_poster    = record.group_of_poster    || '';
+  key_field = data.key_field;
+  key_field_value = record.$key_field;
+
+-%]
+ [% PROCESS DefaultDbi.ttml %]
+
+[% set_headers(data.http_header_params) %]
+
+[%# embed(data.page_top_view,{'-PAGE_TITLE' => 'Page View'}) %]
+
+[% embed('ErrorDisplayView') -%]
+
+[% #embed('BasicWidgetView',{'-TABLE_HEADER' => 'Page Details' }) %]
+
+    [% IF data.form_enctype %]
+              ENCTYPE="[% data.form_enctype %]" %]
+    [% END %]
+	<CENTER>
+        <TABLE WIDTH = "90%" BORDER = "0" CELLSPACING = "1" 
+               CELLPADDING = "0">
+
+[% embed('WidgetPageTableView', 
+         {'-DISPLAY_TYPE'    => 'DISPLAY',
+          '-USE_RECORD_FROM' => 'DB',
+         }) %]
+
+        </TR>
+</table>
+	</CENTER>
+
+
+[% embed(data.page_bottom_view) -%]

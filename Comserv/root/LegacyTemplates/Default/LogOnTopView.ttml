@@ -1,0 +1,35 @@
+[%
+
+# the Left Page template
+#	$Id: LogOnLeftView.ttml,v 1.2 2002/11/10 22:59:04 shanta Exp $	
+
+%]
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+[% IF username %]
+
+
+	<a href="[% data.script_name %]?session_id=[% session_id %]&amp;submit_logoff=on&amp;site=[%SiteName%]" target="[% data.link_target %]"><font class="HeaderBarNavStyle">Logoff</font></A>
+
+[% ELSE %]
+
+
+	<A HREF ="[% data.script_name %]?session_id=[% session_id %]&amp;submit_logon=on&amp;site=[%SiteName%]" TARGET ="[% data.link_target %]" title="To get the most from this application you will need to create an account. Click here to create one or logon" ><font class="HeaderBarNavStyle" >Logon</font></A> 	               
+	
+	<a href="/cgi-bin/FAQ/faq.cgi?site=[%SiteName%]&amp;[% session_string %]&amp;sort_field1=category&amp;sort_field2=fname &amp;first_record_to_display=0&amp;records_per_page=&amp;record_id=2&amp;columns_to_view=category&amp;columns_to_view=question&amp;display_details_view.x=8&amp;display_details_view.y=9&amp;display_details_view=on" title="Why should I create an account?"><font class="HeaderBarNavStyle"size="-2">Why</font></a>
+	    
+
+
+[% END %]

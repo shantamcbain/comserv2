@@ -1,0 +1,112 @@
+[%
+#	$Id: ECFHomeView.ttml,v 1.4 2010/09/28 13:40:30 shanta Exp $	
+
+
+%][% embed(data.page_top_view,['-PAGE_TITLE','Home']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+
+	[% IF username %]
+
+<h3> Hello  [% firstname%]&nbsp;  [% lastname%]! Welcome to Eagle Creek Farms at beemaster.ca!</h3>
+	  
+
+	[% ELSE %]
+
+	<h3>  Hello! Welcome Eagle Creek Farms  at beemaster.ca!</h3
+
+	[% END %]
+
+
+<A NAME="PageTop"></A>
+
+<h2>  Sustainable farming with bees in mind. </h2>
+
+<p> Thorough our main focus is Bees and bee breeding. We are activity promoting or doing other related sustainable farming activities. 
+<p>Such as 
+
+ <ul>
+   <li><a href="?site=ECF&amp;session_id=XUQEFA6V2MKULHRT&amp;view=ChickensView" name="Contact" target="_self" title="Chickens "><font   >Chickens</font></a> 
+   <li>Garlic, 
+   <li>Hops 
+   <li>Seed production.
+   <li><b>New for 20012</b> Urban farming.
+   </ul>     
+           <p> We provide a variety of services to Bee keepers, Farmers,  Health practitioner , and the general public.
+
+            </p>                                            
+            <p>Our services are being developed to provide you with your Bee needs.</p>
+
+ <ul>
+   <li>
+   <a href="/cgi-bin/index.cgi?site=ECF&amp;[% session_string %]&amp;view=ProductView">new Wood ware</a></li>
+   <li><a href="/cgi-bin/index.cgi?site=ECF&amp;[% session_string %]&amp;view=ProductView">Apiary Management Services</a></li>
+   <li><a href="/cgi-bin/index.cgi?site=ECF&amp;[% session_string
+%]&amp;view=ProductView">Bees and Bee Queens</a></li>
+   <li><a href="/cgi-bin/index.cgi?site=ECF&amp;[% session_string %]&amp;view=ProductView">Pollination Products</a>
+   <ul>
+    	<li><a href="/cgi-bin/index.cgi?site=ECF&amp;[% session_string %]&amp;view=ProductView">Farm pollination.</a> 
+  		<li>Crop specific products. These include traditional tree fruits, raspberries, blue berries,  etc.
+   </ul>     
+ </li>
+ <li><a href="http://countrystores.ca/cgi-bin/store/store.cgi?shop=ECF">Wholesale</a>
+      <ul>
+  	      <li><a href="http://countrystores.ca/cgi-bin/store/store.cgi?shop=ECF&amp;L=eng&amp;Category=2">Honey</a>
+  	      <li>Pollen
+ 	      <li><a href="http://countrystores.ca/cgi-bin/store/store.cgi?shop=ECF&amp;L=eng&amp;Category=Wax Products">Candles and wax</a>
+	</ul>     
+  	    <li><a href="http://countrystores.ca/cgi-bin/store/store.cgi?shop=CS">Retail</a>     
+      <ul>
+  	            <li><a href="http://countrystores.ca/cgi-bin/store/store.cgi?shop=CS&amp;L=eng&amp;Category=Honey">Honey</a>
+  	            <li>Pollen
+  	            <li>Propolis
+  	            <li>Venom
+ 	            <li><a href="http://countrystores.ca/cgi-bin/store/store.cgi?shop=CS&amp;L=eng&amp;Category=Candles">Candles</a>
+
+   	</ul>     
+</li>  </ul>     
+<p> The On line Stores are a secure sites that requires you create a log in account. Accounts are free and are for the site to know who you are. This is to protect your information. Please click register to create an account. You may use your Apis account information if you like. As with all site hosted on our server your information is confidential and not sold to others sites.  For more information on log in accounts please click HelpDesk and search the FAQ for Log in. 
+   
+
+    </td>
+    </tr>
+    </table>
+ 
+'
+
+
+
+<div align="center"><a href="/cgi-bin/CSC/helpdesk.cgi?view=BasicDataView&amp;[% session_string %]" target="_Blank" > HelpDesk</a>
+<p>Last Updated: [% data.site_last_update %]
+
+[% embed('CSCCopyRight') %]
+</div>
+
+
+
+
+
+
+
+[% embed(data.page_bottom_view) %]
+

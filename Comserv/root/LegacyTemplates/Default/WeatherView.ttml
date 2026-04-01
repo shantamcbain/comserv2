@@ -1,0 +1,130 @@
+[%
+#	$Id: CSCHomeView.ttml,v 1.9 2002/11/08 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it doesn't rely on any
+# variables from outside.
+
+%]
+
+[% embed(data.page_top_view,['-PAGE_TITLE',"Shanta's Ski Patrol Home page."]) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+        [% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<p>New! Links to Weather on our local mountians Not to useful becouse of the fact they originating system only has pages for Kelowna.
+<br>
+ <!-- Begin WeatherLink Flash Fragment -->
+<object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" codebase="http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=4,0,2,0" width="180" height="110">
+    <param name=movie value="http://www.weatheroffice.com/FlashFeed/WxLinks/CYKA.swf">
+    <param name=quality value=high>    <embed src="http://www.weatheroffice.com/FlashFeed/WxLinks/CYKA.swf" quality="high" pluginspage="http://www.macromedia.com/shockwave/download/index.cgi?P1_Prod_Version=ShockwaveFlash" type="application/x-shockwave-flash" width="180" height="110">
+      	</object>
+<!-- End WeatherLink Flash Fragment -->
+       <!-- Begin WeatherLink Flash Fragment -->
+<object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" codebase="http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=4,0,2,0" width="180" height="110">
+    <param name=movie value="http://www.weatheroffice.com/FlashFeed/WxLinks/CWJV.swf">
+    <param name=quality value=high>    <embed src="http://www.weatheroffice.com/FlashFeed/WxLinks/CWJV.swf" quality="high" pluginspage="http://www.macromedia.com/shockwave/download/index.cgi?P1_Prod_Version=ShockwaveFlash" type="application/x-shockwave-flash" width="180" height="110">
+      	</object>
+<!-- End WeatherLink Flash Fragment -->
+<br>
+
+<!-- End WeatherLink Flash Fragment -->
+<!-- Begin WeatherLink Flash Fragment -->
+<object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" codebase="http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=4,0,2,0" width="180" height="110">
+    <param name=movie value="http://www.weatheroffice.com/FlashFeed/WxLinks/CYLW.swf">
+    <param name=quality value=high>    <embed src="http://www.weatheroffice.com/FlashFeed/WxLinks/CYLW.swf" quality="high" pluginspage="http://www.macromedia.com/shockwave/download/index.cgi?P1_Prod_Version=ShockwaveFlash" type="application/x-shockwave-flash" width="180" height="110">
+      	</object>
+<!-- End WeatherLink Flash Fragment -->
+
+<!-- Begin WeatherLink Flash Fragment -->
+<object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" codebase="http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=4,0,2,0" width="180" height="110">
+    <param name=movie value="http://www.weatheroffice.com/FlashFeed/WxLinks/CWSL.swf">
+    <param name=quality value=high>    <embed src="http://www.weatheroffice.com/FlashFeed/WxLinks/CWSL.swf" quality="high" pluginspage="http://www.macromedia.com/shockwave/download/index.cgi?P1_Prod_Version=ShockwaveFlash" type="application/x-shockwave-flash" width="180" height="110">
+      	</object>
+<!-- End WeatherLink Flash Fragment -->
+
+
+
+<!-- </SERVICE> -->
+<!-- Here is the code for Canada: Silver Star  -->
+
+<!-- <SERVICE NAME="ynews"> -->
+<script LANGUAGE="JavaScript" SRC="http://data.geo.yahoo.com/geo/v1?w=c,ca_silve&hbc=CFE7FF&hfc=040499&hff=Arial&hfs=4&ibc==FFFFFF&ifc=0000ff&iff=Times%20New%20Roman&ifs=3&udd=1&ufc=FFFFFF&uff=Arial&ufs=2&ct=ca&tz=CD&ts=1043514000">
+</SCRIPT>
+
+<a href="http://www.silverstarmtn.com/weather/snowreport.html" target="_Blank" >Silver Star Snow report</a>
+<p>
+<!-- </SERVICE> -->
+
+
+<!-- Here is the code for Canada: Big White  -->
+
+<!-- <SERVICE NAME="ynews"> -->
+<script LANGUAGE="JavaScript" SRC="http://data.geo.yahoo.com/geo/v1?w=c,ca_bigwh&hbc=CFE7FF&hfc=040499&hff=Arial&hfs=4&ibc==FFFFFF&ifc=0000ff&iff=Times%20New%20Roman&ifs=3&udd=1&ufc=FFFFFF&uff=Arial&ufs=2&ct=ca&tz=CD&ts=1043514000">
+</SCRIPT>
+<!-- </SERVICE> -->
+
+<!-- Here is the code for Canada: Red Mountain  -->
+
+<!-- <SERVICE NAME="ynews"> -->
+<script LANGUAGE="JavaScript" SRC="http://data.geo.yahoo.com/geo/v1?w=c,ca_redmo&hbc=CFE7FF&hfc=040499&hff=Arial&hfs=4&ibc==FFFFFF&ifc=0000ff&iff=Times%20New%20Roman&ifs=3&udd=1&ufc=FFFFFF&uff=Arial&ufs=2&ct=ca&tz=CD&ts=1043514000">
+</SCRIPT>
+<!-- </SERVICE> -->
+
+<!-- <SERVICE NAME="ynews"> -->
+<script LANGUAGE="JavaScript" SRC="http://data.geo.yahoo.com/geo/v1?w=c,ca_apexa&hbc=CFE7FF&hfc=040499&hff=Arial&hfs=4&ibc==FFFFFF&ifc=0000ff&iff=Times%20New%20Roman&ifs=3&udd=1&ufc=FFFFFF&uff=Arial&ufs=2&ct=ca&tz=CD&ts=1043514000">
+</SCRIPT>
+<!-- </SERVICE> -->
+
+<!-- Here is the code for Canada: Sun Peaks  -->
+
+<!-- <SERVICE NAME="ynews"> -->
+<script LANGUAGE="JavaScript" SRC="http://data.geo.yahoo.com/geo/v1?w=c,ca_sunpe&hbc=CFE7FF&hfc=040499&hff=Arial&hfs=4&ibc=FFFFFF&ifc=0000ff&iff=Times%20New%20Roman&ifs=3&udd=1&ufc=000000&uff=Arial&ufs=2&ct=ca&tz=CD&ts=1043514000">
+</SCRIPT>
+<!-- </SERVICE> -->
+
+<br>
+<br>
+[% embed (data.page_list_view) %]
+
+
+<div ALIGN="center">
+<br>
+<br>
+<br>
+<p>
+<a href=/cgi-bin/CSC/csc.cgi?view=HelpDesk&[% session_string %]" target="_Blank" > HelpDesk</a>
+<p>Last Updated: Friday Nov 22 2002 
+
+
+[% embed('CSCCopyRight') %]
+
+
+</td>
+</tr>
+</table>
+
+
+</td>
+</tr>
+</table>
+[% embed(data.page_bottom_view) %]
+

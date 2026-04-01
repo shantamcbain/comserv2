@@ -1,0 +1,94 @@
+[%
+#	$Id: BeeTalk.ttml,v 0.04 2014/06/22 13:40:30 shanta Exp $
+
+
+%]
+[% PROCESS DefaultDbi.ttml %]
+ 	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+   [% LastUpdate = data.last_update %]
+   [% SiteUpdate = data.site_last_update %]
+   [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+   [% SiteDisplayName = data.site_display_name %]
+   [% site = SiteName %]
+   [% username = data.session_object.getAttribute('-KEY','auth_username') %]
+   [% PrintMode    = data.session_object.getAttribute('-KEY','PrintMode') %]
+[% developer_status = Data.session_object.getAttribute('-KEY', 'auth_developer_status') %]
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+   [% PAGE = data.page_name || 'Bee Talk' %]
+ 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]<!--ECFProductView-->
+
+[% embed(data.page_top_view,["-PAGE_TITLE","$PageName",]) %]
+[% embed('ErrorDisplayView') %]
+
+ <table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tbody>
+<tr>
+<td><h2>Bee Talk appears on many web sites and news papers</h2>
+
+
+ [% PROCESS BeeTalkHOMEPagesql.ttml %]
+
+
+ [% IF username AND
+      group != 'normal'
+       %] 
+ [% ELSE %]
+[% embed('JoinUsLink')	%]  
+ [% END %]
+
+<p> 
+[% embed('LiveEditAdmin') %]
+	      
+                     
+                                    
+      [% body %][%# process  %]
+ [%  embed('BeeTalkArticalsql') %]
+ <p>  
+      [% IF news %]			
+			<table align="center">
+			<tbody align="center">
+			<tr>
+			<td>
+<h3>News</h3>
+			<script type = "text/javascript"
+							src="/cgi-bin/News/news.cgi?embed=1&amp;site=[% SiteName %]&amp;records_per_page=[% news %]">
+						</script>
+</td></tr></tbody></table>
+  [% END %]	 
+
+[%# FOREACH link = DBI.query("SELECT * FROM beetalk_tb
+                                  WHERE  (sitename = 'ECF' OR
+                                          sitename = 'BMaster'
+                                  ) 
+                                  AND status!= 'Done' 
+                                  ORDER BY start_date
+                                  ")%]    
+
+ [%#embed('WorkShopListTable') %]
+
+
+  [%# END %]
+
+ 
+
+
+
+
+
+</td></tr></tbody></table>

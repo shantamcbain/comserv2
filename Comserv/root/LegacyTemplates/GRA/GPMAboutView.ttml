@@ -1,0 +1,39 @@
+[%
+
+# the home  Page template
+#	$Id:GPMAboutView.ttml,v 1.1 2010/28/09 22:01:26 shanta Exp $
+
+%]
+[%# embed(data.page_top_view,['-PAGE_TITLE','Site Contacts']) %]
+	
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% Username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+ [% script_name = data.app_name %]
+[%# USE DBI( data_source = 'dbi:mysql:shanta_forager',
+                username = 'shanta',
+                password =  'nvidia2' )
+    %]
+<table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<div align="center"><h2>Grindrod Park Market.</h2></div>
+
+<p>We are a lossly organized park market under the <a href="/cgi-bin/index.cgi?site=GRA">GRA</a>
+Market policy is set by a subcommitty made up of market venders and Grindrod recreation Assosiation members.
+See contacts for a current list.
+</p>
+
+</td></tr>

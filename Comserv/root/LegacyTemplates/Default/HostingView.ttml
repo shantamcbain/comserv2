@@ -1,0 +1,65 @@
+[%
+#	$Id: HostingView.ttml,v 1.1 2005/12/13 20:25:14 shanta Exp shanta $
+
+
+%]
+ [% PROCESS DefaultDbi.ttml %]
+[% PROCESS Affiliateid.ttml %]
+[% embed(data.page_top_view,['-PAGE_TITLE','Hosting']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+       [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+
+		<tr>
+		<td >
+		<h3>Sites hosted with us  </h3>
+[%# USE DBI( data_source = 'dbi:mysql:shanta_forager:mysql.computersystemconsulting.ca',
+                username = 'shanta',
+                password =  'nvidia2' )
+    %]
+<ul>	
+[% FOREACH link = DBI.query("SELECT * FROM url_tb
+                                WHERE  category = 'Hosted_link' AND (username_of_poster = '$username' OR share = 'public')
+                                  AND (sitename =  '$SiteName' OR sitename =  'All')
+                                  ORDER BY link_order
+                                    ")%]    
+
+<li>       <a href="[% link.url %]" name="Contact" target="[%link.target %]"title="[% link.name %] "><font   class="LeftSideBarNavStyle">[% link.name %]</font></a>
+</li> [% END %]
+	
+</ul> 
+			<h3> Hosting with us.</h3
+
+
+<ol>
+	<li>Sub domain. Your URL to the site will look like this <a href="http://ecf.beemaster.ca" target="_blank" name="subdomain link" title = "Click here to see what this site looks like.">Http://ecf.beemaster.ca</a> You get 5 email addresess, Web space, and more. Order your sub domain <a href="http://computersystemconsulting.ca/whmcs/cart.php?a=add&pid=21&amp;aff=[% AffiliateID %]">here</a></li>
+	<li>Full domain Your URL to the site will look like this <a href="http://forager.com" target="_blank" name="full domain link" title = "Click here to see what this site looks like.">Http://forager.com</a> You get full Cpanel access to your site. Order your domain <a href="http://computersystemconsulting.ca/whmcs/cart.php?a=add&pid=1&amp;aff=[% AffiliateID %]">here</a</li>
+	<li><a href="http://wwcomputersystemconsulting.ca/whmcs/cart.php?a=add&pid=3'&amp;aff=[% AffiliateID %]">Reseller accounts</a></li> Run your own hosting service for your customers.
+</ol>
+			<h3> Domains.</h3
+<p>We offer discounted hosting services to our members. We have Three types of services.
+</p>
+
+<p> Register or tranfer your <a href="http://computersystemconsulting.ca/whmcs/cart.php?a=add&domain=register&amp;aff=[% AffiliateID %]" target="_new">domain</a> to us.</a>
+		</td>
+			</tr>
+		</table>
+
+[% embed(data.page_bottom_view) %]

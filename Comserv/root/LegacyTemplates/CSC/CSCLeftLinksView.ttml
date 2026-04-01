@@ -1,0 +1,41 @@
+[%
+
+# the Left Page template
+#	$Id: CSCLeftLinksView.ttml,v 1.5 2002/11/11 14:44:48 shanta Exp $	
+
+%]
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+<!--openCSCLeftLinks-->
+
+ 
+
+ 
+
+    [% IF is_authenticated%]
+    <tr>
+    <td Class='NavTableCellStyle'>	<A HREF = "cs.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=CSFrameView&amp;left_page_view=CSLeftLinksView" target="_content"><font   class="LeftSideBarNavStyle">CityShop Admin</font></a>
+    </td>
+    </tr>
+    <tr>
+
+    <td Class='NavTableCellStyle'>
+            <A HREF="/cgi-bin/FAQ/faq.cgi?site=[% SiteName %]&amp;[% session_string %]"  TARGET = "[% data.link_target %]"><font   class="LeftSideBarNavStyle">CSC FAQ </font></a><br>
+        </td>
+        </tr>
+ 
+    <td Class='NavTableCellStyle'>
+            <A HREF="bug_tracker.cgi?site=[% SiteName %]&amp;[% session_string %]"  TARGET = "[% data.link_target %]" ><font   class="LeftSideBarNavStyle">[% SiteName %] SiteBugs . </font></a><br>
+    [% END %]
+<!--closeCSCLeftLinks-->
+
+
+

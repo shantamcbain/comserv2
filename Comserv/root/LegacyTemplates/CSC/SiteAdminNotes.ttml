@@ -1,0 +1,16 @@
+
+
+
+  [% FOREACH link = DBI.query("SELECT * FROM page_tb
+                                  WHERE  (status  = 2 AND
+                                         page_code = 'SiteAdminNotes' AND
+                                         sitename = '$SiteName' )
+                                  ORDER BY sitename
+                                  ")%]    
+               [% PROCESS AdminNotes.ttml %]
+ [% END%]
+
+ 
+  <p><a href="/cgi-bin/page.cgi?site=[% SiteName %]&[% session_string %]&display_modification_form=on&record_id=[% ARecord_id %]" target="_blank">edit admin notes </a>
+   [% AdminNotes   %]
+ 

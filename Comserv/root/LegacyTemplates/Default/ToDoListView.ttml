@@ -1,0 +1,14 @@
+ <h4>From the Todo database.</h4>
+  
+[% IF username %]                                
+  &nbsp;<a href="/cgi-bin/ToDo/todo.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;site_name=[% SiteName %]" name="Add page link" title="Add New Link">Add</a>
+
+  [% END %]
+<table>
+<tr><td>SiteName</td><td> Priority</td><td> Status</td><td> Subject</td><td> Project Code</td></tr>
+[% IF SiteName == 'SLT' %]
+ [% embed ('SQLSiteName' )   %]                            
+ [% ELSE %]
+callAQLAll[% embed ('AQLAll' )   %]  
+ [% END %]
+</table>

@@ -1,0 +1,120 @@
+[%#	$Id: EVHomeView.ttml,v 1.0 2002/11/08 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dozen't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dozen't rely on any
+# variables from outside.
+
+%]
+[%# embed('InheretedVariablesView') %] 
+
+ [% PROCESS DefaultDbi.ttml %]
+ [% username = data.session_object.getAttribute('-KEY','auth_username') %]
+ [% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+ [% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+ [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+ [% site = SiteName %]
+ [% SiteDisplayName = data.site_display_name %]
+[% session_id = data.session_object.getId() %]
+ [% session_string = "session_id=$session_id" %]
+
+[% IF group == "Mentoring"	%]
+[% embed(data.page_top_view,['-PAGE_TITLE','Mentor home.']) %]
+[% ELSE %]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Electrical Vehicle Home page.']) %]
+[% END %]
+[% embed('ErrorDisplayView') %]
+
+[%# embed('InheretedVariablesView') %]
+
+
+ <!-- Begin EV Home View -->  
+<table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+
+[%# embed('InheretedVariablesView') %]
+[% IF username %]
+
+<h3 > Hello  [% firstname%]  [% lastname%]! Welcome to [% data.site_display_name %]</h3>
+
+	[% ELSE %]
+
+	<h3>  [% embed ("LogOnLeftView") %] Welcome to [% data.site_display_name %] Electric Vehicle Page! </h3> 
+	[% END %]
+
+[% SiteName = data.site_name%]
+[% IF data.debug == 1 %]
+Variable ative in DevHomeView
+[% embed('InheretedVariablesView') %]
+[% END %]
+ [%# embed ('CSCDevHomeView') %]
+ 
+
+<A NAME="PageTop"></A>
+<br>
+<br>
+<p>Thanks for your interest in our  Electric Vehicle  solutions.
+</p>
+
+
+
+   [% IF username %]
+   
+ 	
+	 
+ 	[% ELSE %]
+  
+   <p>You will now need to create an account on the system.
+   click on one of the Logon links then click register.
+    </p>
+	[% END %]
+
+<p>Here we attempt to provide you with tool to choose and power an electric Vehicle.
+</p>
+
+<font size="+2">Some to look for.</font> 
+<ol>
+	<li>Charging network and costs</li>
+	<li>EV's available. </li>
+	<li>cost comparison EV Electric vehicle to ICE (internal combustion engine)</li>
+	<li>National and local policies </li>
+	<li> <a href="http://altpower.usbm.ca/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=BuySellHomeView">	Buy And Sell.</a> 
+	Find an EV posted on our system</li>
+	<li></li>
+	<li></li>
+</ol>
+
+
+
+
+
+
+<br>
+[% IF SiteName != 'CSC' %]
+<!-- Call Subscrib list -->
+[%# embed ('SubscribeListView') %]
+<!-- End call subscribe list -->
+<br>
+<br>
+	[% END %]
+
+<p>Last Update [% data.site_last_update %] [% IF SiteName == 'Demo' %]&nbsp; This value is stored in your setup file. [% END %]
+<br>
+<!-- Call CScCopyRight -->
+[% embed('CSCCopyRight') %]
+<!-- End Call CSCCopyRight -->
+<br>
+<!-- close Home page table  -->
+</td>
+</tr>
+</table>
+
+
+<!-- End EV home view -->
+
+[% embed(data.page_bottom_view) %]
+

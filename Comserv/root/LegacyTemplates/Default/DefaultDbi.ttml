@@ -1,0 +1,4 @@
+[% USE DBI( data_source = 'dbi:mysql:shanta_forager',
+                username = 'shanta_forager',
+                password =  'UA=nPF8*m+T#' )
+    %]

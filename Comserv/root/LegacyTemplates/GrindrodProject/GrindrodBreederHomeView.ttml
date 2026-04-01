@@ -1,0 +1,140 @@
+[%
+#	$Id: GrindRodBreaderHomeView.ttml,v 1.1 2010/09/07 06:42:47 shanta Exp shanta $	%]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Gronrod Project']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+<!-- GrindrodBreederHomeView  v 1.1 2010/09/07-->
+<table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<A NAME="PageTop"></A>
+
+<h3> Welcome to the Grindrod project </h3>
+
+	[% IF username %]
+			[% IF  group == 'normal'%]
+
+<p>Please join our project.
+</p>
+<p>As a member you will be able to contribute to the betterment of bees in our world.  
+	</p>	[% ELSE %]
+<p>Please join our project.</p>
+			[% END %]
+
+
+	[% ELSE %]
+
+				 		<h2>Promoting sustainable agriculture with bees as our guide.</h2>
+ 	
+<p><font size="-2">To get the most from this application you will need to create an account.
+<A HREF = "[% data.script_name %]?session_id=[% session_id %]&amp;submit_logon=on&amp;site=[%SiteName%]"
+                 TARGET = "[% data.link_target %]">Logon</A> </font>
+                 
+                 
+               <a href="/cgi-bin/FAQ/faq.cgi?site=[%SiteName%]&amp;[% session_string %]&amp;sort_field1=category &amp;sort_field2=fname &amp;first_record_to_display=0&amp;records_per_page= &amp;record_id=2&amp;columns_to_view=category &amp;columns_to_view=question&amp;display_details_view.x=8 &amp;display_details_view.y=9&amp;display_details_view=on" onmousedown="click Here for info on what we collect">Why should I create an account</a>
+    
+		</td >
+		</tr>
+		<tr>
+		<td >
+
+
+
+		<p>We believe a world that supports healthy bee populations is good for all aspects of agriculture. With an eye to sustainability we are helping to develop a sustainable community in the Grindrod area. What the bees are eating are is the prime source of health on our bees. Honeybees and other pollinators are unique in they eat pollen and nectar as their primary food sources.They bring these things home to feed their young.They also retrieve water. This means that any  sprays, chemicals etc are in the feeding area of the the bee will get into the bees food sources.
+		</p>
+		<p>As we discover what practices work the best for the community as a whole we will promote them though education and actions. 
+		</p>
+		<p>
+			<ul>
+                          <li>Pollinator plant chart and recommended plantings 
+                          <li><a href="/cgi-bin/Apis/apis.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=ECFBreederProjectView" target="_content"> Bee Breeding program </a></li>
+      
+        		  <li>Stock management practices        		  
+         		  <li>Seed harvest program
+       		  	  <li>Workshops and seminars	        		  
+			</ul>
+		</p>
+		<p>
+                 Projects in the community in which we support.
+			<ul>
+                          <li><a href="http://market.grindrodbc.com" onmousedown="The Grindrod Park Market">The Grindrod Park Market</a> This markets current police are promoting a sustainable community. Providing a place of exchange.
+			  <li>Workshops and seminars	        		  
+			</ul>
+ 		</p>			
+					
+				
+
+	[% END %]
+
+            <h3>  This Web Application  is for bee breeders to help each other raise better bees. </h3>
+             
+            
+			<h3>News</h3>
+			<table align="center">
+			<tbody align="center">
+			<tr>
+			<td>
+			<script type = "text/javascript"
+							src="/cgi-bin/News/news.cgi?embed=1&amp;site=BMastBreeder&amp;records_per_page=1">
+						</script>
+	 
+			</td>
+
+
+
+<H2><B>Join Our Grindrod Project list</b></H2>
+ <FORM Method=POST ACTION="http://beemaster.ca/mailman/subscribe/grindrodproject-grindrodbc.com"><br>
+ Your E-mail address: <INPUT type="Text" name="email" size="30" value="[% email %]"><br>
+ Your Name (optional): <INPUT type="Text" name="fullname" size="30" value="[% firstname %]&nbsp; [% lastname%]"><br><br>
+ You may enter a privacy password below. This provides only mild security, but should<br>
+ prevent others from messing with your subscription. <b>Do not use a valuable password</b> as it<br>'
+ will occasionally be emailed back to you in cleartext.<br><br>
+ If you choose not to enter a password, one will be automatically generated for you, and it will<br>
+ be sent to you once you've confirmed your subscription. You can always request a mail-back<br>
+ of your password when you edit your personal options.<br><br>
+ Password choice: <INPUT type="Password" name="pw" size="15"><BR>
+ Confirm Password: <INPUT type="Password" name="pw-conf" size="15"><BR><BR>
+ Would you like to receive list mail batched in a daily digest? (You may choose NoMail after you join.)<BR><br>
+ <input type=radio name="digest" value="0" CHECKED> No <input type=radio name="digest" value="1"> Yes<br><br>
+ <INPUT type="Submit" name="email-button" value="Subscribe">
+ </FORM>
+
+
+			</td>
+		</tr>
+	</tbody>
+	</table>
+
+
+<p>
+<!-- hhmts start -->
+<!-- hhmts end -->
+
+[% embed('CSCCopyRight') %]
+
+		<p>Last Update [% data.site_last_update %][% IF SiteName == 'Demo' %]&nbsp; This value is stored in your setup file. [% END %]
+
+</td>
+</tr>
+</table>
+<!-- GrindrodBreederHomeView  v 1.1 2010/9/07->
+
+
+
+

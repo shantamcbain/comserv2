@@ -1,0 +1,171 @@
+[%#	$Id: SustainableView.ttml,v 0.1 2012/01/14 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dozen't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dozen't rely on any
+# variables from outside.
+
+%]
+[% PROCESS DefaultDbi.ttml %]
+
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+   [% LastUpdate = data.last_update %]
+   [% SiteUpdate = data.site_last_update %]
+   [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+   [% SiteDisplayName = data.site_display_name %]
+   [% site = SiteName %]
+   [% username = data.session_object.getAttribute('-KEY','auth_username') %]
+   [% PrintMode    = data.session_object.getAttribute('-KEY','PrintMode') %]
+[% developer_status = Data.session_object.getAttribute('-KEY', 'auth_developer_status') %]
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+   [% PAGE = data.page_name || 'HomeView' %]
+[%# page = 'GarlicCulture' %]
+
+
+[% IF SiteName == 'CSC' %]
+ [% PROCESS CSCHOMEPagesql.ttml %]
+[% ELSIF SiteName == "BMaster" %]
+  [% PROCESS BMasterSustainPagesql.ttml %]
+[% ELSIF SiteName == "BeeSafe" %]
+  [% PROCESS BeeSafeSustainsql.ttml %]
+[% ELSIF SiteName == "CSCDev"  %]
+ [% PROCESS CSCDevHOMEPagesql.ttml %]
+[% ELSIF SiteName == "ECF"  %]
+ [% IF PAGE == 'GarlicCulture' %]
+  [% PROCESS Garlicculturesql.ttml %]
+ [% ELSIF PAGE == 'SustainableView' %] call SustainableView
+  [% PROCESS ECFSustainablesql.ttml %]
+ [% ELSE %]
+ [% PROCESS ECFSustainableql.ttml %]
+ [% END %]
+[%  ELSIF SiteName ==  'Forager' %]
+ [% IF PAGE == 'GarlicCulture' %]
+  [% PROCESS Garlicculturesql.ttml %]
+ [% ELSE %]
+  [% PROCESS ForagerHOMEPagesql.ttml %]
+ [% END %]
+[% ELSIF SiteName == "GrindrodBC"  %]
+ [% PROCESS GrindrodBCHOMEPagesql.ttml %]
+[% ELSIF SiteName == "HE" %]
+  [% PROCESS HEHOMEPagesql.ttml %]
+[% ELSIF SiteName == "ShantaWorkShop"  %]
+ [% PROCESS ShantaWorkShopHOMEPagesql.ttml %]
+[%  ELSIF SiteName ==  'Skye' %]
+ [% IF PAGE == 'SkyeGarlicCulture' %]
+  [% PROCESS Garlicculturesql.ttml %]
+[%  ELSIF PAGE == 'GarlicOverView' %]
+  [% PROCESS SkyeGarlicOverViewsql.ttml %]
+[%  ELSIF PAGE == 'LinksView' %]
+  [% PROCESS SkyeLinksViewsql.ttml %]
+[%  ELSIF PAGE == 'SkyeGarlicOverView' %]
+  [% PROCESS GarlicOverViewsql.ttml %]
+[%  ELSIF PAGE == 'MarketView' %]
+  [% PROCESS SkyeMarketPagesql.ttml %]
+ [%  ELSIF PAGE == 'PhotoView' %]
+  [% PROCESS SkyePhotoPagesql.ttml %]
+[%  ELSIF PAGE == 'ReferenceView' %]
+  [% PROCESS SkyeReferenceViewsql.ttml %]
+ [%  ELSIF PAGE == 'VideosView' %]
+  [% PROCESS SkyeVideoPagesql.ttml %]
+[% ELSE %]
+  [% PROCESS SkyeHOMEPagesql.ttml %]
+ [% END %]
+[% ELSE %]
+ [% PROCESS DemoHOMEPagesql.ttml %]
+[% END %]
+
+
+[%# query = 'SELECT * FROM page_tb WHERE  (status  = 2 AND page_code = "
+_ data.page_name  + " AND sitename = " _ data.sitename _" ) ORDER BY
+sitename' %]
+
+[%# FOREACH link = DBI.query( query ) %]
+              [%# site#      = link.sitename        %]
+                [%# PageName#  = link.view_name %]
+                [%# Record_id# = link.record_id  %]
+                [%#body      = link.body %]
+      [%# END %]
+
+
+   	[% embed(data.page_top_view,["-PAGE_TITLE","$PageName",]) %]
+[% embed('ErrorDisplayView') %]
+ 
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+	<tr>
+	<td>                    
+                
+[% IF data.debug == 1   
+
+	 %]
+<ul>
+<li>Record id [% Record_id   %]
+<li>SiteName [% SiteName %]
+<li>Page View name[% PageName %] 
+<li>PageViewName pasted to script [% page %]
+<li>Status [% status  %]
+<li>[%  page_code %]
+<li>Sitename form page [% site  %]
+<li>Lastupdate  [% lastupdate  %]
+<ul>
+[% END %]
+[% IF username %]
+			<h3 > Hello  [% firstname%] &nbsp; [% lastname%]! Welcome to [% data.site_display_name %]</h3>
+		[% ELSE %]
+			<h3>  [% embed ("LogOnLeftView") %] Welcome to [% data.site_display_name %]! </h3> 
+		[% END %]
+      [% IF SiteName == 'CSC' %]
+                             
+       [% IF data.session_object.getAttribute('-KEY','Developer') == 1 %]
+	      <p><a href="?site=[% SiteName %]&amp;view=DeveloperView &amp;[% session_string %]" target="_blank" title="CSC Developer page">[% FirstName %]'s Developer Home</a>
+	      [% ELSE %]
+	      <p><a href="?site=[% SiteName %]&amp;view=JobView&amp;[% session_string %]" title="CSC Developer page">Join our team</a>
+	      [% END %]
+      [% END %]
+	      
+[% embed('LiveEditAdmin') %]
+	      
+                     
+                                    
+      [% body %]
+      [% IF news %]			<h3>News</h3>
+			<table align="center">
+			<tbody align="center">
+			<tr>
+			<td>
+			<script type = "text/javascript"
+							src="/cgi-bin/News/news.cgi?embed=1&amp;site=[% SiteName %]&amp;records_per_page=[% news %]">
+						</script>
+	 
+			</td>
+		</tr>
+	</tbody>
+	</table>
+
+		<br>
+[% END %]
+
+ [% IF username == 'Shanta' %]
+  [% embed('ToDoList') %]
+ [% END %]
+
+[% IF facebook %]<div class="fb-like" data-href="[% facebook %]"  data-send="true" data-width="450" data-show-faces="false"></div>
+<p> 
+		<br>
+[% END %]
+
+[% IF lastupdate %]
+<p>Last Update [% lastupdate %][% IF SiteName == 'Demo' %]&nbsp; This value is stored in your setup file. [% END %]
+		<br>
+[% END %]
+[% embed('CSCCopyRight') %]
+
+	
+
+
+
+[% embed(data.page_bottom_view) %]

@@ -1,0 +1,106 @@
+[%
+#	$Id: GrindrodParkMarketHomeView.ttml,v 1.1 2010/09/07 06:42:47 shanta Exp shanta $	%]
+
+[%# embed(data.page_top_view,['-PAGE_TITLE','The Grindrod Park Market']) %]
+
+[%# embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+<!-- GrindrodParkMarketHomeView  v 1.1 2010/09/07-->
+<table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<A NAME="PageTop"></A>
+
+<h3> Welcome to the Grindrod Park Market </h3>
+
+	[% IF username %]
+			[% IF  group == 'normal'%]
+
+				<p>Thanks Creating an account on our site.
+				</p>
+				<p>As a guest user, you will be able to use more of the tool on the site.  
+					</p>	
+				<p>Becoming a Paid member will give you access to even more of the tools offered on the site and Discounts on offering of other participating members.
+                        [% ELSE %]
+				<p>Paid Member </p>
+	
+ 			[% END %]
+
+
+	[% ELSE %]
+                 
+ 
+<p><font size="-2">To get the most from this application you will need to create an account.
+<A HREF = "[% data.script_name %]?session_id=[% session_id %]&amp;submit_logon=on&amp;site=[%SiteName%]"
+ title="To get the most from this application you will need to create an account. Click here to create one or logon"                 TARGET = "[% data.link_target %]">Logon</A> </font>
+                
+    
+		[% END %]
+<h2>The Gridrod Park Market</h2>
+	<p>The Grindrod Park Market happens each Saturday from 8 am to 3 pm. Now at the Grindrod Hall From November to March. All are welcome provided you fallow our basic <a href="/cgi-bin/Apis/apis.cgi?site=[%SiteName%]&amp;view=GPMRulesView"">rules of conduct.</A></p>
+
+
+<p>This is our 2nd year of operations and we have on offer local food, Honey, Bee pollen,  baking, crafts and a wide range of good used items that help satisfy the Second  R in Reduce, Reuse, Recycle mantra. The R are placed in the order that most help our planet. </p>
+
+<p>Grindrod Park Concession is open Net spring. watch for when we move back tothe park</p>
+
+<p> <a href="/cgi-bin/index.cgi?site=[%SiteName%]&amp;view=MembersView&amp;[% session_string %]">Join us.</A></p>
+			 		
+
+
+		
+					
+				
+
+
+             
+			<h3>News</h3>
+			<table align="center">
+			<tbody align="center">
+			<tr>
+			<td>
+			<script type = "text/javascript"
+							src="/cgi-bin/News/news.cgi?embed=1&amp;site=GPMarket&amp;records_per_page=1">
+						</script>
+	 
+			</td>
+			</tr>
+			</tbody>
+			</table>
+
+<H2><B><a href="/cgi-bin/index.cgi?site=GPMarket&amp;view=ListJoinView&amp;[% session_string %]">Join Our Grindrod Park Market Discussion and Announcement list</a></b></H2>
+
+
+			</td>
+		</tr>
+	</tbody>
+	</table>
+
+
+<p>
+<!-- hhmts start -->
+<!-- hhmts end -->
+
+[%# embed('CSCCopyRight') %]
+
+		
+
+<!-- GrindrodBreederHomeView  v 1.1 2010/9/07 -->
+
+
+
+

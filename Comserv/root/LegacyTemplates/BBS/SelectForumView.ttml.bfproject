@@ -1,0 +1,28 @@
+name: BBS
+files: /var/www/cgi-bin/ActionHandler/BuyAndSell/ProcessModifyRequestAction.pm
+files: /var/www/cgi-bin/HTMLTemplates/Default/AddEventEmailView.ttml
+files: /var/www/cgi-bin/HTMLTemplates/Default/SubscribeListView.ttml
+files: /var/www/cgi-bin/BBS/bbs.cgi
+files: /var/www/cgi-bin/HTMLTemplates/BBS/SelectForumView.ttml
+files: /var/www/cgi-bin/HTMLTemplates/BBS/BasicDataView.ttml
+basedir: 
+webdir: 
+template: 
+word_wrap: 1
+searchlist: @INPUT_WIDGET_DEFINITApisIONS
+searchlist: $APP_NAME_TITLE
+searchlist: page_list
+searchlist: $footer
+recent_files: /var/www/cgi-bin/ActionHandler/BBS/ProcessAddRequestAction.pm
+recent_files: /var/www/cgi-bin/HTMLTemplates/Default/AddEventEmailView.ttml
+recent_files: /var/www/cgi-bin/HTMLTemplates/Default/SubscribeListView.ttml
+recent_files: /var/www/cgi-bin/BBS/bbs.cgi
+recent_files: /var/www/cgi-bin/HTMLTemplates/BBS/SelectForumView.ttml
+recent_files: /var/www/cgi-bin/HTMLTemplates/BBS/BasicDataView.ttml
+recent_files: /var/www/cgi-bin/HTMLTemplates/Apis/ApisSubscribeListView.ttml
+opendir: /var/www/cgi-bin/ActionHandler/BBS
+savedir: /var/www/cgi-bin/ActionHandler/BuyAndSell
+view_html_toolbar: 1
+view_custom_menu: 1
+view_main_toolbar: 1
+view_left_panel: 1

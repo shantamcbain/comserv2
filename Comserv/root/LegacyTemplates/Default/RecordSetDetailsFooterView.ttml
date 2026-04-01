@@ -1,0 +1,295 @@
+[%
+
+#
+# this template handles the generation of the
+# [Prev N records | Next N records] bar
+#
+
+# it relies on the variables lists in @required below
+
+# this should be converted into TT at some point
+
+%]
+
+
+[% RAWPERL %]
+
+use strict;
+use Extropia::Core::Base qw(_rearrange);
+
+my @required = (
+        -SORT_FIELD1,
+        -SORT_FIELD2,
+        -SIMPLE_SEARCH_STRING,
+        -TOTAL_RECORDS,
+        -CGI_OBJECT,
+        -MAX_RECORDS_PER_PAGE,   
+        -FIRST_RECORD_ON_PAGE,
+        -SCRIPT_NAME,
+        -DISPLAY_FIELDS,
+        -SELECTED_DISPLAY_FIELDS
+            );
+
+my $view_obj = $stash->get('view_obj');
+
+my $rh_data  = $view_obj->get_data;
+
+exists $rh_data->{$_} or die "$_ is not set" for @required;
+
+    my $session                 = $rh_data->{-SESSION_OBJECT};
+    my $sort_field1             = $rh_data->{-SORT_FIELD1};
+    my $sort_field2             = $rh_data->{-SORT_FIELD2};
+    my $simple_search_string    = $rh_data->{-SIMPLE_SEARCH_STRING};
+    my $total_records           = $rh_data->{-TOTAL_RECORDS};
+    my $cgi                     = $rh_data->{-CGI_OBJECT};
+    my $max_records_to_retrieve = $rh_data->{-MAX_RECORDS_PER_PAGE};
+    my $first_record_on_page    = $rh_data->{-FIRST_RECORD_ON_PAGE};
+    my $script_name             = $rh_data->{-SCRIPT_NAME};
+    my $display_fields          = $rh_data->{-DISPLAY_FIELDS};
+    my $selected_display_fields = $rh_data->{-SELECTED_DISPLAY_FIELDS};
+    my $hidden_admin_fields_view_name = $rh_data->{-HIDDEN_ADMIN_FIELDS_VIEW_NAME};
+    my $url_encoded_admin_fields_view_name = $rh_data->{-URL_ENCODED_ADMIN_FIELDS_VIEW_NAME};
+    my $link_target                        = $rh_data->{-LINK_TARGET} || '';
+
+    my $raw_search = $cgi->param('raw_search');
+
+    my $session_id = "";
+
+    $session_id = $session->getId() if $session;
+
+    my @columns_to_view = $cgi->param('columns_to_view') 
+            ? $cgi->param('columns_to_view')
+            : @$selected_display_fields;
+    my $columns_to_view_string = join (
+        "&columns_to_view=",
+        @columns_to_view
+    );
+    my $number_of_columns = @columns_to_view +1;
+
+    my $last_record_on_page;
+
+    if ($first_record_on_page + $max_records_to_retrieve < $total_records) {
+        $last_record_on_page =  $first_record_on_page + 
+                                $max_records_to_retrieve;
+    }
+    else {
+        $last_record_on_page = $total_records;
+    }
+
+    my $previous_page_link = generatePreviousPageLink(
+        -SORT_FIELD1              => $sort_field1,
+        -SORT_FIELD2              => $sort_field2,
+        -SIMPLE_SEARCH_STRING     => $simple_search_string,
+        -RAW_SEARCH               => $raw_search,
+        -FIRST_RECORD_ON_PAGE     => $first_record_on_page,
+        -MAX_RECORDS_TO_RETRIEVE  => $max_records_to_retrieve,
+        -COLUMNS_TO_VIEW          => \@columns_to_view,
+        -SESSION_ID               => $session_id,
+        -SCRIPT_NAME              => $script_name,
+        -CGI_OBJECT               => $cgi,
+        -LINK_TARGET              => $link_target
+    );
+
+    my $next_page_link =  generateNextPageLink(
+        -SORT_FIELD1              => $sort_field1,
+        -SORT_FIELD2              => $sort_field2,
+        -SIMPLE_SEARCH_STRING     => $simple_search_string,
+        -RAW_SEARCH               => $raw_search,
+        -FIRST_RECORD_ON_PAGE     => $first_record_on_page,
+        -MAX_RECORDS_TO_RETRIEVE  => $max_records_to_retrieve,
+        -COLUMNS_TO_VIEW          => \@columns_to_view,  
+        -SESSION_ID               => $session_id,
+        -SCRIPT_NAME              => $script_name,
+        -CGI_OBJECT               => $cgi,
+        -TOTAL_RECORDS            => $total_records,
+        -LINK_TARGET              => $link_target
+    );
+
+    $output .= qq[ 
+        <TABLE WIDTH = "95%" BORDER = "0" CELLSPACING = "0" 
+               CELLPADDING = "0" ALIGN = "CENTER">
+        <TR>              
+        <TD CLASS = "tableHeaderStyle">
+        Total Records Returned: $total_records
+        </TD>   
+    ];      
+
+    my $first_record_on_page_human_readable = $first_record_on_page+1;
+
+    $output .= qq[
+        <TD COLSPAN = "3" CLASS = "tableHeaderStyle" ALIGN = "CENTER">
+        $previous_page_link
+        $next_page_link
+        &nbsp;
+        </TD>
+
+        <TD CLASS = "tableHeaderStyle" ALIGN = "RIGHT">
+    ];
+
+    if ($last_record_on_page > 0) {
+        $output .= qq[
+        <B>Viewing Records: $first_record_on_page_human_readable -
+                            $last_record_on_page</B>
+        ];
+    }
+
+    $output .= qq[
+        &nbsp;
+        </TD>
+        </TR>
+
+        <TR>
+        <TD HEIGHT = "5" COLSPAN = "5">&nbsp;</TD>
+        </TR>
+
+        </TABLE>
+    ];
+
+sub generatePreviousPageLink {
+    @_ = _rearrange([
+        -SORT_FIELD1,
+        -SORT_FIELD2,
+        -SIMPLE_SEARCH_STRING,
+        -RAW_SEARCH,
+        -FIRST_RECORD_ON_PAGE,
+        -MAX_RECORDS_TO_RETRIEVE,
+        -COLUMNS_TO_VIEW,
+        -SESSION_ID,
+        -SCRIPT_NAME,
+        -CGI_OBJECT,
+        -TOTAL_RECORDS,
+        -LINK_TARGET
+            ],
+            [
+            ],
+        @_
+    ); 
+
+    my $sort_field1             = shift;
+    my $sort_field2             = shift;
+    my $simple_search_string    = shift;
+    my $raw_search              = shift;
+    my $first_record_on_page    = shift;
+    my $max_records_to_retrieve = shift;
+    my $columns_to_view         = shift;
+    my $session_id              = shift;
+    my $script_name             = shift;
+    my $cgi                     = shift;
+    my $total_records           = shift;
+    my $link_target             = shift;
+
+    my $columns_to_view_string = join (
+        "&columns_to_view=",
+        @$columns_to_view
+    );
+
+    return "" if $first_record_on_page == 0;
+
+    my $power_search_string = "";
+    if ($cgi->param('submit_power_search')) {
+        $power_search_string = "submit_power_search=on";
+        my $field;
+        foreach $field (@$columns_to_view) {
+            if ($cgi->param($field)) {
+                $power_search_string = $power_search_string . 
+                                      "&$field=" . $cgi->param($field);
+            }
+        }
+
+        if ($raw_search) {
+            $power_search_string .= "&raw_search=$raw_search";
+        }
+    }
+
+    my $first_record_on_previous_page = $first_record_on_page -
+                                        $max_records_to_retrieve;
+
+    return qq[
+        <A HREF="$script_name?records_per_page=$max_records_to_retrieve&columns_to_view=$columns_to_view_string&simple_search_string=$simple_search_string&sort_field1=$sort_field1&sort_field2=$sort_field2&first_record_to_display=$first_record_on_previous_page&session_id=$session_id&$power_search_string"
+           TARGET = "$link_target">Previous $max_records_to_retrieve</A>
+    ];
+}
+
+sub generateNextPageLink {
+    @_ = _rearrange([
+        -SORT_FIELD1,
+        -SORT_FIELD2,
+        -SIMPLE_SEARCH_STRING,
+        -RAW_SEARCH,
+        -FIRST_RECORD_ON_PAGE,
+        -MAX_RECORDS_TO_RETRIEVE,
+        -COLUMNS_TO_VIEW,
+        -SESSION_ID,
+        -TOTAL_RECORDS,
+        -SCRIPT_NAME,
+        -CGI_OBJECT,
+        -LINK_TARGET
+            ],
+            [
+            ],
+        @_
+    ); 
+
+    my $sort_field1             = shift;
+    my $sort_field2             = shift;
+    my $simple_search_string    = shift;
+    my $raw_search              = shift;
+    my $first_record_on_page    = shift;
+    my $max_records_to_retrieve = shift;
+    my $columns_to_view         = shift;
+    my $session_id              = shift;
+    my $total_records           = shift;
+    my $script_name             = shift;
+    my $cgi                     = shift;
+    my $link_target             = shift;
+
+    my $columns_to_view_string = join (
+        "&columns_to_view=",
+        @$columns_to_view
+    );
+ 
+    if ($first_record_on_page + $max_records_to_retrieve > $total_records) {
+        return "";
+    }
+
+    my $first_record_on_next_page = $first_record_on_page +
+                                    $max_records_to_retrieve;
+
+    my $remaining_records =  $total_records -
+                            ($first_record_on_page +
+                             $max_records_to_retrieve);
+
+    my $power_search_string = "";
+    if ($cgi->param('submit_power_search')) {
+        $power_search_string = "submit_power_search=on";
+        my $field;
+        foreach $field ($cgi->param()) {
+            if ($cgi->param($field) && 
+                $field =~ /^search_/) {
+                $power_search_string = $power_search_string . 
+                                       "&$field=" . $cgi->param($field);
+            }
+        }
+        if ($raw_search) {
+            $power_search_string .= "&raw_search=" . $raw_search;
+        }
+    }
+
+    if ($remaining_records <= 0) {
+        return "" if $remaining_records <= 0;
+    }
+    elsif ($remaining_records < $max_records_to_retrieve) {
+        return  qq[
+            <A HREF ="$script_name?records_per_page=$max_records_to_retrieve&columns_to_view=$columns_to_view_string&simple_search_string=$simple_search_string&sort_field1=$sort_field1&sort_field2=$sort_field2&first_record_to_display=$first_record_on_next_page&session_id=$session_id&$power_search_string"
+               TARGET = "$link_target">Next $remaining_records</A>
+        ];
+    }
+    else {
+        return  qq[
+            <A HREF ="$script_name?records_per_page=$max_records_to_retrieve&columns_to_view=$columns_to_view_string&simple_search_string=$simple_search_string&sort_field1=$sort_field1&sort_field2=$sort_field2&first_record_to_display=$first_record_on_next_page&session_id=$session_id&$power_search_string"
+               TARGET = "$link_target">Next $max_records_to_retrieve</A>
+        ];
+    }
+}
+
+[% END %]

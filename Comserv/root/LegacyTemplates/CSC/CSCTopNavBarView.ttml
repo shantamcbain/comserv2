@@ -1,0 +1,64 @@
+[% #CSC CSCTopNavBarView
+#	$Id: CSCTopNavBarView.ttml,v 1.2 2002/05/11 23:23:17 shanta Exp $	
+
+# this template generates the top of HTML,
+
+# if -PAGE_TITLE is defined, it gets used in the <title>
+
+# if -SCRIPT_DISPLAY_NAME is defined, it gets used in the <title>
+
+# if -CSS_VIEW_URL is defined, the CSS link is created.
+
+# if -APPLICATION_SUB_MENU_VIEW_NAME is defined, the corresponding
+# template gets embedded
+
+# also see various other logo values below
+
+#Set needed values
+
+%]
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+
+<tr>
+<td>
+[% embed('CSCSiteNaveView') %] 
+    </TD>
+
+
+[% IF group ==  'Alegro_admin' OR
+      group ==  'Apis_admin' OR 
+      group ==  'BCAF_admin' OR 
+      group ==  'CAP_admin' OR 
+      group ==  'News_admin' OR  
+      group ==  'CS_admin' OR 
+      group ==  'CSC_admin' OR 
+      group ==  'ECF_admin' OR 
+      group ==  'ENCY_admin' OR 
+      group ==  'eXtropia_admin' OR 
+      group ==  'Linkbat_admin' OR 
+      group ==  'Shanta_admin' OR 
+      group ==  'Brew_admin' OR 
+      group ==  'VitalVic_admin'
+ %]
+
+<td>[% embed('CSCAddListView.ttml') %]
+<td>
+[% embed('DevelHeadLinks.ttml') %]
+[% #Target ="_Blank">%]
+    </TD>
+
+
+
+[% END %] 
+
+ 

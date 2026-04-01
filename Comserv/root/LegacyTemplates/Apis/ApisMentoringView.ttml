@@ -1,0 +1,92 @@
+[%
+#	$Id: ApisMentoringView.ttml,v 1.1 2003/11/29 06:42:47 shanta Exp shanta $	%]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Mentoring']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td >
+<h3>Mentoring is isential in the speedy tranfer of beekeeping arts.</h3>
+<p>
+<p>Learn from our best!</p>
+<p>From each mentor you will learn a diffrent set of skills.</p>
+<p>By learning from active beekeepers you get to see how a beekeepin oppreaates. This opperation is as unique as the beekeeper.  </p>
+<p>Learn by doing. When you need help use our mentors to do solve your problem</p>
+<ul>
+ <li>online mentoring system!</li>
+ <li>In yard traing your and ours.</li>
+ <ul>
+<p>Member Mentors </p>
+<p>
+<p>
+<table style="width: 100%; border-collapse: collapse" summary="" border="1" bordercolor="#000000" cellpadding="3" cellspacing="0">
+<tbody>
+<tr valign="top">
+<td>
+<p>Name of Mentor</p></td>
+<td>
+<p>Location</p></td>
+<td>
+<p>Program </p><br>
+</td>
+<td>
+<p>Shipping</p></td>
+<td>
+<p>Sustainable</p></td></tr>
+<tr valign="top">
+<td>
+<p>&nbsp;<a href="http://ecf.beemaster.ca">Eagle Creek Farms:Apis</a></p></td>
+<td>
+<p>&nbsp;Grindrod BC</p></td>
+<td>
+<p>Mentoring, Workshops, Apprentiships</p></td>
+<td>
+<p>On Line, North Okanagan area</p></td>
+<td>
+<p>Yes No chems 5 years</p></td></tr>
+<tr valign="top">
+<td>
+<p>&nbsp;</p></td>
+<td>
+<p>&nbsp;</p></td>
+<td>
+<p>&nbsp;</p></td>
+<td>
+<p>&nbsp;</p></td>
+<td>
+<p>&nbsp;</p></td></tr></tbody></table>
+<p>
+<p><br>
+&nbsp;</p></p></p>
+<p><a href="http://ecf.beemaster.ca"> </a></p>
+<p>&nbsp;</p>
+
+</table>
+
+</ul>
+</td>
+</tr>
+</table>
+
+
+
+
+
+[% embed(data.page_bottom_view) %]
+

@@ -1,0 +1,8 @@
+Admin Event.
+--------------  
+[% username = data.cgi_object.auth_username.0 %]
+[% subs.sprintf("A user by the username of %s has applied to the system", username) %]
+  
+    
+   
+       

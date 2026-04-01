@@ -1,0 +1,90 @@
+[% RAWPERL %]
+
+use strict;
+
+use Extropia::Core::Base qw(_rearrange);
+my @required = (
+        -INPUT_WIDGET_CONFIG,
+        -INPUT_WIDGET_DISPLAY_ORDER,
+        -CGI_OBJECT,
+            );
+
+my $view_obj = $stash->get('view_obj');
+my $rh_data  = $view_obj->get_data;
+exists $rh_data->{$_} or die "$_ is not set" for @required;
+
+my $input_widget_definitions   = $rh_data->{-INPUT_WIDGET_CONFIG} || {};
+my $input_widget_display_order = $rh_data->{-INPUT_WIDGET_DISPLAY_ORDER} || [];
+my $cgi                        = $rh_data->{-CGI_OBJECT};
+
+#my $fields_to_be_displayed_as_email_links       = $rh_data->{-FIELDS_TO_BE_DISPLAYED_AS_EMAIL_LINKS} || [];
+#my $fields_to_be_displayed_as_links             = $rh_data->{-FIELDS_TO_BE_DISPLAYED_AS_LINKS} || [];
+#my $fields_to_be_displayed_as_images            = $rh_data->{-FIELDS_TO_BE_DISPLAYED_AS_IMAGES} || [];
+#my $fields_to_be_displayed_as_multi_line_text   = $rh_data->{-FIELDS_TO_BE_DISPLAYED_AS_MULTI_LINE_TEXT} || [];
+
+#Extropia::Debug::dumper($cgi);
+
+for (@$input_widget_display_order) {
+
+    my @widgets = ref $_ eq "ARRAY" ? @$_ : $_;
+    
+    $output .= qq[           <TR>\n];
+
+    for my $widget_name (@widgets) {
+        my @values = 
+            _rearrange([
+                        -DISPLAY_NAME,
+                        -DESCRIPTION_CELL_COLSPAN,
+                        -INPUT_CELL_COLSPAN,
+                       ],
+                       [
+                        -DISPLAY_NAME,
+                       ],
+                       @{$input_widget_definitions->{$widget_name}||[]}
+                      );
+
+        my $display_name             = shift @values || '';
+        my $description_cell_colspan = shift @values || "1";
+        my $input_cell_colspan       = shift @values || "1";
+        
+           $output .= qq[
+                <TH CLASS = "tableRowHeaderStyle"
+                    COLSPAN = "$description_cell_colspan">
+                $display_name
+                </TH>
+            ] if length $display_name;
+
+            $output .= qq[
+                <TD CLASS = "tableRowStyle"
+                    COLSPAN = "$input_cell_colspan">
+                     ];
+
+#        warn "$widget_name ".$cgi->param($widget_name);
+#        warn "original_$widget_name ".$cgi->param("original_$widget_name");
+
+        my $widget_value = join (",", $cgi->param($widget_name));
+        $widget_value = '' unless defined $widget_value;
+        $widget_value = $view_obj->embed('RenderTextField',
+                                         {-WIDGET_NAME  => $widget_name,
+                                          -WIDGET_VALUE => $widget_value,
+                                          #-RH_RECORD    => $rh_record,
+                                         }
+                                        );
+        my $hidden_value = join ("\n", $cgi->hidden($widget_name));
+        my $widget_orig_name = "original_$widget_name";
+        my $hidden_orig_value = join ("\n", $cgi->hidden($widget_orig_name));
+        $output .= 
+            qq[
+               $widget_value
+               $hidden_value
+               $hidden_orig_value
+               &nbsp;
+               </TD>
+              ];
+    }
+    $output .= qq[           </TR>\n];
+}
+
+
+[% END %]
+

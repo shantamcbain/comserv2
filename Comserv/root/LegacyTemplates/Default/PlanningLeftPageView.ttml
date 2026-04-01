@@ -1,0 +1,100 @@
+[%# the Left Page template
+#	$Id: PaningLeftPageView.ttml,v 1.1 2003/11/29 06:31:35 shanta Exp shanta $	
+
+%]
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+ [% script_name = data.app_name %]
+[% localip = data.local_ip %]
+
+
+<!-- callSubTopFrameView.ttml-->
+[% IF SiteName == 'CAP' || SiteName == 'CS' %]
+ [%# embed('SubTopFrameView.ttml') %]
+ <!-- callSubTopFrameView.ttml-->
+
+[% END %]
+ <!--This is the current LeftPageView.ttml
+ The fallowing code is what gets displayed on the left nave bar -->
+<!--new table-->
+<table cellpadding="0" cellspacing="0" border="0" width="100%">
+	<tr>
+	<td>
+	 <table class="LeftNavTableStyle" CELLPADDING ="0" >
+	  <tr>
+	  <td width="100%" class="NavtableHeaderCellStyle">     [% embed('LogOnLeftView.ttml') %]
+	  </td>
+	  </tr>
+	 </table>
+	</td>
+	</tr>
+	<tr>
+	<td>
+	[% embed('MainLinkView') %]
+	</td>
+		<tr>
+	  <td>
+	
+	 [%# embed('NewsLeftView.ttml')%]
+	 
+	</td>
+	</tr>	
+ 	
+	<tr>
+	<td>
+	[% embed('PlanningLeftLinksView.ttml')%]
+	</td>
+	<tr>
+	<td>
+ 
+	
+	[%# embed('SQL_Hosted')%]
+
+	
+
+	<tr>
+	<td>
+	
+	[%# embed('MemberLeftLinksView.ttml')%]
+	
+	 </td>
+	</tr>
+
+	[% embed('AdminLeftLinksView.ttml')%]
+
+ 	
+
+	</td>
+	</tr>
+ 	 <tr>
+	  <td>
+[% IF data.local_ip  == 'no' %]
+	  [% embed ('Site_Certification_View') %]
+[% END %]
+	  </td>
+	 </tr>
+ 	<tr>
+	 <td  [%# Class='NavTableCellStyle'>&nbsp;<img src="http://www.mysql.com/common/logos/powered-by-mysql-125x64.png"  border="0" alt="Powered By MySQL">%]
+	
+	 </td>
+	</tr>
+	<tr>
+	 <td>&nbsp;Our Web Application's are 100% Microsoft Free, apps written in Perl, Extropia, MySQL and run on Linux servers.
+	 </td>
+	</tr>
+
+
+	
+</table>
+<!--endnew table-->
+
+<!--This is the end of LeftPageView.ttml-->

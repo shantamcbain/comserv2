@@ -1,0 +1,82 @@
+[% #/HTMLTemplates/Default/SideBarHeadScript
+#	$Id: SideBarHeadScript.ttml,v 1.2 2002/06/02 17:03:20 shanta Exp $	
+
+# this template generates the top of HTML,
+
+# if -PAGE_TITLE is defined, it gets used in the <title>
+
+# if -SCRIPT_DISPLAY_NAME is defined, it gets used in the <title>
+
+# if -CSS_VIEW_URL is defined, the CSS link is created.
+
+# if -APPLICATION_SUB_MENU_VIEW_NAME is defined, the corresponding
+# template gets embedded
+
+# also see various other logo values below
+
+#Set needed values
+
+%]
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+<!--SideBarHeadScript-->
+
+<script type="text/JavaScript">
+function testfunction()
+{ if ((typeof window.sidebar == "object") && (typeof window.sidebar.addPanel == "function"))
+
+      { 
+
+[%  IF SiteName == 'CSC'  %]
+  [% IF data.app_name == 'todo' %]
+           window.sidebar.addPanel ("CSC ToDo", 
+           "http:/computersystemconsulting.ca/cgi-bin/CSC/todo.cgi?display_sidebar_view=on&page_top_view=SBPageTopView&page_bottom_view=SBPageBottomView",""); 
+
+  [%  ELSIF data.app_name == 'todo_admin' %]
+         window.sidebar.addPanel ("CSC ToDo_admin", 
+         "http:/computersystemconsulting.ca/cgi-bin/CSC/todo_admin.cgi?display_sidebar_view=on&page_top_view=SBPageTopView&page_bottom_view=SBPageBottomView",""); 
+
+  [%  ELSE %]
+         window.sidebar.addPanel ("CSC HelpDesk", 
+         "http://computersystemconsulting.ca/cgi-bin/CSC/csc.cgi?view=SideBarHomeView&page_top_view=SBPageTopView&page_bottom_view=SBPageBottomView",""); 
+
+  [% data.app_name %] Should show app_name
+[% END %]
+
+[% ELSIF SiteName == 'Apis'  %]
+         window.sidebar.addPanel ("Apis",
+         "http://shanta.org/cgi-bin/Apis/apis.cgi?view=SideBarHomeView&page_top_view=SBPageTopView&page_bottom_view=SBPageBottomView","");
+
+[% ELSIF SiteName == 'ECF' %]
+         window.sidebar.addPanel ("Eagle Creek Farms",
+         "http://shanta.org/cgi-bin/Apis/apis.cgi?site=ECF&amp;view=ECFSideBarHomeView&page_top_view=SBPageTopView&page_bottom_view=SBPageBottomView","");
+
+[% ELSIF SiteName == 'ENCY' OR 'VitaVic'  %] 
+         window.sidebar.addPanel ("ENCY Natural Health", 
+         "http://forager.com/cgi-bin/ENCY/ency.cgi?site=[% SiteName %]&amp;view=ENCYSideBarHomeView&page_top_view=SBPageTopView&page_bottom_view=SBPageBottomView",""); 
+
+
+[% ELSE %]
+
+	
+No site defined Please fix Header Definitions. Session = [% sitename %] from stetup [% site %]
+[% END %]
+      } 
+      else 
+      {          var rv = window.confirm ("This page is enhanced for use with Netscape 7.  " + "Would you like to upgrade now?"); 
+         if (rv) 
+            document.location.href = "http://home.netscape.com/download/index.html";
+      } 
+ } </script> 
+

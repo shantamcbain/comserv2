@@ -1,0 +1,37 @@
+[%
+
+# the AltPowerProductsView template
+#	$Id: StatsView.ttml,v 1.1 2003/11/29 06:31:35 shanta Exp shanta $	
+
+%]
+[% embed(data.page_top_view,['-PAGE_TITLE','Alt Power Products']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+ [% script_name = data.app_name %]
+[% localip = data.local_ip %]
+
+[% SiteFullName = 'Alternate Power'%]
+<div align="center"><h1>This is [% SiteFullName %] Products page.</h1></div>
+</div>
+We have many items avaible from <IMG SRC="http://service.bfast.com/bfast/serve?bfmid=37919549&siteid=41402687&bfpage=logos_eng" BORDER="0" WIDTH="1" HEIGHT="1" NOSAVE >
+<A HREF="http://service.bfast.com/bfast/click?bfmid=37919549&siteid=41402687&bfpage=logos_eng" TARGET="_top"><IMG SRC="http://www.canadiantire.ca/affiliates/available_click_60x90.gif" BORDER="0" WIDTH="60" HEIGHT="90" ALT="Canadian Tire"></A>
+ 	   
+<br>
+
+   
+ 	 
+[% embed(data.page_bottom_view) %]
+  
+ 	   

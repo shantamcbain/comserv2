@@ -1,0 +1,15 @@
+[% RAWPERL %]
+
+use Extropia::Core::AuthManager::CGI::BaseView;
+
+use strict;
+
+my $view_obj = $stash->get('view_obj');
+my $rh_data  = $view_obj->get_data;
+
+$output .= 
+Extropia::Core::AuthManager::CGI::BaseView::generateHiddenTagsToPreservePreviousFormVars
+($view_obj, -CGI_OBJECT => $rh_data->{-CGI_OBJECT});
+
+[% END %]
+

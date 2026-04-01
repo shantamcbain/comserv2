@@ -1,0 +1,69 @@
+[% #url_encoded_admin_variables = embed(data.url_encoded_admin_fields_view_name);
+   #event_url = "$data.script_name?$url_encoded_admin_variables&date=$data.selected_date_data.date";
+   event_url ="$data.script_name?site=$data.site_name&amp;session_id=$data.session_id&date=$data.selected_date_data.date";
+   highlight_color = 'black';
+
+# since we override the action trigger here, we cannot rely on
+# url_encoded_admin_variables
+
+%]
+
+<TABLE WIDTH=100% BGCOLOR="#EEEEEE" CELLPADDING=0 CELLSPACING=0>
+  <!-- small navbar -->
+  <TR>
+ [% IF PrintMode != 'month'%]
+       <TD CLASS="month_title_header">
+      View Tab
+      </TD>
+ [% END %]
+   <TD CLASS="nav_mode_cell" ALIGN=CENTER>
+
+[% IF data.navigation_modes.day %]
+            <A CLASS="noline" HREF="[% "$event_url&amp;DisplayDayViewAction=on" %]&amp;tab=day">
+            [% IF data.view_mode == 'DisplayDayViewAction' %]
+              <FONT COLOR="[% highlight_color %]"><B>Day</B></FONT></A>
+            [% ELSE %]
+              <B>Day</B></A>
+            [% END %]
+&nbsp;
+[% END %]
+[% IF data.navigation_modes.week %]
+            <A CLASS="noline" HREF="[% "$event_url&amp;DisplayWeekViewAction=on" %]&amp;tab=week">
+            [% IF data.view_mode == 'DisplayWeekViewAction' %]
+              <FONT COLOR="[% highlight_color %]"><B>Week</B></FONT></A>
+            [% ELSE %]
+              <B>Week</B></A>
+            [% END %]
+&nbsp;
+[% END %]
+[% IF data.navigation_modes.month %]
+            <A CLASS="noline" HREF="[% "$event_url&amp;DisplayMonthViewAction=on" %]&amp;tab=month">
+            [% IF data.view_mode == 'DisplayMonthViewAction' %]
+              <FONT COLOR="[% highlight_color %]"><B>Month</B></FONT></A>
+            [% ELSE %]
+              <B>Month</B></A>
+            [% END %]
+&nbsp;
+[% END %]
+[% IF data.navigation_modes.planner %]
+            <A CLASS="noline" HREF="[% "$event_url&amp;DisplayPlannerViewAction=on" %]&amp;tab=planner">
+            [% IF data.view_mode == 'DisplayPlannerViewAction' %]
+              <FONT COLOR="[% highlight_color %]"><B>Planner</B></FONT></A>
+            [% ELSE %]
+              <B>[% planner_name %]Planner<B></A>
+            [% END %]
+&nbsp;
+[% END %]
+[% IF data.navigation_modes.year %]
+            <A CLASS="noline" HREF="[% "$event_url&amp;DisplayYearViewAction=on" %]&amp;tab=year">
+            [% IF data.view_mode == 'DisplayYearViewAction' %]
+              <FONT COLOR="[% highlight_color %]"><B>Year</B></FONT></A>
+            [% ELSE %]
+              <B>Year</B></A>
+            [% END %]
+&nbsp;
+[% END %]
+    </TD>
+  </TR>
+</TABLE>
+

@@ -1,0 +1,73 @@
+[%
+
+# the PersonaLeftLinksView
+#	$Id: PersonalLeftLinksView.ttml,v .01 2002/11/11 14:44:14 shanta Exp shanta $
+
+%]
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% localip = data.local_ip %]
+<!--OpenPersonalLeftLinksView-->
+
+
+  <tr>
+   <td class="NavtableHeaderCellStyle" >
+
+Personal Links  
+[% IF username == 'Shanta' OR
+        group    == 'Apis_Member' OR
+        group    == 'BCHPA_Member' OR
+        group    == 'CSC_Member' OR
+        group    == 'CS_Admin' OR
+        group    == 'ECF_Admin' OR
+        group    == 'Orgainc_Member' OR
+         group    == 'NOOP_Member' OR
+       group    == 'MARTS_Admin' OR
+        group    == 'VitalVic_Admin' OR
+        group    == 'ENCY_Admin' OR
+        group    == 'USBM_Admin' OR
+        group    == 'Shanta_Admin' OR
+        group    == 'RV_Admin' OR
+        group    == 'Brew_Admin'
+        %]
+   &nbsp;<a href="/cgi-bin/URL/url.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;site_name=[% SiteName %]&amp;category=Admin_links&amp;subject=Nav_link&amp;Nav_link=1" name="Add page link"  title="Add New Link">Add</a>
+
+   [% END %]
+<br>
+    </td>
+    </tr>
+ [% IF  group == 'normal' %]
+    <tr>
+
+   <td class="NavTableCellStyle">
+<font   class="LeftSideBarNavStyle">Members may add links to this list.<a href="http://forager.com/cgi-bin/store/store.cgi?&amp;shop=cs&amp;P=OrganicMembership" target="_blank" name="Become a member">Join.</a></font>
+   </td>
+    </tr>
+  [% END %]  
+[% IF username == 'Shanta' %]   <tr>
+
+   <td class="NavTableCellStyle">
+            <A HREF="http://webcthelpdesk.com/cgi-bin/sql-ledger/login.pl"
+ TARGET ="[% data.link_target %]" ><font   class="LeftSideBarNavStyle">ACC.
+</font></a>
+    </td>
+    </tr>
+    
+  <tr>
+
+   <td class="NavTableCellStyle">
+<A HREF="https://[% localip %]
+"  TARGET = "[%
+data.link_target %]" ><font class="LeftSideBarNavStyle">ecf.forager.com
+admin </font></a>
+[% END %] 
+<!--EndOpenPersonalLeftLinksView-->

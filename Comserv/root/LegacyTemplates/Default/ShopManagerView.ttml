@@ -1,0 +1,72 @@
+[%#	$Id: ShopManagerView.ttml,v 1.0 2011/11/30 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dozen't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dozen't rely on any
+# variables from outside.
+
+%] 
+[% PROCESS DefaultDbi.ttml %]
+
+   [% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+   [% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+   [% SiteDisplayName = data.site_display_name %]
+   [% site = SiteName %]
+   [% username = data.session_object.getAttribute('-KEY','auth_username') %]
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+   [% PAGE = data.page_name || 'HomeView' %]
+[% USE DBI( data_source = 'dbi:mysql:shanta_forager',
+                username = 'shanta',
+                password =  'herbsrox2' )
+    %]
+
+[%# embed('InheretedVariablesView') %] 
+[% IF group == "Mentoring"	%]
+[% embed(data.page_top_view,['-PAGE_TITLE','Mentor home.']) %]
+[% ELSE %]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Your store manager']) %]
+[% END %]
+[% embed('ErrorDisplayView') %]
+
+
+ <!-- Begin Demo Home View -->  
+<table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+[% IF username %]
+
+<h3 > Hello  [% firstname%]  [% lastname%]! Welcome to [% data.site_display_name %]</h3>
+
+	[% ELSE %]
+
+	<h3>  [% embed ("LogOnLeftView") %] Welcome to [% data.site_display_name %]! </h3> 
+	[% END %]
+[% IF SiteName == 'CS' %]
+
+ [% PROCESS CSManagerPagesql.ttml %]
+[% ELSIF SiteName == 'HE' %]
+ [% PROCESS HEManagerPagesql.ttml %]
+[% ELSE %]
+
+<p>From here you will find info on how to maintain your store.
+Your store links on the left of all pages in the site. The store link takes you to the public side of the store.
+The manager link takes you do the store admin.
+The third link brings you to this page.
+<p>[% SiteName %]
+[% END %]
+[% embed('LiveEditAdmin') %]
+  <p>You are given three links in the store 
+<ul>
+ <li>Store  this link tacks the user to your store to purchase Items
+ <li>The Store Manager link takes you to the management system of the store it self. All product that you want in your inventory system must be entered here. If it is an item you wish to track but not sell there is a switch to show turn it of and on as far as the store is concerned.
+ <li> The CS Shop Manager brings you here
+</ul>                                  
+      [% body %]
+
+</td></tr></table>
+[% embed(data.page_bottom_view) %]

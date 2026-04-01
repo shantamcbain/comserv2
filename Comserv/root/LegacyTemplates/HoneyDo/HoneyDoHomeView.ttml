@@ -1,0 +1,36 @@
+[%
+#	$Id: HoneyDoHomeView.ttml,v 1. 2002/11/10 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dozen't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dozen't rely on any
+# variables from outside.
+
+%]
+<!--  Start of /cgi-bin/HtmlTemplates/HoneyDo/HoneyDoHomeView -->
+
+[% embed('ErrorDisplayView') %]
+<A NAME="PageTop"></A>
+
+<table cellpadding="0" cellspacing="0" border="0" width="100%">
+<tr>
+	<td>
+<p>We repair Small engines, appliencs recycle compurter and resell good used merchendice.
+</p>
+
+<p>Hi Jens and Lew please readThe data bellow and fallow the instsructions given. You will be doing 2 things here.</p> 
+<ol>
+	<li>You are getting used to the overal site and how it looks to the enduser.</li>
+	<li>You will see the changes between public, member and admin views of the site.</li>
+	<li>You will see how to modify and enter data in your site.</li>
+	<li>You will be giving me feed back on how to imporve the site. Us <a href="/cgi-bin/CSC/helpdesk.cgi?site=HoneyDo&amp;session_id=[% session_id %]" target="_blank" name="Your link to help with your site.">HelpDesk</a> for this</li>
+</ol>
+
+				[% embed ('DemoHomeView') %]
+
+		
+</td></tr>
+</table>
+<!--  Start of /cgi-bin/HtmlTemplates/HoneyDo/HoneyDoHomeView -->

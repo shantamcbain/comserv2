@@ -1,0 +1,12 @@
+[%
+
+# HiddenAdminFieldsView.ttml loads this template at its end, so any
+# app can re-use the usual fields from HiddenAdminFieldsView.ttml and
+# add a set of its own specific ones.
+#
+# if none is provided in the app directory, this one will be used
+# instead, which does nothing.
+
+%]
+
+[% # This template should be overloaded by app specific stuff %]

@@ -1,0 +1,388 @@
+[% IF data.session_object %]
+
+    [% session_id = data.session_id %]
+
+[% END %]
+
+[% username = data.session_object.getAttribute( '-KEY', 'auth_username') %]
+
+[% groups = data.session_object.getAttribute('-KEY', 'auth_groups') %]
+    
+[% IF data.cgi_object.param('columns_to_view') %]
+
+    [% columns_to_view = data.cgi_object.param('columns_to_view') %]
+
+[% ELSE %]
+
+    [% columns_to_view = data.selected_display_fields %]
+
+[% END %] 
+ 
+[% number_of_columns = 5 %]
+
+[% records = data.total_records %]    
+
+[% IF ( (records == 1 && data.cgi_object.param('modify_view_settings')) || 
+      (data.cgi_object.param('submit_power_search')) ) %]
+
+    [% # embed('DetailsRecordView') %] 
+    	
+[% END %]    
+    
+[% set_headers(data.http_header_params) %]
+   
+[% embed('PageTopView', ['-PAGE_TITLE', 'Basic Data View']) %]    
+
+[% embed('ErrorDisplayView') %]    
+
+[% url_encoded_admin_variables = embed(data.url_encoded_admin_fields_view_name,['-REMOVE_SORT_FIELD1', 1] ) %]
+
+        <TABLE WIDTH = "95%" BORDER = "0" CELLSPACING = "0"
+               CELLPADDING = "0" VSPACE = "0" HSPACE = "0" ALIGN = "CENTER">
+        <TR>
+        <TD COLSPAN = "[% number_of_columns %]" 
+            CLASS = "sectionHeaderStyle">
+        Result Set
+        </TD>
+        </TR>
+
+        <TR>
+        <TD HEIGHT = "5">&nbsp;</TD>
+        </TR>
+
+        <TR>
+  
+[% FOREACH field = columns_to_view %]
+
+    
+            <TD CLASS = "tableHeaderStyle">
+            <A HREF = "[% data.script_name %]?sort_field1=[% field %]&return_to_main=on&[% url_encoded_admin_variables %]"
+                  TARGET = "[% data.link_target %]">[% data.field_name_mappings.$field %]</A>
+            </TD>
+[% END %]
+
+
+[% # If detail view would just display redundant information, we decide %]
+[% # not to display the view detail link at all. %]
+
+
+[% IF (data.display_fields != columns_to_view) %]
+
+            <TD CLASS = "tableHeaderStyle">
+            Details
+            </FONT>
+            </TD>
+
+[% END %]
+
+[% IF data.allow_modifications_flag %]
+            <TD CLASS = "tableHeaderStyle">
+            Modify
+            </FONT>
+            </TD>
+
+[% END %]    
+
+[% IF data.allow_deletions_flag %]
+            <TD CLASS = "tableHeaderStyle">
+            Delete
+            </TD>  
+            </TR>
+[% END %]
+
+[% counter = 1 %]
+    
+[% FOR record = data.records %]
+
+    [% key_field = data.key_field %]
+    [% record_id = record.$key_field %]
+    
+    [% IF  data.require_matching_username_for_modifications_flag || 
+           data.require_matching_username_for_deletions_flag %]
+        
+        [% username_of_poster = record.username_of_poster;
+           group_of_poster = data.record.group_of_poster;
+         %]
+         
+    [% END %]
+    
+    [% color_for_row = data.color_for_odd_rows || 'FFFFFF' %]
+    
+    [% IF (counter % 2) == 0 %]
+           
+        [% color_for_row = data.color_for_even_rows || 'E5E5E5' %]
+    
+    [% END %]
+     
+    [% IF data.row_color_rules %]
+    
+        [% FOREACH color_rule = data.row_color_rules %]
+        
+            [% FOREACH rule_key = data.color_rule.keys %]
+            
+                [% field_name = rule_key %]
+                
+                [% field_rules = color_rule.$field_name %]
+                
+                 [% IF record.$field_name == $field_rules.0 %]
+                    [% color_for_row = $field_rules.1 %]
+                
+                [% END %]
+            
+            [% END %]
+            
+        [% END %]
+        
+    [% END %] 
+     
+    <TR BGCOLOR = "[% color_for_row %]"> 
+    
+    [% FOREACH field = columns_to_view %]
+      
+        [% color_for_cell= color_for_row %]
+        
+        [% IF data.field_color_rules %]
+        
+            [% FOREACH color_rule= data.field_color_rules %]
+            
+                [% FOREACH rule_key = color_rule.keys %]
+                
+                    [% field_name = rule_key %]
+                    
+                    [% field_rules = color_rule.$field_name %]
+                    
+                     [% IF record.$field == field_rules.0 %]    
+                        [% color_for_cell = field_rules.1 %]
+        
+                    [% END %]
+                    
+                [% END %]
+                
+            [% END %]
+            
+        [% END %]
+      
+        [% field_value = record.$field %]
+        
+        [% IF !field_value %]
+        
+            [% field_value = "&nbsp;" %]
+        
+        [% ELSE %]
+            
+            [% FOREACH email_field= data.fields_to_be_displayed_as_email_links %]
+            
+                [% IF email_field == field %]
+                
+                    [% field_value = "<A HREF = \"mailto:$field_value\">$field_value</A>" %]
+                
+                [% END %]
+                
+            [% END%]
+        
+            [% FOREACH url_field = data.fields_to_be_displayed_as_links %]
+
+[% # The following makes sure that the session id carries to the script %]
+[% # if the URL includes a session id tag: %SESSION_ID% %]
+                
+                
+                [% field_value.replace('%SESSION_ID%', session_id) %]
+                
+                
+                [% IF !(ref($url_field)) %]
+                
+                    [% IF url_field == field %]
+          
+          	        [% IF field_value.search(www) %]
+          	              	        
+          	            [% field_value = "<A HREF = \"http://$field_value\"
+                                          TARGET = \"data.link_target\">field_value</A>" %]
+          	        [% ELSE %]
+          	            
+          	            [% field_value = "<A HREF = \"$field_value\"
+                                          TARGET = \"data.link_target\">field_value</A>" %]
+          	        [% END %]
+          	    
+          	    [% END %]	
+          	    
+                [% ELSE %]             
+		    
+		    [% url_display_field = url_field.1 %]
+		    
+		    [% url_field = url_field.0 %]
+		    
+		    [% IF url_field == field %]
+		        
+		   	[% display_value = record.url_display_field %]
+		   
+		        [% field_value = "<A HREF = \"$field_value\" TARGET=\"_blank\">display_value</A>" %] 
+		    
+		    [% END %]
+
+                [% END %] 
+            
+            [% END %]
+                
+            [% FOREACH image_field = data.fields_to_be_displayed_as_images %]
+                
+                [% IF image_field == field %]
+                    
+[% # The following makes sure that the session id carries to the script %]
+[% # if the URL includes a session id tag: %SESSION_ID%                 %]   
+                        
+                    
+                    [% field_value.replace('%SESSION_ID%', session_id) %]
+                    
+                    [% field_value = "<IMG SRC = \"$field_value\">" %]    
+                    
+                [% END %]
+                   
+            [% END %]                
+            
+        [% END %]	
+            
+        <TD ALIGN = "LEFT" VALIGN = "TOP" 
+                     BGCOLOR = "[% color_for_cell %]">
+                     
+        <!--__START_HTMLIZE__-->[% field_value %]<!--__END_HTMLIZE__-->
+        </TD>
+         
+    [% END %]
+
+    [% IF data.display_fields != columns_to_view %]
+	    
+	<FORM TARGET = "[% data.link_target %]">
+        <CENTER>
+        <TD BGCOLOR = "FFFFFF" ALIGN = "CENTER" VALIGN = "TOP">	      
+        [% embed(data.hidden_admin_fields_view_name,['-RECORD_ID', record_id] )%]
+        <INPUT TYPE = "IMAGE" 
+                       SRC = "[% data.image_root_url %]/modify_small.gif" 
+                       BORDER = "0" ALT = "details"
+                       NAME = "display_details_view" VALUE = "on"
+                       onMouseOver="this.src='[% data.image_root_url %]/modify_small1.gif'"
+                       onMouseOut="this.src='[% data.image_root_url %]/modify_small.gif'"
+                       onMouseDown="this.src='[% data.image_root_url %]/modify_small.gif'"
+                       onMouseUp="this.src='[% data.image_root_url %]/modify_small1.gif'">
+        </TD>
+        </CENTER>
+        </FORM>
+
+    [% END %]
+        
+    [% IF data.allow_modifications_flag %]
+	
+	<FORM TARGET = "[% data.link_target %]">
+        <TD BGCOLOR = "FFFFFF" ALIGN = "CENTER" VALIGN = "TOP">	
+	[% poster_in_group_of_user = 0 %]
+	    
+	[% FOREACH group =split(",",groups) %]
+	    
+	    [% IF group == group_of_poster %]
+	        
+	        [% poster_in_group_of_user = 1 %]
+	        
+	    [% END %]
+	        
+	[% END %]       
+       
+        [% IF ((!data.require_matching_username_for_modifications_flag ||
+            		username == username_of_poster) && 
+            	   (!data.require_matching_group_for_modifications_flag ||
+            	        poster_in_group_of_user)) %]
+            
+            [% embed(data.hidden_admin_fields_view_name,['-RECORD_ID',record_id])%]
+            <CENTER>
+            <INPUT TYPE = "IMAGE" SRC = "[% data.image_root_url %]/modify_small.gif" 
+                          BORDER = "0" NAME = "display_modification_form"
+                          ALT = "modify" VALUE = "on"
+                          onMouseOver="this.src='[% data.image_root_url %]/modify_small1.gif'"
+                          onMouseOut="this.src='[% data.image_root_url %]/modify_small.gif'"
+                          onMouseDown="this.src='[% data.image_root_url %]/modify_small.gif'"
+                          onMouseUp="this.src='[% data.image_root_url %]/modify_small1.gif'">
+            </CENTER>
+        [% END %]	        	
+    
+    [% END %] 
+    </TD>
+    </FORM>
+	
+    [% IF data.allow_deletions_flag %]
+	    
+	<FORM TARGET = "[% data.link_target %]">
+        <TD BGCOLOR = "FFFFFF" ALIGN = "CENTER" VALIGN = "TOP">
+	[% poster_in_group_of_user = 0 %]
+	    
+	[% FOREACH group = split(",", groups) %]
+	        
+	    [% IF group == group_of_poster %]
+	        
+	        [% poster_in_group_of_user = 1 %]
+	            
+	    [% END %]
+	        
+	[% END %]
+	
+	[% IF ((! data.require_matching_username_for_deletions_flag ||
+	    		username == username_of_poster ) && 
+	           (! data.require_matching_group_for_deletions_flag ||
+	                poster_in_group_of_user)) %]
+	        
+	    [% FOREACH field = columns_to_view %]
+	        
+	         [% field_value = record.$field %]
+	         <INPUT TYPE = "HIDDEN" NAME = "field"
+                                VALUE = "field_value">
+	    [% END %]            
+	    
+	    [% embed(data.hidden_admin_fields_view_name, ['-RECORD_ID' , record_id]) %]
+	    
+	    [% IF data.display_confirmation_on_delete_flag %]
+	    	    <CENTER>
+	            <INPUT TYPE = "IMAGE" SRC = "[% data.image_root_url %]/delete_small.gif" 
+                               BORDER = "0" ALT = "Delete"
+                               NAME = "display_delete_record_confirmation" VALUE = "on"
+                               onMouseOver="this.src='[% data.image_root_url %]/delete_small1.gif'"
+                               onMouseOut="this.src='[% data.image_root_url %]/delete_small.gif'"
+                               onMouseDown="this.src='[% data.image_root_url %]/delete_small.gif'"
+                               onMouseUp="this.src='[% data.image_root_url %]/delete_small1.gif'">
+            [% ELSE %]
+                    
+                    <INPUT TYPE = "IMAGE" SRC = "[% data.image_root_url %]/delete_small.gif" 
+                               BORDER = "0" ALT = "Delete"
+                               NAME = "submit_delete_record" VALUE = "on"
+                               onMouseOver="this.src='[% data.image_root_url %]/delete_small1.gif'"
+                               onMouseOut="this.src='[% data.image_root_url %]/delete_small.gif'"
+                               onMouseDown="this.src='[% data.image_root_url %]/delete_small.gif'"
+                               onMouseUp="this.src='[% data.image_root_url %]/delete_small1.gif'">
+                        
+            [% END %]
+	    
+	[% END %]
+	  
+    [% END %]        
+	</CENTER>
+     </TD>
+     </FORM>
+     </TR>
+        
+     [% counter=counter + 1 %]
+        
+[% END %]   
+
+   
+        </TR>
+        <TR>    
+        <TD HEIGHT = "5"></TD>
+        </TR>
+        </TABLE>
+
+[% embed('RecordSetDetailsFooterView') %]
+    
+    <P>
+    <CENTER>
+    <A HREF = "news.cgi"
+           TARGET = "[% data.link_target %]">WebNews App</A>
+    </CENTER>
+    
+[% embed('PageBottomView') %]
+    

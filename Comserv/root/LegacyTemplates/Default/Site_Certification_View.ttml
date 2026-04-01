@@ -1,0 +1,56 @@
+[%# the Site_Certification_View
+#	$Id: Site_Certification_View.ttml,v 1.1 2003/11/29 06:31:35 shanta Exp shanta $	
+
+%]
+	
+	  <table class="LeftNavTableStyle" CELLPADDING ="1" >
+	
+	    [% IF SiteName == 'Apis' ||
+	       SiteName == 'BMaster' ||
+	       SiteName == 'BMasterDev' ||
+	       SiteName == 'BCHPA' ||
+	       SiteName == 'CSC' ||
+	       SiteName == 'ECF' ||
+	       SiteName == 'eXtropia'||
+	       SiteName == 'HoneyDo'||
+	       SiteName == 'Organic' ||
+	       SiteName == 'Demo'||
+	       SiteName == 'AltPower'
+	       %]
+	
+	 <tr>     <td Class='NavTableCellStyle'>
+	    <a href="http://validator.w3.org/check?uri=referer"><img
+        src="http://www.w3.org/Icons/valid-html401"
+        alt="Valid HTML 4.01 Transitional" height="31" width="88"></a>
+
+		</td>
+	 </tr>
+	
+	[% END %]
+	[% IF SiteName == 'CSC' ||
+	      SiteName == 'Apis' ||
+	      SiteName == 'BCHPA' ||
+	      SiteName == 'BMasterDev' ||
+	      SiteName == 'Brew'||
+	      SiteName == 'CSPS'||
+	      SiteName == 'Demo'||
+	      SiteName == 'Shanta' ||
+	      SiteName == 'BCAF' ||
+	      SiteName == 'HE'||
+	      SiteName == 'CS'||
+	      SiteName == 'ECF' ||
+	      SiteName == 'ENCY' ||
+	      SiteName == 'eXtropia'  ||
+	      SiteName == 'Organic'||
+	      SiteName == 'AltPower'
+	%]
+	<tr>     <td Class='NavTableCellStyle'>
+	 <a href="http://jigsaw.w3.org/css-validator/validator?uri=cgi.[% HostName %][% data.script_name %]?site=[% SiteName %]" title="ccs Validartor link">
+	  <img style="border:0;width:88px;height:31px"
+	       src="http://jigsaw.w3.org/css-validator/images/vcss"
+	       alt="Valid CSS!">
+	 </a>
+	
+	</td>
+	[% END %]
+</table>

@@ -1,0 +1,80 @@
+[% #CSC PageTopView
+#	$Id: CSCSiteChangeView.ttml,v 1.3 2002/09/14 15:01:40 shanta Exp $
+
+# this template generates the top of HTML,
+
+# if -PAGE_TITLE is defined, it gets used in the <title>
+
+# if -SCRIPT_DISPLAY_NAME is defined, it gets used in the <title>
+
+# if -CSS_VIEW_URL is defined, the CSS link is created.
+
+# if -APPLICATION_SUB_MENU_VIEW_NAME is defined, the corresponding
+# template gets embedded
+
+# also see various other logo values below
+
+#Set needed values
+
+%]
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+
+
+
+
+
+
+
+
+
+<form>
+
+<select class="combobox" name="SiteMap" onchange="if(options[selectedIndex].value){location = options[selectedIndex].value}" size="1">
+<option selected>SiteName  </option>
+[% IF group ==  'Apis_admin' OR
+      group ==  'BCHPA_admin' OR
+      group ==  'ECF_admin' OR
+      group ==  'CSC_admin' OR
+	  username == 'Shanta' %]
+<option value="?site=Apis&[%session_string%]">Apis</option>
+<option value="?site=BCHPA&[%session_string%]">BCHPA</option>
+[% END %]
+[% IF group ==  'CSC_admin' OR
+ 	  username == 'Shanta' %]
+<option value="?site=CSC&[%session_string%]">CSC</option>
+<option
+value="?site=Alegro&[%session_string%]">Alegro</option>
+<option value="?site=CS&[%session_string%]">CS</option>
+[% END %]
+[% IF group ==  'CSC_admin' OR
+      group ==  'ECF_admin' OR
+	  username == 'Shanta' %]
+<option value="?site=ECF&[%session_string%]">ECF</option>
+[% END %]
+[% IF group ==  'CSC_admin' OR
+ 	  username == 'Shanta' %]
+<option value="?site=ENCY&[%session_string%]">ENCY</option>
+<option value="?site=Organic&[%session_string%]">Organic</option>
+<option value="?site=rv&[%session_string%]">Rv</option>
+<option value="?site=VitalVic&[%session_string%]">VitalVic</option>
+</select>
+</form>
+[% END %]
+
+
+
+
+     	 
+		  
+[% #Target ="_Blank">%]
+

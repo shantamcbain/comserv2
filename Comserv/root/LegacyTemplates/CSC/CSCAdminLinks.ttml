@@ -1,0 +1,127 @@
+[%
+#	$Id: CSCAdminLinks.ttml,v 0.02 2002/11/11 14:43:53 shanta Exp $
+
+
+%]
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+[% lname = data.session_object.getAttribute('-KEY','auth_lastname') %]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+<!--Open CSCAdminLinks-->
+  <tr>
+  <td class="NavTableCellStyle">
+  <!--CallCSCSiteChangeView.ttml-->
+[%# embed('CSCSiteChangeView.ttml') %]
+  </td>
+ </tr>
+  <tr>
+  <td class="NavTableCellStyle">	<A HREF = "csc_url_admin.cgi?show_devel_urls=on&amp;search1=CSC_Development&amp;visibility=public&amp;[% session_string %]&amp;columns_to_view=name&amp;columns_to_view=url" target="_content"><font   class="LeftSideBarNavStyle"> Show Devel links</font></a>
+  </td>
+ </tr>
+[% IF data.script_display_name =='CSC Store Admin'%]
+[% embed('CSLeftLinksView.ttml') %]
+[% ELSE %]
+  <tr>  
+  <td class="NavTableCellStyle">	<A HREF = "cs.cgi?[% session_string %]&amp;view=CSFrameView" target="_content"><font   class="LeftSideBarNavStyle"> CityShop Admin</font></a>
+  </td>
+ </tr>
+[% END %]
+  <tr>  
+  <td class="NavTableCellStyle">	<A HREF = "csc_bug_tracker_admin.cgi?[% session_string %]" target="_content"><font   class="LeftSideBarNavStyle"> Bugtracker</font></a>
+  </td>
+ </tr>
+ <tr>  
+  <td class="NavTableCellStyle">
+<A HREF ="http://computersystemconsulting.ca/cgi-bin/CSC/faq_manager.cgi?[% session_string %]" Target ="Blank"><font   class="LeftSideBarNavStyle"> FAQ manager</font></a>
+  </td>
+ </tr>
+<tr>
+  <td class="NavtableHeaderCellStyle">
+       ADD Tools<br>
+
+      	</td>
+ </tr>      	
+	<tr>  
+ 	 <td class="NavTableCellStyle">
+<a href="http://computersystemconsulting.ca/cgi-bin/CSC/csc_url_cat.cgi?display_add_form=on&amp;[% session_string %]" target='_Blank'><font   class="LeftSideBarNavStyle"> Category</font></a>
+	<a href="http://computersystemconsulting.ca/cgi-bin/CSC/client.cgi?display_add_form=on&amp;[% session_string %]" target='_Blank'><font   class="LeftSideBarNavStyle">Client</font></a>
+<a href="http://computersystemconsulting.ca/cgi-bin/CSC/csc_kb.cgi?display_add_form=on&amp;[% session_string %]" target='_Blank'><font   class="LeftSideBarNavStyle"> KB</font></a>
+<A HREF ="http://computersystemconsulting.ca/cgi-bin/CSC/csc_log.cgi?display_add_form=on&amp;[% session_string %]" Target ="Blank"><font   class="LeftSideBarNavStyle">  Log</font></a>
+ <br>
+
+           <a href="csc_project_tracker.cgi?[% session_string %]&amp;display_add_form=on" target='_Blank' ><font class="LeftSideBarNavStyle" > Project </font></a>
+
+<a href="http://computersystemconsulting.ca/cgi-bin/CSC/csc_url_sub.cgi?display_add_form=on&amp;[% session_string %]" target='_Blank'><font   class="LeftSideBarNavStyle">&nbsp; Subject</font></a>
+	
+<a href="http://computersystemconsulting.ca/cgi-bin/CSC/todo.cgi?display_add_form=on&amp;[% session_string %]" target='_Blank'><font   class="LeftSideBarNavStyle"> ToDo</font></a>
+<br>
+ <A HREF ="http://computersystemconsulting.ca/cgi-bin/CSC/csc_url_admin.cgi?display_add_form=on&amp;[% session_string %]" Target ="Blank"><font   class="LeftSideBarNavStyle"> URL</font></a>
+ <!--testforapis-->
+[% IF SiteName    != 'Apis' %]
+	 </td>
+ 	</tr>
+	<tr>
+ 	 <td class="NavtableHeaderCellStyle">
+      Extropia ADD Tools<br>
+
+
+	 </td>
+ 	</tr>	
+	<tr>  
+ 	 <td class="NavTableCellStyle">
+<a href="http://computersystemconsulting.ca/cgi-bin/Extropia/extropia_kb.cgi?display_add_form=on&amp;[% session_string %]" target='_Blank'><font   class="LeftSideBarNavStyle"> Extropia kb</font></a>
+[% END %]
+<!--testforshanta-->
+
+[% IF username == 'shanta' %]
+	 </td>
+ 	</tr>
+	<tr>
+ 	 <td>
+<a href="http://computersystemconsulting.ca/cgi-bin/Extropia/extropia_methouds.cgi?display_add_form=on&amp;[% session_string %]" target='_Blank'><font   class="LeftSideBarNavStyle"> Extropia Methouds</font></a>
+	 </td>
+ 	</tr>
+ <tr>
+   <td class="NavtableHeaderCellStyle" >In the works</td>
+ </tr>
+  <tr>
+  <td class="NavTableCellStyle">	<A HREF = "news_debug.cgi?[% session_string %]" target="_content"><font   class="LeftSideBarNavStyle"> News </font></a>
+  </td>
+ </tr>
+  <tr>  
+  <td class="NavTableCellStyle">	<A HREF = "/cgi-bin/Apis/apis_debug.cgi?[% session_string %]" target="_content"><font   class="LeftSideBarNavStyle"> Apis</font></a>
+  </td>
+ </tr>
+  <tr>  
+  <td class="NavTableCellStyle">	<A HREF = "/cgi-bin/Extropia/extropia_debug.cgi?[% session_string %]" target="_content"><font   class="LeftSideBarNavStyle"> Extropia HelpDesk</font></a>
+  </td>
+ </tr>
+  <tr>  
+  <td class="NavTableCellStyle">	<A HREF = "/cgi-bin/ENCY/formulas_debug.cgi?[% session_string %]" target="_content"><font   class="LeftSideBarNavStyle"> Formulas</font></a>
+  </td>
+ </tr>
+  <tr>  
+  <td class="NavTableCellStyle">	<A HREF = "/cgi-bin/ENCY/formulas_admin_debug.cgi?[% session_string %]" target="_content"><font   class="LeftSideBarNavStyle"> Formulas  Admin</font></a>
+  </td>
+ </tr>
+  <tr>  
+  <td class="NavTableCellStyle">	<A HREF = "/cgi-bin/Extropia/deseases_debug.cgi?[% session_string %]" target="_content"><font   class="LeftSideBarNavStyle"> Diseases</font></a>
+  </td>
+ </tr>
+  <tr>  
+  <td class="NavTableCellStyle">	<A HREF = "/cgi-bin/Extropia/deseases_admin_debug.cgi?[% session_string %]" target="_content"><font   class="LeftSideBarNavStyle"> Diseases Admin</font></a>
+  </td>
+ </tr>
+  <tr>  
+  <td class="NavTableCellStyle">	<A HREF = "/cgi-bin/Extropia/reference_debug.cgi?[% session_string %]" target="_content"><font   class="LeftSideBarNavStyle">Reference</font></a>
+[% END %]
+
+<!--End CSCAdminLinks-->

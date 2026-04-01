@@ -1,0 +1,120 @@
+[%
+#	$Id: SLTShantaHome.ttml,v 1.1 2001/12/16 03:45:30 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it doesn't rely on any
+# variables from outside.
+
+%]
+
+[%# embed(data.page_top_view,['-PAGE_TITLE',' Home page.']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+
+ <table cellpadding="0" cellspacing="0" border="0" align="left" width="100%">
+<tr align="left">
+<td align="left" >
+
+[% IF username == 'Shanta' %]
+<ul>
+   <li><a href="/cgi-bin/index.cgi?site=GrindrodBC">Grindrod BC</a></li>
+   <li><a href="/cgi-bin/index.cgi?site=ECF">ECF</a></li>
+   <li><a href="/cgi-bin/index.cgi?site=GPMarket">Grindrod Park Market</a></li>
+   <li><a href="/cgi-bin/News/news.cgi">news</a></li>
+</ul>
+<br>                                                             		
+<br>Things you need to do.
+
+<p>Todo List local</p>
+<ol>
+  <li>Setup  <a href="/cgi-bin/index.cgi?site=CS">CS</a></li>
+  <li>Setup<a href="/cgi-bin/index.cgi?site=CSC>CSC</a></li>
+    <li>Move Files to server  </li>
+   <li>Setup  <a href="/cgi-bin/index.cgi?site=SLT">Add page editing for Home page</a></li>
+   <li>Setup  <a href="/cgi-bin/index.cgi?site=SLT">Add page editing for about page</a></li>
+   <li>Setup  <a href="/cgi-bin/index.cgi?site=SLT">Add New page creation</a></li>
+   <li><a href="http://ldemo.computersystemconsulting.ca/cgi-bin/index.cgi?site=Demo">Local Demo</a></li>
+   <li>Setup  <a href="/cgi-bin/index.cgi?site=Kamasket">Kamasket</a></li>
+   <li>Setup  <a href="/cgi-bin/index.cgi?site=LandTrust">LandTrust</a></li>
+   <li><a href="/cgi-bin/index.cgi?site=CSC&group=Planning">Planning</a></li>
+    <li><a href="/cgi-bin/CSC/csc.cgi?site=CSC&group=Planning">Planning</a></li>
+    <li><a href="/cgi-bin/WebCal/webcal.cgi?site=BMaster">WebCal</a></li>
+  <li>Setup  <a href="/cgi-bin/index.cgi?site=BMaster">Beemaster</a></li>
+   <li>Setup<a href="/cgi-bin/index.cgi?site=ECF">ECF</a></li>
+   <li>Setup<a href="/cgi-bin/index.cgi?site=HE">HE</a></li>
+</ol>
+
+   <p>UpLoad Files list </p> 
+   <p>order of upload ldev > PDA > dev.computersystemconsulting.ca > computersystemconsulting.ca > beemaster.ca > grindrodbc.com</p> 
+
+<ol>
+   <li><a href="/cgi-bin/index.cgi?site=GrindrodBC">/cgi-bin/index.cgi</a></li>
+   <li><a href="/cgi-bin/ToDo/project_tracker.cgi?site=GrindrodBC">/cgi-bin/ToDo/project_tracker.cgi</a></li>
+  <li><a href="/cgi-bin/BuyAndSell/buy.cgi?site=GrindrodBC">/cgi-bin/BuyAndSell/buy.cgi</a></li>
+   <li><a href="/cgi-bin/AddrssBook/address_book.cgi?site=GrindrodBC">/cgi-bin/AddrssBook/addrss_book.cgi</a></li>
+   <li><a href="/cgi-bin/ToDo/todo.cgi?site=GrindrodBC">/cgi-bin/AddrssBook/todo.cgi</a></li>
+   <li><a href="/cgi-bin/CSC/client.cgi?site=[% SiteName %]&amp;[% session_string %]">/cgi-bin/CSC/client.cgi</a></li>
+   <li><a href="/cgi-bin/News/news.cgi?site=GrindrodBC">cgi-bin/News/news.cgi</a></li>
+   <li><a href="/cgi-bin/HTMLTemple/ContactView.ttml?site=GrindrodBC">cgi-bin/HTMLTemple/Default/ContactView.ttml</a></li>
+   <li><a href="/cgi-bin/HTMLTemple/Default/MembesView.ttml?site=GrindrodBC">cgi-bin/HTMLTemple/MembersView.ttml</a></li>
+   <li><a href="/cgi-bin/News/news.cgi?site=GrindrodBC">cgi-bin/News/news.cgi</a></li>
+   <li><a href="/cgi-bin/Modules/DemoSetup.pm">/cgi-bin/Modules/DemoSetup.pm</a></li>
+   <li><a href="/cgi-bin/Modules/DemoSetup.pm">/cgi-bin/Modules/DemoSetup.pm</a></li>
+  <li>Upload to dev <a href="/cgi-bin/index.cgi?site=BMaster">Beemaster</a></li>
+  <li>Upload to beemaster <a href="/cgi-bin/index.cgi?site=BMaster">Beemaster</a></li>
+   <li>Setup<a href="/cgi-bin/index.cgi?site=GRA">GRA</a></li>
+   <li>Setup<a href="/cgi-bin/index.cgi?site=Brew">Brew</a></li>
+</ol>
+
+[% embed('ToDoListView') %]	 
+
+[% ELSE %]
+
+	[% IF username %]
+
+<h3 > Hello  [% firstname%]  [% lastname%]! Welcome !</h3>
+	  
+
+	[% ELSE %]
+
+	<h3>  Hello! Welcome to Shanta Laptop!</h3
+
+	[% END %]
+
+<p>This is my laptops  site. You link to local set up of Development..</p>
+<a href="http://forager.com/usbm/usbm.html" target="_Blank" >USBM</a>. We are proud to sponsor The Universal School of Biological Life Site
+<br>
+<br>                     [%# <script type=" text/javascript" src="/cgi-bin/News/news.cgi?embed=1&amp;site=Shanta&amp;simple_search_string=Shanta&amp;records_per_page=20">
+</script>
+                             %]
+<br>
+<br>
+<br>
+<p>
+<a href="../CSC/helpdesk.cgi?view=BasicDataView&amp;[% session_string %]" target="_Blank" > HelpDesk</a>
+
+
+
+[% END %]
+
+
+</td>
+</tr>
+</table>
+
+

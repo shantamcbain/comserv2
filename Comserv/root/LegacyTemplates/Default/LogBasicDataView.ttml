@@ -1,0 +1,36 @@
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+   [% LastUpdate = data.last_update %]
+   [% SiteUpdate = data.site_last_update %]
+   [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+   [% SiteDisplayName = data.site_display_name %]
+   [% site = SiteName %]
+   [% PrintMode    = data.session_object.getAttribute('-KEY','PrintMode') %]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+[% developer_status = Data.session_object.getAttribute('-KEY', 'auth_developer_status') %]
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+[% embed(data.page_top_view,['-PAGE_TITLE','Log Basic Data View']) %]
+<!--BasicDataView-->
+[% total_time = 0 %]
+
+[% total_open_expenses = 0 %]
+
+[% total_closed_expenses = 0 %]
+
+[% FOR rh_record = data.records %]
+
+    [% total_expenses = total_expenses + rh_record.time %]
+
+[% END %]
+[% embed('ErrorDisplayView') %]
+[% embed('BasicDBTable') %]
+
+[% embed('LogRecordSettotalView') %]
+[% embed('RecordSetDetailsFooterView') %]
+
+<!--EndBasicDataView-->
+[% embed(data.page_bottom_view) %]
+

@@ -1,0 +1,30 @@
+[% IF data.session_object %]
+
+    [% session_id = data.session_object.getId() %]
+    [% username = data.session_object.getAttribute('-KEY','auth_username') %]
+   [% session_string = "session_id=$session_id" %]
+   
+[% END %]
+
+[% data.cgi.header %]
+        <HTML>
+        <HEAD>
+        <TITLE>[% data.script_display_name %]: [% data.page_title %]</TITLE>
+        </HEAD>
+        <FRAMESET ROWS = "120,*" FRAMEBORDER = "0" 
+                  BORDER = "0" FRAMESPACING = "0">
+        <FRAME SRC ="[% data.script_name %]?view=TopFrameView&[% session_string %]&page_top_view=SubTopFrameView"
+               MARGINWIDTH = "0" MARGINHEIGHT = "0" SCROLLING = "no" 
+               FRAMEBORDER = "NO" NORESIZE NAME = "_topNav">
+ 	<frameset cols="17%,*" framespacing="0">
+     	      <FRAME SRC = "[% data.script_name %]?view=[% data.left_page_view %]&[% session_string %]" 
+                 MARGINWIDTH = "0" MARGINHEIGHT = "0" SCROLLING = "AUTO" 
+                 NAME = "_left" FRAMEBORDER = "NO" NORESIZE NAME = "LeftNav">
+    	      <FRAME SRC = "[% data.script_name %]?view=CityShopAdminView&[% session_string %]" 
+                 MARGINWIDTH = "0" MARGINHEIGHT = "0" SCROLLING = "YES" 
+                 NAME = "_mainCon" FRAMEBORDER = "NO" NORESIZE>
+        </frameset>
+        </BODY>
+        </HTML>
+
+ 

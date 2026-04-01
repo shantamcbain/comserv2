@@ -1,0 +1,84 @@
+[%#	$Id: DemoHomeView.ttml,v 1.9 2002/11/08 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dozen't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dozen't rely on any
+# variables from outside.
+
+
+%]
+<A NAME="PageTop"></A>
+<br>
+<br>
+<p>Thanks for your interest in our  Open source web solutions.
+</p>
+
+<p>You are seeing this view for one of two reasons.</p>
+	<ol>
+	 <li>This is the first time you have entred your site.</li>
+	 <li>The owner has not created a page yet.</li> 
+	 <li>You are in the Demo</li>
+	</ol>
+   [% IF username %]
+		   
+	 	
+	 	<p> Create Your profile in the Address Put in How you want the system to see you.
+	 	If Fields the system needs to run are marked with an * All others are optional.
+	 	If you are the site contact please place in the comment area the you are a contact for. SiteNameContact Replace SiteName with the appropriate code for this. 
+	 	</p> 
+	 	      
+	 	 <li>Address</li>
+	 	 <li>world Email email address: customercode@comutersystemconsulting.ca or ?</li>
+	 	 <li>local Email username@192.168.2.10 </li>
+	 	 <li>Forums This is were you Chat with local site members. All messages are stored in the same table. They can be viewed only by forum name. Available forums are defined Those that you have access to publicly and those you choose from the available pool of forum names.</li>
+	 	</ul>
+  	<p>Current Private list</p>
+<ul>
+	<li>Site [% SiteDisplayName %] Only [% SiteDisplayName %] see these entries.</li>
+/UL>
+
+ 	[% ELSE %]
+  
+   <p>You will now need to create an account on the system.
+   click on one of the Logon links then click register.
+    </p>
+	[% END %]
+
+
+		
+		
+		<p>Our application haves many features built in with many optional modules to expand functionality to fit your needs.
+		</p>
+		<font size="+2">Some stock features are.</font> 
+		<ol>
+			<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=AppearanceView">Look and feel controlled by CSS</a></li>
+			<li>Full user authentication.</li>
+			<li>Content to users controlled by username, group and site.</li>
+			<li>Key site configuration in setup file. </li>
+			<li>Ability to access multiple data types. Flat file or MySQL, (other SQL available)</li>
+			<li>Ability to host other sites, or affiliates. This make this application great for Cubs and organizations to offer hosting services to members.</li>
+			<li>News system to announce changes and important events your visitors should know about</li>
+			<li>Calendar to allow you to schedule events of importance to your users</li>
+			<li>Member address book. Users see only their own entries into this database. Admin see all entries. This feature is being expanded into a full user profile system. Great for clubs, Dating sites, customer tracking systems etc.</li>
+			<li>Forums: Let your users communicate with each other. Messages posted to the forums can be configured to be sent to your user email list. </li>
+			<li>HelpDesk. This system allows you and your users to get help with the site content or  site application depending your support package.</li>
+		</ol>
+		<font size="+2">Some Optional features are.</font> 
+		<ol>
+			<li>Buy And Sell. Provides your users a for</li>
+			<li>FAQ. This system lets you provide your users</li>
+			<li>The CityShop online store. This full featured application lets you add eCommerce to your site.</li>
+		</ol>
+		
+		<p>The first thing to do is to try all the links on the page. There is a lot to look at! There are two main places to look for links. The left of the page and the bottom of the page. Some will require you to LOGON. This is because they need a email address or a username/group to work properly. For now just use the back button to com back to this page. This is how visitors will view your site. Be sure to have a look at the contact page. Check the FAQ or HelpDesk if you have any problems or question.</p>
+		
+		To View how your guests that have created an account see the site <a href="[% data.script_name %]?submit_logon=on&amp;site=[%SiteName%]"
+		                  target="_blank" name="Logon as quest">click here</a>. LOGON with guest guest
+		
+		<p>After you have look around it time to create an account. Click any of the LOGON links. Each page has 2 or more. Top of the Nav links on left, the lower nav links on the bottom of the page or on some pages like this one on the top of the page. Other modules, like the Calendar require Logon to view the data.</p>
+		
+		<p>The LOGON screen has a register button click it. Fill in the form. Remember not to use spaces in your username or password. Usersnames and passwords are case sensitive.</p>
+		<p>The <a href="http://demo.computersystemconsulting.ca" target="_blank" name="Complete Demo">complete demo</a></p>
+

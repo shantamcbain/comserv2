@@ -1,0 +1,38 @@
+[%
+#	$Id: ProfileHomeView.ttml,v 0.01 2003/11/29 06:32:11 shanta Exp shanta $	
+# location /cgi-bin/Htmltemplates/default
+# the bottom template
+
+%]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Member Profile']) %]
+
+[% embed('ErrorDisplayView') %]
+<A NAME="PageTop"></A>
+
+<table>
+
+<tr>
+	<td>
+	 <strong>[% fname %] This is were you manage your profile</strong>
+	 
+	 <p>How to create a profile
+	</p> 
+	<ul>
+	<li>Click "Add Profile" Fill in all data that applies to you. Require fields are marked with an *. They must be entered for your profile to be created.</li>
+	</ul>
+	
+	<p>Your profile is the base of how you will be treated by the web application. 
+	</p>
+	<p>We are working on the profile system to allow you to control the content of our site.</p>
+	
+	[% IF SiteName == 'OKB' %]
+	
+	The Okanagan Beekeepers use your profile to keep your contact information current. You can update your address etc and the club can update your records from it.  No other members may view your data. 
+	
+	[% END %]
+	<p>Your data is only viewable by you or site administration.</p> 
+	</td>
+</tr>
+</table>
+[% embed(data.page_bottom_view) %]

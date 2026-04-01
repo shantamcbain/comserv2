@@ -1,0 +1,131 @@
+[%#	$Id: BrewHomeView.ttml,v 1.1 2008/03/25 06:42:47 shanta Exp shanta $	%]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Brew']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% PROCESS DefaultDbi.ttml %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username')%]
+[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% PrintMode    = data.session_object.getAttribute('-KEY','PrintMode') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+
+<table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<A NAME="PageTop"></A>
+
+<h3> A Brewers site Site. </h3>
+
+	[% IF username %]
+			[% IF  group == 'normal'%]
+
+<p>As a guest you may view the FAQ and other database . Contribute to Forums, Calendar of annoucements, Buy and Sell, and Links.
+</p>
+<p>Members may contribute to the sites contend and Join commities monitor content of the diffrent dateabases hosted on the site. Create logs that certification organizations need to access to maintain certification. Available logs will vary according to the need of your certification organization. 
+	</p>	[% ELSE %]
+<p>Member home</p>
+			[% END %]
+
+
+	[% ELSE %]
+
+				 		<h2>Explore the world of Brewing. </h2>
+ 	
+<p><font size="-2">To get the most from this application you will need to create an account.
+<A HREF = "[% data.script_name %]?session_id=[% session_id %]&amp;submit_logon=on&amp;site=[%SiteName%]"
+                 TARGET = "[% data.link_target %]">Logon</A> </font>
+                 
+                 
+               <a href="/cgi-bin/FAQ/faq.cgi?site=[%SiteName%]&amp;[% session_string %]&amp;sort_field1=category &amp;sort_field2=fname &amp;first_record_to_display=0&amp;records_per_page= &amp;record_id=2&amp;columns_to_view=category &amp;columns_to_view=question&amp;display_details_view.x=8 &amp;display_details_view.y=9&amp;display_details_view=on" onmousedown="click Here for info on what we collect">Why should I create an account</a>
+    
+		</td >
+		</tr>
+		<tr>
+		<td >
+
+
+
+		<p>We have forums, Calendars, Links list, FAQ's, Prosedures, Plant Databases, How to's contribute by user..
+		</p>
+					
+					
+					
+				
+
+	[% END %]
+
+            <h3>  This Web Application  is for brewer to brew better and easyer. </h3>
+             
+            <p>
+            </p>
+			<h3>News</h3>
+			<table align="center">
+			<tbody align="center">
+			<tr>
+			<td>
+			<script type = "text/javascript"
+							src="/cgi-bin/News/news.cgi?embed=1&amp;site=[% SiteName %]&amp;records_per_page=1">
+						</script>
+	 
+			</td>
+			<td>
+<a href="/cgi-bin/Brew/recipe.cgi?site=[% SiteName %]&amp;view=BrewRecipeView&amp;[% session_string %]" name="AppToolsView" title="Click here for details of tool this application offerers">Recipe.</a>				
+
+
+			</td>
+		</tr>
+	</tbody>
+	</table>
+
+			</li>
+             </ul>
+            <p>Access rights to resources will vary to your membership status.</p>
+
+            Currently we have 5 Memberships available.
+
+            <ul>
+            <li>Guest. Visitors have access access to all data considered public or essential. No login required</li>
+            <li>Beta tester. Get full access and are active in the development of the site and its usefulness to Bee Keepers. To Become a bata tester. Become a member. Earn one free month of membership for 3 contributions to the site per month. <a href="http://cgi.countrystores.ca/cgi-bin/store/store.cgi?&amp;shop=CS&amp;L=eng&amp;P=BrewUser">Click here to join.</a></li>
+            <li>Member. These Vary much needed folks have full access to the site. They have contributed financially to help finance the site. <a href="http://cgi.countrystores.ca/cgi-bin/store/store.cgi?&amp;shop=CS&amp;L=eng&amp;P=BrewUser">Click here to join.</a>
+             <li>Affiliate. Companies that support this site.
+            They have contributed financially to help finance the site. <a href="http://cgi.countrystores.ca/cgi-bin/store/store.cgi?&amp;shop=CSC&amp;L=eng&amp;P=BrewUser">Click here to join.</a>
+           <li>Hosted Site. There are two levels here. Your site will look the way you want.
+               <ul>
+                <li>Your domain on our server. <a href="http://cgi.countrystores.ca/cgi-bin/store/store.cgi?&amp;L=eng&amp;P=DomainHosting">Click here to join.</a>
+                <li>A site on our domain. <a href="http://cgi.countrystores.ca/cgi-bin/store/store.cgi?&amp;shop=CS&amp;L=eng&amp;P=ApisHosted">Click here to join.</a> 
+               </ul>
+          </ul>
+              <p>PS. You can be both a Beta Tester and a Contributing Member</p>
+
+
+
+<br>
+<br>
+<br>
+
+<p>
+<!-- hhmts start -->
+<!-- hhmts end -->
+
+[% embed('CSCCopyRight') %]
+
+
+</td>
+</tr>
+</table>
+
+
+
+

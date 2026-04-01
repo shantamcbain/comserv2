@@ -1,0 +1,358 @@
+[%
+
+# the StatsView template
+#	$Id: StatsView.ttml,v 1.1 2003/11/29 06:31:35 shanta Exp shanta $	
+
+%]
+[% embed(data.page_top_view,['-PAGE_TITLE','Alt Power Stats']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+ [% script_name = data.app_name %]
+[% localip = data.local_ip %]
+
+    [% USE link1 = DBI( data_source = 'dbi:mysql:forager',
+                username = 'forager',
+                password = 'pwxx88' )
+    %]
+    [% USE link2 = DBI( data_source = 'dbi:mysql:forager',
+                username = 'forager',
+                password = 'pwxx88' )
+    %]
+[% SiteFullName = 'Alternate Power'%]
+<div align="center"><h1>This is [% SiteFullName %] Stats page.</h1></div>
+<table cellpadding="1" cellspacing="0" border="0" class="LeftNavTableStyle">
+<th class="NavtableHeaderCellStyle">Date Time</th>
+<th class="NavtableHeaderCellStyle">Battery Name</th>
+<th class="NavtableHeaderCellStyle">Amps</th>
+<th class="NavtableHeaderCellStyle">current Voltage</th>
+<th class="NavtableHeaderCellStyle">Charge State</th>
+<th class="NavtableHeaderCellStyle">Add</th>
+[% FOREACH code = DBI.query("SELECT * FROM csc_project_tb
+	                                WHERE  (comments  LIKE '%BatteryPack%'
+	                                        )
+ 	                            ")%]
+[% project_code = code.project_code %]
+[% FOREACH item = link1.query("SELECT    C.item_code, C.name, C.amps, L.time, L.start_date, L.start_time
+                                   FROM altpower_inventroy_tb AS C
+                                   JOIN altpower_battery_log_tb AS L
+                                   ON C.item_code = L.project_code
+                                   WHERE C.item_code = '$project_code'
+	                            ")%]  
+ [% END %]
+ <tr><td>[% item.start_date %] [% item.start_time %]</td>
+ <td>[% item.name %]</td> 
+ <td>[% item.amps %]</td> 
+ <td>[% item.time %]</td>	                              
+ <td >
+  		   
+         [% IF item.time   >= 12.73 %]
+	        100% fully charged
+	        [% ELSIF item.time >= 12.62 %]
+	        <font size="0" color="#000000">90% Recharge</font> 
+	        [% ELSIF item.time >= 12.5 %]
+	        <font size="0" color="#000000">80% Recharge</font> 
+	        [% ELSIF item.time >= 12.37 %]
+	        <font size="0" color="#0000FF">70% Recharge</font> 
+	        [% ELSIF item.time >= 12.25 %]
+	        <font size="0" color="#0000FF">60% Critical Recharge</font> 
+	        [% ELSIF item.time >= 12.10 %]
+	        <font size="0" color="#0000FF">50% Critical Recharge</font> 
+	        [% ELSIF item.time >= 11.96 %]
+	        <font size="0" color="#0000FF">40% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.81 %]
+	        <font size="0" color="#0000FF">30% Critical Recharge</font> 
+	        [% ELSIF item.time >= 11.66 %]
+	        <font size="0" color="#0000FF">20% Critical Recharge</font> 
+	        [% ELSIF item.time >= 11.51 %]
+	        <font size="0" color="#0000FF">10% Recharge</font> 
+	        [% ELSE  %] 
+	        <font size="0" color="#0000FF"> This battery is dead recharge.</font>
+	        [% END %]                                                                                           
+ </td>      
+<td><a href="/cgi-bin/AltPower/batterylog.cgi?site=AltPower&amp;display_add_form=on&amp;project_code=[% item.item_code %]&amp;[% session_string %]" name="Battery log" style="AddLink: AddLink; "> Add</a>
+</td>
+</tr>
+[% END %]
+</table><p>Track the status of your system Here. If you become a member you will see only your information. Guest will see sample data based on our own system.</p>
+<table cellpadding="1" cellspacing="0" border="0" class="LeftNavTableStyle">
+<th class="NavtableHeaderCellStyle">Battery Name</th>
+<th class="NavtableHeaderCellStyle">AmpHours</th>
+<th class="NavtableHeaderCellStyle">Date</th>
+<th class="NavtableHeaderCellStyle">Voltage</th>
+<th class="NavtableHeaderCellStyle">Charge State</th>
+<th class="NavtableHeaderCellStyle">Add</th>
+[% Count = 1 %]
+[% FOREACH item = link1.query("SELECT * FROM altpower_inventroy_tb
+	                                WHERE  (comments  LIKE '%BatteryPack%'
+	                                        )
+ 	                            ")%]    
+<tr>
+<td >[% item.name %]</td>
+<td >[% item.amps %]</td>
+[% item_code = item.item_code %]
+[% FOREACH logentry = link2.query("SELECT * FROM altpower_battery_log_tb
+	                                WHERE  (project_code   =  '$item_code'
+	                                        )
+ 	                            ")%]    
+[% Voltage = logentry.time %]
+[% END %]
+<td>[% logentry.start_date %]<br> [%logentry.start_time %]</td> <td >	   
+ [% Voltage %]</td>
+</td>
+
+ <td >
+  		   
+         [% IF Voltage   >= 12.73 %]
+	        100% fully charged
+	        [% ELSIF Voltage >= 12.62 %]
+	        <font size="0" color="#000000">90% Recharge</font> 
+	        [% ELSIF Voltage >= 12.5 %]
+	        <font size="0" color="#000000">80% Recharge</font> 
+	        [% ELSIF Voltage >= 12.37 %]
+	        <font size="0" color="#0000FF">70% Recharge</font> 
+	        [% ELSIF Voltage >= 12.25 %]
+	        <font size="0" color="#0000FF">60% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 12.10 %]
+	        <font size="0" color="#0000FF">50% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.96 %]
+	        <font size="0" color="#0000FF">40% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.81 %]
+	        <font size="0" color="#0000FF">30% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.66 %]
+	        <font size="0" color="#0000FF">20% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.51 %]
+	        <font size="0" color="#0000FF">10% Recharge</font> 
+	        [% ELSE  %] 
+	        <font size="0" color="#0000FF"> This battery is dead recharge.</font>
+	        [% END %]                                                                                           
+ </td>      
+<td><a href="/cgi-bin/AltPower/batterylog.cgi?site=AltPower&amp;display_add_form=on&amp;project_code=[% item.item_code %]&amp;[% session_string %]" name="Battery log" style="AddLink: AddLink; "> Add</a>
+</td>
+</tr>
+[% END %]
+
+</table>
+<ul>
+ <li>Battery stats<a href="/cgi-bin/AltPower/batterylog.cgi?site=AltPower&amp;[% session_string %]" name="Battery log" style="AddLink: AddLink; "> Add</a></li> 
+<ul>
+	
+<li>	
+[% FOREACH item = link1.query("SELECT * FROM altpower_battery_log_tb
+	                                WHERE  (project_code   = 'SMainBattery'
+	                                        )
+ 	                            ")%]    
+ 	   [% END %]
+  Main Battery <a href="/cgi-bin/AltPower/batterylog.cgi?site=AltPower&amp;display_add_form=on&amp;project_code=SMainBattery&amp;[% session_string %]" name="Battery log" style="AddLink: AddLink; "> Add</a>
+   <br>[% item.start_date %] at [% item.start_time %]  was   [% item.time %] Volts
+	   <br>
+	   [% Voltage = item.time %]
+          [% IF Voltage   >= 12.73 %]
+	        100% this Battery is fully charged
+	        [% ELSIF Voltage >= 12.62 %]
+	        <font size="0" color="#000000">This Battery is 90% Recharge</font> 
+	        [% ELSIF Voltage >= 12.5 %]
+	        <font size="0" color="#000000">This Battery is 80% Recharge</font> 
+	        [% ELSIF Voltage >= 12.37 %]
+	        <font size="0" color="#0000FF">This Battery is 70% Recharge</font> 
+	        [% ELSIF Voltage >= 12.25 %]
+	        <font size="0" color="#0000FF">This Battery is 60% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 12.10 %]
+	        <font size="0" color="#0000FF">This Battery is 50% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.96 %]
+	        <font size="0" color="#0000FF">This Battery is 40% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.81 %]
+	        <font size="0" color="#0000FF">This Battery is 30% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.66 %]
+	        <font size="0" color="#0000FF">This Battery is 20% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.51 %]
+	        <font size="0" color="#0000FF">This Battery is 10% Recharge</font> 
+	        [% ELSE  %] 
+	        <font size="0" color="#0000FF"> This battery is dead recharge.</font>
+	        [% END %]                                                                                           
+	        </li>	 
+<li>	
+[% FOREACH item = link1.query("SELECT * FROM altpower_battery_log_tb
+	                                WHERE  (project_code   = '27'
+	                                        )
+ 	                            ")%]    
+ 	   [% END %]
+  27 Yard pack <a href="/cgi-bin/AltPower/batterylog.cgi?site=AltPower&amp;display_add_form=on&amp;project_code=27&amp;[% session_string %]" name="Battery log" style="AddLink: AddLink; "> Add</a>
+   <br>[% item.start_date %] at [% item.start_time %]  was   [% item.time %] Volts
+	   [% Voltage = item.time %]
+ 	   <br>
+         [% IF Voltage   >= 12.73 %]
+	        100% this Battery is fully charged
+	        [% ELSIF Voltage >= 12.62 %]
+	        <font size="0" color="#000000">This Battery is 90% Recharge</font> 
+	        [% ELSIF Voltage >= 12.5 %]
+	        <font size="0" color="#000000">This Battery is 80% Recharge</font> 
+	        [% ELSIF Voltage >= 12.37 %]
+	        <font size="0" color="#0000FF">This Battery is 70% Recharge</font> 
+	        [% ELSIF Voltage >= 12.25 %]
+	        <font size="0" color="#0000FF">This Battery is 60% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 12.10 %]
+	        <font size="0" color="#0000FF">This Battery is 50% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.96 %]
+	        <font size="0" color="#0000FF">This Battery is 40% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.81 %]
+	        <font size="0" color="#0000FF">This Battery is 30% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.66 %]
+	        <font size="0" color="#0000FF">This Battery is 20% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.51 %]
+	        <font size="0" color="#0000FF">This Battery is 10% Recharge</font> 
+	        [% ELSE  %] 
+	        <font size="0" color="#0000FF"> This battery is dead recharge.</font>
+	        [% END %]                                                                                           
+ 	        </li>	 
+<li>	
+[% FOREACH item = link1.query("SELECT * FROM altpower_battery_log_tb
+	                                WHERE  (project_code   = 'gel'
+	                                        )
+ 	                            ")%]    
+ 	   [% END %]
+  Gel Cell <a href="/cgi-bin/AltPower/batterylog.cgi?site=AltPower&amp;display_add_form=on&amp;project_code=Gel&amp;[% session_string %]" name="Battery log" style="AddLink: AddLink; "> Add</a>
+   <br>[% item.start_date %] at [% item.start_time %]  was   [% item.time %] Volts
+	   [% Voltage = item.time %]
+	   <br>
+          [% IF Voltage   >= 12.73 %]
+	        100% this Battery is fully charged
+	        [% ELSIF Voltage >= 12.62 %]
+	        <font size="0" color="#000000">This Battery is 90% Recharge</font> 
+	        [% ELSIF Voltage >= 12.5 %]
+	        <font size="0" color="#000000">This Battery is 80% Recharge</font> 
+	        [% ELSIF Voltage >= 12.37 %]
+	        <font size="0" color="#0000FF">This Battery is 70% Recharge</font> 
+	        [% ELSIF Voltage >= 12.25 %]
+	        <font size="0" color="#0000FF">This Battery is 60% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 12.10 %]
+	        <font size="0" color="#0000FF">This Battery is 50% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.96 %]
+	        <font size="0" color="#0000FF">This Battery is 40% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.81 %]
+	        <font size="0" color="#0000FF">This Battery is 30% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.66 %]
+	        <font size="0" color="#0000FF">This Battery is 20% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.51 %]
+	        <font size="0" color="#0000FF">This Battery is 10% Recharge</font> 
+	        [% ELSE  %] 
+	        <font size="0" color="#0000FF"> This battery is dead recharge.</font>
+	        [% END %]                                                                                           
+ 	        </li>	 
+<li>	
+[% FOREACH item = DBI.query("SELECT * FROM altpower_battery_log_tb
+	                                WHERE  (project_code   = 'trailer'
+	                                        )
+ 	                            ")%]    
+ 	   [% END %]
+  Trailer Battery <a href="/cgi-bin/AltPower/batterylog.cgi?site=AltPower&amp;display_add_form=on&amp;project_code=Trailer&amp;[% session_string %]" name="Battery log" style="AddLink: AddLink; "> Add</a>
+   <br>[% item.start_date %] at [% item.start_time %]  was   [% item.time %] Volts
+	   [% Voltage = item.time %]
+	   <br>
+          [% IF Voltage   >= 12.73 %]
+	        100% this Battery is fully charged
+	        [% ELSIF Voltage >= 12.62 %]
+	        <font size="0" color="#000000">This Battery is 90% Recharge</font> 
+	        [% ELSIF Voltage >= 12.5 %]
+	        <font size="0" color="#000000">This Battery is 80% Recharge</font> 
+	        [% ELSIF Voltage >= 12.37 %]
+	        <font size="0" color="#0000FF">This Battery is 70% Recharge</font> 
+	        [% ELSIF Voltage >= 12.25 %]
+	        <font size="0" color="#0000FF">This Battery is 60% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 12.10 %]
+	        <font size="0" color="#0000FF">This Battery is 50% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.96 %]
+	        <font size="0" color="#0000FF">This Battery is 40% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.81 %]
+	        <font size="0" color="#0000FF">This Battery is 30% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.66 %]
+	        <font size="0" color="#0000FF">This Battery is 20% Critical Recharge</font> 
+	        [% ELSIF Voltage >= 11.51 %]
+	        <font size="0" color="#0000FF">This Battery is 10% Recharge</font> 
+	        [% ELSE  %] 
+	        <font size="0" color="#0000FF"> This battery is dead recharge.</font>
+	        [% END %]                                                                                           
+ 	        </li>	 
+</ul> 
+<li>Generator Stats<a href="/cgi-bin/AltPower/powerlog.cgi?site=AltPower&amp;display_add_form=on&amp;[% session_string %]" name="Battery log" style="AddLink: AddLink; "> Add</a></li>
+       [% total_item_time = 0 %]
+	      [% total_item_cost = 0.00 %]
+[% FOREACH item = link1.query("SELECT * FROM altpower_system_log_tb
+	                                WHERE  (project_code   = '4200Gen'
+	                                        )
+	                            ")%]    
+ 	    [% total_item_time = total_item_time + item.time %]
+	                                 
+	 
+	   [% END %]
+	[% FOREACH item = link1.query("SELECT * FROM accounts_tb
+	                                WHERE  (project_code   = '4200Gen'
+	                                        )
+	                            ")%]    
+ 	    [% total_item_cost = total_item_cost + item.price %]
+	                                 
+	 
+	   [% END %]
+	   
+	<ul>
+	<li>4200 Generator  
+	<br>[% total_item_time %] Hours <a href="/cgi-bin/AltPower/powerlog.cgi?site=AltPower&amp;display_add_form=on&amp;owner=AltPower&amp;[% session_string %]" name="Battery log" style="AddLink: AddLink; "> Add</a></li>
+	<br>Total cost $[% total_item_cost %]
+	<br>Average cost per hour. $[% total_item_cost / total_item_time %] <a href="/cgi-bin/AltPower/acc.cgi?site=AltPower&amp;project_code=4200Gen&amp;owner=AltPower&amp;display_add_form=on&amp;[% session_string %]" name="Battery log" style="AddLink: AddLink; "> Add</a>
+   </ul>
+<li>PV stats</li>
+</ul>
+
+<h3>Power inventory</h3>
+<a href="/cgi-bin/AltPower/power_inventory.cgi?site=[% SiteName %]&amp;owner=AltPower&amp;[% session_string %]">DataBase</a>
+<table class="LeftNavTableStyle" CELLPADDING =" 1">
+<th class='NavtableHeaderCellStyle'>Number</th>
+<th class='NavtableHeaderCellStyle'>Name</th>
+<th class='NavtableHeaderCellStyle'>Watts</th>
+<th class='NavtableHeaderCellStyle'>Hours</th>
+<th class='NavtableHeaderCellStyle'>days</th>
+<th class='NavtableHeaderCellStyle'>Watts used</th>
+<th class='NavtableHeaderCellStyle'>Edit</th>
+       [% total_item_time = 0 %]
+	      [% total_item_cost = 0.00 %]
+	[% FOREACH item = link1.query("SELECT * FROM altpower_inventroy_tb
+	                                WHERE  (project_code   = 'power'
+	                                        )
+	                            ")%]    
+ 	    [% total_item_watts = total_item_watts + (item.rwatts * item.hour  * item.number)%]
+ 	    [% total_item_hours = total_item_hours + item.hour %]
+ 	    [% total_watts = total_watts + (item.rwatts   * item.number)%]
+<tr>
+<td>[% item.number %]</td>
+<td>[% item.name %]</td>
+<td>[% item.rwatts  %]</td>
+<td>[% item.hour %]</td>
+<td>[% item.days %]</td>
+<td>[% item.rwatts * item.hour %]</td>
+<td><a href="/cgi-bin/AltPower/power_inventory.cgi?site=[% SiteName %]&amp;owner=AltPower&amp;[% session_string %]&amp;sort_field2=project&simple_search_string=&first_record_to_display=0&records_per_page=100&view_records_for_user=on&user=Shanta&columns_to_view=project_code&columns_to_view=abstract&columns_to_view=start_date&columns_to_view=status&columns_to_view=time&columns_to_view=priority&display_modification_form=on&record_id=[% item.record_id %]">Edit</a></td>
+</tr>	                                 
+	 
+	   [% END %]
+	   <tr> 	   <td class='NavtableHeaderCellStyle'></td>
+<td colspan="2" class="NavtableHeaderCellStyle"> Watts per hour[% total_watts %]<td  class='NavtableHeaderCellStyle'>Total hours [% total_item_hours%]</td>
+	   <td colspan="2" class="NavtableHeaderCellStyle">Total watts per day [% total_item_watts %]</td>
+	   <td class='NavtableHeaderCellStyle'></td>
+	   </tr>
+ 	   </table>
+ 	   
+ 	   
+ 	 
+[% embed(data.page_bottom_view) %]
+  
+ 	   

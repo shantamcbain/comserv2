@@ -1,0 +1,71 @@
+[% embed(data.page_top_view,['-PAGE_TITLE','Forum View']) %]
+
+[% embed('ErrorDisplayView') %]
+
+[% #CALL data.record_set.moveFirst %]
+[% record = data.records.0 %]
+<!-- The message -->
+<TABLE WIDTH = "95%" BORDER = "0" CELLSPACING = "0" 
+       CELLPADDING = "0" ALIGN = "CENTER">
+<TR><TD>
+<TABLE>
+[% FOR field = ['date_time_posted','name','email','subject'] %]
+        <TR>
+        <TH CLASS = "tableRowHeaderStyle">
+        &nbsp;[% data.field_name_mappings.$field %] :
+        </TH>
+ 
+        [% #value = data.record_set.getField(field) %]
+	[% value = record.$field %]
+        <TD CLASS = "tableRowStyle">
+        [% embed('RenderTextField',
+                  {'-WIDGET_NAME'  => field,
+                   '-WIDGET_VALUE' => value,
+                  });
+        %]
+        </TD>
+        </TR>
+[% END %]
+</TABLE>
+
+        [% #value = data.record_set.getField('body') %]
+        [% value = record.body %]
+        [% value = value.replace("\n","<BR>") %]
+<TABLE width=600>
+        <TR >
+        <TH CLASS = "tableRowHeaderStyle">
+        [% data.field_name_mappings.body %] :
+        </TH>
+        </TR>
+        <TR>
+        <TD CLASS = "tableRowStyle">
+        [% embed('RenderTextField',
+                  {'-WIDGET_NAME'  => 'body',
+                   '-WIDGET_VALUE' => value,
+                  });
+        %]
+        </TD>
+        </TR>
+</TABLE>
+</TD></TR>
+</TABLE>
+
+[% url_encoded_admin_variables =
+embed(data.url_encoded_admin_fields_view_name) %]
+
+[% #parent_id = data.record_set.getField('parent_id') %]
+[% #thread_id = data.record_set.getField('thread_id') %]
+
+[% parent_id = record.parent_id %]
+[% thread_id = record.thread_id %]
+
+
+<CENTER>
+<!--A HREF="[% data.script_name %]?display_add_form=on&[% url_encoded_admin_variables %]&record_id=[% data.record_set.getField('record_id') %]&parent_id=[% parent_id %]&thread_id=[% thread_id %]">Reply</A--> 
+<A HREF="[% data.script_name %]?display_add_form=on&[% url_encoded_admin_variables %]&record_id=[% record.record_id %]&parent_id=[% parent_id %]&thread_id=[% thread_id %]">Reply</A> 
+</CENTER>
+
+[% #embed('RecordSetDetailsFooterView') %]
+
+[% embed(data.page_bottom_view) %]
+

@@ -1,0 +1,58 @@
+[% #url_encoded_admin_variables = embed(data.url_encoded_admin_fields_view_name);
+   #event_url = "$data.script_name?$url_encoded_admin_variables&amp;date=$data.selected_date_data.date";
+   event_url ="$data.script_name?site=$data.site_name&amp;session_id=$data.session_id&amp;date=$data.selected_date_data.date ";
+   highlight_color = 'black';
+
+# since we override the action trigger here, we cannot rely on
+# url_encoded_admin_variables
+
+%]
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+<TABLE WIDTH=100% BGCOLOR="#EEEEEE" CELLPADDING=0 CELLSPACING=0>
+  <!-- small navbar -->
+  <TR>
+      <TD CLASS="month_title_header">
+      Print View
+      </TD>
+  </TR>
+
+  <TR>
+   <TD CLASS="nav_mode_cell" ALIGN=CENTER>
+[% tab = data.tab %]
+[% IF data.navigation_modes.day %]
+            <A CLASS="noline" HREF="[% "$event_url&amp;DisplayDayViewAction=on&amp;page_bottom_view=SBPageBottomView&amp;mode=print" %] >
+            [% IF data.view_mode == 'DisplayDayViewAction' %]
+              <FONT COLOR="[% highlight_color %]"><B> Day</B></FONT></A>
+            [% ELSE %]
+              <B>Day</B></A>
+            [% END %]
+&nbsp;
+[% END %]
+[% IF data.navigation_modes.month %]
+            <A CLASS="noline" HREF="[% "$event_url&amp;DisplayMonthViewAction=on&amp;page_top_view=CalPageTopView&amp;page_bottom_view=SBPageBottomView&amp;mode=month" %]">
+            [% IF data.view_mode == 'DisplayMonthViewAction' %]
+              <FONT COLOR="[% highlight_color %]"><B>Month</B></FONT></A>
+            [% ELSE %]
+              <B>Month</B></A>
+            [% END %]
+&nbsp;
+[% END %]
+[% IF data.navigation_modes.year %]
+            <A CLASS="noline" HREF="[% "$event_url&amp;DisplayYearViewAction=on&amp;page_top_view=CalPageTopView&amp;page_bottom_view=SBPageBottomView&amp;mode=print" %]">
+            [% IF data.view_mode == 'DisplayYearViewAction' %]
+              <FONT COLOR="[% highlight_color %]"><B>Year</B></FONT></A>
+            [% ELSE %]
+              <B>Year</B></A>
+            [% END %]
+[% END %]
+    </TD>
+  </TR>
+</TABLE>
+

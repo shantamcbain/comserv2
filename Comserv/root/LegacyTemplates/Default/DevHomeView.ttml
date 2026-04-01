@@ -1,0 +1,236 @@
+[%#	$Id: DevHomeView.ttml,v 1.0 2002/11/08 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dozen't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dozen't rely on any
+# variables from outside.
+
+%]
+[% embed('InheretedVariablesView') %] Called before pate top
+
+[% IF group == "Mentoring"	%]
+[% embed(data.page_top_view,['-PAGE_TITLE','Mentor home.']) %]
+[% ELSE %]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Home page.']) %]
+[% END %]
+[% embed('ErrorDisplayView') %]
+EvDevHomeView
+[% embed('InheretedVariablesView') %]
+
+
+ <!-- Begin Demo Home View -->  
+<table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+Variables defined in DevHomeView
+[% embed('InheretedVariablesView') %]
+[% IF username %]
+
+<h3 > Hello  [% firstname%]  [% lastname%]! Welcome to [% data.site_display_name %]</h3>
+
+	[% ELSE %]
+
+	<h3>  [% embed ("LogOnLeftView") %] Welcome to [% data.site_display_name %]! </h3> 
+	[% END %]
+
+[% SiteName = data.site_name%]
+[% IF SiteName == "OKB" %]
+[% embed('OkBeekeepersHomeView') %]
+[% ELSIF SiteName == "Aktiv" %]
+[% embed ('AktivHomeView') %]
+
+[% ELSIF SiteName == "Forager" %]
+[% embed ('ForagerHomeView') %]
+
+[% ELSIF SiteName == "SB" %]
+[% embed ('SBHomeView') %]
+
+[% ELSIF SiteName == "Sky" %]
+[% embed ('SkyHomeView') %]
+
+[% ELSIF SiteName == "CertBee" %]
+[% embed ('CertBeeHomeView') %]
+
+[% ELSIF SiteName == "BMaster" OR
+         SiteName == "BMasterDev" %]
+[% embed ('ApisHomeView') %]
+
+[% ELSIF SiteName == "CSCDev" %]
+[% IF data.debug == 1 %]
+Variable ative in DevHomeView
+[% embed('InheretedVariablesView') %]
+[% END %]
+ [%# embed ('CSCDevHomeView') %]
+ 
+<h4>Thanks for your intrest in Joining the CSC development team.</h4>
+
+<ol>
+	<li>First you will need to Join the CSC Team of <a href="/cgi-bin/store/store.cgi?&amp;shop=csc&amp;cart=48357820x13000&amp;L=eng&amp;Category=Memberships" target="_blank" title = "Join one of our development teams">developers</a>. You do this by buying a developer membership at CSC. This creates a channel of for payments. </li>
+	<li>You must create an account with the Development site Click any of the login link on this page. Your group with the site will be upgraded on varification by our admin staff.</li>
+	<li>Once you have been upgraded you will be given access to the resoures and training you will need to fulfill your Development and administrative duties at CSC. </li>
+</ol>
+
+ 
+[% ELSIF SiteName == "Coop" OR
+         SiteName == "Noop" %]
+
+[% embed ('CoopHomeView') %]
+
+[% ELSE %]
+
+
+[% IF group == "normal" %]
+<h4>Thanks for logging in.
+</h4>	
+<p>What you will see now is the guest view of the application.</p>
+<p>
+Depending on individual site policies you will see different links made available. Some module will require you to LOGON in order to work. Modules requiring authentication include Forums, Address book, Calendar, Links Database. This is because of the application needs to know a few things in order to giver the user the links they need. 
+
+</p>
+   [% IF username == "guest" %]
+   <p>On the left you will see changes in the available application and resources.</p>
+	[% END %]
+
+<p>
+</p>
+
+	[%# ELSIF SiteName == "DarmaFarms" %]
+	  [%# embed('DarmaFarmsHomeView') %]
+	[% ELSIF group == "customer" %]
+<p>As a new Customer of Computer System Consulting.ca you will need to know a few more things about how to use your new Web Application. </p>
+
+<p>As you are working  in the same environment here as on the Internet what you do here can be made available on the public server. There is no need to track your day to day operations on the net. It is done locally. You then up date your server. Server space and usage is expensive. 
+</p>
+
+	[% ELSE %]
+
+<A NAME="PageTop"></A>
+<br>
+<br>
+<p>Thanks for your interest in our  Open source web solutions.
+</p>
+
+
+
+   [% IF username %]
+   
+	   [% IF username == 'gardenboy' %]
+<h4>	   Hi [% firstname %] </h4>
+	 	<p> Create Your profile in the Address Put in How you want the system to see you.
+	 	If Fields the system needs to run are marked with an * still thinking about this.  
+	 	All others are optional.
+	 	If you want to have this profile listed as the site contact place DarmaFarmsContact in the comment area. The look up uses this to display back the contact information to the user. You can define what the user can see. A good rule of thumb is 
+	 	<ul>
+	 	 <li>The name you want them to see. What is displayed is what you used in the first and last name Of the profile</li>
+	 	 <li>Address</li>
+	 	 <li>world Email email address: darmafarms@organicfarming.ca or ?</li>
+	 	 <li>local Email gardenboy@192.168.2.10 This is not completely setup yet but I should have internal mail working shortly.</li>
+	 	 <li>Forums This is were you Chat with local site members. All messages are stored in the same table. They can be viewed only by forum name. Available forums are defined Those that you have access to publicly and those you chose from the available pool of forum names.</li>
+	 	</ul>
+	 	
+	 	<p>Address book entries are linked to the username of the user who created the file. It is best there for to create a couple profiles with different usernames. I use Guest guest for the public logged in view of the site.SiteNameAdmin for the administrator view. and Member member for the Member/Customer view of the site.</p>
+<p>Current Public list</p>
+<ul>
+	<li>HelpDesk Go here for system related help</li>
+	<li>PublicAnnouncements</li>
+	<li>General Chat</li>
+	<li>General BeeKeeping</li>
+	<li>ETC.</li>
+</ul>
+	<p>Current Private list</p>
+<ul>
+	<li>Darma Farms Only Darma Farms see these entries.</li>
+/UL>
+ 	[% END %]
+	 	
+	 	<p> Create Your profile in the Address Put in How you want the system to see you.
+	 	If Fields the system needs to run are marked with an * All others are optional.
+	 	If you are the site contact please place in the comment area the you are a contact for. SiteNameContact Replace SiteName with the appropriate code for this. 
+	 	</p> 
+	 	      
+	 	 <li>Address</li>
+	 	 <li>world Email email address: customercode@comutersystemconsulting.ca or ?</li>
+	 	 <li>local Email username@192.168.2.10 </li>
+	 	 <li>Forums This is were you Chat with local site members. All messages are stored in the same table. They can be viewed only by forum name. Available forums are defined Those that you have access to publicly and those you choose from the available pool of forum names.</li>
+	 	</ul>
+  	<p>Current Private list</p>
+<ul>
+	<li>Site [% SiteDisplayName %] Only [% SiteDisplayName %] see these entries.</li>
+/UL>
+
+ 	[% ELSE %]
+  
+   <p>You will now need to create an account on the system.
+   click on one of the Logon links then click register.
+    </p>
+	[% END %]
+
+
+
+
+<p>Our application haves many features built in with many optional modules to expand functionality to fit your needs.
+</p>
+<font size="+2">Some stock features are.</font> 
+<ol>
+	<li><a href="/cgi-bin/CSC/csc.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=AppearanceView">Look and feel controlled by CSS</a></li>
+	<li>Full user authentication.</li>
+	<li>Content to users controlled by username, group and site.</li>
+	<li>Key site configuration in setup file. </li>
+	<li>Ability to access multiple data types. Flat file or MySQL, (other SQL available)</li>
+	<li>Ability to host other sites, or affiliates. This make this application great for Cubs and organizations to offer hosting services to members.</li>
+	<li>News system to announce changes and important events your visitors should know about</li>
+	<li>Calendar to allow you to schedule events of importance to your users</li>
+	<li>Member address book. Users see only their own entries into this database. Admin see all entries. This feature is being expanded into a full user profile system. Great for clubs, Dating sites, customer tracking systems etc.</li>
+	<li>Forums: Let your users communicate with each other. Messages posted to the forums can be configured to be sent to your user email list. </li>
+	<li>HelpDesk. This system allows you and your users to get help with the site content or  site application depending your support package.</li>
+</ol>
+<font size="+2">Some Optional features are.</font> 
+<ol>
+	<li>Buy And Sell. Provides your users a for</li>
+	<li>FAQ. This system lets you provide your users</li>
+	<li>The CityShop online store. This full featured application lets you add eCommerce to your site.</li>
+</ol>
+
+<p>The first thing to do is to try all the links on the page. There is a lot to look at! There are two main places to look for links. The left of the page and the bottom of the page. Some will require you to LOGON. This is because they need a email address or a username/group to work properly. For now just use the back button to com back to this page. This is how visitors will view your site. Be sure to have a look at the contact page. Check the FAQ or HelpDesk if you have any problems or question.</p>
+
+To View how your guests that have created an account see the site <a href="[% data.script_name %]?submit_logon=on&amp;site=[%SiteName%]"
+                  target="_blank" name="Logon as quest">click here</a>. LOGON with guest guest
+
+<p>After you have look around it time to create an account. Click any of the LOGON links. Each page has 2 or more. Top of the Nav links on left, the lower nav links on the bottom of the page or on some pages like this one on the top of the page. Other modules, like the Calendar require Logon to view the data.</p>
+
+<p>The LOGON screen has a register button click it. Fill in the form. Remember not to use spaces in your username or password. Usersnames and passwords are case sensitive.</p>
+
+
+
+	[% END %]
+
+	[% END %]
+
+<br>
+[% IF SiteName != 'CSC' %]
+<!-- Call Subscrib list -->
+[%# embed ('SubscribeListView') %]
+<!-- End call subscribe list -->
+<br>
+<br>
+	[% END %]
+
+<p>Last Update [% data.site_last_update %] [% IF SiteName == 'Demo' %]&nbsp; This value is stored in your setup file. [% END %]
+<br>
+<!-- Call CScCopyRight -->
+[% embed('CSCCopyRight') %]
+<!-- End Call CSCCopyRight -->
+<br>
+<!-- close Home page table  -->
+</td>
+</tr>
+</table>
+
+
+<!-- End Demo home view -->
+
+[% embed(data.page_bottom_view) %]
+

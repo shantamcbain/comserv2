@@ -1,0 +1,2 @@
+	      <IMG SRC ="[% data.header_image %]" WIDTH ="[% data.header_width %]"      HEIGHT ="[% data.header_height %]"	ALT ="[% data.header_alt %]">
+[% data.header_image %]

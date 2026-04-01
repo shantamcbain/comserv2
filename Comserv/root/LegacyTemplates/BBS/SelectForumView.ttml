@@ -1,0 +1,28 @@
+[% embed(data.page_top_view,['-PAGE_TITLE','Forum View']) %]
+
+[% embed('ErrorDisplayView') %]
+
+<FORM>
+
+<SELECT NAME = "forum">
+<OPTION VALUE = ""> Choose a forum 
+[% FOREACH forum = data.valid_forums.keys -%]
+<OPTION VALUE = "[% forum %]"[% " SELECTED" IF forum == data.cgi_object.param('forum') %]> [% data.valid_forums.$forum %]
+[% END %]
+</SELECT>
+<INPUT TYPE=SUBMIT NAME="view_all_records" VALUE=" Submit ">
+
+[% # don't include admins, as it will collide with forum field 
+   # embed(data.hidden_admin_fields_view_name) -%]
+
+[% session_id = data.session_object.getId() -%]
+        <INPUT TYPE="HIDDEN" NAME="session_id"
+               VALUE="[% session_id %]">
+
+
+</FORM>
+[%# embed (SubscaribListView) %]
+
+[%# embed (data.page_list_view) %]
+
+[% embed(data.page_bottom_view) %]

@@ -1,0 +1,49 @@
+[%
+#	$Id: RegsView.ttml,v 0.02 2002/05/01 15:47:05 shanta Exp $
+
+
+%]
+[% embed(data.page_top_view,['-PAGE_TITLE','Regulations and Compliance']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td >
+</CENTER>
+<A NAME="PageTop"></A>
+<h2>Regulations and Compliance requriments.</h2>
+<a href="/cgi-bin/URL/url.cgi?site=" target="_blank" name="Add url" title=Click to Add link to list.></a>
+<p>To order from a supporting producer Please on of the links below
+</p><ul>
+[% IF SiteName == 'BCHPA' %]
+<script type = "text/javascript"
+ src="/cgi-bin/URL/url.cgi?embed=1&amp;site=[% SiteName %]&amp;records_per_page=1&amp;&amp;columns_to_view=fname&amp;columns_to_view=lname&amp;columns_to_view=company_name&amp;columns_to_view=email&amp;columns_to_view=url&amp;submit_power_search=on&amp;simple_search_string=govermentregs">
+</script>
+    [% ELSE %]<li><a href="apis.cgi?site=ECF&amp;[% session_string %]&amp;view=ApisProductView#Honey" title="Order from a supporting company!">Eagle Creek Farms</a>
+[% END %]
+</ul>
+
+</td>
+</tr>
+</table>
+
+
+
+
+
+[% embed(data.page_bottom_view) %]
+

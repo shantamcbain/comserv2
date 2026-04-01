@@ -1,0 +1,110 @@
+[% url_encoded_admin_variables = embed(data.url_encoded_admin_fields_view_name) %]
+[%# 	$Id: ApplicationSubMenuView.ttml,v 1.1 2003/12/02 01:47:41 shanta Exp shanta $ %]	
+
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% username   = data.session_object.getAttribute('-KEY','auth_username') %]
+
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+<!--Start of Application Sub menue defaut v0.01-->
+        <TABLE WIDTH = "100%" BORDER = "0"
+               CELLSPACING = "0" CELLPADDING = "2">
+        <TR>
+        <TD ALIGN = "LEFT" VALIGN = "TOP">
+        <FONT FACE = "[% data.page_font_face %]" SIZE = "-2">
+        <A HREF = "[% data.script_name %]?site=[% SiteName %]&amp;view_all_records=on&amp;[% session_string %]">View All Records</A>
+
+[% IF username && is_authenticated %]
+            | <A HREF = "[% data.script_name %]?site=[% SiteName %]&amp;show_all_open_todos=on&amp;[% session_string %]"
+           TARGET = "[% data.link_target %]">Show All Open Records</A> 
+            | <A HREF = "[% data.script_name %]?site=[% SiteName %]&amp;view_records_for_user=on&amp;user=[% username %]&amp;[% session_string %]">View My Records</A>
+[% END %]
+
+
+[% IF data.allow_additions_flag %]
+            | <A HREF="[% data.script_name %]?site=[% SiteName %]&amp;display_add_form=on&amp;[% session_string %]">Add Record</A>
+[% END %]
+
+
+[% IF data.allow_additions_flag %]
+ | <A HREF = "[% data.script_name %]?site=[% SiteName %]&amp;view_all_records=on&amp;[% session_string %]&amp;page_top_view=SBPageTopView&amp;page_bottom_view=SBPageBottomView">Print</A>
+[% END %]
+[% IF username == "Shanta" %]
+<p>
+[% END %]
+
+[% IF is_authenticated %]
+ [% IF data.app_name ==  'url' OR
+	data.app_name ==  'droplist' OR	
+	data.app_name ==  'faq_manager' OR	
+	data.app_name ==  'todo' OR
+	data.app_name ==  '/cgi-bin/ToDo/todo.cgi' OR
+	data.app_name ==  'buy' OR
+	data.app_name ==  'project_tracker' OR
+	data.app_name ==  'extropia_methouds' OR
+	data.app_name ==  'queen_log'
+	
+ %]	
+  
+ |  <a href="/cgi-bin/CSC/droplist.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on [% IF data.app_name ==  'buy' %]&amp;list_name=category"  [% END %]
+   " "target="_Blank">Add List Item</a>	
+                
+		
+ [% END %]
+[% END %]
+
+
+        </FONT>
+        </TD>
+
+        <TD VALIGN = "TOP" ALIGN = "RIGHT">
+        <FONT FACE = "[% data.page_font_face %]" SIZE = "-2">
+          <A HREF = "[% data.script_name %]?site=[% SiteName %]&amp;[% session_string %]">Home</A>
+        | <A HREF = "[% data.script_name %]?site=[% SiteName %]&amp;[% url_encoded_admin_variables %]&amp;display_options_form=on">Options</A>
+        | <A HREF = "[% data.script_name %]?site=[% SiteName %]&amp;[% session_string %]&amp;display_power_search_form=on">Advanced Search</A>
+
+[% IF is_authenticated %]
+        | <A HREF = "[% data.script_name %]?site=[% SiteName %]&amp;[% url_encoded_admin_variables %]&amp;submit_logoff=on">Logoff</A>
+[% ELSE %]
+        | <A HREF = "[% data.script_name %]?site=[% SiteName %]&amp;[% url_encoded_admin_variables %]&amp;submit_logon=on">Logon</A>
+[% END %]
+        </FONT>
+
+        </TD>
+        </TR>
+        <TR>
+        <TD ALIGN = "LEFT">
+[% IF username && is_authenticated %]
+            <FONT FACE = "[% data.page_font_face %]" SIZE = "-2">
+            Welcome [% username %]! You are logged in.
+            </FONT>
+[% END %]
+
+        &nbsp;</TD>
+        <TD ALIGN = "RIGHT">
+        <FORM METHOD = "POST">
+[% embed(data.hidden_admin_fields_view_name) %]
+         <FONT FACE = "[% data.page_font_face %]" SIZE = "-2">
+        Search
+        <INPUT TYPE="TEXT"   NAME="simple_search_string"
+               VALUE="[% data.simple_search_string %]">
+         <INPUT TYPE="HIDDEN" NAME="site"
+               VALUE = "[% SiteName %]">
+       <INPUT TYPE="HIDDEN" NAME="display_simple_search_results"
+               VALUE = "on">
+        <INPUT TYPE="SUBMIT" NAME="display_simple_search_results"
+               VALUE = "      Go        ">
+        </FONT>
+         </FORM>
+       </TD>
+
+
+        </TR>
+        </TABLE>
+<!--end of Application Sub menue-->
