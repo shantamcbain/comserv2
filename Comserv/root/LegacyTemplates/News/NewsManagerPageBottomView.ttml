@@ -1,9 +1,0 @@
- 
-<P>
-<CENTER>
-<A HREF = "news.cgi"
-   TARGET = "[% data.link_target %]">WebNews App</A>
-</CENTER>
-</BODY>
-</HTML>
-
