@@ -296,7 +296,7 @@
         });
     }
 
-    function makeChart(canvas, hostMap, unit) {
+    function makeChart(canvas, hostMap, unit, onClickCb) {
         var datasets = makeDatasets(hostMap);
         new Chart(canvas, {
             type: 'line',
@@ -304,6 +304,7 @@
             options: {
                 responsive: true, maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
+                onClick: onClickCb || null,
                 plugins: {
                     legend: {
                         position: 'bottom',
@@ -332,11 +333,12 @@
         });
     }
 
-    function addChart(title, hostMap, unit) {
+    function addChart(title, hostMap, unit, onClickCb) {
         var box = document.createElement('div');
         box.className = 'hw-chart-box';
         var h4 = document.createElement('h4');
         h4.innerHTML = title + '<span>drag bottom edge to resize</span>';
+        if (onClickCb) { box.style.cursor = 'pointer'; }
         box.appendChild(h4);
         var wrap = document.createElement('div');
         wrap.className = 'hw-chart-wrap';
@@ -344,7 +346,7 @@
         wrap.appendChild(canvas);
         box.appendChild(wrap);
         container.appendChild(box);
-        makeChart(canvas, hostMap, unit, 0);
+        makeChart(canvas, hostMap, unit, onClickCb);
     }
 
     function addSplitCard(title, topHostMap, topUnit, topLabel, botHostMap, botUnit, botLabel) {
@@ -424,7 +426,19 @@
         });
     });
     if (Object.keys(diskCombined).length) {
-        addChart('Disk Usage % \u2014 <a href="/file/admin_browser" title="Open File Manager to free up space" style="font-size:.8em;font-weight:normal;margin-left:8px;">&#128269; Browse &amp; Manage Files</a>', diskCombined, '%');
+        var diskClickHandler = function(evt, items) {
+            if (!items || !items.length) return;
+            var dsIdx = items[0].datasetIndex;
+            var label = Object.keys(diskCombined).sort()[dsIdx] || '';
+            // label format: "hostname — /mount"
+            var parts = label.split(' \u2014 ');
+            var host  = parts[0] ? parts[0].trim() : 'workstation';
+            var mount = parts[1] ? parts[1].trim() : '/';
+            window.location.href = '/admin/hardware_monitor/disk_diagnose'
+                + '?hostname=' + encodeURIComponent(host)
+                + '&path='     + encodeURIComponent(mount);
+        };
+        addChart('Disk Usage % \u2014 <span style="font-size:.78em;font-weight:normal;color:#2196f3;margin-left:8px;">click a series to diagnose</span>', diskCombined, '%', diskClickHandler);
         rendered++;
     }
 
