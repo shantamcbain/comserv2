@@ -296,7 +296,7 @@
         });
     }
 
-    function makeChart(canvas, hostMap, unit) {
+    function makeChart(canvas, hostMap, unit, onClickCb) {
         var datasets = makeDatasets(hostMap);
         new Chart(canvas, {
             type: 'line',
@@ -304,6 +304,7 @@
             options: {
                 responsive: true, maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
+                onClick: onClickCb || null,
                 plugins: {
                     legend: {
                         position: 'bottom',
@@ -332,11 +333,12 @@
         });
     }
 
-    function addChart(title, hostMap, unit) {
+    function addChart(title, hostMap, unit, onClickCb) {
         var box = document.createElement('div');
         box.className = 'hw-chart-box';
         var h4 = document.createElement('h4');
         h4.innerHTML = title + '<span>drag bottom edge to resize</span>';
+        if (onClickCb) { box.style.cursor = 'pointer'; }
         box.appendChild(h4);
         var wrap = document.createElement('div');
         wrap.className = 'hw-chart-wrap';
@@ -344,7 +346,7 @@
         wrap.appendChild(canvas);
         box.appendChild(wrap);
         container.appendChild(box);
-        makeChart(canvas, hostMap, unit, 0);
+        makeChart(canvas, hostMap, unit, onClickCb);
     }
 
     function addSplitCard(title, topHostMap, topUnit, topLabel, botHostMap, botUnit, botLabel) {
@@ -405,19 +407,40 @@
         if (metric === 'ipmi_ps1_current' || metric === 'ipmi_ps2_current') return;
         if (metric.match(/_temp$/)) return;
 
-        if (metric.match(/^disk_used_pct/)) {
-            var mountPart = metric.replace(/^disk_used_pct/, '') || '_';
-            var mountLabel = mountPart.replace(/^_/, '/').replace(/_/g, '/') || '/';
-            addChart('Disk % \u2014 ' + mountLabel, hostMap, '%');
-            rendered++;
-            return;
-        }
         if (metric.match(/^disk_/)) return;
 
         var unit = METRIC_UNITS[metric] || '';
         addChart(METRIC_LABELS[metric] || metric, hostMap, unit);
         rendered++;
     });
+
+    // Build one combined Disk Usage % chart: series label = "host — /mount"
+    var diskCombined = {};
+    rawData.forEach(function(entry) {
+        if (!entry.metric.match(/^disk_used_pct/) || !entry.hosts) return;
+        var mountPart = entry.metric.replace(/^disk_used_pct/, '') || '_';
+        var mountLabel = mountPart.replace(/^_/, '/').replace(/_/g, '/') || '/';
+        Object.keys(entry.hosts).forEach(function(host) {
+            var shortHost = host.replace(/\.computersystemconsulting\.ca$/, '').replace(/\..*$/, '');
+            diskCombined[shortHost + ' \u2014 ' + mountLabel] = entry.hosts[host];
+        });
+    });
+    if (Object.keys(diskCombined).length) {
+        var diskClickHandler = function(evt, items) {
+            if (!items || !items.length) return;
+            var dsIdx = items[0].datasetIndex;
+            var label = Object.keys(diskCombined).sort()[dsIdx] || '';
+            // label format: "hostname — /mount"
+            var parts = label.split(' \u2014 ');
+            var host  = parts[0] ? parts[0].trim() : 'workstation';
+            var mount = parts[1] ? parts[1].trim() : '/';
+            window.location.href = '/admin/hardware_monitor/disk_diagnose'
+                + '?hostname=' + encodeURIComponent(host)
+                + '&path='     + encodeURIComponent(mount);
+        };
+        addChart('Disk Usage % \u2014 <span style="font-size:.78em;font-weight:normal;color:#2196f3;margin-left:8px;">click a series to diagnose</span>', diskCombined, '%', diskClickHandler);
+        rendered++;
+    }
 
     var combinedTemps = {};
     rawData.forEach(function(entry) {
