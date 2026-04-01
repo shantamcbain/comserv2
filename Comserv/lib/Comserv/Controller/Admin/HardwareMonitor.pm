@@ -167,6 +167,8 @@ sub index :Path('/admin/hardware_monitor') :Args(0) {
             $mount =~ s{^_}{/};
             $mount =~ s{_}{/}g;
             $mount = '/' unless $mount;
+            # Skip virtual/system mount points (efivars, sysfs, etc.)
+            next if $mount =~ m{^(/sys|/proc|/run/|/dev/pts|/snap/)};
             my $total_key = "disk_total_mb$1";
             my $free_key  = "disk_free_mb$1";
             push @{ $disk_by_host{ $m->{hostname} } }, {
@@ -216,6 +218,14 @@ sub index :Path('/admin/hardware_monitor') :Args(0) {
 
     my %in_order   = map { $_ => 1 } @GRAPH_METRICS;
     my @ordered    = grep { exists $chart_data{$_} } @GRAPH_METRICS;
+    # Add disk_used_pct_* metrics (sorted by mount path), excluding virtual mounts
+    push @ordered, grep {
+        /^disk_used_pct/ && !$in_order{$_} && exists $chart_data{$_} && do {
+            (my $mnt = $_) =~ s/^disk_used_pct//;
+            $mnt =~ s{^_}{/}; $mnt =~ s{_}{/}g;
+            $mnt !~ m{^(/sys|/proc|/run/|/dev/pts|/snap/)};
+        }
+    } sort keys %chart_data;
     push @ordered, grep { /$TEMP_METRIC_RE/ && !$in_order{$_} } sort keys %chart_data;
     my $chart_json = JSON::encode_json([ map { { metric => $_, hosts => $chart_data{$_} } } @ordered ]);
 
