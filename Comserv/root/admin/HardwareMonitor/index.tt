@@ -148,7 +148,6 @@
             <p style="margin:8px 0 0;color:#888;">&#128274; Change token: set <code>HW_INGEST_TOKEN=yourtoken</code> in the app environment + update cron lines.<br>&#9881; Override ingest URL: set <code>HW_INGEST_BASE_URL=http://192.168.1.199:3001</code> in the app environment.</p>
         </div>
     </details>
-    [% END %]
 
     [% IF latest.size || power_cards.size %]
     <details style="margin-bottom:12px;">
