@@ -230,7 +230,35 @@ sub index :Path('/admin/hardware_monitor') :Args(0) {
         filter_hours    => $filter_hours,
         db_error        => $db_error,
         ingest_token    => ($ENV{HW_INGEST_TOKEN} // 'changeme'),
+        ingest_url      => _ingest_url($c),
     );
+}
+
+sub _ingest_url {
+    my ($c) = @_;
+    # Use HW_INGEST_BASE_URL env var if set (recommended for production)
+    return "$ENV{HW_INGEST_BASE_URL}/admin/hardware_monitor/ingest"
+        if $ENV{HW_INGEST_BASE_URL};
+
+    # Detect the server's own LAN IP so remote machines can reach it
+    my $lan_ip = do {
+        my $ip = '';
+        # Try to find the IP on the same subnet as the NFS server / LAN
+        eval {
+            require Socket;
+            my $sock;
+            if (Socket::inet_aton('192.168.1.1')) {
+                socket($sock, Socket::PF_INET(), Socket::SOCK_DGRAM(), 0);
+                connect($sock, Socket::pack_sockaddr_in(80, Socket::inet_aton('192.168.1.1')));
+                $ip = Socket::inet_ntoa((Socket::unpack_sockaddr_in(getsockname($sock)))[1]);
+                close $sock;
+            }
+        };
+        $ip || '127.0.0.1';
+    };
+
+    my $port = $c->req->uri->port // 3001;
+    return "http://${lan_ip}:${port}/admin/hardware_monitor/ingest";
 }
 
 # ---------------------------------------------------------------------------
