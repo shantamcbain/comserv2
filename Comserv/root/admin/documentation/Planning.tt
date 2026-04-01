@@ -855,12 +855,12 @@ last_updated = '2026/02/08'
                                 <li>⏳ Verify database entries and Planning.tt rendering</li>
                             </ul>
                         </li>
-                        <li><strong>Phase 1: Domain Detection Middleware</strong> (ID 159) - <span class="status-pending">PENDING</span>
+                        <li><strong>Phase 1: Domain Detection Middleware</strong> (ID 159) - <span class="status-completed">COMPLETED</span>
                             <ul>
-                                <li>Create domain configuration file</li>
-                                <li>Implement ApiDomainDetector middleware</li>
-                                <li>Register middleware in Catalyst</li>
-                                <li>Write unit tests</li>
+                                <li>✅ Create domain configuration file (<code>Comserv/config/api_domains.json</code>)</li>
+                                <li>✅ Implement <code>ApiDomainDetector</code> utility (<code>Comserv/Util/ApiDomainDetector.pm</code>)</li>
+                                <li>✅ No Catalyst registration needed — utility pattern (like ApiTokenValidator)</li>
+                                <li>✅ Write unit tests (<code>t/util/api_domain_detector.t</code>)</li>
                             </ul>
                         </li>
                         <li><strong>Phase 2: Controller Refactoring</strong> (ID 160) - <span class="status-pending">PENDING</span>
@@ -878,11 +878,13 @@ last_updated = '2026/02/08'
                                 <li>Test external access</li>
                             </ul>
                         </li>
-                        <li><strong>Phase 4: CLI Tool Development</strong> (ID 162) - <span class="status-pending">PENDING</span>
+                        <li><strong>Phase 4: CLI Tool Development</strong> (ID 162) - <span class="status-inprogress">IN PROGRESS</span>
                             <ul>
-                                <li>Create CLI script structure</li>
-                                <li>Implement CLI commands</li>
-                                <li>Add authentication support</li>
+                                <li>✅ Create <code>~/.comserv/credentials</code> (chmod 600) with API token + api_url</li>
+                                <li>✅ Create <code>Comserv::Util::ApiCredentials</code> — reads credentials file with env var overrides</li>
+                                <li>✅ Generate CLI Development Token (DB id=1, expires 2027-03-24)</li>
+                                <li>Create CLI script (<code>Comserv/script/comserv-api-cli</code>)</li>
+                                <li>Implement CLI commands (todos list, todo create/get/update, project get)</li>
                                 <li>Implement output formatting and error handling</li>
                                 <li>Test all CLI commands</li>
                             </ul>

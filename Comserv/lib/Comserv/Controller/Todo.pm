@@ -1274,6 +1274,14 @@ sub day :Path('/todo/day') :Args {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
         "Separated into " . scalar(@overdue_todos) . " overdue and " . scalar(@today_todos) . " today todos");
 
+    my %proj_name_map;
+    eval {
+        my @prows = $c->model('DBEncy')->resultset('Project')->search(
+            {}, { columns => [qw(id name)] }
+        )->all;
+        %proj_name_map = map { $_->id => $_->name } @prows;
+    };
+
     # Add the todos to the stash
     $c->stash(
         todos => \@today_todos,
@@ -1282,6 +1290,7 @@ sub day :Path('/todo/day') :Args {
         date => $date,
         previous_date => $previous_date,
         next_date => $next_date,
+        proj_name_map => \%proj_name_map,
         template => 'todo/day.tt',
     );
 
@@ -1337,6 +1346,14 @@ sub week :Path('/todo/week') :Args {
         ($a->start_date // '') cmp ($b->start_date // '')
     } @$filtered_todos;
 
+    my %week_proj_map;
+    eval {
+        my @prows = $c->model('DBEncy')->resultset('Project')->search(
+            {}, { columns => [qw(id name)] }
+        )->all;
+        %week_proj_map = map { $_->id => $_->name } @prows;
+    };
+
     # Add the todos to the stash
     $c->stash(
         todos => \@sorted_todos,
@@ -1346,6 +1363,7 @@ sub week :Path('/todo/week') :Args {
         prev_week_date => $prev_week_date,
         next_week_date => $next_week_date,
         week_dates => \@week_dates,
+        proj_name_map => \%week_proj_map,
         template => 'todo/week.tt',
     );
 
@@ -1870,6 +1888,7 @@ sub reschedule :Path('reschedule') :Args(0) {
     my $now_epoch  = time();
     my $today      = DateTime->now->ymd;
     my $count      = 0;
+    my $date_count = 0;
     my @errors;
 
     eval {
@@ -1883,22 +1902,38 @@ sub reschedule :Path('reschedule') :Args(0) {
         for my $todo (@rows) {
             my $orig_priority = $todo->priority || 5;
             my $new_priority  = $orig_priority;
+            my $new_due_date  = undef;   # only set if we need to extend
 
             # Staleness: >180 days inactive → lower priority (push down)
             my $activity_str = $todo->last_mod_date || $todo->date_time_posted || '';
+            my $days_stale   = 0;
             if ($activity_str =~ /^(\d{4})-(\d{2})-(\d{2})/) {
                 my $act_epoch  = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
-                my $days_stale = int(($now_epoch - $act_epoch) / 86400);
+                $days_stale    = int(($now_epoch - $act_epoch) / 86400);
                 $new_priority  = ($new_priority + 2 <= 10) ? $new_priority + 2 : 10
                     if $days_stale > 180;
             }
 
-            # Due-date urgency: overdue → raise priority; due within 7 days → raise slightly
+            # Due-date handling
             if ($todo->due_date && $todo->due_date =~ /^(\d{4})-(\d{2})-(\d{2})/) {
                 my $due_epoch      = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
                 my $days_until_due = int(($due_epoch - $now_epoch) / 86400);
+
                 if ($days_until_due < 0) {
+                    # Overdue — adjust priority upward
                     $new_priority = ($new_priority - 2 >= 1) ? $new_priority - 2 : 1;
+
+                    # Also extend due_date so it stops showing permanently overdue:
+                    # IN-PROGRESS: extend 14 days (actively being worked)
+                    # NEW stale 30+ days: extend 30 days (date was clearly abandoned)
+                    # NEW stale < 30 days: leave as-is (genuinely overdue, keep the signal)
+                    my $st = $todo->status // '';
+                    my $in_progress = ($st == 2 || $st =~ /^(in.progress|in.process)$/i);
+                    if ($in_progress) {
+                        $new_due_date = DateTime->now->add(days => 14)->ymd;
+                    } elsif ($days_stale >= 30) {
+                        $new_due_date = DateTime->now->add(days => 30)->ymd;
+                    }
                 } elsif ($days_until_due <= 7) {
                     $new_priority = ($new_priority - 1 >= 1) ? $new_priority - 1 : 1;
                 }
@@ -1909,11 +1944,21 @@ sub reschedule :Path('reschedule') :Args(0) {
                 $new_priority = ($new_priority - 1 >= 1) ? $new_priority - 1 : 1;
             }
 
-            next if $new_priority == $orig_priority;
+            my $priority_changed  = ($new_priority != $orig_priority);
+            my $due_date_changed  = defined $new_due_date;
 
-            eval { $todo->update({ priority => $new_priority, last_mod_by => 'reschedule', last_mod_date => $today }) };
+            next unless $priority_changed || $due_date_changed;
+
+            my %update = (last_mod_by => 'reschedule', last_mod_date => $today);
+            $update{priority} = $new_priority if $priority_changed;
+            $update{due_date} = $new_due_date if $due_date_changed;
+
+            eval { $todo->update(\%update) };
             if ($@) { push @errors, "todo " . $todo->record_id . ": $@"; }
-            else     { $count++; }
+            else {
+                $count++;
+                $date_count++ if $due_date_changed;
+            }
         }
     };
     if ($@) {
@@ -1923,8 +1968,8 @@ sub reschedule :Path('reschedule') :Args(0) {
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reschedule',
-        "Reschedule by $username: $count todos updated");
-    $c->response->body('{"ok":1,"count":' . $count . ',"errors":' . (JSON::encode_json(\@errors)) . '}');
+        "Reschedule by $username: $count todos updated ($date_count due-dates extended)");
+    $c->response->body('{"ok":1,"count":' . $count . ',"date_count":' . $date_count . ',"errors":' . (JSON::encode_json(\@errors)) . '}');
 }
 
 1;

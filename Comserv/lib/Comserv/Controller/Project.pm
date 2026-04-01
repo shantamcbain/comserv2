@@ -13,7 +13,7 @@ sub _require_login {
     my $username = $c->session->{username} // '';
     if (!$username || $username eq 'anonymous') {
         $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
-        return 0;
+        $c->detach();
     }
     return 1;
 }
@@ -89,6 +89,13 @@ sub add_project :Path('addproject') :Args(0) {
 
 sub  create_project :Local :Args(0) {
     my ($self, $c) = @_;
+
+    unless ($c->request->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body('Method Not Allowed');
+        return;
+    }
+
     return unless $self->_require_login($c);
 
     my $form_data = $c->request->body_parameters;
@@ -126,6 +133,18 @@ sub  create_project :Local :Args(0) {
 
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_project',
         "Parent ID: " . (defined $parent_id ? $parent_id : 'undef') . ", Group of poster: $group_of_poster");
+
+    unless ($form_data->{name} && $form_data->{client_name}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_project',
+            "Rejected incomplete project submission (missing required fields)");
+        $c->response->status(400);
+        $c->stash(
+            error_message => 'Required fields (name, client name) are missing.',
+            template      => 'todo/add_project.tt',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
 
     my $project = eval {
         $project_rs->create({

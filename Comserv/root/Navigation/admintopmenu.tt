@@ -256,6 +256,7 @@
                 <!-- Docker/Infrastructure Management -->
                 <div class="submenu-section">
                     <span class="submenu-section-title">Infrastructure Management</span>
+                    <a href="/admin/hardware_monitor"><i class="icon-server"></i>Hardware Monitor</a>
                     <a href="/admin/infrastructure"><i class="icon-cluster"></i>K8s Clusters</a>
                     <a href="/admin/docker-containers"><i class="icon-docker"></i>Docker Containers</a>
                 </div>
