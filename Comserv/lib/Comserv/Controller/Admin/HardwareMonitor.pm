@@ -394,19 +394,19 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
             : ([], undef);
     } else {
         my $ssh_user = $ENV{HW_SSH_USER} // 'root';
-        open my $fh, '-|', 'ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5',
-            '-o', 'StrictHostKeyChecking=no', "$ssh_user\@$hostname",
-            "du -sh -- $path/* 2>/dev/null" or do {
-            $err = "Cannot open SSH: $!"; goto DONE_DU;
-        };
-        my @lines_arr = <$fh>;
-        close $fh;
-        if ($? != 0 && !@lines_arr) {
-            $err = "SSH to $hostname failed. Ensure SSH keys are configured for $ssh_user\@$hostname.";
+        if (open my $fh, '-|', 'ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5',
+                '-o', 'StrictHostKeyChecking=no', "$ssh_user\@$hostname",
+                "du -sh -- $path/* 2>/dev/null") {
+            my @lines_arr = <$fh>;
+            close $fh;
+            if ($? != 0 && !@lines_arr) {
+                $err = "SSH to $hostname failed. Ensure SSH keys are configured for $ssh_user\@$hostname.";
+            } else {
+                $lines = \@lines_arr;
+            }
         } else {
-            $lines = \@lines_arr;
+            $err = "Cannot open SSH to $hostname: $!";
         }
-        DONE_DU:
     }
     if ($err) {
         $error    = $err;
