@@ -109,10 +109,7 @@ __PACKAGE__->config(
         },
         cookie_secure => 0,
         cookie_httponly => 1,
-<<<<<<< HEAD
         storage => '/tmp/comserv/session/comserv_sessions.mmap',
-=======
->>>>>>> main
     },
     'Model::ThemeConfig' => {
         # Theme configuration model
