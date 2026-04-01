@@ -15,7 +15,7 @@
 # ---------------------------------------------------------------------------
 # Configuration — override via environment or edit here
 # ---------------------------------------------------------------------------
-INGEST_URL="${INGEST_URL:-http://workstation.local:3001/admin/hardware_monitor/ingest}"
+INGEST_URL="${INGEST_URL:-http://192.168.1.199:3001/admin/hardware_monitor/ingest}"
 INGEST_TOKEN="${INGEST_TOKEN:-changeme}"
 HOSTNAME_OVERRIDE="${HOSTNAME_OVERRIDE:-}"    # leave blank to auto-detect
 
