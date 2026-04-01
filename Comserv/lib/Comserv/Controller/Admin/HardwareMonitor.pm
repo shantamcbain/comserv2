@@ -280,6 +280,174 @@ sub _ingest_url {
 }
 
 # ---------------------------------------------------------------------------
+# GET/POST /admin/hardware_monitor/disk_diagnose
+# Drill into any host/mount to find what's consuming disk space.
+# For localhost: runs du directly. For remote: uses SSH.
+# POST actions: delete, move_to_nfs, compress
+# ---------------------------------------------------------------------------
+my %LOCAL_HOSTS = map { $_ => 1 } qw(
+    workstation workstation.local workstation.computersystemconsulting.ca
+    localhost 127.0.0.1 192.168.1.199
+);
+my $NFS_BASE = '/data/nfs';
+
+sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash(template => 'admin/HardwareMonitor/disk_diagnose.tt');
+
+    my $role = $c->session->{role} // '';
+    unless ($role eq 'admin' || $role eq 'superadmin') {
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $hostname = $c->req->param('hostname') // 'workstation';
+    my $path     = $c->req->param('path')     // '/';
+    my $action   = $c->req->param('action')   // '';
+
+    $hostname =~ s/[^A-Za-z0-9._\-]//g;
+    $path =~ s/[^A-Za-z0-9_.\/\-]//g;
+    $path = '/' unless $path =~ m{^/};
+    $path =~ s{/+}{/}g;
+
+    my $is_local = $LOCAL_HOSTS{ lc($hostname) } // 0;
+    my @entries;
+    my $error;
+    my $action_result;
+    my $ssh_hint;
+
+    my $run_cmd = sub {
+        my (@cmd) = @_;
+        if ($is_local) {
+            open my $fh, '-|', @cmd or return (undef, "Cannot run: $cmd[0]: $!");
+            my @lines = <$fh>;
+            close $fh;
+            return (\@lines, undef);
+        } else {
+            my $ssh_user = $ENV{HW_SSH_USER} // 'root';
+            my @ssh = ('ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5',
+                       '-o', 'StrictHostKeyChecking=no', "$ssh_user\@$hostname", @cmd);
+            open my $fh, '-|', @ssh or return (undef, "SSH failed: $!");
+            my @lines = <$fh>;
+            close $fh;
+            if ($? != 0 && !@lines) {
+                my $cmd_str = join(' ', @cmd);
+                return (undef, "SSH to $hostname failed. Run manually: ssh $ssh_user\@$hostname $cmd_str");
+            }
+            return (\@lines, undef);
+        }
+    };
+
+    if ($action && $c->req->method eq 'POST') {
+        my $target = $c->req->param('target') // '';
+        $target =~ s/[^A-Za-z0-9_.\/\-]//g;
+
+        if ($action eq 'delete' && $target && $target =~ m{^/} && $target ne '/') {
+            if ($is_local) {
+                require File::Path;
+                eval { File::Path::remove_tree($target, { safe => 0 }) };
+                $action_result = $@ ? "Delete failed: $@" : "Deleted: $target";
+            } else {
+                my ($out, $err) = $run_cmd->('rm', '-rf', '--', $target);
+                $action_result = $err // "Deleted on $hostname: $target";
+            }
+        } elsif ($action eq 'move_to_nfs' && $target && $target =~ m{^/}) {
+            my $dest_name = (split '/', $target)[-1];
+            my $dest      = "$NFS_BASE/archive/$dest_name";
+            if ($is_local) {
+                require File::Path;
+                File::Path::make_path("$NFS_BASE/archive");
+                my $ret = system('mv', '--', $target, $dest);
+                $action_result = $ret == 0 ? "Moved to NFS: $dest" : "Move failed (exit $ret)";
+            } else {
+                my ($out, $err) = $run_cmd->('mv', '--', $target, $dest);
+                $action_result = $err // "Moved on $hostname: $target -> $dest";
+            }
+        } elsif ($action eq 'compress' && $target && $target =~ m{^/} && $target ne '/') {
+            my $archive = "$target.tar.gz";
+            if ($is_local) {
+                my $ret = system('tar', '-czf', $archive, '--remove-files', '--', $target);
+                $action_result = $ret == 0 ? "Compressed to: $archive" : "Compress failed (exit $ret)";
+            } else {
+                my ($out, $err) = $run_cmd->('tar', '-czf', $archive, '--remove-files', '--', $target);
+                $action_result = $err // "Compressed on $hostname: $archive";
+            }
+        }
+    }
+
+    my ($lines, $err);
+    if ($is_local) {
+        my @children = glob("$path/*");
+        ($lines, $err) = @children
+            ? $run_cmd->('du', '-shx', '--', @children)
+            : ([], undef);
+    } else {
+        my $ssh_user = $ENV{HW_SSH_USER} // 'root';
+        if (open my $fh, '-|', 'ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5',
+                '-o', 'StrictHostKeyChecking=no', "$ssh_user\@$hostname",
+                "du -shx -- $path/* 2>/dev/null") {
+            my @lines_arr = <$fh>;
+            close $fh;
+            if ($? != 0 && !@lines_arr) {
+                $err = "SSH to $hostname failed. Ensure SSH keys are configured for $ssh_user\@$hostname.";
+            } else {
+                $lines = \@lines_arr;
+            }
+        } else {
+            $err = "Cannot open SSH to $hostname: $!";
+        }
+    }
+    if ($err) {
+        $error    = $err;
+        $ssh_hint = !$is_local ? "ssh root\@$hostname du -sh $path/*" : undef;
+    } else {
+        my $to_bytes = sub {
+            my $s = shift // '0';
+            my %mul = (K=>1024, M=>1024**2, G=>1024**3, T=>1024**4, P=>1024**5);
+            $s =~ /^([\d.]+)([KMGTP]?)/i;
+            return ($1 // 0) * ($mul{uc($2||'B')} // 1);
+        };
+        for my $line (@{ $lines // [] }) {
+            chomp $line;
+            next unless $line =~ /^(\S+)\s+(.+)$/;
+            my ($size, $entry_path) = ($1, $2);
+            my $name = (split '/', $entry_path)[-1];
+            my $is_dir = $is_local ? (-d $entry_path) : 1;
+            push @entries, {
+                size     => $size,
+                bytes    => $to_bytes->($size),
+                path     => $entry_path,
+                name     => $name,
+                is_dir   => $is_dir,
+            };
+        }
+        @entries = sort { $b->{bytes} <=> $a->{bytes} } @entries;
+    }
+
+    my @crumb_parts;
+    my @segments = grep { length } split '/', $path;
+    my $crumb_acc = '';
+    for my $seg (@segments) {
+        $crumb_acc .= "/$seg";
+        push @crumb_parts, { label => $seg, path => $crumb_acc };
+    }
+
+    $c->stash(
+        template      => 'admin/HardwareMonitor/disk_diagnose.tt',
+        hostname      => $hostname,
+        path          => $path,
+        is_local      => $is_local,
+        entries       => \@entries,
+        crumb_parts   => \@crumb_parts,
+        error         => $error,
+        ssh_hint      => $ssh_hint,
+        action_result => $action_result,
+        nfs_base      => $NFS_BASE,
+    );
+}
+
+# ---------------------------------------------------------------------------
 # POST /admin/hardware_monitor/ingest
 # Remote device agents POST JSON metrics here.
 # Auth: X-Ingest-Token header (or ?token= param) must match HW_INGEST_TOKEN.
