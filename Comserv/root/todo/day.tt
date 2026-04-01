@@ -463,8 +463,8 @@
                     <!-- Popup on hover -->
                     <div class="todo-popup">
                         <div class="popup-subject">[% todo.subject %]</div>
-                        [% IF todo.description %]
-                            <div class="popup-description">[% todo.description %]</div>
+                        [% SET _pd = todo.description | trim %][% IF _pd %]
+                            <div class="popup-description">[% _pd %]</div>
                         [% END %]
                         <div class="popup-details">
                             [% IF todo.project_id %]<div><strong>Project:</strong> [% proj_name_map.${todo.project_id} || todo.project_id %]</div>[% END %]
@@ -566,8 +566,8 @@
                                 <!-- Popup on hover -->
                                 <div class="todo-popup">
                                     <div class="popup-subject">[% todo.subject %]</div>
-                                    [% IF todo.description %]
-                                        <div class="popup-description">[% todo.description %]</div>
+                                    [% SET _pd = todo.description | trim %][% IF _pd %]
+                                        <div class="popup-description">[% _pd %]</div>
                                     [% END %]
                                     <div class="popup-details">
                                         [% IF todo.project_id %]<div><strong>Project:</strong> [% proj_name_map.${todo.project_id} || todo.project_id %]</div>[% END %]
