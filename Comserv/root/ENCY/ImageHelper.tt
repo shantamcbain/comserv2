@@ -1,32 +1,22 @@
 [%#
-  ENCY/ImageHelper.tt — smart image URL resolution macro + file picker widget.
+  ENCY/ImageHelper.tt - smart image URL resolution macro + file picker widget.
 
   INCLUDE ONCE at the top of any ENCY template that displays or edits herb images:
-    [% INCLUDE 'ENCY/ImageHelper.tt' %]
+    INCLUDE 'ENCY/ImageHelper.tt'   (wrap in TT tags when using)
 
   MACROS PROVIDED:
-    ency_img_src(val)          — returns the display URL for the image column value
-    ency_img_tag(val, w, h)    — renders <img> tag with resolved src
-    ency_img_picker(field, val) — renders edit widget: text field + file picker dropdown
+    ency_img_src(val)           - returns the display URL for the image column value
+    ency_img_tag(val, w, h)     - renders img tag with resolved src
+    ency_img_picker(field, val) - renders edit widget: text field + file picker dropdown
 
   RESOLUTION ORDER for ency_img_src(val):
-    1. Empty/null        → empty string (no image)
-    2. http:// https://  → use directly (external URL)
-    3. Starts with /     → stream via /file/fs_preview (NFS or server filesystem path)
-    4. Anything else     → treat as relative static path under /static/
+    1. Empty/null       - empty string (no image)
+    2. http:// https:// - use directly (external URL)
+    3. Starts with /    - stream via /file/fs_preview (NFS or server filesystem path)
+    4. Anything else    - treat as relative static path under /static/
 %]
 
-[% MACRO ency_img_src(val) BLOCK %]
-[%- IF val && val.length -%]
-  [%- IF val.match('^https?://') -%]
-[% val %]
-  [%- ELSIF val.match('^/') -%]
-[% c.uri_for('/file/fs_preview', {path => val}) %]
-  [%- ELSE -%]
-[% c.uri_for('/static', [val]) %]
-  [%- END -%]
-[%- END -%]
-[% END %]
+[% MACRO ency_img_src(val) BLOCK %][%- IF val && val.length -%][%- IF val.match('^https?://') -%][%- val -%][%- ELSIF val.match('^/') -%][%- c.uri_for('/file/fs_preview', {path => val}) -%][%- ELSE -%][%- c.uri_for('/static', [val]) -%][%- END -%][%- END -%][% END %]
 
 [% MACRO ency_img_tag(val, w, h) BLOCK %]
 [% SET src = ency_img_src(val) %]
@@ -35,7 +25,11 @@
      [% IF w %]width="[% w %]"[% END %]
      [% IF h %]height="[% h %]"[% END %]
      style="max-width:100%;object-fit:contain"
-     onerror="this.style.display='none'">
+     onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+<span style="display:none;color:#aaa;font-size:.8rem">
+  (image unavailable)<br>
+  <a href="[% src %]" target="_blank" rel="noopener" style="font-size:.75rem;word-break:break-all">[% src %]</a>
+</span>
 [% ELSE %]
 <span style="color:#aaa;font-size:.85rem">(no image)</span>
 [% END %]

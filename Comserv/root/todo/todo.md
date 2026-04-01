@@ -1,0 +1,279 @@
+[% PageVersion  = 'todo.tt,v 0.1 2023/11/09 Shanta Exp Shanta' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+    [%# "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+
+<h1>ToDo List</h1>
+<h2>[% date_today %]</h2>
+
+
+
+<!-- Filter Section -->
+<div class="filter-container">
+    <h3>Filters</h3>
+    <form action="/todo" method="get" id="filter-form">
+        <div class="filter-row">
+            <div class="filter-group">
+                <label for="filter">Time Filter:</label>
+                <select id="filter" name="filter">
+                    <option value="all" [% IF filter_type == 'all' %]selected[% END %]>All Todos</option>
+                    <option value="day" [% IF filter_type == 'day' %]selected[% END %]>Today's Todos</option>
+                    <option value="week" [% IF filter_type == 'week' %]selected[% END %]>This Week's Todos</option>
+                    <option value="month" [% IF filter_type == 'month' %]selected[% END %]>This Month's Todos</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="project_id">Project:</label>
+                <select id="project_id" name="project_id">
+                    <option value="">All Projects</option>
+                    [% IF projects && projects.size > 0 %]
+                        [% FOREACH project IN projects %]
+                            <option value="[% project.id %]" [% IF project_id == project.id %]selected[% END %]>[% project.name %]</option>
+                            [% IF project.sub_projects && project.sub_projects.size > 0 %]
+                                [% FOREACH sub_project IN project.sub_projects %]
+                                    <option value="[% sub_project.id %]" [% IF project_id == sub_project.id %]selected[% END %]>&nbsp;&nbsp;- [% sub_project.name %]</option>
+                                    [% IF sub_project.sub_projects && sub_project.sub_projects.size > 0 %]
+                                        [% FOREACH sub_sub_project IN sub_project.sub_projects %]
+                                            <option value="[% sub_sub_project.id %]" [% IF project_id == sub_sub_project.id %]selected[% END %]>&nbsp;&nbsp;&nbsp;&nbsp;-- [% sub_sub_project.name %]</option>
+                                        [% END %]
+                                    [% END %]
+                                [% END %]
+                            [% END %]
+                        [% END %]
+                    [% END %]
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="status">Status:</label>
+                <select id="status" name="status">
+                    <option value="" [% IF status_filter == '' %]selected[% END %]>Active Todos</option>
+                    <option value="all" [% IF status_filter == 'all' %]selected[% END %]>All Statuses</option>
+                    <option value="new" [% IF status_filter == 'new' %]selected[% END %]>New</option>
+                    <option value="in_progress" [% IF status_filter == 'in_progress' %]selected[% END %]>In Progress</option>
+                    <option value="completed" [% IF status_filter == 'completed' %]selected[% END %]>Completed</option>
+                </select>
+            </div>
+
+            [% IF is_csc_admin %]
+            <div class="filter-group">
+                <label for="sitename">Site Name:</label>
+                <select id="sitename" name="sitename">
+                    <option value="all" [% IF !sitename_filter || sitename_filter == 'all' %]selected[% END %]>All Sites</option>
+                    [% IF sites && sites.size > 0 %]
+                        [% FOREACH site IN sites %]
+                            <option value="[% site.name %]" [% IF sitename_filter == site.name %]selected[% END %]>[% site.name %]</option>
+                        [% END %]
+                    [% END %]
+                </select>
+            </div>
+            [% END %]
+        </div>
+
+        <!-- Hidden field to preserve search term when applying filters -->
+        <input type="hidden" id="search_hidden" name="search" value="[% search_term %]">
+
+        <div class="filter-buttons">
+            <button type="submit">Apply Filters</button>
+            <button type="button" class="reset-filters-button" onclick="resetFilters()">Reset Filters</button>
+        </div>
+    </form>
+</div>
+
+<!-- Search Section -->
+<div class="search-container">
+    <h3>Search</h3>
+    <form action="/todo" method="get" id="search-form">
+        <div class="search-row">
+            <div class="search-group">
+                <label for="search_input">Search in todos:</label>
+                <input type="text" id="search_input" name="search" placeholder="Search in subject, description, comments..." value="[% search_term %]">
+            </div>
+        </div>
+
+        <!-- Hidden fields to preserve filters when searching -->
+        <input type="hidden" id="filter_hidden" name="filter" value="[% filter_type %]">
+        <input type="hidden" id="project_hidden" name="project_id" value="[% project_id %]">
+        <input type="hidden" id="status_hidden" name="status" value="[% status_filter %]">
+        [% IF is_csc_admin %]
+        <input type="hidden" id="sitename_hidden" name="sitename" value="[% sitename_filter %]">
+        [% END %]
+
+        <div class="search-buttons">
+            <button type="submit">Search</button>
+            <button type="button" class="clear-search-button" onclick="clearSearch()">Clear Search</button>
+        </div>
+    </form>
+</div>
+
+<div class="view-buttons">
+    <a href="/todo" class="[% IF !filter_type || filter_type == 'all' %]active[% END %]">List View</a>
+    <a href="/todo/day">Day View</a>
+    <a href="/todo/week">Week View</a>
+    <a href="/todo/month">Month View</a>
+    <a href="/todo/addtodo" style="margin-left: auto;">Add New Todo</a>
+</div>
+
+<div class="table-responsive">
+<table class="week-view-table">
+  <tr>
+    <th>Sitename</th>
+    <th>Project</th>
+    <th>Parent todo</th>
+    <th>Start Date</th>
+    <th>Due Date</th>
+    <th>What needs to be done</th>
+    <th>Details </th>
+    <th>Who is responsible</th>
+    <th>Priority</th>
+    <th>Status</th>
+    <th>Code needed for</th>
+    <th>Accumulated time</th>
+    <th>Action</th>
+  </tr>
+[% counter = 0 %]
+[% FOREACH task IN todos %]
+    [% IF counter % 5 == 0 AND counter != 0 %]
+        <tr>
+        <td colspan="13">
+            <div class="top-controls">
+                <button type="button" onclick="window.scrollTo(0, 0);">Return to top</button>
+                <!-- Add the form next to the "Return to top" button -->
+                <form action="/todo/addtodo" method="post">
+                    <button type="submit">Add New Record</button>
+                </form>
+            </div>
+        </td>
+        </tr>
+        <tr>
+            <th>Sitename</th>
+            <th>Project</th>
+            <th>Parent todo</th>
+            <th>Start Date</th>
+            <th>Due Date</th>
+            <th>What needs to be done</th>
+            <th>Details </th>
+            <th>Who is responsible</th>
+            <th>Priority</th>
+            <th>Status</th>
+            <th>Code needed for</th>
+            <th>Accumulated time</th>
+            <th>Action</th>
+        </tr>
+    [% END %]
+    <tr>
+      <td>[% task.sitename %]</td>
+      <td>[% task.project_id %]</td>
+      <td>[% task.parent_todo %]</td>
+      <td>[% task.start_date %]</td>
+      <td>[% task.due_date %]</td>
+      <td>[% task.subject %]</td>
+      <td>[% task.description %]</td>
+      <td>[% task.developer %]</td>
+      <td>[% INCLUDE todo/priority_display.tt priority_value=task.priority %]</td>
+      <td>[% task.status %]</td>
+      <td>[% task.comments %]</td>
+      <td>[% task.accumulative_time %]</td>
+      <td class="action-buttons-cell">
+        <form action="/log/log_form" method="POST" target="_blank">
+          <input type="hidden" name="todo_record_id" value="[% task.record_id %]">
+          <input type="hidden" name="site_name" value="[% task.sitename %]">
+          <input type="hidden" name="start_date" value="[% task.start_date %]">
+          <input type="hidden" name="due_date" value="[% task.due_date %]">
+          <input type="hidden" name="abstract" value="[% task.subject %]">
+          <input type="hidden" name="details" value="[% task.description %]">
+          <input type="hidden" name="priority" value="[% task.priority %]">
+          <input type="hidden" name="status" value="[% task.status %]">
+          <input type="hidden" name="comments" value="[% task.comments %]">
+          <button type="submit" class="action-button log-button">Add Log</button>
+        </form>
+        <form action="/todo/details" method="POST">
+          <input type="hidden" name="record_id" value="[% task.record_id %]">
+          <button type="submit" class="action-button details-button">Details</button>
+        </form>
+        <form action="/todo/edit/[% task.record_id %]" method="GET" style="display: inline;">
+          <button type="submit" class="action-button edit-button">Edit</button>
+        </form>
+      </td>
+    </tr>
+    [% counter = counter + 1 %]
+[% END %]
+</table>
+</div>
+<script>
+// Existing row highlighting functionality
+document.querySelectorAll('.week-view-table tbody tr').forEach(row => {
+    row.addEventListener('click', () => {
+        row.classList.toggle('highlight');
+    });
+});
+
+// Filter and Search management functions
+function resetFilters() {
+    // Reset filter form to defaults but preserve search
+    document.getElementById('filter').value = 'all';
+    document.getElementById('project_id').value = '';
+    document.getElementById('status').value = '';
+    const sitenameSelect = document.getElementById('sitename');
+    if (sitenameSelect) {
+        sitenameSelect.value = 'all';
+    }
+    
+    // Submit with current search term preserved
+    const currentSearch = document.getElementById('search_input').value;
+    document.getElementById('search_hidden').value = currentSearch;
+    
+    // Navigate to todo with only search parameter if there is one
+    if (currentSearch.trim()) {
+        window.location.href = '/todo?search=' + encodeURIComponent(currentSearch);
+    } else {
+        window.location.href = '/todo';
+    }
+}
+
+function clearSearch() {
+    // Clear search but preserve filters
+    document.getElementById('search_input').value = '';
+    
+    // Build URL with current filters
+    const filter = document.getElementById('filter_hidden').value || 'all';
+    const project = document.getElementById('project_hidden').value || '';
+    const status = document.getElementById('status_hidden').value || '';
+    const sitename = document.getElementById('sitename_hidden') ? document.getElementById('sitename_hidden').value : '';
+    
+    let url = '/todo';
+    let params = [];
+    
+    if (filter !== 'all') params.push('filter=' + encodeURIComponent(filter));
+    if (project) params.push('project_id=' + encodeURIComponent(project));
+    if (status) params.push('status=' + encodeURIComponent(status));
+    if (sitename && sitename !== 'all') params.push('sitename=' + encodeURIComponent(sitename));
+    
+    if (params.length > 0) {
+        url += '?' + params.join('&');
+    }
+    
+    window.location.href = url;
+}
+
+// Auto-sync hidden fields when filter form changes
+document.getElementById('filter').addEventListener('change', function() {
+    document.getElementById('filter_hidden').value = this.value;
+});
+document.getElementById('project_id').addEventListener('change', function() {
+    document.getElementById('project_hidden').value = this.value;
+});
+document.getElementById('status').addEventListener('change', function() {
+    document.getElementById('status_hidden').value = this.value;
+});
+const sitenameSelect = document.getElementById('sitename');
+if (sitenameSelect) {
+    sitenameSelect.addEventListener('change', function() {
+        document.getElementById('sitename_hidden').value = this.value;
+    });
+}
+</script>

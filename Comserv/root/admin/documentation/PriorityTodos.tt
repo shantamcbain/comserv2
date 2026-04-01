@@ -24,7 +24,7 @@
         scroll-margin-top: 170px !important;
     }
     
-    [id^="priority-"], #dynamic-daily, #cleanup-todos, #completed {
+    [id^="priority-"], #cleanup-todos, #completed {
         scroll-margin-top: 170px !important;
     }
     
@@ -253,7 +253,6 @@
             <div class="jump-group">
                 <h6>🟠 MEDIUM Priority</h6>
                 <div class="jump-links">
-                    <a href="#dynamic-daily" class="jump-link">#Dynamic Daily View</a>
                     <a href="#priority-3" class="jump-link">#3 Update Format</a>
                     <a href="#priority-12" class="jump-link">#12 DailyPlan Sync</a>
                     <a href="#priority-5" class="jump-link">#5 DailyPlan Flag</a>
@@ -500,13 +499,6 @@
 
     <!-- MEDIUM PRIORITY ITEMS -->
     <h3 style="color: var(--accent-color); margin-top: 30px;">🟠 MEDIUM Priority</h3>
-
-    <div class="doc-section" id="dynamic-daily" style="margin: 20px 0; padding: 20px; background: var(--secondary-color); border: 1px solid var(--border-color); border-radius: 6px;">
-        <h2>Dynamic Daily Tasks</h2>
-        <div class="dynamic-container">
-            [% INCLUDE 'todo/day.tt' %]
-        </div>
-    </div>
 
     <details class="priority-container priority-medium" id="priority-3">
         <summary>#3 - Update Format & Multi-Plan Support</summary>

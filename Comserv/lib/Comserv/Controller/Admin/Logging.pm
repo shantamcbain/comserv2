@@ -13,31 +13,6 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
-sub begin :Private {
-    my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', 
-        "User accessing logging admin: " . $c->req->uri);
-    
-    my $roles = $c->session->{roles} || [];
-    
-    if (ref $roles ne 'ARRAY') {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', 
-            "Invalid or undefined roles in session");
-        $c->stash->{error_msg} = "Session expired or invalid. Please log in again.";
-        $c->res->redirect($c->uri_for('/user/login'));
-        $c->detach;
-    }
-    
-    unless (grep { $_ eq 'admin' } @$roles) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', 
-            "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
-        $c->stash->{error_msg} = "Unauthorized access. You do not have permission to view this page.";
-        $c->res->redirect($c->uri_for('/'));
-        $c->detach;
-    }
-}
-
 sub index :Path('/admin/logging') :Args(0) {
     my ($self, $c) = @_;
 
@@ -93,23 +68,101 @@ sub index :Path('/admin/logging') :Args(0) {
     $search_params->{username} = $filter_username if $filter_username;
     $search_params->{message} = { -like => "%$search_text%" } if $search_text;
 
-    eval {
-        my $logs_rs = $c->model('DBEncy')->resultset('SystemLog')->search(
-            $search_params,
-            { order_by => { -desc => 'timestamp' }, rows => 100 }
-        );
-        while (my $log = $logs_rs->next) {
-            push @db_logs, {
-                timestamp => $log->timestamp,
-                level => $log->level,
-                subroutine => $log->subroutine,
-                message => $log->message,
-                file => basename($log->file),
-                line => $log->line,
-                username => $log->username,
-                sitename => $log->sitename
+    my $db_error = '';
+    my $total_count = 0;
+    my @base_cols = qw(id timestamp level file line subroutine message sitename username);
+    my @all_cols  = (@base_cols, 'system_identifier');
+
+    my $fetch_logs = sub {
+        my ($schema, $cols) = @_;
+        my %opts = ( order_by => { -desc => 'id' }, rows => 100 );
+        $opts{columns} = $cols if $cols;
+        my $rs = $schema->resultset('SystemLog')->search($search_params, \%opts);
+        my @rows;
+        while (my $log = $rs->next) {
+            my $instance = eval { $log->system_identifier } // '';
+            if (!$instance && ($log->message // '') =~ /^\[HEALTH\]\[[^\]]+\]\[([^\]]+)\]/) {
+                $instance = $1;
+            }
+            push @rows, {
+                timestamp         => $log->timestamp,
+                level             => $log->level,
+                subroutine        => $log->subroutine,
+                message           => $log->message,
+                file              => basename($log->file),
+                line              => $log->line,
+                username          => $log->username,
+                sitename          => $log->sitename,
+                system_identifier => $instance,
             };
         }
+        return @rows;
+    };
+
+    eval {
+        my $schema = $c->model('DBEncy');
+        my $dbh    = $schema->storage->dbh;
+        if (%$search_params) {
+            # Filtered count — still needs WHERE clause
+            eval { $total_count = $schema->resultset('SystemLog')->search($search_params)->count };
+            $total_count //= 0;
+        } else {
+            # Unfiltered: use table row-count estimate from information_schema (instant)
+            ($total_count) = $dbh->selectrow_array(
+                "SELECT TABLE_ROWS FROM information_schema.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'system_log'"
+            );
+            $total_count //= 0;
+        }
+        @db_logs = $fetch_logs->($schema, undef);  # try with all result-class columns
+    };
+    if ($@) {
+        # Retry selecting only the base columns (system_identifier not yet in DB)
+        eval {
+            my $schema = $c->model('DBEncy');
+            @db_logs = $fetch_logs->($schema, \@base_cols);
+        };
+        if ($@) {
+            $db_error = "$@";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+                "Failed to fetch system_log records: $db_error");
+        }
+    }
+
+    # Health evaluation status from HealthLogger
+    my $health_status = {};
+    eval {
+        require Comserv::Util::HealthLogger;
+        my $schema = $c->model('DBEncy');
+        $health_status = Comserv::Util::HealthLogger->compute_health_score($schema, 30);
+        my $eval_summary = Comserv::Util::HealthLogger->evaluate_records($schema, 30);
+        $health_status->{eval_summary} = $eval_summary;
+    };
+
+    # Hardware Monitor — latest reading per metric/host for HealthDash include
+    my @hardware_latest;
+    eval {
+        my $rs = $c->model('DBEncy')->resultset('HardwareMetrics');
+        my @rows = $rs->search(
+            {},
+            { order_by => { -asc => 'timestamp' }, rows => 500 }
+        );
+        my %seen;
+        for my $m (reverse @rows) {
+            my $key = $m->hostname . '|' . $m->metric_name;
+            next if $seen{$key}++;
+            push @hardware_latest, {
+                hostname     => $m->hostname,
+                metric_name  => $m->metric_name,
+                metric_value => $m->metric_value,
+                metric_text  => $m->metric_text,
+                unit         => $m->unit,
+                level        => $m->level,
+                timestamp    => $m->timestamp,
+            };
+        }
+        @hardware_latest = sort { $a->{hostname} cmp $b->{hostname}
+                               || $a->{metric_name} cmp $b->{metric_name} } @hardware_latest;
     };
 
     # Get available levels for filter
@@ -121,16 +174,20 @@ sub index :Path('/admin/logging') :Args(0) {
             size => $log_file && -e $log_file ? sprintf("%.2f KB", (-s $log_file) / 1024) : '0 KB',
             exists => $log_file && -e $log_file ? 1 : 0
         },
-        archived_logs => \@archived_logs,
-        db_logs => \@db_logs,
-        levels => \@levels,
-        filter_level => $filter_level,
+        archived_logs   => \@archived_logs,
+        db_logs         => \@db_logs,
+        db_error        => $db_error,
+        total_count     => $total_count,
+        health_status    => $health_status,
+        hardware_latest  => \@hardware_latest,
+        levels           => \@levels,
+        filter_level    => $filter_level,
         filter_sitename => $filter_sitename,
         filter_username => $filter_username,
-        search_text => $search_text,
+        search_text     => $search_text,
         email_threshold => $Comserv::Util::Logging::EMAIL_NOTIFY_THRESHOLD,
-        nfs_dir => $ENV{COMSERV_NFS_LOG_DIR} || 'Not Set',
-        template => 'admin/Logging/AdminLoggingIndex.tt'
+        nfs_dir         => $ENV{COMSERV_NFS_LOG_DIR} || 'Not Set',
+        template        => 'admin/Logging/AdminLoggingIndex.tt'
     );
 }
 

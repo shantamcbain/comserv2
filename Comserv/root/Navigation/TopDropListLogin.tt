@@ -1,50 +1,70 @@
 
-[% PageVersion = 'Navigation/TopDropListLogin.tt,v 0.06 2025/09/03 shanta Exp shanta ' %]
+[% PageVersion = 'Navigation/TopDropListLogin.tt,v 0.08 2026/03/20 Use c.stash.is_admin for role checks; Planning title is a link; SiteName-aware planning links' %]
 [% IF c.session.debug_mode == 1 %]
     [%# PageVersion %]
 [% END %]
 
-[%# Determine user role for display %]
-[% SET display_role = 'Guest' %]
-[% IF c.session.roles && c.session.roles.size %]
-    [% IF c.session.roles.grep('admin').size %]
-        [% SET display_role = 'Administrator' %]
-    [% ELSIF c.session.roles.grep('developer').size %]
+[%# Use stash is_admin (set by Root.pm begin) for reliable role detection regardless of username.
+    Also derive developer/devops from session roles as a fallback array or scalar. %]
+[% SET is_admin     = c.stash.is_admin %]
+[% SET site         = c.stash.SiteName || c.session.SiteName || 'CSC' %]
+[% SET is_csc       = (site == 'CSC') %]
+
+[%# Determine display role label %]
+[% SET display_role = 'Member' %]
+[% IF is_admin %]
+    [% SET display_role = 'Administrator' %]
+[% ELSIF c.stash.user_roles %]
+    [% IF c.stash.user_roles.grep('developer').size %]
         [% SET display_role = 'Developer' %]
-    [% ELSIF c.session.roles.grep('editor').size %]
+    [% ELSIF c.stash.user_roles.grep('devops').size %]
+        [% SET display_role = 'DevOps' %]
+    [% ELSIF c.stash.user_roles.grep('editor').size %]
         [% SET display_role = 'Editor' %]
-    [% ELSIF c.session.roles.grep('user').size %]
+    [% ELSIF c.stash.user_roles.grep('user').size %]
         [% SET display_role = 'User' %]
     [% END %]
 [% END %]
 
+[%# Can access planning tools: all roles above member (user, editor, developer, devops, admin) %]
+[% SET can_plan = c.session.username && (
+    is_admin
+    || (c.stash.user_roles && (
+        c.stash.user_roles.grep('developer').size
+        || c.stash.user_roles.grep('devops').size
+        || c.stash.user_roles.grep('editor').size
+        || c.stash.user_roles.grep('user').size
+        || c.stash.user_roles.grep('normal').size
+    ))
+) %]
+
 [% IF c.session.debug_mode == 1 %]
     <!-- Debug: Username: [% c.session.username %] -->
-    <!-- Debug: Roles: [% c.session.roles.join(', ') %] -->
-    <!-- Debug: Display Role: [% display_role %] -->
-    <!-- Debug: SiteName: [% c.session.SiteName %] -->
-    <!-- Debug: ControllerName: [% c.session.ControllerName %] -->
+    <!-- Debug: is_admin: [% is_admin %] -->
+    <!-- Debug: site: [% site %] -->
+    <!-- Debug: can_plan: [% can_plan %] -->
+    <!-- Debug: display_role: [% display_role %] -->
 [% END %]
 
 <li class="horizontal-dropdown">
     [% IF c.session.username %]
-        <!-- User is logged in - Clean main button without role badge -->
+        <!-- User is logged in -->
         <a href="#" class="dropbtn user-menu">
             <span class="username"><i class="icon-user"></i> [% c.session.username %]</span>
         </a>
         <div class="dropdown-content">
-            <!-- User info with role displayed in dropdown -->
+            <!-- User info header -->
             <div class="user-info-header">
                 <span class="dropdown-username">[% c.session.username %]</span>
                 <span class="dropdown-role-badge">[% display_role %]</span>
             </div>
             <div class="dropdown-divider"></div>
-            
+
             <!-- Navigation Management -->
             <a href="/navigation/add_link" class="menu-item"><i class="icon-add"></i>Add Link</a>
-            
+
             <div class="dropdown-divider"></div>
-            
+
             <!-- User Account Options -->
             <a href="/user/profile" class="menu-item">
                 <i class="icon-user"></i> My Profile
@@ -64,7 +84,7 @@
                             [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
                             [% link.name %]
                         </a>
-                        [% IF c.session.roles.grep('admin').size || link.owner == c.session.username %]
+                        [% IF is_admin || link.owner == c.session.username %]
                             <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
                         [% END %]
                     [% END %]
@@ -72,8 +92,47 @@
             </div>
             [% END %]
 
-            <!-- Admin/Developer Options -->
-            [% IF c.session.roles.grep('admin').size || c.session.roles.grep('developer').size %]
+            <!-- AI Assistant Submenu (all logged-in users) -->
+            <div class="dropdown-divider"></div>
+            <div class="submenu-item">
+                <a href="/ai" class="submenu-header submenu-header-link"><i class="icon-ai"></i>AI Assistant</a>
+                <div class="submenu">
+                    <a href="/ai" class="submenu-link"><i class="icon-chat"></i>AI Chat</a>
+                    <a href="/ai/conversations" class="submenu-link"><i class="icon-history"></i>Chat History</a>
+                </div>
+            </div>
+
+            <!-- Planning Submenu (visible to all logged-in users; links filtered by role) -->
+            <div class="dropdown-divider"></div>
+            <div class="submenu-item">
+                [% IF can_plan %]
+                    <a href="/Documentation/DailyPlan" class="submenu-header submenu-header-link"><i class="icon-calendar"></i>Planning</a>
+                [% ELSE %]
+                    <span class="submenu-header"><i class="icon-calendar"></i>Planning</span>
+                [% END %]
+                <div class="submenu">
+                    [% IF can_plan %]
+                        <a href="/Documentation/DailyPlan" class="submenu-link">
+                            <i class="icon-calendar"></i> Daily Plan
+                        </a>
+                        <a href="/todo" class="submenu-link">
+                            <i class="icon-check-square"></i> Todo System
+                        </a>
+                        [% IF is_admin %]
+                        <a href="/todo/addtodo" class="submenu-link">
+                            <i class="icon-plus"></i> Add Todo
+                        </a>
+                        [% END %]
+                    [% ELSE %]
+                        <a href="/todo" class="submenu-link">
+                            <i class="icon-check-square"></i> My Todos
+                        </a>
+                    [% END %]
+                </div>
+            </div>
+
+            <!-- Admin/Developer Options (role-based, not username-based) -->
+            [% IF is_admin || (c.stash.user_roles && c.stash.user_roles.grep('developer').size) %]
                 <div class="dropdown-divider"></div>
                 <a href="/admin" class="menu-item">
                     <i class="icon-tachometer-alt"></i> Admin Dashboard
@@ -96,15 +155,16 @@
                 <i class="icon-sign-out-alt"></i> Logout
             </a>
 
-            [% IF c.session.debug_mode == 1 %]
             <script>
-                // Add event listener to capture the current page before logout
                 document.getElementById('logout-link').addEventListener('click', function(e) {
-                    // Log the current URL for debugging
+                    [% IF c.session.debug_mode == 1 %]
                     console.log('Logging out from: ' + window.location.href);
+                    [% END %]
+                    sessionStorage.removeItem('chatMessages');
+                    sessionStorage.removeItem('currentConversationId');
+                    sessionStorage.removeItem('chatUser');
                 });
             </script>
-            [% END %]
         </div>
     [% ELSE %]
         <!-- User is not logged in -->

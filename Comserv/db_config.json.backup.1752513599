@@ -1,0 +1,97 @@
+{
+  "production_server": {
+    "db_type": "mysql",
+    "host": "172.30.161.222",
+    "port": 3306,
+    "username": "shanta_forager",
+    "password": "UA=nPF8*m+T#",
+    "database": "ency",
+    "description": "Production Server  - ENCY Database",
+    "priority": 1,
+    "localhost_override": false
+  },
+  "production_forager": {
+    "db_type": "mysql",
+    "host": "172.30.161.222",
+    "port": 3306,
+    "username": "shanta_forager",
+    "password": "UA=nPF8*m+T#",
+    "database": "shanta_forager",
+    "description": "Production Server  - Forager Database",
+    "priority": 2,
+    "localhost_override": false
+  },
+  "zerotier_server": {
+    "db_type": "mysql",
+    "host": "172.30.161.222",
+    "port": 3306,
+    "username": "shanta_forager",
+    "password": "UA=nPF8*m+T#",
+    "database": "ency",
+    "description": "ZeroTier Access (172.30.161.222) - ENCY Database",
+    "priority": 3,
+    "localhost_override": false
+  },
+  "zerotier_forager": {
+    "db_type": "mysql",
+    "host": "172.30.161.222",
+    "port": 3306,
+    "username": "shanta_forager",
+    "password": "UA=nPF8*m+T#",
+    "database": "shanta_forager",
+    "description": "ZeroTier Access (172.30.161.222) - Forager Database",
+    "priority": 4,
+    "localhost_override": false
+  },
+  "workstation_mysql": {
+    "db_type": "mysql",
+    "host": "localhost",
+    "port": 3306,
+    "username": "shanta_forager",
+    "password": "UA=nPF8*m+T#",
+    "database": "ency",
+    "description": "Workstation MySQL - ENCY Database",
+    "priority": 5,
+    "localhost_override": false
+  },
+  "workstation_forager": {
+    "db_type": "mysql",
+    "host": "localhost",
+    "port": 3306,
+    "username": "shanta_forager",
+    "password": "UA=nPF8*m+T#",
+    "database": "shanta_forager",
+    "description": "Workstation MySQL - Forager Database",
+    "priority": 6,
+    "localhost_override": false
+  },
+  "sqlite_offline": {
+    "db_type": "sqlite",
+    "database_path": "data/comserv_offline.db",
+    "description": "SQLite - True Offline Mode",
+    "priority": 7,
+    "localhost_override": false
+  },
+  "shanta_ency": {
+    "db_type": "mysql",
+    "host": "172.30.161.222",
+    "port": 3306,
+    "username": "shanta_forager",
+    "password": "UA=nPF8*m+T#",
+    "database": "ency",
+    "description": "Legacy DBEncy Configuration - Updated for ZeroTier",
+    "priority": 8,
+    "localhost_override": false
+  },
+  "shanta_forager": {
+    "db_type": "mysql",
+    "host": "172.30.161.222",
+    "port": 3306,
+    "username": "shanta_forager",
+    "password": "UA=nPF8*m+T#",
+    "database": "shanta_forager",
+    "description": "Legacy DBForager Configuration - Updated for ZeroTier",
+    "priority": 9,
+    "localhost_override": false
+  }
+}

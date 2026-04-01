@@ -50,15 +50,8 @@ sub get_past_workshops {
     my @workshops;
     my $error;
     eval {
-        my $admin_auth = Comserv::Util::AdminAuth->new();
-        my $admin_type = $admin_auth->get_admin_type($c);
-        my $is_admin   = ($admin_type eq 'csc' || $admin_type eq 'special' || $admin_type eq 'standard');
-
-        my $filter = { 'me.date' => { '<' => DateTime->today->ymd } };
-        $filter->{'me.status'} = { '!=' => 'draft' } unless $is_admin;
-
         @workshops = $rs->search(
-            $filter,
+            { 'me.date' => { '<' => DateTime->today->ymd } },
             { order_by => { -desc => 'me.date' }, prefetch => 'creator' }
         );
     };

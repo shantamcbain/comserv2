@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "id": "dd640892-a76a-4b3d-b693-813bc726ea3c",
+      "name": "Admin action — Fix PMG relay network entry",
+      "description": "In PMG web UI → Mail Proxy → Networks: verify/change the entry to 192.168.1.0/24 (not 192.168.199/24). Also verify 172.30.131.126/32 for ZeroTier. Once done, test that 192.168.1.199 can relay external addresses through PMG port 25. This is a prerequisite for all outbound mail to work without harper.",
+      "status": "Pending",
+      "sort_order": 0,
+      "start_new_chat": false,
+      "stop_after_completion": true,
+      "created_at": "2026-03-22T17:25:14.876367797Z",
+      "updated_at": "2026-03-22T17:25:14.876367797Z"
+    },
+    {
+      "id": "78206fe8-341c-4846-801a-85172ec95296",
+      "name": "Audit current SMTP config in site_config DB table",
+      "description": "Query the site_config table for all smtp_* keys across all sites. Document what is currently stored vs what is needed. Determine which sites have harper credentials and which are missing. Identify if smtp keys are stored by site_id or site_name and standardize. Check User.pm to find how registration email was previously sent and what config it used.",
+      "status": "Pending",
+      "sort_order": 1,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-22T17:25:14.876367797Z",
+      "updated_at": "2026-03-22T17:25:14.876367797Z"
+    },
+    {
+      "id": "79dce692-b8b0-4a8c-935d-98d1ab03e414",
+      "name": "Refactor Mail.pm — unified single send_email path",
+      "description": "Clean up Mail.pm so there is exactly ONE send_email method used by all callers. Remove any duplicate or feature-specific transport logic. Config lookup must use site_name (from session) not hardcoded values. Add fallback chain: (1) DB site_config SMTP, (2) application config file smtp settings, (3) log error and return failure — never silently swallow. Remove the hardcoded PMG redirect that overrides the DB host. All logging must go through log_with_details.",
+      "status": "Pending",
+      "sort_order": 2,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-22T17:25:14.876367797Z",
+      "updated_at": "2026-03-22T17:25:14.876367797Z"
+    },
+    {
+      "id": "a9269509-72fd-4961-8d70-089bbacc238c",
+      "name": "Restore registration email via harper (User.pm)",
+      "description": "Fix the registration/account-creation email in User.pm to call Mail.pm send_email instead of its own transport. Ensure the site SMTP config is loaded and used. Test that new member registration sends a confirmation email through harper.whc.ca port 465.",
+      "status": "Pending",
+      "sort_order": 3,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-22T17:25:14.876367797Z",
+      "updated_at": "2026-03-22T17:25:14.876367797Z"
+    },
+    {
+      "id": "dfc3831a-0356-44c5-a594-321bcbe9c79a",
+      "name": "SiteName admin SMTP settings UI",
+      "description": "Add an admin page for SiteName admins to view and update their site's SMTP credentials (host, port, user, password, from address, ssl type). Include a 'Send test email' button that sends a test message to the admin's own address. Store credentials in site_config table. Password field should be masked. This page should be accessible from the site admin dashboard.",
+      "status": "Pending",
+      "sort_order": 4,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-22T17:25:14.876367797Z",
+      "updated_at": "2026-03-22T17:25:14.876367797Z"
+    },
+    {
+      "id": "5d5975c4-08f8-49e5-86b6-20279e5ec4e3",
+      "name": "Workshop email — sender address logic",
+      "description": "Finalize the From/Reply-To logic for workshop emails: SMTP MAIL FROM uses the site's configured smtp_from address (avoids SPF issues when leader uses Gmail etc). From: header and Reply-To header show the workshop leader's email. Leader can override reply-to in the compose form. Document the logic clearly in code comments.",
+      "status": "Pending",
+      "sort_order": 5,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-22T17:25:14.876367797Z",
+      "updated_at": "2026-03-22T17:25:14.876367797Z"
+    },
+    {
+      "id": "d9c978a3-4853-4fc5-9f53-020bd80a03b4",
+      "name": "Test end-to-end mail flow for all features",
+      "description": "Test: (1) New member registration sends confirmation email, (2) Workshop leader sends announcement to participants, (3) External addresses (hotmail, gmail) receive mail, (4) Internal addresses (PMG-managed domains) receive mail, (5) Reply-To shows leader email, (6) Error cases logged correctly. Document any remaining failures with specific error messages.",
+      "status": "Pending",
+      "sort_order": 6,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-22T17:25:14.876367797Z",
+      "updated_at": "2026-03-22T17:25:14.876367797Z"
+    }
+  ]
+}

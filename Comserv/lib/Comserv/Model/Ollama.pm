@@ -80,8 +80,8 @@ if not explicitly provided.
 has 'host' => (
     is => 'rw',
     isa => 'Str',
-    default => 'localhost',
-    documentation => 'Ollama server host (localhost or 192.168.1.199)'
+    default => '192.168.1.199',
+    documentation => 'Ollama server host (default: 192.168.1.199 — overridden by comserv.conf <Ollama> block)'
 );
 
 has 'port' => (
@@ -103,14 +103,14 @@ has 'endpoint' => (
 has 'model' => (
     is => 'rw',
     isa => 'Str',
-    default => 'llama3.1:latest',
-    documentation => 'Ollama model to use (default: llama3.1:latest; alternatives: qwen3-coder:30b, deepseek-v3.2:cloud)'
+    default => 'qwen3-coder:30b',
+    documentation => 'Ollama model to use (default: qwen3-coder:30b; alternatives: starcoder2:3b, deepseek-v3.2:cloud)'
 );
 
 has 'timeout' => (
     is => 'rw',
     isa => 'Int',
-    default => 300,
+    default => 120,
     documentation => 'Request timeout in seconds'
 );
 
@@ -260,10 +260,11 @@ sub query {
     
     # Build the request payload
     my $payload = {
-        model => $self->model,
-        prompt => $prompt,
-        stream => $self->stream ? JSON::true : JSON::false,
-        options => {
+        model      => $self->model,
+        prompt     => $prompt,
+        stream     => $self->stream ? JSON::true : JSON::false,
+        keep_alive => '2h',
+        options    => {
             temperature => $self->temperature,
             num_predict => $self->max_tokens,
         }
@@ -295,27 +296,24 @@ sub query {
     $req->header('Content-Type' => 'application/json');
     $req->content($json_payload);
     
-    # Send the request
+    # Send the request — sync UA timeout each time so callers can change $self->timeout
+    $self->ua->timeout($self->timeout);
     my $response;
     try {
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'query',
-            "Ollama API Request: Payload=$json_payload");
         $response = $self->ua->request($req);
     } catch {
         $self->last_error("HTTP request failed: $_");
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'query',
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'query',
             "HTTP request failed: $_");
         return undef;
     };
     
     # Check response status
     unless ($response->is_success) {
-        my $status = $response->status_line;
-        my $content = $response->content || '';
-        my $error = "HTTP request failed: $status";
+        my $error = "HTTP request failed: " . $response->status_line;
         $self->last_error($error);
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'query',
-            "Ollama API Failure: Status=$status, Response=$content");
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'query',
+            $error);
         return undef;
     }
     
@@ -402,10 +400,11 @@ sub chat {
     
     # Build the request payload
     my $payload = {
-        model => $self->model,
-        messages => $messages,
-        stream => $self->stream ? JSON::true : JSON::false,
-        options => {
+        model      => $self->model,
+        messages   => $messages,
+        stream     => $self->stream ? JSON::true : JSON::false,
+        keep_alive => '2h',
+        options    => {
             temperature => $self->temperature,
             num_predict => $self->max_tokens,
         }
@@ -431,27 +430,24 @@ sub chat {
     $req->header('Content-Type' => 'application/json');
     $req->content($json_payload);
     
-    # Send the request
+    # Send the request — sync UA timeout each time so callers can change $self->timeout
+    $self->ua->timeout($self->timeout);
     my $response;
     try {
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'chat',
-            "Ollama Chat API Request: Payload=$json_payload");
         $response = $self->ua->request($req);
     } catch {
         $self->last_error("HTTP request failed: $_");
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'chat',
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'chat',
             "HTTP request failed: $_");
         return undef;
     };
     
     # Check response status
     unless ($response->is_success) {
-        my $status = $response->status_line;
-        my $content = $response->content || '';
-        my $error = "HTTP request failed: $status";
+        my $error = "HTTP request failed: " . $response->status_line;
         $self->last_error($error);
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'chat',
-            "Ollama Chat API Failure: Status=$status, Response=$content");
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'chat',
+            $error);
         return undef;
     }
     
@@ -1095,6 +1091,90 @@ for listing available models. You may need to maintain a static list or scrape f
 the Ollama website.
 
 =cut
+
+=head2 unload_model
+
+Force-unload a model from Ollama's memory by sending a generate request with
+keep_alive => 0.  This frees RAM/VRAM so a new model can be loaded.
+
+    $ollama->unload_model(model => 'llama3.1:latest');
+
+=cut
+
+sub unload_model {
+    my ($self, %args) = @_;
+
+    my $model_name = $args{model} || $self->model;
+    unless ($model_name) {
+        return { success => 0, error => 'No model name provided' };
+    }
+
+    my $endpoint = $self->endpoint;
+    $endpoint =~ s/\/api\/chat$/\/api\/generate/;
+    $endpoint =~ s/\/api\/generate$/\/api\/generate/;
+
+    my $payload = {
+        model      => $model_name,
+        prompt     => '',
+        keep_alive => 0,
+    };
+
+    my $req = HTTP::Request->new(POST => $endpoint);
+    $req->header('Content-Type' => 'application/json');
+    $req->content(encode_json($payload));
+
+    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'unload_model',
+        "Unloading model '$model_name' from memory (keep_alive=0)");
+
+    my $orig_timeout = $self->ua->timeout;
+    $self->ua->timeout(30);
+    my $response;
+    eval { $response = $self->ua->request($req); };
+    $self->ua->timeout($orig_timeout);
+
+    if ($@ || !$response || !$response->is_success) {
+        my $err = $@ || ($response ? $response->status_line : 'no response');
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'unload_model',
+            "Unload request failed (non-fatal): $err");
+        return { success => 0, error => $err };
+    }
+
+    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'unload_model',
+        "Model '$model_name' unloaded successfully");
+    return { success => 1, message => "Model '$model_name' unloaded from memory" };
+}
+
+=head2 get_running_models
+
+Query Ollama's /api/ps endpoint to see which models are currently loaded in memory.
+
+    my $running = $ollama->get_running_models();
+    # returns arrayref of { name, size_vram, ... }
+
+=cut
+
+sub get_running_models {
+    my ($self) = @_;
+
+    my $endpoint = $self->endpoint;
+    $endpoint =~ s/\/api\/(generate|chat)$/\/api\/ps/;
+
+    my $req = HTTP::Request->new(GET => $endpoint);
+
+    my $orig_timeout = $self->ua->timeout;
+    $self->ua->timeout(10);
+    my $response;
+    eval { $response = $self->ua->request($req); };
+    $self->ua->timeout($orig_timeout);
+
+    return [] if $@ || !$response || !$response->is_success;
+
+    my $data;
+    eval { $data = decode_json($response->content); };
+    return [] if $@;
+
+    return $data->{models} || [];
+}
 
 sub list_available_models {
     my ($self) = @_;

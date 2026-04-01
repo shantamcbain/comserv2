@@ -21,26 +21,27 @@ sub begin :Private {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', 
         "User accessing path: " . $c->req->uri);
     
-    my $roles = $c->session->{roles} || [];
+    # Use stash roles (set by Root::auto — includes site-specific admin detection)
+    my $roles = $c->stash->{user_roles} || $c->session->{roles} || [];
+    $roles = [] unless ref $roles eq 'ARRAY';
     
-    if (ref $roles ne 'ARRAY') {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', 
-            "Invalid or undefined roles in session for user: " . ($c->session->{username} || 'Guest'));
-        $c->stash->{error_msg} = "Session expired or invalid. Please log in again.";
-        $c->res->redirect($c->uri_for('/user/login'));
-        $c->detach;
-    }
-    
-    unless (grep { $_ eq 'admin' || $_ eq 'developer' } @$roles) {
+    unless ($c->stash->{is_admin} || grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal)$/ } @$roles) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', 
             "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
-        $c->stash->{error_msg} = "Unauthorized access. You do not have permission to view this page.";
-        $c->res->redirect($c->uri_for('/'));
+        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         $c->detach;
     }
-    
+
+    # Store SiteName-based visibility context in stash:
+    # CSC admins can see all sites; non-CSC admins/developers only see their own site.
+    my $session_sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $is_csc_admin = (uc($session_sitename) eq 'CSC') && ($c->stash->{is_admin} || grep { lc($_) eq 'admin' } @$roles);
+    $c->stash->{plan_sitename}   = $session_sitename;
+    $c->stash->{is_csc_admin}    = $is_csc_admin;
+
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', 
-        "User authorized to access PlanManagement: " . ($c->session->{username} || 'Guest'));
+        "User authorized to access PlanManagement: " . ($c->session->{username} || 'Guest')
+        . " site=$session_sitename is_csc_admin=" . ($is_csc_admin ? 1 : 0));
 }
 
 sub list :Path('/admin/plan/list') :Args(0) {
@@ -52,10 +53,22 @@ sub list :Path('/admin/plan/list') :Args(0) {
     try {
         my $schema = $c->model('DBEncy');
         my $rs = $schema->resultset('DailyPlan');
-        
-        my $sitename = $c->session->{SiteName};
+
+        # CSC admins can view all sites (with optional filter); others only see their own site.
+        my $is_csc_admin  = $c->stash->{is_csc_admin};
+        my $sitename      = $c->stash->{plan_sitename} || $c->session->{SiteName} || 'CSC';
+        my $filter_site   = $c->req->param('sitename');  # optional filter for CSC admin
+
+        my %search_cond;
+        if ($is_csc_admin && $filter_site) {
+            %search_cond = (sitename => $filter_site);
+        } elsif (!$is_csc_admin) {
+            %search_cond = (sitename => $sitename);
+        }
+        # CSC admin with no filter sees all plans (empty search condition)
+
         my @plans = $rs->search(
-            { sitename => $sitename },
+            \%search_cond,
             { order_by => { -desc => 'created_at' } }
         );
         
@@ -77,8 +90,12 @@ sub list :Path('/admin/plan/list') :Args(0) {
             $c->forward('View::JSON');
         } else {
             $c->stash(
-                plans => \@plan_data,
-                template => 'admin/documentation/DailyPlan.tt'
+                plans        => \@plan_data,
+                is_admin     => $c->stash->{is_admin},
+                is_csc_admin => $c->stash->{is_csc_admin},
+                plan_sitename => $c->stash->{plan_sitename},
+                filter_site  => $filter_site,
+                template     => 'admin/plan/list.tt'
             );
             $c->forward($c->view('TT'));
         }
@@ -108,7 +125,19 @@ sub details :Path('/admin/plan') :Args(1) {
             $c->forward('View::JSON');
             $c->detach;
         }
-        
+
+        # Enforce SiteName-based access: non-CSC users cannot view other sites' plans
+        unless ($c->stash->{is_csc_admin}) {
+            my $user_site = $c->stash->{plan_sitename} || $c->session->{SiteName} || 'CSC';
+            if ($plan->sitename ne $user_site) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'details',
+                    "Access denied: plan site " . $plan->sitename . " != user site $user_site");
+                $c->stash->{json} = { success => 0, error => "Access denied" };
+                $c->forward('View::JSON');
+                $c->detach;
+            }
+        }
+
         my %plan_data = $plan->get_columns;
         $plan_data{progress_percentage} = $plan->get_progress_percentage;
         
@@ -143,67 +172,97 @@ sub details :Path('/admin/plan') :Args(1) {
         }
         
         $plan_data{projects} = \@projects;
-        
-        $c->stash->{json} = { 
-            success => 1, 
-            plan => \%plan_data 
-        };
-        $c->forward('View::JSON');
+
+        my $accept = $c->req->header('Accept') || '';
+        if ($accept =~ m{application/json}) {
+            $c->stash->{json} = { success => 1, plan => \%plan_data };
+            $c->forward('View::JSON');
+        } else {
+            $c->stash(
+                plan         => \%plan_data,
+                is_admin     => $c->stash->{is_admin},
+                is_csc_admin => $c->stash->{is_csc_admin},
+                plan_sitename => $c->stash->{plan_sitename},
+                template     => 'admin/plan/view.tt',
+            );
+            $c->forward($c->view('TT'));
+        }
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details', 
             "Error fetching plan details: $_");
-        $c->stash->{json} = { success => 0, error => "Error fetching plan: $_" };
-        $c->forward('View::JSON');
+        $c->stash(error_msg => "Error loading plan: $_", template => 'admin/plan/view.tt');
+        $c->forward($c->view('TT'));
     };
 }
 
 sub create :Path('/admin/plan/create') :Args(0) {
     my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create', 
+
+    # GET — render creation form
+    if ($c->req->method ne 'POST') {
+        $c->stash(
+            sitename  => $c->stash->{plan_sitename} || $c->session->{SiteName} || 'CSC',
+            is_admin  => $c->stash->{is_admin},
+            template  => 'admin/plan/create.tt',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    # POST — process form submission
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create',
         'Creating new plan');
-    
+
+    my $params       = $c->req->body_parameters;
+    my $plan_name    = $params->{plan_name};
+    my $plan_desc    = $params->{plan_description};
+    my $start_date   = $params->{start_date} || undef;
+    my $due_date     = $params->{due_date}   || undef;
+    my $priority     = $params->{priority}   || 0;
+    my $status       = $params->{status}     || 'active';
+    my $sitename     = $c->session->{SiteName} || 'CSC';
+
+    unless ($plan_name) {
+        $c->stash(
+            error_msg => "Plan name is required.",
+            sitename  => $sitename,
+            is_admin  => $c->stash->{is_admin},
+            template  => 'admin/plan/create.tt',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
     try {
-        my $params = $c->req->body_parameters;
-        my $plan_name = $params->{plan_name};
-        my $plan_description = $params->{plan_description};
-        my $start_date = $params->{start_date};
-        my $due_date = $params->{due_date};
-        my $priority = $params->{priority} || 0;
-        my $status = $params->{status} || 'active';
-        
-        unless ($plan_name) {
-            $c->stash->{json} = { success => 0, error => "Plan name is required" };
-            $c->forward('View::JSON');
-            $c->detach;
-        }
-        
-        my $schema = $c->model('DBEncy');
-        my $plan = $schema->resultset('DailyPlan')->create({
-            plan_name => $plan_name,
-            plan_description => $plan_description,
-            sitename => $c->session->{SiteName},
-            status => $status,
-            start_date => $start_date,
-            due_date => $due_date,
-            priority => $priority,
-            created_by => $c->session->{username} || 'unknown',
+        my $plan = $c->model('DBEncy')->resultset('DailyPlan')->create({
+            plan_name        => $plan_name,
+            plan_description => $plan_desc,
+            sitename         => $sitename,
+            status           => $status,
+            start_date       => $start_date,
+            due_date         => $due_date,
+            priority         => $priority,
+            created_by       => $c->session->{username} || 'unknown',
         });
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create', 
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create',
             "Plan created successfully: " . $plan->id);
-        
-        $c->stash->{json} = { 
-            success => 1, 
-            plan_id => $plan->id,
-            message => "Plan created successfully"
-        };
-        $c->forward('View::JSON');
+
+        $c->res->redirect($c->uri_for('/admin/plan/list'));
     } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', 
-            "Error creating plan: $_");
-        $c->stash->{json} = { success => 0, error => "Error creating plan: $_" };
-        $c->forward('View::JSON');
+        my $err = $_;
+        # Re-throw Catalyst internal exceptions (detach, redirect, etc.)
+        die $err if ref $err && $err->isa('Catalyst::Exception');
+
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create',
+            "Error creating plan: $err");
+        $c->stash(
+            error_msg => "Error creating plan: $err",
+            sitename  => $sitename,
+            is_admin  => $c->stash->{is_admin},
+            template  => 'admin/plan/create.tt',
+        );
+        $c->forward($c->view('TT'));
     };
 }
 
@@ -476,6 +535,52 @@ sub add_todo :Path('/admin/plan/project') :Args(2) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_todo', 
             "Error adding todo: $_");
         $c->stash->{json} = { success => 0, error => "Error adding todo: $_" };
+        $c->forward('View::JSON');
+    };
+}
+
+sub link_project :Path('/admin/plan/link_project') :Args(0) {
+    my ($self, $c) = @_;
+
+    return unless $c->req->method eq 'POST';
+
+    my $plan_id    = $c->req->body_parameters->{plan_id};
+    my $project_id = $c->req->body_parameters->{project_id};
+
+    unless ($plan_id && $project_id) {
+        $c->stash->{json} = { success => 0, error => "plan_id and project_id are required" };
+        $c->forward('View::JSON');
+        $c->detach;
+    }
+
+    try {
+        my $schema = $c->model('DBEncy');
+
+        my $existing = $schema->resultset('DailyPlanProject')->search({
+            plan_id    => $plan_id,
+            project_id => $project_id,
+        })->first;
+
+        if ($existing) {
+            $c->stash->{json} = { success => 0, error => "Already linked" };
+            $c->forward('View::JSON');
+            $c->detach;
+        }
+
+        $schema->resultset('DailyPlanProject')->create({
+            plan_id    => $plan_id,
+            project_id => $project_id,
+        });
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'link_project',
+            "Linked plan $plan_id to project $project_id");
+
+        $c->stash->{json} = { success => 1, message => "Plan linked to project" };
+        $c->forward('View::JSON');
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'link_project',
+            "Error linking plan to project: $_");
+        $c->stash->{json} = { success => 0, error => "Error: $_" };
         $c->forward('View::JSON');
     };
 }

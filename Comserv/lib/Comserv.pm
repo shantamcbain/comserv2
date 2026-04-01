@@ -80,11 +80,39 @@ __PACKAGE__->config(
         },
     },
     'Plugin::Session' => {
-        expires => 3600,
-        cookie_name => 'comserv_session',
+        expires => 86400,
+        storage => do {
+            my $port = $ENV{COMSERV_PORT} || $ENV{CATALYST_PORT} || do {
+                my $p = '3001';
+                for my $i (0 .. $#ARGV) {
+                    if ($ARGV[$i] =~ /^-p(\d+)$/)         { $p = $1; last }
+                    elsif ($ARGV[$i] eq '-p' && $ARGV[$i+1] && $ARGV[$i+1] =~ /^\d+$/) { $p = $ARGV[$i+1]; last }
+                    elsif ($ARGV[$i] =~ /^--port=(\d+)$/)  { $p = $1; last }
+                    elsif ($ARGV[$i] eq '--port' && $ARGV[$i+1] && $ARGV[$i+1] =~ /^\d+$/) { $p = $ARGV[$i+1]; last }
+                }
+                $p;
+            };
+            $ENV{COMSERV_SESSION_DIR} || "/tmp/comserv/session_$port";
+        },
+        cookie_name => do {
+            my $port = $ENV{COMSERV_PORT} || $ENV{CATALYST_PORT} || do {
+                my $p = '3001';
+                for my $i (0 .. $#ARGV) {
+                    if ($ARGV[$i] =~ /^-p(\d+)$/)         { $p = $1; last }
+                    elsif ($ARGV[$i] eq '-p' && $ARGV[$i+1] && $ARGV[$i+1] =~ /^\d+$/) { $p = $ARGV[$i+1]; last }
+                    elsif ($ARGV[$i] =~ /^--port=(\d+)$/)  { $p = $1; last }
+                    elsif ($ARGV[$i] eq '--port' && $ARGV[$i+1] && $ARGV[$i+1] =~ /^\d+$/) { $p = $ARGV[$i+1]; last }
+                }
+                $p;
+            };
+            $ENV{COMSERV_SESSION_COOKIE} || "comserv_session_$port";
+        },
         cookie_secure => 0,
         cookie_httponly => 1,
+<<<<<<< HEAD
         storage => '/tmp/comserv/session/comserv_sessions.mmap',
+=======
+>>>>>>> main
     },
     'Model::ThemeConfig' => {
         # Theme configuration model
@@ -198,9 +226,20 @@ around 'finalize_error' => sub {
             my $session_id = $c->sessionid // 'no-session';
             my $user_id = $c->session->{user_id} // 'no-user';
             my $path = $c->req->path;
-            
+
+            my %req = Comserv::Util::Logging::extract_request_info($c);
+            my $ip       = $req{ip_address}    // '-';
+            my $req_type = $req{request_type}  // '-';
+            my $method   = $req{request_method}// '-';
+            my $ua       = substr($req{user_agent} // '-', 0, 120);
+            my $referer  = $req{referer}        // '-';
+
             $logger->log_with_details($c, 'error', __FILE__, __LINE__, 'global_error_handler',
-                "[GLOBAL ERROR] Unhandled exception: $error_msg (Session: $session_id, User: $user_id, Path: $path)");
+                "[GLOBAL ERROR] Unhandled exception: $error_msg"
+                . " (Session: $session_id, User: $user_id, Path: $path,"
+                . " IP: $ip, Type: $req_type, Method: $method, Referer: $referer, UA: $ua)");
+
+            $logger->log_access($c, 500);
         }
     };
 

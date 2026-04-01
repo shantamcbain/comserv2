@@ -1,0 +1,305 @@
+[% PageVersion = 'Comserv/root/Documentation/mail_configuration_guide.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Mail Configuration Guide' %]
+
+<!-- Documentation page for mail_configuration_guide -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+This guide explains how to configure and manage email settings in the Comserv application. Proper mail configuration is essential for system notifications, user registration emails, password resets, and other email-based features.
+
+
+
+<h2>Prerequisites</h2>
+
+
+
+Before configuring the mail system, ensure you have:
+
+
+
+<ol><li>Access to an SMTP server</li></ol>
+
+<ol><li>SMTP server credentials (username and password)</li></ol>
+
+<ol><li>Administrator access to the Comserv application</li></ol>
+
+
+
+<h2>Configuration Process</h2>
+
+
+
+<h3>Step 1: Access the Mail Configuration Form</h3>
+
+
+
+<ol><li>Log in to the Comserv application with administrator credentials</li></ol>
+
+<ol><li>Navigate to <code>/mail/add_mail_config_form</code> in your browser</li></ol>
+
+<ol><li>You will see the mail configuration form</li></ol>
+
+
+
+<h3>Step 2: Enter SMTP Settings</h3>
+
+
+
+Fill in the following fields:
+
+
+
+<ol><li>**Site ID**: The ID of the site for which you're configuring mail</li></ol>
+
+<ol><li>**SMTP Host**: The hostname of your SMTP server (e.g., <code>smtp.gmail.com</code>)</li></ol>
+
+<ol><li>**SMTP Port**: The port number (typically 587 for TLS, 465 for SSL, or 25 for non-encrypted)</li></ol>
+
+<ol><li>**SMTP Username**: Your SMTP authentication username</li></ol>
+
+<ol><li>**SMTP Password**: Your SMTP authentication password</li></ol>
+
+
+
+<h3>Step 3: Submit the Configuration</h3>
+
+
+
+<ol><li>Click the "Add Configuration" button</li></ol>
+
+<ol><li>If successful, you'll see a confirmation message</li></ol>
+
+<ol><li>The settings will be stored in the database for the specified site</li></ol>
+
+
+
+<h2>Testing the Configuration</h2>
+
+
+
+After configuring the mail settings, you should test to ensure emails are sent correctly:
+
+
+
+<ol><li>Navigate to the user management section</li></ol>
+
+<ol><li>Create a test user with your email address</li></ol>
+
+<ol><li>The system should send a welcome email</li></ol>
+
+<ol><li>Check your inbox for the welcome email</li></ol>
+
+
+
+If you don't receive the email, check the application logs for error messages.
+
+
+
+<h2>Configuration Storage</h2>
+
+
+
+Mail configuration is stored in the <code>site_config</code> table with the following structure:
+
+
+
+| site_id | config_key    | config_value        |
+
+|---------|---------------|---------------------|
+
+| 1       | smtp_host     | smtp.example.com    |
+
+| 1       | smtp_port     | 587                 |
+
+| 1       | smtp_username | user@example.com    |
+
+| 1       | smtp_password | (encrypted password) |
+
+| 1       | smtp_from     | noreply@example.com |
+
+
+
+Each site can have its own mail configuration, allowing for different email settings across multiple sites.
+
+
+
+<h2>Updating Configuration</h2>
+
+
+
+To update existing mail configuration:
+
+
+
+<ol><li>Navigate to <code>/mail/add_mail_config_form</code></li></ol>
+
+<ol><li>Enter the site ID and new SMTP settings</li></ol>
+
+<ol><li>Submit the form</li></ol>
+
+<ol><li>The system will update the existing configuration or create a new one if it doesn't exist</li></ol>
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+<h3>Common Configuration Issues</h3>
+
+
+
+<ol><li>**Authentication Failure**</li></ol>
+
+   - Error: "Authentication failed" or "Invalid credentials"
+
+   - Solution: Verify SMTP username and password
+
+
+
+<ol><li>**Connection Issues**</li></ol>
+
+   - Error: "Connection refused" or "Timeout"
+
+   - Solution: Check if the SMTP server is accessible and the port is correct
+
+
+
+<ol><li>**TLS/SSL Issues**</li></ol>
+
+   - Error: "TLS/SSL negotiation failed"
+
+   - Solution: Ensure you're using the correct port and security settings
+
+
+
+<ol><li>**Missing Configuration**</li></ol>
+
+   - Error: "SMTP configuration is missing"
+
+   - Solution: Add the configuration using the form
+
+
+
+<h3>Checking Logs</h3>
+
+
+
+To diagnose mail issues, check the application logs:
+
+
+
+<code></code>`bash
+
+cat /home/shanta/PycharmProjects/comserv2/Comserv/script/logs/application.log
+
+<code></code>`
+
+
+
+Look for entries related to email sending, which will include detailed error messages.
+
+
+
+<h2>Security Considerations</h2>
+
+
+
+<ol><li>**Password Security**</li></ol>
+
+   - Use app-specific passwords for services like Gmail
+
+   - Regularly rotate SMTP passwords
+
+   - Consider using environment variables for sensitive credentials
+
+
+
+<ol><li>**TLS/SSL**</li></ol>
+
+   - Always use TLS/SSL for SMTP connections when possible
+
+   - Avoid using unencrypted connections (port 25)
+
+
+
+<ol><li>**Sender Verification**</li></ol>
+
+   - Ensure the "From" address is valid and authorized
+
+   - Use domain verification if required by your email provider
+
+
+
+<h2>Gmail Configuration Example</h2>
+
+
+
+If using Gmail as your SMTP server:
+
+
+
+<ol><li>**SMTP Host**: smtp.gmail.com</li></ol>
+
+<ol><li>**SMTP Port**: 587</li></ol>
+
+<ol><li>**SMTP Username**: your.email@gmail.com</li></ol>
+
+<ol><li>**SMTP Password**: (app-specific password)</li></ol>
+
+
+
+Note: For Gmail, you'll need to:
+
+<ul><li>Enable 2-Step Verification</li></ul>
+
+<ul><li>Generate an App Password</li></ul>
+
+<ul><li>Use the App Password instead of your regular Gmail password</li></ul>
+
+
+
+<h2>Office 365 Configuration Example</h2>
+
+
+
+If using Office 365:
+
+
+
+<ol><li>**SMTP Host**: smtp.office365.com</li></ol>
+
+<ol><li>**SMTP Port**: 587</li></ol>
+
+<ol><li>**SMTP Username**: your.email@yourdomain.com</li></ol>
+
+<ol><li>**SMTP Password**: (your password)</li></ol>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/Documentation/mail_system.md">Mail System Documentation</a></li></ul>
+
+<ul><li><a href="/EMAIL_MODULE_FIX.md">Email Module Fix</a></li></ul>
+
+<ul><li><a href="/SERVER_DEPLOYMENT.md">Server Deployment</a></li></ul>
+
+</div>

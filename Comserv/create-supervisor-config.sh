@@ -15,7 +15,7 @@ if [ "$CATALYST_ENV" = "development" ]; then
 fi
 
 # Number of workers based on environment
-WORKERS=${STARMAN_WORKERS:-2}
+WORKERS=${STARMAN_WORKERS:-5}
 if [ "$CATALYST_ENV" = "development" ]; then
     WORKERS=1
 fi
@@ -36,16 +36,24 @@ ENV_VARS="$ENV_VARS,PERL5LIB=/opt/comserv/lib:/opt/comserv/local/lib/perl5"
 ENV_VARS="$ENV_VARS,CATALYST_ENV=$CATALYST_ENV"
 ENV_VARS="$ENV_VARS,CATALYST_DEBUG=$CATALYST_DEBUG"
 ENV_VARS="$ENV_VARS,WEB_PORT=$PORT"
+ENV_VARS="$ENV_VARS,STARMAN_WORKERS=$WORKERS"
 ENV_VARS="$ENV_VARS,COMSERV_LOG_DIR=/opt/comserv"
 
-# Pass through all COMSERV_DB_, WORKSHOP_, SYSTEM_IDENTIFIER and HEALTH_ environment variables from container env
-if env | grep -qE '^(COMSERV_DB_|WORKSHOP_|SYSTEM_IDENTIFIER|HEALTH_)'; then
-  for var in $(env | grep -E '^(COMSERV_DB_|WORKSHOP_|SYSTEM_IDENTIFIER|HEALTH_)' | cut -d= -f1); do
-    ENV_VARS="$ENV_VARS,$var=${!var}"
+# Pass through DB_, COMSERV_DB_, COMSERV_SESSION_, WORKSHOP_, SYSTEM_IDENTIFIER,
+# HEALTH_, ACTIVE_DB_, STARMAN_, DB_LOG_, REDIS_ environment variables.
+# DB_HOST/DB_USER/DB_PASSWORD must reach ContainerHealthMonitor.pl so it can authenticate.
+# COMSERV_SESSION_DIR/COMSERV_SESSION_COOKIE must reach the Perl app for session isolation.
+if env | grep -qE '^(DB_|COMSERV_DB_|COMSERV_SESSION|WORKSHOP_|SYSTEM_IDENTIFIER|HEALTH_|ACTIVE_DB_|STARMAN_|DB_LOG_|REDIS_)'; then
+  for var in $(env | grep -E '^(DB_|COMSERV_DB_|COMSERV_SESSION|WORKSHOP_|SYSTEM_IDENTIFIER|HEALTH_|ACTIVE_DB_|STARMAN_|DB_LOG_|REDIS_)' | cut -d= -f1); do
+    val="${!var}"
+    val="${val//,/__COMMA__}"
+    ENV_VARS="$ENV_VARS,$var=$val"
   done
 fi
 
-# Create supervisor program configuration with comprehensive logging
+# Create supervisor program configuration.
+# stdout/stderr go to BOTH a log file (mounted volume) AND /proc/1/fd/1 (container stdout)
+# so that "docker logs" shows app output on the production server.
 cat > /etc/supervisor/conf.d/comserv.conf << EOFCONF
 [program:comserv-server]
 command=$START_CMD
@@ -55,12 +63,10 @@ autostart=true
 autorestart=unexpected
 startsecs=10
 stopasgroup=true
-stdout_logfile=${CATALYST_HOME}/root/log/catalyst.log
+stdout_logfile=/proc/1/fd/1
 stdout_logfile_maxbytes=0
-stdout_capture_maxbytes=0
-stderr_logfile=${CATALYST_HOME}/root/log/catalyst_error.log
+stderr_logfile=/proc/1/fd/2
 stderr_logfile_maxbytes=0
-stderr_capture_maxbytes=0
 environment=$ENV_VARS
 priority=999
 
@@ -71,20 +77,17 @@ user=comserv
 autostart=true
 autorestart=true
 startsecs=5
-stdout_logfile=${CATALYST_HOME}/root/log/health_monitor.log
-stdout_logfile_maxbytes=1MB
-stdout_logfile_backups=5
-stderr_logfile=${CATALYST_HOME}/root/log/health_monitor_error.log
-stderr_logfile_maxbytes=1MB
-stderr_logfile_backups=5
+stdout_logfile=/proc/1/fd/1
+stdout_logfile_maxbytes=0
+stderr_logfile=/proc/1/fd/2
+stderr_logfile_maxbytes=0
 environment=$ENV_VARS
 priority=1000
 EOFCONF
 
 echo "[supervisor-config] Generated supervisor config:"
 echo "[supervisor-config] Command: $START_CMD"
-echo "[supervisor-config] Log file: ${CATALYST_HOME}/root/log/catalyst.log"
-echo "[supervisor-config] Error log: ${CATALYST_HOME}/root/log/catalyst_error.log"
+echo "[supervisor-config] Logs: container stdout/stderr (visible via 'docker logs')"
 
 # Write config to supervisord log so we can see it in docker logs
 echo "[supervisor-config] ===== Supervisor config generated =====" >> /var/log/supervisor/supervisord.log 2>&1 || true
