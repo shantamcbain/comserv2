@@ -1,0 +1,54 @@
+[%
+
+# the home  Page template
+#	$Id: ContactView.ttml,v 1.1 2002/01/09 22:01:26 shanta Exp $
+
+%]
+[% embed(data.page_top_view,['-PAGE_TITLE','Site Contacts']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% Username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+ [% script_name = data.app_name %]
+    [% USE DBI( data_source = 'dbi:mysql:forager',
+                username = 'forager',
+                password = 'pwxx88' )
+    %]
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<div align="center"><h2>Open Vs Closed</h2>
+</div><br>
+<br>
+To understand best how open source technology is developed, we can compare it to traditional closed source software produced by companies such as Microsoft.
+
+Open source software is based around the idea that the user can not only view, but change the source code of an application.
+
+Closed source software is hidden to prevent the user either viewing or changing the code.
+
+After initial production, open source software is released to the development community and undergoes a secondary phase of evolution. It is scrutinised by thousands of professional developers across the globe who highlight potential flaws, bugs and security glitches. These suggestions and improvements are fed back to the developer who considers them for inclusion in his application.
+
+Closed source software is developed in isolation with a small team of developers. It isn't possible to build a team of hundreds to check the code because the code is deemed proprietary and secret. Bugs and security flaws are often not found until after a product launch when a steady stream of security patches and updates are required.
+
+Open source isn't just about having your own applications de-bugged for free. By releasing new applications to the community, we are helping new generations of developers learn how to code. These new developers create their own applications, which are fed back into the community and rapidly advance the growth of the whole system.
+
+It is open source technology that has fuelled the growth of the Internet over the last six years with key applications such as Sendmail, Linux, Apache and WebStore, languages like Java and Perl, and mark-up languages such as HTML, WML and XML.
+
+It is these same open source methods that have made eXtropia the standard for web applications and the head of a global open source development community. [% embed(data.page_bottom_view) %]
+</td>
+</tr>
+</table>
+[% embed(data.page_bottom_view) %]

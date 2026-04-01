@@ -1,0 +1,37 @@
+[%
+#	$Id: NucView.ttml,v 1.1 2003/11/29 06:42:47 shanta Exp shanta $	%]
+[% PROCESS DefaultDbi.ttml %]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Nucs']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+
+ 
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td >
+<h3>This is Nucs.</h3>[% data.dbi_dsn %]
+<p>There two types of nucs we will be tracking. Mating nucs and sale nucs
+
+
+[%  embed ('MatingNuc')%]
+
+[%  embed('ReplacementNuc') %]
+
+[% embed(data.page_bottom_view) %]
+

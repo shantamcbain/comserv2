@@ -1,0 +1,62 @@
+[% 
+ url_encoded_admin_variables = embed(data.url_encoded_admin_fields_view_name);
+ day_view_url = "$data.script_name?site=$data.site_name&amp;$url_encoded_admin_variables";
+
+ # reduce the indirection
+ sel = data.selected_date_data;
+
+ months_str = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+-%]
+
+<TABLE CELLSPACING="2" CELLPADDING="1" WIDTH="100%" BORDER="0">
+  <!-- small navbar -->
+  <TR>
+      <TD WIDTH="14%" CLASS="month_title_header">
+        <A HREF="[% "$day_view_url&amp;date=$sel.prev_year_date" %]">
+          <IMG SRC="[% data.image_root_url %]/prev.gif" BORDER=0 ALT="Previous Year"></A>
+          [% sel.year %]
+        <A HREF="[% "$day_view_url&amp;date=$sel.next_year_date" %]">
+          <IMG SRC="[% data.image_root_url %]/next.gif" BORDER=0 ALT="Next Year"></A>
+      </TD>
+  </TR>
+</TABLE>
+
+<TABLE CELLSPACING="2" CELLPADDING="1" WIDTH="100%" BORDER="0">
+
+  <!-- rows -->
+  [% count = 0 %]
+  [% USE table(months_str, rows=3, cols=4, overlap=0, pad=0) %]
+  [% FOREACH col = table.cols %]
+      <TR>
+      [% FOREACH mon_str = col %]
+          [% count = count + 1;
+             selected = sel.mon == count ? 1 : 0;
+           %]
+  
+          [% IF selected %]
+  
+            <TD WIDTH="14%" CLASS="month_day_cell_selected">
+                [% mon_str %]
+            </TD>
+  
+          [% ELSE %]
+  
+            [% 
+             date = subs.sprintf("%04d-%02d-%02d",sel.year,count,sel.valid_date_by_mon.$count);
+             full_url = "$day_view_url&amp;date=$date";
+            -%]
+  
+            <TD WIDTH="14%" CLASS="month_day_cell">
+              <P CLASS="month_day_cell_text">
+                <A HREF="[% full_url %]">[% mon_str %]</A>
+              </P>
+            </TD>
+  
+          [% END %]
+      [% END %]
+      </TR>
+  [% END %]
+
+</TABLE>
+

@@ -1,0 +1,35 @@
+[%
+#	$Id: HESiteLog.ttml,v 0.1 2011/08/10 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dose't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dose't rely on any
+# variables from outside.
+
+%]
+
+		<ul>
+			<li>Please login each day to stay current</li>
+			<li>All HE members need to crate an account</li>
+			<li>Both sites HE and IamNuts use the same auth user list This can be changed if needed.</li>
+		</ul>
+
+
+[% FOREACH link = DBI.query("SELECT * FROM log_tb
+                                  WHERE (sitename =  'HE')
+                                  ORDER BY project_code
+                                  ")%]    
+                                  
+                                  
+                                   <tr>
+<td class="NavTableCellStyle"> [% link.sitename %] </td>
+<td class="NavTableCellStyle"> [% link.project_code %]  </td>
+<td class="NavTableCellStyle"> [% link.abstract %]  </td>
+<td class="NavTableCellStyle"> [% link.details %]  </td>
+<td class="NavTableCellStyle">        
+  <a href="/cgi-bin/ToDo/log.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %][% link.view_name %]" name="Contact" target="[% link.target %]" title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+ </td>
+</tr>
+[% END %]

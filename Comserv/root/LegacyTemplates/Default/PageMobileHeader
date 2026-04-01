@@ -1,0 +1,36 @@
+[% #/HTMLTemplates/Default/PageMobileHeader.ttml %]
+[%# 	$Id: PageHeaderView.ttml,v 0.01 2003/11/29 06:33:25 shanta Exp shanta $	%]
+
+[%# All content of this view is confined to a table cell in PageTopView %]
+	<!-- PageHeadView 0.01 Begin -->
+
+	  <table>
+		<tr align="left">
+		<td CLASS="HeaderLeftCellStyle"> 
+			 <IMG SRC ="[% data.application_logo %]" WIDTH ="[% data.application_logo_width %]"      HEIGHT ="[% data.application_logo_height %]"	ALT ="[% data.application_logo_alt %]"> 		         
+		</td> 
+		<td align="center" valign="middle">
+
+		
+		
+			[% embed('HeaderHostingView') %] 
+			
+		<td align="center" valign="middle">
+
+<!-- Call HeaderNaveBarView -->
+
+					[% embed('HeaderNavBarView') %] 
+					
+<!-- Close table -->					
+		</td>
+	   </tr>
+   <tr>
+	   <td class="NavTableCellStyle">Javamenu
+[% embed('JavaMenu') %]
+    </TD>
+    </TR>	  
+     </table>
+		
+
+	
+<!--End PageHeaderView -->

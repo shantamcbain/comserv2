@@ -1,0 +1,59 @@
+[% IF data.session_object %]
+
+    [% session_id = data.session_object.getId() %]
+
+[% END %]
+
+[% total_expenses = 0 %]
+
+[% total_open_expenses = 0 %]
+
+[% total_closed_expenses = 0 %]
+
+[% FOR rh_record = data.records %]        
+
+    [% total_expenses = total_expenses + rh_record.time %] 
+
+[% END %]    
+
+[% data.cgi.header %]
+	
+[% embed(data.page_top_view,['-PAGE_TITLE','CSCTotalView']) %]
+<TITLE>[% data.script_display_name %] : Billing Stats</TITLE>
+
+<TABLE BORDER = "0" WIDTH = "85%">
+<TR>
+    <TD CLASS = "sectionHeaderStyle">
+    My  [% rh_record.project_code %]
+    </TD>
+</TR>
+<tr>
+    <TD>
+
+[% embed('ErrorDisplayView') %]
+[% embed('BasicDBTable') %]
+</td>
+</tr>
+<TR>
+    <TD>
+   </tr>
+<TD BACKGROUND = "[% data.image_root_url %]/greyline.gif" BORDER = "0"
+     HEIGHT = "1" COLSPAN = "2">
+    Total Expenses:
+    </TD> 
+    <TD>
+[% total_expenses %]
+    </TD>
+
+    <TD>
+</td>
+</tr>
+</TR>
+<TR>
+    <TD>
+ [% embed('RecordSetDetailsFooterView') %]
+    </TD>
+</TR>
+
+</TABLE>
+[% embed(data.page_bottom_view) %]

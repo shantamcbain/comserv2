@@ -1,0 +1,138 @@
+[%
+#	$Id: LtrustLeasesView.ttml,v 1.0 2010/02/19 01:33:34 shanta Exp $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it doesn't rely on any
+# variables from outside.
+
+%]
+[% embed(data.page_top_view,['-PAGE_TITLE','Land leases.']) %]
+
+[%# embed('SubTopFrameView',['-PAGE_TITLE','Land leases.']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<div ALIGN="center">
+
+</div>
+<A NAME="PageTop"></A>
+</div>		
+
+[% TLCLeaseLink = "<a href='http://blog.conservancy.bc.ca/wp-content/uploads/2010/02/Farmland-Access-Agreement-Guide-2009-for-email.pdf' onmouseover='A must read.'>Reference doc from TLC</a>" %]
+[% LeaseTypes = "
+<ul>
+	<li>Leases,</li>
+	<li>Profits à prendre,</li>
+	<li>Licenses and<i>
+	<li>Memoranda of understanding.</li>
+</ul>
+" %]
+
+[% IF SiteName == "HE" OR
+	   SiteName == "HEDev" %]
+
+	      
+	      
+	      <hr width="50">Hello [% data.session_object.getAttribute('-KEY','auth_firstname') %]
+	      <p>This is were we will develop our leases for tenant access to HE land and resources. The fallowing is a list of leases on offer.</p>
+	      <p>[% TLCLeaseLink %]</p>
+	      [% LeaseTypes %]
+	      <h4>Option 1</h4>
+	      
+	      <h4><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=ECFPurchaseLeaseView" name="See the development of the lease here">Option 1</a></h4>
+	      <h5>Lease/Profits à prendre purchage agreement on land </h5>
+	      <p>Eagle Creek Farms enters into a agrement to take over sturdship of land.</p>
+	      
+	      <h4>Option 2</h4>
+	      <ul> 
+				<li>Agriculture 	
+				<ul>
+					<li>Profits à prendre,</li>
+	            <li>This lease would cover all the crops on the property in the ALR area.</li> 
+	            <li>All RV sites in boundaries would be Included in this lease. </li>
+	            <li>Farmer need autonomy on management of RV sites.</li> 
+	            <li>New sites would be subject to approval by landowner and wood lot leaser.</li> 
+	            <li>Via MOU lower well will have their leaser as primary user as according to Water MOU</li> 
+	            <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=LowerShopLeaseView" name="See the development of the lease here">farming</a> practices in accordance to MOU (based on the TLC MOU)</li>
+	            </ul>
+	</li>
+				<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=LowerShopLeaseView" name="See the development of the lease here">Woodlot</a>
+				<p>This lease will cover all dealings with tree on the property. Ron and shanta interested in this lease.</p>
+				</li>
+				<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=LowerShopLeaseView" name="See the development of the lease here">Residential house</a>. ECF may want temp access till leased.</li>
+				<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=LowerShopLeaseView" name="See the development of the lease here">Lower Shop</a>. This lease will be for access to shop and mid plato access</li>
+				<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=UpperShopLeaseView" name="See the development of the lease here">Upper Shop</a> This will be the upper shop and adjoining plato. Is Shanta residential. Payment on this will be <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=ManagerView" onmouseover="Details on manager position">management fees for HE</a>.</li>
+				<li>Point residence site Target lessor would be senior care center</li>
+				<li></li>
+			</ul>
+[% ELSIF SiteName == "ECF" OR
+	   SiteName == "DevECF" %]
+	      <hr width="50">Hello [% data.session_object.getAttribute('-KEY','auth_firstname') %]
+	      <p>This is were we will develop our leases for tenant access to Eagle Creek Farms  land and resources. The fallowing is a list of leases on offer.</p>
+	      <p>[% TLCLeaseLink %]</p>
+	      [% LeaseTypes %]
+	      <h4>Option 1</h4>
+	      
+	      <h4><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=ECFPurchaseLeaseView" name="See the development of the lease here">Lease</a></h4>
+	      
+	      <h5>Lease/Profits à prendre purchage agreement on land </h5>
+	      <p>Eagle Creek Farms enters into a agrement to take over sturdship of land.</p>
+	      <ul> 
+				<li>Agriculture 	
+				<ul>
+					<li>Profits à prendre,</li>
+	            <li>This lease would cover all the crops on the property in the ALR area.</li> 
+	            <li>All RV sites in boundaries would be Included in this lease. </li>
+	            <li>Farmer need autonomy on management of RV sites.</li> 
+	            <li>New sites would be subject to approval by landowner and wood lot leaser.</li> 
+	            <li>Via MOU lower well will have their leaser as primary user as according to Water MOU</li> 
+	            <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=LowerShopLeaseView" name="See the development of the lease here">farming</a> practices in accordance to MOU (based on the TLC MOU)</li>
+	            </ul>
+	</li>
+				<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=LowerShopLeaseView" name="See the development of the lease here">Woodlot</a>
+				<p>This lease will cover all dealings with tree on the property. Ron and shanta interested in this lease.</p>
+				</li>
+				<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=LowerShopLeaseView" name="See the development of the lease here">Residential house</a>. ECF may want temp access till leased.</li>
+				<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=LowerShopLeaseView" name="See the development of the lease here">Lower Shop</a>. This lease will be for access to shop and mid plato access</li>
+				<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=UpperShopLeaseView" name="See the development of the lease here">Upper Shop</a> This will be the upper shop and adjoining plato. Is Shanta residential. Payment on this will be <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=ManagerView" onmouseover="Details on manager position">management fees for HE</a>.</li>
+				<li>Point residence site Target lessor would be senior care center</li>
+				<li></li>
+			</ul>
+		[% ELSE %]
+
+<p>There are 4 basic ways to acquire the use of land and its resources other than ownership</
+	      <p>[% TLCLeaseLink %]</p>
+<p><ul>
+	<li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=LTrustPurchaceLeaseView" name="See the development of the lease here">Leases</a>,</li>
+	<li>Profits à prendre,</li>
+	<li>Licenses and<i>
+	<li>Memoranda of understanding.</li>
+</ul> </p>
+
+
+		[% END %]
+
+<p><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=LtrustHomeView">Home </a> | <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=PolicyStatmentView">Policy Statment </a></p>
+
+</td>
+</tr>
+</table>
+

@@ -1,0 +1,48 @@
+[%
+
+# this template generates power search form
+
+
+%]
+ [% PROCESS DefaultDbi.ttml %]
+
+[% set_headers(data.http_header_params) %]
+
+[% embed(data.page_top_view,{'-PAGE_TITLE' => 'Power Search'}) %]
+
+[% embed('ErrorDisplayView') %]
+
+[% session_id = data.session_object.getId() %]
+
+        <FORM METHOD = "POST" TARGET = "[% data.link_target %]">
+        <CENTER>
+        <TABLE WIDTH = "95%" BORDER = "0" CELLSPACING = "2" 
+               CELLPADDING = "0">
+        <TR>
+        <TD CLASS = "sectionHeaderStyle" COLSPAN=2>
+        Power Search
+        </TD>
+        </TR>
+
+[% embed('WidgetsTableView', 
+         {'-DISPLAY_TYPE'    => 'SEARCH',
+          '-USE_RECORD_FROM' => 'CGI',
+         }) %]
+
+        <TR>
+        <TD COLSPAN = "2" ALIGN = "CENTER">
+	<INPUT TYPE = "IMAGE" NAME = "submit_power_search"  BORDER = "0"
+               VALUE = "on" SRC = "[% data.image_root_url %]/psearch0.gif"
+               onMouseOver="this.src='[% data.image_root_url %]/psearch1.gif'"
+               onMouseOut="this.src='[% data.image_root_url %]/psearch0.gif'"
+               onMouseDown="this.src='[% data.image_root_url %]/psearch0.gif'"
+               onMouseUp="this.src='[% data.image_root_url %]/psearch1.gif'">
+        &nbsp;</TD>
+        </TR>
+
+	</TABLE>
+	</CENTER>
+	[% embed("HiddenAdminFieldsView") %]
+	</FORM>
+
+[% embed(data.page_bottom_view) %]

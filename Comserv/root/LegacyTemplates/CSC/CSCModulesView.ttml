@@ -1,0 +1,15 @@
+[% #	$Id: CSCModulesView.ttml,v 1.1 2015/08/16 04:23:07 shanta Exp shanta $	%]
+<p>Here is a list of current modules Available to all sites
+
+<ol>
+	<li><a href="http://demo.computersystemconsulting.ca/cgi-bin/WebCal/webcal.cgi?site=Demo&amp;[% session_string %]">Calendar's</a> </li>
+	<li><a href="http://demo.computersystemconsulting.ca/cgi-bin/index.cgi?site=Demo&amp;view=ProductView&amp;[% session_string %]">Products</a> </li>
+	<li><a href="http://demo.computersystemconsulting.ca/cgi-bin/index.cgi?site=Demo&amp;view=WorkShopsView&amp;[% session_string %]">Workshops</a></li>
+	<li><a href="http://demo.computersystemconsulting.ca/cgi-bin/index.cgi?site=Demo&amp;view=BuySellHomeView&amp;[% session_string %]">BuyAndSell</a></li>
+	<li><a href="http://demo.computersystemconsulting.ca/cgi-bin/index.cgi?site=Demo&amp;view=ToDoHomeView&amp;[% session_string %]">ToDo management</a></li>
+	<li><a href="http://demo.computersystemconsulting.ca/cgi-bin/index.cgi?site=Demo&amp;view=LogHomeView&amp;[% session_string %]">Logging Systems</a></li>
+	<li><a href="http://helpdesk.beemaster.ca/cgi-bin/CSC/helpdesk.cgi?site=Demo&amp;[% session_string %]">HelpDesk</a></li>
+	<li><a href="http://demo.computersystemconsulting.ca/cgi-bin/BBS/bbs.cgi?site=Demo&amp;view=ProductView&amp;[% session_string %]">Forums</a></li>
+	<li><a href="http://demo.computersystemconsulting.ca/cgi-bin/ToDo/project_tracker.cgi?site=Demo&amp;[% session_string %]">Project Management</a></li>
+
+</ol>

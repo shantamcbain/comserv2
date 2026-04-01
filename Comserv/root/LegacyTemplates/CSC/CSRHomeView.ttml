@@ -1,0 +1,146 @@
+[%
+#	$Id: CSRHomeView.ttml,v 1.4 2002/05/31 13:40:30 shanta Exp $
+
+
+%]
+ [% PROCESS DefaultDbi.ttml %]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','CSR Home View']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+ 
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+
+		<tr>
+		<td >
+		<div align="center">
+		<p> [% data.virtual_server_name %]</p>
+			[% IF username %]
+
+		<h3> Hello  [% firstname%]&nbsp;  [% lastname%]! This is our Customer Service Request system.!</h3>
+
+
+			[% ELSE %]
+
+			<h3>  Hello!  This is our Customer Service Request system.!</h3
+
+			[% END %]
+		</div>
+		</td >
+		</tr>
+		<tr>
+		<td >
+
+		<A NAME="PageTop"></A>
+
+		<h2> Please search the CSR's to see if your problem has been reported. </h2>
+		<p>Use the application submenu above to browse or search. Enter a keyword or phrase in the search box. If an entry exist open or closed you will get a list of scr on the topic.</p> 
+		<p>Not in the database <a href="http://www.computersystemconsulting.ca/whmcs/knowledgebase.php">submit a csr here</a></p>
+		<h3>Recently Reported Problmes</h3>
+		<table>
+			<tr><th>Priority</th><th>SiteName</th><th>What needs doing.</th><th>Status</th></tr>
+			
+	[% FOREACH link = DBI.query("SELECT * FROM csc_sr_tb
+	                                  WHERE  status = 'reported' 
+	                                 
+	                                          ORDER BY priority DESC
+	                                  ")%]    
+		<tr>
+			   <td><a href="/cgi-bin/CSC/csr.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view=on&amp;record_id=[% link.record_id%]">[% link.priority %]</a></td>
+			   <td><a href="/cgi-bin/CSC/csr.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view=on&amp;record_id=[% link.record_id%]">[% link.sitename %]</a></td>
+				<td><a href="/cgi-bin/CSC/csr.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view=on&amp;record_id=[% link.record_id%]">[% link.abstract %]</a></td>
+			   <td><a href="/cgi-bin/CSC/csr.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view=on&amp;record_id=[% link.record_id%]">[% link.status %]</a></td>
+				</tr>
+	[% END %]
+				</table>
+	
+		<h3>recent Requests</h3>
+		<table>
+			<tr><th>Priority</th><th>SiteName</th><th>What needs doing.</th><th>Status</th></tr>
+			
+	[% FOREACH link = DBI.query("SELECT * FROM csc_sr_tb
+	                                  WHERE  status = 'requested' 
+	                                 
+	                                          ORDER BY priority DESC
+	                                  ")%]    
+		<tr>
+			   <td><a href="/cgi-bin/CSC/csr.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view=on&amp;record_id=[% link.record_id%]">[% link.priority %]</a></td>
+			   <td><a href="/cgi-bin/CSC/csr.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view=on&amp;record_id=[% link.record_id%]">[% link.sitename %]</a></td>
+				<td><a href="/cgi-bin/CSC/csr.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view=on&amp;record_id=[% link.record_id%]">[% link.abstract %]</a></td>
+			   <td><a href="/cgi-bin/CSC/csr.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view=on&amp;record_id=[% link.record_id%]">[% link.status %]</a></td>
+				</tr>
+	[% END %]
+				</table>
+				
+<h3>Accepted CSR's</h3>
+		<table>
+			<tr><th>Priority</th><th>SiteName</th><th>What needs doing.</th><th>Status</th></tr>
+			
+	[% FOREACH link = DBI.query("SELECT * FROM csc_sr_tb
+	                                  WHERE  status = 'accepted' 
+	                                 
+	                                          ORDER BY priority DESC
+	                                  ")%]    
+		<tr>
+			   <td><a href="/cgi-bin/CSC/csr.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view=on&amp;record_id=[% link.record_id%]">[% link.priority %]</a></td>
+			   <td><a href="/cgi-bin/CSC/csr.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view=on&amp;record_id=[% link.record_id%]">[% link.sitename %]</a></td>
+				<td><a href="/cgi-bin/CSC/csr.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view=on&amp;record_id=[% link.record_id%]">[% link.abstract %]</a></td>
+			   <td><a href="/cgi-bin/CSC/csr.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view=on&amp;record_id=[% link.record_id%]">[% link.status %]</a></td>
+				</tr>
+	[% END %]
+				</table>
+
+<h3>CSR's in the works</h3>
+		<table>
+			<tr><th>Priority</th><th>SiteName</th><th>What needs doing.</th><th>Status</th></tr>
+			
+	[% FOREACH link = DBI.query("SELECT * FROM csc_sr_tb
+	                                  WHERE  status = 'In-Progress' 
+	                                 
+	                                          ORDER BY priority DESC
+	                                  ")%]    
+		<tr>
+			   <td><a href="/cgi-bin/CSC/csr.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view=on&amp;record_id=[% link.record_id%]">[% link.priority %]</a></td>
+			   <td><a href="/cgi-bin/CSC/csr.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view=on&amp;record_id=[% link.record_id%]">[% link.sitename %]</a></td>
+				<td><a href="/cgi-bin/CSC/csr.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view=on&amp;record_id=[% link.record_id%]">[% link.abstract %]</a></td>
+			   <td><a href="/cgi-bin/CSC/csr.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view=on&amp;record_id=[% link.record_id%]">[% link.status %]</a></td>
+				</tr>
+	[% END %]
+				</table>
+
+
+
+	[% IF username %]
+		<p>                       <script type=" text/javascript" src="/cgi-bin/CSC/csr.cgi?embed=1&amp;site=[% SiteName %]&amp;view_records_for_user=on&amp;user=[% username %]&amp;show_all_open_bugs_for_user=on&amp;&amp;records_per_page=10">
+</script>
+<A HREF = "[% data.script_name %]?site=[% SiteName %]&amp;view_records_for_user=on&amp;user=[% username %]&amp;[% session_string %]">View My Records</A></p>
+		[% END %]
+			</td>
+			</tr>
+		</table>
+<br>
+<br>
+<br>
+<p>
+
+[%# embed('CSCCopyRight') %]
+
+
+[% embed(data.page_bottom_view) %]
+

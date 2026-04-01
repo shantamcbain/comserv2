@@ -1,0 +1,80 @@
+[% set_headers(data.http_header_params) %]
+
+[% IF (data.page_top_view) %]
+
+	[% embed(data.page_top_view , ['-PAGE_TITLE','Search For An Account']) %]
+
+[% ELSE %]
+
+    <HTML>
+    <HEAD>
+        <TITLE>Search For An Account</TITLE>
+    </HEAD>
+    <BODY>
+
+[% END %]
+
+    <FORM METHOD = "POST">
+        <P>[% embed('AuthManager/CGI/FormData2Hidden') %]</P>	
+        <CENTER>
+            <TABLE WIDTH = "480" BORDER = "0" CELLSPACING = "2" CELLPADDING = "4">
+
+	        <TR>
+	            <TD COLSPAN = "2" HEIGHT = "50">
+	        </TR>
+
+                <TR> 
+                    <TD BGCOLOR = [% data.header_bg_color %] COLSPAN = "2"> 
+	                <FONT FACE = [% data.page_font_face %] COLOR = [% data.header_font_color %]>
+	                    Search For Matching Username
+			</FONT> 
+		    </TD>
+                </TR>
+
+	        <TR>
+	            <TD COLSPAN = "2" BGCOLOR = "#E5E5E5">
+	                Enter Your Email Address To Search For A Matching Username
+	            </TD>
+	        </TR>
+
+	        <TR> 
+                    <TD BGCOLOR = [% data.table_bg_color_1 %] ALIGN = "LEFT" VALIGN = "TOP"> 
+	                <FONT FACE = [% data.page_font_face %]>
+	                    Email 
+	                </FONT> 
+	            </TD>
+            
+	            <TD  bgcolor= [% data.table_bg_color_2 %] ALIGN = "LEFT" VALIGN = "TOP"> 
+	                <FONT FACE = [% data.page_font_face %]>   
+	                    <INPUT TYPE = "TEXT" NAME = "auth_email" SIZE = "34">
+                        </FONT> 
+	            </TD>
+                </TR>
+
+	        <TR>
+	            <TD COLSPAN = "2" HEIGHT = "10">
+	        </TR>
+	
+	        <TR>
+	            <TD COLSPAN = "2" ALIGN = "CENTER">
+	                <INPUT TYPE = "SUBMIT" NAME = "auth_submit_search" 
+               		      VALUE = "Submit Search">
+	                <INPUT TYPE = "SUBMIT" NAME = "auth_submit_logon_request" 
+                              VALUE = "Return to Logon Screen">
+	            </TD>
+	        </TR>
+	    </TABLE>
+        </CENTER>
+     </FORM>
+
+
+[% IF data.page_bottom_view_name %]
+	
+	[% embed(data.page_bottom_view_name) %]
+
+[% ELSE %]
+
+    </BODY>
+    </HTML>
+        
+[% END %]

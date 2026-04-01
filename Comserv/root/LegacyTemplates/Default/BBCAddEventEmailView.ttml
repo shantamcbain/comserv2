@@ -1,0 +1,27 @@
+[%#	$Id: BBCAddEventEmailView.ttml,v 1.2 2002/02/21 19:39:54 shanta Exp shanta $ 	 %]
+[% embed(data.page_top_view,['-PAGE_TITLE','Email']) %]
+[% embed('ErrorDisplayView') %]
+
+[% #CALL data.record_set.moveFirst %]
+[% record = data.records.0 %]
+
+  
+[% FOR field = data.email_display_fields -%]
+[% subs.sprintf("%-30s %s",field,data.cgi_object.param(field).array.join(", ")) %]
+[% END %]
+[% url_encoded_admin_variables =
+embed(data.url_encoded_admin_fields_view_name) %]
+
+[% parent_id = data.record_set.getField('parent_id') %]
+[% thread_id = data.record_set.getField('thread_id') %]
+[% record_id = data.record_set.getField('record_id') %]
+
+[% #parent_id = record.parent_id %]
+[% #thread_id = record.thread_id %]
+
+
+ 
+  
+    
+
+[% embed(data.page_bottom_view) %]

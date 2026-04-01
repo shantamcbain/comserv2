@@ -1,0 +1,59 @@
+ [% PROCESS DefaultDbi.ttml %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+
+<FORM action="[% data.script_name %]" method="post">
+<TABLE BORDER ="0" COLSPAN = "2">
+<TR>
+    <TD>
+    <FONT FACE = "Helvetica, Arial, San Serif" SIZE =
+"2"><B>Search Answers ( Keywords )</B></FONT></TD>    <TD>
+    <FONT FACE = "ARIAL, HELVETICA" SIZE = "1"><INPUT SIZE = "30" TYPE = "TEXT"
+NAME = "search_answers"></FONT></TD></TR>
+        <INPUT TYPE="HIDDEN" NAME="display_simple_search_results"
+ [% embed(data.hidden_admin_fields_view_name) %]
+
+<TR>
+    <TD>
+    <FONT FACE = "Helvetica, Arial, San Serif" SIZE = "2"><B>Search
+Category</B></FONT></TD>    <TD>
+    <SELECT NAME="category">
+       <OPTION VALUE="null"><FONT FACE = "ARIAL, HELVETICA" SIZE =
+"1">Select a Category</FONT>
+<OPTION VALUE="null"><FONT FACE = "ARIAL,
+HELVETICA" SIZE = "1">Search All</FONT>
+<OPTION VALUE="Site"><FONT FACE = "ARIAL,
+HELVETICA" SIZE = "1">Application</FONT>
+[% IF SiteName == 'Brew'%]
+[% ELSIF SiteName == 'Extropia'%]
+        <OPTION VALUE="webdb"><FONT FACE
+= "ARIAL, HELVETICA" SIZE = "1">WebDB</FONT>        <OPTION
+VALUE="webstore"><FONT FACE = "ARIAL, HELVETICA" SIZE = "1">WebStore</FONT>
+  <OPTION VALUE="extropia_install"><FONT FACE = "ARIAL, HELVETICA" SIZE =
+"1">eXtropia Installation</FONT>        <OPTION VALUE="cgi_install"><FONT FACE =
+"ARIAL, HELVETICA" SIZE = "1">CGI Installation</FONT>        <OPTION
+VALUE="taint_mode"><FONT FACE = "ARIAL, HELVETICA" SIZE = "1">Taint Mode</FONT>
+      <OPTION VALUE="dat"><FONT FACE = "ARIAL, HELVETICA" SIZE = "1">Perl
+ADT</FONT>        <OPTION VALUE="webcal"><FONT FACE = "ARIAL, HELVETICA" SIZE =
+"1">WebCal</FONT>        <OPTION VALUE="java"><FONT FACE = "ARIAL, HELVETICA"
+SIZE = "1">Java ADT</FONT>
+[% ELSE %]
+[% END %]
+<OPTION VALUE="HelpDesk"><FONT FACE = "ARIAL,
+HELVETICA" SIZE = "1">HelpDesk
+</FONT>
+    </SELECT></TD></TR>
+<TR COLSPAN = "2">
+    <TD>
+                <INPUT TYPE="SUBMIT" NAME="display_simple_search_results"
+               VALUE = " Search Answer        ">
+    </TD>
+</TR>
+
+</TABLE>
+</FORM>

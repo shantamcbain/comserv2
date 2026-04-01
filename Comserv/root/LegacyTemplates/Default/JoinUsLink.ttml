@@ -1,0 +1,61 @@
+[%#	$Id: JoinUslink.ttml,v 1.4 2002/05/31 13:40:30 shanta Exp $
+
+
+%]
+
+[%# embed(data.page_top_view,['-PAGE_TITLE','Jobs with Us']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% developer_status = Data.session_object.getAttribute('-KEY', 'auth_developer_status') %]
+   [% SiteDisplayName = data.site_display_name %]
+
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+   
+   
+		<A NAME="PageTop"></A>
+     
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+	
+[% IF SiteName == 'CSC' %]
+ [% PID = 15 %]
+[% ELSIF SiteName == "AltPower"  %]
+ [% PID = 25 %]
+[% ELSIF SiteName == "BMaster" %]
+ [% PID = 8 %]
+[% ELSIF SiteName == "ECF"  %]
+ [% AffiliateID = '001' %]
+ [% PID = 26 %]
+[% ELSIF SiteName == "GrindrodProject"  %]
+ [% PID = 16 %]
+[% ELSIF SiteName == "SSeedSavers"  %]
+ [% PID = 28 %]
+
+[% ELSIF SiteName == "Sustainable"  %]
+ [% PID = 27 %]
+[% ELSE %]
+ [% PID = 15 %]
+[% END %]
+[% PROCESS Affiliateid.ttml %]
+
+		<tr>
+
+ <A HREF ="http://www.computersystemconsulting.ca/whmcs/cart.php?a=add&pid=[% PID %]&&amp;aff=[% AffiliateID %]&carttpl=cart">Join our Site</a>! </h2>
+
+<!-- <A HREF ="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&view=MembersView">Join our Site</a>! </h2>
+ -->

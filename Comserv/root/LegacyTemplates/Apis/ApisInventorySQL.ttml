@@ -1,0 +1,131 @@
+
+
+[% total_frames = 0 %]
+[% total_wired_frames = 0 %]
+[% FOREACH item = DBI.query("SELECT * FROM apis_inventory_tb
+	                                WHERE  ( item_code  LIKE  '%broodbox%' 
+	                                        )
+ 	                            ") %]  
+	    [% total_boxes_onhand = total_boxes_onhand + item.number %]
+	    [% broodboxRecordId   = item.record_id %]
+	    [% BroodBoxName       = item.item_name %]
+       [% boxes_price        = item.price %]
+[% END %]
+ [% SingleTopsonhand = 0 %]
+[% FOREACH item = DBI.query("SELECT * FROM apis_inventory_tb
+	                                WHERE  (
+	                                	item_code  LIKE  '%singletop%'
+	                            	                                        )
+ 	                            ")%]  
+	    [% SingleTopsonhand = SingleTopsonhand + item.number %]
+       [% SingleTopPrice   = item.price %]
+       [% SingleTopName    = item.item_name %]
+[% END %]
+[% FOREACH item = DBI.query("SELECT * FROM apis_inventory_tb
+	                                WHERE  ( item_code  =  'comb'
+	                                        )
+ 	                            ")%]  
+	    [% total_Comb_onhand =   total_Comb_on + item.number   %]
+	    [% CombRecordId      = item.record_id %]
+	    [% CombName          = item.item_name %]
+[% END %]
+
+
+[% FOREACH item = DBI.query("SELECT * FROM apis_inventory_tb
+	                                WHERE  ( item_code  LIKE  '%BillStyleFeeder%' 
+	                                        )
+ 	                            ")%]  
+	    [% total_feeders_onhand =  item.number %]
+[% feeder_price = item.price %]
+[% END %]
+[% FOREACH item = DBI.query("SELECT * FROM apis_inventory_tb
+	                                WHERE  (
+	                                	item_code  =  'frames' 
+	                                        )
+ 	                            ")%]  
+	    [% total_frames = total_frames + item.number %]
+[% END %]
+[% FOREACH item = DBI.query("SELECT * FROM apis_inventory_tb
+	                                WHERE  (
+	                                	item_code  = 'broodcomb' OR
+	                                	item_code  = 'broodhoneycomb'OR
+	                                	item_code  = 'honeycomb'
+	                                        )
+ 	                            ")%]  
+	    [% stored_comb = stored_comb + item.number %]
+[% END %]
+[% FOREACH item = DBI.query("SELECT * FROM apis_inventory_tb
+	                                WHERE  (
+	                                	item_code  =  'active_comb' 
+	                                        )
+ 	                            ")%]  
+	    [% active_comb = active_comb + item.number %]
+[% END %]
+[% FOREACH item = DBI.query("SELECT * FROM apis_inventory_tb
+	                                WHERE  (
+	                                	item_code  LIKE  '%foundation%' OR
+	                                	item_code LIKE '%permadent%' OR
+	                                	item_code LIKE '%perco%'
+	                            	                                        )
+ 	                            ")%]  
+	    [% total_foundation_onhand = total_foundation_onhand + item.number %]
+[% END %]
+	    [%# foundation_price = item.price %] 
+
+
+[% FOREACH item = DBI.query("SELECT * FROM apis_inventory_tb
+	                                WHERE  (
+	                                	item_code  =  'frames'
+	                            	                                        )
+ 	                            ")%]  
+	    [% frames_onhand = frames_onhand + item.number %]
+	    [% framesrecordid = item.record_id %]
+	    [% framesName = item.item_name %]
+[% END %]
+	    [% frame_price = item.price %] 
+[% FOREACH item = DBI.query("SELECT * FROM apis_inventory_tb
+	                                WHERE  (
+	                                	item_code  =  'BroodHoneyframes'
+	                            	                                        )
+ 	                            ")%]  
+	    [% BroodHoneyframes_onhand = BroodHoneyframes_onhand + item.number %]
+	    [% BroodHoneyframesrecordid = item.record_id %]
+	    [% BroodHoneyframesName = item.item_name %]
+[% END %]
+	    [% BroodHoneyframe_price = item.price %] 
+
+[% FOREACH item = DBI.query("SELECT * FROM apis_inventory_tb
+	                                WHERE  (
+	                                	item_code  =  'frameswired'
+	                            	                                        )
+ 	                            ")%]  
+	    [% frameswired_onhand = item.number %]
+	    [% frameswiredrecordid = item.record_id %]
+	    [% frameswiredName = item.item_name %]
+[% END %]
+	    [% frame_wired_price = item.price %] 
+
+[% FOREACH item = DBI.query("SELECT * FROM apis_inventory_tb
+	                                WHERE  (
+	                                	item_code  LIKE  '%nb%'
+	                            	                                        )
+ 	                            ")%]  
+	    [% NucBottomsonhand = NucBottomsonhand + item.number %]
+[% END %]
+
+[% FOREACH item = DBI.query("SELECT * FROM apis_inventory_tb
+	                                WHERE  (
+	                                	item_code  LIKE  '%4pack%'
+	                            	                                        )
+ 	                            ")%]  
+	    [% fouronhand = item.number %]
+[% END %]
+	    [% fourpack_price = item.price %] 
+[% FOREACH item = DBI.query("SELECT * FROM apis_inventory_tb
+	                                WHERE  (
+	                                	item_code  =  'BroodComb'
+	                            	                                        )
+ 	                            ")%]  
+	    [%   BroodOnHand  =  BroodOnHand + item.number %]
+[% END %]
+

@@ -1,0 +1,92 @@
+[%
+#	$Id: LandTrustHome.ttml,v 1.6 2002/01/13 01:33:34 shanta Exp $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it doesn't rely on any
+# variables from outside.
+
+%]
+   
+   
+
+[%# embed('SubTopFrameView',['-PAGE_TITLE','LandTrustub']) %]
+[%# embed(data.page_top_view,['-PAGE_TITLE','Home page.']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+	[% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<div ALIGN="center">
+
+</div>
+<A NAME="PageTop"></A>
+</div>
+<p>Land trust.</p>
+
+<p>Join us in developing a sustainable view of land ownership, Sustainable land use from the point of view of sustainable communities. Areas under construction.</p>
+<p><p><ul>
+    <li>Land ownership and requisition
+     <ul>
+      <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;view=LtrustLeasesView&amp;[% session_string %]" onmouseover="Our lists in in progress">Leasing</a></li>
+      <li>Purchase</li>
+		[% IF SiteName == "HE" OR
+	      SiteName == "HEDev"  %]
+		[% ELSE %]
+		<li>Donation</li>
+		[% END %]
+     </ul>
+     <li>[% data.site_display_name %] <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=MembersView">Memberships</a></li>
+     <p>People are the life of any organization. Your support is how it all works.</p>
+     <ul>
+		<li>Land owner</li>
+		<li>Personl/supporting.</li>
+		<li>Residential</li>
+		<li>Leasee</li>
+	  </ul>
+</li>
+    <li>Land use
+     <ul>
+      <li>Sustainable use of agricultural land</li>
+      <p><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=LtrustLeasesView">All our agricultural leases </a></p>
+      <li>Sustainable Building practises</li>
+      <li>Sustainable Woodlots</li>
+     </ul>
+    </li>
+    <li>Social responsibility to community members</li>
+	    <ul>
+		    <li>Senior and disabled support</li>
+		    <li>Health care support using sustainable means. </li>
+		    <li>Educational support</li>
+	    </ul>
+	    <li>Business and economic support</li>
+	    <ul>
+		    <li>Business training and support</li>
+		    <li>Grant writing support. </li>
+		    <li>financial support</li>
+	    </ul>
+   </ul></p>
+<br>
+      <p><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=PolicyStatmentView">Policy Statment </a> | <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=LtrustLeasesView">Leases </a></p>
+
+
+
+</td>
+</tr>
+</table>
+

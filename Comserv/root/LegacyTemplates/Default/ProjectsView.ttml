@@ -1,0 +1,158 @@
+[%#	$Id: ProjectsView.ttml,v 1.9 2013/1/14 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dozen't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dozen't rely on any
+# variables from outside.
+
+%]
+ [% PROCESS DefaultDbi.ttml %]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+   [% LastUpdate = data.last_update %]
+   [% SiteUpdate = data.site_last_update %]
+   [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+   [% SiteDisplayName = data.site_display_name %]
+   [% site = SiteName %]
+   [% PrintMode    = data.session_object.getAttribute('-KEY','PrintMode') %]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+[% developer_status = Data.session_object.getAttribute('-KEY', 'auth_developer_status') %]
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+
+
+
+
+[% IF group == "Mentoring"	%]
+	[% embed(data.page_top_view,['-PAGE_TITLE',' Projects.']) %]
+[% ELSE %]
+	[% embed(data.page_top_view,['-PAGE_TITLE','Projects.']) %]
+[% END %]
+
+[% embed('ErrorDisplayView') %]
+
+ [% sessionstring %]
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+	<tr>
+	<td>[% IF username %]
+			<h3 > Hello  [% firstname%]  [% lastname%]! Welcome to [% data.site_display_name %] Projects!</h3>
+		[% ELSE %]
+			<h3>  [% embed ("LogOnLeftView") %] Welcome to [% data.site_display_name %] Projects! </h3> 
+		[% END %]
+
+<h4>Our current Projects   
+                 [% IF group == 'CSC_admin' OR
+                       group == 'AltPower_admin' OR
+                       group == 'ECF_admin' OROR
+                       group == 'BeeMast_admin' 
+                       group == 'HE_admin' OR
+                       group == 'IM_admin'  OR
+                       group == 'CS_admin'  OR
+                       group == 'Forager_admin'   OR
+                       group == 'WiseWoman_admin' OR
+                       username == 'Shanta%]                    
+                     <a href="/cgi-bin/Projects.cgi?site=[% SiteName %]&amp;[% session_string %]&display_add_form" target = "_blank">Add</a>
+		[% END %]
+</h4>	
+		[% SiteName = data.site_name%]
+   	[% IF SiteName == "OKB" %]
+		[%# embed('OkBeekeepersHomeView') %]
+		[% ELSIF SiteName == "AltPower" %]
+			[% embed ('AltPowerProjects') %]
+		[% ELSIF SiteName == "BMaster"%]
+			[% embed ('BMWorkshops') %]
+		[% ELSIF SiteName == "CS" %]
+			[% embed ('CSWorkShops') %]
+		[% ELSIF SiteName == "CSC" %]
+                 Call CSC       [% IF group == 'Planning' %]
+			[%# embed ('PlanningView') %]
+                        [% ELSE %]
+			[%# embed ('CSCHomeView') %]
+			[% embed ('CSWorkShops') %]
+                        [% END %]
+		[% ELSIF SiteName == "CSCDev" OR
+		         SiteName == "BMasterDev"  %]
+			[%#embed ('CSCDevHomeView') %]
+				[% embed ('CSWorkShops') %]
+		[% ELSIF SiteName == "ECF" OR
+		         SiteName == "ECFDev"  %]
+			[% embed ('ECFWorkShops') %]
+			[%# embed ('SBHomeView') %]
+		[% ELSIF SiteName == "HE" OR
+		         SiteName == "HEDev"  %]
+			[% embed ('HEWorkShops') %]
+			[%# embed ('SBHomeView') %]
+		[% ELSIF SiteName == "USBM" OR
+		         SiteName == "USBMDev"  %]
+			[% embed ('ECFWorkShops') %]
+
+
+
+		[% ELSIF SiteName == "Aktiv" %]
+			[%# embed ('AktivHomeView') %]
+		[% ELSIF SiteName == "BMastBreeder"%]
+			[%# embed ('BMasterBreederHomeView') %]
+		[% ELSIF SiteName == "Forager" %]
+			[%# embed ('ForagerHomeView') %]
+		[% ELSIF SiteName == "Brew" %]
+			[%# embed ('BrewHomeView') %]
+		[% ELSIF SiteName == "CertBee" %]
+			[%# embed ('CertBeeHomeView') %]
+		[% ELSIF SiteName == "SB" %]
+		[% ELSIF SiteName == "CSCRecy" %]
+			[%# embed ('CSCRecyHomeView') %]
+	[% ELSIF SiteName == "Coop" OR
+		         SiteName == "Noop" %]
+			[% embed ('CoopHomeView') %]		
+		[% ELSIF SiteName == "GrindrodBC" %]
+			[%# embed ('GrindrodHomeView') %]
+		[% ELSIF SiteName == "GRA" %]
+			[%# embed ('GRAHomeView') %]
+		[% ELSIF SiteName == "GrindrodProject" %]
+			[%# embed ('GrindrodProjectHomeView') %]
+		[% ELSIF SiteName == "GPMarket" %]
+			[%# embed ('GrindrodParkMarketHomeView') %]
+			[%# embed ('CoopHomeView') %]
+		[% ELSIF SiteName == "HoneyDo" %]
+			[%# embed ('HoneyDoHomeView') %]
+			[%# embed ('CoopHomeView') %]
+		[% ELSIF SiteName == "IM" OR
+		         SiteName == "IMDev"  %]
+			[%# embed ('IMHomeView') %]
+		[% ELSIF SiteName == "Kamasket" %]
+			[%# embed ('KamasketHomeView') %]
+		[% ELSIF SiteName == "LandTrust" OR
+		         SiteName == "LandTrustDev"  %]
+			[%# embed ('LtrustHomeView') %]
+		[% ELSIF SiteName == "ShantaWorkShop" %]
+			[% embed ('ShantaWorkShopProjects') %]
+
+		[% ELSIF SiteName == "Sky" %]
+			[%# embed ('SkyHomeView') %]
+		[% ELSIF SiteName == "SLT"%]
+			[%# embed ('SLTHomeView') %]
+		[% ELSIF SiteName == "WB" OR
+		         SiteName == "WBDev" %]
+			[%# embed ('WBHomeView') %]
+		[% ELSE %]
+		
+		<p>This site has no workshop at this time. </p>
+		<!-- Begin Demo Home View -->  
+		<p>Here are some of the provided by <a href="http://CountryStores.ca/cgi-bin/index.cgi?site=CS&amp;[% session_string %]&amp;view=WorkShopsView" target=_"_blank">Country Stores.ca </a>
+
+	[% embed ('CSWorkShops') %]
+			[%#embed ('DemoHomeView') %]
+			<!-- End Demo home view -->
+		[% END %]
+		
+
+
+
+
+
+[% embed(data.page_bottom_view) %]

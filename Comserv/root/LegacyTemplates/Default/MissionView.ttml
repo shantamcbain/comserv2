@@ -1,0 +1,83 @@
+[%
+#	$Id: OrganicHomeView.ttml,v 1.4 2002/05/31 13:40:30 shanta Exp $
+
+
+%] 
+[% PROCESS DefaultDbi.ttml %]
+[% embed(data.page_top_view,['-PAGE_TITLE','Mission Statement']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+       [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+  
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+
+		<tr>
+		<td >
+		<div align="center"
+			[% IF username %]
+
+		<h3>[% firstname%]! Our Mission Statement!</h3>
+
+
+			[% ELSE %]
+
+			<h3> This is our Mission Statement!</h3
+<p>To get the most from this application you will need to create an account. 
+
+<p><A HREF = "[% data.script_name %]?session_id=[% session_id %]&amp;submit_logon=on&amp;site=[%SiteName%]"
+                 TARGET = "[% data.link_target %]">Logon</A> 
+                 
+                 
+               <a href="/cgi-bin/FAQ/faq.cgi?site=[%SiteName%]&amp;[% session_string %]&amp;sort_field1=category &amp;sort_field2=fname &amp;first_record_to_display=0&amp;records_per_page= &amp;record_id=2&amp;columns_to_view=category &amp;columns_to_view=question&amp;display_details_view.x=8 &amp;display_details_view.y=9&amp;display_details_view=on" onmousedown="click Here for info on what we collect">Why should I create an account</a>
+[% NAME == (name) %] 
+			[% END %]
+		</div>
+		</td >
+		</tr>
+		<tr>
+		<td >
+
+		<A NAME="PageTop"></A>
+		
+		<h4>First draft by Susan at Sudon Farm</h4>
+[% IF group	== 'Member' OR
+      group ==  'Noop_admin' %]
+To comment on this the mission statemet <a href="mailto:Ok_co-op_member@organicfarming.ca">Click here</a>	If you are not a member of the Ok_co-op_member list <a href="http://organicfarming.ca/mailman/listinfo/organicfarming_organicfarming.ca" target="_blank">Click here to join</a>
+[% ELSE %]
+You must be a member to comment. Please create an account.
+You will be upgraded to a member on conformation that you are. You will then be given access to member only resources.
+[% END %]
+
+<p>The [% NAME  %] os a certified organic farmer and their supportes in the Okanagan. Formed over the winter of 2004/5. We now have intrest from 15 farmers from Oliver Kelowna, Vernon, Armstrong, Grinrod, Enderby, Mara, Sicamouse and Sorrento.</p>
+<p>The certified organic farming sector is a growing industry in B.C. With more small farmers in the are we now in a position to supply more produce to customers than we move through our traditional markets (farmers markets, delivery and c.s.a. programmes and retail oultlets near our individual farms). In addition we need to concentrate on producing our crops and have nether the time nore the expertise to approach new markets individually.</p>
+<p>The estiblished organic distribution system through Vancouver warehouses doses not serve our needs due to shipping costs and the perishability of our crops. This system is also not serving the small local retailers, with little storage space local retails need frequent delivery of smaller orders to provide customers with the freshest product at the best price. There is also a growing demand for certified organic produce (and value added products) in every community and we see the thriving cites of Edmonton and Calgary as centres to expand our deliveries.</p> 
+
+<p>The [% NAME  %]  will be able to supply the increasing demand for certified by expanding the acreage of vegetables (and other products) within our own farms and attracting other organic producers to our co-operative.</p>
+
+<p>
+The co-operative will hire a manager with experience in marketing to develop and service targetted markets. Farmers will support the co-operative by working on the board of directors and providing the freshest and best quality produce (product) for shipping.
+</p>
+<p>The [% NAME  %]  will provide farmers with security to continue and expand their operations. The increased sales and security will result in a stable certifed organic farming sector withing the Okanagan and the subsequent increase in permanent seasonal work. This stability will offer farmers the security to expand into greenhouse and storage crops and the oppertunity to extend their farming season. </p>
+<h6>Foo is necessary for life. Food security is the basis of a healthy community.</h6>
+
+		</td>
+			</tr>
+		</table>
+</DIV>
+
+[% embed(data.page_bottom_view) %]
+

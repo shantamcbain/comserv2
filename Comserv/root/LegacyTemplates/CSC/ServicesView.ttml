@@ -1,0 +1,64 @@
+[% #	$Id: ServicesView.ttml,v 1.4 2002/05/31 13:40:30 shanta Exp $
+
+
+%][% embed(data.page_top_view,['-PAGE_TITLE','Services']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+[% IF SiteName == 'd2earth'%]
+[% SiteDisplayName = 'Down to Earth Consulting.' %]
+[% END %]
+
+
+Services provided by CSC.ca for [% SiteDisplayName %]
+[% IF SiteName == 'd2earth'%]
+<ul>
+  <li>Basic customer HelpDesk services.</li>
+  <li>eXtropia support services.</li>
+  <li>What else can we imagine?</li>
+</ul>
+[% END %]
+
+[% IF SiteName == 'Apis'%]
+	All support functions.
+[% END %]
+[% IF SiteName == 'CSC'%]
+	CSC provides the fallowing services
+   <ul>
+	<li>Application Developing.</li>
+	  <ul>
+	    <li>eXtropia based systems</li>
+	    <li></li>
+      </ul>
+	<li>Application Hosting.</li>
+	   <ul>
+	     <li>eXtropia application hosting.</li>
+		 <li>City Shop Store applications.</li>
+       </ul>
+	<li>Site Hosting.</li>
+    <li>HelpDesk</li>
+	  <ul>
+	    <li>The application. You man the fort</li>
+		<li>The application and we supply the support.</li>
+      </ul>
+   </ul>
+
+[% END %]
+
+
+
+

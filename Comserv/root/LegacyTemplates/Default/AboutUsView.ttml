@@ -1,0 +1,119 @@
+[%#	$Id: HomeView.ttml,v 1.9 2002/11/08 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dozen't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dosen't rely on any
+# variables from outside.
+
+%]
+ [% PROCESS DefaultDbi.ttml %]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+   [% LastUpdate = data.last_update %]
+   [% SiteUpdate = data.site_last_update %]
+   [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+   [% SiteDisplayName = data.site_display_name %]
+   [% site = SiteName %]
+   [% PrintMode    = data.session_object.getAttribute('-KEY','PrintMode') %]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+[% developer_status = Data.session_object.getAttribute('-KEY', 'auth_developer_status') %]
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+
+
+
+[% IF group == "Mentoring"	%]
+	[% embed(data.page_top_view,['-PAGE_TITLE','Mentor home.']) %]
+[% ELSE %]
+	[% embed(data.page_top_view,['-PAGE_TITLE','About us.']) %]
+[% END %]
+
+[% embed('ErrorDisplayView') %]
+
+ [% sessionstring %]
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+	<tr>
+	<td>
+		[% IF data.debug == 1 %]
+			AboutUsView.ttml
+			[% embed('InheretedVariablesView') %]
+		[% END %]
+		
+
+   	[% IF SiteName == "OKB" %]
+		[% embed('OkBeekeepersHomeView') %]
+		[% ELSIF SiteName == "Aktiv" %]
+			[% embed ('AktivHomeView') %]
+		[% ELSIF SiteName == "BMaster"%]
+			[% embed ('AbooutBMastView') %]
+		[% ELSIF SiteName == "BMastBreeder"%]
+			[% embed ('BMasterBreederHomeView') %]
+		[% ELSIF SiteName == "Forager" %]
+			[% embed ('ForagerHomeView') %]
+		[% ELSIF SiteName == "Brew" %]
+			[% embed ('BrewHomeView') %]
+		[% ELSIF SiteName == "CertBee" %]
+			[% embed ('CertBeeHomeView') %]
+		[% ELSIF SiteName == "SB" %]
+		[% ELSIF SiteName == "CS" %]
+			[% embed ('CSHomeView') %]
+		[% ELSIF SiteName == "CSCRecy" %]
+			[% embed ('CSCRecyHomeView') %]
+		[% ELSIF SiteName == "CSC" %]
+			[% embed ('CSCHomeView') %]
+		[% ELSIF SiteName == "CSCDev" OR
+		         SiteName == "BMasterDev"  %]
+			[% embed ('CSCDevHomeView') %]
+		[% ELSIF SiteName == "Coop" OR
+		         SiteName == "Noop" %]
+			[% embed ('CoopHomeView') %]
+		[% ELSIF SiteName == "GPMarket" OR
+		         SiteName == "GPMarketDev"  %]
+			[% embed ('GPMAboutView') %]
+		[% ELSIF SiteName == "HE" OR
+		         SiteName == "HEDev"  %]
+			[% embed ('HEHomeView') %]
+			[%# embed ('SBHomeView') %]
+		[% ELSIF SiteName == "HoneyDo" %]
+			[% embed ('HoneyDoHomeView') %]
+			[% embed ('CoopHomeView') %]
+		[% ELSIF SiteName == "IM" OR
+		         SiteName == "IMDev"  %]
+			[% embed ('IMHomeView') %]
+		[% ELSIF SiteName == "LTrust" OR
+		         SiteName == "LTrustDev"  %]
+			[% embed ('LtrustHomeView') %]
+		[% ELSIF SiteName == "Sky" %]
+			[% embed ('SkyHomeView') %]
+		[% ELSIF SiteName == "SLT" %]
+			[% embed ('SLTAboutView') %]
+		[% ELSIF SiteName == "WB" OR
+		         SiteName == "WBDev" %]
+			[% embed ('WBHomeView') %]
+		[% ELSE %]
+		<!-- Begin Demo Home View -->  
+			[% embed ('DefaultAboutUsView') %]
+			<!-- End Demo home view -->
+		[% END %]
+		
+		<!-- Call CScCopyRight -->
+		[% embed('CSCCopyRight') %]
+		<!-- End Call CSCCopyRight -->
+		<br>
+		<!-- close About us table  -->
+	
+	</td>
+	</tr>
+	</table>
+
+
+
+[% embed(data.page_bottom_view) %]
+
+
+

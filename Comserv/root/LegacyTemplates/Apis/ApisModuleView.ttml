@@ -1,0 +1,11 @@
+[% #	$Id: ApisModuleView.ttml,v 1.1 2015/08/16 04:23:07 shanta Exp shanta $ %]	
+<h2>Bee Management Systems</h2>
+<ul><li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=BeePastureView">HerbalDataBase</a></li>
+	<li>AnimalDataBase</li>
+	<li>Project Management</li>
+	 <ul>
+	  <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;view=HiveManHomeView&amp;[% session_string %]">HiveManagementSystem</a></li>
+          <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;view=ApisQueensView&amp;[% session_string %]">Queen Management System</a> 
+          <li><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;view=NucView&amp;[% session_string %] System">Nuc management System</a> 
+	 </ul>
+</ul>

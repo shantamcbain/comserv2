@@ -1,0 +1,59 @@
+[%
+#	$Id: FeedingView.ttml,v 1.1 2014/11/29 06:42:47 shanta Exp shanta $	%]
+[% PROCESS DefaultDbi.ttml %]
+
+[% embed('ErrorDisplayView') %] 
+[% embed(data.page_top_view,['-PAGE_TITLE','Feeding']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+
+<table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td >
+<h3>Feeding</h3>
+<p>Feeds are based on Average Weight per hive</p>
+
+<p>You will need to track what your hive weights.</p>
+<a href="/cgi-bin/Apis/queens.cgi?site=[% SiteName %]&amp;[% session_string %]" target="_blank">Queens</a>
+<p>
+[%# FOREACH hive = DBI.query("SELECT * 
+                                FROM  apis_hive_weight_tb
+		                          WHERE status = 'Active'
+                                  ")%]    
+	    [% total_feeds = total_feeds + hive.feeds %]
+
+Queen code [% hive.feeds %] <a href="/cgi-bin/Apis/weight.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;record_id=[% hive.record_id %]&amp;display_modification_form=on" Target="_blank">Modify</a>
+[%# END %]
+</p>
+<p>Total feeds needed [% total_feeds %].<br>
+Feeder Volume [% Feeder_Volume = (4.5 * 20.7 * 5) / 100 %][% Feeder_Volume %] &nbsp;[% 17 / 4 %]<br>
+Total Lt of feed [% lt_of_feed = total_feeds * Feeder_Volume %] [% lt_of_feed %]<br>
+Total Kg of sugar[% lt_of_feed / 200 * 20* 8 %]
+
+</p>
+
+</td>
+</tr>
+</table>
+
+
+
+
+
+[% embed(data.page_bottom_view) %]
+

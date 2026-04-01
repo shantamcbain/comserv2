@@ -1,0 +1,51 @@
+[% 
+#	$Id: CSCSubscribeListView.ttml,v 1.1 2002/01/13 00:56:42 shanta Exp $	
+
+
+%]
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+[% lname = data.session_object.getAttribute('-KEY','auth_lastname') %]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+
+[% IF SiteName == "BMaster" OR
+      SiteName == "BMasterDev" OR
+      SiteName == "ECF"  OR
+      SiteName == "OKB" OR
+      SiteName == "Stawns"
+      %]
+      [% Domain = "beemaster.ca" %]
+      [% ListName = "apis_discoussion_beemaster.ca" %]
+[% ELSE %]
+      [% Domain = "forager.com" %]
+[% END %]
+
+
+ <H2><B>Join Our [% data.script_display_name %] List</b></H2>
+ <FORM Method=POST ACTION="http://[% Domain %]/mailman/subscribe/[% ListName %]">[%# data.list_name %]<br>
+ Your E-mail address: <INPUT type="Text" name="email" size="30" value="[% email %]"><br>
+ Your Name (optional): <INPUT type="Text" name="fullname" size="30" value="[% firstname %]&nbsp; [% lastname%]"><br><br>
+
+ You may enter a privacy password below. This provides only mild security, but should<br>
+ prevent others from messing with your subscription. <b>Do not use a valuable password</b> as it<br>
+ will occasionally be emailed back to you in cleartext.<br><br>
+ If you choose not to enter a password, one will be automatically generated for you, and it will<br>
+ be sent to you once you've confirmed your subscription. You can always request a mail-back<br>
+ of your password when you edit your personal options.<br><br>
+ Password choice: <INPUT type="Password" name="pw" size="15"><BR>
+ Confirm Password: <INPUT type="Password" name="pw-conf" size="15"><BR><BR>
+ Would you like to receive list mail batched in a daily digest? (You may choose NoMail after you join.)<BR><br>
+ <input type=radio name="digest" value="0" CHECKED> No <input type=radio name="digest" value="1"> Yes<br><br>
+ <INPUT type="Submit" name="email-button" value="Subscribe">
+ </FORM>
+

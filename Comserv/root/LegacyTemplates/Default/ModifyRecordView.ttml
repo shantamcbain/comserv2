@@ -1,0 +1,73 @@
+[%
+
+# this template takes a single value's args listed in @required below
+# and renders an html form widget for this value, so it can be
+# modified by user
+
+%]
+ [% PROCESS DefaultDbi.ttml %]
+
+[% set_headers(data.http_header_params) %]
+
+[% embed(data.page_top_view,{'-PAGE_TITLE' => 'Modify Form'}) %]
+
+[% embed('ErrorDisplayView') %]
+
+	<FORM METHOD = "POST" 
+              TARGET = "[% data.link_target %]"
+    [% IF data.form_enctype -%]
+              ENCTYPE="[% data.form_enctype %]"
+    [% END -%]>
+	<CENTER>
+        <TABLE WIDTH = "90%" BORDER = "0" CELLSPACING = "1" 
+               CELLPADDING = "0">
+        <TR> 
+        <TD CLASS = "sectionHeaderStyle"
+            COLSPAN = "[% data.basic_input_widget_display_colspan %]"> 
+        Modify Record
+	</TD>
+        </TR>
+
+[% embed('WidgetsTableView', 
+         {'-DISPLAY_TYPE'    => 'MODIFY',
+          '-USE_RECORD_FROM' => 'DB',
+         }) %]
+
+        </TR>
+        </TABLE>
+        <TABLE BORDER = "0" WIDTH = "100%">
+        <TR>
+        <TD ALIGN = "CENTER">
+[% embed(data.hidden_admin_fields_view_name) %]
+
+[% record_id = data.cgi_object.param('record_id') %]
+[% IF record_id %]
+        <INPUT TYPE = "HIDDEN" NAME = "record_id"
+               VALUE = "[% record_id %]">
+[% END %]
+
+[% IF data.display_confirmation_on_modify_flag %]
+
+        <INPUT TYPE = "HIDDEN" NAME = "display_modify_record_confirmation" VALUE = "1">
+	<INPUT TYPE = "IMAGE" NAME = "display_modify_record_confirmation" BORDER = "0"
+               VALUE = "on" SRC = "[% data.image_root_url %]/modify.gif"
+               onMouseOver="this.src='[% data.image_root_url %]/modify_over.gif'"
+               onMouseOut="this.src='[% data.image_root_url %]/modify.gif'"
+               onMouseDown="this.src='[% data.image_root_url %]/modify.gif'"
+               onMouseUp="this.src='[% data.image_root_url %]/modify_over.gif'">
+[% ELSE %]
+        <INPUT TYPE = "HIDDEN" NAME = "submit_modify_record" VALUE = "1">
+	<INPUT TYPE = "IMAGE" NAME = "submit_modify_record"  BORDER = "0"
+               VALUE = "on" SRC = "[% data.image_root_url %]/modify.gif"
+               onMouseOver="this.src='[% data.image_root_url %]/modify_over.gif'"
+               onMouseOut="this.src='[% data.image_root_url %]/modify.gif'"
+               onMouseDown="this.src='[% data.image_root_url %]/modify.gif'"
+               onMouseUp="this.src='[% data.image_root_url %]/modify_over.gif'">
+[% END %]
+        </TD>
+        </FORM>
+
+        </TR>
+        </TABLE>
+
+[% embed(data.page_bottom_view) %]

@@ -1,0 +1,75 @@
+[%
+
+# the home  Page template
+#	$Id: SwarmControlView.ttml,v 1.1 2002/01/09 22:01:26 shanta Exp $
+
+%]
+[% embed(data.page_top_view,['-PAGE_TITLE','Swarm Control']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% Username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% IF SiteName == 'ECF' %]
+  [% SiteDisplayName = 'Eagle Creek Farms: Apis '%]
+[% ELSE %]
+ [% SiteDisplayName = SiteName %]
+[% END %] 
+
+ [% script_name = data.app_name %]
+ 
+    [% USE DBI( data_source = 'dbi:mysql:forager',
+                username = 'forager',
+                password = 'pwxx88' )
+    %]
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<div align="center"><h2>[% SiteDisplayName %]'s Mentoring Program. Swarm Control</h2>
+</div><br>
+<br>
+<br>
+<br>
+[% IF SiteName == 'ECF' %]
+  <p>Here at  [% SiteDisplayName %] we are dedicated to helping
+  our clients contol the amount of bees in your hives. Thus helping to prevent swarming.</p>
+ [%  IF username == 'Shanta' OR
+       group == 'ECF_mentor' OR
+       group == 'ECF_admin'
+       %]
+  <p>      As a local [% SiteDisplayName %] mentoring customer you get access to our  program of swarm control. Small scale beekeepers have the problem that they have few places for brood to go if their hives get two crowded with bees, brood and honey. Adding more brood boxes or honey boxes is one way to control swarming. Brood ballacing is also another way. If you are building than haveing a place for your brood to go is no problem but if you have the number of hives that you need then there is no place to put that brood. 
+  </p>      
+  <p>[% SiteDisplayName %] </p>
+ [% ELSE %]
+   <p>      As a local [% SiteDisplayName %] mentoring customer you get access to our  program of swarm control. Small scale beekeepers have the problem that they have few places for brood to go if their hives get two crowded with bees, brood and honey. Adding more brood boxes or honey boxes is one way to control swarming. Brood ballacing is also another way. If you are building than haveing a place for your brood to go is no problem but if you have the number of hives that you need then there is no place to put that brood. 
+  </p>      
+  <p>[% SiteDisplayName %] has addressed this problem by provideing a system of sharing healthy brood with other [% SiteDisplayName %] clients. If your hive is disease free we will provide a means to pass your exess brood to others that need it. In the first year of mentoring we will take that brood as part of our cost of support. In fact the plan we have developed will lead you to haveing 4 boxes fo bees and brood surpluse to your winter ing needs. [% SiteDisplayName %] will take that healthy brood for overwintering our summer queens. In later years if you stay in the program you will be given credit for all the brood you supply to  [% SiteDisplayName %]. </p>
+  <p>Our system of brood management will help you to prevent swarms and get the most value from your hobby both in production and enjoyment.</p>
+     [% END %]
+ [% ELSE %]
+ <p>Swarm control is a problem for all beekeepers big or small. beemaster.ca. will be expandng information on this as resources became avaible to do so. If you would like to help make the resourses avaible please join and contribute.</p>
+      [% END %]
+   [% FOREACH user = DBI.query('SELECT * FROM address_book_tb WHERE  comments = "Site_Contact"') %]
+        [% user.fname %]&nbsp; [% user.lname %]&nbsp; Website &nbsp;<a href="http://[% user.url %]" name="Contact" target="_blank" title="Site Contact">[% user.url %]</a> <br>
+    [% END %]
+
+    [% FOREACH record_id = DBI.query('SELECT * FROM address_book_tb WHERE username = "Shanta"') %]
+      [% address_book_tb.fname %]  [% address_book_tb.lname %]
+    [% END %]
+ [% DBI.disconnect %]
+ <br>
+<br>
+[% embed(data.page_bottom_view) %]
+

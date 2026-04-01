@@ -1,0 +1,54 @@
+[%
+
+# this template prepares a few hashes with mapping for special columns
+# marked as email, images, etc. These hashes are then used in
+# WidgetView.ttml.
+
+%]
+
+[% RAWPERL %]
+
+use strict;
+
+my $view_obj = $stash->get('view_obj');
+my $rh_data  = $view_obj->get_data;
+
+my %effects = 
+    (
+     # Convert special display fields into a hash for faster access if
+     # the display_type is DISPLAY.
+     -EMAIL_LINKS_HASH => {
+                           map {$_ => 1}
+                           @{ $rh_data->{-FIELDS_TO_BE_DISPLAYED_AS_EMAIL_LINKS} || [] }
+                          },
+
+     -IMAGE_FIELDS_HASH => {
+                            map {$_ => 1}
+                            @{ $rh_data->{-FIELDS_TO_BE_DISPLAYED_AS_IMAGES} || [] }
+                           },
+
+     -MULTI_LINE_TEXT_HASH => {
+                               map {$_ => 1}
+                               @{ $rh_data->{-FIELDS_TO_BE_DISPLAYED_AS_MULTI_LINE_TEXT} || [] }
+                              },
+     -HTML_TAG_HASH => {
+     			     map {$_ => 1}
+                               @{ $rh_data->{-FIELDS_TO_BE_DISPLAYED_AS_HTML_TAG} || [] }	
+     			},
+
+    # -LINKS_HASH is a little different. If the data is a
+    # reference(to another array meaning that first element of that
+    # array is the URL, and the second the display) set :
+    #       * the hash key to the URL field (HREF part)
+    #       * the hash value to the field of display part
+        
+    -LINKS_HASH => {
+                     map {ref $_ ? ($_->[0] => $_->[1]) : ($_ => 1)} 
+                     @{ $rh_data->{-FIELDS_TO_BE_DISPLAYED_AS_LINKS} || [] }
+                    },
+    );
+
+# make the data available for templates
+$view_obj->store_data(\%effects);
+
+[% END -%]

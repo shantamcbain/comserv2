@@ -1,0 +1,179 @@
+[%#	$Id: JobView.ttml,v 1.4 2002/05/31 13:40:30 shanta Exp $
+
+
+%]
+ [% PROCESS DefaultDbi.ttml %]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Jobs with Us']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% developer_status = Data.session_object.getAttribute('-KEY', 'auth_developer_status') %]
+   [% SiteDisplayName = data.site_display_name %]
+
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+   
+   
+
+		<A NAME="PageTop"></A>
+     
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+
+		<tr>
+	<td >
+		
+           [% IF username %]
+
+		<h3> Hello  [% firstname%]&nbsp;  [% lastname%]! Welcome to [% SiteDisplayName  %]'s Jobs page!</h3>
+[% ELSE %]
+			<h3>  Hello!  Welcome to [% SiteDisplayName  %]'s Jobs Page!</h3
+		<h2> <A HREF ="http://www.computersystemconsulting.ca/whmcs/cart.php?a=add&pid=15&carttpl=cart">Join our team</a>! <h2>
+			[% END %]
+ 	 [% IF group    ==  'Alegro_admin' OR
+	       group    ==  'CSC_admin' OR
+	       username == 'Shanta'  
+
+	 %]
+
+ <p><a href="/cgi-bin/page.cgi?site=[% SiteName %]&[% session_string %]&display_modification_form=on&record_id=7" target="_blank">edit JobView</a>
+
+ 	   [% END %]
+[% FOREACH link = DBI.query("SELECT * FROM page_tb
+                                  WHERE  (status  = 2 AND
+                                         page_code = 'JobsView' )
+                                  ORDER BY sitename
+                                  ")%]    
+      [% link.body %]
+  [% END %]
+		
+<p>We have many jobs. Here are a few. </p>
+
+<a href="/cgi-bin/BuyAndSell/buy.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on" title='ADD a new item'><font   class="LeftSideBarNavStyle">Add an item.</font></a>	
+<table><tr>
+
+ </tr>
+ 
+
+</table>
+
+<p> 
+[% IF SiteName == 'CSC' %]
+
+ <table>
+  <tr>                                   
+                                    <td class="NavTableCellStyle">Site Name  </td>
+                                    <td class="NavTableCellStyle"> Job Name  </td>
+                                    <td class="NavTableCellStyle"> Job Description  </td>
+                                    <td class="NavTableCellStyle">       Link To More info </a>
+     </td>
+</tr>
+
+ [% FOREACH link = DBI.query("SELECT * FROM buy_sell_tb
+                                  WHERE  (category = 'Jobs' AND status = '1')
+                                  AND (sitename =  'CSC' OR sitename =  'All')
+                                  ORDER BY start_date
+                                  ")%]    
+                                  
+                                  <tr></tr>
+                                   <tr>
+                                    <td class="NavTableCellStyle"> [% link.sitename %]  </td>
+                                    <td class="NavTableCellStyle"> [% link.item_name %]  </td>
+                                    <td class="NavTableCellStyle"> [% link.description%]  </td>
+                                    <td class="NavTableCellStyle">        <a href="[% link.url %] target="[% link.target %]" title=" [% link.name %] "><font   class="LeftSideBarNavStyle">[% link.item_name %]</font></a>
+     </td>
+   </tr>
+[% END %]
+</table> 
+[% END %]
+[% IF SiteName == "Sustainable" %]
+
+<h2>Sustainable Job Postings</h2>
+ <table>
+  <tr>                                   
+                                    <td class="NavTableCellStyle">Site Name  </td>
+                                    <td class="NavTableCellStyle"> Job Name  </td>
+                                    <td class="NavTableCellStyle"> Job Description  </td>
+                                    <td class="NavTableCellStyle">       Link To More info </a>
+     </td>
+</tr>
+
+ [% FOREACH link = DBI.query("SELECT * FROM buy_sell_tb
+                                  WHERE  (category = 'Jobs' OR category = 'HelpWanted' )
+                                  AND    (sitename =  'Sustainable' OR sitename =  'All')
+                                  AND status = '1'
+                                  ORDER BY start_date
+                                  ")%]    
+                                  
+                                  <tr></tr>
+                                   <tr>
+                                    <td class="NavTableCellStyle"> [% link.sitename %]  </td>
+                                    <td class="NavTableCellStyle"> [% link.item_name %]  </td>
+                                    <td class="NavTableCellStyle"> [% link.description%]  </td>
+                                    <td class="NavTableCellStyle">        <a href="[% link.url %]" name="Contact" target="[% link.target %]" title=" [% link.name %] "><font   class="LeftSideBarNavStyle">[% link.item_name %]</font></a>
+     </td>
+   </tr>
+[% END %]
+</table> 
+[% END %]
+
+
+<h2> Complete list of jobs offred by member sites.</h2>
+ <table>
+ 
+   <tr>                                   <tr>
+                                    <td class="NavTableCellStyle">Site Name  </td>
+                                    <td class="NavTableCellStyle"> Job Name  </td>
+                                    <td class="NavTableCellStyle"> Job Description  </td>
+                                    <td class="NavTableCellStyle">       Link To More info </a>
+     </td>
+</tr>
+
+ [% FOREACH link = DBI.query("SELECT * FROM buy_sell_tb
+                                  WHERE  (category = 'Jobs' OR category = 'HelpWanted') AND status = '1'
+                                   ORDER BY start_date
+                                  ")%]    
+                                  
+                                  <tr></tr>
+                                   <tr>
+                                    <td class="NavTableCellStyle"> [% link.sitename %]  </td>
+                                    <td class="NavTableCellStyle"> [% link.item_name %]  </td>
+                                    <td class="NavTableCellStyle"> [% link.description%]  </td>
+                                    <td class="NavTableCellStyle">        <a href="[% link.url %]?site=" name="Contact" target="[% link.target %]" title=" [% link.name %] "><font   class="LeftSideBarNavStyle">[% link.item_name %]</font></a>
+     </td>
+   </tr>
+[% END %]
+</table> 
+
+[% embed(HelpDeskSQL) %]
+
+</table>
+
+ </li>
+</ul>
+To Join our team <A HREF ="http://www.computersystemconsulting.ca/whmcs/cart.php?a=add&pid=15&carttpl=cart">Join our team</a>
+<p>
+
+   
+		</div>
+		</td >
+		</tr>
+</table>		
+
+
+[% embed(data.page_bottom_view) %]
+

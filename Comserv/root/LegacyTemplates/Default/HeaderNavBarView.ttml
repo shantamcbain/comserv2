@@ -1,0 +1,105 @@
+[% #	$Id: HeaderNavBarView.ttml,v 0.02 2002/11/10 22:59:04 shanta Exp $	
+
+%]
+
+
+<!-- This is HeaderNavBar of each page. v 0.02 /home/www/cgi-bin-->
+
+[% # this template generates the top of HTML,
+
+# if -PAGE_TITLE is defined, it gets used in the <title>
+
+# if -SCRIPT_DISPLAY_NAME is defined, it gets used in the <title>
+
+# if -CSS_VIEW_URL is defined, the CSS link is created.
+
+# if -APPLICATION_SUB_MENU_VIEW_NAME is defined, the corresponding
+# template gets embedded
+
+# also see various other logo values below
+
+#Set needed values
+
+%]
+
+
+
+  <TABLE>
+    <tr>    
+    <td colspan="2" class="TopHeaderBarStyle">
+[% IF data.header_image != "none"%]
+  [% embed('HeaderBannerView')%]	
+[% END %]
+
+			[% IF SiteName == 'Skye' OR
+			      SiteName == 'Noop' %]
+				<A HREF ="?[% session_string %]&amp;view=[% data.home_view %]&amp;site=[% Organic%]">[% HostName %]</A>
+				&nbsp; |
+			[% END %]
+			
+[% embed('AffiliateLinkView') %]&nbsp;
+   <a href="http://www.computersystemconsulting.ca/whmcs/cart.php?a=add&domain=register&amp;aff=[% data.affiliate_number %]" target="_blank"title="Domain registration services.">Domains</a>
+	        &nbsp; 
+				
+		<!-- embed JobLinkView -->
+		[% embed('JobLinkView') %]&nbsp;
+		<!-- end JobLinkView -->
+
+		[% IF group == 'Dev_admin' OR
+                      group == 'CSC_Developer'OR
+                      username  == 'Shanta' %]
+			[% IF data.debug == "1"  %]
+					
+					<A HREF ="?site=[% SiteName %]&amp;debug=0&amp;[% IF data.page_name %]
+					&amp;page=[% data.page_name %]
+					[% ELSE %]
+					&amp;view=[% data.view %]
+					[% END %]&amp;[% session_string %]">NonDebug</A>
+				&nbsp; 
+         [% ELSE %]
+
+				<A HREF ="?site=[% SiteName %]&amp;debug=1[% IF data.view %]
+					&amp;page=[% data.page_name %]
+					[% ELSE %]
+					&amp;view=[% data.view %]
+					[% END %]&amp;[% session_string %]">Debug</A> 
+				&nbsp; 
+      	[% END %]
+		&nbsp; |<a href="http://dev.[% HostName %]/cgi-bin/index.cgi?site=CSCDev" name="DevSite" title="DevSite See what we are working on." Target ="_Blank"><font   class="HeaderBarNavStyle">CSCDev</font></a>
+		[% END %]
+		[% IF firstname %]	
+				|&nbsp;<A HREF ="http://webmail.[% HostName %]:2096"target="_Blank">Mail</a>	
+         [% ELSE %]
+	  |<A  HREF ="?site=[% SiteName %]&amp;[% session_string %]&amp;view=MailView" >Mail</a>		   
+		[% END %]
+
+			[% embed('SQLHeaderNav') %]
+		
+		<!-- -->		
+		&nbsp; |				
+						&nbsp; 
+				 
+				<!-- &nbsp; |		<A HREF ="/cgi-bin/URL/url.cgi?[% session_string %]&amp;site=[% SiteName%]" target="_Blank" ><font   class="HeaderBarNavStyle">Links </font></a>  -->
+				[% IF firstname %]	
+		&nbsp; |<a href="http://dev.[% HostName %]/cgi-bin/index.cgi?site=[% SiteName %]" target="_Blank" name="DevSite" title="DevSite See what we are working on."><font   class="HeaderBarNavStyle">Dev</font></a>
+ 		
+		
+	 [% END %]
+	<!-- embed onleftview -->
+	&nbsp; |	[% embed('LogOnTopView.ttml') %]
+		<!-- end logonleftview -->
+		&nbsp; |
+			
+      [% embed('HelpDeskLinkView') %]
+	
+		
+
+    </TD>
+    </TR>
+
+  </TABLE>
+   
+
+<!--This is the end of TopNavBarView.ttml-->
+
+ 

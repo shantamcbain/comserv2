@@ -1,0 +1,37 @@
+[%
+#	$Id: TabBarIconView.ttml,v 1.2 2002/01/25 18:21:28 shanta Exp shanta $	
+# location /cgi-bin/Htmltemplates/defalt
+# the bottom template
+
+%]
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+<!--openTabBarIcon-->
+<center>
+<a href="javascript:testfunction();"><img SRC="http://computersystemconsulting.ca/images/csc/add-button.gif" BORDER=0 height=45 width=100 alt="add_button"></a>
+
+
+ <SCRIPT TYPE="TEXT/JavaScript"> function addNetscapePanel() {
+      if ((typeof window.sidebar == "object") && (typeof window.sidebar.addPanel == "function")) 
+      { 
+         window.sidebar.addPanel ("CSC HelpDesk", 
+         "http://computersystemconsulting.ca/cgi-bin/CSC/csc.cgi?view=SideBarHomeView&page_top=SBPageTopView&page_pagebottom=SBPageBottomView",""); 
+      }      else 
+      { 
+         var rv = window.confirm ("This page is enhanced for use with Netscape 6.  " + "Would you like to upgrade now?"); 
+         if (rv) 
+            document.location.href = "http://home.netscape.com/download/index.html";
+      } 
+   } 
+//--> </SCRIPT>
+</CENTER>
+<!--CloseTabBarIcon-->
+

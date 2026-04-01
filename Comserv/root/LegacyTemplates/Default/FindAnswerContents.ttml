@@ -1,0 +1,41 @@
+[%
+#	$Id: FindAnswerContents.ttml,v 1.3 2002/09/25 01:02:22 shanta Exp $
+	
+
+%]
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+	
+<!--Find Anwers-->
+
+
+  <tr>  
+   <td class="NavTableCellStyle">
+          <a href="http://computersystemconsulting.ca/cgi-bin/CSC/csc.cgi?[% session_string %]&amp;site=[%SiteName %]" target="_blank"><font class="LeftSideBarNavStyle"> CSC </font></a>
+    </td>
+ </tr>
+  <tr>
+  <td class="NavTableCellStyle">	<A HREF ="http://forager.com/cgi-bin/ENCY/ency.cgi" target="_blank"> <font class="LeftSideBarNavStyle">ENCY Health</font></a>
+  </td>
+ </tr>
+  <tr>
+  <td class="NavTableCellStyle">	<A HREF ="http://forager.com/cgi-bin/Organic/organic.cgi" target="_blank"> <font class="LeftSideBarNavStyle">Organic Farming</font></a>
+  </td>
+ </tr>
+  <tr>
+   <td class="NavTableCellStyle">
+           <a href="http://forager.com" target="_blank"> <font class="LeftSideBarNavStyle">Forager </font></a><br>
+
+
+<!-- EndFindAnwers-->
+
+

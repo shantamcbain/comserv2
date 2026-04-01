@@ -1,0 +1,38 @@
+[%
+#	$Id: PageBottomView.ttml,v 1.11 2002/10/09 17:10:34 shanta Exp $
+# location /cgi-bin/Htmltemplates/defalt
+# the bottom template
+
+%]
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% localip = data.local_ip %]
+<!-- This is ShantaPrivateAdmin Bottom links. -->
+
+
+
+	Shanta
+
+                 &nbsp; |
+                  <A  HREF ="/phpmyadmin/">Local MyAdmin </a>
+		   &nbsp;|
+
+                   <A  HREF ="/cgi-bin/CSC/csc.cgi">Mail admin </a>
+                   <A  HREF ="/stats">Stats webalizer</a>
+		   &nbsp; |
+ 
+                  <A  HREF ="/cgi-bin/awstats.pl?config=[% SERVER_NAME %] ">AWStats  </a>
+		   &nbsp; |
+     <A  HREF ="http://sql-ledger.computersystemconsulting.ca">SQL ledger</a>
+		   &nbsp;|
+
+<!--This is the end of ShantasPrivateBottomAdminLinks.ttml-->

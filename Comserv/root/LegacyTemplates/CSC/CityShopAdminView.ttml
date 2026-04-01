@@ -1,0 +1,97 @@
+[%
+#	$Id: CityShopAdminView.ttml,v 1.1 2002/09/24 01:08:44 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it doesn't rely on any
+# variables from outside.
+
+%]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','CityShop Admin .']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+[% SiteName = 'CS' %][%# data.session_object.getAttribute('-KEY','SiteName') %]
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<div ALIGN="center">
+	[% IF username %]
+
+<h3 > Hello  [% firstname%]  [% lastname%]! Welcome to Computer System Consulting.ca!</h3>
+	<h3> CityShop Admin.</h3>
+	  
+
+	[% ELSE %]
+
+	<h3>  Hello! Welcome to Computer System Consulting.ca's</h3>
+	<h3> CityShop Admin.</h3>
+	[% END %]
+
+</div>
+<A NAME="PageTop"></A>
+</div>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+
+[% embed('LogOnLeftView.ttml') %]
+
+
+	[% IF username %]
+
+<h3 >For a demo of our Application</h3>
+<p><a href="/cgi-bin/CS/cs.cgi?[% session_string %]&site=[%SiteName %]"  > CityShop Admin</a>
+
+	  
+
+	[% ELSE %]
+This page requires Login In.<br>
+
+	[% END %]
+
+
+
+[% embed (data.page_list_view) %]
+
+
+<div ALIGN="center">
+<br>
+<br>
+<br>
+<p>
+<a href="../CSC/helpdesk.cgi?view=BasicDataView&[% session_string %]" target="_Blank" > HelpDesk</a>
+<p>Last Updated: Monday 23 September 2002
+
+
+[% embed('CSCCopyRight') %]
+
+
+</td>
+</tr>
+</table>
+
+
+</td>
+</tr>
+</table>
+[% embed(data.page_bottom_view) %]
+

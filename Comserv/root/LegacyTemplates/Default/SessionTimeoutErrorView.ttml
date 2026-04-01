@@ -1,0 +1,29 @@
+[%
+
+# this template handles the session timeout errors
+# it forwards all the vars as is so the data that user has entered
+# won't be lost, during the relogin process.
+
+%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+[% embed('PageTopView',{'-PAGE_TITLE' => 'Session Timeout'}) %]
+
+       <P><P>
+       <DIV CLASS=Warning>
+       It appears that your session has timed out.<BR>
+       Please log-in to the application again.
+
+       <FORM ACTION=[% data.script_name %]&amp;site=[% SiteName
+%] METHOD=POST TARGET = "_parent">
+             [% FOREACH param = data.cgi_object.param %]
+                 [% FOR hidden =  data.cgi_object.hidden(param) -%]
+                     [% hidden %]
+                 [% END -%]
+             [% END -%]
+             <INPUT TYPE=SUBMIT NAME="relogin_form" VALUE=" Re-Login ">
+       <FORM>
+       </DIV>
+
+
+[% embed('PageBottomView') %]

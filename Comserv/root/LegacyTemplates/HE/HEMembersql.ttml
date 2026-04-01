@@ -1,0 +1,9 @@
+
+  [% FOREACH link = DBI.query("SELECT * FROM page_tb
+                                  WHERE  (status  = 2 AND
+                                         page_code = 'MemberView' AND
+                                         sitename = 'HE' )
+                                  ORDER BY sitename
+                                  ")%]    
+               [% PROCESS pagefields.ttml %]
+       [% END %]                  

@@ -1,0 +1,200 @@
+[% RAWPERL %]
+
+# need to rewrite to use WidgetTableView instead
+
+#return;
+
+my @required = (
+        -IMAGE_ROOT_URL,
+        -RECORDS,
+        -DISPLAY_FIELDS,
+        -SELECTED_DISPLAY_FIELDS,
+        -CGI_OBJECT,
+        -FIRST_RECORD_ON_PAGE,
+        -SCRIPT_NAME,
+        -KEY_FIELD,
+        -FIELD_NAME_MAPPINGS,
+            );
+
+my $view_obj = $stash->get('view_obj');
+
+my $rh_data  = $view_obj->get_data;
+
+exists $rh_data->{$_} or die "$_ is not set" for @required;
+
+my $row_color_rules         = $rh_data->{-ROW_COLOR_RULES};
+my $field_color_rules       = $rh_data->{-FIELD_COLOR_RULES};
+my $image_root_url          = $rh_data->{-IMAGE_ROOT_URL};
+my @records                 = @{ $rh_data->{-RECORDS} || []};
+my $display_fields          = $rh_data->{-DISPLAY_FIELDS};
+my $selected_display_fields = $rh_data->{-SELECTED_DISPLAY_FIELDS};
+my $cgi                     = $rh_data->{-CGI_OBJECT};
+my $script_name             = $rh_data->{-SCRIPT_NAME};
+my $key_field               = $rh_data->{-KEY_FIELD};
+my $field_name_mappings     = $rh_data->{-FIELD_NAME_MAPPINGS};
+my $require_matching_username_for_modifications = $rh_data->{-REQUIRE_MATCHING_USERNAME_FOR_MODIFICATIONS_FLAG};
+my $require_matching_username_for_deletions     = $rh_data->{-REQUIRE_MATCHING_USERNAME_FOR_DELETIONS_FLAG};
+my $color_for_odd_rows                  = $rh_data->{-COLOR_FOR_ODD_ROWS}  || 'FFFFFF';
+my $color_for_even_rows                 = $rh_data->{-COLOR_FOR_EVEN_ROWS} || 'E5E5E5';
+my $hidden_admin_fields_view_name       = $rh_data->{-HIDDEN_ADMIN_FIELDS_VIEW_NAME};
+my $url_encoded_admin_fields_view_name  = $rh_data->{-URL_ENCODED_ADMIN_FIELDS_VIEW_NAME};
+my $link_target                         = $rh_data->{-LINK_TARGET};
+my $session_id                          = $rh_data->{-SESSION_ID};
+my $username                            = $rh_data->{-AUTH_USERNAME};
+
+my @columns_to_view = $cgi->param('columns_to_view');
+@columns_to_view = @$selected_display_fields unless @columns_to_view;
+
+my $number_of_columns = @columns_to_view +1;
+
+
+$output .= qq[
+        <TABLE WIDTH = "45" BORDER = "0" CELLSPACING = "0"
+               CELLPADDING = "0" VSPACE = "0" HSPACE = "0" 
+               ALIGN = "CENTER">
+        <TR>
+        <TD COLSPAN="$number_of_columns"
+            CLASS = "sectionHeaderStyle">
+        <B>Result Set</B>
+        </TD>
+        </TR>
+
+        <TR>
+        <TD HEIGHT = "5"></TD>
+        </TR>
+
+        <TR>
+             ];
+
+my $url_encoded_admin_variables = $view_obj->embed
+    ($url_encoded_admin_fields_view_name,
+     ['-REMOVE_SORT_FIELD1',1]);
+
+foreach my $field (@columns_to_view){
+
+    $output .= qq[
+            <TD CLASS="tableHeaderStyle">
+            <A HREF="$script_name?sort_field1=$field&return_to_main=on&$url_encoded_admin_variables"
+                  TARGET = "$link_target">$field_name_mappings->{$field}</A>
+            </TD>
+                 ];
+}
+
+$output .= qq[
+        <TD ALIGN = "CENTER" 
+            CLASS = "tableHeaderStyle">
+        Details
+        </TD>
+             ];
+
+my $counter = 1;
+for my $rh_record (@records) {
+
+    my $username_of_poster;
+    my $group_of_poster;
+    if ($require_matching_username_for_modifications ||
+        $require_matching_username_for_deletions) {
+        $username_of_poster = $rh_record->{'username_of_poster'};
+        $group_of_poster    = $rh_record->{'group_of_poster'};
+    }
+
+    my $color_for_row = "$color_for_odd_rows";
+
+    if ($counter % 2 == 0) {
+        $color_for_row = "$color_for_even_rows";
+    }
+
+    if ($row_color_rules) {
+        foreach my $color_rule (@$row_color_rules) {
+            foreach my $rule_key (keys (%$color_rule)) {
+                my $field_name = $rule_key;
+                my $field_rules = $color_rule->{$field_name};
+                if ($rh_record->{$field_name} eq @$field_rules[0]) {
+                    $color_for_row =  @$field_rules[1];
+                }
+            }
+        }
+    }
+
+    $output .= qq[
+                  <TR CLASS = "$color_for_row">
+                 ];
+
+    foreach my $field (@columns_to_view) {
+     
+        my $color_for_cell = $color_for_row;
+        if ($field_color_rules) {
+            foreach my $color_rule (@$field_color_rules) {
+                foreach my $rule_key (keys (%$color_rule)) {
+                    my $field_name = $rule_key;
+                    my $field_rules = $color_rule->{$field_name};
+                    if ($rh_record->{$field} eq @$field_rules[0]) {
+                        $color_for_cell =  @$field_rules[1];
+                    }
+                }
+            }
+        }
+	
+        my $field_value = $rh_record->{$field};
+        if (defined $field_value and length $field_value ) {
+            $field_value =~ s/%SESSION_ID%/$session_id/;
+            $field_value = $view_obj->embed
+                ('RenderTextField',
+                 {-WIDGET_NAME  => $field,
+                  -WIDGET_VALUE => $field_value,
+                  -RH_RECORD    => $rh_record,
+                 }
+                );
+
+        } else {
+            $field_value = "&nbsp;";
+        }
+
+        $output .= qq[
+                      <TD 
+                      CLASS = "tableCellStyle">
+                      $field_value&nbsp;
+                      </TD>
+                     ];
+    }
+
+    $output .= qq[
+                  <FORM TARGET = "$link_target">
+                  <TD CLASS ="tableAddStyle">	
+                 ];
+
+
+    my $record_id = $rh_record->{$key_field} || '';
+   
+    $output .= $view_obj->embed
+        ($hidden_admin_fields_view_name, {-RECORD_ID => $record_id});
+
+    $output .= qq[
+                  <INPUT TYPE = "IMAGE" 
+                  SRC = "$image_root_url/modify_small.gif" 
+                  BORDER = "0" ALT = "details"
+                  NAME = "display_details_view" VALUE = "on"
+                  onMouseOver="this.src='$image_root_url/modify_small1.gif'"
+                  onMouseOut="this.src='$image_root_url/modify_small.gif'"
+                  onMouseDown="this.src='$image_root_url/modify_small.gif'"
+                  onMouseUp="this.src='$image_root_url/modify_small1.gif'">
+                 ];
+
+    $output .= qq[
+                  </TD>
+                  </FORM>
+                 ];
+
+    $counter++;
+}
+
+
+$output .= qq[
+              </TR>
+              <TR>    
+              <TD HEIGHT = "5"></TD>
+              </TR>
+              </TABLE>
+             ];
+
+[% END %]

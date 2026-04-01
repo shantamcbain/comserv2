@@ -1,0 +1,45 @@
+[% record = data.records.0 %]
+
+[% set_headers(data.http_header_params) %]
+
+[% embed(data.page_top_view, ['-PAGE_TITLE', 'News Item Details']) %]
+
+[% subject = record.subject;
+   abstract = record.abstract;
+   full_text = record.full_text;
+   abstract = abstract.replace("\n","<BR>");
+ %]
+ 
+ 
+
+
+        <FORM METHOD = "POST" TARGET = "[% data.link_target %]">
+        <CENTER>
+        <TABLE WIDTH = "90%" BORDER = "0" CELLSPACING = "2"
+               CELLPADDING = "0">
+        <TR>
+        <TD CLASS = "sectionHeaderStyle">
+        News Item: [% subject %]
+        </TD>
+        </TR>
+
+        <TR>
+        <TD>
+        <BLOCKQUOTE><I>
+        [% abstract %]
+        </I></BLOCKQUOTE>
+        <P>
+        [% full_text %]
+        </TD>
+        </TR>
+        </TABLE>
+        <P>
+        <CENTER>
+        <FORM TARGET = "[% data.link_target %]">
+        <INPUT TYPE = "IMAGE" NAME = "return_to_main"  BORDER = "0"
+               VALUE = "on" SRC = "[% data.image_root_url %]/home.gif">
+        </FORM>
+        </CENTER>
+   
+[% embed(data.page_bottom_view) %]
+    

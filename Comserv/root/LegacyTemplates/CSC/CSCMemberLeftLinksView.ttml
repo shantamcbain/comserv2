@@ -1,0 +1,24 @@
+    [%
+    #	$Id: CSCMemberLeftLinksView.ttml,v 0.1 16/11/03 19:09 shanta Exp shanta $
+    %]
+    [% IF data.session_object %]
+
+        [% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+    [% END %]
+    [% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+    [% username = data.session_object.getAttribute('-KEY','auth_username') %]
+    [% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+    [% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+    [% lname = data.session_object.getAttribute('-KEY','auth_lastname') %]
+    [% email = data.session_object.getAttribute('-KEY','auth_email') %]
+
+<!--OpenCSCMemberLeftLinksView-->
+<a href="/cgi-bin/CSC/cs.cgi" name="CityShop Admin"><font   class="LeftSideBarNavStyle">CityShop Admin</font></a>     </td>
+ </tr>
+ <tr>
+  <td Class='NavTableCellStyle'>
+ <font   class="LeftSideBarNavStyle">
+<a href="/cgi-bin/CSC/client.cgi" name="client">[% fname%]'s profile</a> </font>    </td>
+<!--CloseCSCMemberLeftLinksView-->

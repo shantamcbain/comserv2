@@ -1,0 +1,489 @@
+[%
+#	$Id: ECFPurcanceLeaseView.ttml,v 1.0 2010/02/21 01:33:34 shanta Exp $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it doesn't rely on any
+# variables from outside.
+
+%]
+[% embed(data.page_top_view,['-PAGE_TITLE','Land leases.']) %]
+
+[%# embed('SubTopFrameView',['-PAGE_TITLE','Land leases.']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<div ALIGN="center">
+
+</div>
+<A NAME="PageTop"></A>
+</div>		
+<a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=LtrustHomeView" name="Home">Leasing Home</a> 
+     <hr width="50">Hello [% data.session_object.getAttribute('-KEY','auth_firstname') %]
+
+
+[% IF SiteName == "HE" OR
+	   SiteName == "HEDev" OR
+		SiteName == "ECF" OR
+	   SiteName == "DevECF"%]
+
+	      
+	      
+	      <hr width="50">Hello [% data.session_object.getAttribute('-KEY','auth_firstname') %]
+	      <h1>Current status of this document is on hold. No further effort will be placed on document.</h1>
+	      <ul> 
+				<li>access rights 	
+				<ul>
+					<li><a href="cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=LTustPurchaceLeaseView" name="See the development of the lease here">Lease</a>,</li>
+	            <li>Agricultural MOU</li> 
+	            <li>Capital assess MOU</li>
+	            <li>Chattels MOU.</li> 
+	            <li>Woodlot MOU</li> 
+	            <li>Water MOU</li> 
+	            <li>Recreational MOU</li>
+	            <li>Owner access MOU</li>
+	            <li>Environmental and conservation MOU</li>
+	            <li>Residents access to buildings</li>
+	            </ul>
+			</ul>
+	[% ELSE %]
+	      <p>This is were we will develop our leases purchase of property agreements.</p>
+				</li>
+	            <li>Agricultural MOU</li> 
+	            <li>Capital assess MOU</li>
+	            <li>Chattels MOU.</li> 
+	            <li>Woodlot MOU</li> 
+	            <li>Water MOU</li> 
+	            <li>Recreational MOU</li>
+	            <li>Owner access MOU</li>
+	            <li>Environmental and conservation MOU</li>
+	            <li>Residents access to buildings</li>
+	            <li>Power</li>
+	            <li>Public/member Access right</li>
+            </ul>
+
+<
+
+		[% END %]
+
+<h5>This is a work in progress. This is a developmental sample only. Original document is from TLC. PDF of the our sample document will be available soon. Each lease agreement will be created to accommodate the needs of Lessor and</h5> 
+
+
+<h2>SECTION I -<h1></h1> REQUIRED CLAUSES</h2>
+
+<b>THIS AGREEMENT</b> made the ___ day of __, 20___ (in pursuance of the Land Transfer Form Act - Part 2),
+effective the ___ day of ____, 20____ (the '<b>Effective Date</b>').
+<h3>BETWEEN:</h3>
+		               __________________________________ (Landlord/Landowner)
+	       of 	     __________________________________ (address)
+		               __________________________________ (address)
+                 ("Lessor") - could use Landowner or Landlord or name of Lessor or appropriate acronym
+		
+<h3>AND:</h3>
+		               _________________________________ (Lessee/Tenant)
+	       of 	     _________________________________ (address)
+		               _________________________________ (address)
+                 ("Lessee") – could use Tenant or name of Lessee, or appropriate acronym
+
+<h3>WHEREAS</h3> <p>The Lessor is the registered owner of the following property in __________, Province of British
+Columbia, commonly known as _________________ (farm name), and legally described as:
+	       __________________________________ (address)
+	       _____________ (PID) _____________ (Lot) ______________ (Block)
+	        _______________ (Section) _________________ (District) __________(Plan)
+        consisting of ____ hectares. (if required, describe any variations here e.g. area not included in this Agreement is the 		
+	
+	       north west corner) as shown on the map attached to this Agreement in Appendix A.
+        ("the Lands")</p>
+	
+<h3>GRANT OF LEASE</h3>
+
+1.	 Subject to Sections 2 and 3 and the rights of termination in Sections ___, ___ and __ in this Agreement, the
+    Lessor grants to the Lessee, the Lands described in this Agreement. This Agreement includes all buildings
+    on the Lands as of the Effective Date and all buildings constructed during the term of this Agreement. This
+    Agreement includes all ways, paths, passages, waters, water courses, privileges, advantages and appurtenances
+    whatsoever related to the Lands.
+2.	 This grant of lease is subject to: a)	existing terms contained in any original grant or contained in any other
+    disposition from the Crown with respect to the Lands; and
+	       a)	      existing terms contained in any original grant or contained in any other disposition from the Crown 		
+		               with respect to the Lands; and
+	       b)	      any highway, or public right-of-way, watercourse, right of water or other public easement found on 		
+		               the Lands.
+
+
+TERM OF LEASE
+3. The term of this Agreement shall be in effect for ______ years, starting on ____________ (date) and ending 		
+     on ___________ (date);
+(the following is optional - omit or modify as required)
+every ___ years at:
+___________ (date)
+___________ (date)
+___________ (date)
+date, the contents of this Agreement, including Rent, may be modified as mutually agreed upon by the Lessee and
+Lessor. If the parties are not able to come to a mutual agreement on changes to the Agreement within 60 days
+of the roll-over date the parties will use the Dispute Resolution process outlined in Section ___. If the parties are
+not able to come to a mutual agreement ____ days after the Dispute Resolution process the Agreement shall be
+terminated by the Lessor.
+RENT PAYABLE
+4. The Lessee shall pay to the Lessor rent (“Rent”) of $_____________ for use of the Lands. Rent is based on
+     calculations in Schedule A appended to this Agreement;
+     (Note there are alternative forms of rent such as share cropping)
+	         a)	       Rent shall be due and payable as follows;
+		                  Due Date	           Amount
+		                  ________	           $_________
+		                  ________	           $_________
+		                  ________	           $_________
+		                  ________	           $_________
+	         b)	       Rent will be paid to _________________________ on or before the due dates in this Agreement 		
+		                  without invoice or other notice from the Lessor;
+                    (the following is optional – omit or modify as required)
+		
+	         c)	       if Rent is not paid on or before the due dates in this Lease, the Lessee agrees to pay interest on the 		
+		                  amount of unpaid rent at the rate of Prime plus ____ %.
+
+
+THE LESSEE
+______________________					                                                ______________________
+Signature							                                                           Witness
+______________________					                                                _______________________
+Print Name							                                                          Print Name
+															
+______________________					                                                Address
+Date
+THE LESSOR
+By:
+______________________
+Name
+______________________
+Date
+  SECTION II – RECOMMENDED CLAUSES
+DEFINITIONS AND INTERPRETATIONS
+5. (use this section to define specific words or clauses used in the Agreement that you feel are important e.g. “Farm House”
+    means the primary residence on the Lands, as identified in the Whole Farm Management Plan appended to this
+    Agreement)
+TERMINATION
+6. This Agreement may be terminated by:
+	       a)	        ___ days written notice from the Lessee to the Lessor before termination; or
+	       b)	        abandonment by the Lessee for a period greater than ___ days; or
+	        c)	       on the non-payment of rent when due or non-performance of the covenants contained herein, by 		
+		                 either party through serving written notice citing the instance(s) of default and specifying a 			
+		                 termination date of ______ days from the date of such notice.; or
+	       d)	        the Lessee becomes insolvent or bankrupt and takes the benefit of any act that may be in force for 		
+		                 bankrupt or insolvent debtors; or
+	       e)	        the interests of the Lessee are seized or taken in execution or attachment by any creditor of the 		
+		                 Lessee; or
+	       f)	        the Lessee makes an assignment for the benefit of his creditors.
+
+OWNERSHIP AND TRANSFER
+9. The Lessee owns all personal property improvements (chattels) made on the Lands at their expense or on their
+    behalf during the period of time covered by this Agreement.
+10. All improvements to the real property (fixtures) made on or to the Lands at the Lessee expense or on
+    their behalf during the period of time covered by this Agreement remain on the Lands, without any form of
+    compensation to the Lessee at the termination of this Agreement.
+SUBORDINATION, NON-DISTURBANCE AND ATTORNMENT CLAUSES
+These clauses are vital for the interests of both the Lessor and Lessee. They should be crafted individually for each
+agreement.
+Generally, if a landowner leases out their property after putting a mortgage on the land, the
+person leasing the property can be asked to vacate the land if the landowner defaults on their loan and the lender
+takes over the land. This is true even if the lease is registered. If a mortgage is placed on the land after it is leased
+the lease has priority and the lender cannot ask the lessee to leave. The landowner may insist on a subordination
+clause in the lease that gives the mortgage priority even if the mortgage is done after the lease. Again, in this
+situation if the landowner defaults on their loan the person leasing the land can be asked vacate by the lender taking
+over the land. If the land is leased or is likely to be leased it is in the lending institutions interest to require landlords
+to include subordination clauses in their leases before a mortgage will be approved.
+If the person leasing the land is faced with subordination clauses or knows that there is a mortgage prior to the
+lease, they should ensure the lease agreement includes a non-disturbance clause. This clause(s) will ensure that the
+lender foreclosing on the loan will not disturb the possession rights of the lessee as long as the lessee continues to
+meet the terms of the lease.
+An attornment clause means that the lessee is promising to recognize the lender as their landlord when the original
+landlord defaults on their mortgage obligations. A well written attornment clause will include an obligation by the
+lessee to become the tenant of any successor in title the lender might put in place.
+
+Sample clauses:
+Subordination:
+This Lease is and will be subject, subordinate, and postponed to all Mortgages to the extent that without execution
+of any document other than this Lease, the Mortgages will have priority over this Lease notwithstanding the
+respective dates of execution, delivery, or registration of them. Without limiting the generality of the foregoing,
+the Tenant agrees to promptly execute any document in confirmation of such subordination and postponement of
+this Lease to any of the Mortgages, provided hower that such subordination or postponement will not be effective
+with respect to a specific Mortgage unless and until the Landlord’s Mortgagee holding such Mortgage confirms in
+writing to the Tenant that the Tenant has the right, if not in default under this Lease, to remain in possession of the
+Premises in accordance with the terms of this Lease in the event that such Landlord’s Mortgage obtains title to the
+Premises by way of foreclosure or otherwise.
+Attornment
+Whenever required by any of the Landlord’s Mortgagees under any of the Mortgages, or in the event of an exercise
+by any of the Landlord’s Mortgagees of the power of sale in any of the Mortgages, the Tenant will attorn to and
+become, in each case, a tenant of such Landlord’s Mortgagees or any purchaser from such Landlord’s Mortgagee for
+the then unexpired residue of the Term upon all of the terms and conditions of this Lease.
+LESSEE OBLIGATIONS
+11. The Lessee shall:
+Utilities and taxes
+	        a)	     promptly pay:
+		               (i)	    all charges for heat, water, gas, hydro, sewage and all other utilities supplied to or consumed 		
+			                      on the Lands;
+		               (ii)	   all taxes, levies, duties, assessments and licence fees whatsoever whether municipal, school, 		
+			                      provincial, parliamentary or otherwise levied, imposed or assessed against the Lands or upon 	
+			                      the Lessee in respect thereof;
+Liens
+	        b)	     prevent any liens, judgements or other charges against the Lands. If there is a filing of any liens, 		
+		               judgement or charges against the Lands, the Lessee shall take all necessary steps to have the said 		
+		               liens or charges cancelled and discharged from the Lands within ______ days of the date the Lessee 	
+		               has notice of such filing. In any such event the Lessee shall reimburse the Lessor for all costs and 		
+		               expenses (including actual legal fees and disbursements expended) incurred by the Lessee, if 			
+		               the Lessor, in addition to any other right or remedy, discharges any claim of lien from the Lands by 		
+		               paying the amount claimed to be due or by procuring a discharge of such liens by deposit of 		
+		               such amount in the appropriate court:
+
+Lessee Access
+	       c)	   permit the Lessor to enter the Lands:
+		            (i)	      outside business hours in the case of an emergency;
+		            (ii)	     during business hours where such will not unreasonably disturb or interfere with the Lessee 		
+			                     use of the Lands and operation of the Lessee business to examine and inspect the Land to 		
+			                     provide services or make repairs, replacements or alterations as provided for in this 			
+			                     Agreement;
+Relations
+	       d)	   use the Lands in a socially responsible manner, causing no harm and creating no nuisance to 			
+		            neighbours. Lessee takes responsibility for the use of the Lands by members of their families, 		
+		            employees, friends or visitors. The reasonable decision of the Lessor shall determine if the 			
+		            Lands are being used in this way.
+Housing
+	       e)	   only construct housing with written agreement from the Lessor. All proposals for housing 			
+		            construction must be for the purposes of providing housing for those persons (including 			
+		            their spouses and children) actively farming the Lands, their labour being demonstrated as necessary 		
+		            to the economic success of the farm business on the Lands and not less than 4 months full-time
+		            labour or an identified apprenticeship. Any housing construction must meet all federal, provincial 		
+		            and local government legislation and bylaws;
+Operations and maintenance
+              use the Lands only for the primary purposes of farming legal commercial crops (could add 			
+	       f)	
+		            more specific description or add livestock) for local food production over and above household self-			
+              sufficiency (“Permitted Use”).
+		
+	       g)	   assume full responsibility for the operation, repair, and maintenance of the Lands and any 			
+		            improvements constructed on the Land (whether or not such improvements were constructed by 		
+		            the Lessee), ensuring all is kept in good working condition (including fixtures and chattels);
+	       h)	   not alter, improve, change, remodel, tear down or destroy any buildings erected upon the Lands 		
+		            without written agreement with the Lessor;
+	       i)	   perform all acts required to be done under any Act or by regulation or by-laws with respect to weed 		
+		            and insect control;
+	       j)	   comply with all the laws, rules, regulations and ordinances and by-laws of any government or other 		
+		            body having jurisdiction over the Lands and to indemnify and save harmless the Lessor from all
+		            liability, loss or damage in respect thereof;
+        k)	    be fully responsible for all the operating costs incurred in the maintenance and operation of the 		
+		             Lands during the term of this Agreement;
+	       l)	    at the time of expiry or termination leave the Lands in the same or better condition than recorded 		
+		             on the Effective Date;
+Requested work
+	       m)	    pay the Lessor the costs if the Lessee fails to perform any of the work in this Agreement or meet 		
+		             any expense when due and the Lessor gives the Lessee ___ days notice to commence the said work. 		
+		             The Lessor may enter the Lands and do the said work and pay the said expenses all at the expense 		
+		             of the Lessee. The Lessor may only give such notice if the requested repairs are reasonably 			
+		             necessary and not purely cosmetic;
+New construction and major capital investments
+	       n)	    get written approval from the Lessor for any major improvement construction or major capital 		
+		             investment (over $________).
+LESSOR OBLIGATIONS
+12. The Lessor shall,
+	       a)	    not interfere with the personal lives, associations, expressions or actions of the Lessee, except 		
+		             insofar as they involve the terms and conditions of this Agreement;
+	       b)	    expressly recognize the rights of the Lessee to the quiet enjoyment of the Lands and to their right 		
+		             of privacy;
+	       c)	    not enter into agreements with others in regards to use and occupation of the Lands without written 	
+		             agreement with the Lessee;
+	       d)	    in addition to any other right or remedy, have the right, but not be obliged to post a Notice of 		
+		             Interest (“Notice”) on the Lands pursuant to Section 3(2) of the Builders Lien Act and file 			
+		             the Notice in the Land Title Office.
+DISPUTE RESOLUTION
+13. If a breach of this Agreement occurs or is threatened, or if there is disagreement as to the meaning of this
+    Agreement:
+	       a)	    either the Lessee or the Lessor may give notice to the other parties requiring a meeting of all parties 		
+		             within ___ Business Days of receipt of the notice; and
+	       b)	    all activities giving rise to breach or threatening a breach of this Agreement, or giving rise to a 		
+		             disagreement as to the meaning of this Agreement must immediately cease upon receipt of 			
+		             the notice: and
+
+         c)	       the parties must attempt to resolve the matter, acting reasonably and in good faith, within ____ 		
+		                 Business Days of receipt of the notice; and
+	        d)	       if the parties are not able to resolve the matter within that time, the parties may appoint a mutually 		
+		                 acceptable person to mediate the matter. If the parties are unable to agree on the appointment of 		
+		                 a mediator within ____ days after the mediation process is invoked, any party may apply to 			
+		                 the British Columbia Mediator Roster Society, or it successor, or such other organization or 			
+		                 person agreed to by the parties in writing, for appointment of a mediator. the parties must 			
+		                 act reasonably and in good faith and cooperate with the mediator and with each other in an attempt 		
+		                 to resolve the matter within ______ days after the mediator is appointed; and
+	        e)	       the cost of the mediation will be borne equally between the parties, which costs will not include 		
+		                 costs incurred by a party for representation by counsel at the mediation.
+NON-WAIVER
+14. If the Lessor does not insist upon strict performance of any of the conditions in this Agreement this is not
+    a waiver or relinquishment for the future of any such condition unless the Lessor gives a waiver in writing. The
+    acceptance of any rent or performance of any Agreement condition by a person other than the Lessee shall
+    not be construed as an admission by the Lessor of any right, title or interest of any such persons as a sub-
+    tenant, assignee, transferee or otherwise in place and stead of the Lessee.
+INDEPENDENT CONTRACTOR
+15. The Lessor enters into this Agreement as an independent contractor and in no sense is the Lessee or the
+     Lessee’s employees, invitees or agents to be considered an agent of or under the control of the Lessor.
+INDEMNITY AND RELEASE
+16. The Lessee shall not do or omit to do or permit to be done anything that will cause or shall have the effect of
+     causing the cost of the Lessor’s insurance in respect to the Lands to increase at anytime during the Agreement
+     or any policy of insurance on or relating to the Lands be subject to cancellation.
+17. The Lessee will indemnify and save harmless the Lessor, its guests, invitees and agents from any and all
+     liabilities, expenses, charges, damages, costs, actions and proceedings arising from or as a result of any breach
+     of or interference with the Lessee’s rights under this Agreement.
+18. Upon the signing of this Agreement and each anniversary date thereafter, the Lessee will deliver to the Lessor, a
+     completed “Province of British Columbia Certificate of Insurance” as set out in Schedule __.
+19. The Lessor shall not be liable for any injury or damage to any person or property on, in or about the Lands,
+     howsoever such damage may be occasioned. All risks of any such injury being assumed by the Lessee, who
+     shall hold the Lessor harmless and indemnified therefrom except from any liability arising out of the gross
+     negligence of the Lessor.
+
+NOTICE
+20. Wherever any notice is required to be given to either party and the terms of this Agreement, the notice shall be
+    in writing and shall be deemed to be sufficiently given if forwarded by registered mail addressed as follows:
+	        If to the Lessor:
+	        _________________________ (Name)
+	        _________________________ (address)
+	        If to the Lessee:
+	        _________________________ (Name)
+	        _________________________ (address)
+REGISTRATION OF AGREEMENT
+21. This Agreement shall be registered with the BC Land Title and Survey Authority.
+GENERAL
+22. This Agreement and everything herein contained shall ensure to the benefit of and be binding upon the heirs,
+    executors, administrators, successors, assigns and other legal representatives, as the case may be, of each of the
+    parties hereto, subject to the granting of consent by the Lessor to any assignment or sub-lease, and every
+    reference herein to any party hereto shall include the heirs, executors, administrators, successors, assigns and
+    other legal representatives of such party.
+23. Where there is more than one Lessee or where there is a female party or corporation, the provisions herein shall
+    be read with all grammatical changes thereby rendered necessary and all the covenants shall be deemed joint
+    and several.
+24. Amendments and alterations to this Agreement shall be in writing, shall be signed by both the Lessee and the
+    Lessor and shall be appended to this lease.
+25. The Lessee is not to assign or sublet in whole or in part without the Lessor’s prior consent in writing. At the
+    Execution Date the Lessor’s intent is not to allow the Lessee to sub-let the Lands.
+26. In the event of an emergency situation the Lessee will use their best judgement to respond to the emergency
+    and will notify the Lessor as soon as possible of the actions taken.
+27. It is particularly understood and agreed that this Agreement shall not be deemed to be nor intended to give rise
+    to a partnership relation.
+28. The Lessee acknowledges and agrees that its interest in the Lands under this Agreement is taken subject to
+    the encumbrances described in this Agreement and that the exercise of any rights under or in respect of such
+    encumbrances or the use of the Lands pursuant thereto shall not constitute a breach or a default on the part of
+    the Lessor or give rise to any right of action on the part of the Lessee as against Lessor, notwithstanding the
+    effect of such exercise or use on the Lessee’s rights hereunder in respect of the Lands or otherwise howsoever.
+
+29. The Lessee agrees with the Lessor that this Agreement shall be construed in accordance with, and be governed
+      by, the laws of the Province of British Columbia and the laws of Canada applicable thereto.
+30. The headings in this Agreement form no part of the conditions and shall be deemed to have been inserted for
+      convenience only.
+31. Time is of the essence of this Agreement.
+32. This Agreement is the complete and exclusive agreement between the parties and it supersedes all other
+      agreements whether oral or written, including any renewals and extensions and restatements and any
+      prescriptive rights the Lessee may have or may acquire by operation of law (can include a list of previous agreements
+      that this one supersedes).
+ SECTION III - OPTIONAL CLAUSES
+Optional clauses for farmland trusts or others
+DEFINITIONS AND INTERPRETATIONS
+“Farm Business” means the business operated by the Lessee for the commercial production and sale of local
+food, including related operations such as, but not limited to, agri-tourism and production and sale of value-added
+products.
+“Farm House” means the primary residence on the Lands, as identified in the Whole Farm Management Plan.
+“Whole Farm Management Plan” means a plan developed in collaboration between TLC and the Lessee based on,
+but not limited to, sustainable land use planning and sets forth the natural characteristics of the Lands, pertinent
+ecological principles, activity zones (e.g. tilled areas, processing, natural areas etc) and provides plans for major
+construction/capital investment. (Schedule ___ of this Agreement)
+LESSEE OBLIGATIONS
+The Lessee shall submit to the Lessor a ___ year business plan by _______ ___, 20__ to demonstrate the Farm
+Business is profitable. Subsequent business plans are to be submitted to the Lessor every ___ years for the duration
+of this Agreement.
+The Lessee shall only construct housing at the direction of the Whole Farm Management Plan and with written
+agreement from the Lessor. All proposals for housing construction must be for the purposes of providing housing
+for those persons (including their spouses and children) actively farming the Lands, their labour being demonstrated
+in the Business Plan as necessary to the economic success of the farm business on the Lands and not less than
+4 months full-time labour or is for an identified apprenticeship. Any housing construction must meet all federal,
+provincial and local government legislation and bylaws.
+The Lessee shall use the Lands only for the primary purposes of farming legal commercial crops (could add more
+specific description or add livestock) for local food production over and above household self-sufficiency. The reasonable decision of the Lessor, informed by the Whole Farm Management Plan and the Business Plan, shall determine
+whether the Lands are being operated as aforesaid and such decision shall be binding upon the parties hereto.
+The Lessor may enter the Lands during business hours where such will not unreasonably disturb or interfere with
+the Lessees use of the Land and operation of the Lessees business for the purposes of research, inventory and
+evaluation of natural systems, to view the state of repair, and for the purposes of public education.
+The Lessee shall implement the Whole Farm Management Plan for the entire Lands. All operations shall be
+consistent with the Whole Farm Management Plan, including, but not limited to maintenance of the integrity of the
+landscape and soil of the Lands and shall utilize the Lands consistent with this responsibility;
+The Lessee shall follow the most recent version of the “British Columbia Certified Organic Production Operation
+Policies and Management Standards” published by the Certified Organic Associations of British Columbia.
+Certification by the Lessee is not required. Exceptions to these policies and management standards must be
+included in the Whole Farm Management Plan and agreed to in writing between the Lessee and the Lessor.
+The Lessee shall not cut down timber except either in an emergency situation or by approval of the Whole Farm
+Management Plan or by written agreement with the Lessor.
+The Lessee shall follow the Whole Farm Management Plan in regards to any major improvement construction or
+major capital investment (over $______). The Lessor will, within ____ days of being notified in writing, advice
+the Lessee to what extent, if any the Lessor will fund the undertaking. The Lessee shall first deliver plans and
+specifications to the Lessor and obtain the Lessor’s written consent to construct or install these improvements.
+The Lessee shall determine how to use the Lands’ resources to fully develop an economically viable,
+environmentally responsible and community supportive Farm Business.
+The Lessee shall maintain membership in _______________________ for the duration of this Agreement.
+LESSOR OBLIGATIONS
+The Lessor shall ensure all Lessor contact with the Lessee will be only through __________________________.
+The Lessor shall not sell the Lands nor use all or part of the Lands for activities outside of this Agreement.
+The Lessor shall arrange public access to the Lands for Lessor organized public events (can specify). The Lessor will
+provide a minimum of ____ days written notice to request public access.
+The Lessee, as stated in Sections ____, is in no way an agent or representative of the Lessor nor is in partnership
+with the Lessor and shall not be represented as such by either the Lessee or the Lessor;
+	       a)	     the Lessee shall, beyond the normal activities (can specify), acquire written agreement from the 		
+		              Lessor prior to using the Lessor name and other Lessor representations, such as, but not limited to, 		
+		              logos, for marketing, promotion and other activities related to the Farm Business and the Lands;
+                b)	      the Lessor shall, beyond the normal activities(can specify), acquire written permission from the 		
+			                Lessee prior to using the Farm Business name or other representations of the Farm Business 		
+		                in public.
+The Lessor and the Lessee shall work in collaboration to:
+	       a)	       develop a Whole Farm Management Plan by ________ with the assistance of qualified
+		                professionals as necessary and appended to this Lease as Schedule _____. The Whole Farm 			
+		                Management Plan will be amended:
+		                (i)	    every ___ years from the Effective Date in collaboration between the Lessor and the 		
+			                       Lessee with the help of qualified professionals as required; and
+		                (ii)	   when both the Lessor and the Lessee agree in writing and append any changes to the 		
+			                       Whole Farm Management Plan.
+General optional clauses
+“Farm Business” means the business operated by the Lessee for the commercial production and sale of local
+food, including related operations such as, but not limited to, agri-tourism and production and sale of value-added
+products.
+The Lessee shall not cut down timber except either in an emergency situation or by written approval of the Lessor.
+The Lessee shall use the Lands for cottage industries only related to farm production in accordance with applicable
+laws and regulations.
+The Lessee shall have the option of using farm structures for, but not limited to: storage, shelter for animals,
+growing of plants, value-added processing of farm raised products, and retail sales of farm-raised products as well
+as educational and community based activities including classes, meetings, agri-tourism and similar activities.
+The Lessee and the Lessor, if deemed prudent or necessary by the Lessor or the Lessee, shall designate the
+boundaries of the Lands by notices, posted signs, fences or otherwise as agreed to.
+The Lessee shall obtain and maintain, during the term of this Agreement the requisite approvals and certificates to
+permit the Lessee to use the Lands for the Permitted Use.
+The Lessee, by not later than 60 days after the expiry or the sooner termination of this Agreement, have removed,
+at the Lessee’s expense, all improvements constructed prior to and after the Effective Date and shall restore the
+Lands to their original state unless the Lessor has elected to keep any of the improvements by written notice to
+Lessee prior to the expiry or the sooner termination of this Agreement, in which case the Lessor may re-enter and
+take possession of those specified improvements.
+
+
+
+
+
+</td>
+</tr>
+</table>
+

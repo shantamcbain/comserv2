@@ -1,0 +1,63 @@
+[% #CSC SiteNaveView
+#	$Id: SiteNaveView.ttml,v 1.2 2002/08/07 19:21:44 shanta Exp $	
+
+# this template generates the top of HTML,
+
+# if -PAGE_TITLE is defined, it gets used in the <title>
+
+# if -SCRIPT_DISPLAY_NAME is defined, it gets used in the <title>
+
+# if -CSS_VIEW_URL is defined, the CSS link is created.
+
+# if -APPLICATION_SUB_MENU_VIEW_NAME is defined, the corresponding
+# template gets embedded
+
+# also see various other logo values below
+
+#Set needed values
+
+%]
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+
+
+
+
+<style type="text/css">
+<!--
+
+.combobox {
+background-color: #FFFFFF;
+color: #808080;
+font-size: 10pt;
+font-family: arial;
+font-weight: bold;
+}
+
+-->
+</style>
+
+
+
+
+
+
+<form>
+
+<select class="combobox" name="SiteMap" onchange="if(options[selectedIndex].value){location = options[selectedIndex].value}" size="1">
+<option selected>Select Page  </option>
+<option value="http://computersystemconsulting.ca/cgi-bin/CSC/csc.cgi?[%session_string%]">Home</option><option value="http://computersystemconsulting.ca/cgi-bin/CSC/webcal.cgi?[%session_string%]">Calendar</option><option value="faq.cgi?[%session_string%]">FAQ</option><option value="bbs.cgi?[%session_string%]"">Forums</option><option value="http://computersystemconsulting.ca/cgi-bin/CSC/news.cgi?[%session_string%]">News</option><option value="csc_url.cgi?[%session_string%]">URL DB</option><option value="/cgi-bin/Extropia/extropia.cgi?[%session_string%]">Extropia support</option><option value="/cgi-bin/Extropia/faq.cgi$[%session_string%]">eXtropia FAQ</option><option value="/cgi-bin/Extropia/extropia_kb.cgi?[%session_string%]">Extropia KB</option><option value="/cgi-bin/Extropia/extropia_methouds.cgi?[%session_string%]">Extropia Methouds</option>
+</select>
+</form>
+
+
+

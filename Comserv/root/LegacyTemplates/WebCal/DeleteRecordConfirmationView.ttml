@@ -1,0 +1,53 @@
+[% PROCESS DefaultDbi.ttml %][% set_headers(data.http_header_params) %]
+
+[% embed(data.page_top_view,{'-PAGE_TITLE' => 'Delete Form'}) %]
+
+[% embed('ErrorDisplayView') %]
+
+        <CENTER>
+        <P>
+        <FORM METHOD = "POST" TARGET = "[% data.link_target %]">	
+        <TABLE WIDTH = "95%" BORDER = "0" CELLSPACING = "2" 
+               CELLPADDING = "0">
+
+        <TR> 
+        <TD CLASS = "sectionHeaderStyle"
+            COLSPAN = "[% data.basic_input_widget_display_colspan %]"> 
+        Confirmation....is this the correct data to delete?
+        </TD>
+        </TR>
+
+[% embed('WidgetsTableView', 
+         {'-DISPLAY_TYPE'    => 'CONFIRM',
+          '-USE_RECORD_FROM' => 'DB',
+         }) %]
+
+        <TR>
+        <TD COLSPAN = "2">
+        <DIV ALIGN=CENTER>
+        <INPUT TYPE = "IMAGE" NAME = "submit_delete_record"  BORDER = "0"
+               VALUE = "Submit" SRC = "[% data.image_root_url %]/submit.gif" 
+               ALT = "Submit">
+        <INPUT TYPE = "IMAGE" NAME = "edit_form"  BORDER = "0"
+               VALUE = "Submit" SRC = "[% data.image_root_url %]/home.gif" 
+               ALT = "Submit">
+        </DIV>
+        </TD>
+        </TR>
+        </TABLE>
+
+        <TR>
+        <TD COLSPAN = "2" ALIGN = "CENTER"> 
+
+[% embed(data.hidden_admin_fields_view_name,
+         {'-RECORD_ID' => data.cgi_object.param('record_id')}) %]
+
+[% record = data.records.0;
+   date = subs.sprintf("%04d-%02d-%02d",record.start_year,record.start_mon, record.start_day); %]
+<INPUT TYPE="HIDDEN" NAME="date" VALUE = "[% date %]">
+
+
+        </FORM>
+        </CENTER>
+
+[% embed(data.page_bottom_view) %]

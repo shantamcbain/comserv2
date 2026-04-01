@@ -1,0 +1,60 @@
+[%
+# Projects on offer
+#	$Id: CSCProListView.ttml,v 1.5 2002/11/11 14:44:48 shanta Exp $	
+
+%]
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% IF SiteName == 'Apis' %]
+[% FOREACH news = DBI.query("SELECT * FROM apis_news_tb
+                                  ORDER BY date_time_posted 
+                                  ")  %]  
+ [% END %]
+[% ELSE %]
+[% FOREACH news = DBI.query("SELECT * FROM csc_news_tb
+                                  ORDER BY date_time_posted 
+                                  ")  %]  
+                                 
+[% END %]
+
+ [% END %]
+
+
+
+[% record_id = news.record_id %]                                 
+ <!-- Start CSCProlistView -->
+ 	<table cellpadding="0" cellspacing="0" border="0"  class="NavHeaderStyle"> 
+	  <tr><th Class="NavHeaderStyle">Perl Projects. 
+	      [% IF data.session_object.getAttribute('-KEY','Developer') == 1 %]
+	      <a href="?site=[% SiteName %]&amp;view=DeveloperView &amp;[% session_string %]%]" target="_blank" title="CSC Developer page">Developer Home</a>
+	      [% ELSE %]
+	      <a href="?site=[% SiteName %]&amp;view=JobView&amp;[% session_string %]" target="_blank" title="CSC Developer page">Join our team</a>
+	      [% END %]
+	       </th> 
+	  </tr>
+	  <tr><td> 
+<ul>
+	<li>Site Design</li>
+	<li>Site Application Design</li>
+	<li>Site Content Development and data entry</li>
+	<li>Site testing.</li>
+	<li>Marketing</li>
+	<li>HelpDesk</li>
+</ul>
+	       <script type = "text/javascript"
+							src="/cgi-bin/ToDo/project_tracker.cgi?embed=1&amp;site=[% SiteName %]&amp;[% session_string %]&amp;show_all_public_projects&amp;sort_field1=date_time_posted&amp;sort_field2=subject&amp;simple_search_string=[% SiteName %]&amp;records_per_page=5&amp;columns_to_view=project_name&amp;columns_to_view=project_size">
+											</script>
+</td></tr>
+	</table>     
+
+<!-- End CSCProListView -->
+ 

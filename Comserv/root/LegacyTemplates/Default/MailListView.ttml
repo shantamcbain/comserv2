@@ -1,0 +1,153 @@
+[%
+#	$Id: MailListView.ttml,v 1.0 2011/08/22 13:40:30 shanta Exp $
+
+
+%]
+ [% PROCESS DefaultDbi.ttml %]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Mail Lists']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]`			`
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+ 	[% session_string = "session_id=$session_id" %]
+ [% IF SiteName == 'ENCY' OR
+        SiteName == 'EV' OR
+        SiteName == 'Forager' %]
+   [% shop = 'cs' %] 
+   [% cat = '60001' %]
+    [% MailServerName = 'webmail.forager.com' %]
+    [% MailServer = 'mail.forager.com' %]
+   [% END %]
+  [% IF SiteName == 'Organic' OR
+        SiteName == 'Sky' OR
+        SiteName == 'NOOP' OR
+        SiteName == 'AltPower' %]
+    [% shop = 'cs' %] 
+   [% cat = '60001' %]
+    [% MailServerName = 'webmail.computersystemconsulting.ca' %]
+  [% MailServer = 'mail.computersystemconsulting.ca' %]
+    [% END %]
+[% IF SiteName == 'CSC' OR
+      SiteName == 'Extropia' %]
+   [% MailServerName = 'webmail.computersystemconsulting.ca' %]
+   [% MailServer = 'mail.computersystemconsulting.ca' %]
+   [% shop = 'csc' %] 
+   [% cat = 'Memberships' %]
+   [% END %]
+ [% IF SiteName == 'ECF' %]
+   [% shop = 'apis' %] 
+   [% cat = 'Memberships' %]
+    [% MailServerName = 'webmail.beemaster.ca' %]
+   [% MailServer = 'mail.beemaster.ca' %]
+   [% END %]
+
+[% IF SiteName == 'IM' OR
+      SiteName == 'HE' %]
+   [% shop = 'apis' %] 
+   [% cat = 'Memberships' %]
+    [% MailServerName = 'webmail.helpfullearth.com' %]
+   [% ServerName = 'helpfullearth.com' %]
+[% END %]
+
+ [% IF SiteName == 'Apis' OR
+       SiteName == 'BMaster' OR
+       SiteName == 'Shanta' OR
+       SiteName == 'Brew' OR
+       SiteName == 'CSPS' OR
+       SiteName == 'TelMark'%]
+   [% shop = 'cs' %] 
+   [% cat = '60001' %]
+    [% ServerName = 'beemaster.ca/cgi-bin/index.cgi' %]
+   [% MailServer = 'mail.beemaster.ca' %]
+   [% END %]
+  [% IF SiteName == 'Grindrodbc' OR
+       SiteName == '=GrindrodProject'  %]
+    [% ServerName = 'http://grindrodproject.grindrodbc.com/cgi-bin/index.cgi' %]
+   [% MailServer = 'mail.beemaster.ca' %]
+   [% END %]
+  [%   ListAdmin = '0'  %]
+[% IF group == 'CSC_admin' OR
+      group == 'BMast_admin'OR
+      group == 'ECF_admin'OR
+      group == 'HE_admin'OR
+      group == 'IM_admin'  %]
+    [%   ListAdmin = '1'  %]
+    [% END %]
+     
+ 		<A NAME="PageTop"></A>
+     
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+
+		<tr>
+	<td >
+		<div align="center">
+		 [% embed('VeiwInBrowser')	%] 
+			[% IF username %]
+		<h3> Hello  [% firstname%]&nbsp;  [% lastname%]! Welcome to [% MailServer %]'s Mail List's page!</h3>
+<p></p>
+
+
+
+
+			[% ELSE %]
+
+			<h3>  Hello!  Welcome to [% MailServer %]'s Mail Lists Page!</h3
+			Please to [% embed('JoinUsLink')	%]  Joining our site helps support our efforts to save the bees.
+			[% END %]
+		</div>
+		<h2> Here you will find the list our site offers. <h2>
+<p>Our public list are as Fallows.</p>
+
+
+[% embed ('ListJoinView') %]
+<h2>Member Only Lists</h2>
+[% IF group == 'Normal' %]
+
+<p>This will be a link of your Member only links. </p>
+
+[% END %]    
+
+
+ 
+[% IF ListAdmin == '1' %]
+
+ <h2>Admin Info</h2>
+  <p>     There are several ways to add new user to your list. </p>
+
+<ol>
+   <li><a href="http://www.cpanel.net/media/tutorials/mailinglists.htm" Target="_blank">Video </a>on how to create List with cpanel.</p>	 </li>
+   <li>Log on to<a href="http://cpanel.[% ServerName %]>Cpannel</a></li>
+   <li></li>
+ 
+</ol>
+
+[% END %]
+		</td >
+
+
+
+		</tr>
+		<tr>
+		<td >
+
+	
+</td >
+		</tr>
+</table>		
+
+
+[% embed(data.page_bottom_view) %]
+

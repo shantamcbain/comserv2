@@ -1,0 +1,183 @@
+[%#	$Id: ProjectHomeView.ttml,v 0.1 2012/01/14 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dozen't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dozen't rely on any
+# variables from outside.
+
+%]
+   [% PROCESS DefaultDbi.ttml %]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+   [% LastUpdate = data.last_update %]
+   [% SiteUpdate = data.site_last_update %]
+   [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+   [% SiteDisplayName = data.site_display_name %]
+   [% site = SiteName %]
+   [% username = data.session_object.getAttribute('-KEY','auth_username') %]
+   [% PrintMode    = data.session_object.getAttribute('-KEY','PrintMode') %]
+[% developer_status = Data.session_object.getAttribute('-KEY', 'auth_developer_status') %]
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+   [% PAGE = data.page_name || 'ProjectHomeView' %]
+[% embed('ErrorDisplayView') %]
+
+
+[% IF SiteName == 'CS' %]
+ [% PROCESS CSProjectHOMEPagesql.ttml %]
+[%# ELSIF SiteName == 'CSC' %]
+ [%# PROCESS CSCProjectPagesql.ttml %]
+[%# ELSIF SiteName == "BMaster" %]
+  [%# PROCESS BMasterProjectPagesql.ttml %]
+[% ELSIF SiteName == 'Brew' %]
+ [% PROCESS BrewProjectPagesql.ttml %]
+[% ELSIF SiteName == "CSCDev"  %]
+ [% PROCESS CSCDevProjectPagesql.ttml %]
+[%  ELSIF SiteName ==  'Forager' %]
+ [% IF PAGE == 'GarlicCulture' %]
+  [% PROCESS Garlicculturesql.ttml %]
+ [% ELSE %]
+  [% PROCESS ForagerProjectPagesql.ttml %]
+ [% END %]
+[% ELSIF SiteName == "HE" %]
+  [% PROCESS HEProjectsPageaql.ttml %]
+[% ELSIF SiteName == "ShantaWorkShop"  %]
+ [% PROCESS ShantaWorkShopHOMEPagesql.ttml %]
+[%  ELSIF SiteName ==  'Skye' %]
+  [% PROCESS SkyeProjectPagesql.ttml %]
+[% ELSIF SiteName == "WiseWoman"  %]
+ [% PROCESS WiseWomanProjectPagesql.ttml %]
+ [% ELSE %]
+ [% PROCESS ProjectPagesql.ttml %]
+[% END %]
+
+
+  	[% embed(data.page_top_view,["-PAGE_TITLE","$PageName",]) %]
+
+
+  
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+	<tr>
+	<td>                    
+                
+
+[% IF username %]
+			<h3 > Hello  [% firstname%] &nbsp; [% lastname%]! Welcome to [% data.site_display_name %]</h3>
+		[% ELSE %]
+			<h3>  [% embed ("LogOnLeftView") %] Welcome to [% data.site_display_name %]! </h3> 
+		[% END %]
+      [% IF SiteName == 'CSC' %]
+                             
+       [% IF data.session_object.getAttribute('-KEY','Developer') == 1 %]
+	      <p><a href="?site=[% SiteName %]&amp;view=DeveloperView &amp;[% session_string %]" target="_blank" title="CSC Developer page">[% FirstName %]'s Developer Home</a>
+	      [% ELSE %]
+	      <p><a href="?site=[% SiteName %]&amp;view=JobView&amp;[% session_string %]" title="CSC Developer page">Join our team</a>
+	      [% END %]
+      [% END %]
+	      
+<h4>Our current Projects   </h4>
+                 [% IF group == 'CSC_admin' OR
+                    group == 'CSCDev_admin' OR
+                    username == 'shanta'
+                 %]
+                     <a href="/cgi-bin/ToDo/project_tracker.cgi?site=[% SiteName %]&amp;[% session_string %]&view=BasicDataView" target = "_blank">Data</a>
+		[% END %]
+		
+	      
+[% embed('LiveEditAdmin') %]
+                                
+                                    
+      [% body %]
+                 [% IF group == 'CSC_admin' OR
+                    group == 'CSCDev_admin' OR
+                    group == 'MW_admin' OR
+                    group == 'WiseWoman_admin' OR
+                    username == 'shanta'
+                 %]
+  <p>                   <a href="/cgi-bin/ToDo/project_tracker.cgi?site=[% SiteName %]&amp;[% session_string %]&display_add_form=on" target = "_blank">Add Project</a>
+		[% END %]
+<p>
+ <table>
+ [% IF SiteName == 'CSCDdev' %]   
+                                <tr>
+<td class="NavTableCellStyle"> recordID  </td>
+<td class="NavTableCellStyle"> Site  </td>
+<td class="NavTableCellStyle"> Project Name  </td>
+<td class="NavTableCellStyle"> Project Code  </td>
+<td class="NavTableCellStyle"> Project Name  </td>
+<td class="NavTableCellStyle"> Comments      </td>
+<td class="NavTableCellStyle">   links       </td>
+</tr>
+
+ [% FOREACH link = DBI.query("SELECT * FROM csc_project_tb
+                                  WHERE (sitename =  '$SiteName' AND
+                                         status != 'done' )
+                                  ORDER BY project_code
+                                  ")%]    
+                                  
+<tr>
+<td class="NavTableCellStyle"> [% link.record_id %] </td> 
+<td class="NavTableCellStyle"> [% link.sitename %]  </td>                                 
+<td class="NavTableCellStyle"> [% link.project_code %]  </td>
+<td class="NavTableCellStyle"> [% link.project_name %]  </td>
+<td class="NavTableCellStyle"> [% link.comments %]  </td>
+<td class="NavTableCellStyle">        
+  <a href="/cgi-bin/ToDo/project_tracker.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x=on&record_id=[% link.record_id %]" name="Contact" target="[% link.target %]" title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+  <a href="/cgi-bin/ToDo/log.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;todo_record_id=[% link.record_id %]&amp;abstract=[% link.project_name %]&amp;project_code=[% link.project_code %]&amp;details=[% link.comments %]&amp;priority=" "target="_Blank">Log</a>
+  <a href="/cgi-bin/ToDo/todo.cgi?site=[% SiteName %]&amp;display_add_form=on
+  &amp;record_id=[% link.record_id %]&amp;subject=[% link.project_name %]
+  &amp;project_code=[% link.project_code %]
+  &amp;description=[% link.comments %]
+  &amp;priority=&amp;[% session_string %]" "target="_Blank">Todo</a>
+     </td>
+   </tr> 
+  		[% END %]
+[% ELSE %]<p> 
+                                <tr>
+<td class="NavTableCellStyle"> recordID  </td>
+<td class="NavTableCellStyle"> Site  </td>
+<td class="NavTableCellStyle"> Project Name  </td>
+<td class="NavTableCellStyle"> Project Code  </td>
+<td class="NavTableCellStyle"> Project Name  </td>
+<td class="NavTableCellStyle"> Comments      </td>
+<td class="NavTableCellStyle">   links       </td>
+</tr>
+
+ [% FOREACH link = DBI.query("SELECT * FROM csc_project_tb
+                                  WHERE (sitename =  '$SiteName' AND
+                                         status != 'done' )
+                                  ORDER BY project_code
+                                  ")%]    
+                                  
+<tr>
+<td class="NavTableCellStyle"> [% link.record_id %] </td> 
+<td class="NavTableCellStyle"> [% link.sitename %]  </td>                                 
+<td class="NavTableCellStyle"> [% link.project_code %]  </td>
+<td class="NavTableCellStyle"> [% link.project_name %]  </td>
+<td class="NavTableCellStyle"> [% link.comments %]  </td>
+<td class="NavTableCellStyle">        
+  <a href="/cgi-bin/ToDo/project_tracker.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x=on&record_id=[% link.record_id %]" name="Contact" target="[% link.target %]" title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+  <a href="/cgi-bin/ToDo/log.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;todo_record_id=[% link.record_id %]&amp;abstract=[% link.project_name %]&amp;project_code=[% link.project_code %]&amp;details=[% link.comments %]&amp;priority=" "target="_Blank">Log</a>
+  <a href="/cgi-bin/ToDo/todo.cgi?site=[% SiteName %]&amp;display_add_form=on
+  &amp;record_id=[% link.record_id %]&amp;subject=[% link.project_name %]
+  &amp;project_code=[% link.project_code %]
+  &amp;description=[% link.comments %]
+  &amp;priority=&amp;[% session_string %]" "target="_Blank">Todo</a>
+     </td>
+   </tr> 
+ </table> 
+[% END %]
+[% IF lastupdate %]
+<p>Last Update [% lastupdate %][% IF SiteName == 'Demo' %]&nbsp; This value is stored in your setup file. [% END %]
+		<br>
+[% END %]
+[% embed('CSCCopyRight') %]
+
+	
+
+
+
+[% embed(data.page_bottom_view) %]<td class="NavTableCellStyle"> Project Code  </td>

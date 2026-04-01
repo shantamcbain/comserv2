@@ -1,0 +1,59 @@
+[%
+#	$Id: GeniologyHomeView.ttml,v 1.1 2001/12/16 03:45:30 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it doesn't rely on any
+# variables from outside.
+
+%]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Geniology Home page.']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<div ALIGN="center">
+	[% IF username %]
+
+<h3 > Hello  [% firstname%]  [% lastname%]! Welcome to our genealogy appication!</h3>
+	  
+
+	[% ELSE %]
+
+	<h3>  Hello! Welcome to our genealogy appication!</h3
+
+	[% END %]
+
+<p>This is were our family tracks it self.
+<a href="../CSC/helpdesk.cgi?view=BasicDataView&amp;[% session_string %]" target="_Blank" > HelpDesk</a>
+<p>Last Updated: Thursday 13 January 2005
+
+[% embed('CSCCopyRight') %]
+
+
+
+
+</td>
+</tr>
+</table>
+
+
+[% embed(data.page_bottom_view) %]
+

@@ -1,0 +1,38 @@
+[% IF data.session_object %]
+
+    [% session_id = data.session_object.getId() %]
+
+[% END %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+ [% script_name = data.app_name %]
+
+[% total_time = 0 %]
+[% rate = 0 %]
+[% total_open_expenses = 0 %]
+
+[% total_closed_expenses = 0 %]
+
+[% FOR rh_record = data.records %]
+
+    [% total_time = total_time + rh_record.time %]
+
+[% END %]
+
+ [% IF SiteName == 'ECF' %]
+ [% rate = 14 %]
+ [% ELSIF SiteName == 'AltPower' %]
+ [% rate =  4%]
+ [% ELSE %]
+ [% rate = 35 %]
+[% END %]
+[% total_price = total_time * rate  %]
+[% data.cgi.header %]
+	<!-- LogRecordSettotalView.ttml -->
+<table align="center">
+ <tr>
+  
+  <td>Total Hours:&nbsp;</td> <td>&nbsp;&nbsp;&nbsp;</td><td>[% total_time %]</td><td>&nbsp;</td><td>&nbsp;Value</td><td>&nbsp;$[% total_price %]&nbsp;</td>
+
+</tr>
+</table>

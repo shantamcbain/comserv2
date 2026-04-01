@@ -1,0 +1,163 @@
+[%#	$Id: WorksShopsView.ttml,v 1.9 2002/11/08 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dozen't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dozen't rely on any
+# variables from outside.
+
+%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+   [% LastUpdate = data.last_update %]
+   [% SiteUpdate = data.site_last_update %]
+   [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+   [% SiteDisplayName = data.site_display_name %]
+   [% site = SiteName %]
+   [% PrintMode    = data.session_object.getAttribute('-KEY','PrintMode') %]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+[% developer_status = Data.session_object.getAttribute('-KEY', 'auth_developer_status') %]
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% PROCESS DefaultDbi.ttml %]
+
+
+
+[% IF group == "Mentoring"	%]
+	[% embed(data.page_top_view,['-PAGE_TITLE',' .']) %]
+[% ELSE %]
+	[% embed(data.page_top_view,['-PAGE_TITLE','Hive Management system.']) %]
+[% END %]
+
+[% embed('ErrorDisplayView') %]
+
+ [% sessionstring %]
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+	<tr>
+	<td>[% IF username %]
+			<h3 > Hello  [% firstname %]  [% lastname %]! Welcome to [% data.site_display_name %] WorkShops!</h3>
+		[% ELSE %]
+			<h3>  Welcome to [% data.site_display_name %] Hive Management system! </h3> 
+		[% END %]
+
+<h4>Up coming Hive Management Systems   </h4>	
+                 [% IF group == 'CSC_admin' OR
+                    group == 'Apis_admin' OR
+                    group == 'BMaster_admin' OR
+                    group == 'ECF_admin' OR
+                    group == 'HE_admin' OR
+                    group == 'IM_admin'  OR
+                    group == 'CS_admin'  OR
+                    group == 'WiseWoman_admin'  OR
+                    group == 'Forager_admin' %]
+ <p>                  <a href="/cgi-bin/ENCY/workshops.cgi?site=[% SiteName %]&amp;[% session_string %]&display_add_form" target="_blank" name="Add workshop">Add Workshop</a></p>  
+		[% END %]
+	
+<p><form target="paypal" action="https://www.paypal.com/cgi-bin/webscr" method="post" >
+<input type="hidden" name="cmd" value="_s-xclick">
+<input type="hidden" name="encrypted" value="-----BEGIN PKCS7-----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-----END PKCS7-----
+">
+<input type="image" src="https://www.paypalobjects.com/en_US/i/btn/btn_viewcart_LG.gif" border="0" name="submit" alt="PayPal - The safer, easier way to pay online!">
+<img alt="" border="0" src="https://www.paypalobjects.com/en_US/i/scr/pixel.gif" width="1" height="1">
+</form>
+
+		[% SiteName = data.site_name%]
+   	[% IF SiteName == "OKB" %]
+		[%# embed('OkBeekeepersHomeView') %]
+		[% ELSIF SiteName == "BMaster"%]
+			[% embed ('BMManagement') %]
+		[% ELSIF SiteName == "CS" %]
+			[% embed ('CSWorkShops') %]
+		[% ELSIF SiteName == "CSC" %]
+                        [% IF group == 'Planning' %]
+			[%# embed ('PlanningView') %]
+                        [% ELSE %]
+			[%# embed ('CSCHomeView') %]
+			[% embed ('CSWorkShops') %]
+                        [% END %]
+		[% ELSIF SiteName == "CSCDev" OR
+		         SiteName == "BMasterDev"  %]
+			[%#embed ('CSCDevHomeView') %]
+				[% embed ('CSWorkShops') %]
+		[% ELSIF SiteName == "ECF" OR
+		         SiteName == "ECFDev"  %]
+			[% embed ('ECFWorkShops') %]
+			[%# embed ('SBHomeView') %]
+		[% ELSIF SiteName == "HE" OR
+		         SiteName == "HEDev"  %]
+			[% embed ('HEWorkShops') %]
+			[%# embed ('SBHomeView') %]
+		[% ELSIF SiteName == "USBM" OR
+		         SiteName == "USBMDev"  %]
+			[% embed ('ECFWorkShops') %]
+
+
+
+		[% ELSIF SiteName == "Aktiv" %]
+			[%# embed ('AktivHomeView') %]
+		[% ELSIF SiteName == "BMastBreeder"%]
+			[%# embed ('BMasterBreederHomeView') %]
+		[% ELSIF SiteName == "Forager" %]
+			[%# embed ('ForagerHomeView') %]
+		[% ELSIF SiteName == "Brew" %]
+			[%# embed ('BrewHomeView') %]
+		[% ELSIF SiteName == "CertBee" %]
+			[%# embed ('CertBeeHomeView') %]
+		[% ELSIF SiteName == "SB" %]
+		[% ELSIF SiteName == "CSCRecy" %]
+			[%# embed ('CSCRecyHomeView') %]
+	[% ELSIF SiteName == "Coop" OR
+		         SiteName == "Noop" %]
+			[% embed ('CoopHomeView') %]		
+		[% ELSIF SiteName == "GrindrodBC" %]
+			[% embed ('GrindrodWorkShops') %]
+		[% ELSIF SiteName == "GRA" %]
+			[%# embed ('GRAHomeView') %]
+		[% ELSIF SiteName == "GrindrodProject" %]
+			[% embed ('ECFWorkShops') %]
+			[% embed ('GrindrodWorkShops') %]
+	                [% embed ('CSWorkShops') %]
+			[%# embed ('GrindrodProjectHomeView') %]
+		[% ELSIF SiteName == "GPMarket" %]
+			[%# embed ('GrindrodParkMarketHomeView') %]
+			[%# embed ('CoopHomeView') %]
+		[% ELSIF SiteName == "HoneyDo" %]
+			[%# embed ('HoneyDoHomeView') %]
+			[%# embed ('CoopHomeView') %]
+		[% ELSIF SiteName == "IM" OR
+		         SiteName == "IMDev"  %]
+			[%# embed ('IMHomeView') %]
+		[% ELSIF SiteName == "Kamasket" %]
+			[%# embed ('KamasketHomeView') %]
+		[% ELSIF SiteName == "LandTrust" OR
+		         SiteName == "LandTrustDev"  %]
+			[%# embed ('LtrustHomeView') %]
+		[% ELSIF SiteName == "Sky" %]
+			[%# embed ('SkyHomeView') %]
+		[% ELSIF SiteName == "WiseWoman"%]
+			[% embed ('WiseWomanWorkShops') %]
+	                 [% embed ('CSWorkShops') %]
+		[% ELSIF SiteName == "WB" OR
+		         SiteName == "WBDev" %]
+			[%# embed ('WBHomeView') %]
+		[% ELSE %]
+		
+		<p>This site has no workshop at this time. </p>
+		<!-- Begin Demo Home View -->  
+		<p>Here are some of the provided by <a href="http://CountryStores.ca/cgi-bin/index.cgi?site=CS&amp;[% session_string %]&amp;view=WorkShopsView" target=_"_blank">Country Stores.ca </a>
+
+	[% embed ('CSWorkShops') %]
+			[%#embed ('DemoHomeView') %]
+			<!-- End Demo home view -->
+		[% END %]
+		
+
+
+
+
+
+[% embed(data.page_bottom_view) %]

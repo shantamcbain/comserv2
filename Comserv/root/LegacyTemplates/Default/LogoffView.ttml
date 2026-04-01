@@ -1,0 +1,43 @@
+[%
+
+#
+# this template gets rendered on logoff event
+#
+
+%]
+[% PROCESS DefaultDbi.ttml %]
+
+[% set_headers(data.http_header_params) %]
+
+[% embed(data.page_top_view,['-PAGE_TITLE', 'Log Off']) %]
+
+[% embed('ErrorDisplayView') %]
+
+        <CENTER>
+        <P>
+        <TABLE WIDTH = "95%" BORDER = "0" CELLSPACING = "2"
+               CELLPADDING = "0">
+
+        <TR>
+        <TD CLASS = "sectionHeaderStyle" COLSPAN = "2">
+        Logoff
+        </TD>
+        </TR>
+
+        <TR>
+        <TD COLSPAN = "2">
+        You have successfully logged out of the application.
+        </TD>
+        </TR>
+
+        <TR>
+        <TD COLSPAN = "2">
+        <A HREF = "[% data.script_name %]"><IMG SRC = "[% data.image_root_url %]/home.gif" BORDER = "0" ALT = "Home"></A>
+        </TD>
+        </TR>        
+        
+        </TABLE>
+        </CENTER>
+
+[% embed(data.page_bottom_view) %]
+

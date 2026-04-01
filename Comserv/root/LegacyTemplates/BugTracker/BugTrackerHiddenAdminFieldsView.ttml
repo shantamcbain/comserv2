@@ -1,0 +1,121 @@
+[% IF data.session_object %]
+
+    [% session_id = data.session_object.getId() %]
+      
+[% END %]
+
+[% raw_search = data.cgi_object.param('raw_search') %]
+
+[% columns_to_view = data.cgi_object.param('columns_to_view')
+            ? data.cgi_object.param('columns_to_view')
+            : data.selected_display_fields %]
+            
+<INPUT TYPE = "HIDDEN" NAME = "sort_field1"
+               VALUE = "[% data.sort_field1 %]">
+<INPUT TYPE = "HIDDEN" NAME = "sort_field2"
+               VALUE = "[% data.sort_field2 %]">
+<INPUT TYPE = "HIDDEN" NAME = "simple_search_string"
+               VALUE = "[% data.simple_search_string %]">
+<INPUT TYPE = "HIDDEN" NAME = "first_record_to_display"
+               VALUE = "[% data.first_record_on_page %]">
+<INPUT TYPE = "HIDDEN" NAME = "records_per_page"
+               VALUE = "[% data.max_records_per_page %]">
+<INPUT TYPE = "HIDDEN" NAME = "session_id"
+               VALUE = "[% session_id %]">
+               
+[% IF data.record_id %]                
+    <INPUT TYPE = "HIDDEN" NAME = "record_id"
+               VALUE = "[% data.record_id %]">
+
+[% END %]
+
+[% IF data.cgi_object.param('view_records_for_user') && !data.cgi_object.param('view_all_records') %]
+	
+    [% user = data.cgi_object.param('user') %]
+	
+    <INPUT TYPE = "HIDDEN" NAME = "view_records_for_user"
+                   VALUE = "on">
+    <INPUT TYPE = "HIDDEN" NAME = "user"
+                   VALUE = "[% user %]">
+
+[% END %]        
+
+[% IF data.cgi_object.param('submit_power_search') %]
+    
+    <INPUT TYPE = "HIDDEN" NAME = "submit_power_search"
+                   VALUE = "on">
+
+    [% FOREACH field=data.display_fields %]
+            
+        [% search_name = "search_$field" %]
+            
+        [% IF data.cgi_object.param("$search_name") %]
+            
+            [% value = data.cgi_object.param("$search_name") %]
+            
+            <INPUT TYPE = "HIDDEN" NAME = "search_[% field %]"
+                           VALUE = "[% value %]">
+        [% END %]
+
+    [% END %]        
+        
+    [% IF raw_search %]
+
+        <INPUT TYPE = "HIDDEN" NAME = "raw_search"
+                   VALUE = "[% raw_search %]">
+
+    [% END %]
+        
+[% ELSIF data.cgi_object.param('show_all_open_bugs') %]     
+
+    <INPUT TYPE = "HIDDEN" NAME = "show_all_open_bugs"
+                   VALUE = "on">
+    
+[% ELSIF data.cgi_object.param('show_all_bugs') %]
+
+    <INPUT TYPE = "HIDDEN" NAME = "show_all_bugs"
+                   VALUE = "on">
+
+[% ELSIF data.cgi_object.param('show_all_open_bugs_for_user') %]
+
+    [% user = data.cgi_object.param('user') %]
+    
+    <INPUT TYPE = "HIDDEN" NAME = "show_all_open_bugs_for_user"
+                   VALUE = "on">
+    <INPUT TYPE = "HIDDEN" NAME = "user"
+                   VALUE = "[% user %]">
+
+[% ELSIF data.cgi_object.param('show_all_bugs_for_user') %]
+
+    [% user = data.cgi_object.param('user') %]
+    
+    <INPUT TYPE = "HIDDEN" NAME = "show_all_bugs_for_user"
+                   VALUE = "on">
+    <INPUT TYPE = "HIDDEN" NAME = "user"
+                   VALUE = "[% user %]">
+                   
+[% ELSIF data.cgi_object.param('show_all_open_bugs_posted_by_user') %]
+
+    [% user = data.cgi_object.param('user') %]
+    
+    <INPUT TYPE = "HIDDEN" NAME = "show_all_open_bugs_posted_by_user"
+                   VALUE = "on">
+    <INPUT TYPE = "HIDDEN" NAME = "user"
+                   VALUE = "[% user %]">
+
+[% ELSIF data.cgi_object.param('show_all_bugs_posted_by_user') %]
+
+    [% user = data.cgi_object.param('user') %]
+    
+    <INPUT TYPE = "HIDDEN" NAME = "show_all_bugs_posted_by_user"
+                   VALUE = "on">
+    <INPUT TYPE = "HIDDEN" NAME = "user"
+                   VALUE = "[% user %]">
+
+[% END %]
+
+
+[% FOR field = columns_to_view %]
+    <INPUT TYPE = "HIDDEN" NAME = "columns_to_view"
+                   VALUE = "[% field %]">
+[% END %]

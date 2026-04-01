@@ -1,0 +1,78 @@
+[% #CSC PageTopView
+#	$Id: ShantaHeadLinksView.ttml,v 1.4 2002/05/13 19:48:01 shanta Exp $	
+
+# this template exist on the fallowng server uploade to each when CVS check in done, Add new servers when needed.
+#csc.ca
+#forager.com
+#aikido.bc.ca
+#shanta.org
+#webcthelpdesk.com
+
+# This file will eventualy be replaced with an ActionHandler. 
+
+# ActionHandler will display list according to contents of a db.
+
+
+#Set needed values
+
+%]
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+
+
+</a> 
+
+<!-- GotoBox      Change the VALUES to your links! --> 
+<center>
+  <form>
+    <select name="list">
+      <option value="http://shanta.org/cgi-bin/Shanta/shanta.cgi">Shanta.org</option>
+      <option value=#http://shanta.org/shanta" Target ="_Blank"> Shanta.org Html</option>
+      <option value="http://computersystemconsulting.ca/cgi-bin/Shanta/shanta.cgi?[% session_string%]">dev.shanta.org </option>
+      <option value=""http://computersystemconsulting.ca/shanta" Target ="_Blank"> dev.shanta.org Html</option>
+      <option value="http://aikido.bc.ca/cgi-bin/BCAF/marts.cgi">BCAF </option>
+      <option value="http://computersystemconsulting.ca/cgi-bin/BCAF/marts.cgi">dev.BCAF </option>
+      <option value="http://forager.com/ency">ENCY html</option>
+      <option value="http://computersystemconsulting.ca/ency">dev.ENCY html</option>
+      <option value="http://customautoparts.com/cgi-bin/web_store.cgi">CustomAutoParts</option>
+      <option value="http://forager.com/cgi-bin/ENCY/ency.cgi">ENCY </option>
+      <option value="http://computersystemconsulting.ca/cgi-bin/ENCY/ency.cgi">dev.ENCY </option>
+      <option value="http://aikido.bc.ca/bcaf">BCAF html</option>
+      <option value="http://computersystemconsulting.ca/bcaf">dev.BCAF  html</option>
+      <option value="http://forager.com/cgi-bin/Aikido/marts.cgi">OK Aikikia </option>
+      <option value="/cgi-bin/Aikido/marts.cgi">OK Aikikia Local </option>
+      <option value="/aikido/">Ok Aikikia Local html </option>
+      <option value="http://forager.com">forager.com </option>
+    </select>
+    <input type=BUTTON value="Go Get It!"
+onClick="top.location.href=this.form.list.options[this.form.list.selectedIndex].value" name="BUTTON">
+  </form>
+</center>
+
+<center>
+  <form>
+    <select name="list">
+      <option value="http://computersystemconsulting.ca/cgi-bin/VitalVic/vitalvic.cgi?[% session_string %] ">Vital Victoria</option>
+      <option value="http://customautoparts.com/cgi-bin/web_store_devel.cgi">CustomAutoParts</option>
+      <option value="http://computersystemconsulting.ca/cgi-bin/BCAF/sort.cgi?[% session_string %]">BCAF</option>
+      <option value="http://aikido.bc.ca/cgi-bin/BCAF/marts.cgi?[% session_string %]">BCAF</option>
+</select>
+    <input type=BUTTON value=" Devel!"
+onClick="top.location.href=this.form.list.options[this.form.list.selectedIndex].value" name="BUTTON">
+  </form>
+</center>
+
+
+
+
+[% #Target ="_Blank">%]
+

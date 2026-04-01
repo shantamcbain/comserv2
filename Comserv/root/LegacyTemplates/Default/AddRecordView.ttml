@@ -1,0 +1,81 @@
+ [% PROCESS DefaultDbi.ttml %]
+[% set_headers(data.http_header_params) %]
+  [% form_name = 'Add Form' %]
+  [% form_table_header = 'Add Record' %]
+
+[% IF data.add_form_name -%]
+  [% form_name = data.add_form_name %]
+  [% form_table_header = 'Add record' %]
+
+[% END -%]
+[% embed(data.page_top_view,{'-PAGE_TITLE' =>  form_name}) %]
+
+[% embed('ErrorDisplayView') -%]
+
+	<FORM METHOD = "POST" 
+              TARGET = "[% data.link_target %]"
+[% IF data.form_enctype -%]
+              ENCTYPE="[% data.form_enctype %]"
+[% END -%]
+              onSubmit="return submitOnce()">	
+<!-- Start AddRecordView -->
+	<CENTER>
+        <P>
+        <TABLE WIDTH = "95%" BORDER = "0" CELLSPACING = "2" 
+               CELLPADDING = "0">
+        <TR> 
+        <TD CLASS = "sectionHeaderStyle"
+            COLSPAN = "[% data.basic_input_widget_display_colspan %]"> 
+	<B>Register</B>
+	</TD>
+        </TR>
+
+[% embed('WidgetsTableView', 
+         {'-DISPLAY_TYPE'    => 'INPUT',
+          '-USE_RECORD_FROM' => 'CGI',
+         }) %]
+
+	<TR>
+	<TD ALIGN = "CENTER" COLSPAN = "2">
+        <TABLE BORDER = "0" WIDTH = "100%">
+        <TR>
+        <TD ALIGN = "CENTER">
+
+[% embed('LocalHiddenAdmin') %]
+
+[% IF data.display_confirmation_on_add_flag -%]
+            <INPUT TYPE = "HIDDEN" NAME = "display_add_record_confirmation"
+                   VALUE = "1">
+[% embed(data.hidden_admin_fields_view_name) -%]
+	    <INPUT TYPE = "IMAGE" NAME = "display_add_record_confirmation"
+                   BORDER = "0"
+                   VALUE = "on" SRC = "[% data.image_root_url %]/add.gif"
+                   onMouseOver="this.src='[% data.image_root_url %]/add1.gif'"
+                   onMouseOut="this.src='[% data.image_root_url %]/add.gif'"
+                   onMouseDown="this.src='[% data.image_root_url %]/add.gif'"
+                   onMouseUp="this.src='[% data.image_root_url %]/add1.gif'">
+            </TD>
+            </FORM>
+[% ELSE %]
+            <INPUT TYPE = "HIDDEN" NAME = "submit_add_record" VALUE = "1">
+[% embed(data.hidden_admin_fields_view_name) %]
+	    <INPUT TYPE = "IMAGE" NAME = "submit_add_record"  BORDER = "0"
+                   VALUE = "on" SRC = "[% data.image_root_url %]/add.gif"
+                   onMouseOver="this.src='[% data.image_root_url %]/add1.gif'"
+                   onMouseOut="this.src='[% data.image_root_url %]/add.gif'"
+                   onMouseDown="this.src='[% data.image_root_url %]/add.gif'"
+                   onMouseUp="this.src='[% data.image_root_url %]/add1.gif'">
+            </TD>
+            </FORM>
+[% END %]
+
+        </TR>
+        </TABLE>
+        </TD>
+        </TR>
+        </TABLE>
+        </CENTER>
+
+<!-- end AddRecordView -->
+
+[% embed(data.page_bottom_view) -%]

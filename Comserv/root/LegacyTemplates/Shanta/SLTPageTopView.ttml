@@ -1,0 +1,214 @@
+[%# the  PageTopView
+#	$Id: PageTopView.ttml,v 1.1 2003/11/29 06:31:35 shanta Exp shanta $	%]
+[% PageVersion = 0.02 %]
+[% #setup session ifo %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+
+
+[% IF data.session_object.getAttribute('-KEY','SiteName') %]
+
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+[% ELSE %]
+
+[% SiteName = data.SiteName %]
+[% PageTop = data.page_top_view %]
+[% favicon =  "/images/favicon.ico" %]
+
+[% END %]
+   [% StoreName = 'countrystores.ca' %]
+
+	[% HostName = 'computersystemconsulting.ca' %]
+	[% MailServer = HostName %]
+	[% MailName = username %]
+	[% IF SiteName == 'Telmark'OR
+	      SiteName == 'Aktiv' OR
+	      SiteName == 'Brew' OR
+	      SiteName == 'CSPS' %]
+		[% HostName = 'forager.com' %]
+		[% MailServer = HostName %]
+	[% END %]
+[% IF SiteName == 'Forager	' 
+	      %]
+		[% HostName = 'forager.com' %]
+		[% MailServer = HostName %]
+	[% END %]
+
+	[% IF SiteName == 'OKBee'OR
+	      SiteName == 'Apis' OR
+	      SiteName == 'CertBee' OR
+	      SiteName == 'ECF' OR
+	      SiteName == 'BMaster' OR
+	      SiteName == 'BMasterDev'OR
+	      SiteName == 'BeeCoop' 
+	      %]
+		[% HostName = 'beemaster.ca' %]
+		[% MailServer = HostName %]
+		[% StoreName = 'beemaster.ca' %]
+	[% END %]
+	[% IF SiteName == 'Organic' OR
+	      SiteName == 'Skye' OR
+	      SiteName == 'Noop' OR
+	      SiteName == 'AmberRose' OR
+	      SiteName == 'he'
+	       
+	      %]
+		[% HostName = 'computersystemconsulting.ca' %]
+		[% MailServer = HostName %]
+		
+	[% END %]
+	[% IF SiteName == 'CSC' OR
+	      SiteName == 'Extropia'
+	      %]
+		[% HostName = 'computersystemconsulting.ca' %]
+		[% MailServer = HostName %]
+		[%# StoreName = 'computersystemconsulting.ca' %]
+	[% END %]
+	
+	[% IF SiteName == 'HoneyDo'
+	      %] 
+		[% HostName = 'honeydosmallengine.com' %]
+		[% MailServer = HostName %]
+		[% StoreName = 'honeydosmallengine.com' %]
+	[% END %]
+	   
+	
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"         "http://www.w3.org/TR/html4/loose.dtd">
+
+<html >
+
+<head>
+
+<title> [% data.site_display_name %]: [% data.script_display_name %]: [% data.page_title %] </title>
+
+<!--page top view version [% PageVersion %]
+Group = [% group  %]<br>
+username = [% username %]
+-->
+
+
+[% password = 'pwxx88' %]
+[%# password =  'herbs2'   %]
+[%# username = 'forager'   %]
+[%# username = 'root'  %]
+
+[%# USE DBI( data_source = 'dbi:mysql:forager:mysql.computersystemconsulting.ca',
+                username = 'forager',
+                password =  'pwxx88' )
+    %]
+
+[% IF data.css_view_url %]
+	<LINK REL ="stylesheet" TYPE ="text/css" HREF ="[% data.css_view_url %]">
+[% END %]
+
+<meta NAME="REVISIT-AFTER" CONTENT="7 days">
+<meta NAME="ROBOTS" CONTENT="index all, follow all">
+<META NAME = "keywords" CONTENT= "[% data.http_header_keywords %]">
+<META NAME = "description" CONTENT= "[% data.http_header_description %]">
+<link rel="shortcut icon" href="[% data.favicon %]" >
+<!--<link rel="icon" href="[% data.ani_favicon %]" type="[% data.favicon_type %]" >-->
+<!--Call Head Scripts-->
+
+[% embed('SideBarHeadScript') %]
+<!--return SideBarHeadScript-->
+
+<script type="text/javascript">
+
+function Flash_embedSWF(srcURL, swfbgColor, width, height) 
+{
+  var defaultColor = (document.bgColor != null) ? document.bgColor : "#ffffff";
+  var bgcolor = (swfbgColor != null) ? swfbgColor : defaultColor;
+  document.writeln(
+    '<OBJECT classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000"' +
+'codebase="http://active.macromedia.com/flash2/cabs/swflash.cab#version=4,0,0,0"' +
+    'ID="sonify" WIDTH="'+width+'" HEIGHT="'+height+'">' +
+    '<PARAM NAME="movie" VALUE="' + srcURL + '">' + 
+    '<PARAM NAME="quality" VALUE="high">' +
+    '<PARAM NAME="wmode" VALUE="transparent">'+
+    '<PARAM NAME="autostart" VALUE="1">'+
+    '<PARAM NAME="bgcolor" VALUE=' + bgcolor + '>' +
+    '<embed src="' + srcURL + '" quality="high"' + 'bgcolor="' + 
+    bgcolor + '"' + 'width="'+width+'" height="'+height+'"' +
+    'type="application/x-shockwave-flash" ' +
+ 'pluginspage="http://www.macromedia.com/shockwave/download/index.cgi?P1_Prod_Version=ShockwaveFlash"></embed></OBJECT>');
+
+}</script>
+<SCRIPT LANGUAGE="JavaScript">
+<!--
+function JumpToIt(frm) {
+    var newPage = frm.url.options[frm.url.selectedIndex].value
+    if (newPage != "None") {
+        location.href=newPage
+    }
+}
+//-->
+</SCRIPT>
+
+
+</HEAD>
+<BODY>
+[% IF data.debug == 1 %]
+HomeView.ttml
+[% embed('InheretedVariablesView') %]
+[% END %]
+[%# embed('InheretedVariablesView') %]
+<!-- PageTopView.ttml [% PageVersion %] -->
+<!-- Here we start the Header page The location is  PageTopView [% PageVersion %]-->
+	
+<!-- The main table of the PageTopView -->
+	
+<table class="MainPageTable">
+<tbody>
+<TR >
+<td colspan="2">	 
+
+<!-- Page head row Begin PageTopView -->
+	 
+		[%# embed ('PageHeaderView') %]
+	<!--End page header row PageTopView-->
+
+</td>
+</tr>
+
+<!-- Main PageRow PageTopView-->
+
+<tr>
+	<!-- Left Page Cell PageTopView-->
+	<td 	class="LeftNavDataCell" >
+		[% IF data.page_left_view %]
+			[%# embed(data.page_left_view) %]
+		[% ELSE %]
+	 		[%# embed('LeftPageView') %]
+	   [% END %]
+	  [%# embed ('Site_Certification_View') %]
+	</td>
+  	<!-- Close Left Page Cell PageTopView-->
+
+	<td width="85%" rowspan="15" align="left" valign="top" class="MainPageDataCell">
+<!-- content Main Page Cell PageTopView-->
+
+[% IF SiteName == 'eXtropia'  %]
+	<IMG SRC = "http://www.extropia.com/graphics/template/logo.gif" alt="eXtropia logo">
+[% END %]
+	
+
+ [% IF data.application_sub_menu_view_name %]
+	<table>
+	    <TR>
+	    <TD colspan='2'>
+	    [%  embed(data.application_sub_menu_view_name) %]
+	    </TD>
+	    </TR>
+	</table>
+ [% END %]
+ 
+<!-- Page is closed in PageBottomView.ttml PageTopView-->

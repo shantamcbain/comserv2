@@ -1,0 +1,23 @@
+[%
+#	$Id: SBPageBottomView.ttml,v 1.1 2002/01/18 04:46:03 shanta Exp $	
+# location /cgi-bin/Htmltemplates/defalt
+# the bottom template
+
+%]
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+
+<!-- Turn of main page table -->
+
+
+
+    </BODY>
+    </HTML>

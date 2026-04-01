@@ -1,0 +1,96 @@
+[%
+#	$Id: ChickenView.ttml,v 1.4 2002/05/31 13:40:30 shanta Exp $
+
+
+%]
+[% PROCESS DefaultDbi.ttml %]
+[% embed(data.page_top_view,['-PAGE_TITLE','Chickens']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+       [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+  
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+
+		<tr>
+		<td >
+		<div align="center"
+			[% IF username %]
+
+		<h3> Hello  [% firstname%]&nbsp;  [% lastname%]! This is our Chicken Page!</h3>
+
+
+			[% ELSE %]
+
+			<h3> This is our Chicken Page!</h3
+<p>To get the most from this application you will need to create an account. 
+
+<p><A HREF = "[% data.script_name %]?session_id=[% session_id %]&amp;submit_logon=on&amp;site=[%SiteName%]"
+                 TARGET = "[% data.link_target %]">Logon</A> 
+                 
+                 
+               <a href="/cgi-bin/FAQ/faq.cgi?site=[%SiteName%]&amp;[% session_string %]&amp;sort_field1=category &amp;sort_field2=fname &amp;first_record_to_display=0&amp;records_per_page= &amp;record_id=2&amp;columns_to_view=category &amp;columns_to_view=question&amp;display_details_view.x=8 &amp;display_details_view.y=9&amp;display_details_view=on" onmousedown="click Here for info on what we collect">Why should I create an account</a>
+    
+			[% END %]
+		</div>
+		</td >
+		</tr>
+		<tr>
+		<td >
+
+		<A NAME="PageTop"></A>
+
+		<h2> Chickens are key to sustainable agriculture. </h2>
+   [% IF SiteName =="ECF"  %]
+
+		<p>Chickens We have are;
+		</p>
+		<ul>
+	<li>Black Bantams</li>
+	<li></li>
+	<li></li>
+</ul>
+	[% ELSIF SiteName == 'Noop' %]
+Too see a list of Co-op grower members Click here.
+
+<p> Members are encouraged to add their names to the grower registry. The first round of data collection is what the general public will see such as your Name address, phone, Email, brief description of your operation and a link to your web site. If you don't have a web site we can provide hosting for your site.
+
+<p>Further data will be collected as time progress that will be used to mesh your production items, volumes and harvest times with the marketing system.
+<p>
+In time your reports will be used by the co-op manager to plan what will be available to co-op customers. During production time your timely input of data will ensure that the Co-Op will be able to get your ready products to market in a timely manor.
+<p>
+As a grower you will have access to charts that will show what Co-op customers have predicted they will use. This will help you with your planting planning. The goal of the Growers Co-Op is to get your products to the customer in a timely manner.
+			[% ELSE %]
+<p>Chickens provide meat, eggs, feathers and manure. They weed the gardens and control bugs.</p>
+[% END %]
+
+<p>There are many types of chickens and here are some key links to learning more.
+</p>
+<ul>
+	<li></li>
+	<li></li>
+	<li></li>
+</ul>
+		</td>
+			</tr>
+		</table>
+		</td>
+		</tr>
+	</table>
+
+
+[% embed(data.page_bottom_view) %]
+

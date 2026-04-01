@@ -1,0 +1,8 @@
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+		[% IF fname %]	
+				<?--|&nbsp;<A HREF ="http://[% HostName %]:2096"target="_Blank">Mail</a>-->	
+         [% ELSE %]
+	  <A  HREF =" [% ServerName %]?site=[% SiteName %]&amp;[% session_string %]&amp;view=MailListView" >View in Browser</a>		   
+		[% END %]
+

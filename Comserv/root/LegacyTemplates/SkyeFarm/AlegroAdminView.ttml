@@ -1,0 +1,77 @@
+[%
+#	$Id: AlegroAdminView.ttml,v 1.4 2011/09/30 13:40:30 shanta Exp $	
+
+
+%][%# embed(data.page_top_view,['-PAGE_TITLE','Home']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+
+
+<h2>  Your Admin Page it only apprears when you are logged in.. </h2>
+
+<p>Hi T </p>
+[% IF SiteName == "Skye" %]
+Back to <a href="/cgi-bin/index.cgi?site=CSCdev&amp;[% session_string %]" title="Back to support">CSC support</a>
+[% ELSE %]
+To view your site <a href="/cgi-bin/index.cgi?site=Skye&amp;[% session_string %]" title="View as Skye">click here</a>
+[% END %]
+
+Ok I have set up demo stores on coutrystores.ca
+<ol>
+<li><a href="http://zen.countrystores.ca//admin-1323218044 "  target="_blank" title="View as Skye">zen cart</a>         admin TLvlHqsk4qy73eU6
+I would recomend this one as it looks the most complet on the admin side
+<li><a href="http://tomato.countrystores.ca//admin" target="_blank" title="View as Skye">tomato carte</a> . admin WuMiO1cGWGkCoCeL 
+</ol>
+<p>I have not done much with eather so feel free to enter your data and I will port it to your site when it is ready to go online.
+<p> Now shifting to work on the store to get it open. Use the product link on uper left to go to your product page
+<p>Got to the products page and it is worthless. I will get to other pages over as we go Pictures would be next 
+<p>Now up and running. I will be converting to your style and content.
+
+<p>I am now adding skye farm to the application. 
+
+<p>Just added your Skye Farm user athentication table. This table is your user file and defines the rights of your users. 
+You and I are in the Alegro_admin giving us full administration rights to the site. In the future you may want to add others such as 
+couster, grower or suppler groups to say give the grower more details about growing garlic or access to your exlusive seed garlic etc.
+
+
+
+<p>I will be using this area to direct comments to you. I will be busy till tonight so only be able to do a little at coffee.
+Added 
+    </td>
+    </tr>
+    </table>
+ 
+'
+
+
+
+
+
+
+
+
+
+
+
+[% embed(data.page_bottom_view) %]
+

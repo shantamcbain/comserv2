@@ -1,0 +1,19 @@
+[%
+#	$Id: HoneyDoProductView.ttml,v 1.1 2008/10/08 04:23:07 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it doesn't rely on any
+# variables from outside.
+
+%]
+<!-- Start  /cgi-bin/HtmlTemplates/HoneyDo/HoneyDoProductView.ttml-->
+
+Jens this is were you will place information for your customers looking for your products.
+
+The link to your store is <a href="http://store.honeydosmallengine.com/cgi-bin/store/store.cgi?shop=HoneyDo" target="_blank">http://store.honeydosmallengines.com/cgi-bin/store/store.cgi?shop=HoneyDo</a>
+The link to your admin will be visible in your admin links below member links. This group of left is only shown when you have logged into your site.
+
+<!-- end  /cgi-bin/HtmlTemplates/HoneyDo/HoneyDoProductView.ttml-->

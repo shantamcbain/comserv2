@@ -1,0 +1,111 @@
+[%
+
+#
+# this template renders the page with a single record details and
+# provides links for modification and deletion of that record if
+# appropriate
+#
+
+-%]
+[%
+
+  record = data.records.0;
+  url_encoded_admin_variables = embed(data.url_encoded_admin_fields_view_name);
+
+  username_of_poster = record.username_of_poster || '';
+  group_of_poster    = record.group_of_poster    || '';
+  key_field = data.key_field;
+  key_field_value = record.$key_field;
+
+-%]
+
+[% set_headers(data.http_header_params) %]
+
+[% embed(data.page_top_view,{'-PAGE_TITLE' => 'Record Details'}) %]
+
+[% embed('ErrorDisplayView') -%]
+
+[% #embed('BasicWidgetView',{'-TABLE_HEADER' => 'Record Details' }) %]
+
+	<FORM METHOD = "POST" 
+              TARGET = "[% data.link_target %]"
+    [% IF data.form_enctype %]
+              ENCTYPE="[% data.form_enctype %]" %]
+    [% END %]>
+	<CENTER>
+        <TABLE WIDTH = "90%" BORDER = "0" CELLSPACING = "1" 
+               CELLPADDING = "0">
+        <TR> 
+        <TD CLASS = "PagesectionHeaderStyle"
+            COLSPAN = "[% data.basic_input_widget_display_colspan %]"> 
+    
+	</TD>
+        </TR>
+
+[% embed('WidgetsTableView', 
+         {'-DISPLAY_TYPE'    => 'DISPLAY',
+          '-USE_RECORD_FROM' => 'DB',
+         }) %]
+
+        </TR>
+
+[% IF data.allow_modifications_flag || data.allow_deletions_flag %]
+
+  [% FOR group = data.auth_groups.split(',') %]
+    [% IF group && group == group_of_poster%]
+      [% poster_in_group_of_user = 1 %]
+      [% LAST %]
+    [% END %]
+  [% END %]
+
+        <TR>
+        <TD ALIGN = "RIGHT" CLASS = "PagetableRowStyle" 
+            COLSPAN = "[% data.basic_input_widget_display_colspan %]"> 
+[% END %]
+
+[% IF data.allow_modifications_flag %]
+
+  [% IF  (!data.require_matching_username_for_modifications || 
+          data.auth_username == username_of_poster) 
+          &&
+         (!data.require_matching_group_for_modifications    ||
+          poster_in_group_of_user)
+  %]
+    <A HREF ="[% "$data.script_name?$url_encoded_admin_variables&display_modification_form=on&$key_field=$key_field_value" -%]"
+       TARGET ="[% data.link_target %]">Modify</A>
+  [% END %]
+
+[% END %]
+
+[% IF data.allow_deletions_flag %]
+
+  [% IF  (!data.require_matching_username_for_deletions || 
+          data.auth_username == username_of_poster) 
+          &&
+         (!data.require_matching_group_for_deletions    ||
+          poster_in_group_of_user)
+  %]
+
+    [% IF data.display_confirmation_on_delete_flag %]
+       | <A HREF ="[% "$data.script_name?$url_encoded_admin_variables&display_delete_record_confirmation=on&$key_field=$key_field_value" -%]"
+            TARGET ="[% data.link_target %]">Delete</A>
+    [% ELSE %]
+       | <A HREF ="[% "$data.script_name?$url_encoded_admin_variables&submit_delete_record=on&$key_field=$key_field_value" -%]"
+            TARGET ="[% data.link_target %]">Delete</A>
+    [% END %]
+
+  [% END %]
+
+[% END %]
+
+
+[% IF data.allow_modifications_flag || data.allow_deletions_flag %]
+        </TD>
+        </TR>
+[% END %]
+
+        </FORM>
+        </TABLE>
+        </CENTER>
+
+[% embed(data.page_bottom_view) -%]

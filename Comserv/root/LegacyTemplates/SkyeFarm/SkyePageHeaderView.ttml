@@ -1,0 +1,141 @@
+[% #/HTMLTemplates/SkyeFarm/SkyePageHeaderView.ttml %]
+[%# 	$Id: SkyePageHeaderView.ttml,v 0.01 2003/11/29 06:33:25 shanta Exp shanta $	%]
+
+[%# All content of this view is confined to a table cell in PageTopView %]
+	<!-- PageHeadView 0.01 Begin -->
+[% site = "http://dev.computersystemconsulting.ca" %]
+	  <table CLASS="tablePageTopHeaderStyle">
+		<tr align="left" >
+		<td > 
+			 <IMG SRC ="[% data.application_logo %]" WIDTH ="[% data.application_logo_width %]"      HEIGHT ="[% data.application_logo_height %]"	ALT ="[% data.application_logo_alt %]"> 		         
+		</td> 
+		<td > 
+
+                    <A class=a HREF="[% site %]/cgi-bin/index.cgi?&site=[% SiteName %]&amp;[% session_string %]" NAME="Home" TITLE="Home">
+                      <IMG SRC="http://skyefarm.com/images/home.gif" WIDTH=100 HEIGHT=25 BORDER=0 NAME="Home"
+                       onmouseover='IMAG001.src="http://skyefarm.com/images/homea.gif"'
+                       onmousedown='IMAG001.src="http://skyefarm.com/images/homeb.gif"'
+                       onmouseout='IMAG001.src="http://skyefarm.com/images/homea.gif"'
+                       onmouseup='IMAG001.src="http://skyefarm.com/images/homea.gif"' ALT="Home">
+                    </A>
+ 		</td> 
+		<td > 
+
+			
+                    <A class=a HREF="[% site %]/cgi-bin/index.cgi?&site=[% SiteName %]&amp;[% session_string %]&amp;view=PageView&amp;page=GarlicCulture" NAME="Garlic Culture" TITLE="Garlic Culture">
+                      <IMG SRC="http://skyefarm.com/images/culture.gif" WIDTH=100 HEIGHT=25 BORDER=0 NAME="Garlic Culture"
+                       onmouseover='IMAG001.src="http://skyefarm.com/images/coulturea.gif"'
+                       onmousedown='IMAG001.src="http://skyefarm.com/images/cultureb.gif"'
+                       onmouseout='IMAG001.src="http://skyefarm.com/images/culturea.gif"'
+                       onmouseup='IMAG001.src="http://skyefarm.com/images/culturea.gif"' ALT="Garlic Culture">
+                    </A>
+ 		</td> 
+		<td align="center" valign="middle">
+
+<!-- Call HeaderNaveBarView -->
+                    <A class=a HREF="[% site %]/cgi-bin/index.cgi?&site=[% SiteName %]&amp;[% session_string %]&amp;view=PageView&amp;page=GarlicOverView" NAME="GarlicOverView" TITLE="GarlicOverView">
+                      <IMG SRC="http://skyefarm.com/links/IMAG002B.GIF" WIDTH=100 HEIGHT=25 BORDER=0 NAME="GarlicOverView"
+                       onmouseover='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmousedown='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmouseout='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmouseup='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"' ALT="Home">
+                    </A>
+ 		</td> 
+
+		<td align="center" valign="middle">
+
+                    <A class=a HREF="[% site %]/cgi-bin/index.cgi?&site=[% SiteName %]&amp;[% session_string %]&amp;view=PageView&amp;page=MarketView" NAME="Market View" TITLE="MarketView">
+                      <IMG SRC="http://skyefarm.com/welcome/IMAG003.GIF" WIDTH=100 HEIGHT=25 BORDER=0 NAME="MarketView"
+                       onmouseover='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmousedown='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmouseout='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmouseup='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"' ALT="Home">
+                    </A>
+ 		</td> 
+
+		<td align="center" valign="middle">
+
+                    <A class=a HREF="[% site %]/cgi-bin/index.cgi?&site=[% SiteName %]&amp;[% session_string %]&amp;view=PageView&amp;page=PhotoView" NAME="Photo View" TITLE="PhototView">
+                      <IMG SRC="http://skyefarm.com/welcome/IMAG004.GIF" WIDTH=100 HEIGHT=25 BORDER=0 NAME="Photo"
+                       onmouseover='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmousedown='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmouseout='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmouseup='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"' ALT="Home">
+                    </A>
+ 		</td> 
+					[%# embed('HeaderNavBarView') %] 
+					
+<!-- Close table -->					
+		</td>
+	   </tr>
+		<tr align="left" >
+		<td > 
+		<A  HREF ="?site=[% SiteName %]&amp;[% session_string %]&amp;m=1" title="Switch to New Mobile View">Mobile</a>		   
+			 		         			
+		 <A  HREF ="http://dev.computersystemconsulting.ca/cgi-bin/index.cgi?&site=[% SiteName %]&amp;[% session_string %]&view=HostingView&m=0">Hosting</a> 
+	
+			[%#embed('HeaderHostingView') %] 
+			
+		<td align="center" valign="middle">
+
+                    <A class=a HREF="[% site %]/cgi-bin/index.cgi?&site=[% SiteName %]&amp;[% session_string %]&amp;view=ContactView" NAME="Contacts" TITLE="contacts">
+                      <IMG SRC="http://skyefarm.com/welcome/IMAG001B.GIF" WIDTH=100 HEIGHT=25 BORDER=0 NAME="contacts"
+                       onmouseover='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmousedown='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmouseout='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmouseup='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"' ALT="Home">
+                    </A>
+ 		</td> 
+		<td align="center" valign="middle">
+
+                    <A class=a HREF="[% site %]/cgi-bin/index.cgi?&site=[% SiteName %]&amp;[% session_string %]&amp;view=PageView&amp;page=LinksView" NAME="links" TITLE="Links">
+                      <IMG SRC="http://skyefarm.com/welcome/IMAG006.GIF" WIDTH=100 HEIGHT=25 BORDER=0 NAME="Links"
+                       onmouseover='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmousedown='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmouseout='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmouseup='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"' ALT="Home">
+                    </A>
+ 		</td> 
+		<td align="center" valign="middle">
+
+                    <A class=a HREF="[% site %]/cgi-bin/index.cgi?&site=[% SiteName %]&amp;[% session_string %]&amp;view=PageView&amp;page=ReferenceView" NAME="Reference" TITLE="Reference">
+                      <IMG SRC="http://skyefarm.com/welcome/IMAG007B.GIF" WIDTH=100 HEIGHT=25 BORDER=0 NAME="Refrences"
+                       onmouseover='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmousedown='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmouseout='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmouseup='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"' ALT="Home">
+                    </A>
+ 		</td> 
+		<td align="center" valign="middle">
+
+                    <A class=a HREF="[% site %]/cgi-bin/index.cgi?&site=[% SiteName %]&amp;[% session_string %]&amp;view=ProductView" NAME="Products" TITLE="Products">
+                      <IMG SRC="http://skyefarm.com/welcome/IMAG005.GIF" WIDTH=100 HEIGHT=25 BORDER=0 NAME="Products"
+                       onmouseover='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmousedown='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmouseout='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmouseup='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"' ALT="Home">
+                    </A>
+ 		</td> 
+		<td align="center" valign="middle">
+
+                    <A class=a HREF="[% site %]/cgi-bin/index.cgi?&site=[% SiteName %]&amp;[% session_string %]&amp;view=PageView&amp;page=VideosView" NAME="Videos" TITLE="Videos">
+                      <IMG SRC="http://skyefarm.com/welcome/IMAG012B.GIF" WIDTH=100 HEIGHT=25 BORDER=0 NAME="Videos"
+                       onmouseover='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmousedown='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmouseout='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"'
+                       onmouseup='IMAG001.src="http://skyefarm.com/images/IMAG002B.GIF"' ALT="Home">
+                    </A>
+ 		</td> 
+
+<!-- Call HeaderNaveBarView -->
+
+					[%# embed('HeaderNavBarView') %] 
+					
+<!-- Close table -->					
+		</td>
+	   </tr>
+     </table>
+		
+
+	
+<!--End PageHeaderView -->

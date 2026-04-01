@@ -1,0 +1,60 @@
+[%
+#	$Id: BMasterBreederView .ttml,v 0.02 2002/05/01 15:47:05 shanta Exp $
+
+
+%]
+[% PROCESS DefaultDbi.ttml %]
+
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Breeder program']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td >
+	[%# SiteName  %]
+<CENTER>
+
+	  
+
+	[% IF SiteName == 'ECF' %]
+
+	<h3>These are our Products And Services! Please log in for better service.</h3
+	[% ELSE %]
+	<h3>  Hello! welcome to our breeder program.</h3
+	[% END %]
+
+</CENTER>
+
+[% IF SiteName == 'ECF' %]
+
+[% embed('ECFBreederView') %]
+	[% ELSE %]
+<h2>Breeding is a key to better beestocks.</h2>
+
+We are supporting the <a href="http://grindrodproject.grindrodbc.com">Grindrod breeding project</a>
+	[% END %]
+
+
+
+
+
+
+
+[% embed(data.page_bottom_view) %]
+

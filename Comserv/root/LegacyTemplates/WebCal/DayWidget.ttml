@@ -1,0 +1,99 @@
+[%
+
+# This template renders the DayView widget.
+
+# It uses a ref to a matrix hash data.sel_day_data with the fillout of
+# the cells (refer to
+# WebCal::DisplayDayViewAction::get_data_of_sel_day for more
+# info). The number of columns is precalculated and the last column
+# number is located in data.last_col (count starts from 0); Finally
+# the array with a range of hours to display is in data.display_hours.
+
+-%]
+
+[% url_encoded_admin_variables =
+   embed(data.url_encoded_admin_fields_view_name);
+
+   event_url = "$data.script_name?site=$data.site_name&amp;$url_encoded_admin_variables&display_add_form=on&date=$data.selected_date_data.date";
+
+   colors = ["#EEEEEE","#FFFFFF"];
+
+-%]
+
+<!-- START DAY BY HOUR -->
+ [% USE date(format = '%Y-%m-%d ') %]
+  [% USE day = date(format => '%A', locale => 'en_GB') %]
+
+<TABLE WIDTH=100%>
+  <TR BGCOLOR="#EEEEEE"> 
+   <TD ALIGN=left COLSPAN=2>
+      All Day [% day.format%] [% data.selected_date_data.date_str %] Events:
+    </TD>
+  </TR>
+    &nbsp; &nbsp; &nbsp;
+</TABLE>
+
+<TABLE WIDTH=100% BORDER="1" BORDERCOLOR="#ECECEC" CELLSPACING="0" CELLPADDING="2">
+
+[% count = 0 %]
+[% width_length = 5 %]
+[% FOR hour = data.display_hours %]
+  
+[% IF data.ampm_hour_display %]
+        [% width_length = 10 %]
+  	[% row_data = data.sel_day_data.$hour;
+  	       ampm = " AM"; %]
+  	[% IF hour > 12 %]
+  		[%   hour = hour - 12;
+  		     ampm = " PM"; %]
+  	[% ELSIF hour == 12 %]
+  		[% ampm = " PM" %]
+  	[% END %]
+  	[%
+     	  time_str = subs.sprintf("%02d:%02d",hour,'00');
+     	  time_str = "$time_str$ampm";
+   	%]
+ [% ELSE %]
+  
+  	[% row_data = data.sel_day_data.$hour;
+     	   time_str = subs.sprintf("%02d:%02d",hour,'00');
+  	%]
+  	
+ [% END %] 
+ 
+ [%
+     count = count + 1;
+     color_ind = count % 2;
+  %]
+   
+   
+  <TR BGCOLOR="[% colors.$color_ind %]"> 
+
+    <TD ALIGN=left WIDTH=[% width_length %]%>
+      <A HREF="[% "$event_url&amp;time=$time_str" %]">
+      [% time_str %]
+    </TD>
+
+    [% FOR col = [0..data.last_col] %] 
+
+      [% IF row_data.$col.note %]
+        <TD BGCOLOR=lightgreen ALIGN=left ROWSPAN=[%- row_data.$col.rowspan -%]>
+          [% event = row_data.$col %]
+          <A HREF="[% "$event_url&amp;display_details_view=on&amp;date=$day.date&amp;record_id=$event.record_id" %]">[% event.note %]</A>
+        </TD>
+
+      [% ELSIF row_data.$col %]
+        [% # that's where the cell is already taken from the prev row %]
+
+      [% ELSE %]
+        <TD ALIGN=left ROWSPAN=1>
+          &nbsp;
+        </TD>
+      [% END %]
+
+  [% END %]
+  </TR>
+[% END %]
+</TABLE>
+
+

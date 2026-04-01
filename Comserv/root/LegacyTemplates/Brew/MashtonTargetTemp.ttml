@@ -1,0 +1,51 @@
+[%#	$Id: MashtonTargetTemp.ttml,v 1.1 2008/03/25 06:42:47 shanta Exp shanta $	%]
+
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+   [% BatchNumberS = data.session_object.getAttribute('-KEY','batchnumber') %]
+   
+[% END %]
+
+
+
+<p>Pull from temp log</p>
+
+<a href="/cgi-bin/Brew/temp.cgi?site=[% SiteName %]&amp;droplist=1&amp;[% session_string %]&amp;display_add_form=on&amp;site_name=[% SiteName %]&amp;batchnumber=[% batchnumber %]&amp;Nav_link=1" target=_blank name="Add Ingredients"  title="Add New Recipe" style="AddButtonStyle">Add new temp</a> This will open a new tab. Enter the data save and close the window refresh this page for data to show.
+<table>
+ <tr><td><table id="brewtime"  >
+<th >time<th >Mashton temp</td><th >Line temp</th><th >Sparge temp</th><th >Modify</th>
+[%# USE scr=String('') %]
+[% FOREACH value = DBI.query("SELECT * FROM brew_temp_tb
+	                                WHERE  ( sitename   =  'Brew' AND
+	                                         batchnumber   =  '$batchnumber'
+                                     )
+                                   ORDER BY time
+	                            ")%]  
+ <tr><td>[% value.time %]</td><td>[% value.mastuntemp %][% total_mashtuntemp =  value.mastuntemp %]</td><td>[% value.LineTemp %]</td><td>[% value.spargtemp %]</td><td><a href="/cgi-bin/Brew/temp.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_modification_form=on&amp;&amp;record_id=[% value.record_id %]&amp;batchnumber=[% batchnumber %]" target=_blank name="_Blank"  title="Modify Temp" style="AddButtonStyle">Modify temp</a>
+ </td></tr
+
+[%# str.append(',') %]
+	    [%# total_mashtuntemp = total_mashtuntemp .,. value.mastuntemp %]
+	    [%# total_linetemp = total_linetemp + value.linetemp %]
+	    [%# total_spargtemp = total_spargtemp + ',' value.spargtemp %]
+
+[% END %]
+ </table>
+ </td>
+ <td>
+  <h3>Graph<h3>
+  <img src="/image/temp.png" alt="temp graph">
+  
+  
+  Mashtuntemp [% total_mashtuntemp %]
+  Linetemp [% total_linetemp %]
+  Spargtemp [% total_spargtemp %]
+ </td>
+ </tr>
+ </table> 

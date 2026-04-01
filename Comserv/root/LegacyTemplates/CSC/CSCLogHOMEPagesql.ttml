@@ -1,0 +1,14 @@
+  [% FOREACH link = DBI.query("SELECT * FROM page_tb
+                                  WHERE  (status  = 2 AND
+                                         page_code = 'LogHomeView' AND
+                                         sitename = 'CSC' )
+                                  ORDER BY sitename
+                                  ")%]    
+               [% site      = link.sitename        %]          
+                 [% PageName  = link.view_name %] 
+                 [% Record_id = link.record_id  %]
+                 [% body      = link.body %]
+                 [% status      = link.status %]
+                 [%  page_code     = link.page_code %]
+                 [% lastupdate = link.lastupdate %]
+       [% END %]                  

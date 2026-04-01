@@ -1,0 +1,122 @@
+[% #/cgi-bin/Htmltemplates/Default/SBPageTopView.ttml
+#	$Id: SBPageTopView.ttml,v 1.4 2002/05/28 12:43:09 shanta Exp $	
+
+# this template generates the top of HTML,
+
+# if -PAGE_TITLE is defined, it gets used in the <title>
+
+# if -SCRIPT_DISPLAY_NAME is defined, it gets used in the <title>
+
+# if -CSS_VIEW_URL is defined, the CSS link is created.
+
+# if -APPLICATION_SUB_MENU_VIEW_NAME is defined, the corresponding
+# template gets embedded
+
+# also see various other logo values below
+
+%]
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+
+[% END %]
+   [% session_string = "session_id=$session_id" %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% sitename = data.session_object.getAttribute('-KEY','SiteName') %]
+
+
+    <HTML>
+    <HEAD>
+    <TITLE>[% data.script_display_name %]: [% data.page_title %]</TITLE>
+[% IF data.css_view_url %]
+    <LINK REL = "stylesheet" TYPE = "text/css" 
+          HREF = "[% data.css_view_url %]">
+[% END %]
+
+    <SCRIPT LANGUAGE="JavaScript">
+    <!--
+    var clicks = 0;
+
+    function submitOnce() {
+        clicks ++;
+        if (clicks < 2) {
+            return true;
+        } else {
+            // alert("You have already clicked the submit button. " + clicks + " clicks");
+            return false;
+        }
+    }
+   //-->
+    </SCRIPT>
+ 
+    </HEAD>
+    <BODY>
+
+    <CENTER>
+    <TABLE WIDTH = "60" BORDER = "0"
+           CELLSPACING = "0" CELLPADDING = "2">
+
+    <TR>
+    <TD VALIGN = "TOP" ALIGN = "LEFT">
+[% IF sitename == 'CSC'  %] [% data.app_name %]
+ [% IF data.app_name == 'todo' %]
+         <a href=http://computersystemconsulting.ca/cgi-bin/CSC/todo.cgi?display_sidebar_view=on&[% session_string %]&page_top_view=SBPageTopView&page_bottom_view=SBPageBottomView "><img src="http://computersystemconsulting.ca/images/csc/cscicon.gif" alt="csc icon" width="54" height="43">  </a> 
+  [% ELSIF data.app_name == 'todo_admin' %]
+         <a href=http://computersystemconsulting.ca/cgi-bin/CSC/todo_admin.cgi?display_sidebar_view=on&[% session_string %]&page_top_view=SBPageTopView&page_bottom_view=SBPageBottomView "><img src="http://computersystemconsulting.ca/images/csc/cscicon.gif" alt="csc icon" width="54" height="43">  </a>
+ [% ELSE %]
+<a href="http://computersystemconsulting.ca/cgi-bin/CSC/csc.cgi?[% session_string %]&view=SideBarHomeView&page_top_view=SBPageTopView&page_bottom_view=SBPageBottomView"><img src="http://computersystemconsulting.ca/images/csc/cscicon.gif" alt="csc icon" width="54" height="43">
+      </a> 
+[% END %]
+[% ELSIF sitename == 'ENCY'   %] 
+<a href="http://forager.com/cgi-bin/ENCY/ency.cgi?site=ENCY&amp;[% session_string %]&amp;view=SideBarHomeView&amp;page_top_view=SBPageTopView&amp;page_bottom_view=SBPageBottomView"><img src="http://forager.com/images/ency/encyicon.gif" alt="ency icon" width="85" height="70">
+[% ELSIF sitename == 'BCAF'   %] 
+<a href="http://forager.com/cgi-bin/BCAF/marts.cgi?[% session_string %]&view=SideBarHomeView&page_top_view=SBPageTopView&page_bottom_view=SBPageBottomView">
+      </a>
+[% ELSIF sitename == 'ECF'   %] 
+<a href="/cgi-bin/ECF/ecf.cgi?site=ECF&amp;[% session_string %]&view=SideBarHomeView&page_top_view=SBPageTopView&page_bottom_view=SBPageBottomView"><img src="http://shanta.org/images/apis/bee.gif" alt="forager icon" width="80" height=80">
+      </a>
+[% ELSIF sitename == 'Forager'   %] 
+<a href="http://forager.com/cgi-bin/Forager/index.cgi?[% session_string %]&view=SideBarHomeView&page_top_view=SBPageTopView&page_bottom_view=SBPageBottomView"><img src="http://forager.com/images/forager/foragericon.gif" alt="forager icon" width="80" height=80">
+      </a>
+[% ELSIF sitename == 'Aikido'   %] 
+<a href="http://aikido.bc.ca/cgi-bin/BCAF/marts.cgi?[% session_string %]&view=SideBarHomeView&page_top_view=SBPageTopView&page_bottom_view=SBPageBottomView"><img src="http://forager.com/images/forager/foragericon.gif" alt="forager icon" width="80" height=80">
+      </a>
+[% ELSE %]
+
+	
+No site defined Please fix Header Definitions. Session = [% sitename %] from stetup [% site %]
+[% END %]
+    </td>
+    </tr>	
+    <tr>
+    <td class="tablePageTopWelcomeCellStyle" ALIGN = "LEFT" WIDTH = "50%" >
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% username = data.session_object.getAttribute('-KEY','auth_fname') %]
+
+[% IF username %]
+
+	Hello [% fname%]!
+
+[% ELSE %]
+
+	Hello!
+
+[% END %]
+</td>
+<!--
+<td WIDTH = "50%"ALIGN = "Right">
+[% IF is_authenticated %]  
+	<A HREF = "[% data.script_name %]?session_id=[% session_id %]&submit_logoff=on" >Logoff</A>
+
+[% ELSE %]
+	<A HREF = "[% data.script_name %]?session_id=[% session_id %]&submit_logon=on" >Logon</A>
+[% END %]               
+
+    </TD>
+-->
+    </TR>
+
+    </TABLE>
+    </CENTER>
+
+

@@ -1,0 +1,93 @@
+[%
+#	$Id: IMHomeView.ttml,v 1.9 2002/11/08 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dose't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dose't rely on any
+# variables from outside.
+
+%]
+
+[%# embed(data.page_top_view,['-PAGE_TITLE',"Aktiv Trak Home page."]) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+        [% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+
+<td>
+<div ALIGN="center">
+
+</div>
+<A NAME="PageTop"></A>
+</div>
+
+
+<h4> Healing nuts for you. </h4>
+
+Things in the works.
+<ul>
+	<li>Online </li>
+	<ul>	<li>store now working click store on left to view.</li>
+[% IF username == "paul" OR
+      username ==  "Shanta"%]			<li>Manager takes you to The store manager</li>
+	</ul>	
+	<li>Home page</li>
+	<ul>
+	<li>New Home page created</li>
+	<li>Specialty cuts</li>
+	<li>Live trees</li>
+	<li>Reclimation</li>
+	<li>Buliding</li>
+	</ul>
+	<li>Contact page</li>
+	<ul>
+	<li>When logged Add your contact data to address book and add IM_contact in the comment box.</li>
+	</ul>
+	<ul>
+   	<li>To Do list</li>
+   	<ul>
+			<li>Add Back ground to site</li>
+			<li>Create logo</li>
+			<li>Create flavicon</li>
+			<li>Add Item to store</li>
+			<li>Create PayPal accunt for store to receive mony</li>
+			<li>Create Mission statment</li>
+			<li>Create Product page with discriptions of items for sale with link to store item.</li>
+		</ul>
+   	
+	</ul>
+</ul>
+   [% ELSE %]
+	</ul>
+</ul>
+	[% END %]
+
+<br>
+<br>
+[% embed (data.page_list_view) %]
+
+
+
+
+
+
+</td>
+</tr>
+</table>
+

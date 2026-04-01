@@ -1,0 +1,251 @@
+[%
+
+#
+# This template handles the rendering of a single widget inside: 
+#  <th>header</th><td>value</td>
+#
+# or just
+#  <td>value</td>
+# if the header is not supplied (on purpose)
+#
+# typically this template is envoked as:
+#               embed('WidgetView', 
+#                     {'-WIDGET_NAME'  => widget_name,
+#                      '-WIDGET_VALUE' => widget_value,
+#                     })
+#
+
+# todo: this template should be converted into TT, but this is quite
+# hard with all the code that it uses. So should probably be moved
+# into a function and get it called from the template.
+
+%]
+
+[% RAWPERL %]
+
+use strict;
+use Extropia::Core::Base qw(_rearrangeAsHash);
+
+my @required = 
+    (
+     -DISPLAY_TYPE,
+     -WIDGET_NAME,
+     -WIDGET_VALUE,
+     -INPUT_WIDGET_CONFIG,
+     -LINK_TARGET,
+     -CGI_OBJECT,
+     -DISPLAY_TYPE,
+    );
+
+my $view_obj = $stash->get('view_obj');
+my $rh_data  = $view_obj->get_data;
+
+my $widget_name             = $rh_data->{-WIDGET_NAME};
+my $widget_value            = $rh_data->{-WIDGET_VALUE};
+$widget_value = '' unless defined $widget_value;
+
+my $input_widget_config     = $rh_data->{-INPUT_WIDGET_CONFIG};
+my $link_target             = $rh_data->{-LINK_TARGET} || '';
+my $cgi                     = $rh_data->{-CGI_OBJECT};
+my $display_type            = $rh_data->{-DISPLAY_TYPE};
+
+# set default style names if they are not specified.
+my $display_name_style = $rh_data->{-DISPLAY_NAME_STYLE} || 'tableRowHeaderStyle';
+my $widget_style       = $rh_data->{-WIDGET_STYLE}       || 'tableRowStyle';
+my $widget_reference_style    = $rh_data->{-WIDGET_REFERENCE_STYLE}    || 'tableReferenceStyle';
+
+
+my $widget_html = '';
+
+# turn the autoescaping off here
+my $orig_escape_flag = $cgi->autoEscape(undef);
+
+
+
+ 
+my ($params, %values) = _rearrangeAsHash([
+    -DISPLAY_NAME,
+    -TYPE,
+    -DESCRIPTION_CELL_COLSPAN,
+    -INPUT_CELL_COLSPAN,
+        ],
+        [
+    -DISPLAY_NAME,
+    -TYPE
+        ],
+    @{ $input_widget_config->{$widget_name} }
+);
+
+my $type                     = $params->{-TYPE} || '';
+my $description_cell_colspan = $params->{-DESCRIPTION_CELL_COLSPAN} || 1;
+my $display_name             = $params->{-DISPLAY_NAME} || '';
+my $input_cell_colspan       = $params->{-INPUT_CELL_COLSPAN} || 1;
+
+if ($display_type eq 'SEARCH') {
+
+    $values{-NAME} = 'search_' . $values{-NAME} if defined $values{-NAME};
+    # if it is one of these, add a new value of label '--' and value '' to
+    # allow wildcard searching for that field
+    if ($type eq 'radio_group' || 
+        $type eq 'popup_menu'  || $type eq 'scrolling_list') {
+
+        unshift @{ $values{-VALUES} }, '';
+        $values{-LABELS}->{''} = '--';
+        $widget_html = $cgi->$type(%values);
+
+    } else {
+        $widget_html = $cgi->$type(%values);
+    }
+
+} elsif ($display_type eq 'INPUT') {
+    $widget_html = $cgi->$type(%values);
+
+} elsif ($display_type eq 'MODIFY') {
+
+    if ($type eq 'checkbox_group' ||
+        $type eq 'radio_group'  || $type eq 'scrolling_list') {
+
+        my @selected_values = split ',', $widget_value;
+        $widget_html = $cgi->$type
+            (
+             -DEFAULT => \@selected_values,
+             %values
+            );
+
+    } elsif ($type eq "checkbox") {
+        if ($widget_value) {
+            $widget_html = $cgi->$type
+                (
+                 -CHECKED => '1',
+                 %values
+                );
+
+        } else {
+            $widget_html = $cgi->$type(%values);
+        }
+
+    } else {
+        $widget_html = $cgi->$type
+            (
+             -DEFAULT => $widget_value,
+             %values
+            );
+    }
+
+    # set the previous value into original_ hidden field
+    my $widget_orig_name = "original_$widget_name";
+    $cgi->param($widget_orig_name,$widget_value);
+    my $hidden_orig_value = join "\n", $cgi->hidden($widget_orig_name);
+    $widget_html .= "\n$hidden_orig_value";
+
+} elsif ($display_type eq 'DISPLAY' || $display_type eq 'CONFIRM') {
+
+    # if we have an input definition to use a label instead of the
+    # value we use it
+    if ($values{-LABELS} and ref $values{-LABELS} eq 'HASH') {
+        my %labels = %{ $values{-LABELS} };  
+        
+        if($type eq 'checkbox_group' ||
+           $type eq 'radio_group'    || $type eq 'scrolling_list') {
+        
+            $widget_html = join ", ",
+                map {exists $labels{$_} ? $labels{$_} : $_ } 
+                   ( ref $widget_value eq 'ARRAY' ? @$widget_value : $widget_value);
+            
+  
+        } else {
+        
+        	$widget_html = exists $labels{$widget_value} 
+            		? $labels{$widget_value} : $widget_value;
+        }
+      
+    } else {
+        $widget_html = $widget_value;
+    }
+
+    if (defined $widget_html && $widget_html =~ /\S/) {
+        
+        if ($rh_data->{-IMAGE_FIELDS_HASH}->{$widget_name}) {
+            $widget_html = qq[<IMG SRC = "$widget_html">];
+        }
+
+        if ($rh_data->{-EMAIL_LINKS_HASH}->{$widget_name}) {
+            $widget_html = qq[<A CLASS = "$widget_reference_style" HREF = "mailto:$widget_html">$widget_html</A>];
+        }
+
+        if ($rh_data->{-MULTI_LINE_TEXT_HASH}->{$widget_name}) {
+            $widget_html =~ s/(?:<BR>)?\n/<BR>/g;
+        }
+
+	if ($rh_data->{-HTML_TAG_HASH}->{$widget_name}) {
+	    $widget_html =~ s/&lt;/</g;
+	    $widget_html =~ s/&gt;/>/g;	
+	    $widget_html =~ s/&quot;/"/g;	
+	    $widget_html =~ s/&amp;/&/g;
+	}
+
+        if (exists $rh_data->{-LINKS_HASH}->{$widget_name} 
+            and $rh_data->{-LINKS_HASH}->{$widget_name} eq "1") {
+            $widget_html =~ s/^\s//g;
+            if ($widget_html =~ m|^http://|) {
+                $widget_html = 
+                    qq[<A CLASS = "$widget_reference_style" HREF="$widget_html" 
+                       TARGET="$link_target">$widget_html</A>];
+            } else {
+                $widget_html = 
+                    qq[<A CLASS = "$widget_reference_style" HREF="http://$widget_html" 
+                       TARGET="$link_target">$widget_html</A>];
+            }
+        } elsif (exists $rh_data->{-LINKS_HASH}->{$widget_name}) {
+            # The hash value exists but is not 1, so get the display value
+        
+            my $display_field = $rh_data->{-LINKS_HASH}->{$widget_name};
+            my $display_value = ($rh_data->{-USE_RECORD_FROM} eq 'CGI'
+                                 ? $rh_data->{-CGI_OBJECT}->param($display_field)
+                                 : $rh_data->{-RECORDS}->[0]->{$display_field}
+                                );
+
+            # check if the displayed value of this should be turned into multiline too
+            if ($rh_data->{-MULTI_LINE_TEXT_HASH}->{$display_field}) {
+                $display_value =~ s/(?:<BR>)?\n/<BR>/g;
+            }
+
+            $widget_html = 
+                qq[<A CLASS = "$widget_reference_style" HREF = "$widget_value" 
+                   TARGET="_blank">$display_value</A>];
+        }
+    }
+    $widget_html = '&nbsp;' unless defined $widget_html && $widget_html =~ /\S/;
+ 
+    if ($display_type eq 'CONFIRM') {
+        # set the previous value into original_ hidden field
+        my $hidden_value = join "\n", $cgi->hidden($widget_name);
+        $widget_html .= "\n$hidden_value";
+        my $widget_orig_name = "original_$widget_name";
+        my $hidden_orig_value = join "\n", $cgi->hidden($widget_orig_name);
+        $widget_html .= "\n$hidden_orig_value";
+    }
+
+}
+
+$output .= qq[
+              <TH CLASS = "$display_name_style"
+                  COLSPAN = "$description_cell_colspan">
+                $display_name
+              </TH>
+             ] if length $display_name;
+
+
+$output .= qq[
+              <TD CLASS = "$widget_style"
+                  COLSPAN = "$input_cell_colspan">
+                $widget_html
+              </TD>
+             ];
+
+# restore the autoescaping to the original value
+$cgi->autoEscape($orig_escape_flag);
+
+
+[% END %]
+

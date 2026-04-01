@@ -1,0 +1,25 @@
+[% IF SiteName == "ECF"  OR
+      Sitename == "BMaster" %]
+[% AffiliateID = '001' %]
+[% ELSIF SiteName == "HoneyDo" OR
+      Sitename == "WB"%]
+[% AffiliateID = '002' %]
+[% ELSIF SiteName == "CS" %]
+[% AffiliateID = '003' %]
+[% ELSIF SiteName == "Forager" OR
+      Sitename == "ENCY"%]
+[% AffiliateID = '004' %]
+[% ELSIF SiteName == "IM" OR
+      Sitename == "HE" %]
+ [% AffiliateID = '005' %]
+[%# ELSIF SiteName == "CSC" OR
+      Sitename == "CSCDev"%]
+[% AffiliateID = '006' %]
+  [% ELSIF SiteName == "Grindrod" OR
+           SiteName == "GRA" OR
+           SiteName == "GPMarket" %]
+[% AffiliateID = '009' %]
+[% ELSE    %] 
+[% AffiliateID = data.affiliate_number %]
+[% END %]
+

@@ -1,0 +1,84 @@
+[% TotalYardSize  = 0 %]
+  [% FOREACH item = DBI.query("SELECT * FROM apis_yards_tb
+	                                WHERE  ( status  !=  'defunct'
+                                     )
+                                   ORDER BY yard_code
+	                            ")%]  
+ 	    [% TotalYardSize  =    TotalYardSize +  item.total_yard_size %]
+
+[% END %]
+
+ [% FOREACH item = DBI.query("SELECT * FROM apis_pallet_tb
+	                                WHERE  ( status  =  'In-Use'
+                                     )
+                                   ORDER BY pallet_code
+	                            ")%]  
+	    [% ActivePositions =   item.pallet_code %]
+	    [% PalletToQueen =   item.queen_code %]
+	    [% TotalActivePositions = TotalActivePositions + 1 %]
+	    [%# ActivePositions  %] 
+	    [%# PalletToQueen  %] 
+[% END %]
+[% FOREACH item = DBI.query("SELECT * FROM apis_pallet_tb
+	                                WHERE  ((hivetype = 'Main' OR
+	                                	hivetype  =  'Pmain') AND
+	                                	status    =  'In-Use'
+	                            	                                        )
+ 	                            ")%]  
+	    [%   hives_mains  =  hives_mains + 1 %]
+[% END %]
+[% FOREACH item = DBI.query("SELECT * FROM apis_pallet_tb
+	                                WHERE  (hivetype = 'Main' OR
+	                                        hivetype  =  'PSingle' AND
+	                                	status    =  'In-Use'
+	                            	                                        )
+ 	                            ")%]  
+	    [%   hives_single  =  hives_single + 1 %]
+[% END %]
+[% FOREACH item = DBI.query("SELECT * FROM apis_pallet_tb
+	                                WHERE  (
+	                                	hivetype  =  'TBox' AND
+	                                	status = 'In-Use'
+	                            	                                        )
+ 	                            ")%]  
+	    [%   TBox  =  TBox + 1 %]
+[% END %]
+[% FOREACH item = DBI.query("SELECT * FROM apis_pallet_tb
+	                                WHERE  (hivetype = 'Single' AND
+	                                	status = 'In-Use'
+	                            	                                        )
+ 	                            ")%]  
+	    [%   Single  =  Single + 1 %]
+[% END %]
+[% FOREACH item = DBI.query("SELECT * FROM apis_pallet_tb
+	                                WHERE  (hivetype  =  'PSingle'  AND
+	                                	status = 'In-Use'
+	                            	                                        )
+ 	                            ")%]  
+	    [%   PSingle  =  PSingle + 1 %]
+[% END %]
+	    [%   TotalSingle  =  Single + PSingle %]
+[%   eightframer  = 0 %]
+[% FOREACH item = DBI.query("SELECT * FROM apis_pallet_tb
+	                                WHERE  (hivetype = 'EightF' AND
+	                                	status = 'In-Use'
+	                            	                                        )
+ 	                            ")%]  
+	    [%   eightframer  =  eightframer + 1 %]
+[% END %]
+[% FOREACH item = DBI.query("SELECT * FROM apis_pallet_tb
+	                                WHERE  (hivetype = 'TNuc' AND
+	                                	status = 'In-Use'
+	                            	                                        )
+ 	                            ")%]  
+	    [%   TNuc  =  TNuc + 1 %]
+[% END %]
+[% FOREACH item = DBI.query("SELECT * FROM apis_pallet_tb
+	                                WHERE  (hivetype = 'B4Top' AND
+	                                	status = 'In-Use'
+	                            	                                        )
+ 	                            ")%]  
+	    [%   B4Top  =  B4Top + 1 %]
+[% END %]
+
+[%   topbox  =  eightframer + TBox +  TNuc +B4Top %]

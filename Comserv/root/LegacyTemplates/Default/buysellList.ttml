@@ -1,0 +1,107 @@
+ <table>
+
+[% IF SiteName == 'CSCDev' %]
+[%# embed("CSCProjectListsql") %]  
+[% FOREACH link = DBI.query("SELECT * FROM csc_todo_tb
+                                  WHERE (sitename =  'CSCDev' and 
+                                         status = '2' )
+                                  ORDER BY project_code
+                                  ")%]    
+                                  
+                                  
+                                   <tr>
+<td class="NavTableCellStyle"> [% link.sitename %]  </td>
+<td class="NavTableCellStyle"> [% link.project_code %]  </td>
+<td class="NavTableCellStyle"> [% link.subject %]  </td>
+<td class="NavTableCellStyle"> [% link.description %]  </td>
+<td class="NavTableCellStyle">        
+  <a href="/cgi-bin/ToDo/todo.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %][% link.view_name %]" name="Contact" target="[% link.target %]" title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+  <a href="/cgi-bin/ToDo/log.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;todo_record_id=[% link.record_id %]&amp;abstract=[% link.subject %]&amp;project_code=[% link.project_code %]&amp;details=[% link.description %]&amp;priority=" "target="_Blank">Log</a>
+ </td>
+</tr><tr>
+<td class="NavTableCellStyle">  </td>
+    [% END %]
+  [% ELSIF SiteName == 'BMaster'%]
+  [% FOREACH link = DBI.query("SELECT * FROM csc_todo_tb
+                                  WHERE (sitename =  'Bmaster )
+                                  ORDER BY project_code
+                                  ")%]    
+ <td class="NavTableCellStyle"> [% link.project_code %]  </td>
+<td class="NavTableCellStyle"> [% link.project_name %]  </td>
+<td class="NavTableCellStyle"> [% link.comments %]  </td>
+<td class="NavTableCellStyle">        
+  <a href="/cgi-bin/ToDo/project_tracker.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %][% link.view_name %]" name="Contact" target="[% link.target %]" title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+  <a href="/cgi-bin/ToDo/log.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;todo_record_id=[% link.record_id %]&amp;abstract=[% link.project_name %]&amp;project_code=[% link.project_code %]&amp;details=[% link.comments %]&amp;priority=" "target="_Blank">Log</a>
+  <a href="/cgi-bin/ToDo/todo.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;record_id=[% link.record_id %]&amp;subject=[% link.project_name %]&amp;project_code=[% link.project_code %]&amp;description=[% link.comments %]&amp;priority=" "target="_Blank">Todo</a>
+     </td>
+   </tr>
+  [% END %]
+  [% ELSIF SiteName == 'CSC' %]
+ [% FOREACH link = DBI.query("SELECT * FROM csc_todo_tb
+                                  WHERE (sitename =  'CSC' )
+                                  ORDER BY project_code
+                                  ")%]    
+                                  
+ <td class="NavTableCellStyle"> [% link.project_code %]  </td>
+<td class="NavTableCellStyle"> [% link.project_name %]  </td>
+<td class="NavTableCellStyle"> [% link.comments %]  </td>
+<td class="NavTableCellStyle">        
+  <a href="/cgi-bin/ToDo/project_tracker.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %][% link.view_name %]" name="Contact" target="[% link.target %]" title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+  <a href="/cgi-bin/ToDo/log.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;todo_record_id=[% link.record_id %]&amp;abstract=[% link.project_name %]&amp;project_code=[% link.project_code %]&amp;details=[% link.comments %]&amp;priority=" "target="_Blank">Log</a>
+  <a href="/cgi-bin/ToDo/todo.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;record_id=[% link.record_id %]&amp;subject=[% link.project_name %]&amp;project_code=[% link.project_code %]&amp;description=[% link.comments %]&amp;priority=" "target="_Blank">Todo</a>
+     </td>
+   </tr>
+  [% END %]
+   [% ELSIF SiteName == 'HE' %]
+ [% FOREACH link = DBI.query("SELECT * FROM csc_todo_tb
+                                  WHERE (sitename = 'HE' )
+                                  ORDER BY project_code
+                                  ")%]    
+<td class="NavTableCellStyle"> [% link.project_code %]  </td>
+<td class="NavTableCellStyle"> [% link.project_name %]  </td>
+<td class="NavTableCellStyle"> [% link.comments %]  </td>
+<td class="NavTableCellStyle">        
+  <a href="/cgi-bin/ToDo/project_tracker.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %][% link.view_name %]" name="Contact" target="[% link.target %]" title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+  <a href="/cgi-bin/ToDo/log.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;todo_record_id=[% link.record_id %]&amp;abstract=[% link.project_name %]&amp;project_code=[% link.project_code %]&amp;details=[% link.comments %]&amp;priority=" "target="_Blank">Log</a>
+  <a href="/cgi-bin/ToDo/todo.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;record_id=[% link.record_id %]&amp;subject=[% link.project_name %]&amp;project_code=[% link.project_code %]&amp;description=[% link.comments %]&amp;priority=" "target="_Blank">Todo</a>
+     </td>
+   </tr>
+   [% END %]
+  [% ELSIF SiteName == "Skye" %]
+                                  
+ [% FOREACH link = DBI.query("SELECT * FROM csc_todo_tb
+                                  WHERE (sitename =  'Skye'and 
+                                         status = '2'  )
+                                  ORDER BY project_code
+                                  ")%]    
+   [% END %]
+<td class="NavTableCellStyle"> [% link.sitename %]  </td>
+<td class="NavTableCellStyle"> [% link.project_code %]  </td>
+<td class="NavTableCellStyle"> [% link.subject %]  </td>
+<td class="NavTableCellStyle"> [% link.description %]  </td>
+<td class="NavTableCellStyle">        
+  <a href="/cgi-bin/ToDo/todo.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %][% link.view_name %]" name="Contact" target="[% link.target %]" title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+  <a href="/cgi-bin/ToDo/log.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;todo_record_id=[% link.record_id %]&amp;abstract=[% link.project_name %]&amp;project_code=[% link.project_code %]&amp;details=[% link.comments %]&amp;priority=" "target="_Blank">Log</a>
+     </td>
+   </tr>
+[% ELSE %]
+ [% FOREACH link = DBI.query("SELECT * FROM buy_sell_tb
+                                  WHERE (sitename =  '' )
+                                  ORDER BY category
+                                  ")%]    
+                                  
+                                  <tr></tr>
+                                   <tr>
+<td class="NavTableCellStyle"> [% link.project_code %]  </td>
+<td class="NavTableCellStyle"> [% link.project_name %]  </td>
+<td class="NavTableCellStyle"> [% link.comments %]  </td>
+<td class="NavTableCellStyle">        
+  <a href="/cgi-bin/ToDo/project_tracker.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %][% link.view_name %]" name="Contact" target="[% link.target %]" title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+  <a href="/cgi-bin/ToDo/log.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;todo_record_id=[% link.record_id %]&amp;abstract=[% link.project_name %]&amp;project_code=[% link.project_code %]&amp;details=[% link.comments %]&amp;priority=" "target="_Blank">Log</a>
+  <a href="/cgi-bin/ToDo/todo.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;record_id=[% link.record_id %]&amp;subject=[% link.project_name %]&amp;project_code=[% link.project_code %]&amp;description=[% link.comments %]&amp;priority=" "target="_Blank">Todo</a>
+     </td>
+   </tr> 
+
+   [% END %]
+[% END %]
+</table>

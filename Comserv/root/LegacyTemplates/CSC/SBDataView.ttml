@@ -1,0 +1,12 @@
+[% # embed(SBPageTopView,['-PAGE_TITLE','Basic Data View']) %]
+
+[% embed('ErrorDisplayView') %]
+ [% embed('PrepareDisplayEffects') %]
+[% embed('SBDBTable') %]
+
+[% embed('RecordSetDetailsFooterView') %]
+</td>
+</tr>
+</table>
+[% # embed(data.page_bottom_view) %]
+

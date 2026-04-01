@@ -1,0 +1,13 @@
+                 [% site        = link.sitename        %]          
+                 [% PageName    = link.view_name %] 
+                 [% Record_id   = link.record_id  %]
+                 [% body        = link.body %]
+                 [% status      = link.status %]
+                 [% page_code   = link.page_code %]
+                 [% keywords    = link.keywords %]
+                 [% description = link.description %]
+                 [% lastupdate  = link.lastupdate %]
+                 [% facebook    = link.facebook  %]  
+                 [% linkedin    = link.linkedin %]  
+                 [% news        = link.news %]
+ 

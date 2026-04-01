@@ -1,0 +1,126 @@
+[%# BugTrackerApplicationSubMenuView.ttml %]
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	
+	[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+	
+	[% developer_status = data.session_object.getAttribute('-KEY', 'auth_developer_status') %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %]
+
+[% IF username %]
+
+	[% welcome_message = "Hello $username!" %]
+
+[% ELSE %]
+
+	[% welcome_message = "Hello!" %]
+
+[% END %]
+
+[% IF developer_status %]
+
+	[% welcome_message = "You are here as a developer Please Check the Customer Service Requests existing CSR's If you don't  Find any thing. "%]
+
+[% ELSE %]
+	
+[% IF data.allow_additions_flag %]
+	[% welcome_message = "Please Check the Customer Service Requests existing CSR's If you don't  Find any thing. " %]
+
+	
+[% END %]
+
+	
+[% END %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+
+[%# url_encoded_admin_variables = embed(data.url_encoded_admin_fields_view_name) %]
+
+[% IF data.cgi_object.param('columns_to_view') %]
+	[% columns_to_view = data.cgi_object.param('columns_to_view') %]
+[% ELSE %]
+	[% columns_to_view = data.selected_display_fields %]
+[% END %] 
+ 
+ [% columns_to_view_string = columns_to_view.join("&columns_to_view=") %]
+ 
+
+<TABLE WIDTH = "100%" BORDER = "0"
+               CELLSPACING = "0" CELLPADDING = "2">
+
+ <TR>
+ <TD ALIGN = "LEFT" VALIGN = "TOP" CLASS = "applicationSubMenuStyle">
+ <A HREF = "[% data.script_name %]?show_all_open_bugs=on&[% session_string %]&columns_to_view=[% columns_to_view_string %]&records_per_page= [% data.max_records_per_page %]"
+           TARGET = "[% data.link_target %]">Show All Open Records</A> |
+ <A HREF = "[% data.script_name %]?view_all_records=on&[% session_string %]&columns_to_view=[% columns_to_view_string %]&records_per_page= [% data.max_records_per_page %]"
+           TARGET = "[% data.link_target %]">Show All Records</A>|
+ 	<A HREF = "[% data.script_name %]?show_all_open_bugs_for_user=on&user=[% username %]&[% session_string %]&columns_to_view=[% columns_to_view_string %]&records_per_page= [% data.max_records_per_page %]"
+           TARGET = "[% data.link_target %]">Show My Open Recordss</A> |
+  <A HREF = "[% data.script_name %]?show_all_bugs_posted_by_user=on&user=[% username %]&[% session_string %]&columns_to_view=[% columns_to_view_string %]&records_per_page= [% data.max_records_per_page %]"
+           TARGET = "[% data.link_target %]">Show All My RecordsS</A> |
+          
+ [% IF developer_status %]
+ 	|
+        <A HREF = "[% data.script_name %]?show_all_bugs_for_user=on&user=[% username %]&[% session_string %]&columns_to_view=[% columns_to_view_string %]&records_per_page= [% data.max_records_per_page %]"
+           TARGET = "[% data.link_target %]">Show All Records Posted To Me</A> |
+
+ <A HREF = "[% data.script_name %]?show_all_open_bugs_posted_by_user=on&user=[% username %]&[% session_string %]&columns_to_view=[% columns_to_view_string %]&records_per_page= [% data.max_records_per_page %]"
+           TARGET = "[% data.link_target %]">Show Open Bugs Posted By Me</A> |
+ <A HREF = "[% data.script_name %]?show_all_bugs_posted_by_user=on&user=[% username %]&[% session_string %]&columns_to_view=[% columns_to_view_string %]&records_per_page= [% data.max_records_per_page %]"
+           TARGET = "[% data.link_target %]">Show All Records Posted By Me</A> |
+           
+[% END %]
+
+[% IF data.allow_additions_flag %]   
+	<A HREF="[% data.script_name %]?display_add_form=on&[% session_string %]"
+               TARGET = "[% data.link_target %]">Add Record</A>
+[% END %]
+
+  
+ |  <a href="/cgi-bin/CSC/droplist.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on [% IF data.app_name ==  'buy' %]&amp;list_name=category"  [% END %]
+   " "target="_Blank">Add List Item</a>	
+
+ </TD>
+ <TD VALIGN="TOP" ALIGN="RIGHT" CLASS="applicationSubMenuRightStyle">
+
+ <A HREF = "[% data.script_name %]?session_id=[% session_id %]"
+           TARGET = "[% data.link_target %]">Home</A>
+ | <A HREF = "[% data.script_name %]?session_id=[% session_id %]&display_options_form=on"
+             TARGET = "[% data.link_target %]">Options</A>
+ | <A HREF = "[% data.script_name %]?session_id=[% session_id %]&display_power_search_form=on"
+             TARGET = "[% data.link_target %]">Advanced Search</A>  
+
+[% IF is_authenticated %] 
+	| <A HREF = "[% data.script_name %]?session_id=[% session_id %]&submit_logoff=on"
+                 TARGET = "[% data.link_target %]">Logoff</A>
+
+[% ELSE %]
+
+	| <A HREF = "[% data.script_name %]?session_id=[% session_id %]&submit_logon=on"
+                 TARGET = "[% data.link_target %]">Logon</A>
+[% END %]               
+      
+ </TD>
+
+ </TR>
+  <TD ALIGN = "RIGHT">
+ <FORM METHOD = "POST" TARGET = "[% data.link_target %]">
+ <INPUT TYPE = "HIDDEN" NAME = "session_id" VALUE = "[% session_id %]">
+ <TD ALIGN = "RIGHT">
+ Search
+ <INPUT TYPE = "TEXT" NAME = "simple_search_string"
+               VALUE = "[% data.simple_search_string %]" SIZE = "12">
+ <INPUT TYPE = "SUBMIT" NAME = "display_simple_search_results"
+               VALUE = "      Go        ">
+ </FONT>
+ </TD>
+ </FORM>
+ </TD>
+ </TR>
+ <tr>
+ 
+</TABLE>
+</CENTER>

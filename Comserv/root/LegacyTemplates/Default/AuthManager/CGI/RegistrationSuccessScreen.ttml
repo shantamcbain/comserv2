@@ -1,0 +1,31 @@
+[% set_headers(data.http_header_params) %]
+[% PROCESS DefaultDbi.ttml %]
+
+[% SET logon_message = data.error_list.join("<BR>\n") IF data.error_list.size %]
+
+[% embed(data.page_top_view) %]
+
+<FORM METHOD = "POST"><CENTER>
+    [% embed('AuthManager/CGI/FormData2Hidden') %]
+    <TABLE WIDTH = "100%" BORDER = "0" CELLSPACING = "2" CELLPADDING = "1">
+        <TR>
+            <TD COLSPAN = "2" HEIGHT = "50">
+        </TR>
+        <TR> 
+            <TD CLASS = "sectionHeaderStyle" COLSPAN = "2">
+                Registration Success
+            </TD>
+        </TR>
+        <TR> 
+            <TD COLSPAN = "2" BGCOLOR = "#E5E5E5">
+	            You have been added to the user database
+            </TD>
+        </TR>
+        <TR>
+	        <TD COLSPAN = "2" ALIGN = "CENTER">
+                <INPUT TYPE = "SUBMIT" NAME = "auth_submit_logon_request" VALUE = "Return to Logon Screen">
+            </TD>
+        </TR>
+[% embed('AuthManager/CGI/FormData2Hidden') %]
+</TABLE></CENTER></FORM>
+[% embed(data.page_bottom_view) %]

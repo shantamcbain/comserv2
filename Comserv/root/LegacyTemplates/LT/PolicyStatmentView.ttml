@@ -1,0 +1,316 @@
+[%
+#	$Id: PolicyStatmentHome.ttml,v 1.0 2010/02/22 01:33:34 shanta Exp $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it doesn't rely on any
+# variables from outside.
+
+%]
+   
+   
+
+[%# embed('SubTopFrameView',['-PAGE_TITLE','Policy Statment']) %]
+[% embed(data.page_top_view,['-PAGE_TITLE','Policy Statment']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+	[% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+   [% SiteDisplayName = data.site_display_name %]
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<div ALIGN="center">
+
+</div>
+<A NAME="PageTop"></A>
+</div>
+
+<div align="center"><h1>[% SiteDisplayName %] Policy Statment</h1></div>
+
+<p>Created from TLC document modified to fit [% SiteDisplayName %] needs.</p>
+
+<p><h5>Preamble:</h5> The following policies have been issued from time to time, as circumstances
+have warranted, to set out principles by which [% SiteDisplayName %] operates. They
+have been consolidated and some details have been updated to comply with ongoing
+development and growth of [% SiteDisplayName %].</p>
+<h5>CONTENTS:</h5><A NAME="tc"></A>
+<table cellpadding="0" cellspacing="0" border="0">
+              <tr><td>Section A:</td>       <td><a href="#a">Cooperation with Partners</a></td></tr>
+              <tr><td>Section B:</td>       <td><a href="#b">Cooperation with Neighbours</a></td></tr>
+              <tr><td>Section C:</td>       <td><a href="#c">Cooperation with Tenants</a></td></tr>
+              <tr><td>Section D:</td>       <td><a href="#d">Purchasing</a></td></tr>
+              <tr><td>Section E:</td>       <td><a href="#e">Employment</a></td></tr>
+              <tr><td>Section F:</td>       <td><a href="#f">Expenses</a></td></tr>
+              <tr><td>Section G:</td>       <td><a href="#g">Staff Identification</a></td></tr>
+              <tr><td>Section H:</td>       <td><a href="#h">Recycling</a></td></tr>
+</table>
+
+
+
+
+
+<ol type="A">
+	<li><A NAME="a"></A>Cooperation with Partners <a href="#tc">top</a></li>
+	<h5>Preamble:</h5>
+	<ul>
+		<li>There are many important conservation initiatives which are beyond the power or
+the specific mandate of [% SiteDisplayName %], but which serve to advance our mandate.
+</li>
+		<li>[% SiteDisplayName %] cannot accomplish its goals without the cooperation and efforts of many
+other agencies.
+</li>
+		<li>[% SiteDisplayName %] must be apolitical and must work in a non-confrontational way.</li>
+		<li>[% SiteDisplayName %] must present a professional image.</li>
+   </ul>
+	<h5>Application:</h5>
+	
+		<ul>
+			<li>[% SiteDisplayName %] will work with agencies and persons who share our methods or who can
+support our methods.
+</li>
+			<li>[% SiteDisplayName %] will not publicly criticize the efforts of those who, working under a different
+mandate, use different methods to support conservation efforts.
+</li>
+			<li>[% SiteDisplayName %] will provide technical assistance to any agency or individual which requests
+it, to the extent practical.
+</li>
+			<li>Where a local land trust operates in an area in which [% SiteDisplayName %] has an interest, [% SiteDisplayName %]
+will offer to include the local trust in potential projects, to the extent possible.
+</li>
+			<li>[% SiteDisplayName %] will always treat other agencies as we would wish to be treated.</li>
+			<li>[% SiteDisplayName %] will always provide credit where credit is due to other partner agencies.</li>
+			<li>[% SiteDisplayName %] recognizes the value of umbrella groups such and the Land Trust Alliance
+and the BC Grasslands Conservation Council and will provide as much assistance
+as is practical to these groups.
+</li>
+			<li>In providing assistance to umbrella groups, [% SiteDisplayName %] will be guided by the greater of
+  what it is capable of doing, or what is considered the member's share.
+</li>
+			<li>[% SiteDisplayName %] staff are encouraged to join advisory boards, committees or task forces
+  which are complementary to our purposes.
+</li>
+		</ul>
+	<li><A NAME="b">Cooperation with Neighbours <a href="#tc">top</a></li>
+		<h5>Preamble:</h5>
+		<ul>
+			<li>As a landowner [% SiteDisplayName %] has many neighbours.</li>
+			<li>Our neighbours can be our best supporters.</li>
+			<li>[% SiteDisplayName %] must present a professional image.</li>
+		</ul>
+
+ 
+		<h5>Application:</h5>
+		<ul>
+			<li>[% SiteDisplayName %] will endeavour to be a "good neighbour" in all of our activities.</li>
+			<li>[% SiteDisplayName %] will make contact with the neighbours to our properties and provide
+   information about our organization and how to contact us.</li>
+			<li>[% SiteDisplayName %] will address any concerns from neighbours promptly and adequately.</li>
+			<li>[% SiteDisplayName %] will be an exemplary land manager and will not, to the best of our ability,
+   allow weeds or other nuisances.</li>
+		</ul>
+
+
+	
+	<li><A NAME="c">Cooperation with Tenants <a href="#tc">top</a></li>
+	
+		<h5>Preamble:</h5>
+			<ul>
+				<li>As a landowner [% SiteDisplayName %] has tenants living and working on a number of our
+   properties.</li>
+				<li>Our tenants can be some of [% SiteDisplayName %]'s greatest assets and ambassadors.</li>
+				<li>[% SiteDisplayName %] must present a professional image.</li>
+			</ul>
+
+			<h5>Application:</h5>
+			<ul>
+				<li>[% SiteDisplayName %] will treat all tenants with respect.</li>
+				<li>[% SiteDisplayName %] tenants will be provided with clean, safe, reasonably priced accommodation.</li>
+				<li>[% SiteDisplayName %] farm, ranch and other tenants whose land use is in direct support of [% SiteDisplayName %]'s
+   land protection objectives will be treated as business partners and members of our
+   team.</li>
+			</ul>
+
+ 
+			<h5>General Tenants:</h5
+			<ul>
+				<li>Preference will be given to tenants who will take a pride in maintaining their
+   home and, where practical, assistance will be given to help them do so.</li>
+				<li>[% SiteDisplayName %] will be fair in all matters applying to our tenants and will be sensitive to the
+   tenants' needs and rights to privacy.</li>
+				<li>If property status is to change, [% SiteDisplayName %] will give the tenant as much notice as
+   possible and, where practical, provide reasonable assistance for relocation.
+Land Protection Partners (Farmers, Ranchers Etc.,):</li>
+				<li>Land protection partners will be protected under a fair lease agreement.</li>
+				<li>A management plan will be developed for each land protection project.</li>
+				<li><A ‘whole farm plan’ or similar document will be developed by the tenant with
+   assistance, if required, from [% SiteDisplayName %]./li>
+				<li>Marketing assistance for our tenants will be provided where possible. (e.g. links
+   to web sites, b&b advertising to members, etc.).</li>
+				<li> [% SiteDisplayName %] will remain open to suggestions which will improve the profit margin for the
+   tenant while also meeting our conservation objectives.</li>
+				<li>[% SiteDisplayName %] will provide training and resource assistance to our land protection partners
+   and their on site families, relevant to our mandate.</li>
+				<li>[% SiteDisplayName %] will provide employment opportunities for our land protection partners,
+   where possible.</li>
+				<li>[% SiteDisplayName %] will purchase from land protection partners, where appropriate.</li>
+				<li>[% SiteDisplayName %] will support our land protection partners in dealings with government and
+   the public at large, as appropriate.</li>
+			</ul>
+ 
+	<li><A NAME="d">Purchasing <a href="#tc">top</a></li>
+	
+<h5>Preamble:</h5>
+<ul>
+	<li>[% SiteDisplayName %] maintains high ethical standards in all of its activities, including its
+   purchasing decisions.</li>
+	<li>[% SiteDisplayName %] wants to use its purchases to support local businesses and communities.</li>
+</ul>
+
+
+<h5>Application:</h5>
+<ul>
+	<li>[% SiteDisplayName %] will purchase local products, where possible.</li>
+	<li>Preference will be given to products supplied in reusable containers.</li>
+	<li>Consideration will be given to the entire product lifecycle in determining which
+   product has the least environmental impact.</li>
+	<li>Preference will be given to the purchase of organic products when available.</li>
+	<li>Preference will be given to the purchase of locally produced products when
+   available. Preference will be given to purchasing from our land protection
+   partners (tenants), to the community to the region to BC to Canada, in that order.</li>
+	<li>Preference will be given to purchasing from small businesses where that option
+   exists.</li>
+	<li>Preference will be given to purchasing from companies with a past service record
+   and support for [% SiteDisplayName %]'s goals and objectives.</li>
+   <li>[% SiteDisplayName %] will not purchase from suppliers whose policies are known to be opposed to
+   our ethical values.</li>
+</ul>
+
+
+
+	<li><A NAME="e">Employment <a href="#tc">top</a></li>
+	
+		<h5>Preamble:</h5>
+		<ul>
+		<li>[% SiteDisplayName %] aspires to be an exemplary employer, ensuring equality of opportunity and
+   fairness in all its hiring and personnel decisions.</li>
+		<li>Qualifications of the job description, previous experience and positive
+   involvement with [% SiteDisplayName %] will be important factors in hiring.</li>
+		</ul>
+
+
+	 <h5>Application:</h5>
+	 <ul>
+		<li> All applicants will be judged upon their experience, knowledge and ability to
+   perform the work for which they are being hired.</li>
+		<li>Except where it is a specific funding requirement or a requirement of the Board of
+   Directors that we hire externally, first consideration in hiring will be given to
+   existing [% SiteDisplayName %] staff for employment or promotion. Second consideration will be
+   given to applicants with previous [% SiteDisplayName %] experience and/or who are currently active
+   volunteers.</li>
+		<li>Where appropriate, preference will be given to current tenants of [% SiteDisplayName %] properties.</li>
+		<li>[% SiteDisplayName %] will hire locally where possible</li>
+	 </ul>
+
+	<li><A NAME="f">Expenses <a href="#tc">top</a></li>
+<h5>Preamble:</h5>
+<ul>
+	 <li>[% SiteDisplayName %] <!-- is a charity, supported by money donated by our members, and as such we --> strives
+   to always keep our expenses as low as possible.</li>
+	<li>[% SiteDisplayName %] must present a professional image as well as providing a safe, healthy and
+   enjoyable environment for its staff and volunteers.</li>
+</ul>
+ 
+ 
+<h5>Application:</h5>
+<ul>
+	<li>Travel costs and all expenses incurred as a result of the conduct of [% SiteDisplayName %] business will
+   be compensated upon submission of a [% SiteDisplayName %] Expense Claim Form and the original
+   receipt. Compensation will be for the amount shown on the receipt. There is no flat
+   per-diem rate.</li>
+	<li>The authorized use of private vehicles is compensated at a rate of $0.35 per km.</li>
+	<li>Travel to and from the regular place of work is not compensated.</li>
+	<li>Those incurring expenses on behalf of [% SiteDisplayName %] are expected to make a reasonable effort
+   to keep costs as low as possible, and to choose lower-cost options if available and
+   practical.</li>
+	<li>[% SiteDisplayName %] encourages car pooling when practical, and consideration of the use of a rental
+   vehicle with unlimited mileage for long trips.</li>
+	<li>Volunteer members may claim expenses if previously authorized by staff.</li>
+	<li>Board members may claim expenses if previously authorized by the President.</li>
+	<li>Telephone costs for board and regional committee meeting attendance do not require
+  prior approval.
+</li>
+</ul>
+
+	<li><A NAME="g">Staff Identification <a href="#tc">top</a></li>
+	<h5>Preamble:</h5>
+	<ul>
+		<li>For [% SiteDisplayName %] to survive and prosper in perpetuity it must establish a high degree of 'brand
+	   recognition'.</li>
+		<li>[% SiteDisplayName %] must present a professional image.</li>
+	</ul>
+
+
+	<h5>Application</h5>
+	<ul>
+		<li>All field staff will be issued with at least one item of [% SiteDisplayName %] "logo" clothing and a [% SiteDisplayName %]
+	   name tag. Additional "logo" clothing will be supplied if warranted.</li>
+		<li>[% SiteDisplayName %] vehicles will be identified with magnetic logo signs when available.</li>
+		<li>At public events or when staffing [% SiteDisplayName %] displays, staff and volunteers will either wear
+	   logo clothing or a [% SiteDisplayName %] name tag, as and when appropriate. For field work, where
+	   public contact is not likely, logo items are optional.</li>
+		<li>[% SiteDisplayName %] staff will have business cards available to give to members of the public, if
+	   appropriate.</li>
+	</ul>
+
+
+
+	<li><A NAME="h">Recycling <a href="#tc">top</a></li>
+<h5>Preamble:</h5>
+<ul>
+	<li>[% SiteDisplayName %] aspires to conduct its operations with the highest level of environmental and
+   social integrity.</li>
+	<li>[% SiteDisplayName %] intends to set an example with its operations, ensuring that the impact of our
+   activities and operations has as small a negative impact on the environment as
+   possible.</li>
+</ul>
+
+
+<h5>Application:</h5>
+<ul>
+	<li>[% SiteDisplayName %] will reuse products where possible, and will recycle all products where
+   facilties exist.</li>
+	<li>Purchasing preference will be given to products produced using recycled
+   materials whenever possible and economically feasible.</li>
+	<li>Purchasing preference will be given to products supplied in reusable containers.</li>
+	<li>In determining purchasing preferences, consideration will be given to the entire
+   product lifecycle in determining which product has the least environmental
+   impact.</li>
+	<li>When possible and appropriate documents will be printed on both sides of each
+   page.</li>
+	<li>Brochures and other publications will be printed on recycled paper.</li>
+	<li>Recycled paper and envelopes will be used where economically feasible.</li>
+</ul>
+
+
+
+</ol>
+<p><a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=LtrustHomeView">Home</a> | <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=LtrustLeasesView">Leases </a></p>
+
+</td>
+</tr>
+</table>
+

@@ -1,0 +1,175 @@
+[% #/HTMLTemplates/Default/templatePageTopView.ttml %]
+[%# 	$Id: templatePageTopView.ttml,v 1.1 2003/11/29 06:33:25 shanta Exp shanta $	%]
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% site = data.site_name %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group    = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% Mode    = data.session_object.getAttribute('-KEY','PrintMode') %]
+
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+
+
+[% IF data.session_object.getAttribute('-KEY','SiteName') %]
+
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+[% ELSE %]
+
+[% SiteName = data.SiteName %]
+[% PageTop = data.page_top_view %]
+
+
+[% END %]
+
+	[% MailServer = 'forager.com' %]
+	[% MailName = username %]
+	[% IF SiteName == 'Telmark'OR
+	      SiteName == 'Brew' OR
+	      SiteName == 'CSPS' %]
+		[% HostName = 'shanta.org' %]
+		[% MailServer = HostName %]
+	[% END %]
+
+	[% IF SiteName == 'OKBee'OR
+	      SiteName == 'Apis' OR
+	      SiteName == 'ECF' OR
+	      SiteName == 'BMaster.ca' 
+	      %]
+		[% HostName = 'beemaster.ca' %]
+		[% MailServer = HostName %]
+	[% END %]
+	[% IF SiteName == 'Organic' OR
+	      SiteName == 'Skye' OR
+	      SiteName == 'Noop' %]
+		[% HostName = 'organicfarming.ca' %]
+		[% MailServer = HostName %]
+		
+	[% END %]
+	[% IF SiteName == 'CSC'
+	      %]
+		[% HostName = 'computersystemconsulting.ca' %]
+		[% MailServer = HostName %]
+	[% END %]
+
+[%# SiteName = Organic %]
+
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"         "http://www.w3.org/TR/html4/loose.dtd">
+
+<html >
+
+<head>
+
+<title> [% data.site_display_name %]: [% data.script_display_name %]: [% data.page_title %] </title>
+
+<!--Old Defaltpage top view-->
+[% IF data.css_view_url %]
+    <LINK REL ="stylesheet" TYPE ="text/css" HREF ="[% data.css_view_url %]">
+[% END %]
+<meta NAME="REVISIT-AFTER" CONTENT="7 days">
+<meta NAME="ROBOTS" CONTENT="index all, follow all">
+<META NAME = "keywords" CONTENT= "[% data.http_header_keywords %]">
+<META NAME = "description" CONTENT= "[% data.http_header_description %]">
+<link rel="shortcut icon" href="[% data.favicon %]" >[% data.favicon %]
+<link rel="icon" href="[% data.ani_favicon %]" type="image/gif" >
+<!--Call Head Scripts-->
+
+[% embed('SideBarHeadScript') %]
+<!--return SideBarHeadScript-->
+
+[% IF SiteName == 'ECF'  %]
+<!--Call ECFHead Scripts-->
+[% embed('ECFSideBarScript') %]
+[% ELSIF SiteName == 'CSC'  %]
+<!-- Call CSCJavaScriptHeads -->
+[% embed('CSCSideBarScript') %]
+[% ELSIF SiteName == 'eXtropia'  %]
+[% embed('ExtropiaHeadScriptsView') %]
+[% ELSIF SiteName == 'BCHPA'  %]
+[% ELSIF SiteName == 'CSPS'  %]
+<!-- Call CSPSJavaScriptHeads -->
+[% embed('CSPSJavaScriptHeads') %]
+[% ELSIF SiteName == 'Forager' %]
+<!-- Call  ForagerJavaScriptHeads-->
+[% embed('ForagerSideBarScript') %]
+[% ELSIF SiteName == 'Apis'  %]
+<!-- Call ApisJavaScriptHeads -->
+[% embed('ApisJavaScriptHeads') %]
+[% ELSIF SiteName == 'ENCY' OR 'VitaVic'  %]
+<!-- Call  ENCYJavaScriptHeads-->
+[% embed('ENCYJavaScriptHeads') %]
+[% ELSIF SiteName == 'Organic'  %]
+<!-- Call  OrgnaicJavaScriptHeads-->
+[% embed('OrganicJavaScriptHeads') %]
+[% ELSE %]
+No site defined Please fix Header Definitions. Session = [% sitename %] from 
+stetup [% site %][% END %]
+
+     </HEAD>
+   <BODY>
+[% IF data.debug == 'new' %]
+This will be the new header
+
+[% ELSE%]
+	
+	[% IF data.debug == 'yes' OR
+	      data.debug == '1'  %]
+	
+		Site = [% SiteName %]
+	   group =[% group %] CSSView =[% data.css_view_name %]  PageTop = [% 
+	data.page_top_view %] First Name [% firstname%] tab =	[% 
+	data.session_object.getAttribute('-KEY','tab')%] [% data.tab %][% data.tab 
+	%]header prams[% data.http_header_params %] header discription[% 
+	data.http_header_description %]  header keywords [% data.http_header_keywords %]
+	Frame [% data.frame %] 
+	
+	[% END %]
+	
+	<!--Here we start the Header page The location is  PageTopView -->
+	
+		<!--The main table of the page-->
+<!--End page header -->
+	
+	<table class="MainPageTable" >
+	  <tbody>
+	    <TR>
+	[% embed ('PageHeaderView') %]
+
+</tr>
+<!--End page header -->
+
+<tr>
+<td class="LeftNavDataCell"  >
+[% IF data.left_page_view %]
+	[% embed(data.left_page_view) %]
+	[% ELSE %]
+	[% embed ('LeftPageView') %]
+[% END %]
+	
+</td>
+<td width="100%" colspan="2" align="left" class="MainPageDataCell">
+[% IF SiteName == 'eXtropia'  %]
+	<IMG SRC = "http://www.extropia.com/graphics/template/logo.gif" alt="eXtropia logo">
+[% END %]
+ 
+[% IF data.application_sub_menu_view_name %]
+	<table>
+	    <TR>
+	    <TD colspan='2'>
+	    [%  embed(data.application_sub_menu_view_name) %]
+	    </TD>
+	    </TR>
+	</table>
+[% END %]
+
+[% END %]
+
+<!--  #### End PageTopView 3 #### -->

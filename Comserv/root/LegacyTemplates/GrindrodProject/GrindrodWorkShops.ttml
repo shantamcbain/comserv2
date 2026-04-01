@@ -1,0 +1,45 @@
+[%
+#	$Id: ECFProductView.ttml,v 0.04 2002/05/31 13:40:30 shanta Exp $
+
+
+%]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]<!--ECFProductView-->
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tbody>
+<tr>
+<td>
+<p> Our workshops are geared to helping you look after your bees and the environment in which they live with sustainability in mind. </p>
+<p>Up coming workshops.</p> For more info <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=ContactView" name="Contact" target="_self" title=" WorkShops ">Contact us</a>
+<table >
+
+[% FOREACH link = DBI.query("SELECT * FROM workshop_tb
+                                  WHERE  (sitename = 'ECF'
+                                  ) 
+                                  AND status!= 'Done' 
+                                  ORDER BY start_date
+                                  ")%]    
+
+ [% embed('WorkShopListTable') %]
+
+
+  [% END %]
+
+ 
+</table>
+
+
+
+
+</td></tr></tbody></table>

@@ -1,0 +1,6 @@
+		[% IF fname %]	
+				|&nbsp;<A HREF ="http://[% HostName %]:2096"target="_Blank">Mail</a>	
+         [% ELSE %]
+	  |<A  HREF ="?site=[% SiteName %]&amp;[% session_string %]&amp;view=MailView" >Mail</a>		   
+		[% END %]
+

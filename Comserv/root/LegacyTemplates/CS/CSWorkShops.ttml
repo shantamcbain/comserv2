@@ -1,0 +1,32 @@
+[%
+#	$Id: CSWorkShops.ttml,v 0.04 2002/05/31 13:40:30 shanta Exp $
+
+
+%]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]<!--ECFProductView-->
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tbody>
+<tr>
+<td>
+
+
+<h3>BeeKeeping workShops</h3>
+		<ul>
+		  <li>	[% embed ('ECFWorkShops') %]
+		  <li> [% embed ('BMWorkShops') %]
+		</ul>
+
+<h3>HelpFull Earth Farms workshops</h3>
+			[% embed ('HEWorkShops') %]

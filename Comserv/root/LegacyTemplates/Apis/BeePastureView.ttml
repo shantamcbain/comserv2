@@ -1,0 +1,78 @@
+[%
+
+# the ENCY template
+#	$Id: BotanicalNameView.ttml,v 1.2 2011/09/21 19:25:15 shanta Exp $	
+#file location/cgi-bin/HTMLTemplates/ENCY
+%]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Bee Pasture by botanical name.']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% LastUpdate = data.last_update %]
+   [% SiteLastUpdate = data.site_last_update %]
+  [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% PROCESS DefaultDbi.ttml %]
+
+	[% IF username %]
+
+<h3 > Hello  [% firstname%]  [% lastname%]! Welcome to     [% data.site_display_name %]
+ Plant data base!</h3>
+	  
+
+	[% ELSE %]
+
+	<h3>  Hello! Welcome to [%  data.site_display_name %]
+ Plant data base!</h3
+
+	[% END %]
+
+</div>
+<div ALIGN="center">
+<A NAME="PageTop"></A>
+</div>
+
+
+
+     
+        <h2>Bee forage plants by Botanical name.</h2>
+      
+      <form action="/cgi-bin/ENCY/herbs.cgi?" METHOD =" POST"> 
+<font FACE =" " SIZE =" 2"> 
+Search our herbal Database 
+<input TYPE="HIDDEN" NAME="site=[% SiteName %]"
+               VALUE =" on"> 
+<input TYPE="HIDDEN" NAME="[% session_string %]"
+               VALUE =" on"> 
+        <input TYPE="TEXT"   NAME="simple_search_string"
+               VALUE=""> 
+<input TYPE="HIDDEN" NAME="display_simple_search_results"
+               VALUE =" on"> 
+<input TYPE="SUBMIT" NAME="display_simple_search_results"
+               VALUE ="       Go        "> 
+</font> 
+
+ 
+</form> 
+
+ <p>Diverse Bee pasture is the key to healthy bees
+ [%  embed('PlantListSQL') %]
+  
+  
+      
+ <a href="http://helpdesk.computersystemconsulting.ca" target="_Blank" > HelpDesk</a>
+
+[%# embed('CSCCopyRight') %]
+[% embed(data.page_bottom_view) %]
+

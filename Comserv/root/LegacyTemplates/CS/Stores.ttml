@@ -1,0 +1,72 @@
+[%
+#	$Id: Stores.ttml,v .01 2010/02/04 01:33:34 shanta Exp $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it doesn't rely on any
+# variables from outside.
+
+%]
+
+[%# embed('SubTopFrameView',['-PAGE_TITLE','CountryStores.ca sub']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<div ALIGN="center">
+
+</div>
+<A NAME="PageTop"></A>
+</div>
+<p>We attempt to provide you with quality local products were ever possible.</p>
+
+<p>You may order online at <a href="http://countrystores.ca/cgi-bin/store/store.cgi?shop=CS" target="_mainCon" >Our Store</a>
+ for pickup at market or drop off point. When creating your on line order account. Please indicate your prefired pickup point in the delivered to category. Products and pricing change daily especialy commercial produce.</p>
+<p><p><ul>
+    <li>Enderby
+     <ul>
+      <li> Leas Coffee House, Honey, Wax, Candles, Bee Pollen</li>
+      <li> Gypsy Bazaar. Honey,
+     </ul></li>
+    <li>Grindrod 
+     <ul>
+      <li>Mayberry Store Honey only</li>
+     </ul>
+    </li>
+     <li> <a href="http://skyefarm.com" target="_Blank" >Skye farm</a> Garlic Booth     </li>
+
+     <ul>
+      <li>Honey, order wax, Candles etc</li>
+     </ul>
+     
+   <li>If you would like to be a pickup point please 
+   <a href="/cgi-bin/index.cgi?site=[% SiteName %]&[% session_string %]&view=ContactView" target="_Blank" >contact us</a>.
+   </li>
+    <li>On line Stores we are affiliates with are listed below</li>
+   </ul></p>
+
+
+
+
+
+
+</td>
+</tr>
+</table>
+[%# embed(data.page_bottom_view) %]
+

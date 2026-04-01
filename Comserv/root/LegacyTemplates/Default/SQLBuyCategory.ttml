@@ -1,0 +1,24 @@
+
+
+<!-- start BuyCategorySQL -->
+<div id="navcontainer">
+<ul id="navlist">
+    [% USE DBI( data_source = 'dbi:mysql:forager',
+                username = 'forager',
+                password = 'pwxx88' )
+    %]
+ [% FOREACH link = DBI.query("SELECT * FROM buy_sell_tb
+                                  WHERE  status  !=3
+                                  ORDER BY category
+                                  ")%]    
+ <li>&nbsp;<a href="#"  BORDER =" 0"
+     WIDTH =" 8" HEIGHT =" 8" ALT =" ::">
+ 
+ </a>[% link.category %]    <a href="/cgi-bin/BuyAndSell/buy.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;simple_search_string=[% link.item_name %]" name="Contact" " title=" [% link.item_name %] "><font   class="LeftSideBarNavStyle">[% link.item_name %] </font></a>
+ </li>
+  [% END %]
+</ul>
+</div>
+
+ 
+<!-- end start BuyCategorySQL -->

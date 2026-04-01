@@ -1,0 +1,58 @@
+[%
+# It uses a ref to a matrix hash data.sel_day_data with the fillout of
+# the cells (refer to
+# WebCal::DisplayDayViewAction::get_data_of_sel_day for more
+# info). The number of columns is precalculated and the last column
+# number is located in data.last_col (count starts from 0); Finally
+# the array with a range of hours to display is in data.display_hours.
+
+ url_encoded_admin_variables = embed(data.url_encoded_admin_fields_view_name);
+
+ event_url = "$data.script_name?site=$data.site_name&amp;session_id=$data.session_id";
+
+# event_url = "$data.script_name?$url_encoded_admin_variables&amp;display_add_form=on&amp;date=$data.selected_date_data.date";
+
+ colors = ["#EEEEEE","#FFFFFF"];
+
+-%]
+
+
+<!-- START DAY BY HOUR -->
+
+<TABLE WIDTH=100%>
+  <TR BGCOLOR="#EEEEEE"> 
+    <TD ALIGN=left COLSPAN=2>
+      All Year [% data.selected_date_data.year %] Events:
+    </TD>
+  </TR>
+    &nbsp; &nbsp; &nbsp;
+</TABLE>
+
+<TABLE WIDTH=100% BORDER="1" BORDERCOLOR="#ECECEC" CELLSPACING="0" CELLPADDING="2">
+
+[% count = 0 %]
+[% FOR day = data.sel_year_data %]
+
+  [% date_str   = day.date_str;
+     events = day.events;
+     count = count + 1;
+     color_ind = count % 2;
+   %]
+  <TR BGCOLOR="[% colors.$color_ind %]"> 
+
+    <TD ALIGN=center WIDTH=5% NOWRAP>
+      <A HREF="[% "$event_url&amp;DisplayDayViewAction=on&amp;date=$day.date" %]">
+      [% date_str %]
+    </TD>
+
+    <TD ALIGN=left>
+      [% FOR event = events %]
+          <li><A HREF="[% "$event_url&amp;display_details_view=on&amp;date=$day.date&amp;record_id=$event.record_id" %]">[% event.note %]</A>
+      [% END %]
+    </TD>
+
+  </TR>
+[% END %]
+</TABLE>
+
+

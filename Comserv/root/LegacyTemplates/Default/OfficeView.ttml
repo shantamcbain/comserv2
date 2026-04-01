@@ -1,0 +1,90 @@
+[%
+#	$Id: OfficeView.ttml,v 1.0 2002/05/31 13:40:30 shanta Exp $
+
+
+%] 
+[% PROCESS DefaultDbi.ttml %]
+[% embed(data.page_top_view,['-PAGE_TITLE','Office']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+       [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+     [% USE DBI( data_source = 'dbi:mysql:forager',
+                username = 'forager',
+                password = 'pwxx88' )
+    %]
+ 
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+
+		<tr>
+		<td >
+		<div align="center"
+			[% IF username %]
+
+		<h3>[% firstname%]'s Office!</h3>
+
+
+			[% ELSE %]
+
+			<h3> This is our Office Page!</h3
+<p>To get the most from this application you will need to create an account. 
+
+<p><A HREF = "[% data.script_name %]?session_id=[% session_id %]&amp;submit_logon=on&amp;site=[%SiteName%]"
+                 TARGET = "[% data.link_target %]">Logon</A> 
+                 
+                 
+               <a href="/cgi-bin/FAQ/faq.cgi?site=[%SiteName%]&amp;[% session_string %]&amp;sort_field1=category &amp;sort_field2=fname &amp;first_record_to_display=0&amp;records_per_page= &amp;record_id=2&amp;columns_to_view=category &amp;columns_to_view=question&amp;display_details_view.x=8 &amp;display_details_view.y=9&amp;display_details_view=on" onmousedown="click Here for info on what we collect">Why should I create an account</a>
+    
+			[% END %]
+		</div>
+		</td >
+		</tr>
+		<tr>
+		<td >
+
+		<A NAME="PageTop"></A>
+
+	
+[% IF SiteName == 'ECF' %]
+<li><a href="http://sql-ledger.computersystemconsulting.ca/sql-ledger/" target="_blank">SQL Ledger</a> accounting</li>
+[% ELSIF SiteName == 'HE'%]
+<p>Hi [% UserName %] Here is Helpfull Earths office Page.
+
+<p>Here are our main links
+<ul>
+
+<li><a href="httpsql-ledger/" target="_blank">SQL Ledger</a> accounting</li>
+<p> 	[% IF group == 'HE_admin' %]
+       username mary password he takes mary to her carpentry account system<br.
+       username paul password he takes paul to healpful earth accounts<br>
+  	   [% END %]
+     
+       
+
+</ul>
+
+
+	
+[% ELSE %]
+You have no Office page defined yet.
+[% END %]
+		</td>
+			</tr>
+		</table>
+</DIV>
+
+[% embed(data.page_bottom_view) %]
+

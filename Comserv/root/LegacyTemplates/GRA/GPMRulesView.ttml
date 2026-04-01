@@ -1,0 +1,22 @@
+[%
+#	$Id: CSCProductView.ttml,v 1.1 2002/10/08 04:23:07 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it doesn't rely on any
+# variables from outside.
+
+%]
+[% embed(data.page_top_view,['-PAGE_TITLE','The Grindrod Park Market Rules']) %]
+
+[% embed('ErrorDisplayView') %]
+
+<p>Basic rules of conduct of the market are as fallows</p>
+
+<p>One must treat all vendors and customers with respect.</p>
+<p>One must state up front the source and quality of all products on offer. IE if the food is from out of the local area marketers must say so to the customer. If the honey is mixed with Chinese honey it must be stated so.</p>
+
+[% embed(data.page_bottom_view) %]
+

@@ -1,0 +1,125 @@
+[%
+
+# the Left Page template
+#	$Id: CSLeftLinksView.ttml,v 1.2 2002/10/02 15:22:14 shanta Exp shanta $	
+
+%]
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+
+
+ <tr>
+  <td Class='LeftSideBarNavLinkStyle'>
+           <A HREF="/cgi-bin/CSC/csc.cgi?[% session_string %]" TARGET = "_blank" ><font   class="LeftSideBarNavStyle"> CSC Home</A> </font></a><br>
+    </td>
+    </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+ <tr>  
+
+   <td Class='LeftSideBarNavLinkStyle'>
+           <A HREF="Http://forager.com/cgi-bin/store/store.cgi?shop=csc"  TARGET = "[% data.link_target %]" ><font   class="LeftSideBarNavStyle"> Products</A> </font></a><br>
+    </td>
+    </tr>
+  <tr>  
+   <td>&nbsp;</td>
+ </tr>
+  <tr>  
+
+   <td Class='LeftSideBarNavLinkStyle'>
+           <A HREF="/cgi-bin/CSC/news.cgi?[% session_string %]"  TARGET = "[% data.link_target %]"><font   class="LeftSideBarNavStyle">Whats New</A> </font></a><br>
+    </td>
+    </tr>
+<tr>  
+   <td>&nbsp;</td>
+ </tr>
+
+[% IF group == 'CSC_admin' OR username == 'Shanta' OR group == 'CS_admin' %]
+  <tr>  
+   <td >
+   
+       <font class="LeftSideBarHeaderStyle" >Admin Tools</font><br>
+    </td>
+    </tr>
+ <tr>  
+
+   <td >
+           <A HREF="faq_manager.cgi?[% session_string %]"  TARGET = "[% data.link_target %]" ><font   class="LeftSideBarNavStyle"> CSC FAQ Admin.</A> </font></a><br>
+    </td>
+    </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+ <tr>  
+
+   <td >
+<A HREF="http://forager.com/cgi-bin/store/manager.cgi?shop=csc" TARGET = "[% data.link_target %]"><font   class="LeftSideBarNavStyle">Mangaer</A> </font>
+
+[%# embed('CSHeadLinksView.ttml') %]
+    </td>
+    </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+ <tr>  
+
+   <td >
+[% embed('CSCSiteChangeView.ttml') %]
+    </td>
+    </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+[% IF data.script_display_name =='CSC Project Tracker'%]
+<tr>	      	
+  <td>
+<a href="http://computersystemconsulting.ca/cgi-bin/CSC/csc_client.cgi?display_add_form=on&[% session_string %]" target='_Blank'"><font   class="LeftSideBarNavStyle"> ADD Client</font></a>
+<br>
+      	</td>
+ </tr>      	
+
+[% END %]
+
+  <tr>  
+  <td>	<A HREF = "cs.cgi?[% session_string %]" target="[% data.link_target %]"<font   class="LeftSideBarNavStyle"> </font></a>
+  </td>
+ </tr>
+ <tr>  
+
+   <td >
+           <A HREF="todo.cgi?[% session_string %]"  TARGET = "[% data.link_target %]" ><font   class="LeftSideBarNavStyle"> CSC ToDo List.</A> </font></a><br>
+    </td>
+    </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+  <tr>  
+
+   <td >
+<A HREF="http://forager.com/cgi-bin/store/store.cgi?shop=csc" TARGET = "[% data.link_target %]"><font   class="LeftSideBarNavStyle">Customer View</A> </font>
+[%# embed('CAPHeadLinksView.ttml') %]
+    </td>
+    </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+  <tr>  
+
+   <td Class='LeftSideBarNavLinkStyle'>
+           <A HREF="/cgi-bin/CS/news_manager.cgi?[% session_string %]&page_top_view=SubTopFrameView&view=NewsManagerBasicDataView"  TARGET = "[% data.link_target %]"><font   class="LeftSideBarNavStyle">CS News admin</A> </font></a><br>
+    </td>
+    </tr>
+ 
+
+[% END %]
+
+
