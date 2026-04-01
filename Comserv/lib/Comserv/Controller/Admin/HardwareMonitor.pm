@@ -297,12 +297,11 @@ my %LOCAL_HOSTS = map { $_ => 1 } qw(
     workstation workstation.local workstation.computersystemconsulting.ca
     localhost 127.0.0.1 192.168.1.199
 );
-my $NFS_BASE = '/home/shanta/nfs';
+my $NFS_BASE = '/data/nfs';
 
 sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
     my ($self, $c) = @_;
 
-    # Set template FIRST so it renders even if something below fails
     $c->stash(template => 'admin/HardwareMonitor/disk_diagnose.tt');
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
@@ -315,7 +314,6 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
     my $path     = $c->req->param('path')     // '/';
     my $action   = $c->req->param('action')   // '';
 
-    # Sanitise
     $hostname =~ s/[^A-Za-z0-9._\-]//g;
     $path =~ s/[^A-Za-z0-9_.\/\-]//g;
     $path = '/' unless $path =~ m{^/};
@@ -327,7 +325,6 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
     my $action_result;
     my $ssh_hint;
 
-    # Helper: run a command locally or via SSH, return output lines
     my $run_cmd = sub {
         my (@cmd) = @_;
         if ($is_local) {
@@ -350,7 +347,6 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
         }
     };
 
-    # POST actions
     if ($action && $c->req->method eq 'POST') {
         my $target = $c->req->param('target') // '';
         $target =~ s/[^A-Za-z0-9_.\/\-]//g;
@@ -374,7 +370,7 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
                 $action_result = $ret == 0 ? "Moved to NFS: $dest" : "Move failed (exit $ret)";
             } else {
                 my ($out, $err) = $run_cmd->('mv', '--', $target, $dest);
-                $action_result = $err // "Moved on $hostname: $target → $dest";
+                $action_result = $err // "Moved on $hostname: $target -> $dest";
             }
         } elsif ($action eq 'compress' && $target && $target =~ m{^/} && $target ne '/') {
             my $archive = "$target.tar.gz";
@@ -388,8 +384,29 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
         }
     }
 
-    # Run du on current path
-    # For local: expand glob here. For remote: let the shell expand via sh -c.
+    my %NET_FS = map { $_ => 1 } qw(nfs nfs4 cifs smbfs sshfs fuse.sshfs davfs glusterfs);
+
+    # Build a map of mount_point -> fstype for local host so we can tag/skip network mounts
+    my %mount_fstype;
+    if ($is_local) {
+        if (open my $dfh, '-|', 'df', '-PT') {
+            while (my $dfl = <$dfh>) {
+                chomp $dfl;
+                next if $dfl =~ /^Filesystem/;
+                my ($fs, $type, undef, undef, undef, undef, $mnt) = split /\s+/, $dfl;
+                $mount_fstype{$mnt} = $type if defined $mnt && defined $type;
+            }
+            close $dfh;
+        }
+    }
+
+    my $to_bytes = sub {
+        my $s = shift // '0';
+        my %mul = (K=>1024, M=>1024**2, G=>1024**3, T=>1024**4, P=>1024**5);
+        $s =~ /^([\d.]+)([KMGTP]?)/i;
+        return ($1 // 0) * ($mul{uc($2||'B')} // 1);
+    };
+
     my ($lines, $err);
     if ($is_local) {
         my @children = glob("$path/*");
@@ -416,30 +433,28 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
         $error    = $err;
         $ssh_hint = !$is_local ? "ssh root\@$hostname du -sh $path/*" : undef;
     } else {
-        my $to_bytes = sub {
-            my $s = shift // '0';
-            my %mul = (K=>1024, M=>1024**2, G=>1024**3, T=>1024**4, P=>1024**5);
-            $s =~ /^([\d.]+)([KMGTP]?)/i;
-            return ($1 // 0) * ($mul{uc($2||'B')} // 1);
-        };
         for my $line (@{ $lines // [] }) {
             chomp $line;
             next unless $line =~ /^(\S+)\s+(.+)$/;
             my ($size, $entry_path) = ($1, $2);
             my $name = (split '/', $entry_path)[-1];
             my $is_dir = $is_local ? (-d $entry_path) : 1;
+            my $fstype = $mount_fstype{$entry_path} // '';
+            my $is_net  = $NET_FS{$fstype} ? 1 : 0;
             push @entries, {
                 size     => $size,
-                bytes    => $to_bytes->($size),
+                bytes    => $is_net ? 0 : $to_bytes->($size),
+                raw_size => $to_bytes->($size),
                 path     => $entry_path,
                 name     => $name,
                 is_dir   => $is_dir,
+                fstype   => $fstype || 'local',
+                is_net   => $is_net,
             };
         }
         @entries = sort { $b->{bytes} <=> $a->{bytes} } @entries;
     }
 
-    # Build breadcrumb parts
     my @crumb_parts;
     my @segments = grep { length } split '/', $path;
     my $crumb_acc = '';
@@ -538,6 +553,126 @@ sub ingest :Path('/admin/hardware_monitor/ingest') :Args(0) {
         "Ingested $count metrics from $hostname");
     $c->response->content_type('application/json');
     $c->response->body(JSON::encode_json({ ok => 1, count => $count, hostname => $hostname }));
+}
+
+sub drive_detail :Path('/admin/hardware_monitor/drive_detail') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash(template => 'admin/HardwareMonitor/DriveDetail.tt');
+
+    my $host  = $c->req->param('host')  // '';
+    my $mount = $c->req->param('mount') // '/';
+    $mount =~ s{\.\.}{}g;
+    $mount = '/' unless length $mount;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'drive_detail',
+        "Drive detail requested: host=$host mount=$mount");
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->get_admin_type($c) ne 'none') {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my %disk_info;
+    eval {
+        my $rs = $c->model('DBEncy')->resultset('HardwareMetrics');
+        my $base = $mount;
+        $base =~ s{^/}{};
+        $base =~ s{/}{_}g;
+        $base = '_' . $base if $base;
+        my $metric_key = "disk_used_pct$base";
+
+        my $latest_pct = $rs->search(
+            { hostname => $host, metric_name => $metric_key },
+            { order_by => { -desc => 'timestamp' }, rows => 1 }
+        )->single;
+
+        my $total_key = "disk_total_mb$base";
+        my $free_key  = "disk_free_mb$base";
+        my $latest_total = $rs->search(
+            { hostname => $host, metric_name => $total_key },
+            { order_by => { -desc => 'timestamp' }, rows => 1 }
+        )->single;
+        my $latest_free = $rs->search(
+            { hostname => $host, metric_name => $free_key },
+            { order_by => { -desc => 'timestamp' }, rows => 1 }
+        )->single;
+
+        $disk_info{pct}      = $latest_pct   ? $latest_pct->metric_value   : undef;
+        $disk_info{total_mb} = $latest_total ? $latest_total->metric_value  : undef;
+        $disk_info{free_mb}  = $latest_free  ? $latest_free->metric_value   : undef;
+        if (defined $disk_info{total_mb} && defined $disk_info{free_mb}) {
+            $disk_info{used_mb} = $disk_info{total_mb} - $disk_info{free_mb};
+        }
+    };
+    my $err = "$@" if $@;
+    if ($err) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'drive_detail',
+            "Could not fetch disk metrics from DB: $err");
+    }
+
+    my @dir_sizes;
+    my $local_mount = $mount;
+    if (-d $local_mount) {
+        eval {
+            my $du_out = qx{du -d 1 -m \Q$local_mount\E 2>/dev/null};
+            for my $line (split /\n/, $du_out) {
+                next unless $line =~ /^(\d+)\s+(.+)$/;
+                my ($mb, $path) = ($1, $2);
+                next if $path eq $local_mount;
+                my $name = $path;
+                $name =~ s{^\Q$local_mount\E/?}{};
+                push @dir_sizes, {
+                    path    => $path,
+                    name    => $name,
+                    mb      => $mb,
+                    is_dir  => (-d $path) ? 1 : 0,
+                };
+            }
+            @dir_sizes = sort { $b->{mb} <=> $a->{mb} } @dir_sizes;
+        };
+        my $du_err = "$@" if $@;
+        if ($du_err) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'drive_detail',
+                "du failed on $local_mount: $du_err");
+        }
+    }
+
+    my @files_in_root;
+    if (-d $local_mount) {
+        eval {
+            opendir(my $dh, $local_mount);
+            while (my $e = readdir($dh)) {
+                next if $e =~ /^\./;
+                my $full = "$local_mount/$e";
+                my $size = -d $full ? undef : (-s $full // 0);
+                push @files_in_root, {
+                    name    => $e,
+                    path    => $full,
+                    is_dir  => (-d $full) ? 1 : 0,
+                    size    => $size,
+                    size_kb => defined $size ? int($size / 1024) : undef,
+                };
+            }
+            closedir($dh);
+            @files_in_root = sort { ($b->{is_dir} <=> $a->{is_dir}) || ($a->{name} cmp $b->{name}) } @files_in_root;
+        };
+    }
+
+    my $can_browse = -d $local_mount ? 1 : 0;
+
+    $c->stash(
+        host         => $host,
+        mount        => $mount,
+        disk_info    => \%disk_info,
+        dir_sizes    => \@dir_sizes,
+        files        => \@files_in_root,
+        can_browse   => $can_browse,
+        file_browser_url => $c->uri_for('/file/admin_browser', { dir_path => $local_mount }),
+    );
+    $c->forward($c->view('TT'));
 }
 
 __PACKAGE__->meta->make_immutable;

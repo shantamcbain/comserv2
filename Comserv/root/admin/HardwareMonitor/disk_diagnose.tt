@@ -73,6 +73,7 @@
     <th>Name</th>
     <th style="text-align:right;">Size</th>
     <th style="min-width:130px;"></th>
+    <th>Type</th>
     <th>Actions</th>
   </tr>
 </thead>
@@ -80,29 +81,42 @@
 [% FOR e IN entries %]
 [%  pct = max_bytes > 0 ? e.bytes / max_bytes * 100 : 0; pct = pct.int %]
 [%  bar_class = pct > 90 ? 'crit' : pct > 60 ? 'warn' : '' %]
-<tr id="row-[% loop.index %]">
+<tr id="row-[% loop.index %]" [% IF e.is_net %]style="background:#f0f4ff;opacity:.85;"[% END %]>
   <td>
-    [% IF e.is_dir %]
+    [% IF e.is_net %]
+    &#127760; <a href="/admin/hardware_monitor/disk_diagnose?hostname=[% hostname | uri %]&amp;path=[% e.path | uri %]">[% e.name | html %]</a>
+    <span style="font-size:.75em;color:#1976d2;font-weight:bold;">[network]</span>
+    [% ELSIF e.is_dir %]
     &#128193; <a href="/admin/hardware_monitor/disk_diagnose?hostname=[% hostname | uri %]&amp;path=[% e.path | uri %]">[% e.name | html %]</a>
     [% ELSE %]
     &#128196; [% e.name | html %]
     [% END %]
     <div style="font-size:.75em;color:#aaa;">[% e.path | html %]</div>
   </td>
-  <td style="text-align:right;font-weight:bold;white-space:nowrap;">[% e.size | html %]</td>
+  <td style="text-align:right;font-weight:bold;white-space:nowrap;">
+    [% e.size | html %]
+    [% IF e.is_net %]<div style="font-size:.7em;color:#888;font-weight:normal;">(not counted)</div>[% END %]
+  </td>
   <td>
+    [% IF e.is_net %]
+    <div class="dd-bar-wrap"><div class="dd-bar" style="width:0%;background:#90caf9;"></div></div>
+    [% ELSE %]
     <div class="dd-bar-wrap">
       <div class="dd-bar [% bar_class %]" style="width:[% pct %]%;"></div>
     </div>
+    [% END %]
   </td>
+  <td style="font-size:.8em;color:#666;white-space:nowrap;">[% e.fstype | html %]</td>
   <td>
     <div class="dd-actions">
-      [% IF e.path != '/' %]
+      [% IF e.path != '/' && !e.is_net %]
       <button type="button" class="dd-btn dd-btn-del" onclick="showConfirm([% loop.index %],'delete','[% e.path | html %]')">&#128465; Delete</button>
       <button type="button" class="dd-btn dd-btn-nfs" onclick="showConfirm([% loop.index %],'move_to_nfs','[% e.path | html %]')">&#128190; Move to NFS</button>
       [% IF e.is_dir %]
       <button type="button" class="dd-btn dd-btn-zip" onclick="showConfirm([% loop.index %],'compress','[% e.path | html %]')">&#128230; Compress</button>
       [% END %]
+      [% ELSIF e.is_net %]
+      <a href="/admin/hardware_monitor/disk_diagnose?hostname=[% hostname | uri %]&amp;path=[% e.path | uri %]" class="dd-btn">&#128065; Browse</a>
       [% END %]
     </div>
     <div class="dd-confirm" id="confirm-[% loop.index %]">
