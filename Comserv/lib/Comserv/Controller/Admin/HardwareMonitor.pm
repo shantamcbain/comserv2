@@ -218,16 +218,18 @@ sub index :Path('/admin/hardware_monitor') :Args(0) {
 
     my %in_order   = map { $_ => 1 } @GRAPH_METRICS;
     my @ordered    = grep { exists $chart_data{$_} } @GRAPH_METRICS;
-    # Add disk_used_pct_* metrics (sorted by mount path), excluding virtual mounts
-    push @ordered, grep {
-        /^disk_used_pct/ && !$in_order{$_} && exists $chart_data{$_} && do {
+    push @ordered, grep { /$TEMP_METRIC_RE/ && !$in_order{$_} } sort keys %chart_data;
+    my $chart_json = JSON::encode_json([ map { { metric => $_, hosts => $chart_data{$_} } } @ordered ]);
+
+    # Separate disk chart JSON for the Drive Space section
+    my @disk_ordered = grep {
+        /^disk_used_pct/ && exists $chart_data{$_} && do {
             (my $mnt = $_) =~ s/^disk_used_pct//;
             $mnt =~ s{^_}{/}; $mnt =~ s{_}{/}g;
             $mnt !~ m{^(/sys|/proc|/run/|/dev/pts|/snap/)};
         }
     } sort keys %chart_data;
-    push @ordered, grep { /$TEMP_METRIC_RE/ && !$in_order{$_} } sort keys %chart_data;
-    my $chart_json = JSON::encode_json([ map { { metric => $_, hosts => $chart_data{$_} } } @ordered ]);
+    my $disk_chart_json = JSON::encode_json([ map { { metric => $_, hosts => $chart_data{$_} } } @disk_ordered ]);
 
     $c->stash(
         template        => 'admin/HardwareMonitor/index.tt',
@@ -239,6 +241,7 @@ sub index :Path('/admin/hardware_monitor') :Args(0) {
         metric_names    => \@metric_names,
         graph_metrics   => \@GRAPH_METRICS,
         chart_data_json => $chart_json,
+        disk_chart_json => $disk_chart_json,
         filter_host     => $filter_host,
         filter_metric   => $filter_metric,
         filter_level    => $filter_level,
