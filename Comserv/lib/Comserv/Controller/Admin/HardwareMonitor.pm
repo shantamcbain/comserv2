@@ -2,6 +2,7 @@ package Comserv::Controller::Admin::HardwareMonitor;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
 use JSON ();
 use Scalar::Util qw(looks_like_number);
 
@@ -304,8 +305,8 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
     # Set template FIRST so it renders even if something below fails
     $c->stash(template => 'admin/HardwareMonitor/disk_diagnose.tt');
 
-    my $role = $c->session->{role} // '';
-    unless ($role eq 'admin' || $role eq 'superadmin') {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->get_admin_type($c) ne 'none') {
         $c->response->redirect($c->uri_for('/'));
         return;
     }
