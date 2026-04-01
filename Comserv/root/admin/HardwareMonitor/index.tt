@@ -190,6 +190,50 @@
     </details>
     [% END %]
 
+    [% IF disk_hosts.size %]
+    <details style="margin-bottom:12px;">
+        <summary style="cursor:pointer;font-weight:bold;font-size:1.05em;padding:6px 0;list-style:none;display:flex;align-items:center;gap:8px;">
+            &#128190; Disk Space <span style="font-size:.8em;font-weight:normal;color:#888;">(latest per host — NFS mounts show identical values on all hosts)</span>
+        </summary>
+        <div style="margin-top:10px;">
+        [% FOR dh IN disk_hosts %]
+            <div style="margin-bottom:14px;">
+                <strong>[% dh.hostname | html %]</strong>
+                <span style="font-size:.8em;color:#888;margin-left:6px;">[% dh.mounts.size %] mount(s)</span>
+                <table style="border-collapse:collapse;width:100%;margin-top:4px;font-size:.88em;">
+                <thead><tr style="background:#f0f0f0;">
+                    <th style="padding:4px 8px;text-align:left;border-bottom:1px solid #ccc;">Mount</th>
+                    <th style="padding:4px 8px;text-align:right;border-bottom:1px solid #ccc;">Used %</th>
+                    <th style="padding:4px 8px;border-bottom:1px solid #ccc;min-width:100px;"></th>
+                    <th style="padding:4px 8px;text-align:right;border-bottom:1px solid #ccc;">Free</th>
+                    <th style="padding:4px 8px;border-bottom:1px solid #ccc;"></th>
+                </tr></thead>
+                <tbody>
+                [% FOR d IN dh.mounts %]
+                <tr>
+                    <td style="padding:3px 8px;border-bottom:1px solid #eee;font-family:monospace;">[% d.mount | html %]</td>
+                    <td style="padding:3px 8px;border-bottom:1px solid #eee;text-align:right;font-weight:bold;color:[% d.pct > 90 ? '#c00' : d.pct > 75 ? '#e65c00' : '#333' %]">[% d.pct %]%</td>
+                    <td style="padding:3px 8px;border-bottom:1px solid #eee;">
+                        <div style="background:#e8e8e8;border-radius:4px;height:10px;width:100px;display:inline-block;vertical-align:middle;">
+                            <div style="height:10px;border-radius:4px;width:[% d.pct %]%;background:[% d.pct > 90 ? '#f44336' : d.pct > 75 ? '#ff9800' : '#4caf50' %];"></div>
+                        </div>
+                    </td>
+                    <td style="padding:3px 8px;border-bottom:1px solid #eee;text-align:right;color:#555;">[% IF d.free_mb.defined %][% d.free_mb %] MB[% ELSE %]&mdash;[% END %]</td>
+                    <td style="padding:3px 8px;border-bottom:1px solid #eee;">
+                        [% IF dh.hostname.match('workstation') || dh.hostname == 'localhost' %]
+                        <a href="/admin/hardware_monitor/disk_explorer?mount=[% d.mount | uri %]" style="font-size:.8em;">&#128269; Explore</a>
+                        [% END %]
+                    </td>
+                </tr>
+                [% END %]
+                </tbody>
+                </table>
+            </div>
+        [% END %]
+        </div>
+    </details>
+    [% END %]
+
     <details style="margin-bottom:12px;">
         <summary style="cursor:pointer;font-weight:bold;font-size:1.05em;padding:6px 0;list-style:none;display:flex;align-items:center;gap:8px;">
             &#128200; Trend Graphs <span style="font-size:.8em;font-weight:normal;color:#888;">(CPU, memory, disk % over time)</span>
@@ -405,19 +449,28 @@
         if (metric === 'ipmi_ps1_current' || metric === 'ipmi_ps2_current') return;
         if (metric.match(/_temp$/)) return;
 
-        if (metric.match(/^disk_used_pct/)) {
-            var mountPart = metric.replace(/^disk_used_pct/, '') || '_';
-            var mountLabel = mountPart.replace(/^_/, '/').replace(/_/g, '/') || '/';
-            addChart('Disk % \u2014 ' + mountLabel, hostMap, '%');
-            rendered++;
-            return;
-        }
         if (metric.match(/^disk_/)) return;
 
         var unit = METRIC_UNITS[metric] || '';
         addChart(METRIC_LABELS[metric] || metric, hostMap, unit);
         rendered++;
     });
+
+    // Build one combined Disk Usage % chart: series label = "host — /mount"
+    var diskCombined = {};
+    rawData.forEach(function(entry) {
+        if (!entry.metric.match(/^disk_used_pct/) || !entry.hosts) return;
+        var mountPart = entry.metric.replace(/^disk_used_pct/, '') || '_';
+        var mountLabel = mountPart.replace(/^_/, '/').replace(/_/g, '/') || '/';
+        Object.keys(entry.hosts).forEach(function(host) {
+            var shortHost = host.replace(/\.computersystemconsulting\.ca$/, '').replace(/\..*$/, '');
+            diskCombined[shortHost + ' \u2014 ' + mountLabel] = entry.hosts[host];
+        });
+    });
+    if (Object.keys(diskCombined).length) {
+        addChart('Disk Usage %', diskCombined, '%');
+        rendered++;
+    }
 
     var combinedTemps = {};
     rawData.forEach(function(entry) {
