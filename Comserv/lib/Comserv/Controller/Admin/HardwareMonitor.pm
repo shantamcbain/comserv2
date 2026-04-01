@@ -384,6 +384,29 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
         }
     }
 
+    my %NET_FS = map { $_ => 1 } qw(nfs nfs4 cifs smbfs sshfs fuse.sshfs davfs glusterfs);
+
+    # Build a map of mount_point -> fstype for local host so we can tag/skip network mounts
+    my %mount_fstype;
+    if ($is_local) {
+        if (open my $dfh, '-|', 'df', '-PT') {
+            while (my $dfl = <$dfh>) {
+                chomp $dfl;
+                next if $dfl =~ /^Filesystem/;
+                my ($fs, $type, undef, undef, undef, undef, $mnt) = split /\s+/, $dfl;
+                $mount_fstype{$mnt} = $type if defined $mnt && defined $type;
+            }
+            close $dfh;
+        }
+    }
+
+    my $to_bytes = sub {
+        my $s = shift // '0';
+        my %mul = (K=>1024, M=>1024**2, G=>1024**3, T=>1024**4, P=>1024**5);
+        $s =~ /^([\d.]+)([KMGTP]?)/i;
+        return ($1 // 0) * ($mul{uc($2||'B')} // 1);
+    };
+
     my ($lines, $err);
     if ($is_local) {
         my @children = glob("$path/*");
@@ -410,24 +433,23 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
         $error    = $err;
         $ssh_hint = !$is_local ? "ssh root\@$hostname du -sh $path/*" : undef;
     } else {
-        my $to_bytes = sub {
-            my $s = shift // '0';
-            my %mul = (K=>1024, M=>1024**2, G=>1024**3, T=>1024**4, P=>1024**5);
-            $s =~ /^([\d.]+)([KMGTP]?)/i;
-            return ($1 // 0) * ($mul{uc($2||'B')} // 1);
-        };
         for my $line (@{ $lines // [] }) {
             chomp $line;
             next unless $line =~ /^(\S+)\s+(.+)$/;
             my ($size, $entry_path) = ($1, $2);
             my $name = (split '/', $entry_path)[-1];
             my $is_dir = $is_local ? (-d $entry_path) : 1;
+            my $fstype = $mount_fstype{$entry_path} // '';
+            my $is_net  = $NET_FS{$fstype} ? 1 : 0;
             push @entries, {
                 size     => $size,
-                bytes    => $to_bytes->($size),
+                bytes    => $is_net ? 0 : $to_bytes->($size),
+                raw_size => $to_bytes->($size),
                 path     => $entry_path,
                 name     => $name,
                 is_dir   => $is_dir,
+                fstype   => $fstype || 'local',
+                is_net   => $is_net,
             };
         }
         @entries = sort { $b->{bytes} <=> $a->{bytes} } @entries;
