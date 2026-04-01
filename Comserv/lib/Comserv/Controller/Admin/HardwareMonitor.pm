@@ -301,6 +301,9 @@ my $NFS_BASE = '/home/shanta/nfs';
 sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
     my ($self, $c) = @_;
 
+    # Set template FIRST so it renders even if something below fails
+    $c->stash(template => 'admin/HardwareMonitor/disk_diagnose.tt');
+
     my $role = $c->session->{role} // '';
     unless ($role eq 'admin' || $role eq 'superadmin') {
         $c->response->redirect($c->uri_for('/'));
@@ -390,13 +393,13 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
     if ($is_local) {
         my @children = glob("$path/*");
         ($lines, $err) = @children
-            ? $run_cmd->('du', '-sh', '--', @children)
+            ? $run_cmd->('du', '-shx', '--', @children)
             : ([], undef);
     } else {
         my $ssh_user = $ENV{HW_SSH_USER} // 'root';
         if (open my $fh, '-|', 'ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5',
                 '-o', 'StrictHostKeyChecking=no', "$ssh_user\@$hostname",
-                "du -sh -- $path/* 2>/dev/null") {
+                "du -shx -- $path/* 2>/dev/null") {
             my @lines_arr = <$fh>;
             close $fh;
             if ($? != 0 && !@lines_arr) {
