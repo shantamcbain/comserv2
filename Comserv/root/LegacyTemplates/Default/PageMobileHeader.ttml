@@ -1,0 +1,92 @@
+[% #/HTMLTemplates/Default/PageMobileHeader.ttml %]
+[%# 	$Id: PageHeaderView.ttml,v 0.01 2003/11/29 06:33:25 shanta Exp shanta $	%]
+
+[%# All content of this view is confined to a table cell in PageTopView %]
+	<!-- PageMobilHeadView 0.01 Begin -->
+[% IF data.css_view_url %]
+  [% IF SiteName == "ECF" %]
+   [% css_view_url = "/styles/ECFMCSSView.css"  %]
+
+  [% ELSE %]   
+   [% css_view_url = "/styles/CSCMCSSView.css"  %]
+  [% END %]
+
+	<LINK REL ="stylesheet" TYPE ="text/css" HREF ="[% css_view_url %]">
+[% END %]
+
+<meta NAME="REVISIT-AFTER" CONTENT="7 days">
+<meta NAME="ROBOTS" CONTENT="index all, follow all">
+<META NAME = "keywords" CONTENT= "[% data.http_header_keywords %]">
+<META NAME = "description" CONTENT= "[% data.http_header_description %]">
+<link rel="shortcut icon" href="[% data.favicon %]" >
+<!--<link rel="icon" href="[% data.ani_favicon %]" type="[% data.favicon_type %]" >-->
+<script type="text/javascript" src="/tinydropdown.js"></script>
+<script type="text/javascript">
+var _gaq = _gaq || [];
+_gaq.push(['_setAccount', 'UA-393684-3']);
+_gaq.push(['_setDomainName', '.scriptiny.com']);
+_gaq.push(['_trackPageview']);
+(function() {
+var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+})();
+</script>
+<!--<style type="text/css">
+body {padding-top:130px}
+#scripinty {height:130px; width:100%; position:fixed; top:0px; left:0px; margin:0; background:#666; min-width:900px}
+#scripintyleft {float:left; padding:30px 0 0 35px}
+#scripintyleft h1 {font:32px 'Trebuchet MS',Verdana; color:#fff; text-shadow:1px 1px #000}
+#scripintyleft p {color:#aaa; font-size:16px; font-style:italic}
+#scripintyleft p a {color:#eee; text-decoration:none}
+#scripintyleft p a:hover {color:#fff}
+#scripintyleft span {font:15px Arial,Verdana; color:#ddd; text-shadow:1px 1px #444}
+#scriptinyright {float:right; padding:10px 15px 0; height:120px; width:300px; background:#555}
+#bsap_aplink {float:right; font-size:10px; margin:0; padding:4px 0 0; color:#eee; text-shadow:none}
+#bsap_aplink:hover {color:#fff}
+body .one .bsa_it_ad {border:none; background:transparent; font-family:inherit; padding:0; margin:0; text-align:right}
+body .one .bsa_it_ad .bsa_it_i {float:right; padding:0; margin:0 0 0 13px}
+body .one .bsa_it_ad .bsa_it_i img {padding:0; border:none; margin-top:3px}
+body .one .bsa_it_ad .bsa_it_t {padding:0; font-size:13px; color:#eee; text-shadow:1px 1px #444; margin-bottom:6px}
+body .one .bsa_it_ad .bsa_it_t:hover {color:#fff}
+body .one .bsa_it_p {display:none}
+body .one .bsa_it_ad .bsa_it_d {font:12px Arial,Verdana; color:#ccc; text-shadow:#444 1px 1px}
+</style>-->
+</HEAD>
+<BODY>
+
+	  <table>
+		<tr align="left">
+		<td CLASS="TopMobileHeaderBarNavStyle"> 
+			 <IMG SRC ="[% data.application_logo %]" WIDTH ="[% data.application_logo_width %]"      HEIGHT ="[% data.application_logo_height %]"	ALT ="[% data.application_logo_alt %]"> 		         
+		</td> 
+		<td CLASS="TopMobileHeaderBarNavStyle">
+
+		<A  HREF ="?site=[% SiteName %]&amp;[% session_string %]&amp;m=0" title="The Pc View of the site.">Standard View</a>		   
+
+		<br>
+		<h3 > Hosting </h3>
+			[% embed('HeaderHostingView') %] 
+			
+		<td CLASS="TopMobileHeaderBarNavStyle">
+
+<!-- Call HeaderNaveBarView -->
+
+					[% embed('HeaderMobileNavBar') %] 
+					
+<!-- Close table -->					
+		</td>
+    </TR>	  
+[%#     <tr align="left">
+	      
+	   <td class="NavTableCellStyle">
+[% embed('JavaMenu') %]
+ [%#    </TD>
+    </TR>	  
+ %]  
+ 
+  </table>
+		
+
+	
+<!--End MobiPageHeaderView -->

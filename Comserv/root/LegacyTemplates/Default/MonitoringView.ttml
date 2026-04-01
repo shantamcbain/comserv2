@@ -1,0 +1,34 @@
+[%
+
+# the home  Page template
+#	$Id: MonitoringView.ttml,v 1.0 2015/09/09 22:01:26 shanta Exp $
+
+%] 
+[% PROCESS DefaultDbi.ttml %]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Pollinator Monitoring']) %]
+	
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% Username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+ [% script_name = data.app_name %]
+
+<div align="center"><h2>Pollinator Monitoring</h2>
+</div>
+<p>This application is under construction. We will be developing a system of recording pollinators and the plants they are foraging. The data will provide us with an indication of the health of the environment. we live in. Please join us to get this project under way.
+	
+<p>
+[% embed(data.page_bottom_view) %]
+

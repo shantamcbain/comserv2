@@ -1,0 +1,70 @@
+[%
+#	$Id: ECFProductView.ttml,v 0.04 2002/05/31 13:40:30 shanta Exp $
+
+
+%]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+<!--ECFProductView-->
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td >
+
+
+            <p> We provide a variety of products to Bee keepers, Farmers,  Health practitioners, and the general public.
+
+            </p>                                            
+            <p>Our products are being developed to provide you with your Bee needs.</p>
+
+          <ul>
+            <li>Apiary Management Services
+              <ul> 
+               <li><a href="http://www.computersystemconsulting.ca/whmcs/cart.php?a=add&pid=31&carttpl=cart" target="_blank" title="Order online">Operation management services</a>.
+                                                                                                                                        </ul>        
+                                                                                                                                            <li><h3>Teaching</h3> We have a full line of teaching services.                                                                                                                                 
+             <ul> 
+ 				  	<li><a href="http://www.computersystemconsulting.ca/whmcs/cart.php?a=add&pid=30&carttpl=cart" id="mentor" title="Order Online mentoring">Online Mentoring </a>Small and beginner beekeeping consulting.</li>			   	<li><a href="http://www.computersystemconsulting.ca/whmcs/cart.php?a=add&pid=36&carttpl=cart" target="_blank" id="mentor" title="Order LiveMentoring mentoring">Live Mentoring</a> Small and beginner beekeeping consulting.</li>
+ 				  	<li>Workshops have a workshop in your yard or teaching centre.<a href="http://www.computersystemconsulting.ca/whmcs/cart.php?a=add&pid=41&carttpl=cart" target="_blank" id="mentor" title="Workshop">Order</a> Please order and open a support ticket in the order system to negotiate the details for your situation.</li>
+   </ul>
+           <li>Pollination Products</li>
+ 	           <ul>
+        	       <li>We provide hives by the season. We put our hives on your land to provide you with pollination for your plants.  Get as many pollination units you need. 
+        	       <p><ul>
+        	       <li>1 to 4 hives $180 per year. You provide bear fencing.
+        	       <li>5 or more $160 per year
+        	       <li><a href="http://www.computersystemconsulting.ca/whmcs/cart.php?a=add&pid=40&carttpl=cart" target="_blank" id="Pollination" title="Order Online">To order</a> If you are getting 5 or more units Please enter 'PollinationDiscount' in the </p>  
+        	       </ul>
+        	      </ul>
+        	  <li><h3>New Urban Hives</h3><a href="http://www.computersystemconsulting.ca/whmcs/cart.php?a=add&pid=39&carttpl=cart" target="_blank" id="Urban Hive" title="Order Online">Order here</a> Want bees in your yard. These maintained hives are just the thing. See our urban beekeeping page for details.
+           <li>Bees are sold out for this year. Orders taken for 2016. Order early to ensure you get yours.</li>
+  <dl>
+<dt><a href="http://www.computersystemconsulting.ca/whmcs/cart.php?a=add&pid=33&carttpl=cart" target="_blank" name="4 frame nucs">4 Frame Nucs</a></dt>
+	<dd>Our nucs come from last years proven over wintered queens. Our program of selection ensure that you have a queen that will over winter well in Canadian climates.</dd>
+<dt><a href="http://www.computersystemconsulting.ca/whmcs/cart.php?a=add&pid=34&carttpl=cart" target="_blank" name="Shaken Swarms">Shaken Swarms</a></dt><dd>Bring us your inspected single box hive. We shake the queen and all her bees into it. We wait for her to lay than you take her home.</dd>
+</dl>
+ <dt><a href="http://ecf.beemaster.ca/cgi-bin/index
+.cgi?site=ECF&view=ApisQueensView&amp;session_id=[% session_id %]">Queens</a></dt><dd>We have queens ongoing all summer for your annual queen replacements. New queens have better wintering, disease resistance etc than old queens. Queens performance peeks in 2 to 3 years depending on genetics and how well they were mated. If we are out of stock we will backorder to our next round of production.</dd>
+</dl>
+  
+
+
+
+</td>
+</tr>
+</table>
+
+
+
+
+

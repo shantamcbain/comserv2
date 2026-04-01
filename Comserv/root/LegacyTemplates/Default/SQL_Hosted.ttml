@@ -1,0 +1,42 @@
+    <tr>
+      <td class="NavTableHeaderStyle"> <font class="NavtableHeaderCellStyle">Hosted Sites</font>  
+  [% IF username == 'Shanta' OR
+        group    == 'Apis_Admin' OR
+        group    == 'BCHPA_Admin' OR
+        group    == 'CSC_Admin' OR
+        group    == 'CS_Admin' OR
+        group    == 'ECF_Admin' OR
+        group    == 'Orgainc_Admin' OR
+        group    == 'MARTS_Admin' OR
+        group    == 'NOK_Admin' OR
+        group    == 'VitalVic_Admin' OR
+        group    == 'ENCY_Admin' OR
+        group    == 'USBM_Admin' OR
+        group    == 'Shanta_Admin' OR
+        group    == 'RV_Admin' OR
+        group    == 'Brew_Admin'
+        %]
+  &nbsp;<a href="/cgi-bin/URL/url.cgi?site=[% SiteName %]&amp;display_add_form=on&amp;site_name=[% SiteName %]&amp;category=Hosted_link&amp;subject=Nav_link&amp;Nav_link=1&amp;[% session_string %]" name="Add page link" title="Add New Link"><font class="NavtableAddButtonStyle">Add</font>  </a>
+
+  [% END %]
+       </td>
+   </tr> 
+
+  [% IF username != 'nothosted' 
+          %]
+<tr><td>
+ <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;view=HostingView&amp;[% session_string %]" target="_blank">Host with Us!</a>
+</td></tr> 
+[% END %]
+
+[% FOREACH link = DBI.query("SELECT * FROM internal_links_tb
+                                WHERE  category = 'Hosted_link' AND (username_of_poster = '$username' OR share = 'public')
+                                  AND (sitename =  '$SiteName' OR sitename =  'All')
+                                  ORDER BY link_order
+                                    ")%]    
+                                  <tr>
+  <td class="NavTableCellStyle">
+       <a href="[% link.url %]" name="Contact" target="[%link.target %]"title="[% link.name %] "><font   class="LeftSideBarNavStyle">[% link.name %]</font></a>
+     </td>
+   </tr>
+  [% END %]

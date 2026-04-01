@@ -1,0 +1,53 @@
+[%
+#	$Id: ApisPollenView.ttml,v 0.02 2002/05/01 15:47:05 shanta Exp $
+
+
+%]
+[% embed(data.page_top_view,['-PAGE_TITLE','Pollen']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td >
+</CENTER>
+<A NAME="PageTop"></A>
+<h2 align="center">Pollen is one of the great foods.</h2>
+
+Pollen is used in diet. </p>
+<p>Pollen is used as a medicine.</p>
+<p>We get pollen by traps. </p>
+<p>Pollen is collected and frozen the same day. Cleaned and sold as frozen product. This ensures the quality of the pollen that you are taking. Pollen can be dried but the process losses 40% to 60% of its value.</p>
+<p>To order from a supporting producer Please on of the links below</p>
+
+[% IF SiteName == 'BCHPA' %]
+<script type = "text/javascript"
+ src="/cgi-bin/Apis/address_book.cgi?embed=1&amp;site=BCHPA&amp;records_per_page=1&amp;&amp;columns_to_view=fname&amp;columns_to_view=lname&amp;columns_to_view=company_name&amp;columns_to_view=email&amp;columns_to_view=url&amp;submit_power_search=on&amp;simple_search_string=Honey_Producer">
+</script>
+    [% ELSE %]<li><a href="/cgi-bin/index.cgi?site=ECF&amp;[% session_string %]&amp;view=ProductView#Honey" title="Order from a supporting company!">Eagle Creek Farms</a>
+[% END %]
+</ul>
+
+</td>
+</tr>
+</table>
+
+
+
+
+
+[% embed(data.page_bottom_view) %]
+

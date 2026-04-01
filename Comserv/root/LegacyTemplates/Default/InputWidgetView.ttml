@@ -1,0 +1,237 @@
+[%
+
+#
+# this is a template that renders input view. 
+#
+# this template's use is deprecated in favor of WidgetsTableView.ttml
+#
+
+%]
+
+
+[% RAWPERL %]
+
+use strict;
+
+use Extropia::Core::Base qw(_rearrange _rearrangeAsHash);
+my @required = (
+        -INPUT_WIDGET_CONFIG,
+        -INPUT_WIDGET_DISPLAY_ORDER,
+        -CGI_OBJECT,
+            );
+
+my $view_obj = $stash->get('view_obj');
+
+my $rh_data  = $view_obj->get_data;
+
+exists $rh_data->{$_} or die "$_ is not set" for @required;
+
+my $session                    = $rh_data->{-SESSION_OBJECT};
+my $input_widget_definitions   = $rh_data->{-INPUT_WIDGET_CONFIG};# || {};
+my $input_widget_display_order = $rh_data->{-INPUT_WIDGET_DISPLAY_ORDER};# || [];
+my $display_type               = $rh_data->{-DISPLAY_TYPE} || "INPUT";
+my @records                    = @{ $rh_data->{-RECORDS} || [] };
+my $cgi                        = $rh_data->{-CGI_OBJECT};
+
+my $rh_record = $records[0];
+
+
+foreach my $widget (@$input_widget_display_order) {
+    if (ref $widget eq "ARRAY") {
+        my $widget_in_group;
+        $output .= qq[
+           <TR>
+        ];
+
+        foreach $widget_in_group (@$widget) {
+            my $values_ref = $input_widget_definitions->{$widget_in_group};
+            my ($params, %values) = _rearrangeAsHash([
+                 -DISPLAY_NAME,
+                 -TYPE,
+                 -DESCRIPTION_CELL_COLSPAN,
+                 -INPUT_CELL_COLSPAN,
+                      ],
+                      [
+                 -DISPLAY_NAME,
+                 -TYPE
+                      ],
+                @$values_ref
+            );
+
+            my $display_name             = $params->{-DISPLAY_NAME}|| '';
+            my $type                     = $params->{-TYPE}|| '';
+            my $description_cell_colspan = $params->{-DESCRIPTION_CELL_COLSPAN}|| "1";
+            my $input_cell_colspan       = $params->{-INPUT_CELL_COLSPAN}|| "1";
+
+            $output .= qq[
+                <TH CLASS = "tableRowHeaderStyle"
+                    COLSPAN = "$description_cell_colspan">
+                $display_name
+                </TH>
+            ] if length $display_name;
+
+            $output .= qq[
+                <TD CLASS = "tableRowStyle"
+                    COLSPAN = "$input_cell_colspan">
+            ];
+            if ($display_type eq "SEARCH") {
+                $values{-NAME} = 'search_' . $values{-NAME} if defined $values{-NAME};
+            }
+            if ($type eq "text") {
+                # nothing
+            } elsif ($display_type eq "INPUT" || $display_type eq "SEARCH") {
+                $output .= $cgi->$type(%values);
+
+            } elsif ($display_type eq "DISPLAY") {
+                $output .= $rh_record->{$widget};
+
+            } elsif ($type eq "checkbox_group" ||
+               $type eq "radio_group" ||
+               $type eq "scrolling_list") {
+               my @selected_values = split(",", $rh_record->{$widget});
+               $output .= $cgi->$type(
+                   -DEFAULT => \@selected_values,
+                   %values
+               );
+
+            } elsif ($type eq "popup_menu") {
+                $output .= $cgi->$type(
+                   -DEFAULT => $rh_record->{$widget},
+                   %values
+                );
+
+            } elsif ($type eq "checkbox") {
+                if ($rh_record->{$widget}) {
+                    $output .= $cgi->$type(
+                        -CHECKED => '1',
+                        %values
+                    );
+
+                } else {
+                    $output .= $cgi->$type(
+                       %values
+                    );
+                }
+
+            } else {
+                $output .= $cgi->$type(
+                    -DEFAULT => $rh_record->{$widget},
+                    %values
+                );
+            }
+
+            $output .= qq[
+                &nbsp;
+                </TD>
+            ];
+        }
+        $output .= qq[
+            </TR>
+        ];
+
+        next;
+    }
+
+    my $values_ref = $input_widget_definitions->{$widget};
+    my ($params, %values) = _rearrangeAsHash([
+         -DISPLAY_NAME,
+         -TYPE,
+         -DESCRIPTION_CELL_COLSPAN,
+         -INPUT_CELL_COLSPAN,
+              ],
+              [
+              ],
+        @$values_ref
+    );
+
+    my $display_name             = $params->{-DISPLAY_NAME}|| '';
+    my $type                     = $params->{-TYPE}|| '';
+    my $description_cell_colspan = $params->{-DESCRIPTION_CELL_COLSPAN}|| "1";
+    my $input_cell_colspan       = $params->{-INPUT_CELL_COLSPAN}|| "1";
+
+    $output .= qq[
+        <TR>
+        <TH CLASS = "tableRowHeaderStyle"
+            COLSPAN = "$description_cell_colspan">
+        $display_name
+        </TH>
+                 ] if length $display_name;
+
+    $output .= qq[
+
+        <TD CLASS = "tableRowStyle"
+            COLSPAN = "$input_cell_colspan">
+    ];
+
+    if ($display_type eq "SEARCH") {
+        $values{-NAME} = 'search_' . $values{-NAME} if defined $values{-NAME};
+    }
+    if ($type eq "text") {
+    }
+
+    elsif ($display_type eq "INPUT" || $display_type eq "SEARCH") {
+        $output .= $cgi->$type(%values);
+    }
+
+    elsif ($display_type eq "DISPLAY") {
+        $output .= $rh_record->{$widget};
+    }
+
+    elsif ($display_type eq "MODIFY") {
+        my $widget_value = $rh_record->{$widget} || "";
+        $output .= qq[
+            <INPUT TYPE = "HIDDEN" NAME = "original_$widget"
+                   VALUE = "$widget_value">
+        ];
+
+        if ($type eq "checkbox_group" ||
+           $type eq "radio_group" ||
+           $type eq "scrolling_list") {
+            my @selected_values = split(",", $rh_record->{$widget});
+            $output .= $cgi->$type(
+               -DEFAULT => \@selected_values,
+               %values
+            );
+        }
+
+        elsif ($type eq "popup_menu") {
+            $output .= $cgi->$type(
+               -DEFAULT => $rh_record->{$widget},
+               %values
+            );
+        }
+
+        elsif ($type eq "checkbox") {
+            if ($rh_record->{$widget}) {
+                $output .= $cgi->$type(
+                   -CHECKED => '1',
+                   %values
+                );
+            }
+            else {
+                $output .= $cgi->$type(
+                   %values
+               );
+            }
+        }
+
+        else {
+            $output .= $cgi->$type(
+               -DEFAULT => $rh_record->{$widget},
+               %values
+            );
+        }
+    }
+
+    else {
+        $output .= $cgi->$type(%values);
+    }
+
+    $output .= qq[
+        &nbsp;
+        </TD>
+        </TR>
+    ];
+}
+
+[% END %]

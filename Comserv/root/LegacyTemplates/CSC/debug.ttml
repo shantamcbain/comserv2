@@ -1,0 +1,14 @@
+<!-- debug table --><table><tr>
+
+<td>Record id </td><td>[% Record_id   %]</td></tr>
+<tr><td>SiteName </td><td> [% SiteName %]</td></tr>
+<tr>group  </td><td>[% group   %]</td></tr>
+<tr>ScriptDisplayName  </td><td>[%  ScriptDisplayName %]</td></tr>
+<tr>Page View name </td><td>[% PageName %] </td></tr>
+<tr>PageViewName pasted to script  </td><td>[% page %]</td></tr>
+<tr>Status  </td><td>[% status  %]</td></tr>
+<tr>PageCode </td><td>[%  page_code %]</td></tr>
+<tr>Sitename form page  </td><td>[% site  %]</td></tr>
+<tr>Lastupdate  </td><td>[% lastupdate  %]</td></tr>
+
+</table><!-- debug table -->

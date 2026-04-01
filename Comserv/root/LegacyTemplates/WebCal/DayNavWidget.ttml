@@ -1,0 +1,37 @@
+[%
+ url_encoded_admin_variables = embed(data.url_encoded_admin_fields_view_name); 
+ day_view_url = "$data.script_name?site=$data.site_name&amp;$url_encoded_admin_variables";
+ day_view_url = "$day_view_url&data.view_mode=on" IF data.view_mode;
+
+ # reduce the indirection
+ sel = data.selected_date_data;
+ today = data.today_data
+-%]
+
+
+<TABLE CELLSPACING="2" CELLPADDING="1" WIDTH="100%" BORDER="0">
+
+  <!-- days navigation -->
+  <TR BGCOLOR="#FFCC66"> 
+    <TD ALIGN=center>
+        <A HREF="[% "$day_view_url&amp;date=$sel.prev_day_date" %]">
+          <IMG SRC="[% data.image_root_url %]/prev.gif" BORDER=0 ALT="Previous Day"></A>
+          [% sel.date_str %]
+        <A HREF="site=[% "$day_view_url&amp;date=$sel.next_day_date" %]">
+          <IMG SRC="[% data.image_root_url %]/next.gif" BORDER=0 ALT="Next Day"></A>
+    </TD>
+  <TR>
+
+  <!-- today -->
+  <TR>
+    <TD CLASS="month_day_cell">
+       Today: 
+       <B><FONT SIZE=-1>
+        <A HREF="[% "$day_view_url&amp;date=$today.date" %]">
+        [% today.date_str %][% today.day_str %]</A></FONT></B>
+    </TD>
+  </TR>
+
+</TABLE>
+
+

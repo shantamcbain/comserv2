@@ -1,0 +1,21 @@
+[% IF data.script_name == "/cgi-bin/CSC/mail.cgi" %]
+[% data.script_display_name %]
+ from a user on the site.
+[% ELSIF data.script_name == "/cgi-bin/BBS/bbs.cgi" %]
+Forums Post From [% data.scrip_display_name %]
+[% ELSIF data.script_name == "/cgi-bin/BuyAndSell/buy.cgi" %]
+Buy and Sell edition From [% data.scrip_display_name %]
+[% ELSE %]
+
+Add Event.
+----------
+[% END %]
+
+[% FOR field = data.email_display_fields -%]
+[% subs.sprintf("%-30s %s",field,data.cgi_object.param(field).array.join(", ")) %]
+[% END %]
+
+  
+  
+    
+   

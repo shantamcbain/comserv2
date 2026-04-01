@@ -1,0 +1,19 @@
+[%
+#	$Id: HEToDo.ttml,v 0.1 2011/08/10 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dose't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dose't rely on any
+# variables from outside.
+
+%]
+
+		<ul>
+			<li>Add Farm plan</li>
+			<li>Add contact info</li>
+			<li>Add crop page and farm management system</li>
+			<li>Add Projects</li>
+			<li>Add todo page</li>
+		</ul>

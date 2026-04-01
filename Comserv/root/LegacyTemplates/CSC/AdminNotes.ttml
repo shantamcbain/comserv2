@@ -1,0 +1,12 @@
+                 [%# site       = link.sitename        %]          
+                 [%# PageName   = link.view_name %] 
+                 [% ARecord_id  = link.record_id  %]
+                 [% AdminNotes = link.body %]
+                 [%# body       = link.body %]
+                 [%# status     = link.status %]
+                 [%# page_code  = link.page_code %]
+                 [%# lastupdate = link.lastupdate %]
+                 [%# facebook   = link.facebook  %]  
+                 [%# linkedin   = link.linkedin %]  
+                 [%# news       = link.news %]
+ 

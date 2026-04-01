@@ -1,0 +1,72 @@
+ [% PROCESS DefaultDbi.ttml %]
+[% embed(data.page_top_view,['-PAGE_TITLE','Basic Data View']) %]
+[% IF data.app_name == 'slfaq' %]
+[% embed('SLSearchView') %]
+[% ELSE %]
+[% embed('SearchView') %]
+[% END %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+<TABLE BORDER = "0" BORDERCOLOR = "#DCDCDC" WIDTH = "100%" CELLPADDING = "2"
+CELLSPACING = "0"><TR>
+<TD BGCOLOR = "#DCDCDC" ALIGN = "CENTER" VALIGN = "top" COLSPAN = "2">
+<FONT FACE = "Helvetica, Arial, San Serif" COLOR = "#000000">
+<B>[% data.script_display_name %]  </FONT></B></TD>
+</TR>
+
+<!--GRAY LINE-->
+<TR>
+<TD BACKGROUND = "/graphics/template/greyline.gif" BORDER = "0"
+     HEIGHT = "1" COLSPAN = "2">
+</TD>
+</TR>
+
+[% url_encoded_admin_fields = embed(data.url_encoded_admin_fields_view_name) %]
+
+[% FOR record = data.records %] 
+    [% key_field= data.key_field;
+       record_id = record.$key_field;
+       question = record.question;
+       answer = record.answer; 
+       date = record.date_time_posted;
+     %] 
+     
+<!--GRAY LINE-->
+<TR>
+<TD BACKGROUND = "[% data.image_root_url %]/greyline.gif" BORDER = "0"
+     HEIGHT = "1" COLSPAN = "2">
+</TD>
+</TR>
+
+
+<TR>
+    <TD VALIGN = "TOP">
+        <IMG SRC = "[% data.image_root_url %]/pointerred.gif" WIDTH = "14" 
+HEIGHT = "14">    </TD>
+    <TD WIDTH = "100%"><FONT FACE = "Helvetica, Arial, San Serif" SIZE = "2" 
+COLOR = "#990000">        <A HREF ="[% 
+"$data.script_name?display_details_view=on&record_id=$record_id&$url_encoded_adm
+in_fields" %]&amp;site=[%SiteName%]&amp;[% session_string %]"                       TARGET = "[% data.link_target %]">[% 
+question %]</A>    </TD></TR>
+<TR>
+    <TD COLSPAN = "2" WIDTH = "100%" ALIGN = "RIGHT"><FONT FACE = "Helvetica, 
+Arial, San Serif" SIZE = "2" COLOR = "#990000">        [% date %]</FONT>
+    </TD>
+</TR>
+
+[% #CALL data.record_set.moveNext %]
+
+[% END %]
+
+<!--ENDING GREY BLOCK-->
+<TR>
+<TD BGCOLOR = "#DCDCDC" BORDER = "0" HEIGHT = "1" COLSPAN = "2">&nbsp;
+</TD>
+</TR>
+
+
+</TABLE>
+<!--END OF QUESTION LIST-->
+
+[% embed(data.page_bottom_view) %]
+

@@ -1,0 +1,75 @@
+[%
+
+# Displays data in the table, whose layout and order is specified in
+# the -INPUT_WIDGET_DISPLAY_ORDER array of arrays.
+
+# This template should be called as:
+#
+# embed('WidgetsTableView', 
+#       {'-DISPLAY_TYPE'    => 'DISPLAY',
+#        '-USE_RECORD_FROM' => 'DB',
+#       })
+#
+# where '-USE_RECORD_FROM' can be:
+# 'DB' -- use the data from database record
+# or 
+# 'CGI' -- use the data from the cgi object.
+#
+# '-DISPLAY_TYPE' specifies how the data should be displayed. Valid
+# formats are: 'DISPLAY', 'CONFIRM', 'SEARCH', 'INPUT', 'MODIFY'.
+
+%]
+
+[% RAWPERL %]
+
+use strict;
+my $rh_data  = $stash->get('view_obj')->get_data;
+if ($rh_data->{-INPUT_WIDGET_DISPLAY_ORDER}) {
+    # Convert a lone entry into a single-entry widget group
+    foreach my $widget_group (@{ $rh_data->{-INPUT_WIDGET_DISPLAY_ORDER} }) {
+        $widget_group = [$widget_group] if ref $widget_group ne "ARRAY";
+    }
+}
+[% END %]
+
+
+[% # prepare data used for URL, mailto and similar effects
+embed('PrepareDisplayEffects')
+ IF data.display_type == 'DISPLAY' or data.display_type == 'CONFIRM';
+%]
+
+[%
+
+#
+# Currently the widgets handle the data coming either from the
+# data.records.0 or the cgi object if data.records is not defined
+#
+# data.records is defined when the data is retrieved from the
+# database, whereas cgi.object is used when the data is rendered from
+# the user input.
+#
+# Note that you can and should explicitly specify what input should be
+# used, the current default is CGI.
+#
+# META: need to make it handle multiply rows as well, see DBTable
+#
+#
+
+%]
+
+
+[% FOREACH widget_group = data.input_widget_display_order %]
+    <TR>
+        [% FOREACH widget_name = widget_group %]
+            [% embed('WidgetView', 
+                     {'-WIDGET_NAME'  => widget_name,
+                      '-WIDGET_VALUE' => (data.use_record_from == 'CGI'
+                                          ? data.cgi_object.param(widget_name)
+                                          : data.records.0.$widget_name
+                                         ),
+                     })
+             %]
+        [% END %]
+    </TR>
+[% END %]
+

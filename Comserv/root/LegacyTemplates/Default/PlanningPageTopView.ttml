@@ -1,0 +1,157 @@
+[%#	$Id: PlanningPageTopView.ttml,v 0.1 2017/04/08 06:31:35 shanta Exp shanta $	%]
+[% PageVersion = 0.01 %]
+[% #setup session ifo %]
+
+[% PROCESS HostName.ttml %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+
+
+[% IF data.session_object.getAttribute('-KEY','SiteName') %]
+
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+[% ELSE %]
+
+[% SiteName = data.SiteName %]
+[% PageTop = data.page_top_view %]
+[% favicon =  "/images/favicon.ico" %]
+
+[% END %]
+
+	[%# ScriptDisplayName = 'TEST' %]
+<!DOCTYPE html>
+<html >
+<head> 
+<meta charset="utf-8">
+[% IF PageSiteName %]       
+ [% PageSiteName = data.site_display_name %]
+[% ELSE %]
+
+[% PageSiteName = data.site_display_name %]
+	[% END %]
+
+ [% IF ScriptDisplayName %]       
+[% ScriptDisplayName = data.script_display_name %]
+ [% ELSE %]
+
+[% ScriptDisplayName = data.script_display_name %]
+	[% END %]
+	
+<title> [% PageSiteName %]: [% ScriptDisplayName %]: [% data.page_title %] </title>
+
+<!--page top view version [% PageVersion %]
+Group = [% group  %]<br>
+username = [% username %]
+-->
+
+	<LINK REL ="stylesheet" TYPE ="text/css" HREF ="[% data.css_view_url %]">
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta NAME="REVISIT-AFTER" CONTENT="7 days">
+<meta NAME="ROBOTS" CONTENT="index all, follow all">
+
+[% IF keywords %]
+ <META NAME = "keywords" CONTENT= "[% keywords %] ">
+
+[% ELSE %]		
+<META NAME = "keywords" CONTENT= "[% data.http_header_keywords %] ">
+[% END %]
+
+[% IF  description %]
+<META NAME = "description" CONTENT= "[% description %] ">
+[% ELSE %]		
+<META NAME = "description" CONTENT= "[% data.http_header_description %] ">
+[% END %]
+<link rel="shortcut icon" href="[% data.favicon %]" >
+<!--<link rel="icon" href="[% data.ani_favicon %]" type="[% data.favicon_type %]" -->
+ 
+     
+<script language="javascript" type="text/javascript">
+function switchpage(select) {
+var index;
+for(index=0; index<select.options.length; index++)
+if(select.options[index].selected)
+{
+if(select.options[index].value!="")
+window.location.href=select.options[index].value;
+break;
+}
+ 
+
+
+<script>(function(d, s, id) {
+  var js, fjs = d.getElementsByTagName(s)[0];
+  if (d.getElementById(id)) {return;}
+  js = d.createElement(s); js.id = id;
+  js.src = "//connect.facebook.net/en_US/all.js#xfbml=1";
+  fjs.parentNode.insertBefore(js, fjs);
+}(document, 'script', 'facebook-jssdk'));</script>
+<!--[if lt IE 9]><script language="javascript" type="text/javascript" src="excanvas.js"></script><![endif]-->
+<script language="javascript" type="text/javascript" src="jquery.min.js"></script>
+<script language="javascript" type="text/javascript" src="jquery.jqplot.min.js"></script>
+   <script class="include" type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <link class="include" rel="stylesheet" type="text/css" href="../jquery.jqplot.min.css" />
+    <link rel="stylesheet" type="text/css" href="examples.min.css" />
+    <link type="text/css" rel="stylesheet" href="syntaxhighlighter/styles/shCoreDefault.min.css" />
+ <link rel="stylesheet" type="text/css" href="jquery.jqplot.css" />
+</HEAD>
+<BODY>
+ <!-- PageTopView.ttml [% PageVersion %] -->
+ <!-- Here we start the Header page The location is$.jqplot('chartdiv',  [[[1, 2],[3,5.12],[5,13.1],[7,33.6],[9,85.9],[11,219.9]]]);
+   PageTopView [% PageVersion %]-->
+	
+ <!-- The main table of the PageTopView -->
+	
+ <table class="MainPageTable">
+ <tbody>
+  [% IF data.debug == 1 %]
+ <tr colspan="5"><td>
+ [% embed('InheretedVariablesView') %]
+</td> </tr>
+ [% END %]
+ <TR >
+ <td colspan="2">	 
+
+ <!-- Page head row Begin PageTopView -->
+ 		[% embed ('PageHeaderView') %]
+ <!--End page header row PageTopView-->
+
+ </td>
+ </tr>  
+
+ <!-- Main PageRow -->
+
+ <tr>
+	<!-- page_left_view.ttml in PlanningPageTopView.ttml-->
+ <td 	class="LeftNavDataCell" >[%  data.domain_dame %]
+		   [% embed('PlanningLeftPageView') %]		
+</td>
+  	<!-- Close Left Page Cell PageTopView-->
+
+ <td width="85%" rowspan="15" align="left" valign="top" class="MainPageDataCell">
+ <!-- content Main Page Cell PageTopView-->
+
+  [% IF SiteName == 'eXtropia'  %]
+	<IMG SRC = "http://www.extropia.com/graphics/template/logo.gif" alt="eXtropia logo">
+  [% END %]
+	
+
+ [% IF data.application_sub_menu_view_name %]
+	<table>
+	    <TR>
+	     <TD colspan='2'>
+	     [%  embed(data.application_sub_menu_view_name) %]
+	    </tr>
+ 	</table>
+[% END %]
+
+<!-- Page is closed in PageBottomView.ttml PageTopView-->

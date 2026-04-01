@@ -1,0 +1,126 @@
+[%
+#	$Id: HEHomeView.ttml,v 1.10 2002/11/08 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dose't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dose't rely on any
+# variables from outside.
+
+%]
+
+[%# embed(data.page_top_view,['-PAGE_TITLE',"Aktiv Trak Home page."]) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+        [% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% USE DBI( data_source = 'dbi:mysql:shanta_forager',
+                username = 'shanta',
+                password =  'herbsrox2' )
+    %]
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+
+<td>
+<div ALIGN="center">
+	[% IF username %]
+
+<h3 > Hello  [% firstname%]&nbsp;  [% lastname%]! Welcome to Helpfull Earth!</h3>
+	  
+
+	[% ELSE %]
+
+	<h3>  Hello! Welcome to Helpfull Earth!</h3
+<h3> Please Log-on to get more from this site. Many of the features listed below are only available to logged in Helpfulearth Members. </h3>
+
+	[% END %]
+
+</div>
+<A NAME="PageTop"></A>
+</div>
+
+
+	[% IF group == 'HE_admin' OR
+	      group == 'IM_admin' %]
+		<h5>Site log (will be moved to its own page as it grows</h5>
+[% embed('HESiteLog') %]
+<h5>ToDo this will be moved to its own page in time</h5>
+[% embed('HEToDo') %]
+	[% END %]
+	
+	 [% IF group    ==  'Alegro_admin' OR
+	       group    ==  'Apis_admin' OR
+	       group    ==  'BCHPA_admin' OR
+	       group    ==  'Brew_admin' OR
+	       group    ==  'CS_admin' OR
+	       group    ==  'CSC_admin' OR
+	       group    ==  'CSPS_admin' OR
+	       group    ==  'ENCY_admin' OR
+	       group    ==  'Forager_admin' OR
+	       group    ==  'eXtropia_admin' OR
+	       group    ==  'GPMarket_admin' OR
+	       group    ==  'HE_admin' OR
+	       group    ==  'CSCDev_admin' OR
+	       group    ==  'News_admin' OR
+	       group    ==  'OKB_admin'OR
+	       group    ==  'Organic_admin' OR
+	       group     == 'DarmaFarmsAdmin' OR
+	       group    ==  'Shanta_admin' OR
+	       group    ==  'Stawns_admin' OR
+	       group    ==  'VitalVic_admin' OR
+	       group    ==  'rv_admin' OR
+	       group    == 'MJB_Admin' OR
+	       group    ==  'WB_admin' OR
+	       username == 'Shanta' OR
+	      group    == 'Demo_admin' 
+
+	 %]
+
+ <a href="http://dev.computersystemconsulting.ca/cgi-bin/page.cgi?site=[% SiteName %]&[% session_string %]&display_modification_form=on&record_id=5
+" target="_blank">edit page</a>
+You can modify anything from here to the last update. You may use Html code in this area.
+ 	   [% END %]
+	
+ [% FOREACH link = DBI.query("SELECT * FROM page_tb
+                                  WHERE  (status  = 2 AND
+                                         page_code = 'HEHomveView' )
+                                  ORDER BY sitename
+                                  ")%]    
+      [% link.body %]
+  [% END %]
+<br>
+<br>
+[% embed (data.page_list_view) %]pAGE LIST
+
+
+<div ALIGN="center">
+<br>
+<br>
+<br>
+<p>
+<a href=/cgi-bin/CSC/csc.cgi?view=HelpDesk&[% session_string %]" target="_Blank" > HelpDesk</a>
+<p>Last Updated: Sunday 02 January 2005 
+
+
+[% embed('CSCCopyRight') %]
+
+
+
+
+</td>
+</tr>
+</table>
+[% embed(data.page_bottom_view) %]
+

@@ -1,0 +1,24 @@
+[%
+#	$Id: CSCTopAdvertView.ttml,v 1.2 2002/10/23 21:31:06 shanta Exp $	
+# location /cgi-bin/Htmltemplates/defalt
+# the bottom template
+
+%]
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+
+
+
+Put this Web Application to work for you. <a href="http://computersystemconsulting.ca/cgi-bin/CSC/csc.cgi?referrer=[% SiteName %]">Computer System Consulting.ca</a>
+
+

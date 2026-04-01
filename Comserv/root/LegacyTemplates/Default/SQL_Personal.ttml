@@ -1,0 +1,19 @@
+   <tr>
+      <td class="NavTableHeaderStyle">[% IF username %][% username %]'s	[% END %]  Personal links   [% IF username %]                                
+  &nbsp;<a href="/cgi-bin/URL/url.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;site_name=[% SiteName %]&amp;category=Personal_links&amp;subject=Nav_link&amp;Nav_link=1" name="Add page link" title="Add New Link">Add</a>
+
+  [% END %]
+       </td>
+   </tr>
+
+[% FOREACH link = DBI.query("SELECT * FROM internal_links_tb
+                                WHERE  category = 'Personal_links' AND (username_of_poster = '$username')
+                                  ORDER BY link_order
+                                    ")%]    
+                                  <tr>
+  <td class="NavTableCellStyle">
+       <a href="http://[% link.url %]" name="Contact" target="[% link.target %]" title=" [% link.name %] "><font   class="LeftSideBarNavStyle">[% link.name %]</font></a>
+     </td>
+   </tr>
+  [% END %]
+

@@ -1,0 +1,49 @@
+[% #CSC PageTopView
+#	$Id: JoinLinks.ttml,v 1.4 2002/11/10 20:14:06 shanta Exp $	
+
+# this template exist on the fallowng server uploade to each when CVS check in done, Add new servers when needed.
+#csc.ca
+#forager.com
+#aikido.bc.ca
+#shanta.org
+#webcthelpdesk.com
+
+# This file will eventualy be replaced with an ActionHandler. 
+
+# ActionHandler will display list according to contents of a db.
+
+
+#Set needed values
+
+%]
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+[% IF SiteName == "CS" %]
+[% MemberShipCode = "P=CSMemberShip" %]
+[% ELSIF SiteName == 'ECF' %]
+[% MemberShipCode = "P=ECFMemberShip" %]
+[% ELSIF SiteName == 'CSC' %]
+[% MemberShipCode = "P=CSCMemberShip" %]
+[% ELSIF SiteName == 'LTrust' %]
+[% MemberShipCode = "P=SECMemberShip" %]
+
+[% ELSE %]
+[% MemberShipCode = "P=CSCMemberShip" %]
+[% END %]
+
+<p><a href="http://countrystores.ca/cgi-bin/store/store.cgi?&amp;shop=CS&amp;[% MemberShipCode %]" target="_blank" name="Become a member">Click here to join.</a></p> 
+
+
+
+

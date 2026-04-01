@@ -1,0 +1,412 @@
+[%
+#	$Id:InvneoryProjectionView.ttml,v 1.9 2010/09/28 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it doesn't rely on any
+# variables from outside.
+
+%]
+
+[%# embed(data.page_top_view,['-PAGE_TITLE','Inventory module View.']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+        [% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+	[% LastUpdate = data.last_update %]
+	[%# LastUpdate = 'May 27, 2005'%]
+ [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+ [% script_name = data.app_name %]
+[% localip = data.local_ip %]
+
+[%# contastants %]
+[% ProjectedNucPerHive = 2 %]
+[% boxes_price = 15 %]
+[% foundation_price = 1.65 %] 
+[% Mylarsonhand = 0 %]
+[% MylarPrice = 221 / 125 %]
+[% NucCost = 150 %]
+[% HoneyRetailPrice    = 6 / 2.2 %]
+[% HoneyWholeSalePrice = 4.66 / 2.2 %]
+[% WaxRetailPrice      = 5.40 / 2.2 %]
+[% WaxWholeSalePrice   = 4.40 / 2.2 %]
+[% NucSalePrice = 160 %]
+[% SwarmSalePrice = 150 %]
+[% QueenSalePrice = 25 %]
+[% numberofgrafts = 5 %]
+[% SaleQueens = 100 %]
+[% Loses = 1.1%]
+<!-- costs -->
+
+[% TotalLabourCosts = 20 %]
+[% TotalCostRepairs = 3 %]
+[% TotalMedCost     = 0%]
+[% TotalFeedCost    = 600 / 60 %]
+[% insurance        = 0 %]
+[% Fuel = 400 %]
+[% Repairs          = 100*12%]
+[% Replacement      = 100 %]
+[% TotalCostTrans   = insurance + Fuel + Repairs + Replacement %]
+[% TotalYardRepairs = 500 %]
+[% TotalFenceCost   = 500 %] 
+
+
+
+
+[% FOREACH item = DBI.query("SELECT * FROM ecf_project_tb
+	                                WHERE  ( project_code  LIKE  '%winteringunits%'
+	                                        )
+ 	                            ")%]  
+	    [% WinterUnits = WinterUnits + item.estimated_man_hours %]
+[% END %]
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>[% WinterUnits  %]
+<div align="center">
+</div></div>
+<A NAME="PageTop"></A>
+<h4>Inventory Projection for 2014</h4>
+<h5>Current Yards and there size And list of queens</h5>
+  [%#   Get number of active hives, queens and their status, and get number of boxes they are in. %]
+	    
+Total Partions [% TotalActivePositions  %]. <BR>
+
+	    [% item.name %] Boxes [% total_boxInuse %]. Comb inuse[% total_combinuse %][% total_2boxInuse %]<br>
+
+	    [% total_boxes_inuse = total_boxes_inuse + total_1boxInuse %]
+
+ 	    [% total_combinuse = total_combinuse  + total_nuccombinuse %]
+
+
+
+	    [%# total_frames = total_frames %]
+	    [%# total_comb = total_frames %]
+	    
+
+
+ 
+
+[% TotalCombBrood %]
+
+[%# NucBottomsonhand = 6%]
+	    [% nb_price = item.price %] 
+
+	    [%   total_wintering_units_onhand  =  hives_mains / 4 %]
+
+<table cellpadding="1" cellspacing="0" border="0" width="100%">
+<th>Item</th><th>Max</th><th></t h><th></th><th></th>
+<tr><td>[% TotalActivePositions %]
+ </td><td>[% TotalYardSize %]</td><td>
+</td><td>
+ 
+</td>
+</tr>
+</table>
+
+<h3>Number of wintering units</h3>
+ [%  WinterUnits %]  <a href="/cgi-bin/ToDo/project_tracker.cgi?site=ECF&amp;sort_field1=project_code&[% session_string %]&amp;display_modification_form=on&first_record_to_display=0&amp;record_id=1" target="_NEW">change</a>
+<table cellpadding="1" cellspacing="0" border="0" width="100%">
+<th>Item</th><th>Projected</th><th>In use/On hand</th><th>Short</th><th>Cost</th>
+
+
+<tr><td>Wintering units</td><td>[% WinterUnits %]</td><td>[% total_wintering_units_onhand %]</td><td>[% WinterUnits - total_wintering_units_onhand %]</td></tr>
+[% total_2box = total_2boxInuse + total_2box %]
+<tr><td>Main Hives</td><td>[%  WinterUnits * 4 %]</td><td>[% hives_mains %]</td><td>[%  WinterUnits * 4 - hives_mains %]</td><td>[% nuccost = (WinterUnits * 4 - hives_mains ) * NucCost %] $[% nuccost %]</td></tr>
+<tr><td>Top Box</td><td>[%  WinterUnits * 4 %]</td><td>[%   topbox %]</td><td>[%  WinterUnits * 4 - topbox%]</td><td>[%  nuccost2 = ( WinterUnits * 4 - topbox) * NucCost %]$[% nuccost2 %]</td></tr>
+<tr><td>8 Framers</td><td>[% winter_nucs %]</td><td>[%   eightframer   %] </td><td>[% winter_nucs - nucs %]</td></tr>
+
+<tr><td>TopNuc</td><td></td><td>[% TBox %]</td><td></td></tr>
+<tr><td>Bob 4 top</td><td></td><td>[% B4Top  %]</td><td></td></tr>
+
+<tr><td>Single Hives</td><td>0</td><td>[% TotalSingle %]</td><td>[% 0 - TotalSingle %]</td></tr>
+
+[% total_boxes_onhand = total_boxes_onhand + total_boxes_inuse %]
+<tr><td><a href="/cgi-bin/Apis/inventory.cgi?site=[% SiteName %]&amp;first_record_to_display=0&amp;records_per_page=&&amp;[% session_string %]&amp;record_id=[% broodboxRecordId %]&display_details_view.x=15&amp;display_details_view.y=12&amp;" display_details_view="on" name="Brood boxes" title="Brood boxes"  >[% BroodBoxName %]</a> </td>
+<td>[% winter_boxes = WinterUnits * 3 * 4 %][% winter_boxes %]</td><td>[%total_boxes_inuse %]/[% total_boxes_onhand %]</td><td>[% BoxesShort = winter_boxes - total_boxes_onhand %][% BoxesShort %]</td><td>
+[% IF BoxesShort <= 0%]
+ [%# BoxCost = BoxesShort *  boxes_price * -1 %]$[% BoxCost %]
+[% ELSE %]
+ [% BoxCost = BoxesShort *  boxes_price %]$[% BoxCost %]
+ [% END %]
+</td></tr>
+[% total_comb = total_comb + total_combinuse %]
+<tr><td><a href="/cgi-bin/Apis/inventory.cgi?site=[% SiteName %]&amp;first_record_to_display=0&amp;records_per_page=&&amp;[% session_string %]&amp;record_id=[% CombRecordId%]&display_details_view.x=15&amp;display_details_view.y=12&amp;" display_details_view="on" name="Brood boxes" title="Brood boxes"  >[% CombName %]</a> </td>
+<td>[% winter_comb = WinterUnits * ((18+8) ) * 4  %][% winter_comb %]</td>
+<td>[%  total_combinuse %]/[% total_Comb_onhand %]</td>
+<td>[% TotalWinterComb = winter_comb- (total_combinuse + total_Comb_onhand) %][% TotalWinterComb%]</td>
+<td></td></tr>
+<tr><td><a href="/cgi-bin/Apis/inventory.cgi?site=[% SiteName %]&amp;first_record_to_display=0&amp;records_per_page=&&amp;[% session_string %]&amp;record_id=[% framesrecordid %]&display_details_view.x=15&amp;display_details_view.y=12&amp;" display_details_view=on" name="frames" title="Frames"  >Brood [% framesName %]</a></td><td>
+[% IF Short > 0 %][% frameswired = foundation -  total_foundation_onhand %][% frames %]</td><td>[% frames_onhand %]
+[% END %]</td><td>
+[% IF frameswired < 0 %] 
+ [% FrameswiredShort = frames +  frames_onhand %]
+
+[% ELSE %] 
+ [% FramesShort = frameswired -  frameswired_onhand %]
+[% END %]
+[% FrameswiredShort %]
+</td><td>
+[% IF FrameswiredShort  > 0 %] 
+ [% FramewiredCost = FrameswiredShort *  framewired_price  %]$[% FramewiredCost %]
+[% END %]
+</td></tr>
+<tr><td><a href="/cgi-bin/Apis/inventory.cgi?site=[% SiteName %]&amp;first_record_to_display=0&amp;records_per_page=&&amp;[% session_string %]&amp;record_id=[% frameswiredrecordid %]&display_details_view.x=15&amp;display_details_view.y=12&amp;" display_details_view=on" name="frameswired" title="Frameswired"  >[% frameswiredName %]</a></td><td>
+[% IF FoundationShort > 0 %][% frames = foundation -  total_foundation_onhand %][% frames %]</td><td>[% frameswired_onhand %]
+[% END %]</td><td>
+[% IF frameswired < 0 %] 
+ [% FramesShort = frameswired +  		 %]
+
+[% ELSE %] 
+ [% FrameswiredShort = frameswired -  frameswired_onhand %]
+[% END %]
+[% Short %]
+</td><td>
+[% IF FrameswiredShort  > 0 %] 
+ [% FramewiredCost = FrameswiredShort *  framewired_price  %]$[% FramewiredCost %]
+[% END %]
+</td></tr>
+<tr><td>Honey production</td>
+<tr><td>Honey Boxes</td><td>Needed</td><td>Onhand</td><td>Short</td>
+<tr><td>Brood Size</td><td>[% hives_mains + TotalSingle %]</td><td>[% BoxesShort * -1%]</td>[%  Honeyshort =BoxesShort - (hives_mains + TotalSingle)  %] [%  Honeyshort %]<td></td><td>[% IF HoneyShort <= 0%]
+ [% BoxCost = HoneyShort *  boxes_price * -1 %]$[% BoxCost %]
+[% ELSE %]
+ [% BoxCost = HoneyShort *  boxes_price %]$[% BoxCost %]
+ [% END %]
+</td></tr>
+<tr><td><a href="/cgi-bin/Apis/inventory.cgi?site=[% SiteName %]&amp;first_record_to_display=0&amp;records_per_page=&&amp;[% session_string %]&amp;record_id=[% BroodHoneyframesrecordid %]&display_details_view.x=15&amp;display_details_view.y=12&amp;" display_details_view=on" name="BroodHoneyHoneyframes" title="BroodHoneyHoneyFrames"  >[% BroodHoneyframesName %]</a></td><td>
+[% IF Short > 0 %][% BroodHoneyframes = foundation -  total_foundation_onhand %][% frames %]</td><td>[% BroodHoneyframes_onhand %]
+[% END %]</td><td>
+[% IF BroodHoneyframes < 0 %] 
+ [% BroodHoneyframesShort = BroodHoneyframes +  BroodHoneyframes_onhand %]
+
+[% ELSE %] 
+ [% BroodHoneyframesShort = BroodHoneyframes -  BroodHoneyframes_onhand %]
+[% END %]
+[% BroodHoneyframesShort %]
+</td><td>
+[% IF BroodHoneyframesShort  > 0 %] 
+ [% BroodHoneyframeCost = BroodHoneyframesShort *  BroodHoneyframe_price  %]$[% BroodHoneyframeCost %]
+[% END %]
+</td></tr>
+
+<tr><td>Brood Size</td><td>[% hives_mains + TotalSingle %]</td><td>[% BoxesShort * -1%]</td>[%  Honeyshort =BoxesShort - (hives_mains + TotalSingle)  %] [%  Honeyshort %]<td></td><td>[% IF HoneyShort <= 0%]
+ [% BoxCost = HoneyShort *  boxes_price * -1 %]$[% BoxCost %]
+[% ELSE %]
+ [% BoxCost = HoneyShort *  boxes_price %]$[% BoxCost %]
+ [% END %]
+</td></tr>
+
+<tr><td><a href="/cgi-bin/Apis/inventory.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;submit_power_search=on&amp;simple_search_string=foundation ">Foundation</a></td>
+<td>[% IF TotalWinterComb > 0 %][% foundation = winter_comb -  total_comb %][% foundation %]
+[% END %]
+  </td><td>[% total_foundation_onhand %]</td><td> 
+[% IF foundation < 0 %] 
+  [% FoundationShort = foundation + total_foundation_onhand%]
+[% ELSE %] 
+  [% FoundationShort = foundation - total_foundation_onhand %] 
+[% END %]
+[% FoundationShort  %]</td><td>
+[% IF FoundationShort > 0 %]
+  [% FoundationCost = FoundationShort *  foundation_price   %]$[% FoundationCost %] [% END %]</td></tr>
+  
+
+<tr><td><a href="/cgi-bin/Apis/inventory.cgi?site=[% SiteName %]&amp;first_record_to_display=0&amp;records_per_page=&&amp;[% session_string %]&amp;record_id=[% framesrecordid %]&display_details_view.x=15&amp;display_details_view.y=12&amp;" display_details_view=on" name="frames" title="Frames"  >[% framesName %]</a></td><td>
+[% IF Short > 0 %][% frameswired = foundation -  total_foundation_onhand %][% frames %]</td><td>[% frames_onhand %]
+[% END %]</td><td>
+[% IF frameswired < 0 %] 
+ [% FrameswiredShort = frames +  frames_onhand %]
+
+[% ELSE %] 
+ [% FramesShort = frameswired -  frameswired_onhand %]
+[% END %]
+[% FrameswiredShort %]
+</td><td>
+[% IF FrameswiredShort  > 0 %] 
+ [% FramewiredCost = FrameswiredShort *  framewired_price  %]$[% FramewiredCost %]
+[% END %]
+</td></tr>
+
+<tr><td>Feeders</td><td>[% Feeders = WinterUnits * 8 %][% Feeders %]</td><td>[% total_feeders_onhand %]</td><td>[% FeedersShort =  Feeders - total_feeders_onhand %][% FeedersShort %]</td><td>
+ [% IF FeedersShort >0 %][% FeedersCost = FeedersShort  * feeder_price %]$[% FeedersCost %]
+[% END %]
+
+</td></tr>
+<tr><td>nuc bottoms</td><td>[%  NucBottoms = WinterUnits * 4 %][% NucBottoms %]</td><td>[% NucBottomsonhand %]</td><td>[% NucBottomShort = NucBottoms -  NucBottomsonhand %][% NucBottomShort %]</td><td>
+ [% NucBottomCost = NucBottomShort * nb_price %]$[% NucBottomCost %]
+</td></tr>
+<tr><td>4packs</td><td>[%  fourpacs = WinterUnits %][% fourpacs %]</td><td>[% fouronhand %]</td><td>[% FourPackShort = fourpacs -  fouronhand %][% FourPackShort %] </td><td>
+[% IF FourPackShort  < 0 %] 
+ [% FourPackCost =  FourPackShort * fourpack_price * -1 %]$[% FourPackCost %]
+[% END %]
+</td></tr>
+<tr><td>single tops</td><td>[%  SingleTops = WinterUnits * 4 %][% SingleTops %]</td><td>[% SingleTopsonhand %]</td><td>[% SingleTopShort = SingleTops -  SingleTopsonhand %][% SingleTopShort %]</td><td>
+[% IF SingleTopShort > 0 %][% SingleTopCost = SingleTopShort * SingleTopPrice %]$[% SingleTopCost%]
+[% END %]
+</td></tr>
+<tr><td>Milar for winterpacks</td><td>[% Mylar =  WinterUnits * 12.666667 %][% Mylar %]</td><td>[% Mylarsonhand %]</td><td>[% MylarShort =  Mylar -  Maylaronhand %][% MylarShort / 125 %]</td><td>[% MylarCost = MylarShort * MylarPrice %]$[% MylarCost%]</td></tr>
+
+
+<tr><td colspan="4">Total cost</td><td>[% TotalExpansionCost = TotalExpansionCost + FrameCost + FoundationCost + BoxCost + FourPackCost + NucBottomCost + SingleTopCost + MylarCost %]$[% TotalExpansionCost %]</td>
+</tr>
+</table>
+<h2>Nuc and queen projections</h2>
+
+<table cellpadding="1" cellspacing="1" border="0" width="100%">
+<th>Nuc type</th><th>Number</th><th>2fr</th><th>3fr</th><th>4fr</th>
+<tr>
+<td>Replacement queens</td><td>[% ReplacementQueens = WinterUnits * 8  %][% ReplacementQueens %]</td>
+</tr>
+<tr>
+<td>Queens for Sale nucs</td><td>[% NucsCreated = WinterUnits * ProjectedNucPerHive %][% NucQueens = NucsCreated    %][% NucQueens %]</td>
+</tr>
+<tr>
+<td>Queens for Sale</td><td>[% SaleQueens  %]</td>
+</tr>
+<tr>
+<td>Total Queens needed</td><td>[% TotalQueens = SaleQueens + NucQueens + ReplacementQueens %][% TotalQueens %]</td>
+</tr>
+<tr>
+<td>Total cell needed</td><td>[% TotalCells = TotalQueens * Loses %][% TotalCells %]</td>
+<tr>
+</tr>
+<tr>
+<td>Total starter/finishers needed</td><td>[% TotalStarters = TotalCells * Loses / (15 * 2 * numberofgrafts) %][% TotalStarters %]</td>
+<tr>
+</tr>
+<tr>
+<td>Total nucs needed</td><td>[% TotalNucs = TotalCells %][% TotalNucs %]/[% total_MateingInuse  %]</td>
+<tr>
+</tr>
+<td>Total Mini nucs needed</td><td>[% SaleQueens %]</td><td>[% MiniNucs =  SaleQueens  - 20 %][% MiniNucs %]</td>
+</tr>
+<tr>
+<td>fulsize nucs needed</td><td>[% FullNucs =  NucQueens + ReplacementQueens %][% FullNucs %]</td><td>need/short</td><td>need/short</td><td>need/short</td>
+</tr>
+<tr>
+<td><a href="/cgi-bin/Apis/inventory.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;" target="_blank">combs Honey</a></td><td></td>
+
+<td>[% TotalCombHoney = 1 * FullNucs %][% TotalCombHoney %]/[% TotalCombHoney - HoneyCombOnHand%]</td>
+<td>[% TotalCombHoney3 = 1  * FullNucs %][% TotalCombHoney3 %]/[% TotalCombHoney3 %]</td>
+<td>[% TotalCombHoney4 = 2  * FullNucs %][% TotalCombHoney4 %]/[% TotalCombHoney4  - HoneyCombOnHand%]</td>
+<tr>
+<td>Combs Brood</td>
+<td></td>
+
+<td>[% Brood = 1 * FullNucs %][% TotalCombBrood %]/[% TotalCombBrood - BroodOnHand %]</td>
+<td>[% TotalCombBrood3= 1  * FullNucs %][% TotalCombBrood3 %]/[% TotalCombBrood3  - BroodOnHand %]</td>
+<td>[% TotalCombBrood4 = 2  * FullNucs %][% TotalCombBrood4 %]/[% TotalCombBrood4  - BroodOnHand %]</td>
+</tr>
+<tr>
+<td>Combs Bees</td><td></td>
+
+<td>[% TotalCombBees = 1 * FullNucs %][% TotalCombBees %]/[% TotalCombBees - TotalCombBeeOnHand %]</td>
+<td>[% TotalCombBees3 = 1.5  * FullNucs %][% TotalCombBees3 %]/[% TotalCombBees3 - TotalCombBeeOnHand %]</td>
+<td>[% TotalCombBees4 = 2  * FullNucs %][% TotalCombBees4 %]/[% TotalCombBees4 - TotalCombBeeOnHand %]</td>
+</tr>
+<tr>
+<td>Empty comb</td><td></td>
+
+<td>[% TotalCombHoney = 1 * FullNucs %]/[% TotalCombHoney %]</td>
+<td>[% TotalCombHoney3 = 1  * FullNucs %]/[% TotalCombHoney3 %]</td>
+<td>[% TotalCombHoney4 = 2  * FullNucs %]/[% TotalCombHoney4 %]</td>
+</tr>
+</table>
+<h2>Revenue from above.</h2>
+
+<table cellpadding="0" cellspacing="0" border="0" width="100%">
+<th>Resource</th><th>amount produced</th><th>wholesale</th><th>retail</th><th>total</th>
+<tr>
+<td>Honey</td>
+<td>[% HoneyKg = winter_mains * 30 %][% HoneyKg %]</td>
+<td>$[% HoneyWEarnings = HoneyKg * HoneyWholeSalePrice * 0.75%][% HoneyWEarnings %]</td>
+<td>$[% HoneyREarnings = HoneyKg * HoneyRetailPrice * 0.25 %][% HoneyREarnings %]</td>
+</tr>
+
+<tr>
+<td>Wax from Cappings</td>
+<td>[% CappingsKg = winter_mains * 0.30 %][% CappingsKg %]</td>
+<td>$[% WaxWRevenue = WaxWRevenue + CappingsKg * WaxWholeSalePrice * 0.25 %][% WaxWRevenue %]</td>
+<td>$[% WaxRRevenue = WaxRRevenue + CappingsKg * WaxRetailPrice * 0.75 %][% WaxRRevenue %]</td>
+</tr>
+
+<tr>
+<td>Nucs</td>
+<td>[% NucsCreated %]</td>
+<td>$[% NucRevenue = NucsCreated * NucSalePrice %][% NucRevenue %]</td>
+<td></td>
+</tr>
+
+<tr>
+<td>Shaken Swarms</td>
+<td>[% SwarmsCreated = WinterUnits  %][% SwarmsCreated %]</td>
+<td>$[% SwarmsRevenue =  SwarmsCreated * SwarmSalePrice %][% SwarmsRevenue %]</td>
+<td></td>
+</tr>
+<tr>
+<td>Queen Sales</td>
+<td>[% SaleQueens %]</td>
+<td>$[% QueenRevenue =  SaleQueens * QueenSalePrice %][% 
+QueenRevenue %]</td>
+<td></td>
+</tr>
+[% WholesaleRevenue = WholesaleRevenue + HoneyWEarnings + WaxWRevenue + NucRevenue + SwarmsRevenue + QueenRevenue %]
+[% RetailRevenue = RetailRevenue + HoneyREarnings + WaxRRevenue %][% TotalRevenue = WholesaleRevenue + RetailRevenue %]
+
+<tr>
+<td>Revenue earned</td>
+<td></td>
+<td>$[% WholesaleRevenue %] + </td>
+<td>$[% RetailRevenue %]</td>
+<td> = $[% TotalRevenue %]
+</td>
+</tr>
+</table>
+<h2>Cost of opperation.</h2>
+
+<table cellpadding="1" cellspacing="1" border="0" align="center" valign="middle" width="100%">
+<th>item</th><th>Discription</th><th>Cost</th>
+<tr>
+<td>Labour</td><td>Labour costs</td><td>[% TotalLabourCosts = otalLabourCosts * WinterUnits %][% TotalLabourCosts%] </td>
+</tr>
+<tr>
+<td>Feed</td><td>Sugar, pollon, feed supliments</td><td>[% TotalFeedCost = TotalFeedCost * WinterUnits %][% TotalFeedCost%] </td>
+</tr>
+<tr>
+<td>Medication</td><td>Medication Costs</td><td>[% TotalMedCost = TotalMedCost * WinterUnits %][% TotalMedCost %]</td>
+</tr>
+<tr>
+<td><a href="/cgi-bin/Apis/yards.cgi?site=[% SiteName %]&amp;view=YardsView&amp;[% session_string %]">Yards</a></td><td>fencing</td><td>[% TotalYardCost = ( TotalYardRepairs + TotalFenceCost) * WinterUnits %][% TotalYardCost %]</td>
+</tr>
+<td>Repairs</td><td>Equipment and Repairs</td><td>[% TotalCostRepairs =TotalCostRepairs * WinterUnits %][% TotalCostRepairs  %]</td>
+</tr>
+<td>Repalcement Nuc</td><td>Total cost of replaement </td><td>[% totalnuc = nuccost +  nuccost2 %][% totalnuc %]
+<tr>
+<td>Transportation</td><td>Transportaion and delivery cost. </td><td> [% TotalCostTrans %]</td>
+</tr>
+<tr>
+<td>Expansion</td><td>Equipment needed to achive goals</td><td>[% TotalExpansionCost %]</td>
+</tr>
+<tr>
+<td>Total Cost</td><td>[% TotalCostOfOperation =  totalnuc + TotalLabourCosts + TotalFeedCost + TotalMedCost + TotalYardCost + TotalCostRepairs + TotalCostTrans + TotalExpansionCost %]$[% TotalCostOfOperation  %]</td>
+</tr>
+<tr>
+<td>Profit/loss</td><td>
+$[% TotalRevenue %] - $[% TotalCostOfOperation %]= <td>[% ProfitOfOperation =  TotalRevenue - TotalCostOfOperation %]$[% ProfitOfOperation  %]</td>
+</tr>
+</table>
+

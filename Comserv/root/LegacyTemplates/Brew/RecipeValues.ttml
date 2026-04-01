@@ -1,0 +1,30 @@
+[% IF BrewName == data.recipe_code %]
+	[% FOREACH link = DBI.query("SELECT * FROM  brew_recipe_tb
+	 	                                  WHERE  recipe_code = 'data.recipe_code'
+		                                  AND (sitename =  $SiteName )
+		                                  ORDER BY recipe_code
+		                                  ")%]    
+		
+     [%  recipe_code  = link.recipe_code %]
+     [%  recipe_name  = link.recipe_name %]
+     [%  recipe_size  = link.recipe_size %]
+     [%  mashtontemp  = link.mashtontemp %]
+     [%  spargtemp    = link.spargtemp %]
+     [%  mashtemp     = link.mashtemp %]
+     [%  mashduration = link.mashduration %]
+     [%  boiltime     = link.boiltime %]
+     [%  description  = link.description %]
+     [%  category     = link.category %]
+     [%  gravity      = link.gravity %]
+     [%  username_of_poster = link.username_of_poster %]
+     [%  ingredients  = link.ingredients %]
+     [%  instructions = link.instructions %]
+     [%  alcohol      = link.alcohol %]
+     [%  colour       = link.colou %]
+     [%  ph           = link.ph %]
+     [%  bitterness   = link.bitterness %]
+     [%  maturation   = link.maturation %]
+     [%  comments     = link.comments       %] 
+	[% END %]
+	
+[% END %]

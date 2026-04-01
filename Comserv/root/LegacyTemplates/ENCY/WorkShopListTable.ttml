@@ -1,0 +1,38 @@
+ 
+             <tr class='NavtableHeaderCellStyle'>
+
+<td >Workshop title</td>
+  <td >[% link.workshop_name %]</td>
+  <td>[% link.registration %]
+<!--<a href="[% link.registration %]
+         [% link.workshop_code %]  " 
+         title="[% link.workshop_name %]" 
+         target="_blank">Click Here To Register.</a>%]
+                     <a href="/cgi-bin/ENCY/workshops.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %][% link.view_name %]" name="Contact" target="[% link.target %]" title="details "><font   class="LeftSideBarNavStyle">Details</font></a>-->
+</td>
+</tr>
+                     
+                                  
+<tr>
+<td>status</td>   
+<td>Start Date</td>
+<td>End Date</td>   
+
+</tr>
+<tr>
+
+<td>[% link.status  %]</td>   
+<td>[% link.   start_date %]</td>
+<td>[% link.   end_date %]</td>
+
+</tr>
+<tr>
+
+<td>Attendies</td>
+   <td>[% link.participants %]</td>
+</tr>
+<tr>
+
+<td>Details</td>
+<td>[% link.description %]</td>
+      </tr>

@@ -1,0 +1,82 @@
+[%
+
+# this template generates power search form
+
+
+%]
+
+[% set_headers(data.http_header_params) %]
+
+[% embed(data.page_top_view,{'-PAGE_TITLE' => 'Billling Search'}) %]
+
+[% embed('ErrorDisplayView') %]
+
+[% session_id = data.session_object.getId() %]
+
+        <FORM METHOD = "POST" TARGET = "[% data.link_target %]">
+        <CENTER>
+        <TABLE WIDTH = "95%" BORDER = "0" CELLSPACING = "2" 
+               CELLPADDING = "0">
+        <TR>
+        <TD CLASS = "sectionHeaderStyle" COLSPAN=2>
+        Power Search
+        </TD>
+        </TR>
+
+[%# embed('SearchWidgetsTableView', 
+
+         {'-DISPLAY_TYPE'    => 'SEARCH',
+          '-USE_RECORD_FROM' => 'CGI',
+         }) %]
+         
+         <tr>
+ <TH CLASS =" tableRowHeaderStyle"
+                  COLSPAN =" 1">
+                Project Code
+              </TH>
+             
+              <TD CLASS =" tableRowStyle"
+                  COLSPAN =" 1">
+                <select name="project_code" size="8" multiple>
+
+<option  value="ECF_BeeWork_Bill">ECF_BeeWork_Bill</option>
+<option  value="ECF_Bill_HH_WO">ECF_Bill_HH_WO</option>
+<option  value="ECF_Bill_Maintinance_Equipment">ECF_Bill_Maintinance_Equipment</option>
+<option  value="ECF_Bill_Management">ECF_Bill_Management</option>
+
+<option  value="ECF_Bill_Property_Matinance">ECF_Bill_Property_Matinance</option>
+<option  value="ECF_Maintenace_Vehicles_Bills">ECF_Maintenace_Vehicles_Bills</option>
+<option  value="ECF_Pollination_Management_Bill">ECF_Pollination_Management_Bill</option>
+<option  value="ECF_Research_Bill">ECF_Research_Bill</option>
+<option  value="ECF_Unpacking_Bill">ECF_Unpacking_Bill</option>
+</select>
+              </TD>    </TR> 
+               <td>Client</td> <td><select name="client" size="2" type = "scroling_list">
+       <optionv alue="All"> value="All" </option>
+       <option> value="Bill" </option>
+        </select>      </td>
+         </tr>
+        <tr>
+  <td>Project Code</td> <td><select name="project_code" size="2" type = "scroling_list">
+       <option> ECF_Bill_HH </option>
+       <option>  </option>
+        </select>      </td>
+         </tr>
+
+        <TR>
+        <TD COLSPAN = "2" ALIGN = "CENTER">
+	<INPUT TYPE = "IMAGE" NAME = "submit_billing_search"  BORDER = "0"
+               VALUE = "on" SRC = "[% data.image_root_url %]/psearch0.gif"
+               onMouseOver="this.src='[% data.image_root_url %]/psearch1.gif'"
+               onMouseOut="this.src='[% data.image_root_url %]/psearch0.gif'"
+               onMouseDown="this.src='[% data.image_root_url %]/psearch0.gif'"
+               onMouseUp="this.src='[% data.image_root_url %]/psearch1.gif'">
+        &nbsp;</TD>
+        </TR>
+
+	</TABLE>
+	</CENTER>
+	[% embed("HiddenAdminFieldsView") %]
+	</FORM>
+
+[% embed(data.page_bottom_view) %]

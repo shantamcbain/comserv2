@@ -1,0 +1,38 @@
+ [% PROCESS DefaultDbi.ttml %]
+[% set_headers(data.http_header_params) %]
+
+[% embed(data.page_top_view,{'-PAGE_TITLE' => data.script_display_name}) %]
+
+[% embed('ErrorDisplayView') %]
+
+        <CENTER>
+        <P>
+        <FORM METHOD = "POST" TARGET = "[% data.link_target %]">	
+        <TABLE WIDTH = "95%" BORDER = "0" CELLSPACING = "2" 
+               CELLPADDING = "0">
+
+        <TR> 
+        <TD CLASS = "sectionHeaderStyle" COLSPAN = "2"> 
+        Addition Acknowledgement
+        </TD>
+        </TR>
+          
+        <TR>
+        <TD COLSPAN = "2" ALIGN = "CENTER">
+        You have successfully added the record. 
+        <P>
+
+        <INPUT TYPE = "IMAGE" NAME = "display_data_view"  BORDER = "0"
+               VALUE = "Home" SRC = "[% data.image_root_url %]/home.gif" 
+               ALT = "Home">
+        </TD>
+        </TR>
+        </TABLE>
+ 
+[% embed(data.hidden_admin_fields_view_name) %]
+[% embed('LocalHiddenAdmin') %]
+ 
+        </FORM>
+        </CENTER>
+
+[% embed(data.page_bottom_view) %]

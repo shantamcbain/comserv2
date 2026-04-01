@@ -1,0 +1,77 @@
+[% #/HTMLTemplates/Default/MemberLeftLinksView.ttml %]
+    [%    #$Id: MemberLeftLinksView.ttml,v 1.2 2003/11/30 00:21:33 shanta Exp shanta $    %]
+ [% IF data.session_object %]        [% session_id = data.session_object.getId() %]
+ [% session_string = "session_id=$session_id" %]
+    [% END %]
+    [% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) 
+%]    [% username = data.session_object.getAttribute('-KEY','auth_username') %]
+    [% group = data.session_object.getAttribute('-KEY','auth_groups')||'normal' %]
+    [% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+    [% lname = data.session_object.getAttribute('-KEY','auth_lastname') %]
+    [% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% localip = data.local_ip %]
+
+
+    <!--OpenMemberLeftLinksView-->
+
+ <table CLASS="LeftNavTableStyle" CELLPADDING="1" >
+   <tr>
+   <td class="NavtableHeaderCellStyle" >
+
+    [% IF group == 'normal' %]
+      Guest Links
+    [% ELSIF SiteName == 'ECF' OR
+             SiteName == 'Skye' OR
+             SiteName == 'Noop' 
+    %]
+    Customer Links      
+     <a href="?site=[% SiteName %]&amp;[% session_string %]&amp;view=MembersView" target="_blank" name="Member_link" onmousemove="test"title="Member Info">Customer Info</a>  
+    [% ELSE %] 
+      Member Links
+     <a href="?site=[% SiteName %]&amp;[% session_string %]&amp;view=MembersView" target="_blank" name="Member_link" onmousemove="test"title="Member Info">Member Info</a>  
+
+   [% END %]
+[% IF username == 'Shanta' OR
+        group    == 'Apis_Admin' OR
+        group    == 'BCHPA_Admin' OR
+        group    == 'BMaster_Admin' OR
+        group    == 'CSC_Admin' OR
+        group    == 'CS_Admin' OR
+        group    == 'ECF_Admin' OR
+        group    == 'Orgainc_Admin' OR
+        group    == 'DarmaFarmsAdmin' OR
+        group    == 'MARTS_Admin' OR
+        group    == 'LumbyThrift_Admin' OR
+        group    == 'ENCY_Admin' OR
+        group    == 'USBM_Admin' OR
+        group    == 'AltPower_Admin' OR
+        group    == 'Shanta_Admin' OR
+        group    == 'Skye_admin' OR
+        group    == 'RV_Admin' OR
+        group    == 'Brew_Admin'OR
+ 	     group    ==  'WB_admin' OR
+        group    == 'MJB_Admin' 
+        %]
+   &nbsp;<a href="/cgi-bin/URL/url.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;site_name=[% SiteName %]&amp;category=Member_links&amp;subject=Nav_link&amp;Nav_link=1" name="Add page link" title="Add New Link">Add</a>
+
+   [% END %]
+<br>
+    </td>
+</tr>
+		<tr>
+		<td class="NavTableCellStyle">
+    <a href="?[% SiteName %]&amp;[% session_string %]&amp;view=MembersView" target="_blank" name="Members_link" onmousemove="test" id="Members_link"><font   class="LeftSideBarNavStyle">See our member page.</font></a>  
+		</td>
+		</tr>
+		
+
+               
+<!-- call SQL_Members' -->
+	 [% embed ('SQL_Member') %]
+		 
+
+
+  </table>
+
+  <!--CloseMemberLeftLinksView-->

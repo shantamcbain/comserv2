@@ -1,0 +1,149 @@
+[%
+#	$Id: ReplacementNuc.ttml,v 1.1 2003/11/29 06:42:47 shanta Exp shanta $	%]
+
+[%# embed(data.page_top_view,['-PAGE_TITLE','Nucs']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% ActiveQueens = 0 %]
+[% FOREACH link = DBI.query("SELECT * FROM apis_queens_tb
+                                  WHERE  status = 'Active' OR 
+                                  status = 'Breeder'OR 
+                                  status = 'Breeder_candidate'
+                                 ")%]    
+ [% ActiveQueens = ActiveQueens + 1 %]
+
+[% END %]
+ 
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td >
+<h3>Our Relacement and Sale Nucs.</h3>[% data.dbi_dsn %]
+<table>
+<tr><th>Yard <a href="/cgi-bin/Apis/yards.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on" target="_blank" name="Add Yard">Add</a></th><th>status</th><th>Pallet code</th><th>Hive Type</th><th>View pallets</th></tr>
+[% FOREACH link = DBI.query("SELECT * FROM apis_pallet_tb
+                                  WHERE  
+                                  status = 'In-Use'  AND
+                                  (hivetype  = 'TNuc' OR
+                                   hivetype = 'EightF')
+                                  ORDER BY yard_code
+                                  ")%]    
+                                  
+                                  <tr>
+   
+   <td>[% link.yard_code  %]<a href="/cgi-bin/Apis/yards.cgi?site=[% SiteName %]&amp;sort_field1=yard_code&amp;sort_field2=status&amp;first_record_to_display=0&amp;records_per_page=&&amp;[% session_string %]&amp;record_id=[% link.record_id %]&display_details_view.x=15&amp;display_details_view.y=12&amp;display_details_view=on" name="Contact"  title="[% link.yard_name %] "><font   class="LeftSideBarNavStyle">[% link.yard_name %]</td>
+   <td>[% link.status  %]</td>
+   <td>[% link.pallet_code %]</td>
+   <td>[% link.hivetype %]</td>
+   <td><a href="/cgi-bin/Apis/pallet.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;submit_power_search=on&amp;simple_search_string=[% link.yard_code %]&amp;sort_field1=pallet_code">Pallet</a>    </td>
+[% HiveCap = HiveCap + link.total_yard_size %]
+ [% CurrentSize = CurrentSize + link.current %]
+   [% END %] 
+  [% total_nucs = total_nucs + CurrentSize %]
+
+   </tr>
+   <tr><td></td><td></td><td>[% HiveCap %]</td><td>[% CurrentSize %]</td><td>Active Queens [% ActiveQueens %] </td></tr>
+
+</table>
+<p><a href="/cgi-bin/Apis/yards.cgi?site=[% SiteName %]&amp;view=FeedingView&amp;[% session_string %]">Feeding</a></p>
+<ul>
+ 
+ <table>
+<tr><th>Bob nucs <a href="/cgi-bin/Apis/queens.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on" target="_blank" name="Add Queen">Add</a></th><th>Nuc code</th><th>Yard Code</th><th>Pallet code</th><th>Queen code</th></tr>
+[% FOREACH link = DBI.query("SELECT * FROM apis_pallet_tb
+                                  WHERE   (status = 'In-Use') and
+                                          (hivetype  = 'TNuc')
+                                  ORDER BY yard_code
+                                  ")%]    
+                                  
+                                  <tr>
+   
+   <td><a href="/cgi-bin/Apis/pallet.cgi?site=[% SiteName %]&amp;sort_field1=yard_code&amp;sort_field2=status&amp;first_record_to_display=0&amp;records_per_page=&&amp;[% session_string %]&amp;record_id=[% link.record_id %]&display_details_view.x=15&amp;display_details_view.y=12&amp;display_details_view=on" name="Contact"  title="[% link.yard_name %] "><font   class="LeftSideBarNavStyle">[% link.yard_name %]</td>
+   <td>[% link.hivetype  %]</td>
+   <td>[% link.yard_code %]</td>
+   <td>[% link.pallet_code %]</td>
+   <td>[% link.queen_code %]</td>
+   <td><a href="/cgi-bin/Apis/pallet.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;submit_power_search=on&amp;simple_search_string=[% link.yard_code %]&amp;sort_field1=pallet_code">Pallet</a>    </td>
+ [% NumberOfBNucs = NumberOfBNucs + 1 %]
+   [% END %]
+   </tr>
+   <tr><td></td><td>Number of Bnucs</td><td>[% NumberOfBNucs %]</td><td></td></tr>
+
+</table>
+ 
+  
+<table>
+<tr><th>Kooteny nucs <a href="/cgi-bin/Apis/queens.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on" target="_blank" name="Add Queen">Add</a></th><th>Nuc code</th><th>Yard Code</th><th>Pallet code</th><th>Queen code</th></tr>
+[% FOREACH link = DBI.query("SELECT * FROM apis_pallet_tb
+                                  WHERE   (status = 'In-Use' and
+                                           hivetype  = 'kNuc')
+                                  ORDER BY yard_code
+                                  ")%]    
+                                  
+                                  <tr>
+   
+   <td><a href="/cgi-bin/Apis/pallet.cgi?site=[% SiteName %]&amp;sort_field1=yard_code&amp;sort_field2=status&amp;first_record_to_display=0&amp;records_per_page=&&amp;[% session_string %]&amp;record_id=[% link.record_id %]&display_details_view.x=15&amp;display_details_view.y=12&amp;display_details_view=on" name="Contact"  title="[% link.yard_name %] "><font   class="LeftSideBarNavStyle">[% link.yard_name %]</td>
+   <td>[% link.hivetype  %]</td>
+   <td>[% link.yard_code %]</td>
+   <td>[% link.pallet_code %]</td>
+   <td>[% link.queen_code %]</td>
+   <td><a href="/cgi-bin/Apis/pallet.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;submit_power_search=on&amp;simple_search_string=[% link.yard_code %]&amp;sort_field1=pallet_code">Pallet</a>    </td>
+ [% CurrentSize = CurrentSize + 1 %]
+   [% END %]
+   </tr>
+  [% NumberOfKNucs = NumberOfKNucs + 1 %]
+    <tr><td></td><td>Number of Knucs</td><td>[% NumberOfKNucs %]</td><td></td></tr>
+
+</table>
+ <table>
+
+<tr><th>Top nucs <a href="/cgi-bin/Apis/queens.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on" target="_blank" name="Add Queen">Add</a></th><th>Nuc code</th><th>Yard Code</th><th>Pallet code</th><th>Queen code</th></tr>
+[% FOREACH link = DBI.query("SELECT * FROM apis_pallet_tb
+                                  WHERE   (status = 'In-Use' and
+                                           hivetype  = 'TNuc') and
+                                           (queen_code = 'c4' or
+                                           queen_code = 'c35' or
+                                           queen_code = 'virgin')
+                                  ORDER BY yard_code
+                                  ")%]    
+                                  
+                                  <tr>
+   
+   <td><a href="/cgi-bin/Apis/pallet.cgi?site=[% SiteName %]&amp;sort_field1=yard_code&amp;sort_field2=status&amp;first_record_to_display=0&amp;records_per_page=&&amp;[% session_string %]&amp;record_id=[% link.record_id %]&display_details_view.x=15&amp;display_details_view.y=12&amp;display_details_view=on" name="Contact"  title="[% link.yard_name %] "><font   class="LeftSideBarNavStyle">[% link.yard_name %]</td>
+   <td>[% link.hivetype  %]</td>
+   <td>[% link.yard_code %]</td>
+   <td>[% link.pallet_code %]</td>
+   <td>[% link.queen_code %]</td>
+   <td><a href="/cgi-bin/Apis/pallet.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;submit_power_search=on&amp;simple_search_string=[% link.yard_code %]&amp;sort_field1=pallet_code">Pallet</a>    </td>
+ [% CurrentSize = CurrentSize + 1 %]
+   [% END %]
+   </tr>
+  [% NumberOfTKNucs = NumberOfTNucs + 1 %]
+    <tr><td></td><td>Number of Tnucs</td><td>[% NumberOfTNucs %]</td><td></td></tr>
+
+</table>
+</ul>
+</td>
+</tr>
+</table>
+
+
+
+
+
+[% embed(data.page_bottom_view) %]
+

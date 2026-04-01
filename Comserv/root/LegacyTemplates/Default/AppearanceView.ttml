@@ -1,0 +1,56 @@
+[%
+#	$Id: AppearanceView.ttml,v 1.1 2005/12/13 20:25:14 shanta Exp shanta $
+
+
+%] [% PROCESS DefaultDbi.ttml %]
+[% embed(data.page_top_view,['-PAGE_TITLE','Controlling Appearance']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+       [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+    
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+
+		<tr>
+		<td >
+			[% IF username %]
+
+		<h3>[% firstname%]! Our Membership Page!</h3>
+
+
+			[% ELSE %]
+
+			<h3> Controlling how the site looks.</h3
+<p>We control how your site looks with two basic values sent form the
+browser or from withing the applications setup files.</p> 
+
+<ol>
+  <li><a href="/cgi-bin/FAQ/faq.cgi?site=Demo&amp;Display_details_view=on&amp;record_id=42" target="_blank" name="FAQ on SiteName" title="Click here for our FAQ on how we use the SiteName">SiteName</a>. This value controls were the application gets its setup values. These Values are set it the site setup file. The application looks to the passed Value site=SiteName comparis it to it programed set of SiteNames and changes key values to it. Primaily to appearance is the name and location of the CSS file. 
+  </li>
+  <li>CSS is the main control of the look and feel. We use W3.org standards for controlling the look of your site. This ensures that your site is displayed similarly in all browsers.</li>
+  <li>We use TTML for the 'Views' or pages of the application. The page is divided into sections that are the same or similar on all pages of the application. Such as the Header bar at the top, The left Navigation, the Main area of the page and the Footer. TTML is an advanced Perl module that allows easy programmable content in your page. Although it can be used for extensive programing we only use it for display. All application Logic in contained in Action Handlers. Search our FAQ, and  <a href="/cgi-bin/Extropia/extropia.cgi?site=eXtropia" target="_blank" title="eXtropia HelpDesk is our online support. It concontains details on Module usage and Examples of code.' name="eXtropia HelpDesk">eXtropia HelpDesk</a> for more details.</li>
+</ol>
+
+<p>Examples of how this works.</p>
+
+
+[% END %]
+		</td>
+			</tr>
+		</table>
+
+[% embed(data.page_bottom_view) %]
+

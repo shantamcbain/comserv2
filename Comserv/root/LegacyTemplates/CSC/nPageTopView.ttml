@@ -1,0 +1,187 @@
+[% #CSC PageTopView
+#	$Id: PageTopView.ttml,v 1.3 2002/05/02 15:31:10 shanta Exp shanta $	
+
+# this template generates the top of HTML,
+
+# if -PAGE_TITLE is defined, it gets used in the <title>
+
+# if -SCRIPT_DISPLAY_NAME is defined, it gets used in the <title>
+
+# if -CSS_VIEW_URL is defined, the CSS link is created.
+
+# if -APPLICATION_SUB_MENU_VIEW_NAME is defined, the corresponding
+# template gets embedded
+
+# also see various other logo values below
+
+#Set needed values
+
+%]
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+
+
+    <HTML>
+    <HEAD>
+    <TITLE>[% data.script_display_name %]: [% data.page_title %]</TITLE>
+[% IF data.css_view_url %]
+    <LINK REL = "stylesheet" TYPE = "text/css" 
+          HREF = "[% data.css_view_url %]">
+[% END %]
+
+    <SCRIPT LANGUAGE="JavaScript">
+    <!--
+    var clicks = 0;
+
+    function submitOnce() {
+        clicks ++;
+        if (clicks < 2) {
+            return true;
+        } else {
+            // alert("You have already clicked the submit button. " + clicks + " clicks");
+            return false;
+        }
+    }
+    //-->
+    </SCRIPT>
+
+<script language="JavaScript">
+function testfunction()
+{ if ((typeof window.sidebar == "object") && (typeof window.sidebar.addPanel == "function"))
+
+      { 
+         window.sidebar.addPanel ("CSC HelpDesk", 
+         "http://computersystemconsulting.ca/cgi-bin/CSC/csc_devel_debug.cgi?view=SideBarHomeView&page_top=SBPageTopView&pagebottom=SBPageBottomView",""); 
+      } 
+      else 
+      {          var rv = window.confirm ("This page is enhanced for use with Netscape 6.  " + "Would you like to upgrade now?"); 
+         if (rv) 
+            document.location.href = "http://home.netscape.com/download/index.html";
+      } 
+ } </script> 
+<SCRIPT LANGUAGE="JavaScript">
+
+<!-- This script and many more are available free online at -->
+<!-- The JavaScript Source!! http://javascript.internet.com -->
+
+<!-- Begin
+function formHandler(form) {
+var windowprops = "height=600,width=700,location=no,"
++ "scrollbars=yes,menubars=no,toolbars=no,resizable=yes";
+
+var URL = form.site.options[form.site.selectedIndex].value;
+popup = window.open(URL,"MenuPopup",windowprops);
+}
+// End -->
+</script>
+
+    </HEAD>
+    <BODY>
+
+    <CENTER>
+    <TABLE WIDTH = "95%" BORDER = "0"
+           CELLSPACING = "0" CELLPADDING = "2">
+
+    <TR>
+    <TD VALIGN = "TOP" ALIGN = "LEFT">
+    <IMG SRC = "[% data.image_root_url %]/[% data.application_logo %]"
+         WIDTH = "[% data.application_logo_width %]"
+         HEIGHT = "[% data.application_logo_height %]"
+         BORDER = "0" ALT = "[% data.application_logo_alt %]"
+    >
+    </TD>
+    <td>
+
+[% IF group == 'CSC_admin' OR username == 'Shanta' %]
+[% embed('CSCAdminHeadLinks.ttml') %]
+[% #Target ="_Blank">%]
+
+
+[% ELSE %]
+Host your site with us. Web Applications, virtual offices, and HelpDesk systems  built to your needs.	      
+[% END %]    
+</td>
+
+[% IF  username == 'Shanta' %]
+
+      	<td align=center VALIGN=top>
+[% embed('ShantaHeadLinksView.ttml') %] 
+</td>
+[% END %]
+ 
+    </TR>
+ 
+   <tr>
+    <td class="tablePageTopWelcomeCellStyle" >
+
+[% IF username %]
+
+	Hello [% username%]! Thanks for login in!
+
+[% ELSE %]
+
+	Hello!
+
+[% END %]
+    </td>
+    <td class="tablePageTopLoginCellStyle">
+
+[% IF is_authenticated %] 
+	| <A HREF = "[% data.script_name %]?session_id=[% session_id %]&submit_logoff=on"
+                 TARGET = "[% data.link_target %]">Logoff</A>
+
+[% ELSE %]
+	| <A HREF = "[% data.script_name %]?session_id=[% session_id %]&submit_logon=on"
+                 TARGET = "[% data.link_target %]">Logon</A>
+[% END %]               
+
+    </TD>
+    </TR>
+<tr>
+<td>
+[% embed('SiteNaveView') %] 
+    </TD>
+
+<td>
+[% IF group == 'CSC_admin' OR username == 'Shanta' %]
+[% embed('CSCAddListView.ttml') %]
+[% #Target ="_Blank">%]
+[% END %] 
+
+    </TD>
+
+</tr>
+    </TABLE>
+    </CENTER>
+<table>
+<tr>
+<td width="15%">
+
+[%# IF data.left_page_view %]
+[% #embed(data.left_page_view) %]
+
+[% #ELSE %]
+[% embed('LeftPageView') %]
+[% #END %] 
+
+</td>
+<td>
+
+[% IF data.application_sub_menu_view_name %]
+<table>
+    <TR>
+    <TD colspan='2'>
+    [%  embed(data.application_sub_menu_view_name) %]
+    </TD>
+    </TR>  
+</table>    
+[% END %]

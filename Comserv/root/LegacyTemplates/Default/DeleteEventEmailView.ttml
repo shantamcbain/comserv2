@@ -1,0 +1,14 @@
+[%-
+
+#
+# this template is used for sending email which is triggered on record
+# delete
+#
+
+-%]
+Delete Event.
+-------------
+
+[% FOR field = data.email_display_fields -%]
+[% subs.sprintf("%-30s %s",field,data.cgi_object.param(field).array.join(", ")) %]
+[% END %]

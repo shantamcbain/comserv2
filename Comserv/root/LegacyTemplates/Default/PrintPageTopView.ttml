@@ -1,0 +1,139 @@
+[% #/HTMLTemplates/Default/PageTopView.ttml
+#	$Id: PrintPageTopView.ttml,v 1.2 2002/08/13 18:49:34 shanta Exp $#
+#Servers this page used by.
+# csc.ca, bcaf, forager.com shanta.org webcthelpdesk.com
+
+# this template generates the top of HTML,
+
+# if -PAGE_TITLE is defined, it gets used in the <title>
+
+# if -SCRIPT_DISPLAY_NAME is defined, it gets used in the <title>
+
+# if -CSS_VIEW_URL is defined, the CSS link is created.
+
+# if -APPLICATION_SUB_MENU_VIEW_NAME is defined, the corresponding
+# template gets embedded
+
+# also see various other logo values below
+
+%] 
+[% PROCESS DefaultDbi.ttml %]
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% site = data.site_name %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group    = data.session_object.getAttribute('-KEY','auth_groups') %]
+ 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+[% IF data.session_object.getAttribute('-KEY','SiteName') %]
+
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+[% ELSE %]
+
+[% SiteName = data.SiteName %]
+	
+<!-- PrintPageTopView -->
+[% END %]
+
+    <HTML>
+    <HEAD>
+    <TITLE>[% data.script_display_name %]: [% data.page_title %]</TITLE>
+[% IF data.css_view_url %]
+    <LINK REL ="stylesheet" TYPE = "text/css" 
+          HREF ="[% data.css_view_url %]">
+[% END %]
+
+    <SCRIPT LANGUAGE="JavaScript">
+    <!--
+    var clicks = 0;
+
+    function submitOnce() {
+        clicks ++;
+        if (clicks < 2) {
+            return true;
+        } else {
+            // alert("You have already clicked the submit button. " + clicks + " clicks");
+            return false;
+        }
+    }
+    //-->
+    </SCRIPT>
+
+<!-- Call SideBarHeadScript Site name [% SiteName %] First Name [% firstname%] -->
+[% embed('SideBarHeadScript') %] 
+[% IF SiteName == 'ECF'  %]
+[% ELSIF SiteName == 'Shanta'  %]
+[% ELSIF SiteName == 'Apis'  %] 
+<!-- Call ApisJavaScriptHeads -->
+[% embed('ApisJavaScriptHeads') %] 
+[% ELSIF SiteName == 'CSC'  %]
+<!-- Call CSCSideBarScript -->
+[% embed('CSCSideBarScript') %] 
+[% ELSIF SiteName == 'Forager' %] 
+<!-- Call  ForagerJavaScriptHeads-->
+[% embed('ForagerSideBarScript') %] 
+[% ELSIF SiteName == 'ENCY' OR 'VitaVic'  %] 
+<!-- Call  ENCYJavaScriptHeads-->
+[% embed('ENCYJavaScriptHeads') %] 
+[% ELSE %]
+
+	
+No site defined Please fix Header Definitions. Session = [% sitename %] from stetup [% site %]
+[% END %]
+
+    </HEAD>
+    <BODY>
+
+    <CENTER>
+    <TABLE WIDTH = "95%" BORDER = "0"
+           CELLSPACING = "0" CELLPADDING = "2">
+
+    <TR>
+    <TD VALIGN = "TOP" ALIGN = "LEFT">
+    </TD>
+    <td>
+[% IF SiteName == 'Forager'  %]
+[% embed('ForagerRightHead') %] 
+[% ELSIF SiteName == 'CSC'  %]
+[% embed('CSCRightHead') %] 
+[% ELSIF SiteName == 'Apis'  %]
+ Print  Header for Apis Calendar
+[% ELSIF SiteName == 'ECF'  %]
+[% embed('ECFRightHead') %] 
+[% ELSIF SiteName == 'ENCY'  %]
+ <H1>The Encyclopaedia of Biological life.</H1>
+Your home for Health information that grows with you.
+<br>
+Add this resource to your site.  
+[% ELSIF SiteName  == 'VitalVic'  %]
+ <H1>Vital Victoria's Encyclopaedia of Biological life.</H1>
+Your home for Health information that grows with you.
+<br>
+Add this resource to your site.  
+[% ELSE %]
+
+	
+
+WebCal print view Add this resource to your site.  
+
+[% END %]
+		      
+    </td>
+ 
+    </TR>
+
+    </TABLE>
+    </CENTER>
+
+<table ALIGN =" LEFT" >
+<tr>
+<td>
+<!-- end printpagetopview -->

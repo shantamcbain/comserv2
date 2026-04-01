@@ -1,0 +1,91 @@
+[% set_headers(data.http_header_params) %]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','eXtropia WebNews']) %]   
+
+[% embed('ErrorDisplayView') %]
+    
+
+        <FORM METHOD = "POST" TARGET = "[% data.link_target %]">
+        <CENTER>
+        <TABLE WIDTH = "400" BORDER = "1" CELLSPACING = "0"
+               CELLPADDING = "0" VSPACE = "0" HSPACE = "0" 
+               ALIGN = "CENTER">
+        <TR>
+        <TD CLASS = "sectionHeaderStyle">
+        WebNews
+        </FONT>
+        </TD>
+
+        <TD CLASS = "sectionHeaderStyle" ALIGN = "RIGHT" NOWRAP>
+        <INPUT TYPE = "HIDDEN" NAME = "view" VALUE = "BasicDataView">
+        <INPUT TYPE = "TEXT" NAME = "simple_search_string"
+               VALUE = "[% data.simple_search_string %]" SIZE = "6">
+        <INPUT TYPE = "SUBMIT" NAME = "modify_view_settings"
+               VALUE = "  Go  ">
+        </TD>
+
+        </TR>
+
+        </TABLE>
+        </FORM>
+
+
+[% IF !data.total_records %]
+	[% record_set_is_empty_message = "There are no news items that meet your query. Please try again. " %]
+    
+[% END %]
+
+[% url_encoded_admin_fields = embed(data.url_encoded_admin_fields_view_name) %]
+
+[% FOR record = data.records %] 
+  
+    [% key_field= data.key_field;
+       record_id = record.$key_field;
+       SiteName = data.site_name;
+       subject = record.subject;
+       abstract = record.abstract; 
+       date = record.date_time_posted;
+       abstract = abstract.replace("\n","<BR>");
+     %] 
+    
+    <CENTER>
+    <TABLE BORDER = "0" CELLSPACING = "0" 
+                   CELLPADDING = "0" WIDTH = "400"
+                   BGCOLOR = "WHITE">
+    <TR>
+    <TD CLASS = "tableRowHeaderStyle"><B>[% subject %]</B></FONT></TD>
+    <TD  CLASS = "tableRowHeaderStyle"><B>[% date %]</B></FONT></TD>
+    </TR>
+
+    <TR>
+    <TD COLSPAN = "2" BGCOLOR = "EEEEEE">
+    [% abstract %] 
+    </TD>
+    </TR>
+
+    <TR>
+    <TD ALIGN = "RIGHT" COLSPAN = "2" BGCOLOR = "EEEEEE">
+    <A HREF ="[% "$data.script_name?site=$SiteName&display_details_view=on&record_id=$record_id&$url_encoded_admin_fields" %]"
+               TARGET = "[% data.link_target %]">Details-&gt</A>
+    </TD>
+    </TR>
+    </TABLE>
+    </CENTER>
+    <P>
+    
+    [% #CALL data.record_set.moveNext %]
+    
+[% END %]
+    
+[% record_set_is_empty_message %]
+
+[% embed('NewsRecordSetDetailsFooterView') %]   
+
+    <P>
+    <CENTER>
+<!--     <A HREF = "news_manager.cgi" TARGET = "[% data.link_target %]">News Manager</A>
+ -->    </CENTER>
+    
+[% embed(data.page_bottom_view) %]
+
+   

@@ -1,0 +1,25 @@
+<tr><td>Sitename</td><td>Project code</td><td>Project name</td><td>Priority </td><td>Comments</td><td>Links </td></tr>
+ <tr><td colspan="6">Sort by site.</td></tr>
+ 
+ [% FOREACH link = DBI.query("SELECT * FROM csc_todo_tb
+                                  WHERE ( status != '3')
+                                  ORDER BY priority DESC
+                                           sitename
+                                  ")%]    
+                                  
+                                 
+                                   <tr>
+<td class="NavTableCellStyle"> [% link.sitename %]  </td>
+<td class="NavTableCellStyle"> [% link.project_code %]  </td>
+<td class="NavTableCellStyle"> [% link.subject %]  </td>
+<td class="NavTableCellStyle"> [% link.priority %]  </td>
+<td class="NavTableCellStyle"> [% link.description %]  </td>
+<td class="NavTableCellStyle">        
+   <a href="/cgi-bin/ToDo/todo.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x=on&record_id=[% link.record_id %]" target="[% link.target %]" name="Contact" title="details"><font   class="LeftSideBarNavStyle">Details</font></a>
+
+  <a href="/cgi-bin/ToDo/log.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;todo_record_id=[% link.record_id %]&amp;sitename=[% SiteName %]&amp;subject=[% link.subject %]&amp;project_code=[% link.project_code %]&amp;details=[% link.description %]&amp;priority=" "target="_Blank">Log</a>
+ 
+  <a href="/cgi-bin/ToDo/todo.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;record_id=[% link.record_id %]&amp;subject=[% link.project_name %]&amp;project_code=[% link.project_code %]&amp;description=[% link.comments %]&amp;priority=" "target="_Blank">Todo</a>
+     </td>
+   </tr> 
+ [% END %] 

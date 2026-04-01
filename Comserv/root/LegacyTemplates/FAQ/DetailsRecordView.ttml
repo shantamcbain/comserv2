@@ -1,0 +1,37 @@
+[% record = data.records.0 %]
+ [% PROCESS DefaultDbi.ttml %]
+
+[% set_headers(data.http_header_params) %]
+[% embed(data.page_top_view, ['-PAGE_TITLE', 'Question and Answer Details']) %]
+
+[%# Starts of the display of the question. %]
+
+[% question = record.question;
+   answer = record.answer;
+ %]
+
+[%# prepare data used for URL, mailto and similar effects %]
+ [% embed('PrepareDisplayEffects') %]
+
+<TABLE BORDER = "1" WIDTH = "100%" CELLSPACING = "2" CELLPADDING ="0">      
+        [% FOREACH widget_group = data.input_widget_display_order %]
+        <TR><FONT FACE = "ARIAL, HELVETICA" SIZE = "2" COLOR = "#000000" >
+        [% FOREACH widget_name = widget_group %]
+            [% embed('WidgetView', 
+                     {'-WIDGET_NAME'  => widget_name,
+                      '-WIDGET_VALUE' => data.records.0.$widget_name,
+                      '-DISPLAY_TYPE' => 'DISPLAY',                   
+                     })
+             %]
+        [% END %]<BR><BR></FONT>
+        </TR> 
+                [% END %]
+        <HR>
+</TABLE>
+
+<HR>
+
+        <P>
+
+
+        

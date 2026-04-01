@@ -1,0 +1,135 @@
+[%#	$Id: ReUseAblesView.ttml,v 1.09 2002/11/08 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dozen't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dozen't rely on any
+# variables from outside.
+
+%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+   [% LastUpdate = data.last_update %]
+   [% SiteUpdate = data.site_last_update %]
+   [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+   [% SiteDisplayName = data.site_display_name %]
+   [% site = SiteName %]
+   [% PrintMode    = data.session_object.getAttribute('-KEY','PrintMode') %]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+[% developer_status = Data.session_object.getAttribute('-KEY', 'auth_developer_status') %]
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[%# USE DBI( data_source = 'dbi:mysql:shanta_forager',
+                username = 'shanta',
+                password =  'nvidia' )
+    %]
+
+
+
+[% IF group == "Mentoring"	%]
+	[% embed(data.page_top_view,['-PAGE_TITLE','Mentor home.']) %]
+[% ELSE %]
+	[% embed(data.page_top_view,['-PAGE_TITLE','ReUsables.']) %]
+[% END %]
+
+[% embed('ErrorDisplayView') %]
+
+ [% sessionstring %]
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+	<tr>
+	<td>[% IF username %]
+			<h3 > Hello  [% firstname%]  [% lastname%]! Welcome to [% data.site_display_name %]</h3>
+		[% ELSE %]
+			<h3>  [% embed ("LogOnLeftView") %] Welcome to [% data.site_display_name %]! </h3> 
+		[% END %]
+		
+		[% SiteName = data.site_name%]
+
+   	[% IF SiteName == "OKB" %]
+		[% embed('OkBeekeepersHomeView') %]
+		[%# ELSIF SiteName == "Aktiv" %]
+			[% embed ('AktivHomeView') %]
+		[%# ELSIF SiteName == "BMaster"%]
+			[% embed ('ApisHomeView') %]
+		[%# ELSIF SiteName == "BMastBreeder"%]
+			[% embed ('BMasterBreederHomeView') %]
+		[%# ELSIF SiteName == "Forager" %]
+			[% embed ('ForagerHomeView') %]
+		[%# ELSIF SiteName == "Brew" %]
+			[% embed ('BrewHomeView') %]
+		[%# ELSIF SiteName == "CertBee" %]
+			[% embed ('CertBeeHomeView') %]
+		[%# ELSIF SiteName == "SB" %]
+		[%# ELSIF SiteName == "CS" %]
+			[% embed ('CSHomeView') %]
+		[%# ELSIF SiteName == "CSCRecy" %]
+			[% embed ('CSCRecyHomeView') %]
+		[%# ELSIF SiteName == "CSC" %]
+                        [% IF group == 'Planning' %]
+			[% embed ('PlanningView') %]
+                        [% ELSE %]
+			[% embed ('CSCHomeView') %]
+                        [% END %]
+		[%# ELSIF SiteName == "CSCDev" OR
+		         SiteName == "BMasterDev"  %]
+			[% embed ('CSCDevHomeView') %]
+		[%# ELSIF SiteName == "Coop" OR
+		         SiteName == "Noop" %]
+			[% embed ('CoopHomeView') %]		
+		[#% ELSIF SiteName == "GrindrodBC" %]
+			[% embed ('GrindrodHomeView') %]
+		[%# ELSIF SiteName == "GRA" %]
+			[% embed ('GRAHomeView') %]
+		[#% ELSIF SiteName == "GrindrodProject" %]
+			[% embed ('GrindrodProjectHomeView') %]
+		[#% ELSIF SiteName == "GPMarket" %]
+			[% embed ('GrindrodParkMarketHomeView') %]
+			[%# embed ('CoopHomeView') %]
+		[#% ELSIF SiteName == "HE" OR
+		         SiteName == "HEDev"  %]
+			[% embed ('HEReusables') %]
+			[%# embed ('SBHomeView') %]
+		[#% ELSIF SiteName == "HoneyDo" %]
+			[% embed ('HoneyDoHomeView') %]
+			[% embed ('CoopHomeView') %]
+		[%# ELSIF SiteName == "IM" OR
+		         SiteName == "IMDev"  %]
+			[% embed ('IMHomeView') %]
+		[#% ELSIF SiteName == "Kamasket" %]
+			[% embed ('KamasketHomeView') %]
+		[%# ELSIF SiteName == "LandTrust" OR
+		         SiteName == "LandTrustDev"  %]
+			[% embed ('LtrustHomeView') %]
+		[#% ELSIF SiteName == "Sky" %]
+			[% embed ('SkyHomeView') %]
+		[%# ELSIF SiteName == "SLT"%]
+			[% embed ('SLTHomeView') %]
+		[%# ELSIF SiteName == "WB" OR
+		         SiteName == "WBDev" %]
+			[% embed ('WBHomeView') %]
+		[% ELSE %]
+		<!-- Begin Demo Home View -->  
+			[% embed ('ReCycling') %]
+			<!-- End Demo home view -->
+		[% END %]
+		
+
+
+<p>Last Update [% data.site_last_update %][% IF SiteName == 'Demo' %]&nbsp; This value is stored in your setup file. [% END %]
+		<br>
+		
+
+[% embed('CSCCopyRight') %]
+
+	
+
+
+
+[% embed(data.page_bottom_view) %]
+
+
+

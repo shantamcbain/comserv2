@@ -1,0 +1,12 @@
+[% FOREACH link = DBI.query("SELECT * FROM page_tb
+	                                  WHERE  menu = 'Main'
+	                                  AND (sitename =  '$SiteName')
+	                                  ORDER BY link_order
+	                                  ")%]    
+	   <tr>
+	   <td class="NavTableCellStyle">
+	       <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]" title=" [% linkview_.name %] "><font   class="LeftSideBarNavStyle">[% link.view_name %]</font></a>
+	   </td>
+	   </tr>
+	[% END %]
+                            

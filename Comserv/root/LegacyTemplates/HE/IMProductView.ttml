@@ -1,0 +1,20 @@
+[%
+#	$Id: IMProductView.ttml,v 1.1 2002/10/08 04:23:07 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it doesn't rely on any
+# variables from outside.
+
+%]
+
+
+Our Products will show up here.
+<p><img src="/images/IM/top.JPG" border="0" alt=""></p>
+<p><img src="/images/IM/nuttop.JPG" border="0" alt=""></p>
+<p><img src="/images/IM/front.JPG" border="0" alt=""></p>
+<p><img src="/images/IM/nutside.JPG" border="0" alt=""></p>
+<p><img src="/images/IM/side2.JPG" border="0" alt=""></p>
+<p><img src="/images/IM/top2.JPG" border="0" alt=""></p>

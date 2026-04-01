@@ -1,0 +1,39 @@
+[%
+
+#
+# this template should be included in the top level template (that
+# renders that main page). If some errors have happened in one of the
+# Action Handlers that were executed, this template will print these
+# out.
+#
+
+-%]
+[% IF data.error_messages.size %]
+            <CENTER>
+            <P>
+            <TABLE WIDTH = "95%" BORDER = "0" 
+                   CELLSPACING = "0" CELLPADDING = "0">
+            <TR>
+            <TD COLSPAN = "2" CLASS = "sectionHeaderStyle">
+            Error Notice
+            </TD>
+            </TR>
+      
+            <TR>
+            <TD COLSPAN = "2">   
+            I am sorry, but there were some errors in your submission.
+            Please correct the errors to continue...
+            <UL>
+
+    [% FOREACH error = data.error_messages %]
+               <LI><FONT COLOR = "RED">[% error %]</FONT>
+    [% END %]
+            </UL>
+            Please try again!
+            </TD>
+            </TR>
+            </TABLE>
+            </CENTER>
+[% END %]
+
+

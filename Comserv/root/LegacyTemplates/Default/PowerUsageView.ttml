@@ -1,0 +1,159 @@
+[%#	$Id: PowerUsageView.ttml,v 0.1 2012/01/14 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dozen't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dozen't rely on any
+# variables from outside.
+
+%] 
+[% PROCESS DefaultDbi.ttml %]
+
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+   [% LastUpdate = data.last_update %]
+   [% SiteUpdate = data.site_last_update %]
+   [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+   [% SiteDisplayName = data.site_display_name %]
+   [% site = SiteName %]
+   [% username = data.session_object.getAttribute('-KEY','auth_username') %]
+   [% PrintMode    = data.session_object.getAttribute('-KEY','PrintMode') %]
+[% developer_status = Data.session_object.getAttribute('-KEY', 'auth_developer_status') %]
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+   [% PAGE = data.page_name || 'Power Usage View' %]
+[%# PROCESS SiteMysql.ttml %]   
+
+
+[% IF SiteName == 'CS' %]
+ [% PROCESS CSProjectHOMEPagesql.ttml %]
+[% ELSIF SiteName == 'AltPower' %]
+ [% PROCESS AltPowerUsagePagesql.ttml %]
+[% ELSIF SiteName == 'CSC' %]
+ [% PROCESS CSCProjectPagesql.ttml %]
+[% ELSIF SiteName == "BMaster" %]
+  [% PROCESS BMasterProjectPagesql.ttml %]
+[% ELSIF SiteName == 'Brew' %]
+ [% PROCESS BrewProjectPagesql.ttml %]
+[% ELSIF SiteName == "CSCDev"  %]
+ [% PROCESS CSCDevProjectPagesql.ttml %]
+[%  ELSIF SiteName ==  'Forager' %]
+ [% IF PAGE == 'GarlicCulture' %]
+  [% PROCESS Garlicculturesql.ttml %]
+ [% ELSE %]
+  [% PROCESS ForagerProjectPagesql.ttml %]
+ [% END %]
+[% ELSIF SiteName == "HE" %]
+  [% PROCESS HEProjectsPageaql.ttml %]
+[% ELSIF SiteName == "ShantaWorkShop"  %]
+ [% PROCESS ShantaWorkShopHOMEPagesql.ttml %]
+[%  ELSIF SiteName ==  'Skye' %]
+  [% PROCESS SkyeProjectPagesql.ttml %]
+[% ELSIF SiteName == "WiseWoman"  %]
+ [% PROCESS WiseWomanProjectPagesql.ttml %]
+ [% ELSE %]
+ [% PROCESS DemoToDoPagesql.ttml %]
+[% END %]
+
+   	[% embed(data.page_top_view,["-PAGE_TITLE","$PageName",]) %]
+[% embed('ErrorDisplayView') %]
+ 
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+	<tr>
+	<td>                    
+                
+[% IF data.debug == 1   
+
+	 %]
+<ul>
+<li>Record id [% Record_id   %]
+<li>SiteName [% SiteName %]
+<li>Page View name[% PageName %] 
+<li>PageViewName pasted to script [% page %]
+<li>Status [% status  %]
+<li>[%  page_code %]
+<li>Sitename form page [% site  %]
+<li>Lastupdate  [% lastupdate  %]
+<ul>
+[% END %]
+[% IF username %]
+			<h3 > Hello  [% firstname%] &nbsp; [% lastname%]! Welcome to [% data.site_display_name %]</h3>
+		[% ELSE %]
+			<h3>  [% embed ("LogOnLeftView") %] Welcome to [% data.site_display_name %]! </h3> 
+		[% END %]
+      [% IF SiteName == 'CSC' %]
+                             
+       [% IF data.session_object.getAttribute('-KEY','Developer') == 1 %]
+	      <p><a href="?site=[% SiteName %]&amp;view=DeveloperView &amp;[% session_string %]" target="_blank" title="CSC Developer page">[% FirstName %]'s Developer Home</a>
+	      [% ELSE %]
+	      <p><a href="?site=[% SiteName %]&amp;view=JobView&amp;[% session_string %]" title="CSC Developer page">Join our team</a>
+	      [% END %]
+      [% END %]
+	      
+<h4>Our Proposed power usage.   </h4>
+                 [% IF group == 'CSC_admin' OR
+                    group == 'CSCDev_admin' OR
+                    username == 'shanta'
+                 %]
+                     <a href="/cgi-bin/ToDo/project_tracker.cgi?site=[% SiteName %]&amp;[% session_string %]&view=BasicDataView" target = "_blank">Data</a>
+		[% END %]
+		
+	      
+[% embed('LiveEditAdmin') %]
+                                
+                                    
+      [% body %]
+                 [% IF group == 'CSC_admin' OR
+                    group == 'CSCDev_admin' OR
+                    group == 'MW_admin' OR
+                    group == 'WiseWoman_admin' OR
+                    username == 'shanta'
+                 %]
+  <p>              <a href="/cgi-bin/Inventory/item.cgi?site=[% SiteName %]&amp;[% session_string %]&display_add_form=on" target = "_blank">createn item to track</a>
+  		[% END %]
+<h4>Our Proposed power usage.   </h4>
+
+<table boarder>
+ <tr>
+  <td width="50%" align= "center"><h3>110 VOLT loads</h3>
+  [% embed('110loads') %]
+  </td>
+  <td width="50%" align= "center"><h3>12 VOLT loads</h3>
+  [% embed('12vloads') %]
+  </td>
+ <tr>
+</table>
+ <p>This system will pull data from a Item list that will give estimated value of consumption.
+   <ul>
+     <li>Panels
+     <li>inverter
+     <li>battery pack
+     <li>computer system
+     <li>cooking
+     <li>heating
+     <li>power tools
+     <li>lights
+     <li>fridge
+     <li>freezer
+     <li>tv vcr etc
+     <li>
+   <ul>
+<h4>Our <a href="/cgi-bin/AltPower/power_log.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=AltpowerLogHomeView" target="_blank">Power usage Log</a>.   </h4>
+
+ [% embed('ProjectList') %]
+ 
+
+
+[% IF lastupdate %]
+<p>Last Update [% lastupdate %][% IF SiteName == 'Demo' %]&nbsp; This value is stored in your setup file. [% END %]
+		<br>
+[% END %]
+[% embed('CSCCopyRight') %]
+
+	
+
+
+
+[% embed(data.page_bottom_view) %]

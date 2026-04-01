@@ -1,0 +1,11 @@
+[% FOREACH link = DBI.query("SELECT * FROM csc_todo_tb
+                                  WHERE  status = '1' or '3'
+                                  AND (sitename =  '$SiteName' OR sitename =  'All') ORDER BY priority AND status
+                                    ")%]  
+                                     
+<tr><td>[% link.priority %] </td><td>[% link.status %] </td><td>
+<a href="/cgi-bin/ToDo/todo.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;[% session_string %]&sort_field1=priority&sort_field2=due_date&simple_search_string=&first_record_to_display=0&records_per_page=100&columns_to_view=record_id&columns_to_view=project_code&columns_to_view=subject&columns_to_view=abstract&columns_to_view=start_date&columns_to_view=status&columns_to_view=priority&display_modification_form=on&record_id=[% link.record_id %]"><font   class="HeaderBarNavStyle">[% link.subject %]</td><td>
+</font></a> [% link.project_code %]</td></tr>
+
+
+  [% END %]

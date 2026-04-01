@@ -1,0 +1,8 @@
+[%
+
+# the Amazon Page template
+#	$Id: AmazonView.ttml,v 1.2 2002/10/02 15:22:14 shanta Exp shanta $	
+
+%]
+
+<iframe src="http://astore.amazon.ca/countrystor06-20" width="90%" height="4000" frameborder="0" scrolling="no"></iframe>

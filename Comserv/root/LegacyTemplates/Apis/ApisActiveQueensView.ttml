@@ -1,0 +1,95 @@
+[%
+#	$Id: ApisActiveQueensView.ttml,v 1.1 2015/09/08 06:42:47 shanta Exp shanta $	%]
+ [% PROCESS DefaultDbi.ttml %]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Active Queens']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+  
+
+ 
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td >
+
+
+[% CurrentSize = 0 %]
+<h2>This is your Queens Management view.</h2>
+<p>See how and where your queens are. What needs to be done and plan how to get it done.</p>
+
+<p>You will need to track what your bees are doing.</p>
+
+<p>The Queen system records Queens and there rates of production. 
+</p>
+<p>Based on data collected from your yards we can plan what needs to be done next and what you need to do it.
+</p>
+<h2>Active Queens.</h2>
+<p>Your list of active Queens.</p><!-- Nave bar to QueenViews -->
+<table>
+<tr><th>Yard <a href="/cgi-bin/Apis/queens.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on" target="_blank" name="Add Queen">Add</a></th><th>status</th><th>Queen code</th><th>Pallet code</th><th>View pallets</th></tr>
+[% FOREACH link = DBI.query("SELECT * FROM apis_queens_tb
+                                  WHERE   client_name = '$SiteName'
+                                   AND (status != 'Sold' AND 
+                                   status     != 'Dead')
+                                   ORDER BY queen_code 
+                                  ")%]    
+                                  
+                                  <tr>
+   
+   <td><a href="/cgi-bin/Apis/yards.cgi?site=[% SiteName %]&amp;sort_field1=yard_code&amp;sort_field2=status&amp;first_record_to_display=0&amp;records_per_page=&&amp;[% session_string %]&amp;record_id=[% link.record_id %]&display_details_view.x=15&amp;display_details_view.y=12&amp;display_details_view=on" name="Contact"  title="[% link.yard_code %] "><font   class="LeftSideBarNavStyle">[% link.yard_code %]</td>
+   <td>[% link.status  %]</td>
+   <td><a href="/cgi-bin/Apis/queens.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view=on&amp;record_id=[% link.record_id %] ">[% link.queen_code %]</a> </td>
+   <td>[% link.pallet_code %]</td>
+   <td><a href="/cgi-bin/Apis/pallet.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;submit_power_search=on&amp;simple_search_string=[% link.pallet_code %] ">Pallet</a>    </td>
+[% HiveCap = HiveCap + link.total_yard_size %]
+ [% CurrentSize = CurrentSize + 1 %]
+   [% END %]
+   </tr>
+   <tr><td></td><td></td><td>[% HiveCap %]</td><td>[% CurrentSize %]</td><td></td></tr>
+
+
+
+
+[% IF CurrentSize == 0 %]
+<tr><td>You Have no queens!</td><td>
+[% END %]
+<tr><td><a href="/cgi-bin/Apis/queens.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on" target="_blank" name="Add Queen">Add a New Queen</a>
+</td></tr>
+
+<tr><td><a href="/cgi-bin/Apis/queens.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=ApisNucQueensView">Nucs</a>
+</td></tr>
+<tr><td><a href="/cgi-bin/Apis/yards.cgi?site=[% SiteName %]&amp;view=FeedingView&amp;[% session_string %]">Feeding</a>
+</td></tr>
+</table>
+ <table>
+ 
+ 
+ </table>  
+
+
+</td>
+</tr>
+</table>
+
+
+
+
+
+[% embed(data.page_bottom_view) %]
+

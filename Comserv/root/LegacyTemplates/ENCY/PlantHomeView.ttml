@@ -1,0 +1,56 @@
+[%
+#	$Id: PlantHomeView.ttml,v 1.9 2002/11/08 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dozen't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dozen't rely on any
+# variables from outside.
+
+%]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Home.']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+   [% LastUpdate = data.last_update %]
+   [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+   [% SiteDisplayName = data.site_display_name %]
+ <!-- Begin Demo Home View -->  
+<table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+
+<h2>This is our plant database.</h2>
+
+It contains information about plants, there uses, how to grow them etc. There is a wide range of data stored about them. What you see will depend on the site you come in to it from. <a href="http://organicfarming.ca" target="_blank" title="Information on organicly grown foods, sources, and farming tools.">http://organicfarming.ca</a> provides information on Cultivation, Pollination requriements, processing, storeage etc. Forager.com provides a foragers view. ENCY on <a href="http://forager.com" target="_blank" title="Information of herbs, Herb forageing, Health etc.">http://forager.com</a> gives a detailed medicinal view.  <a href="http://beemaster.ca" target="_blank" title="Bees, Beekeeping, Polination, Honey etc.">http://beemaster.ca</a> provides information on bee pature an pollination needs. You can use the search box above to find what you are intresed in. If the word or phraze you enter in the serach box appears in any field it will retern that record.
+
+We need your help to expand this resource. Earn site credits for your contributions..
+
+
+<br>
+<!-- Call CScCopyRight -->
+[% embed('CSCCopyRight') %]
+<!-- End Call CSCCopyRight -->
+<br>
+
+</td>
+</tr>
+</table>
+<!-- End Demo home view -->
+
+[% embed(data.page_bottom_view) %]
+

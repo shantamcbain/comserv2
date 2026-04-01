@@ -1,0 +1,112 @@
+[%
+
+# this template renders a form with various options that can be
+# dynamically set by users.
+
+%]
+ [% PROCESS DefaultDbi.ttml %]
+
+
+[% set_headers(data.http_header_params) %]
+
+[% embed(data.page_top_view,{'-PAGE_TITLE' => 'Redefine Display'}) %]
+
+[% embed('ErrorDisplayView') %]
+
+[% session_id = data.session_object.getId() %]
+
+        <FORM METHOD = "POST" TARGET = "[% data.link_target %]">
+        <CENTER>
+        <TABLE WIDTH = "90%" BORDER = "0" CELLSPACING = "0"
+               CELLPADDING = "0">
+        <TR>
+        <TD CLASS = "sectionHeaderStyle">
+        Redefine Display
+        </TD>
+        </TR>
+
+        <TR>
+        <TD>
+        <INPUT TYPE = "HIDDEN" NAME = "session_id" 
+                               VALUE = "[% session_id %]">
+        <CENTER>
+        <TABLE BORDER = "0" BGCOLOR = "#D4D4D4" WIDTH = "100%"
+               CELLSPACING = "2" CELLPADDING = "2">
+        <TR>
+
+
+        <TD>
+        Records per Page
+        </TD>
+        <TD>
+
+        <SELECT NAME ="records_per_page">
+        [% FOR opt = data.records_per_page_opts %]
+          <OPTION [% "SELECTED" IF opt == data.max_records_per_page %]>[% opt %]
+        [% END %]
+        </SELECT>
+        </FONT>
+        </TD>
+
+        <TD ROWSPAN = "3">
+        Viewable Columns
+        <P>
+        (CNTL-Click for Multiple)
+        </TD>
+
+
+        <TD ROWSPAN = "3">
+
+    [% data.cgi_object.scrolling_list(
+        '-NAME'    => 'columns_to_view',
+        '-VALUES'  => data.display_fields,
+        '-DEFAULT' => [data.cgi_object.param('columns_to_view')],
+        '-MULTIPLE' => 'TRUE',
+        '-SIZE' => 6) 
+    %]
+
+        </TD>
+
+        <TD ROWSPAN = "3">
+        <INPUT TYPE = "SUBMIT" NAME = "display_simple_search_results"
+               VALUE = "View as Defined">
+        </TD>
+        </TR>
+
+
+
+    [% UNLESS data.enable_sorting_flag %]
+            <TR>
+            <TD COLSPAN = "2">&nbsp;</TD>
+            </TR>
+    [% ELSE %]
+            <TR>
+            <TD>
+            Sort Field (primary/secondary)
+            </FONT>
+            </TD>
+
+            <TD ALIGN = "LEFT" VALIGN = "TOP">
+    [% 
+    data.cgi_object.popup_menu(
+            '-NAME'    => 'sort_field1',
+            '-VALUES'  => data.sort_fields,
+            '-DEFAULT' => data.cgi_object.param('sort_field1')
+            );
+    data.cgi_object.popup_menu(
+            '-NAME'    => 'sort_field2',
+            '-VALUES'  => data.sort_fields,
+            '-DEFAULT' => data.cgi_object.param('sort_field2')
+            );
+     %]
+            </TD>
+            </TR>
+    [% END %]
+
+        </TABLE>
+        </TD>
+        </TR>
+        </TR>
+        </TABLE>
+
+[% embed(data.page_bottom_view) %]

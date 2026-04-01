@@ -1,0 +1,77 @@
+[% 
+ url_encoded_admin_variables = embed(data.url_encoded_admin_fields_view_name);
+ day_view_url = "$data.script_name?site=$data.site_name&amp;$url_encoded_admin_variables";
+
+ # reduce the indirection
+ sel = data.selected_date_data;
+
+ months_str = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+-%]
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% USE date(format = '%Y-%m-%d ') %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+        [% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+	[% LastUpdate = data.last_update %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[%# date = sel.year .'-'. sel.mon. '-'. sel.mday %]<br>
+<!-- [% date1 = sel.year + '-' %]
+date one[% date1 %]<br>
+date format [% date.format %]<br>
+year month day [% sel.year %]-[% sel.mon %]-[% sel.mday %]
+  [%# data.selected_date_data.date_str %] 
+  [%# data.selected_date_data %] 
+[% months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+%]
+<br>
+ -->
+<table cellpadding="1" cellspacing="2" border="0" width="100">
+  <!-- small navbar -->
+  <TR>
+      <td width="100" colspan="3" class="month_title_header">
+ Today's&nbsp;Todos     
+      </TD>  
+   </TR>
+
+   <tr><td colspan="2">[% date.format %]</td><td><a href="/cgi-bin/ToDo/todo.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on" target="_blank">&nbsp;Add&nbsp;ToDo</a>    
+  </td></tr>
+
+   [%# USE DBI( data_source = 'dbi:mysql:shanta_forager',
+                username = 'shanta',
+                password = 'nvidia2' )
+    %]
+ [%# Name = 'Shanta' %]  
+[% Name = data.selected_date_data %]
+[%# SiteName = 'Apis' %]
+[% FOREACH link = DBI.query("SELECT * FROM csc_todo_tb
+                                  WHERE  due_date <= 'date.format'
+                                  AND      due_date >= '$date1'
+                                  AND status != '3' 
+                                  AND project_code LIKE  '%$SiteName%'
+                                  AND group_of_poster = '$group'
+                                  ORDER BY due_date
+                                  ")%]    
+                                  
+                                  <tr>
+    <td>[% link.subject %]</td>  
+    <td>[% link.due_date %]</td>  
+ <td><a href="/cgi-bin/ToDo/todo.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_details_view=on&amp;record_id=[% link.record_id %]" target="_blank">ToDo</a>
+&nbsp;
+
+<a href="/cgi-bin/ToDo/log.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;todo_record_id=[% link.record_id %]&amp;abstract=[% link.subject %]&amp;project_code=[% link.project_code %]&amp;details=[% link.details %]&amp;priority[% link=priority %]" "target="_Blank">Log</a>
+</td>
+</tr>
+   [% END %]
+
+
+</TABLE>
+

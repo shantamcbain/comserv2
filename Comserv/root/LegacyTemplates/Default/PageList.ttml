@@ -1,0 +1,39 @@
+[%#	$Id: /cgi-bin/HTMLTemplates/Default/ToDoList.ttml,v 0.1 2015/02/05 17:43:15  <table>
+%]
+<tr><td colspan=5 class="HeaderTableCellStyle"><h2>Current admin todos</h2>      </td>
+   </tr>
+
+
+<p>  <a href="/cgi-bin/ToDo/todo.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;record_id=[% link.record_id %]&amp;subject=[% link.project_name %]&amp;project_code=[% link.project_code %]&amp;description=[% link.comments %]&amp;priority=" "target="_Blank">Add New Todo</a>
+</td>
+ <tr>
+   <td class="NavTableCellStyle">Page Code</td>
+   <td class="NavTableCellStyle"> Name of page shows in link.  </td>
+   <td class="NavTableCellStyle"> Site  </td>
+   <td class="NavTableCellStyle"> Status  2 = active</td>
+   <td class="NavTableCellStyle"> Comments </td>
+   <td class="NavTableCellStyle"> Link</a>
+       </td>
+
+
+ [% FOREACH link = DBI.query("SELECT * FROM page_tb
+                                  WHERE (sitename =  '$SiteName' )
+                                  ORDER BY page_code
+                                  ")%]    
+                                  
+   
+  </tr>
+  <tr>
+  <td class="NavTableCellStyle"> [% link.page_code %]  </td>
+  <td class="NavTableCellStyle"> [% link.view_name %]  </td>
+  <td class="NavTableCellStyle"> [% link.page_site %]  </td>
+  <td class="NavTableCellStyle"> [% link.status %]  </td>
+  <td class="NavTableCellStyle"> [% link.comments %]  </td>
+  <td class="NavTableCellStyle">        
+  <a href="/cgi-bin/page.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&amp;display_details_view.x&amp;record_id=[% link.record_id %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title="[% link.view_name %]"><font   class="LeftSideBarNavStyle">Details</font></a>
+       </td>
+   </tr> 
+
+   [% END %]
+
+</table>

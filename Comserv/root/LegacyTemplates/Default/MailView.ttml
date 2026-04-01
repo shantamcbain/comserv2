@@ -1,0 +1,124 @@
+[%
+#	$Id: MailView.ttml,v 1.4 2002/05/31 13:40:30 shanta Exp $
+
+
+%]
+ [% PROCESS DefaultDbi.ttml %]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Mail']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+  [% IF SiteName == 'ENCY' OR
+        SiteName == 'EV' OR
+        SiteName == 'Forager' %]
+   [% shop = 'cs' %] 
+   [% cat = '60001' %]
+    [% MailServerName = 'webmail.forager.com' %]
+    [% MailServer = 'mail.forager.com' %]
+   [% END %]
+   [% IF SiteName == 'CS' OR
+        SiteName == 'LumbyThrift' OR
+        SiteName == 'NOOP'  %]
+    [% shop = 'cs' %] 
+   [% cat = '60001' %]
+    [% MailServerName = 'webmail.countrystores.ca' %]
+  [% MailServer = 'mail.countrystores.ca' %]
+    [% END %]
+  [% IF SiteName == 'Organic' OR
+        SiteName == 'Sky' OR
+        SiteName == 'NOOP' OR
+        SiteName == 'AltPower' %]
+    [% shop = 'cs' %] 
+   [% cat = '60001' %]
+    [% MailServerName = 'webmail.computersystemconsulting.ca' %]
+  [% MailServer = 'mail.computersystemconsulting.ca' %]
+    [% END %]
+[% IF SiteName == 'CSC' OR
+      SiteName == 'CSCDev' OR
+      SiteName == 'Extropia' %]
+   [% MailServerName = 'webmail.computersystemconsulting.ca' %]
+   [% MailServer = 'mail.computersystemconsulting.ca' %]
+   [% shop = 'csc' %] 
+   [% cat = 'Memberships' %]
+   [% END %]
+ [% IF SiteName == 'ECF' %]
+   [% shop = 'apis' %] 
+   [% cat = 'Memberships' %]
+    [% MailServerName = 'webmail.beemaster.ca' %]
+   [% MailServer = 'mail.beemaster.ca' %]
+   [% END %]
+
+ [% IF SiteName == 'HE' %]
+   [% shop = 'HE' %] 
+   [% cat = 'Memberships' %]
+    [% MailServerName = 'webmail.helpfullearth.com' %]
+   [% MailServer = 'mail.beemaster.ca' %]
+   [% END %]
+[% IF SiteName == 'Skye' %]
+   [% shop = 'Skye' %] 
+   [% cat = 'Memberships' %]
+    [% MailServerName = 'webmail.skyefarm.com' %]
+   [% MailServer = 'mail.beemaster.ca' %]
+   [% END %]
+
+ [% IF SiteName == 'Apis' OR
+       SiteName == 'BMaster' OR
+       SiteName == 'Shanta' OR
+       SiteName == 'Brew' OR
+       SiteName == 'CSPS' OR
+       SiteName == 'TelMark'%]
+   [% shop = 'cs' %] 
+   [% cat = '60001' %]
+    [% MailServerName = 'webmail.beemaster.ca' %]
+   [% MailServer = 'mail.beemaster.ca' %]
+   [% END %]
+		<A NAME="PageTop"></A>
+     
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+
+		<tr>
+	<td >
+		<div align="center"
+			[% IF username %]
+
+		<h3> Hello  [% firstname%]&nbsp;  [% lastname%]! Welcome to [% MailServer %]'s Mail page!</h3>
+<p>When you click the mail link you will come to this page if you are not logged in. If you are logged in you will be prompted for your username@[% MailServer %] and your mail password. Once you are logged into the mail you will have a choice of 3 mail readers, forwarding and spam control functions. </p>
+
+<p><a href="http://[% MailServerName %]" Target="_blank">Mail</a></p>
+
+
+			[% ELSE %]
+
+			<h3>  Hello!  Welcome to [% MailServer %]'s Mail Page!</h3
+		<h2> We offer to our members one free </a> email address. <h2>
+<p>When you join any of the hosted sites at [% MailServerName %] you will be given an email address based on your username, if available. You may access your mail by either your local mail reader for reading off line or you can use the Mail link's on our sites. Once you log the application will know who you are and take you to your mail.</p>
+<p>To join <a href="http://countrystores.ca/cgi-bin/store/store.cgi?shop=[% SiteName%]&amp;L=eng&amp;Category=[% cat %]" Target="_blank">[% SiteName%]</a> </p>	
+			[% END %]
+		</div>
+		</td >
+		</tr>
+		<tr>
+		<td >
+
+	
+</td >
+		</tr>
+</table>		
+
+
+[% embed(data.page_bottom_view) %]
+

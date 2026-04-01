@@ -1,0 +1,115 @@
+[%
+
+# the AdminToolsLeftPage.ttml template
+#	$Id: AdminToolsLeftPage.ttml,v 1.1 2003/11/29 23:59:14 shanta Exp shanta $
+
+%]
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+
+<!--OpenAdminToolsLeftPage-->
+     [% IF group == 'ENCY_admin' OR username == 'Shanta'  %]
+    <tr>
+    <td >
+<!--CallENCYAdminLinks-->
+
+    [% embed('ENCYAdminToolsLeftLinks') %]
+<!--CloseCallENCYAdminLinks-->
+    [% END %]
+     <td  class="NavtableHeaderCellStyle" >
+     Site tools Tools<br>
+
+      	</td>
+ </tr>
+
+<!--    <tr>
+    <td >
+
+           <A HREF="/cgi-bin/CSC/auth.cgi?[% session_string %]&amp;site=[%
+SiteName %]"  TARGET = "[% data.link_target %]" ><font
+class="LeftSideBarNavStyle">User managment.</font> </a><br>    </td>    </tr>
+ -->
+    <tr>
+  <td class="NavTableCellStyle">
+           <A HREF="/cgi-bin/CSC/client.cgi?[% session_string %]&amp;site=[% SiteName %]"
+TARGET = "[% data.link_target %]" ><font
+class="LeftSideBarNavStyle">Client.</font></a><br>    </td>    </tr>
+ <tr>
+   <td class="NavTableCellStyle">
+           <A HREF="site_news_manager.cgi?[% session_string %]&amp;site=[%
+SiteName %]"  ><font
+class="LeftSideBarNavStyle">Client news. </font></a><br>    </td>    </tr>
+  <tr>
+
+   <td class="NavTableCellStyle">
+           <A HREF="/cgi-bin/CSC/csr.cgi?view_records_for_user=on&amp;user=[%
+username %]&amp;[% session_string %]&amp;site=[% SiteName %]"  ><font   class="LeftSideBarNavStyle"> Customer Service
+Request . </font></a><br>    </td>    </tr>  <tr>
+   <td class="NavTableCellStyle">
+           <A HREF="/cgi-bin/CSC/droplist.cgi?[% session_string %]&amp;site=[% SiteName %]" ><font
+class="LeftSideBarNavStyle"> Droplist Admin . </font></a><br>    </td>    </tr>
+  <tr>
+
+   <td class="NavTableCellStyle">
+           <A HREF="/cgi-bin/FAQ/faq_manager.cgi?[% session_string %]&amp;site=[% SiteName %]"   ><font   class="LeftSideBarNavStyle"> FAQ Manager.
+</font></a><br>    </td>    </tr>
+
+   <tr>
+   <td class="NavTableCellStyle">
+           <A HREF="/cgi-bin/ToDo/log.cgi?[% session_string %]&amp;site=[%
+SiteName %]"  TARGET = "[% data.link_target %]" ><font   
+class="LeftSideBarNavStyle">[% SiteName %] Log. </font></a><br>    </td>    
+</tr>  <tr>  
+
+   <td class="NavTableCellStyle">
+           <A HREF="/cgi-bin/ToDo/project_tracker.cgi?[% session_string
+%]&amp;site=[% SiteName %]"  TARGET = "[% data.link_target %]" ><font   
+class="LeftSideBarNavStyle"> Project Tracker. </font></a><br>    </td>    </tr>
+  <tr>
+
+   <td class="NavTableCellStyle">
+           <A HREF="/cgi-bin/CSC/page.cgi?[%
+session_string %]" ><font
+class="LeftSideBarNavStyle">Page Tool.</font></a><br>    </td>
+</tr>
+ <tr>
+
+   <td class="NavTableCellStyle">
+           <A HREF="/cgi-bin/News/news_manager.cgi?[% session_string
+%]&amp;site=[% SiteName %]"  TARGET = "[% data.link_target %]" ><font
+class="LeftSideBarNavStyle">News Manager. </font></a><br>    </td>    </tr>
+
+  <tr>
+
+   <td class="NavTableCellStyle">
+           <A HREF="/cgi-bin/ToDo/todo.cgi?show_all_open_todos=on&amp;[%
+session_string %]"  TARGET = "[% data.link_target %]" ><font
+class="LeftSideBarNavStyle">[% SiteName %] todo.</font></a><br>    </td>
+</tr>
+  <tr>
+
+   <td class="NavTableCellStyle">
+           <A HREF="url_admin.cgi?[% session_string %]"  TARGET = "[%
+data.link_target %]" ><font   class="LeftSideBarNavStyle"> URL
+Admin.</font></a><br>     [% IF group == 'CSC_admin' OR username == 'Shanta'  %]
+    <tr>
+    <td >
+<!--CallCSCAdminLinks-->
+
+    [% embed('CSCAdminLinks') %]
+<!--CloseCallCSCAdminLinks-->
+    [% END %]
+
+<!--CloseAdminToolsLeftPage-->
+
+

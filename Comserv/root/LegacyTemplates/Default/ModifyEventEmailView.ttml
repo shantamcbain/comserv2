@@ -1,0 +1,13 @@
+[%
+
+# this template is used in emails sent when somethings gets modified. 
+#
+# notice that the spaces/newlines is siginificant in email templates
+
+-%]
+Modify Event.
+-------------
+
+[% FOR field = data.email_display_fields -%]
+[% subs.sprintf("%-30s %s",field,data.cgi_object.param(field).array.join(", ")) %]
+[% END %]

@@ -1,0 +1,45 @@
+[% embed(data.page_top_view,['-PAGE_TITLE','Forum View']) %]
+
+[% embed('ErrorDisplayView') %]
+
+[% IF data.posted_date.defined %]
+    [% posted_date = data.posted_date %]
+[% ELSE %]
+    [% posted_date = 'date_time_posted' %]
+[% END %]
+
+[% url_encoded_admin_variables =
+embed(data.url_encoded_admin_fields_view_name) %]
+
+[% BLOCK nest %]
+    [% rec  = thread.$pid.data %]
+    <UL>
+      <LI HEIGHT = "5">
+      <A HREF="[% data.script_name %]?display_details_view=on&[% url_encoded_admin_variables %]&record_id=[% rec.record_id %]">[% rec.subject %]</A> 
+      <I>[% rec.name %] ([% rec.$posted_date %])</I>
+    [% kids = thread.$pid.kids %]
+    [% IF kids %]
+      [% # since ids are always growing, we get a correct sorting here  %]
+      [% FOREACH kid = kids.nsort.reverse %]
+         [% PROCESS nest pid=kid %]
+      [% END %]
+    [% END %]
+    </UL>
+
+[% END %]
+
+        <TABLE>
+        <TR>
+        <TD>
+[% FOREACH thread_id = data.nest_threads.keys.nsort.reverse %]
+   [% thread = data.nest_threads.$thread_id %]
+   [% PROCESS nest pid=thread_id %]
+[% END %]
+        </TD>
+        </TR>
+        </TABLE>
+
+[% embed('RecordSetDetailsFooterView') %]
+
+[% embed(data.page_bottom_view) %]
+

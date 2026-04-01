@@ -1,0 +1,217 @@
+[% #	$Id: ProductView.ttml,v 1.1 2002/10/08 04:23:07 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dose't't rely on any
+# variables from outside.
+
+%]
+
+ [% PROCESS DefaultDbi.ttml %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+   [% SiteDisplayName = data.site_display_name %]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+ [% PROCESS DefaultDbi.ttml %]
+ 
+[% IF SiteName == 'Apis' OR
+      SiteName == 'BMaster'
+      %]
+[% embed(data.page_top_view,['-PAGE_TITLE','Honey Bees, Queens, Education,  online Tools']) %]
+
+[% ELSIF SiteName == 'ECF'
+      %]
+[% embed(data.page_top_view,['-PAGE_TITLE','Bees, Queens Honey Pollination']) %]
+	[% ELSE %]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Our Products.']) %]
+	[% END %]
+
+[% embed('ErrorDisplayView') %]
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+	[% IF username %]
+
+<h3 > Hello  [% firstname %] &nbsp; [% lastname %]! Welcome to [% SiteDisplayName %]</h3>
+	<h3> Our Products.</h3>
+	  
+
+	[% ELSE %]
+
+	<h3>  Hello! Welcome to [% SiteDisplayName %]</h3>
+	<h3> Our Products.</h3>
+	[% END %]
+<form target="paypal" action="https://www.paypal.com/cgi-bin/webscr" method="post" >
+<input type="hidden" name="cmd" value="_s-xclick">
+<input type="hidden" name="encrypted" value="-----BEGIN PKCS7-----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-----END PKCS7-----
+">
+<input type="image" src="https://www.paypalobjects.com/en_US/i/btn/btn_viewcart_LG.gif" border="0" name="submit" alt="PayPal - The safer, easier way to pay online!">
+<img alt="" border="0" src="https://www.paypalobjects.com/en_US/i/scr/pixel.gif" width="1" height="1">
+</form>
+
+[% IF group == 'CSC_admin' OR
+                    group == 'Apis_admin' OR
+                    group == 'Bmaster_admin' OR
+                    group == 'ECF_admin' OR
+                    group == 'HE_admin' OR
+                    group == 'IM_admin'  OR
+                    group == 'CS_admin'  OR
+                    group == 'WiseWoman_admin'  OR
+                    group == 'Forager_admin' %]
+                     <a href="/cgi-bin/Inventory/inventory.cgi?site=[% SiteName %]&amp;[% session_string %]&display_add_form" target = "_blank">Add</a>
+		[% END %]
+
+<A NAME="PageTop"></A>
+<br>
+
+	[% IF  SiteName == 'CSC' OR
+	       SiteName == 'CSCDev' OR
+	       SiteName == 'Demo'
+	       %]
+[% embed('CSCProductView') %]
+
+	[% ELSIF  SiteName == 'IM' OR
+	       SiteName == 'IMDev'
+	       %]
+	       
+[% embed('IMProductView') %]
+
+	[% ELSIF  SiteName == 'CS' OR
+	       SiteName == 'CSDev'
+	       %]
+	       
+[% embed('CSProductView') %]
+
+	[% ELSIF SiteName == 'BMaster' OR
+	         SiteName == 'ECF'
+	         %]
+	[% embed('ApisProductView') %]
+	<ul>
+		<li><a href="/cgi-bin/store/store.cgi?shop=cs&L=eng&P=BMasterMember" target="_blank">BeeMaster Membership</a></li>
+		<li>Hosting of Beekeeping related sites. Service provided by <a href="http://computersystemconsulting.ca" target="_blank">Computer System Consulting.ca</a></li>
+		<li><a href="[% data.script_name %]?&amp;site=[%SiteName%]&amp;session_id=[% session_id %]&amp;view=MentoringHomeView">Mentoring Program</a>		</li>
+		<li>Discount's At <a href="Http://coop.beemaster.ca/cgi-bin/Coop/coop.cgi?site=BeeCoop&amp;view=ProductView" target="_blank">BeeMaster Co-Op</a> Products available from our members</li>
+   </ul>
+	[% ELSIF SiteName == 'BeeCoop' %]
+	
+	Products and services offred by our members. Orders will be shipped from the nearest member location were possible.
+<ul>
+ <li><a href="http://beemaster.ca/cgi-bin/store/store.cgi?&shop=beecoop&cart=9510832x9606&session=4502e1123d480089&L=eng&Category=Equipment
+">Equipment</a></li>
+ <li><a href="http://beemaster.ca/cgi-bin/store/store.cgi?&shop=beecoop&cart=9510832x9606&session=4502e1123d480089&L=eng&Category=2
+">Honey products, </a>We buy products from our members were possible. beemaster.ca honey is a blend of member local honeys.</li>
+</ul>	
+ 
+
+[% ELSIF SiteName == 'Skye' %]
+	  
+	 <p>It seems that all your products are not uploaded.  
+	
+	 
+	 <p>I have set up your  <a href="http://countrystores.ca/cgi-bin/index.cgi?site=Skye">online store</a> here. This is my application to manager stores.
+	 
+	 
+	 
+	 </p> 
+
+
+
+
+<h3>Our Current Crops</h3>
+    [% USE  DBI( data_source = 'dbi:mysql:forager:mail.computersystemconsulting.ca',
+                username = 'forager',
+                password =  'pwxx88' )
+    %]
+<table>	
+		[% FOREACH link = DBI.query("SELECT * FROM crop_tb
+		                                  WHERE   status   = 'Active'
+		                                      AND sitename = '$SiteName' 
+		                                  ORDER BY plant_code
+		                                  ")%]    
+		                                  
+		                                  <tr>
+		   <td class="NavTableCellStyle">
+		       <a href="/cgi-bin/ENCY/ency.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;" name="Contact" target="[% data.link_target %]" title=" [% link.crop_name %] "><font   class="LeftSideBarNavStyle">[% link.crop_name %]</font></a>
+		     </td>
+		   </tr>
+      </table>   
+[% END %]
+	[% ELSIF  SiteName == 'HoneyDo' OR
+	       SiteName == 'HoneyDoDev'
+	       %]
+[% embed('HoneyDoProductView') %]
+<p>The fallowing is what I setup in CSC's Computer Recycling</p>      
+[% embed('CSCRecyProductView') %]
+		[% ELSIF SiteName == 'Sky' %]
+	  
+<h3>Our Current Crops</h3>
+    [% USE  DBI( data_source = 'dbi:mysql:forager_stores',
+                username = 'forager',
+                password =  'pwxx88' )
+    %]
+<table>	
+		[% FOREACH link = DBI.query("SELECT * FROM product
+		                                  WHERE  ProductDisabled = '0'
+		                                  AND sitename =  '$SiteName' 
+		                                  ORDER BY CategoryID
+		                                  ")%]    
+		                                  
+		                                  <tr>
+		   <td class="NavTableCellStyle">
+		       <a href="/cgi-bin/ENCY/ency.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;" name="Contact" target="[% data.link_target %]" title=" [% link.crop_name %] "><font   class="LeftSideBarNavStyle">[% link.crop_name %]</font></a>
+		     </td>
+		   </tr>
+      </table>   
+
+	[% END %]
+		[% ELSIF SiteName == 'WiseWoman' %]
+<h2> We will get this working as you needed it.	  
+<h3>Our Current Crops</h3>
+    [%# USE  DBI( data_source = 'dbi:mysql:forager_stores',
+                username = 'forager',
+                password =  'pwxx88' )
+    %]
+<table>	
+		[% FOREACH link = DBI.query("SELECT * FROM product
+		                                  WHERE  ProductDisabled = '0'
+		                                  AND sitename =  '$SiteName' 
+		                                  ORDER BY CategoryID
+		                                  ")%]    
+		                                  
+		                                  <tr>
+		   <td class="NavTableCellStyle">
+		       <a href="/cgi-bin/.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;" name="Contact" target="[% data.link_target %]" title=" [% link.crop_name %] "><font   class="LeftSideBarNavStyle">[% link.crop_name %]</font></a>
+		     </td>
+		   </tr>
+      </table>   
+
+	[% END %]
+	[% ELSE %]
+	
+No Products are available for this site.
+
+	[% END %]
+[% embed('CSCCopyRight') %]
+
+
+</td>
+</tr>
+</table>
+
+
+[% embed(data.page_bottom_view) %]
+

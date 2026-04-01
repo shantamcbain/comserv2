@@ -1,0 +1,69 @@
+[%
+#	$Id:PollinatorSQLView.ttml,v 1.1 2003/11/29 06:42:47 shanta Exp shanta $	%]
+
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+
+<table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td >
+<div align="center">
+Here is a list of our registered bee keepers providing pollination Products.
+    </td>
+   </tr>
+ 
+<tr>
+<td >
+<div align="center">
+<!-- Start of Pollinator SQL --> 
+<table cellpadding="0" cellspacing="1" border="0" width="100%" class="LeftNavTableStyle">
+                      <th align="center" valign="top">Country</th>
+                      <th align="center" valign="top">Prov/State</th>
+                      <th align="center" valign="top">Company</th>
+                      <th align="center" valign="top">Contact </th>
+                      <th align="center" valign="top">Phone</th>
+                      <th align="center" valign="top">Email</th>
+                      <th align="center" valign="top">Link</th>
+                      <th align="center" valign="top">Details</th>
+ [% FOREACH link = DBI.query("SELECT * 
+                                FROM address_book_tb 
+		                          WHERE category = 'beekeeper'
+		                          AND   products LIKE '%Pollinator%'
+		                          ORDER BY company_name ASC 
+                                  ")%]    
+                                  <tr>
+                                  <td class="NavTableCellStyle"> [% link.country %]</td>
+                                  <td class="NavTableCellStyle"> [% link.prov %]</td>
+                                  <td class="NavTableCellStyle"> [% link.company_name %]</td>
+                                  <td class="NavTableCellStyle"> [% link.fname %] [% link.fname %]</td>
+                                  <td class="NavTableCellStyle"> [% link.phone %]</td>
+                                  <td class="NavTableCellStyle"><a href="mailto:[% link.email %]" title="Not Showen for secuity. Click to send mail.">E-Mail</a></td>
+                                  <td class="NavTableCellStyle"><a href="http://[% link.url %]?site=[% link.company_code %]&amp;[% session_string %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title=" [% link.company_name %] "><font   class="LeftSideBarNavStyle">[% link.company_name %]</font></a> </td>
+                                  <td class="NavTableCellStyle"><a href="/cgi-bin/AddressBook/address_book.cgi?site=[% SiteName %]&amp;sort_field1=category&sort_field2=fname&first_record_to_display=5&records_per_page=&amp;[% session_string %]&amp;record_id=[% link.record_id %]&amp;submit_power_search=on&amp;columns_to_view=category&amp;columns_to_view=fname&amp;columns_to_view=lname&amp%3Bcolumns_to_view=email&amp;display_details_view.x=14&amp;display_details_view.y=9">Details</a> </td>
+   </tr>
+</table>    [% END %]
+<!-- End of Pollinator Main SQL -->                                
+</td>
+</tr>
+</table>
+
+
+
+
+
+
+
+

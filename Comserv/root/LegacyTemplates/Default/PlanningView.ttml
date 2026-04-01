@@ -1,0 +1,425 @@
+[% #	$Id: PlaningView.ttml,v 1.1 2017/04/08 04:23:07 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dose't't rely on any
+# variables from outside.
+
+%]
+
+ [% PROCESS DefaultDbi.ttml %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+   [% SiteDisplayName = data.site_display_name %]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+ 
+
+[% embed('PlanningPageTopView',['-PAGE_TITLE','Planning.']) %]
+<SCRIPT LANGUAGE="JavaScript">
+<!--
+
+// document.frmLinkList.FileName.options[1].selected = true
+
+function CheckSelection() {
+    var selection = document.frmLinkList.FileName.options[document.frmLinkList.FileName.selectedIndex].value
+    if (selection != "None") {
+        location.href = selection;
+        return false;
+    }
+    else
+        return false;
+}
+
+function QuickClick(list) {
+    return false
+    //var selection = list.options[list.selectedIndex].value
+    //if (selection != "None") 
+    //    location.href = selection
+}
+
+//-->
+</SCRIPT>
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0" collumspan=2>
+<tr>
+<td>
+	[% IF username %]
+
+<h3 > Hello  [% firstname %] &nbsp; [% lastname %]! Welcome to [% SiteDisplayName %]</h3>
+	<h3> Your Planning page.</h3>
+	  
+
+	[% ELSE %]
+
+	<h3>  Hello! Welcome to [% SiteDisplayName %]</h3>
+	<h3> Your Planning page.</h3>
+	[% END %]
+
+[% IF group == 'CSC_admin' OR
+                    group == 'Apis_admin' OR
+                    group == 'Bmaster_admin' OR
+                    group == 'ECF_admin' OR
+                    group == 'HE_admin' OR
+                    group == 'IM_admin'  OR
+                    group == 'CS_admin'  OR
+                    group == 'WiseWoman_admin'  OR
+                    group == 'Forager_admin' %]
+                     <a href="/cgi-bin/ToDo/project_tracker.cgi?site=[% SiteName %]&amp;[% session_string %]&display_add_form" target = "_blank">Add New Project</a>
+		[% END %]
+
+<A NAME="PageTop"></A>
+<br>
+
+<table width="100%" border="0" cellspacing="0" cellpaddiBatch Numberng="0">
+<tr>
+<td>
+
+<A NAME="PageTop"></A>
+[% BrewItemListTb = 'brew_item_list_tb'%]
+<h2>Plan your projects [% version %] </h2>
+<h5>Variables</h5>
+	<ol>
+		<li>SiteName  = [% data.site_name %].data</li>
+		<li>Project number   = [% data.project_code %].data</li>
+		<li>Date  = [% date_time_posted %]</li>
+	    <li>BrewName  = [% BrewName %].session</li>
+		<li>App verson  = [% data.app_ver %].data</li>
+	    <li>Recipe Code = [%  data.recipecode %].data</li>
+		  <li>    [% RecipeCode %]</li>
+		  <li>BatchNumberS [% BatchNumber %]</li>
+</ol>
+<h5>Logs</h5>
+[%# Batch = BatchNumberS %]
+ 
+  <table>
+   <tr><td>Record id</td><td>Date</td><td> Planning </td><td>Project code</td><td>description </td><td>category</td><td>comments</td><td>details</td>
+ [% FOREACH link = DBI.query(" SELECT * FROM  planning_tb
+	 	                                  WHERE  (sitename =  '$SiteName' )
+		                                  
+		                                  ORDER BY recipecode
+		                                  ")%]    
+ 
+    <tr> 
+    <td>[%  record_id    = link.record_id  %][%  record_id %]</td></td>
+   <td>  [% date         = link.start_date  %][%  date %]</td></td>
+    <td> [%  batchnumber  = link.batchnumber %][% batchnumber  %]</td>
+   <td>  [%  recipecode = link.recipecode %][% recipecode  %]</td>
+    <td>[%  brew_name  = link.brew_name %][%brew_name %]</td>
+    <td> [%  description  = link.description %][%description %]</td>
+    <td> [%  comments     = link.comments    %] [%  comments %]</td>
+
+
+    <td> <a href="/cgi-bin/ToDo/planning.cgi?site=[% SiteName %]&amp;[% session_string %]&batchnumber=[% batchnumber  %]&amp;recipecode=[% item.recipecode %]amp;display_details_view.x=15&display_details_view.y=12&amp;record_id=[% record_id %]"  target="blank" title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+	</tr>
+[% END %]
+</table>
+
+<FORM METHOD=POST  ACTION="/cgi-bin/ToDo/planning.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=PlanningView&batchnumber=[% item.batchnumber %]&amp;recipecode=[% item.recipecode %]" NAME="frmLinkList" onSubmit="return CheckSelection()">
+
+<SELECT  NAME="FileName" WIDTH=20>
+<OPTION VALUE="None">Select a Plan --->
+
+ [% FOREACH item = DBI.query("SELECT * FROM  csc_todo_tb
+	 	                                  WHERE status != 'DONE' AND (sitename =  '$SiteName' )
+		                                  
+		                                  ORDER BY status
+	                            ")%]  
+<OPTION VALUE="/cgi-bin/ToDo/planning.cgi?site=[% SiteName %]&[% session_string %]&view=PlanningView&subject=[% item.subject %]&amp;discription=[% item.discription %]">[% item.project_code %] [% item.discrition%][% item.date%]</option>
+
+[% END %]
+            
+
+<INPUT TYPE=SUBMIT VALUE="Go!"onChange="QuickClick(this)" >	 
+<br>
+<a href="/cgi-bin//log.cgi?site=[% SiteName %]&display_add_form=on&[% session_string %]" name="Add Batch"  title="Add New Batch" style="AddButtonStyle">Add</a>
+
+
+
+
+
+</FORM>
+[%# BrewName = RecipeCode %]
+[%BatchCode = data.batchnumber %]
+
+
+[% FOREACH link = DBI.query(" SELECT * FROM  csc_todo_tb
+	 	                                  WHERE status != '3' AND (sitename =  '$SiteName' OR sitename =  'All')
+		                                  
+		                                  ORDER BY priority
+		                                  ")%]    
+     [%  batchrecord_id    = link.record_id  %]
+     [%  batchnumber  = link.batchnumber %]
+     [%  recipecode  = link.recipecode %]
+     
+     	[% END %]
+     	
+<h2>[% BrewName  %]</h2>
+recipe code [%  recipecode  %]
+[% FOREACH link = DBI.query(" SELECT * FROM  brew_recipe_tb
+	 	                                  WHERE  recipe_code = '$recipecode'
+		                                  
+		                                  ORDER BY recipe_code
+		                                  ")%]    
+     [%  record_id    = link.record_id  %]
+     [%  recipe_code  = link.recipe_code %]
+     [%  recipe_name  = link.recipe_name %]
+     [%  boiltime     = link.boiltime %]
+     [%  description  = link.description %]
+     [%  category     = link.category %]
+     [%  gravity      = link.gravity %]
+     [%  ingredients  = link.ingredients %]
+     [%  mashtontemp  = link.mashtontemp %]
+     [%  spargtemp    = link.spargtemp %]
+     [%  instructions = link.instructions %]
+     [%  alcohol      = link.alcohol %]
+     [%  colour       = link.colour %]
+     [%  ph           = link.ph  %]
+     [%  maturation   = link.maturation %]
+     [%  comments     = link.comments    %] 
+     	[% END %]
+
+<h3>Batch Number [% batchnumber %] <br> 
+<a href="http://brew.computersystemconsulting.ca/cgi-bin/Brew/log.cgi?site=[% SiteName %]&view=BrewLogView&batchnumber=[% item.batchnumber %]&amp;recipecode=[% item.recipecode %]&display_modification_form=on&record_id=[% record_id %]&[% session_string %]" name="Modify Batch"  title="Add New Batch" style="AddButtonStyle">Modify</a> </h3>
+
+
+<ul>
+ <li><h3>Name of brew [%  recipe_name %]</h3> 
+ <p>Recipe Code	[% recipe_code %] </p>
+ <li>Grains[% embed('IngredianceList') %] from recipe file  
+ <p>[%  ingredients %] .</p>
+ <li>sparge kettle target temp  [%  spargtemp    %].
+ <li><h5>MashtonTargetTemp.ttml [%  mashtontemp %]</h5></li>
+ <li>
+ <p>This will be a graph mash temp log Data will eventually come from sensors</p>
+ [% embed('MashtonTargetTemp') %]
+
+
+$.jqplot('document',  [[[1, 2],[3,5.12],[5,13.1],[7,33.6],[9,85.9],[11,219.9]]]);
+
+
+{ title:'Exponential Line', 
+>   axes:{yaxis:{min:-10, max:240}}, 
+>   series:[{color:'#5FAB78'}]
+> });
+<div id="document" style="height:400px;width:300px; "></div> 
+$(document).ready(function(){
+  // Some simple loops to build up data arrays.
+  var cosPoints = [];
+  for (var i=0; i<2*Math.PI; i+=1){ 
+    cosPoints.push([i, Math.cos(i)]); 
+  }
+    
+  var sinPoints = []; 
+  for (var i=0; i<2*Math.PI; i+=0.4){ 
+     sinPoints.push([i, 2*Math.sin(i-.8)]); 
+  }
+    
+  var powPoints1 = []; 
+  for (var i=0; i<2*Math.PI; i+=1) { 
+      powPoints1.push([i, 2.5 + Math.pow(i/4, 2)]); 
+  }
+    
+  var powPoints2 = []; 
+  for (var i=0; i<2*Math.PI; i+=1) { 
+      powPoints2.push([i, -2.5 - Math.pow(i/4, 2)]); 
+  } 
+ 
+  var plot3 = $.jqplot('chart3', [cosPoints, sinPoints, powPoints1, powPoints2], 
+    { 
+      title:'Line Style Options', 
+      // Set default options on all series, turn on smoothing.
+      seriesDefaults: {
+          rendererOptions: {
+              smooth: true
+          }
+      },
+      // Series options are specified as an array of objects, one object
+      // for each series.
+      series:[ 
+          {
+            // Change our line width and use a diamond shaped marker.
+            lineWidth:2, 
+            markerOptions: { style:'diamond' }
+          }, 
+          {
+            // Don't show a line, just show markers.
+            // Make the markers 7 pixels with an 'x' style
+            showLine:false, 
+            markerOptions: { size: 7, style:"x" }
+          },
+          { 
+            // Use (open) circlular markers.
+            markerOptions: { style:"circle" }
+          }, 
+          {
+            // Use a thicker, 5 pixel line and 10 pixel
+            // filled square markers.
+            lineWidth:5, 
+            markerOptions: { style:"filledSquare", size:10 }
+          }
+      ]
+    }
+  );
+    
+});
+ <li>Mash in temp time	heat on heat off
+ <li>Protein rest target temp start finish
+  <li>start finsh
+
+ <li>heat to stop enzimes
+<li> sparge start stop
+<li> boil start
+<li>rolling boil time
+<li>hop amount timein populate list per resipie
+<li>rest time start end
+<li>pump chill start finsh
+<li>1st rack
+<li>2nd rack
+<li>aginng keg
+<li>5gal# date
+<li>bottles number bottle date
+<li>notes
+</ul>
+
+[% IF username  == 'Shanta' OR
+	        group     == 'Apis_Admin' OR
+	        group     == 'BCHPA_Admin' OR
+	        group     == 'BMast_Admin' OR
+	        group     == 'BMast_Co-op_Admin' OR
+	        group     == 'Brew_Admin' OR
+           group     == 'CSC_Admin' OR
+	        group     == 'CS_Admin' OR
+	        group     == 'ECF_Admin' OR
+	        group     == 'Orgainc_Admin' OR
+	        group     == 'DarmaFarmsAdmin' OR
+	        group     == 'MARTS_Admin' OR
+	        group     == 'VitalVic_Admin' OR
+	        group     == 'ENCY_Admin' OR
+	        group     == 'USBM_Admin' OR
+	        group     == 'Shanta_Admin' OR
+	        group     == 'HoneyDo_Admin' OR
+	        group     == 'Brew_Admin' OR
+	        group     == 'Demo_admin' OR
+	       group    ==  'WB_admin' OR
+	        group     == 'MJB_Admin'        %]
+
+	   &nbsp;<a href="/cgi-bin/Brew/log.cgi?site=[% SiteName %]&amp;droplist=1&amp;[% session_string %]&amp;display_add_form=on&amp;site_name=[% SiteName %]&amp;category=BrewIngrediant&amp;subject=Item_link&amp;Nav_link=1" name="Add Ingredients"  title="Add New Recipe" style="AddButtonStyle">Add</a>
+	
+	   [% END %]
+	[% IF  SiteName == 'CSC' OR
+	       SiteName == 'CSCDev' OR
+	       SiteName == 'Demo'
+	       %]
+[% embed('CSCProductView') %]
+
+	[% ELSIF  SiteName == 'IM' OR
+	       SiteName == 'IMDev'
+	       %]
+	       
+[% embed('IMProductView') %]
+
+	[% ELSIF  SiteName == 'CS' OR
+	       SiteName == 'CSDev'
+	       %]
+	       
+[% embed('CSProductView') %]
+
+	[% ELSIF SiteName == 'BMaster' OR
+	         SiteName == 'ECF'
+	         %]
+	[% embed('ApisProductView') %]
+	<ul>
+		<li><a href="/cgi-bin/store/store.cgi?shop=cs&L=eng&P=BMasterMember" target="_blank">BeeMaster Membership</a></li>
+		<li>Hosting of Beekeeping related sites. Service provided by <a href="http://computersystemconsulting.ca" target="_blank">Computer System Consulting.ca</a></li>
+		<li><a href="[% data.script_name %]?&amp;site=[%SiteName%]&amp;session_id=[% session_id %]&amp;view=MentoringHomeView">Mentoring Program</a>		</li>
+		<li>Discount's At <a href="Http://coop.beemaster.ca/cgi-bin/Coop/coop.cgi?site=BeeCoop&amp;view=ProductView" target="_blank">BeeMaster Co-Op</a> Products available from our members</li>
+   </ul>
+	[% ELSIF SiteName == 'BeeCoop' %]
+	
+	Products and services offred by our members. Orders will be shipped from the nearest member location were possible.
+<ul>
+ <li><a href="http://beemaster.ca/cgi-bin/store/store.cgi?&shop=beecoop&cart=9510832x9606&session=4502e1123d480089&L=eng&Category=Equipment
+">Equipment</a></li>
+ <li><a href="http://beemaster.ca/cgi-bin/store/store.cgi?&shop=beecoop&cart=9510832x9606&session=4502e1123d480089&L=eng&Category=2
+">Honey products, </a>We buy products from our members were possible. beemaster.ca honey is a blend of member local honeys.</li>
+</ul>	
+ 
+
+	[% ELSIF  SiteName == 'HoneyDo' OR
+	       SiteName == 'HoneyDoDev'
+	       %]
+[% embed('HoneyDoProductView') %]
+<p>The fallowing is what I setup in CSC's Computer Recycling</p>      
+[% embed('CSCRecyProductView') %]
+		[% ELSIF SiteName == 'Sky' %]
+	  
+<h3>Our Current Crops</h3>
+    [% USE  DBI( data_source = 'dbi:mysql:forager_stores',
+                username = 'forager',
+                password =  'pwxx88' )
+    %]
+<table>	
+		[% FOREACH link = DBI.query("SELECT * FROM product
+		                                  WHERE  ProductDisabled = '0'
+		                                  AND sitename =  '$SiteName' 
+		                                  ORDER BY CategoryID
+		                                  ")%]    
+		                                  
+		                                  <tr>
+		   <td class="NavTableCellStyle">
+		       <a href="/cgi-bin/ENCY/ency.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;" name="Contact" target="[% data.link_target %]" title=" [% link.crop_name %] "><font   class="LeftSideBarNavStyle">[% link.crop_name %]</font></a>
+		     </td>
+		   </tr>
+      </table>   
+
+	[% END %]
+		[% ELSIF SiteName == 'WiseWoman' %]
+<h2> We will get this working as you needed it.	  
+<h3>Our Current Crops</h3>
+    [%# USE  DBI( data_source = 'dbi:mysql:forager_stores',
+                username = 'forager',
+                password =  'pwxx88' )
+    %]
+<table>	
+		[% FOREACH link = DBI.query("SELECT * FROM product
+		                                  WHERE  ProductDisabled = '0'
+		                                  AND sitename =  '$SiteName' 
+		                                  ORDER BY CategoryID
+		                                  ")%]    
+		                                  
+		                                  <tr>
+		   <td class="NavTableCellStyle">
+		       <a href="/cgi-bin/.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;" name="Contact" target="[% data.link_target %]" title=" [% link.crop_name %] "><font   class="LeftSideBarNavStyle">[% link.crop_name %]</font></a>
+		     </td>
+		   </tr>
+      </table>   
+     [% END %]
+.
+	[% ELSE %]
+	
+No Products are available for this site.
+
+	[% END %]
+[% embed('CSCCopyRight') %]
+
+
+</td>
+</tr>
+</table>
+ 
+
+[% embed(data.page_bottom_view) %]
+

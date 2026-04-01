@@ -1,0 +1,33 @@
+[%
+#	$Id: CSCRecyHomeView.ttml,v 1.9 2002/11/08 17:43:15 shanta Exp shanta $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and dozen't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it dozen't rely on any
+# variables from outside.
+
+%]
+
+
+[% embed('ErrorDisplayView') %]
+<A NAME="PageTop"></A>
+
+<table>
+<tr>
+	<td>
+
+
+[% IF username == "peter" or group == "Alegro_admin"%]
+[%# embed('AlegroAdminView') %]
+Hi T 
+[% ELSIF group == "CSC_Admin" %]
+My persal stuff
+[% ELSE %]
+<p>We are implementing a Computer Recycling system to keep equipment in use for as long as possible before they are reclamed for its componets.
+[% END %]	
+		
+</td>
+</p></tr>
+</table>

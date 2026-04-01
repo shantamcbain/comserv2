@@ -1,0 +1,76 @@
+	 [% IF group    ==  'Alegro_admin' OR
+	       group    ==  'Apis_admin' OR
+	       group    ==  'BCHPA_admin' OR
+	       group    ==  'Brew_admin' OR
+	       group    ==  'CS_admin' OR
+	       group    ==  'CSC_admin' OR
+	       group    ==  'CSPS_admin' OR
+	       group    ==  'ENCY_admin' OR
+	       group    ==  'Forager_admin' OR
+	       group    ==  'eXtropia_admin' OR
+	       group    ==  'GPMarket_admin' OR
+	       group    ==  'HE_admin' OR
+	       group    ==  'NOWD_admin' OR
+	       group    ==  'News_admin' OR
+	       group    ==  'OKB_admin'OR
+	       group    ==  'Organic_admin' OR
+	       group     == 'DarmaFarmsAdmin' OR
+	       group    ==  'Shanta_admin' OR
+	       group    ==  'Stawns_admin' OR
+	       group    ==  'VitalVic_admin' OR
+	       group    ==  'rv_admin' OR
+	       group    == 'MJB_Admin' OR
+	       group    ==  'WB_admin' OR
+	       group    ==  'WW_admin' OR
+	       username == 'Shanta' OR
+	      group    == 'Demo_admin'
+	 %]
+	<tr>
+	
+	<td>
+	   <table class="LeftNavTableStyle" CELLPADDING ="1" >
+	  <tr>
+	   <td class="NavtableHeaderCellStyle" >
+	
+	       [% SiteName %] Admin Tools  
+	  [% IF username == 'Shanta' OR
+	        group    == 'Apis_Admin' OR
+	        group    == 'BCHPA_Admin' OR
+	        group    == 'CSC_Admin' OR
+	        group    == 'CS_Admin' OR
+	        group    == 'ECF_Admin' OR
+	        group     == 'HoneyDo_Admin' OR
+	        group    == 'Orgainc_Admin' OR
+	        group     == 'DarmaFarmsAdmin' OR
+	        group    == 'MARTS_Admin' OR
+	        group    == 'VitalVic_Admin' OR
+	        group    == 'ENCY_Admin' OR
+	        group    == 'USBM_Admin' OR
+	        group    == 'Shanta_Admin' OR
+	       group    ==  'GPMarket_admin' OR
+	        group    == 'RV_Admin' OR
+	        group    == 'Brew_Admin' OR
+	       group    ==  'WB_admin' OR
+	       group    == 'MJB_Admin' 
+	   %]
+	   &nbsp;<a href="/cgi-bin/URL/url.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;site_name=[% SiteName %]&amp;category=Admin_links&amp;subject=Nav_link&amp;Nav_link=1" name="Add page link"  title="Add New Link">Add</a>
+	
+	   [% END %]
+	<br>
+	    </td>
+	    </tr>
+	<tr><td>
+	  [% IF group    == 'Demo_admin' %]
+		 [% embed ('SQL_Demo_Admin') %]
+	  [% ELSE %]
+	 	[% embed ('SQL_Admin') %]
+	
+	  [% END %]
+	    </td>
+	    </tr>
+	
+	   </table>
+</td>
+</tr>
+[% END %]
+

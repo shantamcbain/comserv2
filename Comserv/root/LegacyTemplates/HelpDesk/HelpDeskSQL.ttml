@@ -1,0 +1,46 @@
+[%# IF == "navcontainer" %]
+[%#<ul id="navlist"> %]
+
+[%# FOREACH link = DBI.query("SELECT * FROM internal_links_tb
+                                 WHERE  category = 'HelpDesk'
+                                  AND (sitename =  '$SiteName' OR sitename =  'All')
+                                  ORDER BY link_order
+                                  ")%]    
+[%# 	 <li>&nbsp;<a href="#"  BORDER =" 0" %]
+[%# 	     WIDTH =" 8" HEIGHT =" 8" ALT =" ::">
+	  %]
+[%# 	 </li> %]
+   [%# END %]
+[%# </ul> %]
+[%# </div> %]
+ [%#   </td> %]
+ [%#   </tr> %]
+
+ 
+[%# ELSE %]     	  
+
+[% FOREACH link = DBI.query("SELECT * FROM page_tb
+	                                  WHERE  menu = 'HelpDesk'
+	                                  AND (sitename =  '$SiteName' OR sitename =  'All')
+	                                  ORDER BY link_order
+	                                  ")%]    
+	   <tr>
+	   <td class="NavTableCellStyle">
+	       <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]" title=" [% linkview_.name %] "><font   class="LeftSideBarNavStyle">[% link.view_name %]</font></a>
+	   </td>
+	   </tr>
+	[% END %]
+                            
+	  [% FOREACH link = DBI.query("SELECT * FROM internal_links_tb
+	                                  WHERE  category = 'HelpDesk'
+	                                  AND (sitename =  '$SiteName' OR sitename =  'All')
+	                                  ORDER BY link_order
+	                                  ")%]    
+	   <tr>
+	   <td class="NavTableCellStyle">
+	       <a href="[% link.url %]?site=[% SiteName %]&amp;[% session_string %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title=" [% link.name %] "><font   class="LeftSideBarNavStyle">[% link.name %]</font></a>
+	   </td>
+	   </tr>
+	[% END %]
+[%# END %]
+<!-- end HelpDeskstart SQL -->

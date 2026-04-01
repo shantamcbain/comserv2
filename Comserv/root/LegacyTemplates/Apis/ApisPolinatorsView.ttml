@@ -1,0 +1,181 @@
+[%
+#	$Id: ApisHomeView.ttml,v 1.1 2003/11/29 06:42:47 shanta Exp shanta $	%]
+ [% PROCESS DefaultDbi.ttml %]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Pollination']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+  [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+<!--Start Page here-->
+<h2>Pollination is the most known of all Products provided by Bee Keepers</h2>
+<p>Agriculture's dependence on the service of bees and other insects is staggering. Bee keepers contribute greatly to the production of all kinds of groups.</p>
+
+<p>There are two main kinds of pollination Products provided </p>
+<ol><li>One crop</li>
+<ul>
+<li>This group of services is directed at one crop such as Orchards, Berry corps, cranberries, Canola etc. Bees are placed in the clients fields for a short period of time. Ie during the flowering stage of the particular crop.</li>
+</ul>
+<li>On going</li>
+<ul>
+<li>This group of Products are for farms that have a constant demand for pollination. Berry production, Cucumbers, squash, Peppers are a few of the crops that require this Product.</li>
+
+</ul>
+<li>Our list a pollinators near you.</a>
+</ol>
+
+
+
+[% embed('PollinatorSQLView') %]
+
+[% IF SiteName == 'BCHPA' %]
+ <h2>
+
+<center>
+    <font color="#FFC01A" face="AvantGarde Md BT"> </font>
+    <table width=433 border=0 cellpadding=0 cellspacing=0>
+      <tr> 
+        <td rowspan=2> <img src="http://bcbeekeepers.com/images/contacts_bcbreeders_01.gif" width=117 height=150 alt=""></td>
+        <td> <img src="http://bcbeekeepers.com/images/contacts_bcbreeders_02.gif" width=239 height=91 alt=""></td>
+        <td rowspan=3> <img src="http://bcbeekeepers.com/images/contacts_bcbreeders_03.gif" width=77 height=151 alt=""></td>
+
+        <td> <img src="http://bcbeekeepers.com/images/spacer.gif" width=1 height=91 alt=""></td>
+      </tr>
+      <tr> 
+        <td rowspan=2> <img src="http://bcbeekeepers.com/images/contacts_bcbreeders_04.gif" width=239 height=60 alt=""></td>
+        <td> <img src="http://bcbeekeepers.com/images/spacer.gif" width=1 height=59 alt=""></td>
+      </tr>
+      <tr> 
+        <td> <img src="http://bcbeekeepers.com/images/contacts_bcbreeders_05.gif" width=117 height=1 alt=""></td>
+
+        <td> <img src="http://bcbeekeepers.com/images/spacer.gif" width=1 height=1 alt=""></td>
+      </tr>
+    </table>
+    <p>&nbsp;</p>
+    <table width="90%" border="0" cellspacing="5">
+      <tr> 
+        <td bgcolor="#FFCC66"> 
+          <div align="center"><b><font size="2">Company </font></b></div>
+        </td>
+
+        <td bgcolor="#FFCC66"> 
+          <div align="center"><b><font size="2">Contact Information</font></b></div>
+        </td>
+      </tr>
+      <tr valign="middle"> 
+        <td height="109" bgcolor="#FFE0A6" > 
+          <p><b><font color="#000000">Jane's Honey Bees Ltd.</font></b><font color="#000000"><br>
+            Honey bee pollination for commercial fruit and berry growers in the 
+            Fraser Valley.<br>
+            <br>
+
+            </font></p>
+        </td>
+        <td height="109" bgcolor="#FFE0A6" >Tel: (604) 790-0624 <br>
+          (604) 790-0625 <br>
+          Website: <a href="http://janeshoneybees.com" target="_blank">janeshoneybees.com 
+          </a>Contacts: J Chandler, Liz Graham</td>
+      </tr>
+
+     
+      <tr valign="middle"> 
+        <td height="109"> 
+          <p><b><font color="#000000">North Peace Apiaries Ltd. </font></b></p>
+          <p><font color="#000000"><i>"Over 50 years in the Pollination Business" 
+            </i><br>
+            <br>
+            </font></p>
+        </td>
+        <td height="109"><font color="#000000">RR#1 Fort St. John, <br>
+
+          B.C. V1J 4M6 <br>
+          Tel: 250 785 4808 <br>
+          Cell: 250 262 5633 <br>
+          Web page: <a href="http://www.honeyplace.com" target="_blank">www.honeyplace.com</a> 
+          <br>
+          Contact: Ernie Fuhr </font></td>
+
+      </tr>
+      <tr bgcolor="#FFE0A6" valign="middle"> 
+        <td bgcolor="#FFE0A6" height="85"><b>Neidig Apiaries<br>
+          </b>200 colonies available for the Fraser Valley<b> </b></td>
+        <td bgcolor="#FFE0A6" height="85">Tel: 604 591 1385<br>
+          Contact: Wayne Neidig</td>
+      </tr>
+
+      <tr valign="middle"> 
+        <td height="109"> 
+          <p><b><font color="#000000">Barry Wilcox</font></b><font color="#000000"><br>
+            12-15 honey bee colonies available for pollination in the Port Kells, 
+            Aldergrove, Matsqui area. <br>
+            <br>
+            </font></p>
+        </td>
+        <td height="109">18859 86th Ave. <br>
+
+          Surrey, V4N 3G5 <br>
+          Tel: 604 882 8283<br>
+          Contact: Barry Wilcox </td>
+      </tr>
+      <tr bgcolor="#FFE0A6" valign="middle"> 
+        <td bgcolor="#FFE0A6" height="85"><b>Golden Ears Apiaries Inc.<br>
+          </b>1000 hives available for pollination; pollinate blueberries, raspberries 
+          and cranberries</td>
+
+        <td bgcolor="#FFE0A6" height="85">Tel: (604) 820-6924<br>
+          Fax: (604) 820-6924 <br>
+          Email: <a href="mailto:jmcshipley@sprint.ca">jmcshipley@sprint.ca</a> 
+          <br>
+          Contact: Jean-Marc Le Dorze</td>
+      </tr>
+      <tr> 
+        <td>&nbsp;</td>
+
+        <td>&nbsp;</td>
+      </tr>
+      <tr>
+        <td>
+        [% END %]
+
+
+ <script type = "text/javascript"
+ src="/cgi-bin/Apis/address_book.cgi?embed=1&amp;site=[% SiteName %]&amp;records_per_page=1&amp;&amp;columns_to_view=fname&amp;columns_to_view=lname&amp;columns_to_view=company_name&amp;columns_to_view=email&amp;columns_to_view=url&amp;submit_power_search=on&amp;simple_search_string=Pollinator">
+</script>
+ [% IF SiteName == 'BCHPA' %]
+</td>
+        <td>&nbsp;</td>
+      </tr>
+    </table>
+    <p>&nbsp;</p>
+  </center>
+
+</h2>
+<center>
+  <p>
+<font size="3">
+<b><font color="#F39E01">Your Bees Should be Listed Here!</font></b>
+</font>
+  <p><font size="2"> Email your information to <a href="mailto:bunsebee@telus.net">bunsebee@telus.net</a>
+    or call 604-521-4493 to be included for the 2003 pollination season.</font>
+[% embed('WenLinCopyRight') %]
+[% END %]
+</center>
+[% embed('CSCCopyRight') %]
+
+
+[% embed(data.page_bottom_view) %]
+

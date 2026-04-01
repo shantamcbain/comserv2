@@ -1,0 +1,59 @@
+[%#	$Id: CSCHome.ttml,v 1.6 2002/01/13 01:33:34 shanta Exp $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it doesn't rely on any
+# variables from outside.
+
+%]
+
+[%# embed('SubTopFrameView',['-PAGE_TITLE','CountryStores.ca sub']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<div ALIGN="center">
+
+</div>
+<A NAME="PageTop"></A>
+</div>
+<p>We have many <a href="/cgi-bin/index.cgi?site=[% SiteName %]&[% session_string %]&view=ProductView" > products</a> on offer. Honey and Bee products, 
+<a href="/cgi-bin/index.cgi?site=[% SiteName %]&[% session_string %]&view=WorkShopsView" target="_Blank" > Workshops</a>, Herbs, Produce, Used Goods, Website memberships to name just a few.</p>
+
+<br>
+[% embed('Stores') %]
+[% embed('Affiliates') %]
+
+[% embed('AmazonView') %]
+
+<br>
+<br>
+<a href="http://usbm.ca" target="_Blank" >USBM</a>. We are proud to sponsor The Universal School of Biological Life Site.
+<br>
+<br>
+
+
+[%# embed('CSCCopyRight') %]
+
+
+
+</td>
+</tr>
+</table>
+[%# embed(data.page_bottom_view) %]
+

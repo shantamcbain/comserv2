@@ -1,0 +1,107 @@
+[%#	$Id: BatchLogView.ttml,v 1.0 2013/11/16 06:42:47 shanta Exp shanta $	%]
+<!-- ApisHomeView  v 1.1 2003/11/29-->
+       [% version = data.app_ver %]
+ [% PROCESS DefaultDbi.ttml %]
+[% embed(data.page_top_view,['-PAGE_TITLE','Batch Logs  ' data.app_ver $version]) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+
+  [% BrewName = data.session_object.getAttribute('-KEY','BrewName') %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+<table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+
+<A NAME="PageTop"></A>
+[% BrewItemListTb = 'brew_item_list_tb'%]
+<h2>Our batches [% version %]</h2>
+<h5>Variables</h5>
+	<ol>
+		<li>SiteName  = [% data.SiteName %].data</li>
+		<li>BrewName  = [% data.brewname %].data</li>
+       	        <li>BrewName  = [% BrewName %].session</li>
+		<li>App verson  = [% data.app_ver %].data</li>
+</ol>
+<h5></h5>
+
+ 
+[%# BrewName = BrewName||'1516' %]
+
+
+<FORM>
+<SELECT  NAME="url" WIDTH=20>
+<OPTION VALUE="None">Select a page from this list --->
+<OPTION VALUE="http://cgi.computersystemconsulting.ca/cgi-bin/index.cgi?site=[% SiteName %]&[% session_string %]&view=BrewRecipeView&brewname=1516">1516
+<OPTION VALUE="http://cgi.computersystemconsulting.ca/cgi-bin/index.cgi?site=[% SiteName %]&[% session_string %]&view=BrewRecipeView&brewname=ODM">ODM Stout
+<OPTION VALUE="http://cgi.computersystemconsulting.ca/cgi-bin/index.cgi?site=[% SiteName %]&[% session_string %]&view=BrewRecipeView&brewname=TradAle">Trad Ale
+<OPTION VALUE="http://cgi.computersystemconsulting.ca/cgi-bin/index.cgi?site=[% SiteName %]&[% session_string %]&view=BrewRecipeView&brewname=ArpicotAle">Apricot Ale
+<OPTION VALUE="http://cgi.computersystemconsulting.ca/cgi-bin/index.cgi?site=[% SiteName %]&[% session_string %]&view=BrewRecipeView&brewname=TTKIrishRedAle">TTK Irish Red Ale
+<OPTION VALUE="http://cgi.computersystemconsulting.ca/cgi-bin/index.cgi?site=[% SiteName %]&[% session_string %]&view=BrewRecipeView&brewname=GarlicAleVin">Garlic Ale (for Vineger)</SELECT>
+
+<INPUT TYPE=BUTTON VALUE="Go!" onClick="JumpToIt(this.form)">	  
+
+[% IF username  == 'Shanta' OR
+	        group     == 'Apis_Admin' OR
+	        group     == 'BCHPA_Admin' OR
+	        group     == 'BMast_Admin' OR
+	        group     == 'BMast_Co-op_Admin' OR
+	        group     == 'Brew_Admin' OR
+           group     == 'CSC_Admin' OR
+	        group     == 'CS_Admin' OR
+	        group     == 'ECF_Admin' OR
+	        group     == 'Orgainc_Admin' OR
+	        group     == 'DarmaFarmsAdmin' OR
+	        group     == 'MARTS_Admin' OR
+	        group     == 'VitalVic_Admin' OR
+	        group     == 'ENCY_Admin' OR
+	        group     == 'USBM_Admin' OR
+	        group     == 'Shanta_Admin' OR
+	        group     == 'HoneyDo_Admin' OR
+	        group     == 'Brew_Admin' OR
+	        group     == 'Demo_admin' OR
+	       group    ==  'WB_admin' OR
+	        group     == 'MJB_Admin'        %]
+
+	   &nbsp;<a href="/cgi-bin/Brew/recipe.cgi?site=[% SiteName %]&amp;droplist=1&amp;[% session_string %]&amp;display_add_form=on&amp;site_name=[% SiteName %]&amp;category=BrewIngrediant&amp;subject=Item_link&amp;Nav_link=1" name="Add Ingredients"  title="Add New Recipe" style="AddButtonStyle">Add</a>
+	
+	   [% END %]
+
+
+
+</FORM>
+<h3>Our Brewing log 	[% BrewName %] </h3>
+
+
+
+[% embed('IngredianceList') %]
+ 	
+
+                 
+ procedure
+ boil wort
+ 
+ 
+[% embed('CSCCopyRight') %]
+
+
+</td>
+</tr>
+</table>
+
+
+
+

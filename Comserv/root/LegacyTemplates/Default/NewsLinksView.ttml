@@ -1,0 +1,67 @@
+[% 
+#	$Id: NewsLinksView.ttml,v 1.2 2002/08/13 19:57:02 shanta Exp $	
+
+
+%]
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+[% lname = data.session_object.getAttribute('-KEY','auth_lastname') %]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+
+
+<tr>
+   <td>
+      <font class="LeftSideBarHeaderStyle" >News</font><br>
+
+      	</td>
+ </tr>      	
+ <tr>
+     	      	<td>
+ 
+	<A HREF ="webcal.cgi?[% session_string %]&DisplayMonthViewAction=on&cal=none" Target ="_content"><font   class="LeftSideBarNavStyle">Calander of events</font></a>	
+      	</td>
+ 
+  <tr>  
+  <td>	<A HREF = "bbs.cgi?[% session_string %]" target="_content"><font   class="LeftSideBarNavStyle"> Forums </font></a>
+  </td>
+ </tr>
+[% IF  group == 'admin' or group == 'member' %]
+ <tr>
+     	      	<td>
+
+	<A HREF ="webcal.cgi?[% session_string %]&DisplayMonthViewAction=on&cal=[% username%]" Target ="_content" ><font   class="LeftSideBarNavStyle">[% fname%]'s Personal  Calendar</font></a>	
+  </td>
+ </tr>
+[% ELSE %]
+ <tr>
+     	      	<td>
+
+	<A HREF ="http://computersystemconsulting.ca/cgi-bin/csc.cgi?view=&[% session_string %]"><font   class="LeftSideBarNavStyle">Join now for your free personal Calendar</font></a>	
+  </td>
+ </tr>
+[% END %]  
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+
+<tr>
+    <td>
+        <script language = "JavaScript"
+                SRC = "news.cgi?embed=1&site=[% SiteName%]">
+                                        
+        </script>
+        
+        
+        
+        </td>
+</tr>

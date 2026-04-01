@@ -1,0 +1,53 @@
+[%
+
+# this template renders the modification confirmation page
+
+%]
+ [% PROCESS DefaultDbi.ttml %]
+
+[% set_headers(data.http_header_params) %]
+
+[% embed(data.page_top_view,{'-PAGE_TITLE' => 'Modify Record Confirmation'}) %]
+
+[% embed('ErrorDisplayView') %]
+
+        <CENTER>
+        <P>
+        <FORM METHOD = "POST" TARGET = "[% data.link_target %]">	
+        <TABLE WIDTH = "95%" BORDER = "0" CELLSPACING = "2" 
+               CELLPADDING = "0">
+
+        <TR> 
+        <TD CLASS = "sectionHeaderStyle"
+            COLSPAN = "[% data.basic_input_widget_display_colspan %]"> 
+        Confirmation....is this the correct modification data?
+        </TD>
+        </TR>
+
+[% embed('WidgetsTableView', 
+         {'-DISPLAY_TYPE'    => 'CONFIRM',
+          '-USE_RECORD_FROM' => 'CGI',
+         }) %]
+
+        <TR>
+        <TD COLSPAN = "2" ALIGN = "CENTER">
+        <INPUT TYPE = "IMAGE" NAME = "submit_modify_record"  BORDER = "0"
+               VALUE = "Submit" SRC = "[% data.image_root_url %]/submit.gif" 
+               ALT = "Submit">
+        <INPUT TYPE = "IMAGE" NAME = "display_modification_form"  BORDER = "0"
+               VALUE = "Back" SRC = "[% data.image_root_url %]/back.gif" 
+               ALT = "Back">
+        </TD>
+        </TR>
+        </TABLE>
+
+        <TR>
+        <TD COLSPAN = "2" ALIGN = "CENTER"> 
+
+[% embed(data.hidden_admin_fields_view_name,
+         {'-RECORD_ID' => data.cgi_object.param('record_id')}) %]
+
+        </FORM>
+        </CENTER>
+
+[% embed(data.page_bottom_view) %]

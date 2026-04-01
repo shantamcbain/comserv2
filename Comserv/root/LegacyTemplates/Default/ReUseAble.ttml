@@ -1,0 +1,76 @@
+[%
+#	$Id:ReUseAble.ttml,v 1.1 2010/09/28 06:42:47 shanta Exp shanta $	%]
+
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+<!-- GrindrodParkMarketHomeView  v 1.1 2010/09/07-->
+<table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<A NAME="PageTop"></A>
+
+<h3> Reusables </h3>
+
+	[% IF username %]
+			[% IF  group == 'normal'%]
+
+				<p>Thanks Creating an account on our site.
+				</p>
+				<p>As a guest user, you will be able to use more of the tool on the site.  
+					</p>	
+				<p>Becoming a Paid member will give you access to even more of the tools offered on the site and Discounts on offering of other participating members.
+                        [% ELSE %]
+				<p>Paid Member </p>
+	
+ 			[% END %]
+
+
+	[% ELSE %]
+                 
+ 
+<p><font size="-2">To get the most from this application you will need to create an account.
+<A HREF = "[% data.script_name %]?session_id=[% session_id %]&amp;submit_logon=on&amp;site=[%SiteName%]"
+                 TARGET = "[% data.link_target %]">Logon</A> </font>
+                
+    
+		[% END %]
+<p>The second of the 3 R's  is reuse. By reusing the things that we make further reduces our impact on the planet. Many of our members have projects going. You can see some at <a href="/cgi-bin/store/store.cgi">Country Stores</a></p>
+
+  <p><a href="/cgi-bin/index.cgi?site=[%SiteName%]&amp;view=ReCyclingView&amp;[% session_string %]">Recycling</a>
+</p>
+<p> <a href="/cgi-bin/index.cgi?site=[%SiteName%]&amp;view=MembersView&amp;[% session_string %]">Join us.</A></p>
+			 		
+
+
+		
+					
+				
+
+
+ 
+
+
+<!-- hhmts start -->
+<!-- hhmts end -->
+
+[%# embed('CSCCopyRight') %]
+		
+
+<!-- ReUseAble  v 1.1 2010/9/07 -->
+
+
+
+

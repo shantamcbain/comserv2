@@ -1,0 +1,97 @@
+[%
+#	$Id: LTrustCompanyMemberView.ttml,v 1.4 2002/05/31 13:40:30 shanta Exp $
+
+
+%][% embed(data.page_top_view,['-PAGE_TITLE',' Company Members']) %]
+
+[% embed('ErrorDisplayView') %] 
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+       [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+	<table width="100%" border="0" cellspacing="0" cellpadding="0">
+
+		<tr>
+		<td >
+		<div align="center"
+		
+		<h3>[% data.site_display_name %]</h3>
+			[% IF username %]
+
+		<h3>[% firstname%]! Company Membership Page!</h3>
+
+
+			[% ELSE %]
+
+			<h3> This is our Company Membership Page!</h3
+<p>To get the most from this application you will need to create an account. 
+
+<p><A HREF = "[% data.script_name %]?session_id=[% session_id %]&amp;submit_logon=on&amp;site=[%SiteName%]"
+                 TARGET = "[% data.link_target %]">Log on</A> 
+                 
+                 
+               <a href="/cgi-bin/FAQ/faq.cgi?site=[%SiteName%]&amp;[% session_string %]&amp;sort_field1=category &amp;sort_field2=fname &amp;first_record_to_display=0&amp;records_per_page= &amp;record_id=2&amp;columns_to_view=category &amp;columns_to_view=question&amp;display_details_view.x=8 &amp;display_details_view.y=9&amp;display_details_view=on" onmousedown="click Here for info on what we collect">Why should I create an account</a>
+    
+			[% END %]
+		</div>
+		</td >
+		</tr>
+		<tr>
+		<td >
+
+		<A NAME="PageTop"></A>
+
+		<h2> Companies play a key role. </h2>
+		
+		<p>[% data.site_display_name %] encourages companies to take a pivotal role in creating a sustainable business community. </p>
+[% IF SiteName == "CS" OR
+	   SiteName == "CSCDev" OR
+	   SiteName == "CSC" OR
+		SiteName == "ECF" OR
+	   SiteName == "DevECF"%]
+	   
+	   
+	   <p>We believe at [% data.site_display_name %] that business should in a sustainable manner</p>
+	<ul>
+	<li><a href="/cgi-bin/index.cgi?site=Ltrust&amp;view=LtrustHomeView" name="Home">Land Trusts</a> 
+     <hr width="50">[% data.session_object.getAttribute('-KEY','auth_firstname') %]
+</li>
+	<li>Supporting other sustainable business's</li>
+	<li>Promoting and education sustainable business's practices</li>
+</ul>[% ELSE %]
+		<p>
+		<ul>
+			<li>Member companies will create and maintain a MOU of sustainable business practices</li>
+			<li>Member companies will support sustainable business practices by supporting those those that do with an focus on local first</li>
+			<li>Member companies may also contribute financial to [% data.site_display_name %]</li>
+		</ul>
+		</p>
+		<p><h5>Companies that have expressed an interest in joining.</h5>
+			<ul>
+				<li><a href="/cgi-bin/index.cgi?site=CSC&view=LTrustCompanyMemberView">Computersystemconsulting.ca</a></li>
+				<li><a href="/cgi-bin/index.cgi?site=ECF&view=LTrustCompanyMemberView">Eagle Creek Farms</a></li>
+				<li><a href="/cgi-bin/index.cgi?site=CS&view=LTrustCompanyMemberView">Country Stores.ca</a></li>
+			</ul>		
+		</p>
+		[% END %]
+		
+[% embed('JoinLinkView') %]
+
+		</td>
+			</tr>
+		</table>
+</DIV>
+[% embed(data.page_bottom_view) %] 
+

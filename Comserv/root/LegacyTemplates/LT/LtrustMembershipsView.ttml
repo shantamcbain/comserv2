@@ -1,0 +1,60 @@
+[%
+#	$Id: LtrustMembershipsView.ttml,v 0.04 2010/02/24 13:40:30 shanta Exp $
+
+
+%]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% email = data.session_object.getAttribute('-KEY','auth_email') %]
+<!--LtrustMembershipsView-->
+ <p>Our memberships are now in preliminary implementation. We are attempting to attract member in the fallowing areas</p>
+ <p>Benefits to members.</p>
+<ul>
+	<li>Access to members area on the website</li>
+	<li>Discounts at member company offering them and at [% data.site_display_name %] sponsored events.</li>
+	<li>All benefits of membership will be defined by the board of directors.</li>
+</ul>
+ 
+ <ol>
+	<li><h4>Core of Members</h4> to start the society/company. We would like to have 9 members to register [% data.site_display_name %].</li>
+	<li><h4>Public memberships. </h4>
+	<p>Public member our our core resource.</p>
+	</li>
+	<li><h4>Supporting members.</h4>
+	<p>These are members who really like what we are doing and are contributing financially to [% data.site_display_name %]</p>
+	</li>
+	<li><h4>Land owners</h4>
+	<p>These members are landowners that have a land owned/leased by [% data.site_display_name %]</p>
+	</li>
+	<li><h4>Lessees 
+	<p>These members are lessees of [% data.site_display_name %]</p>
+	</h4></li>
+	<li><h4>Company and organizational <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=LTrustCompanyMemberView" name="See the development of the lease here">membership</a></h4>
+	<p>These are our corporate members. </p>	
+	</li>
+	<li><h4>Government memberships</h4></li>
+</ol>
+[% END %]
+[% embed ('JoinLinkView') %]
+
+
+
+
+</td>
+</tr>
+</table>
+
+
+
+
+

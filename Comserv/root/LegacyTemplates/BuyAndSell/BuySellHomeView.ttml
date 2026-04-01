@@ -1,0 +1,136 @@
+[%# the home  Page template#	$Id: BuySellHomeView.ttml,v 1.1 2002/01/09 22:01:26 shanta Exp $
+
+%]
+
+[% PROCESS DefaultDbi.ttml %]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Buy and Sell']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% Username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+	[% group = data.session_object.getAttribute('-KEY','auth_groups')%]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+ [% script_name = data.app_name %]
+
+    <div align="center"><h2>[% SiteName %] Our Buy and Sell</h2>
+</div><br>
+
+<p>  <a href="/cgi-bin/BuyAndSell/buy.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on" title='ADD a new item'><font   class="LeftSideBarNavStyle">Add an item.</font></a>
+[% IF SiteName == "CSC" OR
+      SiteName == "CSCDev" %]
+        <table>
+ <tr><td colspan = 4>CSC Posts</td></tr>
+ [% FOREACH link = DBI.query("SELECT * FROM buy_sell_tb
+                                  WHERE (status !=  '3' and
+                                         sitename = 'CSC' )
+                                  ORDER BY category
+                                  ")%]    
+                                   <tr>
+ <td class="NavTableCellStyle"> [% link.category %]  </td>
+ <td class="NavTableCellStyle"> [% link.item_name %]  </td>
+ <td class="NavTableCellStyle"> [% link.description %]  </td>
+ <td class="NavTableCellStyle">        
+  <a href="/cgi-bin/BuyAndSell/buy.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %]&[% link.item_name %]" name="Contact" " title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+     </td>
+   </tr> 
+ [% END %]
+
+ </table>
+[% END %]
+
+[% IF SiteName == "GrindrodBC"  %]
+        <table>
+ <tr><td colspan = 4>Our Posts</td></tr>
+ [% FOREACH link = DBI.query("SELECT * FROM buy_sell_tb
+                                  WHERE (status !=  '3' and
+                                         sitename = 'GrindrodBC' )
+                                  ORDER BY category
+                                  ")%]    
+                                   <tr>
+ <td class="NavTableCellStyle"> [% link.category %]  </td>
+ <td class="NavTableCellStyle"> [% link.item_name %]  </td>
+ <td class="NavTableCellStyle"> [% link.description %]  </td>
+ <td class="NavTableCellStyle">        
+  <a href="/cgi-bin/BuyAndSell/buy.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %]&[% link.item_name %]" name="Contact" " title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+     </td>
+   </tr> 
+ [% END %]
+ </table>
+[% END %]
+
+[% IF SiteName == "HE"  %]
+        <table>
+ <tr><td colspan = 4>Our Posts</td></tr>
+ [% FOREACH link = DBI.query("SELECT * FROM buy_sell_tb
+                                  WHERE (status !=  '3' and
+                                         sitename = 'HE' )
+                                  ORDER BY category
+                                  ")%]    
+                                   <tr>
+ <td class="NavTableCellStyle"> [% link.category %]  </td>
+ <td class="NavTableCellStyle"> [% link.item_name %]  </td>
+ <td class="NavTableCellStyle"> [% link.description %]  </td>
+ <td class="NavTableCellStyle">        
+  <a href="/cgi-bin/BuyAndSell/buy.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %]&[% link.item_name %]" name="Contact" " title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+     </td>
+   </tr> 
+ [% END %]
+
+ </table>
+[% END %]
+
+[% IF SiteName == "Skye"  %]
+        <table>
+ <tr><td colspan = 4>Our Posts</td></tr>
+ [% FOREACH link = DBI.query("SELECT * FROM buy_sell_tb
+                                  WHERE (status !=  '3' and
+                                         sitename = 'Skye' )
+                                  ORDER BY category
+                                  ")%]    
+                                   <tr>
+ <td class="NavTableCellStyle"> [% link.category %]  </td>
+ <td class="NavTableCellStyle"> [% link.item_name %]  </td>
+ <td class="NavTableCellStyle"> [% link.description %]  </td>
+ <td class="NavTableCellStyle">        
+  <a href="/cgi-bin/BuyAndSell/buy.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %]&[% link.item_name %]" name="Contact" " title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+     </td>
+   </tr> 
+ [% END %]
+</table>
+[% END %]
+
+  <table>
+<tr><td colspan = 4><h2>All products on offer by all member sites.</h2></td></tr>
+ [% FOREACH link = DBI.query("SELECT * FROM buy_sell_tb
+                                  WHERE (status !=  '3' and
+                                        share !=  'priv' )
+                                  ORDER BY category
+                                  ")%]    
+                                   <tr>
+<td class="NavTableCellStyle"> [% link.category %]  </td>
+<td class="NavTableCellStyle"> [% link.item_name %]  </td>
+<td class="NavTableCellStyle"> [% link.description %]  </td>
+<td class="NavTableCellStyle">        
+  <a href="/cgi-bin/BuyAndSell/buy.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %]&[% link.item_name %]" name="Contact" " title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+     </td>
+   </tr> 
+[% END %]
+
+ </table>
+
+
+ <br>
+<br>
+[% embed(data.page_bottom_view) %]
+

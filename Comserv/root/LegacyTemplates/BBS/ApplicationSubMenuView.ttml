@@ -1,0 +1,51 @@
+[% url_encoded_admin_variables = embed(data.url_encoded_admin_fields_view_name) %]
+
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% username   = data.session_object.getAttribute('-KEY','auth_username') %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+
+        <TABLE WIDTH = "100%" BORDER = "0"
+               CELLSPACING = "0" CELLPADDING = "2">
+        <TR>
+        <TD ALIGN = "LEFT" VALIGN = "TOP">
+        <FONT FACE = "[% data.page_font_face %]" SIZE = "-2">
+
+[% IF data.allow_additions_flag %]
+        [<A HREF="[% data.script_name %]?site=[% data.site_name %]&amp;display_add_form=on&amp;[% url_encoded_admin_variables %]">Post Message</A>]
+[% END %]
+        [<A HREF="[% data.script_name %]?site=[% data.site_name %]&amp;view_all_records=on[% url_encoded_admin_variables %]">Forum Index</A>] 
+
+        </FONT>
+        </TD>
+
+        <TD VALIGN = "TOP" ALIGN = "RIGHT">
+        <FONT FACE = "[% data.page_font_face %]" SIZE = "-2">
+        [<A HREF="[% data.script_name %]?site=[% data.site_name %]&amp;[% url_encoded_admin_variables %]">Forums</A>]
+
+[% IF is_authenticated %]
+        [<A HREF = "[% data.script_name %]?site=[% data.site_name %]&amp;[% url_encoded_admin_variables %]&submit_logoff=on">Logoff</A>]
+[% ELSE %]
+        [<A HREF = "[% data.script_name %]?site=[% data.site_name %]&amp;[% url_encoded_admin_variables %]&submit_logon=on">Logon</A>]
+[% END %]
+
+        </FONT>
+        </TD>
+        </TR>
+        <TR>
+        <TD ALIGN = "LEFT">
+[% IF username && is_authenticated %]
+            <FONT FACE = "[% data.page_font_face %]" SIZE = "-2">
+            Welcome [% username %]! You are logged in.
+            </FONT>
+[% END %]
+
+        &nbsp;</TD>
+        <TD ALIGN = "RIGHT">
+        </TD>
+        </TR>
+        </TABLE>
+        </CENTER>
