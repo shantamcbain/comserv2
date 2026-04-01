@@ -157,10 +157,11 @@
         [% NEXT IF d.mount.match('^/(sys|proc|run/|dev/pts|snap/)') %]
         <div class="ds-mount">
             <span style="font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="[% d.device | html %]">[% d.mount | html %]</span>
-            <div class="ds-bar-wrap" title="[% d.pct %]% used">
-                <div class="ds-bar lvl-[% d.level %]" style="width:[% d.pct || 0 %]%;"></div>
+            [% SET _pct = d.pct | format('%.0f') %]
+            <div class="ds-bar-wrap" title="[% _pct %]% used">
+                <div class="ds-bar lvl-[% d.level %]" style="width:[% _pct %]%;"></div>
             </div>
-            <span class="ds-pct" style="[% IF d.level == 'critical' %]color:#b71c1c[% ELSIF d.level == 'warn' %]color:#e65100[% END %]">[% d.pct || 0 %]%</span>
+            <span class="ds-pct" style="[% IF d.level == 'critical' %]color:#b71c1c[% ELSIF d.level == 'warn' %]color:#e65100[% END %]">[% _pct %]%</span>
             <span class="ds-sizes">
                 [% IF d.free_mb.defined %]
                     [% SET _free = d.free_mb %]
