@@ -154,6 +154,7 @@
         </div>
         <div class="ds-mounts">
         [% FOR d IN dh.mounts %]
+        [% NEXT IF d.mount.match('^/(sys|proc|run/|dev/pts|snap/)') %]
         <div class="ds-mount">
             <span style="font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="[% d.device | html %]">[% d.mount | html %]</span>
             <div class="ds-bar-wrap" title="[% d.pct %]% used">
