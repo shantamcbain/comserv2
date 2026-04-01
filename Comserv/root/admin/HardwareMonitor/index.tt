@@ -177,17 +177,15 @@
     [% END %]
 
     <details style="margin-bottom:16px;">
-        <summary style="cursor:pointer;font-size:.88em;color:#888;padding:4px 0;">&#128268; Remote agent setup — deploy to any server-room device</summary>
+        <summary style="cursor:pointer;font-size:.88em;color:#888;padding:4px 0;">&#128268; Remote agent setup — add any server-room device (one cron line per machine)</summary>
         <div style="margin-top:8px;background:#f8f9fa;border:1px solid #ddd;border-radius:4px;padding:12px;font-size:.85em;">
-            <p style="margin:0 0 8px;"><strong>1.</strong> Copy the agent script to the target machine:</p>
-            <pre style="background:#222;color:#eee;padding:8px;border-radius:4px;overflow-x:auto;margin:0 0 8px;">scp script/device_agent.sh root@TARGET:/usr/local/bin/device_agent.sh
-ssh root@TARGET chmod +x /usr/local/bin/device_agent.sh</pre>
-            <p style="margin:0 0 8px;"><strong>2.</strong> Set the token and URL, then add a cron job (every 5 minutes):</p>
-            <pre style="background:#222;color:#eee;padding:8px;border-radius:4px;overflow-x:auto;margin:0 0 8px;">export INGEST_URL="[% c.uri_for('/admin/hardware_monitor/ingest') | html %]"
-export INGEST_TOKEN="[% ingest_token | html %]"
-# Add to /etc/cron.d/comserv_agent:
-# */5 * * * * root INGEST_URL=... INGEST_TOKEN=... /usr/local/bin/device_agent.sh</pre>
-            <p style="margin:0;color:#888;">Token is set via <code>HW_INGEST_TOKEN</code> environment variable on the <strong>server</strong>. Change it from the default <code>changeme</code>.</p>
+            <p style="margin:0 0 6px;"><strong>&#9989; No script copy needed</strong> — the agent is on the shared NFS mount at:</p>
+            <pre style="background:#222;color:#eee;padding:6px 10px;border-radius:4px;overflow-x:auto;margin:0 0 10px;">/home/shanta/nfs/comserv/scripts/device_agent.sh</pre>
+            <p style="margin:0 0 6px;">The script <strong>auto-detects the hostname</strong> of whichever machine runs it — no per-machine edits required.</p>
+            <p style="margin:0 0 6px;"><strong>On each machine</strong>, add one line to <code>/etc/cron.d/comserv_agent</code>:</p>
+            <pre style="background:#222;color:#eee;padding:8px;border-radius:4px;overflow-x:auto;margin:0 0 10px;">*/5 * * * * root INGEST_URL="[% c.uri_for('/admin/hardware_monitor/ingest') | html %]" INGEST_TOKEN="[% ingest_token | html %]" /home/shanta/nfs/comserv/scripts/device_agent.sh</pre>
+            <p style="margin:0 0 4px;color:#555;"><strong>Requirements:</strong> NFS mount at <code>/home/shanta/nfs</code> (already set up on server-room machines) + <code>curl</code> or <code>wget</code>.</p>
+            <p style="margin:0;color:#888;">&#128274; Change the token from <code>changeme</code> by setting <code>HW_INGEST_TOKEN=yourtoken</code> in the application environment and updating the cron lines.</p>
         </div>
     </details>
     [% END %]
