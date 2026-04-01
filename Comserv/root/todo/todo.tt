@@ -1,15 +1,10 @@
-[% PageVersion  = 'todo.tt,v 0.1 2023/11/09 Shanta Exp Shanta' %]
+[% PageVersion  = 'todo.tt,v 0.2 2026/04/01 Shanta Exp Shanta' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
-    [%# "Debugging HostName: " _ HostName %]
-    [%# INCLUDE 'debug.tt' %]
 [% END %]
-
 
 <h1>ToDo List</h1>
 <h2>[% date_today %]</h2>
-
-
 
 <!-- Filter Section -->
 <div class="filter-container">
@@ -36,11 +31,6 @@
                             [% IF project.sub_projects && project.sub_projects.size > 0 %]
                                 [% FOREACH sub_project IN project.sub_projects %]
                                     <option value="[% sub_project.id %]" [% IF project_id == sub_project.id %]selected[% END %]>&nbsp;&nbsp;- [% sub_project.name %]</option>
-                                    [% IF sub_project.sub_projects && sub_project.sub_projects.size > 0 %]
-                                        [% FOREACH sub_sub_project IN sub_project.sub_projects %]
-                                            <option value="[% sub_sub_project.id %]" [% IF project_id == sub_sub_project.id %]selected[% END %]>&nbsp;&nbsp;&nbsp;&nbsp;-- [% sub_sub_project.name %]</option>
-                                        [% END %]
-                                    [% END %]
                                 [% END %]
                             [% END %]
                         [% END %]
@@ -74,7 +64,6 @@
             [% END %]
         </div>
 
-        <!-- Hidden field to preserve search term when applying filters -->
         <input type="hidden" id="search_hidden" name="search" value="[% search_term %]">
 
         <div class="filter-buttons">
@@ -94,15 +83,12 @@
                 <input type="text" id="search_input" name="search" placeholder="Search in subject, description, comments..." value="[% search_term %]">
             </div>
         </div>
-
-        <!-- Hidden fields to preserve filters when searching -->
         <input type="hidden" id="filter_hidden" name="filter" value="[% filter_type %]">
         <input type="hidden" id="project_hidden" name="project_id" value="[% project_id %]">
         <input type="hidden" id="status_hidden" name="status" value="[% status_filter %]">
         [% IF is_csc_admin %]
         <input type="hidden" id="sitename_hidden" name="sitename" value="[% sitename_filter %]">
         [% END %]
-
         <div class="search-buttons">
             <button type="submit">Search</button>
             <button type="button" class="clear-search-button" onclick="clearSearch()">Clear Search</button>
@@ -118,163 +104,279 @@
     <a href="/todo/addtodo" style="margin-left: auto;">Add New Todo</a>
 </div>
 
-<div class="table-responsive">
-<table class="week-view-table">
-  <tr>
-    <th>Sitename</th>
-    <th>Project</th>
-    <th>Parent todo</th>
-    <th>Start Date</th>
-    <th>Due Date</th>
-    <th>What needs to be done</th>
-    <th>Details </th>
-    <th>Who is responsible</th>
-    <th>Priority</th>
-    <th>Status</th>
-    <th>Code needed for</th>
-    <th>Accumulated time</th>
-    <th>Action</th>
-  </tr>
-[% counter = 0 %]
+[%# ── Priority label map ── %]
+[% SET pri_label = {
+    '1'  => 'Critical',
+    '2'  => 'When we have time',
+    '3'  => 'Urgent',
+    '4'  => 'High',
+    '5'  => 'Medium',
+    '6'  => 'Medium-Low',
+    '7'  => 'Low',
+    '8'  => 'Very Low',
+    '9'  => 'Minimal',
+    '10' => 'Optional'
+} %]
+
+<style>
+.todo-accordion { list-style: none; margin: 0; padding: 0; }
+
+.todo-item { border: 1px solid var(--border-color, #dee2e6); border-radius: 6px; margin-bottom: 6px; overflow: hidden; }
+
+.todo-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    cursor: pointer;
+    background: var(--bg-color, #fff);
+    user-select: none;
+    list-style: none;
+    flex-wrap: wrap;
+}
+.todo-summary::-webkit-details-marker { display: none; }
+.todo-summary:hover { background: var(--bg-secondary, #f8f9fa); }
+
+.todo-item[open] > .todo-summary { border-bottom: 1px solid var(--border-color, #dee2e6); background: var(--bg-secondary, #f8f9fa); }
+
+.todo-badge {
+    font-size: 0.7em; font-weight: bold;
+    padding: 2px 6px; border-radius: 3px;
+    white-space: nowrap; flex-shrink: 0;
+}
+.pri-1  { background: #dc3545; color: #fff; }
+.pri-2  { background: #c0392b; color: #fff; }
+.pri-3  { background: #e67e22; color: #fff; }
+.pri-4  { background: #fd7e14; color: #fff; }
+.pri-5  { background: #ffc107; color: #333; }
+.pri-6  { background: #f0ad4e; color: #333; }
+.pri-7  { background: #6c757d; color: #fff; }
+.pri-8,.pri-9,.pri-10 { background: #adb5bd; color: #333; }
+
+.status-new      { background: #6c757d; color: #fff; }
+.status-progress { background: #17a2b8; color: #fff; }
+.status-done     { background: #28a745; color: #fff; }
+
+.todo-subject { font-weight: 600; font-size: 0.95em; flex: 1; min-width: 0; }
+.todo-meta    { font-size: 0.78em; color: var(--text-muted-color, #6c757d); white-space: nowrap; }
+.todo-toggle  { font-size: 0.75em; color: var(--text-muted-color, #6c757d); flex-shrink: 0; margin-left: auto; }
+
+.todo-body {
+    padding: 12px 14px;
+    background: var(--bg-color, #fff);
+    font-size: 0.88em;
+}
+.todo-body-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px 16px;
+    margin-bottom: 12px;
+}
+.todo-field label { display: block; font-size: 0.78em; color: var(--text-muted-color, #6c757d); margin-bottom: 2px; }
+.todo-field .val   { font-size: 0.92em; }
+
+.todo-desc { margin-bottom: 10px; }
+.todo-desc label { font-size: 0.78em; color: var(--text-muted-color, #6c757d); margin-bottom: 3px; display: block; }
+.todo-desc .val   { background: var(--bg-secondary, #f8f9fa); border-radius: 4px; padding: 7px 10px; font-size: 0.9em; white-space: pre-wrap; word-break: break-word; }
+
+.todo-actions { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--border-color, #dee2e6); }
+.todo-actions form { margin: 0; }
+.todo-actions button, .todo-actions a.action-button {
+    font-size: 0.78em; padding: 4px 10px;
+    border-radius: 4px; cursor: pointer;
+    text-decoration: none; display: inline-block;
+}
+</style>
+
+[% IF todos && todos.size > 0 %]
+<p style="font-size:0.85em;color:var(--text-muted-color,#6c757d);margin-bottom:8px;">
+    [% todos.size %] todo[% todos.size != 1 ? 's' : '' %] — click a row to expand details
+</p>
+<ul class="todo-accordion">
 [% FOREACH task IN todos %]
-    [% IF counter % 5 == 0 AND counter != 0 %]
-        <tr>
-        <td colspan="13">
-            <div class="top-controls">
-                <button type="button" onclick="window.scrollTo(0, 0);">Return to top</button>
-                <!-- Add the form next to the "Return to top" button -->
-                <form action="/todo/addtodo" method="post">
-                    <button type="submit">Add New Record</button>
-                </form>
-            </div>
-        </td>
-        </tr>
-        <tr>
-            <th>Sitename</th>
-            <th>Project</th>
-            <th>Parent todo</th>
-            <th>Start Date</th>
-            <th>Due Date</th>
-            <th>What needs to be done</th>
-            <th>Details </th>
-            <th>Who is responsible</th>
-            <th>Priority</th>
-            <th>Status</th>
-            <th>Code needed for</th>
-            <th>Accumulated time</th>
-            <th>Action</th>
-        </tr>
-    [% END %]
-    <tr>
-      <td>[% task.sitename %]</td>
-      <td>[% task.project_id %]</td>
-      <td>[% task.parent_todo %]</td>
-      <td>[% task.start_date %]</td>
-      <td>[% task.due_date %]</td>
-      <td>[% task.subject %]</td>
-      <td>[% task.description %]</td>
-      <td>[% task.developer %]</td>
-      <td>[% INCLUDE todo/priority_display.tt priority_value=task.priority %]</td>
-      <td>[% task.status %]</td>
-      <td>[% task.comments %]</td>
-      <td>[% task.accumulative_time %]</td>
-      <td class="action-buttons-cell">
-        <form action="/log/log_form" method="POST" target="_blank">
-          <input type="hidden" name="todo_record_id" value="[% task.record_id %]">
-          <input type="hidden" name="site_name" value="[% task.sitename %]">
-          <input type="hidden" name="start_date" value="[% task.start_date %]">
-          <input type="hidden" name="due_date" value="[% task.due_date %]">
-          <input type="hidden" name="abstract" value="[% task.subject %]">
-          <input type="hidden" name="details" value="[% task.description %]">
-          <input type="hidden" name="priority" value="[% task.priority %]">
-          <input type="hidden" name="status" value="[% task.status %]">
-          <input type="hidden" name="comments" value="[% task.comments %]">
-          <button type="submit" class="action-button log-button">Add Log</button>
-        </form>
-        <form action="/todo/details" method="POST" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
-          <input type="hidden" name="record_id" value="[% task.record_id %]">
-          <input type="hidden" name="return_to" value="">
-          <button type="submit" class="action-button details-button">Details</button>
-        </form>
-        <form action="/todo/edit/[% task.record_id %]" method="GET" style="display: inline;" onsubmit="const returnTo = window.location.href + window.location.hash; this.action = this.action + (this.action.includes('?') ? '&' : '?') + 'return_to=' + encodeURIComponent(returnTo);">
-          <button type="submit" class="action-button edit-button">Edit</button>
-        </form>
-      </td>
-    </tr>
-    [% counter = counter + 1 %]
+
+[%# ── Determine priority class ── %]
+[% SET pcls = 'pri-' _ (task.priority || 5) %]
+
+[%# ── Determine status label + class ── %]
+[% SET st = task.status %]
+[% IF st == 2 || st == 'in_progress' || st == 'In Progress' || st == 'IN PROGRESS' || st == 'in-process' || st == 'In-Process' %]
+    [% SET st_label = 'IN PROGRESS' %][% SET st_cls = 'status-progress' %]
+[% ELSIF st == 3 || st == 4 || st == 'completed' || st == 'Completed' || st == 'done' || st == 'Done' || st == 'closed' || st == 'Closed' %]
+    [% SET st_label = 'DONE' %][% SET st_cls = 'status-done' %]
+[% ELSE %]
+    [% SET st_label = 'NEW' %][% SET st_cls = 'status-new' %]
 [% END %]
-</table>
+
+[%# ── Overdue check ── %]
+[% SET is_overdue = 0 %]
+[% IF task.due_date && task.due_date < date_today %]
+    [% SET is_overdue = 1 %]
+[% END %]
+
+<li class="todo-item" [% IF st_cls == 'status-done' %]style="opacity:0.6"[% END %]>
+<details>
+    <summary class="todo-summary">
+
+        [%# Priority badge %]
+        [% IF task.priority %]
+        <span class="todo-badge [% pcls %]">P[% task.priority %] [% pri_label.${task.priority} || '' %]</span>
+        [% END %]
+
+        [%# Status badge %]
+        <span class="todo-badge [% st_cls %]">[% st_label %]</span>
+
+        [%# Overdue badge %]
+        [% IF is_overdue && st_cls != 'status-done' %]
+        <span class="todo-badge" style="background:#dc3545;color:#fff;">OVERDUE</span>
+        [% END %]
+
+        [%# Subject %]
+        <span class="todo-subject">[% task.subject || '(no subject)' %]</span>
+
+        [%# Compact meta %]
+        [% IF task.project_id %]
+        <span class="todo-meta">📁 [% task.project_id %]</span>
+        [% END %]
+        [% IF task.due_date %]
+        <span class="todo-meta" [% IF is_overdue && st_cls != 'status-done' %]style="color:#dc3545;font-weight:bold"[% END %]>📅 [% task.due_date %]</span>
+        [% END %]
+        [% IF is_csc_admin && task.sitename %]
+        <span class="todo-meta">[% task.sitename %]</span>
+        [% END %]
+
+        <span class="todo-toggle">▼</span>
+    </summary>
+
+    <div class="todo-body">
+        <div class="todo-body-grid">
+            [% IF task.start_date %]
+            <div class="todo-field">
+                <label>Start Date</label>
+                <div class="val">[% task.start_date %]</div>
+            </div>
+            [% END %]
+            [% IF task.due_date %]
+            <div class="todo-field">
+                <label>Due Date</label>
+                <div class="val" [% IF is_overdue && st_cls != 'status-done' %]style="color:#dc3545;font-weight:bold"[% END %]>[% task.due_date %]</div>
+            </div>
+            [% END %]
+            [% IF task.developer %]
+            <div class="todo-field">
+                <label>Assigned To</label>
+                <div class="val">[% task.developer %]</div>
+            </div>
+            [% END %]
+            [% IF task.accumulative_time %]
+            <div class="todo-field">
+                <label>Accumulated Time</label>
+                <div class="val">[% task.accumulative_time %]</div>
+            </div>
+            [% END %]
+            [% IF task.parent_todo %]
+            <div class="todo-field">
+                <label>Parent Todo</label>
+                <div class="val"><a href="/todo/details?record_id=[% task.parent_todo %]">#[% task.parent_todo %]</a></div>
+            </div>
+            [% END %]
+            [% IF task.sitename %]
+            <div class="todo-field">
+                <label>Site</label>
+                <div class="val">[% task.sitename %]</div>
+            </div>
+            [% END %]
+        </div>
+
+        [% IF task.description %]
+        <div class="todo-desc">
+            <label>Description</label>
+            <div class="val">[% task.description %]</div>
+        </div>
+        [% END %]
+
+        [% IF task.comments %]
+        <div class="todo-desc">
+            <label>Comments / Code context</label>
+            <div class="val">[% task.comments %]</div>
+        </div>
+        [% END %]
+
+        <div class="todo-actions">
+            <form action="/log/log_form" method="POST" target="_blank">
+                <input type="hidden" name="todo_record_id" value="[% task.record_id %]">
+                <input type="hidden" name="site_name"      value="[% task.sitename %]">
+                <input type="hidden" name="start_date"     value="[% task.start_date %]">
+                <input type="hidden" name="due_date"       value="[% task.due_date %]">
+                <input type="hidden" name="abstract"       value="[% task.subject %]">
+                <input type="hidden" name="details"        value="[% task.description %]">
+                <input type="hidden" name="priority"       value="[% task.priority %]">
+                <input type="hidden" name="status"         value="[% task.status %]">
+                <input type="hidden" name="comments"       value="[% task.comments %]">
+                <button type="submit" class="action-button log-button">📋 Log</button>
+            </form>
+            <form action="/todo/details" method="POST" onsubmit="this.return_to.value = window.location.href;">
+                <input type="hidden" name="record_id" value="[% task.record_id %]">
+                <input type="hidden" name="return_to"  value="">
+                <button type="submit" class="action-button details-button">Details</button>
+            </form>
+            <form action="/todo/edit/[% task.record_id %]" method="GET"
+                  onsubmit="const rt = window.location.href; this.action = this.action + (this.action.includes('?') ? '&' : '?') + 'return_to=' + encodeURIComponent(rt);">
+                <button type="submit" class="action-button edit-button">Edit</button>
+            </form>
+            <a href="/todo/details?record_id=[% task.record_id %]" class="action-button" style="border:1px solid var(--primary-color,#007bff);color:var(--primary-color,#007bff);">View →</a>
+        </div>
+    </div>
+</details>
+</li>
+
+[% END %]
+</ul>
+
+[% ELSE %]
+<div style="text-align:center;padding:40px;color:var(--text-muted-color,#6c757d);">
+    <p>No todos found matching the current filters.</p>
+    <a href="/todo/addtodo" class="action-button" style="background:var(--primary-color,#007bff);color:#fff;padding:8px 18px;border-radius:4px;text-decoration:none;">Add New Todo</a>
 </div>
+[% END %]
+
 <script>
-// Existing row highlighting functionality
-document.querySelectorAll('.week-view-table tbody tr').forEach(row => {
-    row.addEventListener('click', () => {
-        row.classList.toggle('highlight');
+/* Rotate the ▼ arrow when open */
+document.querySelectorAll('.todo-item').forEach(function(item) {
+    item.addEventListener('toggle', function() {
+        var arrow = this.querySelector('.todo-toggle');
+        if (arrow) arrow.textContent = this.open ? '▲' : '▼';
     });
 });
 
-// Filter and Search management functions
 function resetFilters() {
-    // Reset filter form to defaults but preserve search
     document.getElementById('filter').value = 'all';
     document.getElementById('project_id').value = '';
     document.getElementById('status').value = '';
-    const sitenameSelect = document.getElementById('sitename');
-    if (sitenameSelect) {
-        sitenameSelect.value = 'all';
-    }
-    
-    // Submit with current search term preserved
-    const currentSearch = document.getElementById('search_input').value;
-    document.getElementById('search_hidden').value = currentSearch;
-    
-    // Navigate to todo with only search parameter if there is one
-    if (currentSearch.trim()) {
-        window.location.href = '/todo?search=' + encodeURIComponent(currentSearch);
-    } else {
-        window.location.href = '/todo';
-    }
+    var s = document.getElementById('sitename');
+    if (s) s.value = 'all';
+    var search = document.getElementById('search_input').value;
+    document.getElementById('search_hidden').value = search;
+    window.location.href = search.trim() ? '/todo?search=' + encodeURIComponent(search) : '/todo';
 }
 
 function clearSearch() {
-    // Clear search but preserve filters
     document.getElementById('search_input').value = '';
-    
-    // Build URL with current filters
-    const filter = document.getElementById('filter_hidden').value || 'all';
-    const project = document.getElementById('project_hidden').value || '';
-    const status = document.getElementById('status_hidden').value || '';
-    const sitename = document.getElementById('sitename_hidden') ? document.getElementById('sitename_hidden').value : '';
-    
-    let url = '/todo';
-    let params = [];
-    
-    if (filter !== 'all') params.push('filter=' + encodeURIComponent(filter));
-    if (project) params.push('project_id=' + encodeURIComponent(project));
-    if (status) params.push('status=' + encodeURIComponent(status));
+    var filter   = document.getElementById('filter_hidden').value  || 'all';
+    var project  = document.getElementById('project_hidden').value || '';
+    var status   = document.getElementById('status_hidden').value  || '';
+    var sitename = document.getElementById('sitename_hidden') ? document.getElementById('sitename_hidden').value : '';
+    var params = [];
+    if (filter  !== 'all') params.push('filter='     + encodeURIComponent(filter));
+    if (project)            params.push('project_id=' + encodeURIComponent(project));
+    if (status)             params.push('status='     + encodeURIComponent(status));
     if (sitename && sitename !== 'all') params.push('sitename=' + encodeURIComponent(sitename));
-    
-    if (params.length > 0) {
-        url += '?' + params.join('&');
-    }
-    
-    window.location.href = url;
+    window.location.href = '/todo' + (params.length ? '?' + params.join('&') : '');
 }
 
-// Auto-sync hidden fields when filter form changes
-document.getElementById('filter').addEventListener('change', function() {
-    document.getElementById('filter_hidden').value = this.value;
-});
-document.getElementById('project_id').addEventListener('change', function() {
-    document.getElementById('project_hidden').value = this.value;
-});
-document.getElementById('status').addEventListener('change', function() {
-    document.getElementById('status_hidden').value = this.value;
-});
-const sitenameSelect = document.getElementById('sitename');
-if (sitenameSelect) {
-    sitenameSelect.addEventListener('change', function() {
-        document.getElementById('sitename_hidden').value = this.value;
-    });
-}
+document.getElementById('filter').addEventListener('change',     function() { document.getElementById('filter_hidden').value   = this.value; });
+document.getElementById('project_id').addEventListener('change', function() { document.getElementById('project_hidden').value   = this.value; });
+document.getElementById('status').addEventListener('change',     function() { document.getElementById('status_hidden').value    = this.value; });
+var sn = document.getElementById('sitename');
+if (sn) sn.addEventListener('change', function() { document.getElementById('sitename_hidden').value = this.value; });
 </script>
