@@ -120,4 +120,29 @@ __PACKAGE__->add_columns(
 
 __PACKAGE__->set_primary_key('record_id');
 
+__PACKAGE__->has_many(
+    disease_symptoms => 'Comserv::Model::Schema::Forager::Result::DiseaseSymptom',
+    'disease_id',
+);
+
+__PACKAGE__->has_many(
+    disease_animals => 'Comserv::Model::Schema::Forager::Result::DiseaseAnimal',
+    'disease_id',
+);
+
+__PACKAGE__->has_many(
+    disease_insects => 'Comserv::Model::Schema::Forager::Result::DiseaseInsect',
+    'disease_id',
+);
+
+__PACKAGE__->has_many(
+    disease_herbs => 'Comserv::Model::Schema::Forager::Result::DiseaseHerb',
+    'disease_id',
+);
+
+__PACKAGE__->has_many(
+    constituent_diseases => 'Comserv::Model::Schema::Forager::Result::ConstituentDisease',
+    'disease_id',
+);
+
 1;

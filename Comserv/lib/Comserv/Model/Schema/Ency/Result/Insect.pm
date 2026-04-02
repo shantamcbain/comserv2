@@ -133,4 +133,14 @@ __PACKAGE__->add_columns(
 
 __PACKAGE__->set_primary_key('record_id');
 
+__PACKAGE__->has_many(
+    disease_insects => 'Comserv::Model::Schema::Forager::Result::DiseaseInsect',
+    'insect_id',
+);
+
+__PACKAGE__->has_many(
+    insect_herbs => 'Comserv::Model::Schema::Forager::Result::InsectHerb',
+    'insect_id',
+);
+
 1;
