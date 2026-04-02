@@ -23,18 +23,12 @@ __PACKAGE__->add_columns(
         size        => 500,
         is_nullable => 1,
     },
-    author => {
-        data_type   => 'varchar',
-        size        => 500,
+    publisher_id => {
+        data_type   => 'integer',
         is_nullable => 1,
     },
     publication_date => {
         data_type   => 'date',
-        is_nullable => 1,
-    },
-    publisher => {
-        data_type   => 'varchar',
-        size        => 255,
         is_nullable => 1,
     },
     isbn => {
@@ -67,5 +61,15 @@ __PACKAGE__->add_columns(
     },
 );
 __PACKAGE__->set_primary_key('reference_id');
+
+__PACKAGE__->belongs_to(
+    publisher => 'Comserv::Model::Schema::Ency::Result::Publisher',
+    'publisher_id',
+);
+
+__PACKAGE__->has_many(
+    reference_authors => 'Comserv::Model::Schema::Ency::Result::ReferenceAuthor',
+    'reference_id',
+);
 
 1;
