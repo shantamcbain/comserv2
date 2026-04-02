@@ -1134,6 +1134,219 @@ sub edit_symptom : Path('/ENCY/Symptom/edit') : Args(0) {
     );
 }
 
+sub constituents_redirect : Path('/ENCY/constituents') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->redirect($c->uri_for('/ENCY/Constituent'), 301);
+}
+
+sub constituent_list : Path('/ENCY/Constituent') : Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'constituent_list', 'Entered constituent_list');
+    my $chemical_class = $c->request->parameters->{chemical_class} // '';
+    my $opts = $chemical_class ? { where => { chemical_class => $chemical_class } } : {};
+    my $constituents = $c->model('ENCYModel')->list_constituents($c, $opts);
+    $c->stash(
+        constituents   => $constituents,
+        chemical_class => $chemical_class,
+        template       => 'ENCY/ConstituentList.tt',
+    );
+}
+
+sub constituent_detail : Path('/ENCY/Constituent') : Args(1) {
+    my ($self, $c, $id) = @_;
+
+    unless (defined $id && $id =~ /^\d+$/) {
+        $c->response->status(400);
+        $c->response->body('Invalid constituent ID');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'constituent_detail', "Fetching constituent ID: $id");
+    my $constituent = $c->model('ENCYModel')->get_constituent_by_id($c, $id);
+
+    unless ($constituent) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'constituent_detail', "Constituent not found for ID: $id");
+        $c->response->status(404);
+        $c->stash(
+            error_message => "Constituent record #$id was not found.",
+            template      => 'error.tt',
+        );
+        return;
+    }
+
+    $c->session->{record_id} = $id;
+    my $related = $c->model('ENCYModel')->get_constituent_related($c, $id);
+    $c->stash(
+        constituent      => $constituent,
+        related_diseases => $related->{diseases}  // [],
+        related_symptoms => $related->{symptoms}  // [],
+        edit_mode        => 0,
+        template         => 'ENCY/ConstituentDetail.tt',
+    );
+}
+
+sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/Constituent/add' }));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' } @role_list) {
+        $c->stash(
+            error_msg => "You do not have permission to add constituents.",
+            template  => 'ENCY/ConstituentList.tt',
+        );
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $data = {
+            name                   => $p->{name}                   // '',
+            common_name            => $p->{common_name}            // '',
+            chemical_formula       => $p->{chemical_formula}       // '',
+            chemical_class         => $p->{chemical_class}         // '',
+            iupac_name             => $p->{iupac_name}             // '',
+            cas_number             => $p->{cas_number}             // '',
+            molecular_weight       => $p->{molecular_weight}       // '',
+            therapeutic_action     => $p->{therapeutic_action}     // '',
+            toxicity               => $p->{toxicity}               // '',
+            solubility             => $p->{solubility}             // '',
+            found_in_herbs         => $p->{found_in_herbs}         // '',
+            found_in_foods         => $p->{found_in_foods}         // '',
+            found_in_drugs         => $p->{found_in_drugs}         // '',
+            pharmacological_effects => $p->{pharmacological_effects} // '',
+            research_notes         => $p->{research_notes}         // '',
+            image                  => $p->{image}                  // '',
+            url                    => $p->{url}                    // '',
+            reference              => $p->{reference}              // '',
+            sitename               => $p->{sitename}               // 'ENCY',
+            username_of_poster     => $c->session->{username},
+            group_of_poster        => $c->session->{group},
+            date_time_posted       => \'NOW()',
+        };
+
+        unless ($data->{name}) {
+            $c->stash(
+                error_msg    => "Name is required.",
+                constituent  => $data,
+                edit_mode    => 1,
+                template     => 'ENCY/ConstituentDetail.tt',
+            );
+            return;
+        }
+
+        $c->model('ENCYModel')->add_constituent($c, $data);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_constituent', "Constituent added: $data->{name}");
+        $c->flash->{success_msg} = 'Constituent added successfully.';
+        $c->response->redirect($c->uri_for('/ENCY/Constituent'));
+        return;
+    }
+
+    $self->_stash_image_files($c);
+    $c->stash(
+        edit_mode => 1,
+        template  => 'ENCY/ConstituentDetail.tt',
+    );
+}
+
+sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/Constituent/edit' }));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' } @role_list) {
+        $c->stash(
+            error_msg => "You do not have permission to edit constituents.",
+            template  => 'ENCY/ConstituentList.tt',
+        );
+        return;
+    }
+
+    my $record_id = $c->session->{record_id};
+
+    unless (defined $record_id && $record_id =~ /^\d+$/) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_constituent',
+            "Invalid or missing record_id in session.");
+        $c->stash(
+            error_msg => "Invalid or missing constituent record for editing. Please try again.",
+            template  => 'ENCY/ConstituentList.tt',
+        );
+        return;
+    }
+
+    my $constituent = $c->model('ENCYModel')->get_constituent_by_id($c, $record_id);
+    unless ($constituent) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_constituent',
+            "Constituent not found for record_id: $record_id");
+        $c->stash(
+            error_msg => "Constituent not found in the database. Please try again.",
+            template  => 'ENCY/ConstituentList.tt',
+        );
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $data = {
+            name                   => $p->{name}                   // '',
+            common_name            => $p->{common_name}            // '',
+            chemical_formula       => $p->{chemical_formula}       // '',
+            chemical_class         => $p->{chemical_class}         // '',
+            iupac_name             => $p->{iupac_name}             // '',
+            cas_number             => $p->{cas_number}             // '',
+            molecular_weight       => $p->{molecular_weight}       // '',
+            therapeutic_action     => $p->{therapeutic_action}     // '',
+            toxicity               => $p->{toxicity}               // '',
+            solubility             => $p->{solubility}             // '',
+            found_in_herbs         => $p->{found_in_herbs}         // '',
+            found_in_foods         => $p->{found_in_foods}         // '',
+            found_in_drugs         => $p->{found_in_drugs}         // '',
+            pharmacological_effects => $p->{pharmacological_effects} // '',
+            research_notes         => $p->{research_notes}         // '',
+            image                  => $p->{image}                  // '',
+            url                    => $p->{url}                    // '',
+            reference              => $p->{reference}              // '',
+        };
+
+        my ($status, $msg) = $c->model('ENCYModel')->update_constituent($c, $record_id, $data);
+
+        if ($status) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_constituent',
+                "Constituent updated successfully for record_id: $record_id");
+            $c->flash->{success_msg} = "Constituent details updated successfully.";
+            $c->response->redirect($c->uri_for('/ENCY/Constituent', $record_id));
+            return;
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_constituent',
+                "Failed to update constituent: $msg");
+            $c->stash(
+                error_msg   => "Failed to update constituent: $msg",
+                constituent => { %{ $constituent->get_columns }, %$data },
+                edit_mode   => 1,
+                template    => 'ENCY/ConstituentDetail.tt',
+            );
+            return;
+        }
+    }
+
+    $self->_stash_image_files($c);
+    $c->stash(
+        constituent => $constituent,
+        edit_mode   => 1,
+        template    => 'ENCY/ConstituentDetail.tt',
+    );
+}
+
 sub create_reference :Local {
     my ( $self, $c ) = @_;
     # Implement the logic to display the form for creating a new reference
