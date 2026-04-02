@@ -37,6 +37,7 @@ __PACKAGE__->add_unique_constraint(['insect_id', 'herb_id', 'interaction_type'])
 __PACKAGE__->belongs_to(
     insect => 'Comserv::Model::Schema::Ency::Result::Insect',
     'insect_id',
+    { is_foreign_key_constraint => 0 },
 );
 
 __PACKAGE__->belongs_to(
