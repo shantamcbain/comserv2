@@ -942,6 +942,8 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
                     html += '<button class="sync-to-result-btn" onclick="syncTableToResult(\'' + tableName + '\', \'' + database + '\', \'' + fieldName + '\', event);">';
                     html += '<i class="fas fa-arrow-right"></i> To Result</button>';
                 }
+                html += ' <button class="remove-field-btn remove-from-table-btn" onclick="removeFieldFromTable(\'' + tableName + '\', \'' + database + '\', \'' + fieldName + '\', event)" title="DROP COLUMN from database table">';
+                html += '<i class="fas fa-trash-alt"></i> Drop</button>';
                 html += '</td>';
                 html += '</tr>';
             } else {
@@ -993,6 +995,8 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
                     html += '<button class="sync-to-table-btn" onclick="syncResultToTable(\'' + tableName + '\', \'' + database + '\', \'' + fieldName + '\', event);">';
                     html += '<i class="fas fa-arrow-left"></i> To Table</button>';
                 }
+                html += ' <button class="remove-field-btn remove-from-result-btn" onclick="removeFieldFromResult(\'' + tableName + '\', \'' + database + '\', \'' + fieldName + '\', event)" title="Remove field from Result file">';
+                html += '<i class="fas fa-minus-circle"></i> Remove</button>';
                 html += '</td>';
                 html += '</tr>';
             } else {
@@ -1769,6 +1773,78 @@ function createFieldInResult(tableName, database, fieldName) {
         return;
     }
     syncTableToResult(tableName, database, fieldName);
+}
+
+// Remove a field from the Result .pm file
+function removeFieldFromResult(tableName, database, fieldName, event) {
+    if (!confirm('Remove field "' + fieldName + '" from the Result file?\n\nA backup will be created automatically.')) {
+        return;
+    }
+
+    const button = event ? event.currentTarget : null;
+    let originalText = '';
+    if (button) {
+        originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        button.disabled = true;
+    }
+
+    fetch('[% c.uri_for("/schema-comparison/remove_field_from_result") %]', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table_name: tableName, field_name: fieldName, database: database })
+    })
+    .then(handleFetchResponse)
+    .then(data => {
+        if (button) { button.innerHTML = originalText; button.disabled = false; }
+        if (data.success) {
+            alert('Field "' + fieldName + '" removed from Result file.');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        if (button) { button.innerHTML = originalText; button.disabled = false; }
+        if (error.message && (error.message.includes('not logged in') || error.message.includes('Access denied'))) return;
+        alert('Failed to remove field from Result. Please try again.');
+    });
+}
+
+// Drop a column from the database table
+function removeFieldFromTable(tableName, database, fieldName, event) {
+    if (!confirm('WARNING: This will DROP column "' + fieldName + '" from the database table "' + tableName + '".\n\nThis cannot be undone! Are you sure?')) {
+        return;
+    }
+
+    const button = event ? event.currentTarget : null;
+    let originalText = '';
+    if (button) {
+        originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        button.disabled = true;
+    }
+
+    fetch('[% c.uri_for("/schema-comparison/remove_field_from_table") %]', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table_name: tableName, field_name: fieldName, database: database, confirmed: true })
+    })
+    .then(handleFetchResponse)
+    .then(data => {
+        if (button) { button.innerHTML = originalText; button.disabled = false; }
+        if (data.success) {
+            alert('Column "' + fieldName + '" dropped from table "' + tableName + '".');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        if (button) { button.innerHTML = originalText; button.disabled = false; }
+        if (error.message && (error.message.includes('not logged in') || error.message.includes('Access denied'))) return;
+        alert('Failed to drop column. Please try again.');
+    });
 }
 
 // Sync primary key to result
