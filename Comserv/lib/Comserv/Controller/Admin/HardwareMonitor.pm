@@ -335,7 +335,8 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
     my $action   = $c->req->param('action')   // '';
 
     $hostname =~ s/[^A-Za-z0-9._\-]//g;
-    $path =~ s/[^A-Za-z0-9_.\/\-]//g;
+    $path =~ s/\.\.//g;
+    $path =~ s/[\x00-\x1f\x7f]//g;
     $path = '/' unless $path =~ m{^/};
     $path =~ s{/+}{/}g;
 
