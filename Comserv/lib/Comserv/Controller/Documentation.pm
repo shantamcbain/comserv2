@@ -320,10 +320,10 @@ sub _ensure_scanned {
         # Run the existing scan routines to refresh in-memory index
         _scan_directories($self, $c);
         _categorize_pages($self, $c);
-        # Update JSON config with newly scanned files
+        # Update JSON config with newly scanned files (preserves existing roles)
         $self->_update_json_config_with_scanned_files($c);
-        # Update JSON config with newly scanned files
-        $self->_update_json_config_with_scanned_files($c);
+        # Sync JSON config roles back into in-memory pages (overrides scan defaults)
+        $self->_apply_json_roles_to_memory($c);
         # Persist new fingerprint atomically
         _store_fingerprint($state_path, $current_fp) or do {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_ensure_scanned',
@@ -612,9 +612,9 @@ sub view :Path('/Documentation') :Args(1) {
     # Get the current user's role
     my $user_role = 'guest';  # Default to guest — unauthenticated users get no access above guest
     my $is_admin = 0;  # Flag to track if user has admin role
-    
-    my $session_username = $c->session->{username} // '';
-    my $is_authenticated = ($session_username && $session_username ne 'anonymous');
+
+    my $session_username_v = $c->session->{username} // '';
+    my $is_authenticated = ($session_username_v && $session_username_v ne 'anonymous');
 
     # First check if user is authenticated
     if ($is_authenticated) {
@@ -1816,17 +1816,18 @@ sub search :Path('/documentation/search') :Args(0) {
     # Get user role (same logic as index method)
     my $user_role = 'guest';
     my $is_admin = 0;
+
     my $session_username_s = $c->session->{username} // '';
-    my $is_authenticated_s = ($session_username_s && $session_username_s ne 'anonymous');
-    
-    if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
+    my $is_authenticated = ($session_username_s && $session_username_s ne 'anonymous');
+
+    if ($is_authenticated && $c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
         if (grep { lc($_) eq 'admin' } @{$c->session->{roles}}) {
             $user_role = 'admin';
             $is_admin = 1;
         } else {
             $user_role = $c->session->{roles}->[0];
         }
-    } elsif ($is_authenticated_s && $c->controller('Root')->user_exists($c)) {
+    } elsif ($is_authenticated && $c->controller('Root')->user_exists($c)) {
         $user_role = $c->session->{roles} || 'user';
         $is_admin = 1 if lc($user_role) eq 'admin';
     }
@@ -1871,7 +1872,7 @@ sub search :Path('/documentation/search') :Args(0) {
                             $has_role = 1;
                             last;
                         }
-                    } elsif ($role eq 'normal' && $is_authenticated_s) {
+                    } elsif ($role eq 'normal' && $is_authenticated) {
                         $has_role = 1;
                         last;
                     }
@@ -2011,8 +2012,8 @@ sub _update_json_config_with_scanned_files {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_update_json_config_with_scanned_files',
                 "Added uncategorized page to admin_guides: $page_name");
         } else {
-            $category = $metadata->{category} || $self->_determine_page_category($page_name, $metadata->{path});
-            $roles = $metadata->{roles};
+            $category = $config->{pages}->{$page_name}->{category} || $metadata->{category} || $self->_determine_page_category($page_name, $metadata->{path});
+            $roles = $config->{pages}->{$page_name}->{roles} || $metadata->{roles};
             $title = $metadata->{title} || $self->_format_title($page_name);
             $update_count++;
         }
@@ -2042,6 +2043,24 @@ sub _update_json_config_with_scanned_files {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_update_json_config_with_scanned_files',
             "Failed to write JSON config file");
     }
+}
+
+sub _apply_json_roles_to_memory {
+    my ($self, $c) = @_;
+    my $config_file = $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json');
+    return unless -e $config_file;
+    my $config = _load_json_file($config_file) || {};
+    my $json_pages = $config->{pages} || {};
+    my $memory_pages = $self->documentation_pages;
+    my $synced = 0;
+    foreach my $page_name (keys %$json_pages) {
+        if (exists $memory_pages->{$page_name} && ref $json_pages->{$page_name}->{roles} eq 'ARRAY') {
+            $memory_pages->{$page_name}->{roles} = $json_pages->{$page_name}->{roles};
+            $synced++;
+        }
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_apply_json_roles_to_memory',
+        "Synced roles from JSON config into memory for $synced pages");
 }
 
 # Helper method to clean data structure for JSON encoding
@@ -2431,7 +2450,13 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
             "Could not fetch all_plans: $@");
     }
 
-    # --- Active Priorities: DB-driven, role/site/user scoped, dependency-ordered ---
+    # --- Active Priorities: DB-driven, role/site/user scoped, smart-scored ordering ---
+    # Score formula (lower = shown first):
+    #   status tier:   IN PROGRESS = 0, NEW/Pending = 1, anything else = 2
+    #   is_blocking:   halves the effective priority within tier
+    #   priority:      1 (critical) .. 10 (low)
+    #   staleness:     > 180 days since last activity adds +500 (pushes to bottom)
+    # Fetch 60 rows from DB (raw sort: active statuses first, then priority), then re-score in Perl.
     my @active_priorities;
     eval {
         my $user_id  = $c->session->{user_id};
@@ -2439,9 +2464,47 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         my $can_see_all = $c->stash->{is_admin}
             || grep { lc($_) =~ /^(developer|devops|editor)$/ } @$roles;
 
-        my %ap_cond = (status => { '!=' => 3 });   # exclude DONE
-        $ap_cond{sitename} = $sitename unless $is_csc;  # non-CSC: own site only
-        $ap_cond{user_id}  = $user_id  unless $can_see_all;  # members: own todos only
+        # Exclude all "done" status variants — numeric AND string
+        my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+        my %ap_cond = (status => { -not_in => \@done_statuses });
+        $ap_cond{sitename} = $sitename unless $is_csc;
+        $ap_cond{user_id}  = $user_id  unless $can_see_all;
+
+        # ── Load projects that are blocking other projects ────────────────────
+        # project_dependencies table:
+        #   project_id    = the BLOCKED project (cannot proceed yet)
+        #   depends_on_id = the BLOCKER project (must deliver first)
+        # Todos in "depends_on_id" projects get a priority boost.
+        my %cross_blocker_projects;  # depends_on_id => [project_ids that are blocked]
+        my %cross_blocker_names;     # depends_on_id => [names of blocked projects]
+        my @dep_rows_ap = eval {
+            $c->model('DBEncy')->resultset('ProjectDependency')->search(
+                { status => 'active', dependency_type => 'blocks' },
+                { columns => [qw(depends_on_id project_id)] }
+            )->all;
+        };
+        if (@dep_rows_ap) {
+            my %ids_needed;
+            for my $dr (@dep_rows_ap) {
+                push @{ $cross_blocker_projects{$dr->depends_on_id} }, $dr->project_id;
+                $ids_needed{$dr->project_id}    = 1;
+                $ids_needed{$dr->depends_on_id} = 1;
+            }
+            my %pid2name;
+            eval {
+                my @prows = $c->model('DBEncy')->resultset('Project')->search(
+                    { id => { -in => [keys %ids_needed] } },
+                    { columns => [qw(id name)] }
+                )->all;
+                %pid2name = map { $_->id => $_->name } @prows;
+            };
+            for my $dep_id (keys %cross_blocker_projects) {
+                $cross_blocker_names{$dep_id} = [
+                    map { $pid2name{$_} || "Project #$_" }
+                        @{ $cross_blocker_projects{$dep_id} }
+                ];
+            }
+        }
 
         my @rows = $c->model('DBEncy')->resultset('Todo')->search(
             \%ap_cond,
@@ -2449,32 +2512,67 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
                 order_by => [
                     { -asc  => 'priority'    },
                     { -desc => 'is_blocking' },
-                    { -asc  => 'start_date'  },
+                    { -desc => 'last_mod_date' },
                 ],
-                rows => 20,
+                rows => 60,   # fetch more so Perl scoring can find the best 25
             }
         )->all;
 
-        # Pre-fetch all returned IDs for fast blocker lookup
         my %row_by_id = map { $_->record_id => $_ } @rows;
-
-        # Cache for project names
         my %proj_cache;
+        my $now_epoch = time();
 
+        my @scored;
         for my $todo (@rows) {
             my %h = $todo->get_columns;
 
-            # Blocker info
+            # ── Status tier ──────────────────────────────────────────────────
+            my $st = $h{status} // '';
+            my $in_progress = ($st == 2 || $st =~ /^(in.progress|in.process|IN PROGRESS)$/i) ? 1 : 0;
+            my $status_tier = $in_progress ? 0 : 1;
+
+            # ── Staleness (days since last activity) ─────────────────────────
+            my $activity_str = $h{last_mod_date} || $h{date_time_posted} || '';
+            my $days_stale   = 0;
+            if ($activity_str =~ /^(\d{4})-(\d{2})-(\d{2})/) {
+                require POSIX;
+                my $act_epoch = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
+                $days_stale = int(($now_epoch - $act_epoch) / 86400) if $act_epoch;
+            }
+            my $stale_penalty = $days_stale > 180 ? 500 : ($days_stale > 90 ? 50 : 0);
+            $h{stale_days}    = $days_stale;
+            $h{is_stale}      = $days_stale > 180 ? 1 : 0;
+
+            # ── Composite score (lower = higher priority) ─────────────────────
+            my $priority    = ($h{priority} || 5);
+            my $block_bonus = $h{is_blocking} ? -0.4 : 0;
+
+            # Cross-project blocker bonus: this todo's project must complete first
+            # (it appears as depends_on_id — other projects are waiting on it)
+            # -3 means a P5 blocker (score 102) beats any P3+ non-blocker (score 103+)
+            # Status-tier × 100 ensures IN-PROGRESS always beats NEW regardless of bonus
+            my $cross_block_bonus = 0;
+            if ($h{project_id} && $cross_blocker_projects{$h{project_id}}) {
+                $cross_block_bonus = -3;   # boosts ~3 priority levels above equivalent non-blocker
+                $h{is_cross_blocker} = 1;
+                $h{blocking_count}   = scalar @{ $cross_blocker_projects{$h{project_id}} };
+                $h{blocking_names}   = join(', ', @{ $cross_blocker_names{$h{project_id}} || [] });
+            }
+
+            $h{ap_score} = ($status_tier * 100) + ($priority + $block_bonus + $cross_block_bonus) + $stale_penalty;
+
+            # ── Blocker info ──────────────────────────────────────────────────
             if ($h{blocked_by_todo_id}) {
                 my $blocker = $row_by_id{$h{blocked_by_todo_id}}
                     || eval { $c->model('DBEncy')->resultset('Todo')->find($h{blocked_by_todo_id}) };
                 if ($blocker) {
                     $h{blocker_subject} = $blocker->subject;
-                    $h{blocker_done}    = ($blocker->status == 3) ? 1 : 0;
+                    my $bs = $blocker->status // '';
+                    $h{blocker_done} = ($bs == 3 || $bs =~ /^(done|completed|closed)$/i) ? 1 : 0;
                 }
             }
 
-            # Project name (cached)
+            # ── Project name (cached) ─────────────────────────────────────────
             if ($h{project_id}) {
                 unless (exists $proj_cache{$h{project_id}}) {
                     my $p = eval { $c->model('DBEncy')->resultset('Project')->find($h{project_id}) };
@@ -2483,12 +2581,44 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
                 $h{project_name} = $proj_cache{$h{project_id}};
             }
 
-            push @active_priorities, \%h;
+            push @scored, \%h;
         }
+
+        # Sort by composite score, then by priority as tiebreaker
+        @active_priorities = (sort { $a->{ap_score} <=> $b->{ap_score} || $a->{priority} <=> $b->{priority} } @scored)[0..24];
+        @active_priorities = grep { defined } @active_priorities;  # trim undef if fewer than 25
     };
     if ($@) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
             "Could not fetch active priorities: $@");
+    }
+
+    # ── Project dependencies (cross-project blocking) ─────────────────────────
+    my @project_deps;
+    eval {
+        my @dep_rows = $c->model('DBEncy')->resultset('ProjectDependency')->search(
+            { status => 'active' },
+            { order_by => { -asc => 'project_id' } }
+        )->all;
+
+        my %proj_name_cache;
+        my $prs = $c->model('DBEncy')->resultset('Project');
+        for my $dep (@dep_rows) {
+            my %d = $dep->get_columns;
+            for my $fid ($d{project_id}, $d{depends_on_id}) {
+                unless (exists $proj_name_cache{$fid}) {
+                    my $p = eval { $prs->find($fid) };
+                    $proj_name_cache{$fid} = $p ? $p->name : "Project #$fid";
+                }
+            }
+            $d{project_name}    = $proj_name_cache{$d{project_id}};
+            $d{depends_on_name} = $proj_name_cache{$d{depends_on_id}};
+            push @project_deps, \%d;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Could not fetch project dependencies: $@");
     }
 
     # Pass all date information and todos to template
@@ -2532,7 +2662,9 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         # Todos
         todos           => $all_todos_calendar,    # For week.tt
         todos_for_today => $todos_for_today,       # For day view
-        active_priorities => \@active_priorities,  # DB-driven priority list for TODAY'S FOCUS
+        active_priorities    => \@active_priorities,    # DB-driven priority list for TODAY'S FOCUS
+        project_deps         => \@project_deps,         # Cross-project blocking dependencies
+        active_blockers      => [ grep { $_->{dependency_type} eq 'blocks' && $_->{status} eq 'active' } @project_deps ],
 
         template => 'admin/documentation/DailyPlan.tt'
     );
