@@ -34,6 +34,7 @@ __PACKAGE__->belongs_to(
 __PACKAGE__->belongs_to(
     category => 'Comserv::Model::Schema::Ency::Result::Category',
     'category_id',
+    { is_foreign_key_constraint => 0 },
 );
 
 1;

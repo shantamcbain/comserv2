@@ -43,6 +43,7 @@ __PACKAGE__->belongs_to(
 __PACKAGE__->belongs_to(
     symptom => 'Comserv::Model::Schema::Ency::Result::Symptom',
     'symptom_id',
+    { is_foreign_key_constraint => 0 },
 );
 
 1;

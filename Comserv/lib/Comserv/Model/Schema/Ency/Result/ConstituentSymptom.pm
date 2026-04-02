@@ -37,11 +37,13 @@ __PACKAGE__->add_unique_constraint(['constituent_id', 'symptom_id', 'relationshi
 __PACKAGE__->belongs_to(
     constituent => 'Comserv::Model::Schema::Ency::Result::Constituent',
     'constituent_id',
+    { is_foreign_key_constraint => 0 },
 );
 
 __PACKAGE__->belongs_to(
     symptom => 'Comserv::Model::Schema::Ency::Result::Symptom',
     'symptom_id',
+    { is_foreign_key_constraint => 0 },
 );
 
 1;

@@ -53,6 +53,7 @@ __PACKAGE__->belongs_to(
 __PACKAGE__->belongs_to(
     constituent => 'Comserv::Model::Schema::Ency::Result::Constituent',
     'constituent_id',
+    { is_foreign_key_constraint => 0 },
 );
 
 1;
