@@ -873,8 +873,8 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
                 # Generate and execute the deployment SQL for just this table
                 my @statements = $schema->deployment_statements('MySQL');
                 
-                # Filter to only statements that create the target table
-                my @table_statements = grep { /CREATE TABLE.*\Q$table_name\E/i } @statements;
+                # Filter to only statements that create the target table (exact match with backtick delimiters)
+                my @table_statements = grep { /CREATE TABLE\s+`\Q$table_name\E`/i } @statements;
                 
                 if (@table_statements) {
                     foreach my $statement (@table_statements) {
