@@ -107,6 +107,37 @@ __PACKAGE__->has_many(
     { cascade_delete => 1 }
 );
 
+__PACKAGE__->has_one(
+    'point_account' => 'Comserv::Model::Schema::Ency::Result::PointAccount',
+    { 'foreign.user_id' => 'self.id' },
+    { cascade_delete => 1 }
+);
+
+__PACKAGE__->has_many(
+    'point_credits' => 'Comserv::Model::Schema::Ency::Result::PointLedger',
+    { 'foreign.to_user_id' => 'self.id' },
+);
+
+__PACKAGE__->has_many(
+    'point_debits' => 'Comserv::Model::Schema::Ency::Result::PointLedger',
+    { 'foreign.from_user_id' => 'self.id' },
+);
+
+__PACKAGE__->has_many(
+    'memberships' => 'Comserv::Model::Schema::Ency::Result::UserMembership',
+    { 'foreign.user_id' => 'self.id' }
+);
+
+__PACKAGE__->has_many(
+    'payment_transactions' => 'Comserv::Model::Schema::Ency::Result::PaymentTransaction',
+    { 'foreign.user_id' => 'self.id' },
+);
+
+__PACKAGE__->has_many(
+    'service_access' => 'Comserv::Model::Schema::Ency::Result::MembershipServiceAccess',
+    { 'foreign.user_id' => 'self.id' }
+);
+
 # Add method to check password (needed for authentication)
 sub check_password {
     my ($self, $password) = @_;

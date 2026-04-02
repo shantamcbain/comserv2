@@ -109,6 +109,8 @@ sub update :Path('update') :Args(0) {
         return;
     }
     
+    
+    
     # Load current credentials
     my $credentials = $self->_load_credentials($c);
     
