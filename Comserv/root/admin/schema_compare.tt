@@ -240,7 +240,7 @@
         
         <!-- Ency Database Section -->
         [% IF database_comparison.ency.connection_status == 'connected' OR 1 %]
-        <div class="schema-section">
+        <div class="schema-section" data-section-id="ency">
             <button class="section-toggle" onclick="toggleSection(this)">
                 <span>
                     <i class="fas fa-database"></i> [% database_comparison.ency.display_name %]
@@ -389,7 +389,7 @@
         
         <!-- Forager Database Section -->
         [% IF database_comparison.forager.connection_status == 'connected' OR 1 %]
-        <div class="schema-section">
+        <div class="schema-section" data-section-id="forager">
             <button class="section-toggle" onclick="toggleSection(this)">
                 <span>
                     <i class="fas fa-database"></i> [% database_comparison.forager.display_name %]
@@ -576,23 +576,49 @@ function refreshComparison() {
 }
 
 // Function to toggle database sections
+// --- localStorage helpers for container state ---
+const SC_STORAGE_KEY = 'schema_compare_open';
+
+function scGetOpenSet() {
+    try { return new Set(JSON.parse(localStorage.getItem(SC_STORAGE_KEY) || '[]')); }
+    catch(e) { return new Set(); }
+}
+
+function scSaveOpenSet(set) {
+    try { localStorage.setItem(SC_STORAGE_KEY, JSON.stringify([...set])); }
+    catch(e) {}
+}
+
+function scMarkOpen(id) {
+    const s = scGetOpenSet(); s.add(id); scSaveOpenSet(s);
+}
+
+function scMarkClosed(id) {
+    const s = scGetOpenSet(); s.delete(id); scSaveOpenSet(s);
+}
+
+function scIsOpen(id) {
+    return scGetOpenSet().has(id);
+}
+
 function toggleSection(button) {
     const section = button.closest('.schema-section');
     const content = section.querySelector('.section-content');
-    const icon = button.querySelector('.fas.fa-chevron-down, .fas.fa-chevron-right');
-    
+    const icon = button.querySelector('.fas');
+    const id = section.dataset.sectionId || button.textContent.trim().substring(0, 30);
+
     if (content.classList.contains('expanded')) {
         content.classList.remove('expanded');
         button.classList.remove('expanded');
-        content.style.display = 'none';
         icon.classList.remove('fa-chevron-down');
         icon.classList.add('fa-chevron-right');
+        scMarkClosed('section:' + id);
     } else {
         content.classList.add('expanded');
         button.classList.add('expanded');
-        content.style.display = 'block';
         icon.classList.remove('fa-chevron-right');
         icon.classList.add('fa-chevron-down');
+        scMarkOpen('section:' + id);
     }
 }
 
@@ -601,19 +627,22 @@ function toggleTableGroup(header) {
     const group = header.closest('.table-group');
     const content = group.querySelector('.table-group-content');
     const icon = header.querySelector('.group-toggle-icon');
-    
+    const section = header.closest('.schema-section');
+    const sectionId = section ? (section.dataset.sectionId || '') : '';
+    const id = sectionId + ':group:' + (header.querySelector('span')?.textContent.trim().substring(0, 30) || '');
+
     if (content.classList.contains('expanded')) {
         content.classList.remove('expanded');
         header.classList.remove('expanded');
-        content.style.display = 'none';
         icon.classList.remove('fa-chevron-down');
         icon.classList.add('fa-chevron-right');
+        scMarkClosed(id);
     } else {
         content.classList.add('expanded');
         header.classList.add('expanded');
-        content.style.display = 'block';
         icon.classList.remove('fa-chevron-right');
         icon.classList.add('fa-chevron-down');
+        scMarkOpen(id);
     }
 }
 
@@ -622,29 +651,82 @@ function toggleTableComparison(header) {
     const card = header.closest('.table-comparison-card');
     const content = card.querySelector('.field-comparison-content');
     const icon = header.querySelector('.expand-icon');
-    
+    const tableName = card.dataset.table;
+    const database = card.dataset.database;
+    const id = 'table:' + database + ':' + tableName;
+
     if (content.classList.contains('expanded')) {
         content.classList.remove('expanded');
         header.classList.remove('expanded');
-        content.style.display = 'none';
         icon.classList.remove('fa-chevron-down');
         icon.classList.add('fa-chevron-right');
         card.classList.remove('expanded');
+        scMarkClosed(id);
     } else {
         content.classList.add('expanded');
         header.classList.add('expanded');
-        content.style.display = 'block';
         icon.classList.remove('fa-chevron-right');
         icon.classList.add('fa-chevron-down');
         card.classList.add('expanded');
-        
+        scMarkOpen(id);
+
         // Load field comparison if not already loaded
-        const tableName = card.dataset.table;
-        const database = card.dataset.database;
         if (content.querySelector('.loading-indicator')) {
             loadFieldComparison(content, tableName, database);
         }
     }
+}
+
+// Restore previously-open containers from localStorage
+function restoreContainerStates() {
+    const openSet = scGetOpenSet();
+
+    // Sections
+    document.querySelectorAll('.schema-section').forEach(section => {
+        const button = section.querySelector('.section-toggle');
+        const content = section.querySelector('.section-content');
+        const icon = button ? button.querySelector('.fas') : null;
+        const id = 'section:' + (section.dataset.sectionId || (button ? button.textContent.trim().substring(0, 30) : ''));
+        if (openSet.has(id)) {
+            content.classList.add('expanded');
+            if (button) button.classList.add('expanded');
+            if (icon) { icon.classList.remove('fa-chevron-right'); icon.classList.add('fa-chevron-down'); }
+        }
+    });
+
+    // Table groups
+    document.querySelectorAll('.table-group').forEach(group => {
+        const header = group.querySelector('.table-group-header');
+        const content = group.querySelector('.table-group-content');
+        const icon = header ? header.querySelector('.group-toggle-icon') : null;
+        const section = group.closest('.schema-section');
+        const sectionId = section ? (section.dataset.sectionId || '') : '';
+        const id = sectionId + ':group:' + (header?.querySelector('span')?.textContent.trim().substring(0, 30) || '');
+        if (openSet.has(id)) {
+            content.classList.add('expanded');
+            if (header) header.classList.add('expanded');
+            if (icon) { icon.classList.remove('fa-chevron-right'); icon.classList.add('fa-chevron-down'); }
+        }
+    });
+
+    // Table comparison cards
+    document.querySelectorAll('.table-comparison-card').forEach(card => {
+        const header = card.querySelector('.table-comparison-header');
+        const content = card.querySelector('.field-comparison-content');
+        const icon = header ? header.querySelector('.expand-icon') : null;
+        const tableName = card.dataset.table;
+        const database = card.dataset.database;
+        const id = 'table:' + database + ':' + tableName;
+        if (openSet.has(id)) {
+            content.classList.add('expanded');
+            if (header) header.classList.add('expanded');
+            if (icon) { icon.classList.remove('fa-chevron-right'); icon.classList.add('fa-chevron-down'); }
+            card.classList.add('expanded');
+            if (content.querySelector('.loading-indicator')) {
+                loadFieldComparison(content, tableName, database);
+            }
+        }
+    });
 }
 
 // Count total comparison issues from a comparison object
@@ -2055,6 +2137,9 @@ document.getElementById('fullDevMode').addEventListener('change', function() {
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
+    // Restore previously-open containers from localStorage
+    restoreContainerStates();
+
     // Add event listeners for radio button changes
     document.addEventListener('change', function(e) {
         if (e.target.type === 'radio' && e.target.classList.contains('field-checkbox')) {
