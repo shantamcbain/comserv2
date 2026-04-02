@@ -931,6 +931,209 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
     );
 }
 
+sub symptoms_redirect : Path('/ENCY/symptoms') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->redirect($c->uri_for('/ENCY/Symptom'), 301);
+}
+
+sub symptom_list : Path('/ENCY/Symptom') : Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'symptom_list', 'Entered symptom_list');
+    my $body_system = $c->request->parameters->{body_system} // '';
+    my $host_type   = $c->request->parameters->{host_type}   // '';
+    my %where;
+    $where{body_system} = $body_system if $body_system;
+    $where{host_type}   = $host_type   if $host_type;
+    my $opts = %where ? { where => \%where } : {};
+    my $symptoms = $c->model('ENCYModel')->list_symptoms($c, $opts);
+    $c->stash(
+        symptoms    => $symptoms,
+        body_system => $body_system,
+        host_type   => $host_type,
+        template    => 'ENCY/SymptomList.tt',
+    );
+}
+
+sub symptom_detail : Path('/ENCY/Symptom') : Args(1) {
+    my ($self, $c, $id) = @_;
+
+    unless (defined $id && $id =~ /^\d+$/) {
+        $c->response->status(400);
+        $c->response->body('Invalid symptom ID');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'symptom_detail', "Fetching symptom ID: $id");
+    my $symptom = $c->model('ENCYModel')->get_symptom_by_id($c, $id);
+
+    unless ($symptom) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'symptom_detail', "Symptom not found for ID: $id");
+        $c->response->status(404);
+        $c->stash(
+            error_message => "Symptom record #$id was not found.",
+            template      => 'error.tt',
+        );
+        return;
+    }
+
+    $c->session->{record_id} = $id;
+    my $related = $c->model('ENCYModel')->get_symptom_related($c, $id);
+    $c->stash(
+        symptom               => $symptom,
+        related_diseases      => $related->{diseases}     // [],
+        related_herbs         => $related->{herbs}        // [],
+        related_constituents  => $related->{constituents} // [],
+        edit_mode             => 0,
+        template              => 'ENCY/SymptomDetail.tt',
+    );
+}
+
+sub add_symptom : Path('/ENCY/Symptom/add') : Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/Symptom/add' }));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' } @role_list) {
+        $c->stash(
+            error_msg => "You do not have permission to add symptoms.",
+            template  => 'ENCY/SymptomList.tt',
+        );
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $data = {
+            name                => $p->{name}                // '',
+            common_name         => $p->{common_name}         // '',
+            description         => $p->{description}         // '',
+            body_system         => $p->{body_system}         // '',
+            severity            => $p->{severity}            // '',
+            acute_chronic       => $p->{acute_chronic}       // '',
+            host_type           => $p->{host_type}           // '',
+            image               => $p->{image}               // '',
+            url                 => $p->{url}                 // '',
+            reference           => $p->{reference}           // '',
+            sitename            => $p->{sitename}            // 'ENCY',
+            username_of_poster  => $c->session->{username},
+            group_of_poster     => $c->session->{group},
+            date_time_posted    => \'NOW()',
+        };
+
+        unless ($data->{name}) {
+            $c->stash(
+                error_msg => "Name is required.",
+                symptom   => $data,
+                edit_mode => 1,
+                template  => 'ENCY/SymptomDetail.tt',
+            );
+            return;
+        }
+
+        $c->model('ENCYModel')->add_symptom($c, $data);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_symptom', "Symptom added: $data->{name}");
+        $c->flash->{success_msg} = 'Symptom added successfully.';
+        $c->response->redirect($c->uri_for('/ENCY/Symptom'));
+        return;
+    }
+
+    $self->_stash_image_files($c);
+    $c->stash(
+        edit_mode => 1,
+        template  => 'ENCY/SymptomDetail.tt',
+    );
+}
+
+sub edit_symptom : Path('/ENCY/Symptom/edit') : Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/Symptom/edit' }));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' } @role_list) {
+        $c->stash(
+            error_msg => "You do not have permission to edit symptoms.",
+            template  => 'ENCY/SymptomList.tt',
+        );
+        return;
+    }
+
+    my $record_id = $c->session->{record_id};
+
+    unless (defined $record_id && $record_id =~ /^\d+$/) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_symptom',
+            "Invalid or missing record_id in session.");
+        $c->stash(
+            error_msg => "Invalid or missing symptom record for editing. Please try again.",
+            template  => 'ENCY/SymptomList.tt',
+        );
+        return;
+    }
+
+    my $symptom = $c->model('ENCYModel')->get_symptom_by_id($c, $record_id);
+    unless ($symptom) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_symptom',
+            "Symptom not found for record_id: $record_id");
+        $c->stash(
+            error_msg => "Symptom not found in the database. Please try again.",
+            template  => 'ENCY/SymptomList.tt',
+        );
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $data = {
+            name          => $p->{name}          // '',
+            common_name   => $p->{common_name}   // '',
+            description   => $p->{description}   // '',
+            body_system   => $p->{body_system}   // '',
+            severity      => $p->{severity}      // '',
+            acute_chronic => $p->{acute_chronic} // '',
+            host_type     => $p->{host_type}     // '',
+            image         => $p->{image}         // '',
+            url           => $p->{url}           // '',
+            reference     => $p->{reference}     // '',
+        };
+
+        my ($status, $msg) = $c->model('ENCYModel')->update_symptom($c, $record_id, $data);
+
+        if ($status) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_symptom',
+                "Symptom updated successfully for record_id: $record_id");
+            $c->flash->{success_msg} = "Symptom details updated successfully.";
+            $c->response->redirect($c->uri_for('/ENCY/Symptom', $record_id));
+            return;
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_symptom',
+                "Failed to update symptom: $msg");
+            $c->stash(
+                error_msg => "Failed to update symptom: $msg",
+                symptom   => { %{ $symptom->get_columns }, %$data },
+                edit_mode => 1,
+                template  => 'ENCY/SymptomDetail.tt',
+            );
+            return;
+        }
+    }
+
+    $self->_stash_image_files($c);
+    $c->stash(
+        symptom   => $symptom,
+        edit_mode => 1,
+        template  => 'ENCY/SymptomDetail.tt',
+    );
+}
+
 sub create_reference :Local {
     my ( $self, $c ) = @_;
     # Implement the logic to display the form for creating a new reference
