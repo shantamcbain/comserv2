@@ -121,3 +121,4 @@ requires 'Plack::Test';
 requires 'Catalyst::ScriptRunner';
 requires 'Log::Log4perl';
 requires 'local::lib';
+requires 'Linux::Inotify2';
