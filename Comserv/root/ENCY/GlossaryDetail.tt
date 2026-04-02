@@ -1,0 +1,149 @@
+[% META
+   title = "Glossary Detail - Encyclopedia of Biological Life"
+   description = "View and edit glossary term details in the ENCY encyclopedia"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-02"
+%]
+[% PageVersion = 'ENCY/GlossaryDetail.tt,v 0.01 2026/04/02' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF success_msg || c.flash.success_msg %]
+<div class="alert alert-success">[% success_msg || c.flash.success_msg | html %]</div>
+[% END %]
+[% IF error_msg || c.flash.error_msg %]
+<div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
+[% END %]
+
+[% roles = c.session.roles;
+   is_admin = 0;
+   FOREACH r IN roles;
+     IF r == 'admin'; is_admin = 1; END;
+   END;
+%]
+
+[% IF edit_mode %]
+<h1>Editing Glossary Term: [% entry.term | html %]</h1>
+[% ELSE %]
+<h1>[% entry.term | html %]</h1>
+[% END %]
+
+<p><a href="[% c.uri_for('/ENCY/Glossary') %]">&larr; Back to Glossary</a>
+[% IF is_admin && !edit_mode && entry.record_id %]
+  | <a href="[% c.uri_for('/ENCY/Glossary/edit') %]" onclick="document.cookie='record_id=[% entry.record_id %]'">Edit</a>
+[% END %]
+</p>
+
+[% IF edit_mode %]
+<form action="[% IF entry.record_id %][% c.uri_for('/ENCY/Glossary/edit') %][% ELSE %][% c.uri_for('/ENCY/Glossary/add') %][% END %]" method="post">
+[% IF entry.record_id %]
+<input type="hidden" name="record_id" value="[% entry.record_id %]" />
+[% END %]
+[% END %]
+
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Term</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="term" value="[% entry.term | html %]" size="60" />
+            [% ELSE %]
+            [% entry.term | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Alternate Terms</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="alternate_terms" value="[% entry.alternate_terms | html %]" size="60" />
+            [% ELSE %]
+            [% entry.alternate_terms | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Definition</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="definition" rows="6" cols="60">[% entry.definition | html %]</textarea>
+            [% ELSE %]
+            [% entry.definition | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Category</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="category" value="[% entry.category | html %]" size="40" />
+            [% ELSE %]
+            [% entry.category | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Context</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="context" rows="3" cols="60">[% entry.context | html %]</textarea>
+            [% ELSE %]
+            [% entry.context | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Etymology</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="etymology" rows="3" cols="60">[% entry.etymology | html %]</textarea>
+            [% ELSE %]
+            [% entry.etymology | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Examples</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="examples" rows="3" cols="60">[% entry.examples | html %]</textarea>
+            [% ELSE %]
+            [% entry.examples | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Related Terms</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="related_terms" value="[% entry.related_terms | html %]" size="60" />
+            [% ELSE %]
+            [% IF entry.related_terms %]
+            [% FOREACH rt IN entry.related_terms.split(',') %]
+              [% rt_trimmed = rt.replace('^\s+|\s+$', '') %]
+              <a href="[% c.uri_for('/ENCY/Glossary') %]?term=[% rt_trimmed | uri %]">[% rt_trimmed | html %]</a>[% UNLESS loop.last %],[% END %]
+            [% END %]
+            [% END %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>URL</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="url" value="[% entry.url | html %]" size="60" />
+            [% ELSE %]
+            [% IF entry.url %]<a href="[% entry.url | html %]" target="_blank">[% entry.url | html %]</a>[% END %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+[% IF edit_mode %]
+<br/>
+<input type="submit" value="[% IF entry.record_id %]Update Term[% ELSE %]Add Term[% END %]" class="btn btn-primary" />
+<a href="[% c.uri_for('/ENCY/Glossary') %]" class="btn btn-default">Cancel</a>
+</form>
+[% END %]
