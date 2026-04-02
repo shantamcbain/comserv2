@@ -1,11 +1,11 @@
-package Comserv::Model::Schema::Forager::Result::DiseaseHerb;
+package Comserv::Model::Schema::Ency::Result::DiseaseInsect;
 
 use strict;
 use warnings;
 use base 'DBIx::Class::Core';
 
 __PACKAGE__->load_components('InflateColumn::DateTime', 'TimeStamp');
-__PACKAGE__->table('disease_herb');
+__PACKAGE__->table('disease_insect');
 __PACKAGE__->add_columns(
     id => {
         data_type         => 'int',
@@ -16,11 +16,11 @@ __PACKAGE__->add_columns(
         data_type   => 'int',
         is_nullable => 0,
     },
-    herb_id => {
+    insect_id => {
         data_type   => 'int',
         is_nullable => 0,
     },
-    relationship_type => {
+    role => {
         data_type   => 'varchar',
         size        => 50,
         is_nullable => 1,
@@ -32,18 +32,16 @@ __PACKAGE__->add_columns(
 );
 
 __PACKAGE__->set_primary_key('id');
-__PACKAGE__->add_unique_constraint(['disease_id', 'herb_id']);
+__PACKAGE__->add_unique_constraint(['disease_id', 'insect_id']);
 
 __PACKAGE__->belongs_to(
     disease => 'Comserv::Model::Schema::Ency::Result::Disease',
     'disease_id',
-    { is_foreign_key_constraint => 0 },
 );
 
 __PACKAGE__->belongs_to(
-    herb => 'Comserv::Model::Schema::Forager::Result::Herb',
-    'herb_id',
-    { is_foreign_key_constraint => 0 },
+    insect => 'Comserv::Model::Schema::Ency::Result::Insect',
+    'insect_id',
 );
 
 1;

@@ -241,7 +241,7 @@ sub get_animal_related {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_animal_related', "Fetching related data for animal ID: $id");
     my %related;
     eval {
-        my @animal_herbs = $self->forager_schema->resultset('AnimalHerb')->search({ animal_id => $id })->all;
+        my @animal_herbs = $self->ency_schema->resultset('AnimalHerb')->search({ animal_id => $id })->all;
         if (@animal_herbs) {
             my @herb_ids = map { $_->herb_id } @animal_herbs;
             my @herbs = $self->forager_schema->resultset('Herb')->search({ record_id => { -in => \@herb_ids } })->all;
@@ -250,7 +250,7 @@ sub get_animal_related {
             $related{herbs} = [];
         }
 
-        my @disease_animals = $self->forager_schema->resultset('DiseaseAnimal')->search({ animal_id => $id })->all;
+        my @disease_animals = $self->ency_schema->resultset('DiseaseAnimal')->search({ animal_id => $id })->all;
         if (@disease_animals) {
             my @disease_ids = map { $_->disease_id } @disease_animals;
             my @diseases = $self->ency_schema->resultset('Disease')->search({ record_id => { -in => \@disease_ids } })->all;
@@ -360,7 +360,7 @@ sub get_insect_related {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_insect_related', "Fetching related data for insect ID: $id");
     my %related;
     eval {
-        my @insect_herbs = $self->forager_schema->resultset('InsectHerb')->search({ insect_id => $id })->all;
+        my @insect_herbs = $self->ency_schema->resultset('InsectHerb')->search({ insect_id => $id })->all;
         if (@insect_herbs) {
             my @herb_ids = map { $_->herb_id } @insect_herbs;
             my @herbs = $self->forager_schema->resultset('Herb')->search({ record_id => { -in => \@herb_ids } })->all;
@@ -369,7 +369,7 @@ sub get_insect_related {
             $related{herbs} = [];
         }
 
-        my @disease_insects = $self->forager_schema->resultset('DiseaseInsect')->search({ insect_id => $id })->all;
+        my @disease_insects = $self->ency_schema->resultset('DiseaseInsect')->search({ insect_id => $id })->all;
         if (@disease_insects) {
             my @disease_ids = map { $_->disease_id } @disease_insects;
             my @diseases = $self->ency_schema->resultset('Disease')->search({ record_id => { -in => \@disease_ids } })->all;
@@ -479,7 +479,7 @@ sub get_disease_related {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_disease_related', "Fetching related data for disease ID: $id");
     my %related;
     eval {
-        my @disease_symptoms = $self->forager_schema->resultset('DiseaseSymptom')->search({ disease_id => $id })->all;
+        my @disease_symptoms = $self->ency_schema->resultset('DiseaseSymptom')->search({ disease_id => $id })->all;
         if (@disease_symptoms) {
             my @symptom_ids = map { $_->symptom_id } @disease_symptoms;
             $related{symptoms} = [$self->ency_schema->resultset('Symptom')->search({ record_id => { -in => \@symptom_ids } })->all];
@@ -487,7 +487,7 @@ sub get_disease_related {
             $related{symptoms} = [];
         }
 
-        my @disease_herbs = $self->forager_schema->resultset('DiseaseHerb')->search({ disease_id => $id })->all;
+        my @disease_herbs = $self->ency_schema->resultset('DiseaseHerb')->search({ disease_id => $id })->all;
         if (@disease_herbs) {
             my @herb_ids = map { $_->herb_id } @disease_herbs;
             $related{herbs} = [$self->forager_schema->resultset('Herb')->search({ record_id => { -in => \@herb_ids } })->all];
@@ -495,7 +495,7 @@ sub get_disease_related {
             $related{herbs} = [];
         }
 
-        my @disease_animals = $self->forager_schema->resultset('DiseaseAnimal')->search({ disease_id => $id })->all;
+        my @disease_animals = $self->ency_schema->resultset('DiseaseAnimal')->search({ disease_id => $id })->all;
         if (@disease_animals) {
             my @animal_ids = map { $_->animal_id } @disease_animals;
             $related{animals} = [$self->ency_schema->resultset('Animal')->search({ record_id => { -in => \@animal_ids } })->all];
@@ -503,7 +503,7 @@ sub get_disease_related {
             $related{animals} = [];
         }
 
-        my @disease_insects = $self->forager_schema->resultset('DiseaseInsect')->search({ disease_id => $id })->all;
+        my @disease_insects = $self->ency_schema->resultset('DiseaseInsect')->search({ disease_id => $id })->all;
         if (@disease_insects) {
             my @insect_ids = map { $_->insect_id } @disease_insects;
             $related{insects} = [$self->ency_schema->resultset('Insect')->search({ record_id => { -in => \@insect_ids } })->all];
@@ -511,7 +511,7 @@ sub get_disease_related {
             $related{insects} = [];
         }
 
-        my @constituent_diseases = $self->forager_schema->resultset('ConstituentDisease')->search({ disease_id => $id })->all;
+        my @constituent_diseases = $self->ency_schema->resultset('ConstituentDisease')->search({ disease_id => $id })->all;
         if (@constituent_diseases) {
             my @constituent_ids = map { $_->constituent_id } @constituent_diseases;
             $related{constituents} = [$self->ency_schema->resultset('Constituent')->search({ record_id => { -in => \@constituent_ids } })->all];
@@ -620,7 +620,7 @@ sub get_symptom_related {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_symptom_related', "Fetching related data for symptom ID: $id");
     my %related;
     eval {
-        my @disease_symptoms = $self->forager_schema->resultset('DiseaseSymptom')->search({ symptom_id => $id })->all;
+        my @disease_symptoms = $self->ency_schema->resultset('DiseaseSymptom')->search({ symptom_id => $id })->all;
         if (@disease_symptoms) {
             my @disease_ids = map { $_->disease_id } @disease_symptoms;
             $related{diseases} = [$self->ency_schema->resultset('Disease')->search({ record_id => { -in => \@disease_ids } })->all];
@@ -628,7 +628,7 @@ sub get_symptom_related {
             $related{diseases} = [];
         }
 
-        my @herb_symptoms = $self->forager_schema->resultset('HerbSymptom')->search({ symptom_id => $id })->all;
+        my @herb_symptoms = $self->ency_schema->resultset('HerbSymptom')->search({ symptom_id => $id })->all;
         if (@herb_symptoms) {
             my @herb_ids = map { $_->herb_id } @herb_symptoms;
             $related{herbs} = [$self->forager_schema->resultset('Herb')->search({ record_id => { -in => \@herb_ids } })->all];
@@ -636,7 +636,7 @@ sub get_symptom_related {
             $related{herbs} = [];
         }
 
-        my @constituent_symptoms = $self->forager_schema->resultset('ConstituentSymptom')->search({ symptom_id => $id })->all;
+        my @constituent_symptoms = $self->ency_schema->resultset('ConstituentSymptom')->search({ symptom_id => $id })->all;
         if (@constituent_symptoms) {
             my @constituent_ids = map { $_->constituent_id } @constituent_symptoms;
             $related{constituents} = [$self->ency_schema->resultset('Constituent')->search({ record_id => { -in => \@constituent_ids } })->all];
@@ -745,7 +745,7 @@ sub get_constituent_related {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_constituent_related', "Fetching related data for constituent ID: $id");
     my %related;
     eval {
-        my @herb_constituents = $self->forager_schema->resultset('HerbConstituent')->search({ constituent_id => $id })->all;
+        my @herb_constituents = $self->ency_schema->resultset('HerbConstituent')->search({ constituent_id => $id })->all;
         if (@herb_constituents) {
             my @herb_ids = map { $_->herb_id } @herb_constituents;
             $related{herbs} = [$self->forager_schema->resultset('Herb')->search({ record_id => { -in => \@herb_ids } })->all];
@@ -753,7 +753,7 @@ sub get_constituent_related {
             $related{herbs} = [];
         }
 
-        my @constituent_diseases = $self->forager_schema->resultset('ConstituentDisease')->search({ constituent_id => $id })->all;
+        my @constituent_diseases = $self->ency_schema->resultset('ConstituentDisease')->search({ constituent_id => $id })->all;
         if (@constituent_diseases) {
             my @disease_ids = map { $_->disease_id } @constituent_diseases;
             $related{diseases} = [$self->ency_schema->resultset('Disease')->search({ record_id => { -in => \@disease_ids } })->all];
@@ -761,7 +761,7 @@ sub get_constituent_related {
             $related{diseases} = [];
         }
 
-        my @constituent_symptoms = $self->forager_schema->resultset('ConstituentSymptom')->search({ constituent_id => $id })->all;
+        my @constituent_symptoms = $self->ency_schema->resultset('ConstituentSymptom')->search({ constituent_id => $id })->all;
         if (@constituent_symptoms) {
             my @symptom_ids = map { $_->symptom_id } @constituent_symptoms;
             $related{symptoms} = [$self->ency_schema->resultset('Symptom')->search({ record_id => { -in => \@symptom_ids } })->all];
@@ -881,7 +881,7 @@ sub _link_junction {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, $method_name, "Linking $resultset_name: " . Dumper($data));
     my $result;
     eval {
-        $result = $self->forager_schema->resultset($resultset_name)->find_or_create($data);
+        $result = $self->ency_schema->resultset($resultset_name)->find_or_create($data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, $method_name, "$resultset_name link created or found.");
     } or do {
         my $error = $@ || 'Unknown error';
@@ -895,7 +895,7 @@ sub _unlink_junction {
     my ($self, $c, $resultset_name, $criteria, $method_name) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, $method_name, "Unlinking $resultset_name: " . Dumper($criteria));
     eval {
-        $self->forager_schema->resultset($resultset_name)->search($criteria)->delete;
+        $self->ency_schema->resultset($resultset_name)->search($criteria)->delete;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, $method_name, "$resultset_name unlinked.");
     } or do {
         my $error = $@ || 'Unknown error';
