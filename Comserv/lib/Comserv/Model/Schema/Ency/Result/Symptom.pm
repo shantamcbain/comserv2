@@ -89,4 +89,19 @@ __PACKAGE__->add_columns(
 
 __PACKAGE__->set_primary_key('record_id');
 
+__PACKAGE__->has_many(
+    disease_symptoms => 'Comserv::Model::Schema::Forager::Result::DiseaseSymptom',
+    'symptom_id',
+);
+
+__PACKAGE__->has_many(
+    herb_symptoms => 'Comserv::Model::Schema::Forager::Result::HerbSymptom',
+    'symptom_id',
+);
+
+__PACKAGE__->has_many(
+    constituent_symptoms => 'Comserv::Model::Schema::Forager::Result::ConstituentSymptom',
+    'symptom_id',
+);
+
 1;
