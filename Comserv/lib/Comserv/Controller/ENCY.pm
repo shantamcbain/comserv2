@@ -716,6 +716,221 @@ sub edit_insect : Path('/ENCY/Insect/edit') : Args(0) {
     );
 }
 
+sub diseases_redirect : Path('/ENCY/diseases') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->redirect($c->uri_for('/ENCY/Disease'), 301);
+}
+
+sub disease_list : Path('/ENCY/Disease') : Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'disease_list', 'Entered disease_list');
+    my $host_type = $c->request->parameters->{host_type} // '';
+    my $opts = $host_type ? { where => { host_type => $host_type } } : {};
+    my $diseases = $c->model('ENCYModel')->list_diseases($c, $opts);
+    $c->stash(
+        diseases  => $diseases,
+        host_type => $host_type,
+        template  => 'ENCY/DiseaseList.tt',
+    );
+}
+
+sub disease_detail : Path('/ENCY/Disease') : Args(1) {
+    my ($self, $c, $id) = @_;
+
+    unless (defined $id && $id =~ /^\d+$/) {
+        $c->response->status(400);
+        $c->response->body('Invalid disease ID');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'disease_detail', "Fetching disease ID: $id");
+    my $disease = $c->model('ENCYModel')->get_disease_by_id($c, $id);
+
+    unless ($disease) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'disease_detail', "Disease not found for ID: $id");
+        $c->response->status(404);
+        $c->stash(
+            error_message => "Disease record #$id was not found.",
+            template      => 'error.tt',
+        );
+        return;
+    }
+
+    $c->session->{record_id} = $id;
+    my $related = $c->model('ENCYModel')->get_disease_related($c, $id);
+    $c->stash(
+        disease           => $disease,
+        related_symptoms  => $related->{symptoms}  // [],
+        related_herbs     => $related->{herbs}     // [],
+        related_animals   => $related->{animals}   // [],
+        related_insects   => $related->{insects}   // [],
+        edit_mode         => 0,
+        template          => 'ENCY/DiseaseDetail.tt',
+    );
+}
+
+sub add_disease : Path('/ENCY/Disease/add') : Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/Disease/add' }));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' } @role_list) {
+        $c->stash(
+            error_msg => "You do not have permission to add diseases.",
+            template  => 'ENCY/DiseaseList.tt',
+        );
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $data = {
+            common_name              => $p->{common_name}              // '',
+            scientific_name          => $p->{scientific_name}          // '',
+            disease_type             => $p->{disease_type}             // '',
+            host_type                => $p->{host_type}                // '',
+            causative_agent          => $p->{causative_agent}          // '',
+            transmission             => $p->{transmission}             // '',
+            symptoms_description     => $p->{symptoms_description}     // '',
+            diagnosis                => $p->{diagnosis}                // '',
+            treatment_conventional   => $p->{treatment_conventional}   // '',
+            treatment_herbal         => $p->{treatment_herbal}         // '',
+            prevention               => $p->{prevention}               // '',
+            prognosis                => $p->{prognosis}                // '',
+            icd_code                 => $p->{icd_code}                 // '',
+            distribution             => $p->{distribution}             // '',
+            image                    => $p->{image}                    // '',
+            url                      => $p->{url}                      // '',
+            history                  => $p->{history}                  // '',
+            reference                => $p->{reference}                // '',
+            sitename                 => $p->{sitename}                 // 'ENCY',
+            username_of_poster       => $c->session->{username},
+            group_of_poster          => $c->session->{group},
+            date_time_posted         => \'NOW()',
+        };
+
+        unless ($data->{common_name}) {
+            $c->stash(
+                error_msg => "Common name is required.",
+                disease   => $data,
+                edit_mode => 1,
+                template  => 'ENCY/DiseaseDetail.tt',
+            );
+            return;
+        }
+
+        $c->model('ENCYModel')->add_disease($c, $data);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_disease', "Disease added: $data->{common_name}");
+        $c->flash->{success_msg} = 'Disease added successfully.';
+        $c->response->redirect($c->uri_for('/ENCY/Disease'));
+        return;
+    }
+
+    $self->_stash_image_files($c);
+    $c->stash(
+        edit_mode => 1,
+        template  => 'ENCY/DiseaseDetail.tt',
+    );
+}
+
+sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/Disease/edit' }));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' } @role_list) {
+        $c->stash(
+            error_msg => "You do not have permission to edit diseases.",
+            template  => 'ENCY/DiseaseList.tt',
+        );
+        return;
+    }
+
+    my $record_id = $c->session->{record_id};
+
+    unless (defined $record_id && $record_id =~ /^\d+$/) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_disease',
+            "Invalid or missing record_id in session.");
+        $c->stash(
+            error_msg => "Invalid or missing disease record for editing. Please try again.",
+            template  => 'ENCY/DiseaseList.tt',
+        );
+        return;
+    }
+
+    my $disease = $c->model('ENCYModel')->get_disease_by_id($c, $record_id);
+    unless ($disease) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_disease',
+            "Disease not found for record_id: $record_id");
+        $c->stash(
+            error_msg => "Disease not found in the database. Please try again.",
+            template  => 'ENCY/DiseaseList.tt',
+        );
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $data = {
+            common_name              => $p->{common_name}              // '',
+            scientific_name          => $p->{scientific_name}          // '',
+            disease_type             => $p->{disease_type}             // '',
+            host_type                => $p->{host_type}                // '',
+            causative_agent          => $p->{causative_agent}          // '',
+            transmission             => $p->{transmission}             // '',
+            symptoms_description     => $p->{symptoms_description}     // '',
+            diagnosis                => $p->{diagnosis}                // '',
+            treatment_conventional   => $p->{treatment_conventional}   // '',
+            treatment_herbal         => $p->{treatment_herbal}         // '',
+            prevention               => $p->{prevention}               // '',
+            prognosis                => $p->{prognosis}                // '',
+            icd_code                 => $p->{icd_code}                 // '',
+            distribution             => $p->{distribution}             // '',
+            image                    => $p->{image}                    // '',
+            url                      => $p->{url}                      // '',
+            history                  => $p->{history}                  // '',
+            reference                => $p->{reference}                // '',
+        };
+
+        my ($status, $msg) = $c->model('ENCYModel')->update_disease($c, $record_id, $data);
+
+        if ($status) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_disease',
+                "Disease updated successfully for record_id: $record_id");
+            $c->flash->{success_msg} = "Disease details updated successfully.";
+            $c->response->redirect($c->uri_for('/ENCY/Disease', $record_id));
+            return;
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_disease',
+                "Failed to update disease: $msg");
+            $c->stash(
+                error_msg => "Failed to update disease: $msg",
+                disease   => { %{ $disease->get_columns }, %$data },
+                edit_mode => 1,
+                template  => 'ENCY/DiseaseDetail.tt',
+            );
+            return;
+        }
+    }
+
+    $self->_stash_image_files($c);
+    $c->stash(
+        disease   => $disease,
+        edit_mode => 1,
+        template  => 'ENCY/DiseaseDetail.tt',
+    );
+}
+
 sub create_reference :Local {
     my ( $self, $c ) = @_;
     # Implement the logic to display the form for creating a new reference
