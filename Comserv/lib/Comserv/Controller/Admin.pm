@@ -1169,14 +1169,50 @@ sub security_scan :Path('/admin/security-scan') :Args(0) {
     }
 
     my @known_targets = (
-        { label => 'localhost:3001 (dev main)',                     url => 'http://localhost:3001',                           site => 'none'  },
-        { label => 'localhost:3001 as MCoop',                       url => 'http://localhost:3001',                           site => 'MCoop' },
-        { label => 'localhost:3000 (docker)',                       url => 'http://localhost:3000',                           site => 'none'  },
-        { label => 'localhost:3000 as MCoop (docker)',              url => 'http://localhost:3000',                           site => 'MCoop' },
-        { label => 'Production coop.computersystemconsulting.ca',  url => 'http://coop.computersystemconsulting.ca',         site => 'MCoop' },
-        { label => 'usbm.local',                                    url => 'http://usbm.local',                               site => 'USBM'  },
-        { label => 'bmaster.workstation',                           url => 'http://bmaster.workstation',                      site => 'none'  },
-        { label => 've7tit.local',                                  url => 'http://ve7tit.local',                              site => 'none'  },
+        # ── Production public sites ─────────────────────────────────────────
+        { label => 'PROD: coop.computersystemconsulting.ca (MCoop)', url => 'http://coop.computersystemconsulting.ca',  site => 'MCoop'      },
+        { label => 'PROD: usbm.ca (USBM)',                           url => 'http://usbm.ca',                           site => 'USBM'       },
+        { label => 'PROD: 3d.usbm.ca (3d)',                          url => 'http://3d.usbm.ca',                        site => '3d'         },
+        { label => 'PROD: shamanbotanicals.ca (SB)',                  url => 'http://shamanbotanicals.ca',               site => 'SB'         },
+        { label => 'PROD: ve7tit.com (VE7TIT)',                      url => 'http://ve7tit.com',                        site => 'VE7TIT'     },
+        { label => 'PROD: weaverbeck.com (WeaverBeck)',              url => 'http://weaverbeck.com',                    site => 'WeaverBeck' },
+        { label => 'PROD: altpowerstore.com',                        url => 'http://altpowerstore.com',                 site => 'none'       },
+        # ── Dev main app (port 3001) — host selects site ────────────────────
+        { label => 'DEV:3001 workstation.local (none)',              url => 'http://workstation.local:3001',            site => 'none'       },
+        { label => 'DEV:3001 coop.workstation (MCoop)',              url => 'http://coop.workstation:3001',             site => 'MCoop'      },
+        { label => 'DEV:3001 usbm.local (USBM)',                     url => 'http://usbm.local:3001',                   site => 'USBM'       },
+        { label => 'DEV:3001 3d.local (3d)',                         url => 'http://3d.local:3001',                     site => '3d'         },
+        { label => 'DEV:3001 bmaster.workstation (BMaster)',         url => 'http://bmaster.workstation:3001',          site => 'BMaster'    },
+        { label => 'DEV:3001 ve7tit.local (VE7TIT)',                 url => 'http://ve7tit.local:3001',                 site => 'VE7TIT'     },
+        # ── Docker prod (port 3000) ──────────────────────────────────────────
+        { label => 'DOCKER:3000 workstation.local (none)',           url => 'http://workstation.local:3000',            site => 'none'       },
+        { label => 'DOCKER:3000 coop.workstation (MCoop)',           url => 'http://coop.workstation:3000',             site => 'MCoop'      },
+        { label => 'DOCKER:3000 usbm.local (USBM)',                  url => 'http://usbm.local:3000',                   site => 'USBM'       },
+        # ── Docker dev (port 5000) ───────────────────────────────────────────
+        { label => 'DOCKER:5000 workstation.local (none)',           url => 'http://workstation.local:5000',            site => 'none'       },
+        { label => 'DOCKER:5000 usbm.local (USBM)',                  url => 'http://usbm.local:5000',                   site => 'USBM'       },
+        # ── Worktrees from planning (port 4000–4021) ─────────────────────────
+        { label => 'WT:4001 PlanningSystem',                         url => 'http://workstation.local:4001',            site => 'none'       },
+        { label => 'WT:4002 SchemaManagement',                       url => 'http://workstation.local:4002',            site => 'none'       },
+        { label => 'WT:4003 InfrastructureHA',                       url => 'http://workstation.local:4003',            site => 'none'       },
+        { label => 'WT:4004 WorkShops',                              url => 'http://workstation.local:4004',            site => 'none'       },
+        { label => 'WT:4005 Users',                                  url => 'http://workstation.local:4005',            site => 'none'       },
+        { label => 'WT:4006 FileManagement',                         url => 'http://workstation.local:4006',            site => 'none'       },
+        { label => 'WT:4007 UnifiedMail',                            url => 'http://workstation.local:4007',            site => 'none'       },
+        { label => 'WT:4008 Membership',                             url => 'http://workstation.local:4008',            site => 'none'       },
+        { label => 'WT:4009 PointSystem',                            url => 'http://workstation.local:4009',            site => 'none'       },
+        { label => 'WT:4010 AIChatSystem',                           url => 'http://workstation.local:4010',            site => 'none'       },
+        { label => 'WT:4011 CssThemes',                              url => 'http://workstation.local:4011',            site => 'none'       },
+        { label => 'WT:4012 ENCY',                                   url => 'http://workstation.local:4012',            site => 'none'       },
+        { label => 'WT:4013 HelpDesk',                               url => 'http://workstation.local:4013',            site => 'none'       },
+        { label => 'WT:4014 HealthPlanning',                         url => 'http://workstation.local:4014',            site => 'none'       },
+        { label => 'WT:4015 ProdServerHealth',                       url => 'http://workstation.local:4015',            site => 'none'       },
+        { label => 'WT:4016 Security',                               url => 'http://workstation.local:4016',            site => 'none'       },
+        { label => 'WT:4017 Documentation',                          url => 'http://workstation.local:4017',            site => 'none'       },
+        { label => 'WT:4018 APISystem',                              url => 'http://workstation.local:4018',            site => 'none'       },
+        { label => 'WT:4019 BMaster',                                url => 'http://workstation.local:4019',            site => 'none'       },
+        { label => 'WT:4020 AIChatPlanInt',                          url => 'http://workstation.local:4020',            site => 'none'       },
+        { label => 'WT:4021 Inventory',                              url => 'http://workstation.local:4021',            site => 'none'       },
     );
 
     my $scan_results = undef;
