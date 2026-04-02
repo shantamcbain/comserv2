@@ -37,6 +37,7 @@ __PACKAGE__->add_unique_constraint(['disease_id', 'herb_id']);
 __PACKAGE__->belongs_to(
     disease => 'Comserv::Model::Schema::Ency::Result::Disease',
     'disease_id',
+    { is_foreign_key_constraint => 0 },
 );
 
 __PACKAGE__->belongs_to(
