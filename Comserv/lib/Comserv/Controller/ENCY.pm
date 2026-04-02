@@ -266,7 +266,7 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
         $c->model('ENCYModel')->add_herb($new_herb);
 
         # Redirect or display a success message
-        $c->flash->{success_message} = 'Herb added successfully';
+        $c->flash->{success_msg} = 'Herb added successfully';
         $c->res->redirect($c->uri_for($self->action_for('index')));
     } else {
         # Display the form

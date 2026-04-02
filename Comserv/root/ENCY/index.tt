@@ -1,7 +1,20 @@
-<!-- File: /home/shanta/PycharmProjects/comserv/Comserv/root/ENCY/index.tt -->
-[% PageVersion = 'ENCY/index.tt,v 0.02 2024/05/22 Shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
+[% META
+   title = "Encyclopedia of Biological Life"
+   description = "ENCY: A comprehensive reference for herbs, animals, insects, diseases, symptoms, and constituents"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.03"
+   last_updated = "2026-04-02"
+%]
+[% PageVersion = 'ENCY/index.tt,v 0.03 2026/04/02' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.success_msg %]
+<div class="alert alert-success">[% c.flash.success_msg | html %]</div>
+[% END %]
+[% IF c.flash.error_msg %]
+<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
 [% END %]
 <div align="center">
     [% IF username %]
