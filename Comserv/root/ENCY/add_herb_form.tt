@@ -1,14 +1,23 @@
-[% PageVersion = 'ency/add_herb_form.tt,v 0.01 2025/01/12 shanta Exp shanta ' %]
-[%# PageVersion = 'pagetop.tt,v 0.02 2023/08/30 shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
- [% END %]
+[% META
+   title = "Add New Herb - Encyclopedia of Biological Life"
+   description = "Add a new herb entry to the ENCY encyclopedia database"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.02"
+   last_updated = "2026-04-02"
+%]
+[% PageVersion = 'ENCY/add_herb_form.tt,v 0.02 2026/04/02' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 [% PROCESS 'ENCY/ImageHelper.tt' %]
 
-
-[% IF error_message %]
-    <p class="error">[% error_message %]</p>
+[% IF success_msg || c.flash.success_msg %]
+<div class="alert alert-success">[% success_msg || c.flash.success_msg | html %]</div>
 [% END %]
+[% IF error_msg || c.flash.error_msg %]
+<div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
+[% END %]
+
 <h1>Add New Herb</h1>
 
 
