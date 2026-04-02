@@ -31,6 +31,14 @@
 <a href="[% c.uri_for('/ENCY/Insect/add') %]" class="btn btn-primary">Add Insect</a>
 [% END %]
 
+<form method="get" action="[% c.uri_for('/ENCY/Insect') %]">
+    <label>Ecological Role:
+        <input type="text" name="ecological_role" value="[% ecological_role | html %]" size="20" />
+    </label>
+    <input type="submit" value="Filter" class="btn btn-default" />
+    <a href="[% c.uri_for('/ENCY/Insect') %]">Clear</a>
+</form>
+
 [% IF insects && insects.size %]
 <table border="1" cellpadding="4" cellspacing="0">
     <tr>
