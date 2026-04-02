@@ -125,6 +125,11 @@
     <strong>Done:</strong> [% c.flash.success_msg | html %]
   </div>
   [% END %]
+  [% IF c.flash.info_msg %]
+  <div style="background:#e3f2fd;border:1px solid #90caf9;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#0d47a1">
+    <strong>Info:</strong> [% c.flash.info_msg | html %]
+  </div>
+  [% END %]
 
   [%# ── Quick action bar ─────────────────────────────────────── %]
   <div class="content-section">
