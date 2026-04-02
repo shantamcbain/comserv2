@@ -1347,6 +1347,202 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
     );
 }
 
+sub glossary_list : Path('/ENCY/Glossary') : Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'glossary_list', 'Entered glossary_list');
+    my $letter = $c->request->parameters->{letter} // '';
+    my $opts = {};
+    $opts->{letter} = $letter if $letter && $letter =~ /^[A-Za-z]$/;
+    my $terms = $c->model('ENCYModel')->list_glossary($c, $opts);
+    $c->stash(
+        terms    => $terms,
+        letter   => $letter,
+        template => 'ENCY/GlossaryList.tt',
+    );
+}
+
+sub glossary_detail : Path('/ENCY/Glossary') : Args(1) {
+    my ($self, $c, $id) = @_;
+
+    unless (defined $id && $id =~ /^\d+$/) {
+        $c->response->status(400);
+        $c->response->body('Invalid glossary ID');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'glossary_detail', "Fetching glossary term ID: $id");
+    my $term = $c->model('ENCYModel')->get_glossary_by_id($c, $id);
+
+    unless ($term) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'glossary_detail', "Glossary term not found for ID: $id");
+        $c->response->status(404);
+        $c->stash(
+            error_message => "Glossary term #$id was not found.",
+            template      => 'error.tt',
+        );
+        return;
+    }
+
+    $c->session->{record_id} = $id;
+    $c->stash(
+        term      => $term,
+        edit_mode => 0,
+        template  => 'ENCY/GlossaryDetail.tt',
+    );
+}
+
+sub add_glossary : Path('/ENCY/Glossary/add') : Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/Glossary/add' }));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' } @role_list) {
+        $c->stash(
+            error_msg => "You do not have permission to add glossary terms.",
+            template  => 'ENCY/GlossaryList.tt',
+        );
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $data = {
+            term                => $p->{term}                // '',
+            alternate_terms     => $p->{alternate_terms}     // '',
+            definition          => $p->{definition}          // '',
+            category            => $p->{category}            // '',
+            context             => $p->{context}             // '',
+            etymology           => $p->{etymology}           // '',
+            examples            => $p->{examples}            // '',
+            related_terms       => $p->{related_terms}       // '',
+            url                 => $p->{url}                 // '',
+            sitename            => $p->{sitename}            // 'ENCY',
+            username_of_poster  => $c->session->{username},
+            group_of_poster     => $c->session->{group},
+            date_time_posted    => \'NOW()',
+        };
+
+        unless ($data->{term}) {
+            $c->stash(
+                error_msg => "Term is required.",
+                term      => $data,
+                edit_mode => 1,
+                template  => 'ENCY/GlossaryDetail.tt',
+            );
+            return;
+        }
+
+        unless ($data->{definition}) {
+            $c->stash(
+                error_msg => "Definition is required.",
+                term      => $data,
+                edit_mode => 1,
+                template  => 'ENCY/GlossaryDetail.tt',
+            );
+            return;
+        }
+
+        $c->model('ENCYModel')->add_glossary($c, $data);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_glossary', "Glossary term added: $data->{term}");
+        $c->flash->{success_msg} = 'Glossary term added successfully.';
+        $c->response->redirect($c->uri_for('/ENCY/Glossary'));
+        return;
+    }
+
+    $c->stash(
+        edit_mode => 1,
+        template  => 'ENCY/GlossaryDetail.tt',
+    );
+}
+
+sub edit_glossary : Path('/ENCY/Glossary/edit') : Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/Glossary/edit' }));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' } @role_list) {
+        $c->stash(
+            error_msg => "You do not have permission to edit glossary terms.",
+            template  => 'ENCY/GlossaryList.tt',
+        );
+        return;
+    }
+
+    my $record_id = $c->session->{record_id};
+
+    unless (defined $record_id && $record_id =~ /^\d+$/) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_glossary',
+            "Invalid or missing record_id in session.");
+        $c->stash(
+            error_msg => "Invalid or missing glossary record for editing. Please try again.",
+            template  => 'ENCY/GlossaryList.tt',
+        );
+        return;
+    }
+
+    my $term = $c->model('ENCYModel')->get_glossary_by_id($c, $record_id);
+    unless ($term) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_glossary',
+            "Glossary term not found for record_id: $record_id");
+        $c->stash(
+            error_msg => "Glossary term not found in the database. Please try again.",
+            template  => 'ENCY/GlossaryList.tt',
+        );
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $data = {
+            term            => $p->{term}            // '',
+            alternate_terms => $p->{alternate_terms} // '',
+            definition      => $p->{definition}      // '',
+            category        => $p->{category}        // '',
+            context         => $p->{context}         // '',
+            etymology       => $p->{etymology}       // '',
+            examples        => $p->{examples}        // '',
+            related_terms   => $p->{related_terms}   // '',
+            url             => $p->{url}             // '',
+        };
+
+        my ($status, $msg) = $c->model('ENCYModel')->update_glossary($c, $record_id, $data);
+
+        if ($status) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_glossary',
+                "Glossary term updated successfully for record_id: $record_id");
+            $c->flash->{success_msg} = "Glossary term updated successfully.";
+            $c->response->redirect($c->uri_for('/ENCY/Glossary', $record_id));
+            return;
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_glossary',
+                "Failed to update glossary term: $msg");
+            $c->stash(
+                error_msg => "Failed to update glossary term: $msg",
+                term      => { %{ $term->get_columns }, %$data },
+                edit_mode => 1,
+                template  => 'ENCY/GlossaryDetail.tt',
+            );
+            return;
+        }
+    }
+
+    $c->stash(
+        term      => $term,
+        edit_mode => 1,
+        template  => 'ENCY/GlossaryDetail.tt',
+    );
+}
+
 sub create_reference :Local {
     my ( $self, $c ) = @_;
     # Implement the logic to display the form for creating a new reference
