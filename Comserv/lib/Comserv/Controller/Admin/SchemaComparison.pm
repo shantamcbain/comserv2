@@ -879,7 +879,9 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
                 if (@table_statements) {
                     $dbh->do('SET FOREIGN_KEY_CHECKS=0');
                     foreach my $statement (@table_statements) {
-                        $dbh->do($statement);
+                        # Strip CONSTRAINT lines to avoid FK formation errors (type/charset mismatches)
+                        my $safe_statement = _strip_fk_constraints($statement);
+                        $dbh->do($safe_statement);
                     }
                     $dbh->do('SET FOREIGN_KEY_CHECKS=1');
                     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
@@ -2035,6 +2037,20 @@ This library is free software. You can redistribute it and/or modify
 it under the same terms as Perl itself.
 
 =cut
+
+sub _strip_fk_constraints {
+    my ($sql) = @_;
+    my @lines = split /\n/, $sql;
+    my @kept;
+    for my $line (@lines) {
+        next if $line =~ /^\s*CONSTRAINT\s+/i;
+        next if $line =~ /^\s*INDEX\s+.*_idx_/i && $line =~ /REFERENCES/i;
+        push @kept, $line;
+    }
+    my $result = join "\n", @kept;
+    $result =~ s/,(\s*\n\s*\))/\n)/g;
+    return $result;
+}
 
 __PACKAGE__->meta->make_immutable;
 
