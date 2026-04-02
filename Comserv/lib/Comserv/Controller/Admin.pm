@@ -1169,14 +1169,50 @@ sub security_scan :Path('/admin/security-scan') :Args(0) {
     }
 
     my @known_targets = (
-        { label => 'localhost:3001 (dev main)',                     url => 'http://localhost:3001',                           site => 'none'  },
-        { label => 'localhost:3001 as MCoop',                       url => 'http://localhost:3001',                           site => 'MCoop' },
-        { label => 'localhost:3000 (docker)',                       url => 'http://localhost:3000',                           site => 'none'  },
-        { label => 'localhost:3000 as MCoop (docker)',              url => 'http://localhost:3000',                           site => 'MCoop' },
-        { label => 'Production coop.computersystemconsulting.ca',  url => 'http://coop.computersystemconsulting.ca',         site => 'MCoop' },
-        { label => 'usbm.local',                                    url => 'http://usbm.local',                               site => 'USBM'  },
-        { label => 'bmaster.workstation',                           url => 'http://bmaster.workstation',                      site => 'none'  },
-        { label => 've7tit.local',                                  url => 'http://ve7tit.local',                              site => 'none'  },
+        # ── Production public sites ─────────────────────────────────────────
+        { label => 'PROD: coop.computersystemconsulting.ca (MCoop)', url => 'http://coop.computersystemconsulting.ca',  site => 'MCoop'      },
+        { label => 'PROD: usbm.ca (USBM)',                           url => 'http://usbm.ca',                           site => 'USBM'       },
+        { label => 'PROD: 3d.usbm.ca (3d)',                          url => 'http://3d.usbm.ca',                        site => '3d'         },
+        { label => 'PROD: shamanbotanicals.ca (SB)',                  url => 'http://shamanbotanicals.ca',               site => 'SB'         },
+        { label => 'PROD: ve7tit.com (VE7TIT)',                      url => 'http://ve7tit.com',                        site => 'VE7TIT'     },
+        { label => 'PROD: weaverbeck.com (WeaverBeck)',              url => 'http://weaverbeck.com',                    site => 'WeaverBeck' },
+        { label => 'PROD: altpowerstore.com',                        url => 'http://altpowerstore.com',                 site => 'none'       },
+        # ── Dev main app (port 3001) — host selects site ────────────────────
+        { label => 'DEV:3001 workstation.local (none)',              url => 'http://workstation.local:3001',            site => 'none'       },
+        { label => 'DEV:3001 coop.workstation (MCoop)',              url => 'http://coop.workstation:3001',             site => 'MCoop'      },
+        { label => 'DEV:3001 usbm.local (USBM)',                     url => 'http://usbm.local:3001',                   site => 'USBM'       },
+        { label => 'DEV:3001 3d.local (3d)',                         url => 'http://3d.local:3001',                     site => '3d'         },
+        { label => 'DEV:3001 bmaster.workstation (BMaster)',         url => 'http://bmaster.workstation:3001',          site => 'BMaster'    },
+        { label => 'DEV:3001 ve7tit.local (VE7TIT)',                 url => 'http://ve7tit.local:3001',                 site => 'VE7TIT'     },
+        # ── Docker prod (port 3000) ──────────────────────────────────────────
+        { label => 'DOCKER:3000 workstation.local (none)',           url => 'http://workstation.local:3000',            site => 'none'       },
+        { label => 'DOCKER:3000 coop.workstation (MCoop)',           url => 'http://coop.workstation:3000',             site => 'MCoop'      },
+        { label => 'DOCKER:3000 usbm.local (USBM)',                  url => 'http://usbm.local:3000',                   site => 'USBM'       },
+        # ── Docker dev (port 5000) ───────────────────────────────────────────
+        { label => 'DOCKER:5000 workstation.local (none)',           url => 'http://workstation.local:5000',            site => 'none'       },
+        { label => 'DOCKER:5000 usbm.local (USBM)',                  url => 'http://usbm.local:5000',                   site => 'USBM'       },
+        # ── Worktrees from planning (port 4000–4021) ─────────────────────────
+        { label => 'WT:4001 PlanningSystem',                         url => 'http://workstation.local:4001',            site => 'none'       },
+        { label => 'WT:4002 SchemaManagement',                       url => 'http://workstation.local:4002',            site => 'none'       },
+        { label => 'WT:4003 InfrastructureHA',                       url => 'http://workstation.local:4003',            site => 'none'       },
+        { label => 'WT:4004 WorkShops',                              url => 'http://workstation.local:4004',            site => 'none'       },
+        { label => 'WT:4005 Users',                                  url => 'http://workstation.local:4005',            site => 'none'       },
+        { label => 'WT:4006 FileManagement',                         url => 'http://workstation.local:4006',            site => 'none'       },
+        { label => 'WT:4007 UnifiedMail',                            url => 'http://workstation.local:4007',            site => 'none'       },
+        { label => 'WT:4008 Membership',                             url => 'http://workstation.local:4008',            site => 'none'       },
+        { label => 'WT:4009 PointSystem',                            url => 'http://workstation.local:4009',            site => 'none'       },
+        { label => 'WT:4010 AIChatSystem',                           url => 'http://workstation.local:4010',            site => 'none'       },
+        { label => 'WT:4011 CssThemes',                              url => 'http://workstation.local:4011',            site => 'none'       },
+        { label => 'WT:4012 ENCY',                                   url => 'http://workstation.local:4012',            site => 'none'       },
+        { label => 'WT:4013 HelpDesk',                               url => 'http://workstation.local:4013',            site => 'none'       },
+        { label => 'WT:4014 HealthPlanning',                         url => 'http://workstation.local:4014',            site => 'none'       },
+        { label => 'WT:4015 ProdServerHealth',                       url => 'http://workstation.local:4015',            site => 'none'       },
+        { label => 'WT:4016 Security',                               url => 'http://workstation.local:4016',            site => 'none'       },
+        { label => 'WT:4017 Documentation',                          url => 'http://workstation.local:4017',            site => 'none'       },
+        { label => 'WT:4018 APISystem',                              url => 'http://workstation.local:4018',            site => 'none'       },
+        { label => 'WT:4019 BMaster',                                url => 'http://workstation.local:4019',            site => 'none'       },
+        { label => 'WT:4020 AIChatPlanInt',                          url => 'http://workstation.local:4020',            site => 'none'       },
+        { label => 'WT:4021 Inventory',                              url => 'http://workstation.local:4021',            site => 'none'       },
     );
 
     my $scan_results = undef;
@@ -1266,6 +1302,7 @@ sub security_scan_start :Path('/admin/security-scan-start') :Args(0) {
     my $target_url = $c->req->param('target_url') // '';
     my $site_name  = $c->req->param('site_name')  // 'none';
     my $max_pages  = $c->req->param('max_pages')  // 100;
+    my $use_auth   = $c->req->param('use_auth')   // 0;
 
     $target_url =~ s/\s+//g;
     $site_name  =~ s/[^a-zA-Z0-9._-]//g;
@@ -1276,6 +1313,14 @@ sub security_scan_start :Path('/admin/security-scan-start') :Args(0) {
     unless ($target_url =~ m{^https?://[\w.\-]+(:\d+)?(/.*)?$}) {
         $c->response->body(encode_json({ error => 'Invalid URL' }));
         return;
+    }
+
+    # When authenticated mode is requested, forward the caller's Cookie header
+    # to the scan script so it runs as the current logged-in user.
+    my $auth_cookie = '';
+    if ($use_auth) {
+        $auth_cookie = $c->req->header('Cookie') // '';
+        $auth_cookie =~ s/[\r\n]//g;  # strip any newlines (header injection guard)
     }
 
     my $out_file  = '/tmp/comserv_security_scan.txt';
@@ -1293,12 +1338,14 @@ sub security_scan_start :Path('/admin/security-scan-start') :Args(0) {
     if ($pid == 0) {
         open(STDOUT, '>', $out_file) or exit 1;
         open(STDERR, '>&STDOUT');
-        exec('perl', $script,
+        my @cmd = ('perl', $script,
             '--url',    $target_url,
             '--site',   $site_name,
             '--max',    $max_pages,
             '--output', $json_file,
         );
+        push @cmd, '--auth-cookie', $auth_cookie if $auth_cookie;
+        exec(@cmd);
         exit 1;
     }
 
@@ -1306,9 +1353,9 @@ sub security_scan_start :Path('/admin/security-scan-start') :Args(0) {
     local $SIG{CHLD} = 'IGNORE';
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'security_scan_start',
-        "Started background scan pid=$pid url=$target_url site=$site_name max=$max_pages");
+        "Started background scan pid=$pid url=$target_url site=$site_name max=$max_pages auth=" . ($auth_cookie ? 'yes' : 'no'));
 
-    $c->response->body(encode_json({ started => 1, pid => $pid }));
+    $c->response->body(encode_json({ started => 1, pid => $pid, auth_mode => $auth_cookie ? 1 : 0 }));
 }
 
 # Security scan — poll for new output lines (GET)
@@ -1450,6 +1497,163 @@ sub security_scan_load :Path('/admin/security-scan-load') :Args(0) {
     if ($@) {
         $c->response->body(encode_json({ error => "Cannot read file: $@" }));
     }
+}
+
+# Security scan — create todos from a scan archive (POST, returns JSON)
+sub security_scan_create_todos :Path('/admin/security-scan-create-todos') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'security_scan_create_todos')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ error => 'Access denied' }));
+        return;
+    }
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body(encode_json({ error => 'POST required' }));
+        return;
+    }
+
+    my $file = $c->req->param('file') // '';
+    $file =~ s|[^a-zA-Z0-9._-]||g;
+
+    my $data;
+    if ($file && $file =~ /\.json$/) {
+        my $path = $c->path_to('logs', 'security_scans', $file);
+        unless (-f $path) {
+            $c->response->body(encode_json({ error => "File not found: $file" }));
+            return;
+        }
+        eval {
+            my $json_text = do { local $/; open(my $f, '<', $path) or die $!; <$f> };
+            $data = decode_json($json_text);
+        };
+        if ($@) {
+            $c->response->body(encode_json({ error => "Cannot read file: $@" }));
+            return;
+        }
+    } else {
+        my $live = '/tmp/comserv_security_scan.json';
+        unless (-f $live) {
+            $c->response->body(encode_json({ error => 'No scan results available. Run a scan first.' }));
+            return;
+        }
+        eval {
+            my $json_text = do { local $/; open(my $f, '<', $live) or die $!; <$f> };
+            $data = decode_json($json_text);
+        };
+        if ($@) {
+            $c->response->body(encode_json({ error => "Cannot read live scan: $@" }));
+            return;
+        }
+    }
+
+    my $findings  = $data->{findings} // [];
+    my $sitename  = $data->{sitename} // 'none';
+    my $scan_url  = $data->{base_url} // '';
+    my $scan_time = $data->{scan_time} // '';
+
+    my $schema    = $c->model('DBEncy');
+    my $todo_rs   = $schema->resultset('Todo');
+    my $today     = DateTime->now->ymd;
+    my $due       = DateTime->now->add(days => 14)->ymd;
+    my $poster    = $c->session->{username} // 'security_scan';
+
+    # Priority map: critical findings get priority 1, broken links get priority 3
+    my %priority_for = (
+        EXPOSED_SENSITIVE    => 1,
+        EXPOSED_POST_ACCEPTED => 1,
+        LEAK_STACK_TRACE     => 1,
+        SERVER_ERROR         => 2,
+        NOT_FOUND            => 3,
+    );
+
+    my $created = 0;
+    my $skipped = 0;
+    my @created_subjects;
+
+    for my $f (@$findings) {
+        my $result   = $f->{result} // '';
+        my $url      = $f->{url}    // '';
+        my $from_url = $f->{from_url} // '';
+        my $phase    = $f->{phase}  // '';
+
+        next unless $result && $url;
+
+        # Only create todos for actionable findings
+        my $is_security = ($result =~ /^EXPOSED|LEAK_STACK_TRACE/);
+        my $is_broken   = ($result eq 'NOT_FOUND' && $phase eq 'crawl' && $from_url);
+        next unless ($is_security || $is_broken);
+
+        # Build subject (max 240 chars)
+        my $path = $url; $path =~ s|^\Q$scan_url\E||; $path ||= $url;
+        my $subject;
+        if ($is_broken) {
+            my $from_path = $from_url; $from_path =~ s|^\Q$scan_url\E||; $from_path ||= $from_url;
+            $subject = "Dead link: $path (on $from_path)";
+        } else {
+            $subject = "Security [$result]: $path";
+        }
+        $subject = substr($subject, 0, 240) if length($subject) > 240;
+
+        # Skip if an open todo with the same subject already exists for this site
+        my $existing = $todo_rs->search({
+            sitename => $sitename,
+            subject  => $subject,
+            status   => { -not_in => ['Delivered', 'Cancelled'] },
+        })->first;
+        if ($existing) {
+            $skipped++;
+            next;
+        }
+
+        my $priority = $priority_for{$result} // 2;
+        my $description = $is_broken
+            ? "Dead link found by security crawler on $scan_time.\nURL: $url\nFound on page: $from_url\nScan target: $scan_url"
+            : "Security finding from crawler on $scan_time.\nResult: $result\nURL: $url\nPhase: $phase\nScan target: $scan_url"
+                . ($f->{snippet} ? "\n\nSnippet:\n" . $f->{snippet} : '');
+
+        eval {
+            $todo_rs->create({
+                sitename            => $sitename,
+                subject             => $subject,
+                description         => $description,
+                status              => 'Requested',
+                priority            => $priority,
+                start_date          => $today,
+                due_date            => $due,
+                reporter            => 'security_scan',
+                username_of_poster  => $poster,
+                group_of_poster     => 'admin',
+                project_code        => 'security',
+                last_mod_by         => $poster,
+                last_mod_date       => $today,
+                date_time_posted    => $today,
+                share               => 0,
+                user_id             => 0,
+                project_id          => 0,
+            });
+            $created++;
+            push @created_subjects, $subject;
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'security_scan_create_todos', "Failed to create todo for $url: $@");
+        }
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'security_scan_create_todos',
+        "Created $created todos, skipped $skipped duplicates from scan: $scan_url");
+
+    $c->response->body(encode_json({
+        created  => $created,
+        skipped  => $skipped,
+        subjects => \@created_subjects,
+    }));
 }
 
 # Admin backup and restore

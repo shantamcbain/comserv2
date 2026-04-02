@@ -28,6 +28,7 @@ my $verbose     = 0;
 my $max_pages   = 200;
 my $output_file = '';
 my $archive_dir = '';
+my $auth_cookie = '';   # when set, both UAs send this Cookie header (authenticated scan)
 
 GetOptions(
     'url=s'         => \$base_url,
@@ -36,7 +37,8 @@ GetOptions(
     'max=i'         => \$max_pages,
     'output=s'      => \$output_file,
     'archive-dir=s' => \$archive_dir,
-) or die "Usage: $0 --url http://host:port [--site sitename] [--verbose] [--max N] [--output file.json] [--archive-dir dir]\n";
+    'auth-cookie=s' => \$auth_cookie,
+) or die "Usage: $0 --url http://host:port [--site sitename] [--verbose] [--max N] [--output file.json] [--archive-dir dir] [--auth-cookie 'Cookie: ...']\n";
 
 # Default archive dir next to the script: ../logs/security_scans/
 $archive_dir ||= "$Bin/../logs/security_scans";
@@ -47,16 +49,18 @@ $output_file ||= '/tmp/comserv_security_scan.json';
 
 $base_url =~ s|/$||;
 
+my $auth_mode = $auth_cookie ? 'AUTHENTICATED' : 'UNAUTHENTICATED';
+
 print "=" x 60 . "\n";
 print "Comserv Security Crawl\n";
-print "Target: $base_url  Site: $sitename\n";
+print "Target: $base_url  Site: $sitename  Mode: $auth_mode\n";
 print "=" x 60 . "\n\n";
 
-# Two separate cookie jars / agents — both are fully unauthenticated.
-# The crawl UA optionally sends X-Sitename so Phase 1 can render site-specific
-# public pages.  The probe UA sends NO X-Sitename so Phase 2/3/4 hit routes
-# exactly as a fresh anonymous browser would (Host header determines the site,
-# just like a real user).  Neither UA ever shares the admin browser session.
+# Two separate cookie jars / agents.
+# When --auth-cookie is supplied both UAs run as the logged-in user so we can
+# see what that role can access.  Without it both are fully unauthenticated.
+# The crawl UA optionally sends X-Sitename; the probe UA does not (simulates
+# a real browser hitting the route via Host header only).
 my $crawl_jar = HTTP::Cookies->new;
 my $probe_jar = HTTP::Cookies->new;
 
@@ -73,6 +77,13 @@ my $probe_ua = LWP::UserAgent->new(
     timeout      => 15,
     agent        => 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36',
 );
+
+# Inject session cookie into both UAs when running in authenticated mode
+if ($auth_cookie) {
+    $ua->default_header('Cookie'       => $auth_cookie);
+    $probe_ua->default_header('Cookie' => $auth_cookie);
+    print "  [AUTH] Running as authenticated user (session cookie injected)\n\n";
+}
 
 # Site header: only sent by crawl UA, and only when --site is a real site name
 my @site_hdr = ($sitename && $sitename ne 'none') ? ('X-Sitename' => $sitename) : ();
@@ -138,7 +149,7 @@ my @SENSITIVE_POST_ENDPOINTS = (
 );
 
 my %visited;
-my @queue     = ($base_url . '/');
+my @queue     = ({ url => $base_url . '/', from_url => '' });
 my @findings  = ();
 my $page_count = 0;
 
@@ -230,14 +241,16 @@ sub extract_links {
 print "[Phase 1] Crawling as unauthenticated visitor...\n";
 
 while (@queue && $page_count < $max_pages) {
-    my $url = shift @queue;
+    my $item     = shift @queue;
+    my $url      = $item->{url};
+    my $from_url = $item->{from_url} // '';
     next if $visited{$url}++;
     $page_count++;
 
     my $resp = $ua->get($url, @site_hdr);
     my $finding = classify_response($url, $resp);
 
-    push @findings, { phase => 'crawl', %$finding };
+    push @findings, { phase => 'crawl', from_url => $from_url, %$finding };
 
     my $icon = $finding->{result} =~ /EXPOSED|LEAK/ ? '!!' :
                $finding->{result} eq 'PROTECTED'    ? 'ok' :
@@ -254,7 +267,7 @@ while (@queue && $page_count < $max_pages) {
         my $new_count = 0;
         for my $link (@links) {
             unless ($visited{$link}) {
-                push @queue, $link;
+                push @queue, { url => $link, from_url => $url };
                 $new_count++;
             }
         }
@@ -430,6 +443,7 @@ my %report = (
     scan_time => $ts_iso,
     base_url  => $base_url,
     sitename  => $sitename,
+    auth_mode => $auth_mode,
     summary   => {
         total        => scalar @findings,
         exposed      => scalar @critical,

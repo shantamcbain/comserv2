@@ -1,0 +1,18 @@
+User-agent: *
+
+# Weather is a member/logged-in feature — no public content to index
+Disallow: /Weather
+
+# Admin area — no public access
+Disallow: /admin
+
+# User account pages — private
+Disallow: /user/create_account
+Disallow: /user/profile
+Disallow: /user/login
+
+# API endpoints — not human-readable pages
+Disallow: /api/
+
+# Sitemap
+Sitemap: https://beemaster.ca/sitemap.xml
