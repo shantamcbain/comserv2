@@ -123,17 +123,17 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key('record_id');
 
 __PACKAGE__->has_many(
-    herb_constituents => 'Comserv::Model::Schema::Forager::Result::HerbConstituent',
+    herb_constituents => 'Comserv::Model::Schema::Ency::Result::HerbConstituent',
     'constituent_id',
 );
 
 __PACKAGE__->has_many(
-    constituent_diseases => 'Comserv::Model::Schema::Forager::Result::ConstituentDisease',
+    constituent_diseases => 'Comserv::Model::Schema::Ency::Result::ConstituentDisease',
     'constituent_id',
 );
 
 __PACKAGE__->has_many(
-    constituent_symptoms => 'Comserv::Model::Schema::Forager::Result::ConstituentSymptom',
+    constituent_symptoms => 'Comserv::Model::Schema::Ency::Result::ConstituentSymptom',
     'constituent_id',
 );
 

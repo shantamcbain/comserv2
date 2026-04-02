@@ -1,28 +1,38 @@
-package Comserv::Model::Schema::Forager::Result::AnimalHerb;
+package Comserv::Model::Schema::Ency::Result::HerbConstituent;
 
 use strict;
 use warnings;
 use base 'DBIx::Class::Core';
 
 __PACKAGE__->load_components('InflateColumn::DateTime', 'TimeStamp');
-__PACKAGE__->table('animal_herb');
+__PACKAGE__->table('herb_constituent');
 __PACKAGE__->add_columns(
     id => {
         data_type         => 'int',
         is_auto_increment => 1,
         is_nullable       => 0,
     },
-    animal_id => {
-        data_type   => 'int',
-        is_nullable => 0,
-    },
     herb_id => {
         data_type   => 'int',
         is_nullable => 0,
     },
-    interaction_type => {
+    constituent_id => {
+        data_type   => 'int',
+        is_nullable => 0,
+    },
+    quantity => {
+        data_type     => 'decimal',
+        size          => [10, 4],
+        is_nullable   => 1,
+    },
+    unit => {
         data_type   => 'varchar',
-        size        => 50,
+        size        => 30,
+        is_nullable => 1,
+    },
+    plant_part => {
+        data_type   => 'varchar',
+        size        => 100,
         is_nullable => 1,
     },
     notes => {
@@ -32,18 +42,17 @@ __PACKAGE__->add_columns(
 );
 
 __PACKAGE__->set_primary_key('id');
-__PACKAGE__->add_unique_constraint(['animal_id', 'herb_id', 'interaction_type']);
-
-__PACKAGE__->belongs_to(
-    animal => 'Comserv::Model::Schema::Ency::Result::Animal',
-    'animal_id',
-    { is_foreign_key_constraint => 0 },
-);
+__PACKAGE__->add_unique_constraint(['herb_id', 'constituent_id', 'plant_part']);
 
 __PACKAGE__->belongs_to(
     herb => 'Comserv::Model::Schema::Forager::Result::Herb',
     'herb_id',
     { is_foreign_key_constraint => 0 },
+);
+
+__PACKAGE__->belongs_to(
+    constituent => 'Comserv::Model::Schema::Ency::Result::Constituent',
+    'constituent_id',
 );
 
 1;
