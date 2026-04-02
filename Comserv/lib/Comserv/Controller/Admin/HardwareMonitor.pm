@@ -373,15 +373,36 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
         $target =~ s/\.\.//g;
         $target =~ s/[\x00-\x1f\x7f]//g;
 
-        if ($action eq 'delete' && $target && $target =~ m{^/} && $target ne '/') {
+        my $_do_delete = sub {
+            my $t = shift;
+            return "Skipped: empty path" unless length $t;
+            return "Skipped: invalid path '$t'" unless $t =~ m{^/} && $t ne '/';
             if ($is_local) {
                 require File::Path;
-                eval { File::Path::remove_tree($target, { safe => 0 }) };
-                $action_result = $@ ? "Delete failed: $@" : "Deleted: $target";
+                if (-f $t) {
+                    my $ok = unlink $t;
+                    return $ok ? "Deleted: $t" : "Delete failed: $t: $!";
+                } else {
+                    eval { File::Path::remove_tree($t, { safe => 0 }) };
+                    return $@ ? "Delete failed: $t: $@" : "Deleted: $t";
+                }
             } else {
-                my ($out, $err) = $run_cmd->('rm', '-rf', '--', $target);
-                $action_result = $err // "Deleted on $hostname: $target";
+                my ($out, $err) = $run_cmd->('rm', '-rf', '--', $t);
+                return $err // "Deleted on $hostname: $t";
             }
+        };
+
+        if ($action eq 'delete' && $target && $target =~ m{^/} && $target ne '/') {
+            $action_result = $_do_delete->($target);
+        } elsif ($action eq 'delete_selected') {
+            my @targets = $c->req->param('target');
+            my @results;
+            for my $t (@targets) {
+                $t =~ s/\.\.//g;
+                $t =~ s/[\x00-\x1f\x7f]//g;
+                push @results, $_do_delete->($t);
+            }
+            $action_result = @results ? join('; ', @results) : 'No items selected.';
         } elsif ($action eq 'move_to_nfs' && $target && $target =~ m{^/}) {
             my $dest_name = (split '/', $target)[-1];
             my $dest      = "$NFS_BASE/archive/$dest_name";
