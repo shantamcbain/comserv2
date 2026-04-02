@@ -401,12 +401,22 @@ sub get_duplicates {
         offset   => ($page - 1) * $page_size,
     })->all;
 
+    my %orig_dup_count;
+    for my $d (@duplicates) {
+        next unless $d->duplicate_of;
+        $orig_dup_count{ $d->duplicate_of }++;
+    }
+
+    my %orig_cache;
     my @pairs;
     for my $dup (@duplicates) {
         my $original;
         if ($dup->duplicate_of) {
-            $original = $schema->resultset('File')->find($dup->duplicate_of);
+            $original = $orig_cache{ $dup->duplicate_of }
+                     //= $schema->resultset('File')->find($dup->duplicate_of);
         }
+        my $orig_id       = $original ? $original->id : undef;
+        my $sibling_count = $orig_id ? ($orig_dup_count{$orig_id} // 1) : 1;
         push @pairs, {
             duplicate      => $dup,
             original       => $original,
@@ -414,6 +424,7 @@ sub get_duplicates {
             orig_fs        => $original ? $self->_file_fs_info($original) : { fs_path => '', fs_exists => 0, fs_size => undef },
             same_path      => ($original && ($dup->file_path // '') eq ($original->file_path // '') && length($dup->file_path // '')) ? 1 : 0,
             same_nfs       => ($original && ($dup->nfs_path  // '') eq ($original->nfs_path  // '') && length($dup->nfs_path  // '')) ? 1 : 0,
+            sibling_count  => $sibling_count,
         };
     }
 
