@@ -393,8 +393,9 @@ sub add_animal : Path('/ENCY/Animal/add') : Args(0) {
 
     $self->_stash_image_files($c);
     $c->stash(
-        edit_mode => 1,
-        template  => 'ENCY/AnimalDetail.tt',
+        edit_mode       => 1,
+        ency_ai_prompt  => 'common_name, scientific_name, kingdom, phylum, class_name, order_name, family_name, genus, species, habitat, diet, behavior, ecological_role, therapeutic_uses, veterinary_uses, distribution, conservation_status, constituents, history, reference, url',
+        template        => 'ENCY/AnimalDetail.tt',
     );
 }
 
@@ -489,9 +490,10 @@ sub edit_animal : Path('/ENCY/Animal/edit') : Args(0) {
 
     $self->_stash_image_files($c);
     $c->stash(
-        animal    => $animal,
-        edit_mode => 1,
-        template  => 'ENCY/AnimalDetail.tt',
+        animal          => $animal,
+        edit_mode       => 1,
+        ency_ai_prompt  => 'common_name, scientific_name, kingdom, phylum, class_name, order_name, family_name, genus, species, habitat, diet, behavior, ecological_role, therapeutic_uses, veterinary_uses, distribution, conservation_status, constituents, history, reference, url',
+        template        => 'ENCY/AnimalDetail.tt',
     );
 }
 
@@ -615,8 +617,9 @@ sub add_insect : Path('/ENCY/Insect/add') : Args(0) {
 
     $self->_stash_image_files($c);
     $c->stash(
-        edit_mode => 1,
-        template  => 'ENCY/InsectDetail.tt',
+        edit_mode       => 1,
+        ency_ai_prompt  => 'common_name, scientific_name, order_name, family_name, genus, species, ecological_role, plants_foraged, plants_damaged, habitat, lifecycle, behavior, distribution, honey_production, pollination_notes, pest_notes, beneficial_notes, history, reference, url',
+        template        => 'ENCY/InsectDetail.tt',
     );
 }
 
@@ -710,9 +713,10 @@ sub edit_insect : Path('/ENCY/Insect/edit') : Args(0) {
 
     $self->_stash_image_files($c);
     $c->stash(
-        insect    => $insect,
-        edit_mode => 1,
-        template  => 'ENCY/InsectDetail.tt',
+        insect          => $insect,
+        edit_mode       => 1,
+        ency_ai_prompt  => 'common_name, scientific_name, order_name, family_name, genus, species, ecological_role, plants_foraged, plants_damaged, habitat, lifecycle, behavior, distribution, honey_production, pollination_notes, pest_notes, beneficial_notes, history, reference, url',
+        template        => 'ENCY/InsectDetail.tt',
     );
 }
 
@@ -833,8 +837,9 @@ sub add_disease : Path('/ENCY/Disease/add') : Args(0) {
 
     $self->_stash_image_files($c);
     $c->stash(
-        edit_mode => 1,
-        template  => 'ENCY/DiseaseDetail.tt',
+        edit_mode       => 1,
+        ency_ai_prompt  => 'common_name, scientific_name, disease_type, host_type, causative_agent, transmission, symptoms_description, diagnosis, treatment_conventional, treatment_herbal, prevention, prognosis, icd_code, distribution, history, reference, url',
+        template        => 'ENCY/DiseaseDetail.tt',
     );
 }
 
@@ -925,9 +930,10 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
 
     $self->_stash_image_files($c);
     $c->stash(
-        disease   => $disease,
-        edit_mode => 1,
-        template  => 'ENCY/DiseaseDetail.tt',
+        disease         => $disease,
+        edit_mode       => 1,
+        ency_ai_prompt  => 'common_name, scientific_name, disease_type, host_type, causative_agent, transmission, symptoms_description, diagnosis, treatment_conventional, treatment_herbal, prevention, prognosis, icd_code, distribution, history, reference, url',
+        template        => 'ENCY/DiseaseDetail.tt',
     );
 }
 
@@ -1044,8 +1050,9 @@ sub add_symptom : Path('/ENCY/Symptom/add') : Args(0) {
 
     $self->_stash_image_files($c);
     $c->stash(
-        edit_mode => 1,
-        template  => 'ENCY/SymptomDetail.tt',
+        edit_mode       => 1,
+        ency_ai_prompt  => 'name, common_name, description, body_system, severity, acute_chronic, host_type, reference, url',
+        template        => 'ENCY/SymptomDetail.tt',
     );
 }
 
@@ -1128,9 +1135,10 @@ sub edit_symptom : Path('/ENCY/Symptom/edit') : Args(0) {
 
     $self->_stash_image_files($c);
     $c->stash(
-        symptom   => $symptom,
-        edit_mode => 1,
-        template  => 'ENCY/SymptomDetail.tt',
+        symptom         => $symptom,
+        edit_mode       => 1,
+        ency_ai_prompt  => 'name, common_name, description, body_system, severity, acute_chronic, host_type, reference, url',
+        template        => 'ENCY/SymptomDetail.tt',
     );
 }
 
@@ -1249,8 +1257,9 @@ sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
 
     $self->_stash_image_files($c);
     $c->stash(
-        edit_mode => 1,
-        template  => 'ENCY/ConstituentDetail.tt',
+        edit_mode       => 1,
+        ency_ai_prompt  => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs, found_in_foods, found_in_drugs, pharmacological_effects, research_notes, reference, url',
+        template        => 'ENCY/ConstituentDetail.tt',
     );
 }
 
@@ -1341,9 +1350,10 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
 
     $self->_stash_image_files($c);
     $c->stash(
-        constituent => $constituent,
-        edit_mode   => 1,
-        template    => 'ENCY/ConstituentDetail.tt',
+        constituent     => $constituent,
+        edit_mode       => 1,
+        ency_ai_prompt  => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs, found_in_foods, found_in_drugs, pharmacological_effects, research_notes, reference, url',
+        template        => 'ENCY/ConstituentDetail.tt',
     );
 }
 
@@ -1455,8 +1465,9 @@ sub add_glossary : Path('/ENCY/Glossary/add') : Args(0) {
     }
 
     $c->stash(
-        edit_mode => 1,
-        template  => 'ENCY/GlossaryDetail.tt',
+        edit_mode       => 1,
+        ency_ai_prompt  => 'term, alternate_terms, definition, category, context, etymology, examples, related_terms',
+        template        => 'ENCY/GlossaryDetail.tt',
     );
 }
 
@@ -1537,9 +1548,10 @@ sub edit_glossary : Path('/ENCY/Glossary/edit') : Args(0) {
     }
 
     $c->stash(
-        term      => $term,
-        edit_mode => 1,
-        template  => 'ENCY/GlossaryDetail.tt',
+        term            => $term,
+        edit_mode       => 1,
+        ency_ai_prompt  => 'term, alternate_terms, definition, category, context, etymology, examples, related_terms',
+        template        => 'ENCY/GlossaryDetail.tt',
     );
 }
 

@@ -201,6 +201,7 @@
 </table>
 
 [% IF edit_mode %]
+[% PROCESS 'ENCY/partials/AiFormFill.tt' %]
 <br/>
 <input type="submit" value="[% IF symptom.record_id %]Update Symptom[% ELSE %]Add Symptom[% END %]" class="btn btn-primary" />
 <a href="[% c.uri_for('/ENCY/Symptom') %]" class="btn btn-default">Cancel</a>
