@@ -369,7 +369,8 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
 
     if ($action && $c->req->method eq 'POST') {
         my $target = $c->req->param('target') // '';
-        $target =~ s/[^A-Za-z0-9_.\/\-]//g;
+        $target =~ s/\.\.//g;
+        $target =~ s/[\x00-\x1f\x7f]//g;
 
         if ($action eq 'delete' && $target && $target =~ m{^/} && $target ne '/') {
             if ($is_local) {
