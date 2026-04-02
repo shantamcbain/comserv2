@@ -495,6 +495,217 @@ sub edit_animal : Path('/ENCY/Animal/edit') : Args(0) {
     );
 }
 
+sub insect_list : Path('/ENCY/Insect') : Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'insect_list', 'Entered insect_list');
+    my $insects = $c->model('ENCYModel')->list_insects($c, {});
+    $c->stash(
+        insects  => $insects,
+        template => 'ENCY/InsectList.tt',
+    );
+}
+
+sub insect_detail : Path('/ENCY/Insect') : Args(1) {
+    my ($self, $c, $id) = @_;
+
+    unless (defined $id && $id =~ /^\d+$/) {
+        $c->response->status(400);
+        $c->response->body('Invalid insect ID');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'insect_detail', "Fetching insect ID: $id");
+    my $insect = $c->model('ENCYModel')->get_insect_by_id($c, $id);
+
+    unless ($insect) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'insect_detail', "Insect not found for ID: $id");
+        $c->response->status(404);
+        $c->stash(
+            error_message => "Insect record #$id was not found.",
+            template      => 'error.tt',
+        );
+        return;
+    }
+
+    $c->session->{record_id} = $id;
+    my $related = $c->model('ENCYModel')->get_insect_related($c, $id);
+    $c->stash(
+        insect           => $insect,
+        related_herbs    => $related->{herbs}    // [],
+        related_diseases => $related->{diseases} // [],
+        edit_mode        => 0,
+        template         => 'ENCY/InsectDetail.tt',
+    );
+}
+
+sub add_insect : Path('/ENCY/Insect/add') : Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/Insect/add' }));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' } @role_list) {
+        $c->stash(
+            error_msg => "You do not have permission to add insects.",
+            template  => 'ENCY/InsectList.tt',
+        );
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $data = {
+            common_name       => $p->{common_name}       // '',
+            scientific_name   => $p->{scientific_name}   // '',
+            order_name        => $p->{order_name}        // '',
+            family_name       => $p->{family_name}       // '',
+            genus             => $p->{genus}             // '',
+            species           => $p->{species}           // '',
+            ecological_role   => $p->{ecological_role}   // '',
+            plants_foraged    => $p->{plants_foraged}    // '',
+            plants_damaged    => $p->{plants_damaged}    // '',
+            habitat           => $p->{habitat}           // '',
+            lifecycle         => $p->{lifecycle}         // '',
+            behavior          => $p->{behavior}          // '',
+            distribution      => $p->{distribution}      // '',
+            honey_production  => $p->{honey_production}  // '',
+            pollination_notes => $p->{pollination_notes} // '',
+            pest_notes        => $p->{pest_notes}        // '',
+            beneficial_notes  => $p->{beneficial_notes}  // '',
+            image             => $p->{image}             // '',
+            url               => $p->{url}               // '',
+            history           => $p->{history}           // '',
+            reference         => $p->{reference}         // '',
+            sitename          => $p->{sitename}          // 'ENCY',
+            username_of_poster => $c->session->{username},
+            group_of_poster    => $c->session->{group},
+            date_time_posted   => \'NOW()',
+        };
+
+        unless ($data->{common_name}) {
+            $c->stash(
+                error_msg => "Common name is required.",
+                insect    => $data,
+                edit_mode => 1,
+                template  => 'ENCY/InsectDetail.tt',
+            );
+            return;
+        }
+
+        $c->model('ENCYModel')->add_insect($c, $data);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_insect', "Insect added: $data->{common_name}");
+        $c->flash->{success_msg} = 'Insect added successfully.';
+        $c->response->redirect($c->uri_for('/ENCY/Insect'));
+        return;
+    }
+
+    $self->_stash_image_files($c);
+    $c->stash(
+        edit_mode => 1,
+        template  => 'ENCY/InsectDetail.tt',
+    );
+}
+
+sub edit_insect : Path('/ENCY/Insect/edit') : Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/Insect/edit' }));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' } @role_list) {
+        $c->stash(
+            error_msg => "You do not have permission to edit insects.",
+            template  => 'ENCY/InsectList.tt',
+        );
+        return;
+    }
+
+    my $record_id = $c->session->{record_id};
+
+    unless (defined $record_id && $record_id =~ /^\d+$/) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_insect',
+            "Invalid or missing record_id in session.");
+        $c->stash(
+            error_msg => "Invalid or missing insect record for editing. Please try again.",
+            template  => 'ENCY/InsectList.tt',
+        );
+        return;
+    }
+
+    my $insect = $c->model('ENCYModel')->get_insect_by_id($c, $record_id);
+    unless ($insect) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_insect',
+            "Insect not found for record_id: $record_id");
+        $c->stash(
+            error_msg => "Insect not found in the database. Please try again.",
+            template  => 'ENCY/InsectList.tt',
+        );
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $data = {
+            common_name       => $p->{common_name}       // '',
+            scientific_name   => $p->{scientific_name}   // '',
+            order_name        => $p->{order_name}        // '',
+            family_name       => $p->{family_name}       // '',
+            genus             => $p->{genus}             // '',
+            species           => $p->{species}           // '',
+            ecological_role   => $p->{ecological_role}   // '',
+            plants_foraged    => $p->{plants_foraged}    // '',
+            plants_damaged    => $p->{plants_damaged}    // '',
+            habitat           => $p->{habitat}           // '',
+            lifecycle         => $p->{lifecycle}         // '',
+            behavior          => $p->{behavior}          // '',
+            distribution      => $p->{distribution}      // '',
+            honey_production  => $p->{honey_production}  // '',
+            pollination_notes => $p->{pollination_notes} // '',
+            pest_notes        => $p->{pest_notes}        // '',
+            beneficial_notes  => $p->{beneficial_notes}  // '',
+            image             => $p->{image}             // '',
+            url               => $p->{url}               // '',
+            history           => $p->{history}           // '',
+            reference         => $p->{reference}         // '',
+        };
+
+        my ($status, $msg) = $c->model('ENCYModel')->update_insect($c, $record_id, $data);
+
+        if ($status) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_insect',
+                "Insect updated successfully for record_id: $record_id");
+            $c->flash->{success_msg} = "Insect details updated successfully.";
+            $c->response->redirect($c->uri_for('/ENCY/Insect', $record_id));
+            return;
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_insect',
+                "Failed to update insect: $msg");
+            $c->stash(
+                error_msg => "Failed to update insect: $msg",
+                insect    => { %{ $insect->get_columns }, %$data },
+                edit_mode => 1,
+                template  => 'ENCY/InsectDetail.tt',
+            );
+            return;
+        }
+    }
+
+    $self->_stash_image_files($c);
+    $c->stash(
+        insect    => $insect,
+        edit_mode => 1,
+        template  => 'ENCY/InsectDetail.tt',
+    );
+}
+
 sub create_reference :Local {
     my ( $self, $c ) = @_;
     # Implement the logic to display the form for creating a new reference
