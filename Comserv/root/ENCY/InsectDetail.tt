@@ -293,6 +293,7 @@
 [% END %]
 
 [% IF edit_mode %]
+[% PROCESS 'ENCY/partials/AiFormFill.tt' %]
 <br/>
 <input type="submit" value="[% IF insect.record_id %]Update Insect[% ELSE %]Add Insect[% END %]" class="btn btn-primary" />
 <a href="[% c.uri_for('/ENCY/Insect') %]" class="btn btn-default">Cancel</a>

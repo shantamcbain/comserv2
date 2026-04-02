@@ -1,0 +1,91 @@
+[% IF is_admin %]
+<div id="ency-ai-fill-panel" style="margin:1em 0;padding:1em;border:1px solid #acd;background:#f0f7ff;border-radius:4px;">
+  <strong>Ask AI to Fill Form</strong>
+  <span id="ency-ai-prompt-data" data-prompt="[% ency_ai_prompt | html %]" style="display:none;"></span>
+  <div style="margin-top:0.5em;">
+    <input type="text" id="ency-ai-entity-name" placeholder="Enter entity name to look up..." size="45" />
+    <button type="button" id="ency-ai-ask-btn" onclick="encyAiFill()">Ask AI</button>
+    <span id="ency-ai-status" style="margin-left:1em;color:#555;font-style:italic;"></span>
+  </div>
+  <div id="ency-ai-raw" style="display:none;margin-top:0.8em;">
+    <strong>AI Raw Response:</strong>
+    <pre id="ency-ai-raw-text" style="background:#eee;padding:0.5em;max-height:180px;overflow:auto;font-size:0.85em;"></pre>
+    <button type="button" onclick="encyAiMarkReference()">Mark Reference as AI-generated</button>
+    <span style="color:#888;font-size:0.85em;margin-left:0.5em;">Appends attribution to the Reference field.</span>
+  </div>
+</div>
+<script>
+(function() {
+    function encyAiFill() {
+        var name = document.getElementById('ency-ai-entity-name').value.trim();
+        if (!name) { alert('Please enter an entity name.'); return; }
+        var promptEl = document.getElementById('ency-ai-prompt-data');
+        var systemPrompt = promptEl ? promptEl.getAttribute('data-prompt') : '';
+        var statusEl = document.getElementById('ency-ai-status');
+        var btn = document.getElementById('ency-ai-ask-btn');
+        statusEl.textContent = 'Asking AI\u2026';
+        btn.disabled = true;
+        document.getElementById('ency-ai-raw').style.display = 'none';
+
+        fetch('/AI/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt: 'Return ONLY a raw JSON object (no markdown, no code blocks, no explanation) with encyclopedia fields for: ' + name + '. Required fields: ' + systemPrompt,
+                system: 'You are an encyclopedia data assistant. Return ONLY a raw JSON object with the requested fields filled in for the named entity. No markdown, no code fences, no prose \u2014 pure JSON only.'
+            })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            if (!data.success) {
+                statusEl.textContent = 'AI error: ' + (data.error || 'unknown error');
+                return;
+            }
+            var raw = (data.response || '').trim();
+            document.getElementById('ency-ai-raw-text').textContent = raw;
+            document.getElementById('ency-ai-raw').style.display = '';
+            var jsonStart = raw.indexOf('{');
+            var jsonEnd   = raw.lastIndexOf('}');
+            if (jsonStart === -1 || jsonEnd === -1) {
+                statusEl.textContent = 'AI did not return JSON. See raw response above.';
+                return;
+            }
+            try {
+                var fields = JSON.parse(raw.substring(jsonStart, jsonEnd + 1));
+                var filled = 0;
+                Object.keys(fields).forEach(function(key) {
+                    var el = document.querySelector('[name="' + key + '"]');
+                    if (el && fields[key] !== null && fields[key] !== undefined && fields[key] !== '') {
+                        el.value = fields[key];
+                        filled++;
+                    }
+                });
+                statusEl.textContent = 'Filled ' + filled + ' field(s). Please review carefully before saving.';
+            } catch(e) {
+                statusEl.textContent = 'Could not parse JSON from AI response. See raw response above.';
+            }
+        })
+        .catch(function(err) {
+            btn.disabled = false;
+            document.getElementById('ency-ai-status').textContent = 'Request failed: ' + err;
+        });
+    }
+
+    function encyAiMarkReference() {
+        var refEl = document.querySelector('[name="reference"]');
+        if (!refEl) { return; }
+        var username = '[% c.session.username | html %]';
+        var note = 'AI-generated, reviewed by ' + username;
+        if (refEl.value && refEl.value.indexOf('AI-generated') === -1) {
+            refEl.value = refEl.value + '\n' + note;
+        } else if (!refEl.value) {
+            refEl.value = note;
+        }
+    }
+
+    window.encyAiFill = encyAiFill;
+    window.encyAiMarkReference = encyAiMarkReference;
+})();
+</script>
+[% END %]
