@@ -495,6 +495,16 @@ sub edit_animal : Path('/ENCY/Animal/edit') : Args(0) {
     );
 }
 
+sub animals_redirect : Path('/ENCY/animals') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->redirect($c->uri_for('/ENCY/Animal'), 301);
+}
+
+sub insects_redirect : Path('/ENCY/insects') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->redirect($c->uri_for('/ENCY/Insect'), 301);
+}
+
 sub insect_list : Path('/ENCY/Insect') : Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'insect_list', 'Entered insect_list');
