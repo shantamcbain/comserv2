@@ -61,3 +61,10 @@
 [% ELSE %]
 <p>No constituents found in the database.</p>
 [% END %]
+
+[% IF ai_fallback %]
+<div class="alert alert-info" style="margin-top:1em;">
+  No local results for &ldquo;[% ai_query | html %]&rdquo;.
+  <a href="/AI/chat?prompt=Tell+me+about+[% ai_query | uri %]+in+the+context+of+the+encyclopedia">Ask AI</a>
+</div>
+[% END %]

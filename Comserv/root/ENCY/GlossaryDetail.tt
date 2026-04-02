@@ -142,6 +142,7 @@
 </table>
 
 [% IF edit_mode %]
+[% PROCESS 'ENCY/partials/AiFormFill.tt' %]
 <br/>
 <input type="submit" value="[% IF entry.record_id %]Update Term[% ELSE %]Add Term[% END %]" class="btn btn-primary" />
 <a href="[% c.uri_for('/ENCY/Glossary') %]" class="btn btn-default">Cancel</a>
