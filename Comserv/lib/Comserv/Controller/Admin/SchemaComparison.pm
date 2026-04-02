@@ -877,20 +877,24 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
                 my @table_statements = grep { /CREATE TABLE\s+`\Q$table_name\E`/i } @statements;
                 
                 if (@table_statements) {
+                    $dbh->do('SET FOREIGN_KEY_CHECKS=0');
                     foreach my $statement (@table_statements) {
                         $dbh->do($statement);
                     }
+                    $dbh->do('SET FOREIGN_KEY_CHECKS=1');
                     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
                         "Successfully created table '$table_name' from Result class '$class_name' using SQL deployment");
                 } else {
                     # Fallback: Try the full deploy if we can't isolate the statement
+                    $dbh->do('SET FOREIGN_KEY_CHECKS=0');
                     $schema->deploy();
+                    $dbh->do('SET FOREIGN_KEY_CHECKS=1');
                     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
                         "Successfully created table '$table_name' from Result class '$class_name' using schema->deploy()");
                 }
             } catch {
                 my $deploy_error = $_;
-                # Check if it's a permission/privilege error
+                eval { $dbh->do('SET FOREIGN_KEY_CHECKS=1') };
                 if ($deploy_error =~ /access denied|permission/i) {
                     die "Database user does not have CREATE TABLE privileges for table '$table_name': $deploy_error";
                 } else {
