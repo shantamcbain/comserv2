@@ -52,12 +52,17 @@ sub check_admin_access {
     my $has_valid_session = 0;
     if ($username && $username ne 'unknown') {
         $has_valid_session = 1;
-    } elsif ($roles && ((ref($roles) eq 'ARRAY' && @$roles > 0) || ($roles ne '' && $roles ne 'none'))) {
-        # If we have roles but no username, try to get username from user object or use user_id
-        $username = ($c->user ? $c->user->username : undef) || "user_id_$user_id" || 'session_user';
+    } elsif (ref($roles) eq 'ARRAY' && @$roles > 0) {
+        # If we have actual roles but no username, try to get username from user object
+        $username = ($c->user ? $c->user->username : undef) || "user_id_$user_id";
+        if ($username && $username ne 'user_id_none') {
+            $has_valid_session = 1;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_admin_access',
+                "Using fallback username '$username' for $action_name (roles exist but username missing)");
+        }
+    } elsif (!ref($roles) && $roles && $roles ne 'none') {
+        # String roles (legacy format)
         $has_valid_session = 1;
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_admin_access',
-            "Using fallback username '$username' for $action_name (roles exist but username missing)");
     }
     
     unless ($has_valid_session) {
@@ -70,10 +75,10 @@ sub check_admin_access {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_admin_access',
         "Session debug for $action_name - Username: '$username', SiteName: '$sitename', Roles: '$roles_str'");
     
-    # Check for special username
-    if ($username eq 'Shanta' || $username eq 'ai_assistant') {
+    # Check for system/service users
+    if ($username eq 'ai_assistant' || $username eq 'Shanta') {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_admin_access',
-            "Access granted for $action_name: Special user '$username'");
+            "Access granted for $action_name: User '$username' (bypass check)");
         return 1;
     }
     
@@ -81,7 +86,7 @@ sub check_admin_access {
     my $has_admin_role = 0;
     if (ref($roles) eq 'ARRAY') {
         $has_admin_role = grep { $_ eq 'admin' } @$roles;
-    } elsif ($roles && $roles eq 'admin') {
+    } elsif ($roles && ($roles eq 'admin' || $roles =~ /\badmin\b/i)) {
         $has_admin_role = 1;
     }
     
@@ -137,9 +142,22 @@ Helper method to check if user is a CSC admin specifically.
 sub is_csc_admin {
     my ($self, $c) = @_;
     
+    # CSC Admin check: SiteName = 'CSC' AND admin role
+    # This identifies the system-level administrator
+    my $username = $c->session->{username} || ($c->user ? $c->user->username : undef) || '';
+    return 1 if $username eq 'Shanta';
+
+    my $roles = $c->session->{roles} || [];
+    my $has_admin_role = 0;
+    if (ref($roles) eq 'ARRAY') {
+        $has_admin_role = grep { $_ eq 'admin' } @$roles;
+    } elsif ($roles && ($roles eq 'admin' || $roles =~ /\badmin\b/i)) {
+        $has_admin_role = 1;
+    }
+    
     return ($c->session->{SiteName} && 
             $c->session->{SiteName} eq 'CSC' && 
-            $c->check_user_roles('admin'));
+            $has_admin_role);
 }
 
 =head2 get_admin_type
@@ -151,18 +169,18 @@ Returns the type of admin: 'standard', 'csc', 'special', or 'none'
 sub get_admin_type {
     my ($self, $c) = @_;
     
-    my $username = $c->session->{username} || '';
+    my $username = $c->session->{username} || ($c->user ? $c->user->username : undef) || '';
     my $roles = $c->session->{roles} || [];
     my $sitename = $c->session->{SiteName} || '';
     
-    if ($username eq 'Shanta' || $username eq 'ai_assistant') {
+    if ($username eq 'ai_assistant' || $username eq 'Shanta') {
         return 'special';
     }
     
     my $has_admin_role = 0;
     if (ref($roles) eq 'ARRAY') {
         $has_admin_role = grep { $_ eq 'admin' } @$roles;
-    } elsif ($roles && $roles eq 'admin') {
+    } elsif ($roles && ($roles eq 'admin' || $roles =~ /\badmin\b/i)) {
         $has_admin_role = 1;
     }
     

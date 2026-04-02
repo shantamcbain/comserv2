@@ -3,8 +3,15 @@ use Moose;
 use namespace::autoclean;
 use POSIX qw(strftime);
 use File::Path qw(make_path);
+use Comserv::Util::NfsPath;
 
 extends 'Catalyst::Model';
+
+has 'nfs_path_util' => (
+    is => 'ro',
+    lazy => 1,
+    default => sub { Comserv::Util::NfsPath->new() }
+);
 
 # Set the schema_class attribute
 
@@ -349,10 +356,12 @@ sub upload_and_record {
 }
 
 sub _file_fs_info {
-    my ($file) = @_;
+    my ($self, $file) = @_;
     my $path = '';
-    $path = $file->file_path if defined $file->file_path && length($file->file_path // '');
-    $path = $file->nfs_path  if !length($path) && defined $file->nfs_path && length($file->nfs_path // '');
+    my $stored = $file->nfs_path // $file->file_path // '';
+    if (length $stored) {
+        $path = $self->nfs_path_util->resolve_path($stored);
+    }
     return {
         fs_path   => $path,
         fs_exists => (length($path) && -f $path) ? 1 : 0,
@@ -392,19 +401,30 @@ sub get_duplicates {
         offset   => ($page - 1) * $page_size,
     })->all;
 
+    my %orig_dup_count;
+    for my $d (@duplicates) {
+        next unless $d->duplicate_of;
+        $orig_dup_count{ $d->duplicate_of }++;
+    }
+
+    my %orig_cache;
     my @pairs;
     for my $dup (@duplicates) {
         my $original;
         if ($dup->duplicate_of) {
-            $original = $schema->resultset('File')->find($dup->duplicate_of);
+            $original = $orig_cache{ $dup->duplicate_of }
+                     //= $schema->resultset('File')->find($dup->duplicate_of);
         }
+        my $orig_id       = $original ? $original->id : undef;
+        my $sibling_count = $orig_id ? ($orig_dup_count{$orig_id} // 1) : 1;
         push @pairs, {
             duplicate      => $dup,
             original       => $original,
-            dup_fs         => _file_fs_info($dup),
-            orig_fs        => $original ? _file_fs_info($original) : { fs_path => '', fs_exists => 0, fs_size => undef },
+            dup_fs         => $self->_file_fs_info($dup),
+            orig_fs        => $original ? $self->_file_fs_info($original) : { fs_path => '', fs_exists => 0, fs_size => undef },
             same_path      => ($original && ($dup->file_path // '') eq ($original->file_path // '') && length($dup->file_path // '')) ? 1 : 0,
             same_nfs       => ($original && ($dup->nfs_path  // '') eq ($original->nfs_path  // '') && length($dup->nfs_path  // '')) ? 1 : 0,
+            sibling_count  => $sibling_count,
         };
     }
 

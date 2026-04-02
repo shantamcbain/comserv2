@@ -3,6 +3,7 @@ use Moose;
 use namespace::autoclean;
 use DateTime;
 use Data::Dumper;
+use JSON ();
 use Comserv::Util::Logging;
 use Comserv::Controller::Site;
 BEGIN { extends 'Catalyst::Controller'; }
@@ -12,7 +13,7 @@ sub _require_login {
     my $username = $c->session->{username} // '';
     if (!$username || $username eq 'anonymous') {
         $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
-        return 0;
+        $c->detach();
     }
     return 1;
 }
@@ -88,6 +89,13 @@ sub add_project :Path('addproject') :Args(0) {
 
 sub  create_project :Local :Args(0) {
     my ($self, $c) = @_;
+
+    unless ($c->request->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body('Method Not Allowed');
+        return;
+    }
+
     return unless $self->_require_login($c);
 
     my $form_data = $c->request->body_parameters;
@@ -125,6 +133,18 @@ sub  create_project :Local :Args(0) {
 
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_project',
         "Parent ID: " . (defined $parent_id ? $parent_id : 'undef') . ", Group of poster: $group_of_poster");
+
+    unless ($form_data->{name} && $form_data->{client_name}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_project',
+            "Rejected incomplete project submission (missing required fields)");
+        $c->response->status(400);
+        $c->stash(
+            error_message => 'Required fields (name, client name) are missing.',
+            template      => 'todo/add_project.tt',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
 
     my $project = eval {
         $project_rs->create({
@@ -811,7 +831,8 @@ sub reorder :Path('reorder') :Args(0) {
         return;
     }
 
-    my $json_body = $c->req->content;
+    my $body_fh   = $c->req->body;
+    my $json_body = $body_fh ? do { local $/; <$body_fh> } : '';
     unless ($json_body) {
         $c->response->status(400);
         $c->response->body('{"ok":0,"error":"No body"}');
@@ -838,6 +859,126 @@ sub reorder :Path('reorder') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reorder',
         "Project sort order updated by $username: " . join(',', @{ $data->{order} }));
 
+    $c->response->body('{"ok":1}');
+}
+
+sub dependency_form :Path('dependency_form') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $username = $c->session->{username} // '';
+    unless ($username && $username ne 'anonymous') {
+        $c->response->redirect($c->uri_for('/login'));
+        return;
+    }
+    my $roles  = $c->session->{roles} || [];
+    my @rl     = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
+    unless (grep { /^(admin|developer)$/i } @rl) {
+        $c->response->status(403);
+        $c->stash(template => 'error.tt', error_msg => 'Admin role required');
+        return;
+    }
+
+    my @all_projects = $c->model('DBEncy')->resultset('Project')->search(
+        {},
+        { order_by => [{ -asc => 'sitename' }, { -asc => 'name' }] }
+    )->all;
+
+    my @all_deps = $c->model('DBEncy')->resultset('ProjectDependency')->search(
+        {},
+        { order_by => { -asc => 'id' } }
+    )->all;
+
+    my %proj_map = map { $_->id => $_->name } @all_projects;
+
+    my @deps_display;
+    for my $d (@all_deps) {
+        my %h = $d->get_columns;
+        $h{project_name}    = $proj_map{$h{project_id}}    || "Project #$h{project_id}";
+        $h{depends_on_name} = $proj_map{$h{depends_on_id}} || "Project #$h{depends_on_id}";
+        push @deps_display, \%h;
+    }
+
+    if ($c->req->method eq 'POST') {
+        my $p_id  = $c->req->param('project_id')    || '';
+        my $d_id  = $c->req->param('depends_on_id') || '';
+        my $type  = $c->req->param('dependency_type') || 'blocks';
+        my $desc  = $c->req->param('description')   || '';
+        my $site  = $c->req->param('sitename')       || $c->stash->{SiteName} || 'CSC';
+
+        if ($p_id && $d_id && $p_id != $d_id) {
+            eval {
+                $c->model('DBEncy')->resultset('ProjectDependency')->update_or_create({
+                    project_id      => $p_id,
+                    depends_on_id   => $d_id,
+                    dependency_type => $type,
+                    description     => $desc,
+                    status          => 'active',
+                    sitename        => $site,
+                    created_by      => $username,
+                });
+            };
+            if ($@) {
+                $c->stash(error_msg => "Could not save dependency: $@");
+            } else {
+                $c->response->redirect($c->uri_for('/project/dependency_form'));
+                return;
+            }
+        } else {
+            $c->stash(error_msg => 'Please select two different projects.');
+        }
+    }
+
+    $c->stash(
+        all_projects  => \@all_projects,
+        deps_display  => \@deps_display,
+        template      => 'project/dependency_form.tt',
+    );
+}
+
+sub resolve_dependency :Path('resolve_dependency') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $username = $c->session->{username} // '';
+    unless ($username && $username ne 'anonymous') {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Login required"}');
+        return;
+    }
+    my $roles    = $c->session->{roles} || [];
+    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
+    unless (grep { /^(admin|developer)$/i } @rl) {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Admin role required"}');
+        return;
+    }
+
+    my $data = eval { $c->req->body_data } // {};
+    my $id   = $data->{id} || $c->req->param('id');
+    unless ($id && $id =~ /^\d+$/) {
+        $c->response->status(400);
+        $c->response->body('{"ok":0,"error":"Invalid id"}');
+        return;
+    }
+
+    eval {
+        my $dep = $c->model('DBEncy')->resultset('ProjectDependency')->find($id);
+        unless ($dep) {
+            $c->response->status(404);
+            $c->response->body('{"ok":0,"error":"Dependency not found"}');
+            return;
+        }
+        my $new_status = ($data->{status} && $data->{status} =~ /^(resolved|waived)$/) ? $data->{status} : 'resolved';
+        $dep->update({ status => $new_status, resolved_at => DateTime->now->ymd . ' ' . DateTime->now->hms });
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resolve_dependency', "Error: $@");
+        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_dependency',
+        "Dependency $id resolved by $username");
     $c->response->body('{"ok":1}');
 }
 

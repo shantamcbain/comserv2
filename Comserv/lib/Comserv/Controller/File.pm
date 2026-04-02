@@ -246,7 +246,7 @@ sub fs_rename :Path('/file/fs_rename') :Args(0) {
         return;
     }
 
-    
+
 
     my $old_path = $c->req->param('old_path') // '';
     my $new_name = $c->req->param('new_name') // '';
@@ -378,6 +378,7 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
     my $old_path = $c->req->param('old_path') // '';
     my $dest_dir = $c->req->param('dest_dir') // '';
     my $dir      = $c->req->param('dir')      // '';
+    my $back_url = $c->req->param('back_url') // '';
 
     $old_path =~ s{\.\.}{}g;
     $dest_dir =~ s{\.\.}{}g;
@@ -385,15 +386,21 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
     $dest_dir =~ s/\s+$//;
     $dest_dir =~ s{/+$}{};
 
+    my $_err_redir = sub {
+        my $msg = shift;
+        $c->flash->{error_msg} = $msg;
+        my $r = length($back_url) ? $back_url
+              : $c->uri_for('/file/admin_browser', { dir_path => $dir });
+        $c->response->redirect($r);
+    };
+
     unless (length $old_path && length $dest_dir) {
-        $c->flash->{error_msg} = 'Source path and destination directory are required.';
-        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        $_err_redir->('Source path and destination directory are required.');
         return;
     }
 
     unless (-e $old_path) {
-        $c->flash->{error_msg} = 'Source file not found.';
-        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        $_err_redir->('Source file not found.');
         return;
     }
 
@@ -404,16 +411,14 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
     unless ($allowed_src && $allowed_dst) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fs_move',
             "Scope violation: '$sitename' tried to move '$old_path' -> '$dest_dir'");
-        $c->flash->{error_msg} = 'Access denied: destination is outside your allocated directories.';
-        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        $_err_redir->('Access denied: destination is outside your allocated directories.');
         return;
     }
 
     unless (-d $dest_dir) {
         eval { make_path($dest_dir) };
         if ($@ || !-d $dest_dir) {
-            $c->flash->{error_msg} = "Destination directory could not be created: $@";
-            $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+            $_err_redir->("Destination directory could not be created: $@");
             return;
         }
     }
@@ -425,14 +430,14 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
     if (-e $new_path) {
         if (-d $old_path && -d $new_path) {
             $c->response->redirect($c->uri_for('/file/dir_merge', {
-                src  => $old_path,
-                dest => $new_path,
-                back => $dir,
+                src      => $old_path,
+                dest     => $new_path,
+                back     => $dir,
+                back_url => $back_url,
             }));
             return;
         }
-        $c->flash->{error_msg} = "A file named '$filename' already exists in '$dest_dir'. Cannot overwrite a file with a file — rename one first.";
-        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        $_err_redir->("A file named '$filename' already exists in '$dest_dir'. Cannot overwrite a file with a file — rename one first.");
         return;
     }
 
@@ -443,8 +448,7 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
     } elsif ($is_dir) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fs_move',
             "Rename failed for directory '$old_path' -> '$new_path': $!");
-        $c->flash->{error_msg} = "Cannot move directory: $! (directories can only be moved within the same filesystem)";
-        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        $_err_redir->("Cannot move directory: $! (directories can only be moved within the same filesystem)");
         return;
     } else {
         require File::Copy;
@@ -452,8 +456,7 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
         unless ($move_ok) {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fs_move',
                 "Move failed: $old_path -> $new_path: $!");
-            $c->flash->{error_msg} = "Move failed: $!";
-            $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+            $_err_redir->("Move failed: $!");
             return;
         }
     }
@@ -474,7 +477,9 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
         $msg .= " <strong>Duplicate detected</strong> — check the Duplicates page." if $sync->{dup_flagged};
     }
     $c->flash->{success_msg} = $msg;
-    $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+    my $redir = length($back_url) ? $back_url
+              : $c->uri_for('/file/admin_browser', { dir_path => $dir });
+    $c->response->redirect($redir);
 }
 
 sub fs_mkdir :Path('/file/fs_mkdir') :Args(0) {
