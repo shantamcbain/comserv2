@@ -373,23 +373,44 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
         $target =~ s/\.\.//g;
         $target =~ s/[\x00-\x1f\x7f]//g;
 
+        my $_db_orphan_path = sub {
+            my $deleted_path = shift;
+            eval {
+                my $schema = $c->model('DBEncy');
+                my $rs = $schema->resultset('File')->search([
+                    { file_path => { 'like', "$deleted_path%" } },
+                    { nfs_path  => { 'like', "$deleted_path%" } },
+                ]);
+                my $count = 0;
+                while (my $rec = $rs->next) {
+                    $rec->update({ file_status => 'orphaned' });
+                    $count++;
+                }
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'disk_diagnose_delete',
+                    "Marked $count DB record(s) orphaned after delete of '$deleted_path'") if $count;
+            };
+        };
+
         my $_do_delete = sub {
             my $t = shift;
             return "Skipped: empty path" unless length $t;
             return "Skipped: invalid path '$t'" unless $t =~ m{^/} && $t ne '/';
+            my $result;
             if ($is_local) {
                 require File::Path;
                 if (-f $t) {
                     my $ok = unlink $t;
-                    return $ok ? "Deleted: $t" : "Delete failed: $t: $!";
+                    $result = $ok ? "Deleted: $t" : "Delete failed: $t: $!";
                 } else {
                     eval { File::Path::remove_tree($t, { safe => 0 }) };
-                    return $@ ? "Delete failed: $t: $@" : "Deleted: $t";
+                    $result = $@ ? "Delete failed: $t: $@" : "Deleted: $t";
                 }
             } else {
                 my ($out, $err) = $run_cmd->('rm', '-rf', '--', $t);
-                return $err // "Deleted on $hostname: $t";
+                $result = $err // "Deleted on $hostname: $t";
             }
+            $_db_orphan_path->($t) if $result =~ /^Deleted/;
+            return $result;
         };
 
         if ($action eq 'delete' && $target && $target =~ m{^/} && $target ne '/') {
