@@ -1551,25 +1551,44 @@ sub create_reference :Local {
 sub search :Path('/ENCY/search') :Args(0) {
     my ($self, $c) = @_;
 
-    my $search_string = $c->request->parameters->{search_string};
+    my $query = $c->request->parameters->{search_string} // $c->request->parameters->{q} // '';
+    $query =~ s/^\s+|\s+$//g;
 
-    # Call the searchHerbs method in the DBForager model
-    my $results = $c->model('DBForager')->searchHerbs($c, $search_string);
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'search', "Search query: $query");
 
-    # Stash the results for the view
-    $c->stash(herbal_data => $results);
+    my $ency_model = $c->model('ENCYModel');
 
-    # Get the referer from the request headers
-    my $referer = $c->req->headers->referer;
+    my $herbs       = $query ? $c->model('DBForager')->searchHerbs($c, $query) : [];
+    my $animals     = $query ? $ency_model->search_animals($c, $query)     : [];
+    my $insects     = $query ? $ency_model->search_insects($c, $query)     : [];
+    my $diseases    = $query ? $ency_model->search_diseases($c, $query)    : [];
+    my $symptoms    = $query ? $ency_model->search_symptoms($c, $query)    : [];
+    my $constituents = $query ? $ency_model->search_constituents($c, $query) : [];
+    my $glossary    = $query ? $ency_model->search_glossary($c, $query)    : [];
 
-    # Determine which template to use based on the referer
-    my $template = 'ENCY/BotanicalNameView.tt';
-    if ($referer && $referer =~ /BeePastureView/) {
-        $template = 'ENCY/BeePastureView.tt';
-    }
+    my $total_results = scalar(@$herbs) + scalar(@$animals) + scalar(@$insects)
+                      + scalar(@$diseases) + scalar(@$symptoms)
+                      + scalar(@$constituents) + scalar(@$glossary);
 
-    # Set the template
-    $c->stash(template => $template);
+    my $ai_fallback = ($query && $total_results == 0) ? 1 : 0;
+
+    $c->stash(
+        search_results => {
+            herbs        => $herbs,
+            animals      => $animals,
+            insects      => $insects,
+            diseases     => $diseases,
+            symptoms     => $symptoms,
+            constituents => $constituents,
+            glossary     => $glossary,
+        },
+        herbal_data    => $herbs,
+        search_query   => $query,
+        total_results  => $total_results,
+        ai_fallback    => $ai_fallback,
+        ai_query       => $query,
+        template       => 'ENCY/SearchResults.tt',
+    );
 }
 sub get_category_by_id :Local {
     my ( $self, $c, $id ) = @_;
