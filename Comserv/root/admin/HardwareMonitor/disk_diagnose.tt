@@ -112,25 +112,26 @@
   <td style="font-size:.8em;color:#666;white-space:nowrap;">[% e.fstype | html %]</td>
   <td>
     <div class="dd-actions">
-      [% IF e.path != '/' && !e.is_net %]
-      <button type="button" class="dd-btn dd-btn-del" onclick="showConfirm([% loop.index %],'delete','[% e.path | html %]')">&#128465; Delete</button>
-      <button type="button" class="dd-btn dd-btn-nfs" onclick="showConfirm([% loop.index %],'move_to_nfs','[% e.path | html %]')">&#128190; Move to NFS</button>
-      [% IF e.is_dir %]
-      <button type="button" class="dd-btn dd-btn-zip" onclick="showConfirm([% loop.index %],'compress','[% e.path | html %]')">&#128230; Compress</button>
-      [% END %]
-      [% ELSIF e.is_net %]
-      <a href="/admin/hardware_monitor/disk_diagnose?hostname=[% hostname | uri %]&amp;path=[% e.path | uri %]" class="dd-btn">&#128065; Browse</a>
+      [% IF e.is_net %]
+      <a href="/admin/hardware_monitor/disk_diagnose?hostname=[% hostname | uri %]&amp;path=[% e.path | uri %]" class="dd-btn">&#128065; Drill in</a>
+      [% ELSIF e.is_dir %]
+      <a href="/file/admin_browser?dir_path=[% e.path | uri %]" class="dd-btn dd-btn-nfs">&#128193; Manage</a>
+      <a href="/admin/hardware_monitor/disk_diagnose?hostname=[% hostname | uri %]&amp;path=[% e.path | uri %]" class="dd-btn">&#128202; Size detail</a>
+      <button type="button" class="dd-btn dd-btn-del" onclick="showConfirm([% loop.index %])">&#128465; Delete</button>
+      [% ELSE %]
+      <a href="/file/admin_browser?dir_path=[% path | uri %]" class="dd-btn dd-btn-nfs">&#128193; Manage</a>
+      <button type="button" class="dd-btn dd-btn-del" onclick="showConfirm([% loop.index %])">&#128465; Delete</button>
       [% END %]
     </div>
-    <div class="dd-confirm" id="confirm-[% loop.index %]">
+    <div class="dd-confirm" id="confirm-[% loop.index %]" style="display:none;background:#fff8e1;border:1px solid #ffe082;border-radius:4px;padding:8px 12px;margin-top:6px;font-size:.85em;">
       <form method="post" action="/admin/hardware_monitor/disk_diagnose">
         <input type="hidden" name="hostname" value="[% hostname | html %]">
         <input type="hidden" name="path"     value="[% path | html %]">
         <input type="hidden" name="target"   value="[% e.path | html %]">
-        <input type="hidden" name="action"   id="act-[% loop.index %]" value="">
-        <strong id="confirm-label-[% loop.index %]"></strong>
-        <code style="font-size:.85em;">[% e.path | html %]</code>
-        &nbsp;<button type="submit" class="dd-btn" style="background:#333;color:#fff;border-color:#333;">Confirm</button>
+        <input type="hidden" name="action"   value="delete">
+        &#9888; Delete <code style="font-size:.9em;">[% e.path | html %]</code>?
+        This cannot be undone.
+        &nbsp;<button type="submit" class="dd-btn dd-btn-del">Confirm Delete</button>
         <button type="button" class="dd-btn" onclick="hideConfirm([% loop.index %])">Cancel</button>
       </form>
     </div>
@@ -151,10 +152,7 @@
 [% END %]
 
 <script>
-function showConfirm(idx, action, path) {
-    document.getElementById('act-' + idx).value = action;
-    var labels = { delete: '&#128465; Confirm delete:', move_to_nfs: '&#128190; Move to NFS:', compress: '&#128230; Compress:' };
-    document.getElementById('confirm-label-' + idx).innerHTML = (labels[action] || action) + ' ';
+function showConfirm(idx) {
     var el = document.getElementById('confirm-' + idx);
     el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
