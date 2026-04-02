@@ -46,7 +46,7 @@
 .dd-bulk-bar button { font-size:.82em; }
 .dd-sel-count { color:#c0720a; font-weight:bold; }
 .dd-help-toggle { font-size:.82em; color:#1976d2; cursor:pointer; text-decoration:underline; margin-left:12px; }
-.dd-help-panel { display:none; background:#e8f4ff; border:1px solid #90caf9; border-radius:4px;
+.dd-help-panel { background:#e8f4ff; border:1px solid #90caf9; border-radius:4px;
                  padding:12px 16px; margin-bottom:14px; font-size:.82em; line-height:1.6; }
 .dd-help-panel dl { margin:0; }
 .dd-help-panel dt { font-weight:bold; color:#0d47a1; margin-top:8px; }
@@ -58,7 +58,7 @@
 </div>
 
 <h2>&#128202; Disk Diagnose: <code>[% hostname | html %]</code>
-  <span class="dd-help-toggle" onclick="ddToggleHelp()">&#10067; Help</span>
+  <span class="dd-help-toggle" id="dd-help-lbl" onclick="ddToggleHelp()">&#8743; Hide Help</span>
 </h2>
 
 <div class="dd-help-panel" id="dd-help">
@@ -261,8 +261,11 @@
 
 <script>
 function ddToggleHelp() {
-    var el = document.getElementById('dd-help');
-    el.style.display = el.style.display === 'none' || !el.style.display ? 'block' : 'none';
+    var el  = document.getElementById('dd-help');
+    var lbl = document.getElementById('dd-help-lbl');
+    var hidden = el.style.display === 'none';
+    el.style.display  = hidden ? 'block' : 'none';
+    lbl.textContent   = hidden ? '\u2227 Hide Help' : '\u2228 Show Help';
 }
 
 function showConfirm(idx) {
