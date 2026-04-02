@@ -525,7 +525,7 @@ sub _get_forecast_data {
         
         for my $day (1..5) {
             push @forecast, {
-                date => DateTime->now->add(days => $day)->ymd,
+                date => DateTime->now->add(days => $day)->epoch,
                 high_temp => 20 + int(rand(10)),
                 low_temp => 10 + int(rand(8)),
                 condition => $conditions[int(rand(4))],
