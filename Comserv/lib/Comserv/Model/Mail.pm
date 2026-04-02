@@ -51,12 +51,17 @@ sub send_email {
     my $leader_name  = $opts->{leader_name}  || '';
     my $leader_email = $opts->{reply_to}     || '';  # leader's real email
 
-    # From: header — what recipients see.
-    # Use leader's real email if available; fall back to system address.
-    # SMTP envelope MAIL FROM stays as system address (avoids SPF failure for external domains).
-    my $from_header = $leader_email
-        ? ($leader_name ? qq{"$leader_name" <$leader_email>} : $leader_email)
-        : ($leader_name ? qq{"$leader_name" <$system_from>}  : $system_from);
+    # SMTP envelope MAIL FROM: use leader's email when provided so PMG relays correctly.
+    # If leader has no email, fall back to system address.
+    my $smtp_from = $leader_email || $system_from;
+
+    # From: header — what recipients see in their email client.
+    my $from_header = $leader_name
+        ? qq{"$leader_name" <$smtp_from>}
+        : $smtp_from;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+        "Email envelope: MAIL FROM=<$smtp_from> From-header='$from_header' To=<$to>");
 
     # Create a MIME::Lite message
     my $msg = MIME::Lite->new(
@@ -68,57 +73,72 @@ sub send_email {
     );
     
     try {
-        # Log SMTP settings for debugging
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-            "SMTP settings: " . $smtp_config->{host} . ":" . $smtp_config->{port} . 
+            "SMTP settings: " . $smtp_config->{host} . ":" . $smtp_config->{port} .
             ", SSL: " . ($smtp_config->{ssl} // 'none'));
         
         # Connect to the SMTP server
         my $smtp = Net::SMTP->new(
             $smtp_config->{host},
             Port    => $smtp_config->{port},
-            Debug   => 1,
+            Debug   => 0,
             Timeout => 15
         );
         
         unless ($smtp) {
-            die "Could not connect to SMTP server " . $smtp_config->{host} . ":" . $smtp_config->{port} . ": $!";
+            die "CONNECT failed: Could not connect to " . $smtp_config->{host} . ":" . $smtp_config->{port} . ": $!";
         }
         
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-            "Connected to SMTP server " . $smtp_config->{host} . ":" . $smtp_config->{port});
+            "SMTP CONNECT OK: " . $smtp_config->{host} . ":" . $smtp_config->{port});
         
         # Start TLS if needed
         my $ssl_setting = $smtp_config->{ssl} // '';
         if ($ssl_setting eq 'starttls' || $ssl_setting eq '1') {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-                "Starting TLS");
+                "SMTP STARTTLS begin");
             $smtp->starttls() or die "STARTTLS failed: " . $smtp->message();
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+                "SMTP STARTTLS OK");
         }
         
         # Authenticate if credentials are provided
         if ($smtp_config->{username} && $smtp_config->{password}) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-                "Authenticating as " . $smtp_config->{username});
-            $smtp->auth($smtp_config->{username}, $smtp_config->{password}) 
-                or die "Authentication failed: " . $smtp->message();
+                "SMTP AUTH as " . $smtp_config->{username});
+            $smtp->auth($smtp_config->{username}, $smtp_config->{password})
+                or die "AUTH failed: " . $smtp->message();
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+                "SMTP AUTH OK");
         }
         
-        # Send the email — log each SMTP step
+        # MAIL FROM
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+            "SMTP MAIL FROM: <$smtp_from>");
+        $smtp->mail($smtp_from) or die "MAIL FROM failed: " . $smtp->message();
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-            "SMTP MAIL FROM: <" . $smtp_config->{from} . ">");
-        $smtp->mail($smtp_config->{from}) or die "FROM failed: " . $smtp->message();
+            "SMTP MAIL FROM accepted");
 
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+        # RCPT TO
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
             "SMTP RCPT TO: <$to>");
-        $smtp->to($to) or die "TO failed: " . $smtp->message();
-
+        $smtp->to($to) or do {
+            my $msg_detail = $smtp->message() || 'no response';
+            $smtp->quit();
+            die "RCPT TO failed for <$to>: $msg_detail";
+        };
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-            "SMTP DATA begin");
-        $smtp->data() or die "DATA failed: " . $smtp->message();
+            "SMTP RCPT TO accepted for <$to>");
+
+        # DATA
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+            "SMTP DATA begin for <$to>");
+        $smtp->data() or die "DATA cmd failed: " . $smtp->message();
         $smtp->datasend($msg->as_string()) or die "DATASEND failed: " . $smtp->message();
         $smtp->dataend() or die "DATAEND failed: " . $smtp->message();
-        $smtp->quit() or die "QUIT failed: " . $smtp->message();
+        $smtp->quit();
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+            "SMTP QUIT OK for <$to>");
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email', 
             "Email sent successfully to $to");
         Comserv::Util::HealthLogger->log_email($c,
