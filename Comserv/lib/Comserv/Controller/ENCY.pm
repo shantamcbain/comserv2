@@ -282,6 +282,219 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
 
 
 
+sub animal_list : Path('/ENCY/Animal') : Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'animal_list', 'Entered animal_list');
+    my $animals = $c->model('ENCYModel')->list_animals($c, {});
+    $c->stash(
+        animals  => $animals,
+        template => 'ENCY/AnimalList.tt',
+    );
+}
+
+sub animal_detail : Path('/ENCY/Animal') : Args(1) {
+    my ($self, $c, $id) = @_;
+
+    unless (defined $id && $id =~ /^\d+$/) {
+        $c->response->status(400);
+        $c->response->body('Invalid animal ID');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'animal_detail', "Fetching animal ID: $id");
+    my $animal = $c->model('ENCYModel')->get_animal_by_id($c, $id);
+
+    unless ($animal) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'animal_detail', "Animal not found for ID: $id");
+        $c->response->status(404);
+        $c->stash(
+            error_message => "Animal record #$id was not found.",
+            template      => 'error.tt',
+        );
+        return;
+    }
+
+    $c->session->{record_id} = $id;
+    my $related = $c->model('ENCYModel')->get_animal_related($c, $id);
+    $c->stash(
+        animal          => $animal,
+        related_herbs   => $related->{herbs}    // [],
+        related_diseases => $related->{diseases} // [],
+        edit_mode       => 0,
+        template        => 'ENCY/AnimalDetail.tt',
+    );
+}
+
+sub add_animal : Path('/ENCY/Animal/add') : Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/Animal/add' }));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' } @role_list) {
+        $c->stash(
+            error_msg => "You do not have permission to add animals.",
+            template  => 'ENCY/AnimalList.tt',
+        );
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $data = {
+            common_name          => $p->{common_name}          // '',
+            scientific_name      => $p->{scientific_name}      // '',
+            kingdom              => $p->{kingdom}              // '',
+            phylum               => $p->{phylum}               // '',
+            class_name           => $p->{class_name}           // '',
+            order_name           => $p->{order_name}           // '',
+            family_name          => $p->{family_name}          // '',
+            genus                => $p->{genus}                // '',
+            species              => $p->{species}              // '',
+            habitat              => $p->{habitat}              // '',
+            diet                 => $p->{diet}                 // '',
+            behavior             => $p->{behavior}             // '',
+            ecological_role      => $p->{ecological_role}      // '',
+            therapeutic_uses     => $p->{therapeutic_uses}     // '',
+            veterinary_uses      => $p->{veterinary_uses}      // '',
+            distribution         => $p->{distribution}         // '',
+            conservation_status  => $p->{conservation_status}  // '',
+            constituents         => $p->{constituents}         // '',
+            image                => $p->{image}                // '',
+            url                  => $p->{url}                  // '',
+            history              => $p->{history}              // '',
+            reference            => $p->{reference}            // '',
+            sitename             => $p->{sitename}             // 'ENCY',
+            username_of_poster   => $c->session->{username},
+            group_of_poster      => $c->session->{group},
+            date_time_posted     => \'NOW()',
+        };
+
+        unless ($data->{common_name}) {
+            $c->stash(
+                error_msg => "Common name is required.",
+                animal    => $data,
+                edit_mode => 1,
+                template  => 'ENCY/AnimalDetail.tt',
+            );
+            return;
+        }
+
+        $c->model('ENCYModel')->add_animal($c, $data);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_animal', "Animal added: $data->{common_name}");
+        $c->flash->{success_msg} = 'Animal added successfully.';
+        $c->response->redirect($c->uri_for('/ENCY/Animal'));
+        return;
+    }
+
+    $self->_stash_image_files($c);
+    $c->stash(
+        edit_mode => 1,
+        template  => 'ENCY/AnimalDetail.tt',
+    );
+}
+
+sub edit_animal : Path('/ENCY/Animal/edit') : Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/Animal/edit' }));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' } @role_list) {
+        $c->stash(
+            error_msg => "You do not have permission to edit animals.",
+            template  => 'ENCY/AnimalList.tt',
+        );
+        return;
+    }
+
+    my $record_id = $c->session->{record_id};
+
+    unless (defined $record_id && $record_id =~ /^\d+$/) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_animal',
+            "Invalid or missing record_id in session.");
+        $c->stash(
+            error_msg => "Invalid or missing animal record for editing. Please try again.",
+            template  => 'ENCY/AnimalList.tt',
+        );
+        return;
+    }
+
+    my $animal = $c->model('ENCYModel')->get_animal_by_id($c, $record_id);
+    unless ($animal) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_animal',
+            "Animal not found for record_id: $record_id");
+        $c->stash(
+            error_msg => "Animal not found in the database. Please try again.",
+            template  => 'ENCY/AnimalList.tt',
+        );
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $data = {
+            common_name          => $p->{common_name}          // '',
+            scientific_name      => $p->{scientific_name}      // '',
+            kingdom              => $p->{kingdom}              // '',
+            phylum               => $p->{phylum}               // '',
+            class_name           => $p->{class_name}           // '',
+            order_name           => $p->{order_name}           // '',
+            family_name          => $p->{family_name}          // '',
+            genus                => $p->{genus}                // '',
+            species              => $p->{species}              // '',
+            habitat              => $p->{habitat}              // '',
+            diet                 => $p->{diet}                 // '',
+            behavior             => $p->{behavior}             // '',
+            ecological_role      => $p->{ecological_role}      // '',
+            therapeutic_uses     => $p->{therapeutic_uses}     // '',
+            veterinary_uses      => $p->{veterinary_uses}      // '',
+            distribution         => $p->{distribution}         // '',
+            conservation_status  => $p->{conservation_status}  // '',
+            constituents         => $p->{constituents}         // '',
+            image                => $p->{image}                // '',
+            url                  => $p->{url}                  // '',
+            history              => $p->{history}              // '',
+            reference            => $p->{reference}            // '',
+        };
+
+        my ($status, $msg) = $c->model('ENCYModel')->update_animal($c, $record_id, $data);
+
+        if ($status) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_animal',
+                "Animal updated successfully for record_id: $record_id");
+            $c->flash->{success_msg} = "Animal details updated successfully.";
+            $c->response->redirect($c->uri_for('/ENCY/Animal', $record_id));
+            return;
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_animal',
+                "Failed to update animal: $msg");
+            $c->stash(
+                error_msg => "Failed to update animal: $msg",
+                animal    => { %{ $animal->get_columns }, %$data },
+                edit_mode => 1,
+                template  => 'ENCY/AnimalDetail.tt',
+            );
+            return;
+        }
+    }
+
+    $self->_stash_image_files($c);
+    $c->stash(
+        animal    => $animal,
+        edit_mode => 1,
+        template  => 'ENCY/AnimalDetail.tt',
+    );
+}
+
 sub create_reference :Local {
     my ( $self, $c ) = @_;
     # Implement the logic to display the form for creating a new reference
