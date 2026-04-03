@@ -56,6 +56,10 @@
             <p>Record and review operational costs vs membership revenue.</p>
           </div>
           <div class="form-field">
+            <a href="[% c.uri_for('/membership/admin/pricing') %]" class="btn btn-secondary">Geographic Pricing</a>
+            <p>Configure purchasing power parity pricing overrides per plan and region.</p>
+          </div>
+          <div class="form-field">
             <a href="[% c.uri_for('/membership/admin/paypal_settings') %]" class="btn btn-secondary">PayPal Settings</a>
             <p>Configure PayPal business email, sandbox mode, and API credentials.</p>
           </div>
