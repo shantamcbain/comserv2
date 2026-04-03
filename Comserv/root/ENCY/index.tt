@@ -51,6 +51,12 @@
     <a href="/ENCY/BotanicalNameView" style="display: block; padding: 12px 18px; background: #f9fbe7; border: 1px solid #dce775; border-radius: 6px; text-decoration: none; color: #827717; font-weight: bold;">Botanical Names</a>
 </div>
 
+<div class="ency-ai-panel" style="margin: 20px 0; padding: 12px; background: #e8eaf6; border: 1px solid #9fa8da; border-radius: 6px;">
+    <strong>Ask AI:</strong> Can't find what you're looking for?
+    <a href="/AI/chat?prompt=Tell+me+about+this+topic+in+the+context+of+the+Encyclopedia+of+Biological+Life%3A+" style="margin-left: 8px; padding: 4px 12px; background: #3949ab; color: white; border-radius: 4px; text-decoration: none;">Open AI Chat</a>
+    &mdash; Our AI assistant can help explain herbs, animals, insects, diseases, symptoms, and constituents.
+</div>
+
 [% IF c.session.roles.grep('^admin$').size %]
 <div class="ency-admin-panel" style="margin: 20px 0; padding: 12px; background: #fff3e0; border: 1px solid #ffcc02; border-radius: 6px;">
     <strong>Admin:</strong>
