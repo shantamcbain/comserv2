@@ -431,6 +431,65 @@ $sitename Team
     return $self->send_email($c, $email, $smtp_config);
 }
 
+sub send_admin_verification_alert {
+    my ($self, $c, $user, $reason) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_admin_verification_alert',
+        "Sending verification alert to admin for user: " . $user->username);
+
+    my $sitename    = $c->stash->{SiteName} || 'CSC';
+    my $smtp_config = $self->get_smtp_config($c, $sitename);
+
+    unless ($smtp_config->{smtp_host}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_admin_verification_alert',
+            "No SMTP configuration — alert not sent");
+        return 0;
+    }
+
+    my $site        = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
+    my $admin_email = ($site && $site->mail_to_admin)
+        ? $site->mail_to_admin
+        : 'helpdesk@computersystemconsulting.ca';
+
+    my $timestamp  = scalar localtime;
+    my $admin_link = $c->uri_for('/user/admin_resend_verification', { user_id => $user->id })->as_string;
+
+    my $body = qq{
+Verification Problem — $sitename
+Time: $timestamp
+
+A user is having trouble completing email verification:
+
+  Username : } . $user->username . qq{
+  Email    : } . $user->email . qq{
+  User ID  : } . $user->id . qq{
+  Status   : } . ($user->status || 'unknown') . qq{
+  Reason   : $reason
+
+ACTION: You can resend a verification code for this user via:
+  $admin_link
+
+Or log in to the admin panel and resend from the user management page.
+
+This is an automated notification.
+};
+
+    my $email = Email::MIME->create(
+        header_str => [
+            From    => $smtp_config->{smtp_from} || 'noreply@' . $smtp_config->{smtp_host},
+            To      => $admin_email,
+            Subject => "[$sitename] Verification problem: " . $user->username,
+        ],
+        attributes => {
+            encoding => 'quoted-printable',
+            charset  => 'UTF-8',
+        },
+        body_str => $body,
+    );
+
+    return $self->send_email($c, $email, $smtp_config);
+}
+
 sub get_smtp_config {
     my ($self, $c, $sitename) = @_;
     
