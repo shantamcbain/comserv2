@@ -120,9 +120,21 @@ tr.level-critical     { background:#f8d7da; font-weight:bold; }
 
     </div>
 
+    <!-- Active filter notice -->
+    [% IF filter_system || filter_level %]
+    <div class="content-section" style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:10px 16px;">
+        <strong>&#x1F50D; Filtered view</strong>
+        [% IF filter_system %]&nbsp;&mdash; System: <code>[% filter_system | html %]</code>[% END %]
+        [% IF filter_level %]&nbsp;&mdash; Level: <code>[% filter_level | html %]</code>[% END %]
+        &nbsp;<a href="[% c.uri_for('/admin/logging/audit') %]" style="font-size:0.85em">&times; Clear filter</a>
+    </div>
+    [% END %]
+
     <!-- Look-back window selector -->
     <div class="content-section">
         <form method="get" action="[% c.uri_for('/admin/logging/audit') %]" class="lookback-form">
+            [% IF filter_system %]<input type="hidden" name="system" value="[% filter_system | html %]">[% END %]
+            [% IF filter_level  %]<input type="hidden" name="level"  value="[% filter_level  | html %]">[% END %]
             <label><strong>Look-back window:</strong></label>
             <select name="hours" onchange="this.form.submit()">
                 [% FOR h IN [1, 6, 12, 24, 48, 168] %]
@@ -148,7 +160,9 @@ tr.level-critical     { background:#f8d7da; font-weight:bold; }
 <script>
 (function() {
     var hours = [% hours | html %];
-    var url   = '[% c.uri_for('/admin/logging/audit/stats') %]?hours=' + hours;
+    var url   = '[% c.uri_for('/admin/logging/audit/stats') %]?hours=' + hours
+        [% IF filter_system %] + '&system=' + encodeURIComponent('[% filter_system | html %]')[% END %]
+        [% IF filter_level  %] + '&level='  + encodeURIComponent('[% filter_level  | html %]')[% END %];
     fetch(url, { credentials: 'same-origin', redirect: 'manual' })
         .then(function(r) {
             if (r.type === 'opaqueredirect' || r.status === 0 || (r.status >= 300 && r.status < 400)) {

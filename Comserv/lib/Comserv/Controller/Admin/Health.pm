@@ -21,14 +21,16 @@ sub check :Path('/admin/health/check') :Args(0) {
         return;
     }
 
+    my $local_system = $self->logging->get_system_identifier();
     my $status = {
-        status => 'ok',
-        system => $self->logging->get_system_identifier(),
-        timestamp => time(),
-        issues => []
+        status         => 'ok',
+        system         => $local_system,
+        timestamp      => time(),
+        issues         => [],     # local server issues (DB ping etc.)
+        server_alerts  => [],     # per-server alerts from ALL systems in system_log
     };
 
-    # 1. Database Ping
+    # 1. Database Ping (local check)
     try {
         unless ($c->model('DBEncy')->storage->dbh->ping) {
             $status->{status} = 'critical';
@@ -39,25 +41,55 @@ sub check :Path('/admin/health/check') :Args(0) {
         push @{$status->{issues}}, "Database connection error: $_";
     };
 
-    # 2. Check recent CRITICAL or ERROR logs for this system
+    # 2. Check ALL systems in system_log for recent ERROR/CRITICAL entries.
+    #    This covers every server that writes to the shared DB — production,
+    #    dev containers, worktrees — so any port on the workstation sees every alert.
     try {
-        my $system_id = $status->{system};
-        my $five_minutes_ago = DateTime->now()->subtract(minutes => 5)->strftime('%Y-%m-%d %H:%M:%S');
-        
-        my $recent_logs_rs = $c->model('DBEncy')->resultset('SystemLog')->search({
-            system_identifier => $system_id,
-            level => { -in => ['ERROR', 'CRITICAL'] },
-            timestamp => { '>=' => $five_minutes_ago }
-        });
+        my $schema = $c->model('DBEncy');
+        my $ten_minutes_ago = DateTime->now()->subtract(minutes => 10)->strftime('%Y-%m-%d %H:%M:%S');
 
-        if ($recent_logs_rs->count > 0) {
-            # Only escalate status if it's not already critical
-            $status->{status} = 'warning' if $status->{status} eq 'ok';
-            push @{$status->{issues}}, "Recent critical/error logs detected for this system";
+        # Group by system_identifier so we get one alert entry per server
+        my $rs = $schema->resultset('SystemLog')->search(
+            {
+                level     => { -in => ['ERROR', 'CRITICAL'] },
+                timestamp => { '>=' => $ten_minutes_ago },
+            },
+            {
+                select   => [ 'system_identifier',
+                              { max => 'level',     -as => 'worst_level' },
+                              { count => 'id',      -as => 'error_count' },
+                              { max => 'timestamp', -as => 'latest_ts'   } ],
+                as       => [qw( system_identifier worst_level error_count latest_ts )],
+                group_by => ['system_identifier'],
+                order_by => { -desc => 'latest_ts' },
+            }
+        );
+
+        while (my $row = $rs->next) {
+            my $sys   = $row->get_column('system_identifier') // 'unknown';
+            my $cnt   = $row->get_column('error_count')       // 0;
+            my $worst = $row->get_column('worst_level')       // 'ERROR';
+            my $ts    = $row->get_column('latest_ts')         // '';
+
+            my $server_status = ($worst eq 'CRITICAL') ? 'critical' : 'warning';
+
+            # Escalate the overall banner status
+            if ($server_status eq 'critical') {
+                $status->{status} = 'critical';
+            } elsif ($status->{status} eq 'ok') {
+                $status->{status} = 'warning';
+            }
+
+            push @{$status->{server_alerts}}, {
+                system  => $sys,
+                level   => $server_status,
+                count   => int($cnt),
+                latest  => $ts,
+                message => "$cnt error(s) in the last 10 minutes",
+            };
         }
     } catch {
-        # If logging DB check fails, we might have a DB issue already caught, 
-        # or it's a transient error. Don't let it crash the health check.
+        # Transient DB error — don't crash the health poll
     };
 
     $c->response->content_type('application/json');
