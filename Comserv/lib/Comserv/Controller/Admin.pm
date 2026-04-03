@@ -952,9 +952,31 @@ sub planning :Path('/admin/planning') :Args(0) {
         $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
-    $c->stash(template => 'admin/documentation/Planning.tt');
+
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $is_csc   = (uc($sitename) eq 'CSC') ? 1 : 0;
+
+    my @all_db_projects;
+    eval {
+        my %cond = ();
+        $cond{sitename} = $sitename unless $is_csc;
+        @all_db_projects = $c->model('DBEncy')->resultset('Project')->search(
+            \%cond, { order_by => 'id' }
+        )->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'planning',
+            "Could not fetch projects for planning: $@");
+    }
+
+    $c->stash(
+        template          => 'admin/documentation/Planning.tt',
+        planning_is_csc   => $is_csc,
+        planning_sitename => $sitename,
+        all_db_projects   => \@all_db_projects,
+    );
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'planning',
-        "Rendering admin/documentation/Planning.tt");
+        "Rendering admin/documentation/Planning.tt (is_csc=$is_csc sitename=$sitename projects=" . scalar(@all_db_projects) . ")");
     $c->forward($c->view('TT'));
 }
 
