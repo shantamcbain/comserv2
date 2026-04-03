@@ -3735,6 +3735,7 @@ Supported actions:
 - Add a comment:         [ACTION: {"action": "add_todo_comment",   "params": {"todo_id": N, "comment": "text"}}]
 - Create a log entry:    [ACTION: {"action": "create_log_entry",   "params": {"todo_id": N, "abstract": "title", "details": "description"}}]
 - Create a new todo:     [ACTION: {"action": "create_todo", "params": {"subject": "title", "description": "details", "project_id": N, "due_date": "YYYY-MM-DD", "priority": 3}}]
+- Create a HelpDesk support ticket: [ACTION: {"action": "create_helpdesk_ticket", "params": {"subject": "issue title", "description": "details", "page_url": "/current/page"}}]
 
 Rules:
 - ONLY emit an [ACTION: ...] block when the user explicitly asks you to perform a write operation.
@@ -6116,9 +6117,273 @@ sub action :Local :Args(0) {
         return;
     }
 
+    # ── create_helpdesk_ticket ────────────────────────────────────────────────
+    if ($action_name eq 'create_helpdesk_ticket') {
+        my $subject = $params->{subject};
+        unless ($subject) {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'subject required' }));
+            return;
+        }
+        my $description = $params->{description} || '';
+        my $page_url    = $params->{page_url}    || $c->request->referer || '';
+        my $priority    = $params->{priority}    // 2;
+        my $sitename    = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+        my $user_id     = $c->session->{user_id} || 1;
+        my $roles       = $c->session->{roles}   || [];
+        my $group       = ref $roles eq 'ARRAY' && @$roles ? $roles->[0] : 'user';
+
+        my $new_ticket;
+        eval {
+            $new_ticket = $schema->resultset('AiSupportSession')->create({
+                user_id          => $user_id,
+                sitename         => $sitename,
+                status           => 'pending',
+                subject          => $subject,
+                user_description => $description,
+                page_url         => $page_url,
+                conversation_id  => do { my $cid = $params->{conversation_id} || $c->session->{current_conversation_id}; ($cid && $cid =~ /^\d+$/) ? $cid : undef },
+            });
+        };
+        if ($@ || !$new_ticket) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'action',
+                "create_helpdesk_ticket failed: $@");
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Ticket creation failed' }));
+            return;
+        }
+        my $ticket_id = $new_ticket->id // '?';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
+            "AI action create_helpdesk_ticket: id=$ticket_id sitename=$sitename by=$current_user subject='$subject'");
+        $c->response->body(encode_json({
+            success    => JSON::true,
+            message    => "Support ticket #$ticket_id created: \"$subject\". An admin will be notified.",
+            ticket_id  => $ticket_id + 0,
+            ticket_url => "/ai/support/$ticket_id",
+        }));
+        return;
+    }
+
     # Unknown action
     $c->response->status(400);
     $c->response->body(encode_json({ success => JSON::false, error => "Unknown action: $action_name" }));
+}
+
+# ── Admin presence heartbeat ──────────────────────────────────────────────────
+sub admin_heartbeat :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $user_id  = $c->session->{user_id};
+    my $roles    = $c->session->{roles} || [];
+    my $is_admin = grep { /^(admin|developer)$/i } (ref $roles eq 'ARRAY' ? @$roles : ());
+
+    unless ($user_id && $is_admin) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
+        return;
+    }
+
+    my $username = $c->session->{username} || 'admin';
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $status   = $c->request->body_parameters->{status} || 'available';
+    $status = 'available' unless $status =~ /^(available|busy|away|offline)$/;
+
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        $schema->resultset('AdminPresence')->update_or_create(
+            {
+                user_id    => $user_id,
+                username   => $username,
+                sitename   => $sitename,
+                status     => $status,
+                session_id => $c->sessionid,
+                last_seen  => \'NOW()',
+            },
+            { key => 'admin_presence_user_id' }
+        );
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_heartbeat', "Heartbeat failed: $@");
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Heartbeat failed' }));
+        return;
+    }
+
+    $c->response->body(encode_json({ success => JSON::true }));
+}
+
+# ── List pending support requests (admin) ─────────────────────────────────────
+sub support_requests :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $user_id  = $c->session->{user_id};
+    my $roles    = $c->session->{roles} || [];
+    my $is_admin = grep { /^(admin|developer)$/i } (ref $roles eq 'ARRAY' ? @$roles : ());
+
+    unless ($user_id && $is_admin) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
+        return;
+    }
+
+    my @requests;
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my @sessions = $schema->resultset('AiSupportSession')->search(
+            { status => { -in => ['pending', 'accepted'] } },
+            { order_by => { -asc => 'created_at' }, rows => 20 }
+        );
+        for my $s (@sessions) {
+            push @requests, {
+                id          => $s->id,
+                user_id     => $s->user_id,
+                sitename    => $s->sitename,
+                status      => $s->status,
+                subject     => $s->subject || '',
+                page_url    => $s->page_url || '',
+                created_at  => $s->created_at . '',
+            };
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'support_requests', "Query failed: $@");
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Query failed' }));
+        return;
+    }
+
+    $c->response->body(encode_json({ success => JSON::true, requests => \@requests }));
+}
+
+# ── Accept a support session (admin) ─────────────────────────────────────────
+sub accept_support :Local :Args(1) {
+    my ($self, $c, $session_id) = @_;
+    $c->response->content_type('application/json');
+
+    my $user_id  = $c->session->{user_id};
+    my $roles    = $c->session->{roles} || [];
+    my $is_admin = grep { /^(admin|developer)$/i } (ref $roles eq 'ARRAY' ? @$roles : ());
+
+    unless ($user_id && $is_admin) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
+        return;
+    }
+
+    eval {
+        my $schema   = $c->model('DBEncy')->schema;
+        my $session  = $schema->resultset('AiSupportSession')->find($session_id);
+        unless ($session) {
+            $c->response->status(404);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Session not found' }));
+            return;
+        }
+        $session->update({ status => 'active', admin_user_id => $user_id });
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'accept_support', "Update failed: $@");
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Update failed' }));
+        return;
+    }
+
+    $c->response->body(encode_json({ success => JSON::true, session_id => $session_id + 0 }));
+}
+
+# ── Get messages for a support session ────────────────────────────────────────
+sub support_messages :Local :Args(1) {
+    my ($self, $c, $session_id) = @_;
+    $c->response->content_type('application/json');
+
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required' }));
+        return;
+    }
+
+    my @msgs;
+    eval {
+        my $schema  = $c->model('DBEncy')->schema;
+        my $session = $schema->resultset('AiSupportSession')->find($session_id);
+        unless ($session && ($session->user_id == $user_id || do {
+            my $roles = $c->session->{roles} || [];
+            grep { /^(admin|developer)$/i } (ref $roles eq 'ARRAY' ? @$roles : ())
+        })) {
+            $c->response->status(403);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Access denied' }));
+            return;
+        }
+        my @rows = $schema->resultset('AiSupportMessage')->search(
+            { session_id => $session_id },
+            { order_by => { -asc => 'created_at' } }
+        );
+        for my $m (@rows) {
+            push @msgs, {
+                id          => $m->id,
+                sender_role => $m->sender_role,
+                content     => $m->content,
+                created_at  => $m->created_at . '',
+            };
+        }
+    };
+    if ($@) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Query failed' }));
+        return;
+    }
+
+    $c->response->body(encode_json({ success => JSON::true, messages => \@msgs }));
+}
+
+# ── Send a message in a support session ───────────────────────────────────────
+sub support_send :Local :Args(1) {
+    my ($self, $c, $session_id) = @_;
+    $c->response->content_type('application/json');
+
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required' }));
+        return;
+    }
+
+    my $content = eval { decode_json($c->request->body || '{}') }->{content} || '';
+    unless ($content) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'content required' }));
+        return;
+    }
+
+    eval {
+        my $schema  = $c->model('DBEncy')->schema;
+        my $session = $schema->resultset('AiSupportSession')->find($session_id);
+        my $roles   = $c->session->{roles} || [];
+        my $is_admin = grep { /^(admin|developer)$/i } (ref $roles eq 'ARRAY' ? @$roles : ());
+        unless ($session && ($session->user_id == $user_id || $is_admin)) {
+            $c->response->status(403);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Access denied' }));
+            return;
+        }
+        my $sender_role = $is_admin ? 'admin' : 'user';
+        $schema->resultset('AiSupportMessage')->create({
+            session_id     => $session_id,
+            sender_user_id => $user_id,
+            sender_role    => $sender_role,
+            content        => $content,
+        });
+        $session->update({ updated_at => \'NOW()' });
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'support_send', "Create failed: $@");
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Message send failed' }));
+        return;
+    }
+
+    $c->response->body(encode_json({ success => JSON::true }));
 }
 
 __PACKAGE__->meta->make_immutable;
