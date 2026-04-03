@@ -69,7 +69,7 @@
 
                     [% UNLESS show_resend_verification OR show_forgot_password %]
                     <div style="margin-top: 12px; text-align: center;">
-                        <a href="#" id="forgot-pw-link">Forgot your password?</a>
+                        <a href="/user/forgot_password" id="forgot-pw-link">Forgot your password?</a>
                     </div>
                     [% END %]
 
