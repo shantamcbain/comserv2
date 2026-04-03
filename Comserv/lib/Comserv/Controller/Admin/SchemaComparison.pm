@@ -928,6 +928,170 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
     $c->forward('View::JSON');
 }
 
+=head2 remove_field_from_result
+
+Remove a field definition from a Result file
+
+=cut
+
+sub remove_field_from_result :Path('/schema-comparison/remove_field_from_result') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $json_data;
+    try {
+        local $/;
+        my $body = $c->req->body;
+        $json_data = decode_json(<$body>) if $body;
+    } catch {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => "Invalid JSON: $_" });
+        $c->forward('View::JSON');
+        return;
+    };
+
+    my $table_name = $json_data->{table_name};
+    my $field_name  = $json_data->{field_name};
+    my $database    = $json_data->{database};
+
+    unless ($table_name && $field_name && $database) {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => 'Missing required parameters: table_name, field_name, database' });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    try {
+        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        my $result_file_path = $result_table_mapping->{lc($table_name)}->{result_path};
+
+        die "Result file not found for table '$table_name'" unless $result_file_path && -f $result_file_path;
+
+        my $content = read_file($result_file_path);
+
+        # Make a backup first
+        write_file("$result_file_path.bak", $content);
+
+        # Remove the field from add_columns block using balanced-brace extraction
+        if ($content =~ /(__PACKAGE__->add_columns\s*\()(.*?)(\s*\)\s*;)/s) {
+            my ($prefix, $cols, $suffix) = ($1, $2, $3);
+            my $original_cols = $cols;
+
+            # Find and remove: optional comma before, fieldname => { ... }, trailing comma/whitespace
+            # Pattern: optional leading comma+whitespace, fieldname => {balanced}, optional trailing comma
+            my $found = 0;
+            my $new_cols = '';
+            my $pos = 0;
+            while ($cols =~ /\b(\w+)\s*=>\s*\{/g) {
+                my $fname = $1;
+                my $fstart = pos($cols) - length($fname) - length(' => {') + 1;
+                my $brace_start = pos($cols);
+                my $depth = 1;
+                my $i = $brace_start;
+                while ($i < length($cols) && $depth > 0) {
+                    my $ch = substr($cols, $i, 1);
+                    $depth++ if $ch eq '{';
+                    $depth-- if $ch eq '}';
+                    $i++;
+                }
+                # $i is now one past the closing '}'
+                if ($fname eq $field_name) {
+                    # Remove this field: capture text before and after
+                    my $before = substr($cols, 0, $fstart);
+                    my $after  = substr($cols, $i);
+                    # Strip trailing comma from $before or leading comma from $after
+                    $before =~ s/,\s*$//s;
+                    $after  =~ s/^\s*,//s;
+                    $cols = $before . $after;
+                    $found = 1;
+                    last;
+                }
+                pos($cols) = $i;
+            }
+
+            die "Field '$field_name' not found in Result file add_columns" unless $found;
+
+            my $new_content = $prefix . $cols . $suffix;
+            $content =~ s/__PACKAGE__->add_columns\s*\(.*?\)\s*;/$new_content/s;
+            write_file($result_file_path, $content);
+
+            $c->stash(json => {
+                success => 1,
+                message => "Field '$field_name' removed from Result file (backup at $result_file_path.bak)"
+            });
+        } else {
+            die "Could not parse add_columns block in Result file";
+        }
+    } catch {
+        $c->response->status(500);
+        $c->stash(json => { success => 0, error => "Error removing field from Result: $_" });
+    };
+
+    $c->forward('View::JSON');
+}
+
+=head2 remove_field_from_table
+
+Drop a column from the database table (ALTER TABLE DROP COLUMN)
+
+=cut
+
+sub remove_field_from_table :Path('/schema-comparison/remove_field_from_table') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $json_data;
+    try {
+        local $/;
+        my $body = $c->req->body;
+        $json_data = decode_json(<$body>) if $body;
+    } catch {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => "Invalid JSON: $_" });
+        $c->forward('View::JSON');
+        return;
+    };
+
+    my $table_name  = $json_data->{table_name};
+    my $field_name  = $json_data->{field_name};
+    my $database    = $json_data->{database};
+    my $confirmed   = $json_data->{confirmed};
+
+    unless ($table_name && $field_name && $database) {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => 'Missing required parameters: table_name, field_name, database' });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    unless ($confirmed) {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => 'Confirmation required to drop a column' });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    try {
+        my $model_name = $database eq 'ency' ? 'DBEncy' : 'DBForager';
+        my $dbh = $c->model($model_name)->schema->storage->dbh;
+
+        my $sql = "ALTER TABLE `$table_name` DROP COLUMN `$field_name`";
+        $dbh->do($sql);
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'remove_field_from_table',
+            "Dropped column '$field_name' from table '$table_name' in $database: $sql");
+
+        $c->stash(json => {
+            success => 1,
+            message => "Column '$field_name' dropped from table '$table_name'",
+            sql => $sql
+        });
+    } catch {
+        $c->response->status(500);
+        $c->stash(json => { success => 0, error => "Error dropping column: $_" });
+    };
+
+    $c->forward('View::JSON');
+}
+
 =head2 get_table_field_info
 
 Get database table field information

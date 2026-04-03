@@ -131,8 +131,8 @@ has 'temperature' => (
 has 'max_tokens' => (
     is => 'rw',
     isa => 'Int',
-    default => 2048,
-    documentation => 'Maximum tokens in response'
+    default => 800,
+    documentation => 'Maximum tokens in response (keep low for CPU inference speed)'
 );
 
 has 'ua' => (
@@ -267,6 +267,7 @@ sub query {
         options    => {
             temperature => $self->temperature,
             num_predict => $self->max_tokens,
+            num_ctx     => 4096,
         }
     };
     
@@ -407,6 +408,7 @@ sub chat {
         options    => {
             temperature => $self->temperature,
             num_predict => $self->max_tokens,
+            num_ctx     => 4096,
         }
     };
     
