@@ -1,0 +1,82 @@
+[% META
+   title = "Cancel Membership"
+   description = "Cancel your active membership subscription"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-04-03"
+%]
+[% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Cancel Membership</h1>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      [% IF membership %]
+      <div class="content-section">
+        <h2>Subscription Details</h2>
+        <div class="table-container">
+          <table class="data-table">
+            <tbody>
+              <tr><td><strong>Plan</strong></td><td>[% membership.plan.name | html %]</td></tr>
+              <tr><td><strong>Status</strong></td><td>[% membership.status | html %]</td></tr>
+              <tr><td><strong>Billing</strong></td><td>[% membership.billing_cycle | ucfirst | html %]</td></tr>
+              <tr><td><strong>Expires</strong></td><td>[% membership.expires_at ? membership.expires_at : 'Never' | html %]</td></tr>
+              <tr><td><strong>Provider</strong></td><td>[% membership.payment_provider | html %]</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="content-section" style="border:1px solid #e74c3c;border-radius:6px;padding:1.25rem;background:#fdf3f2">
+        <h2 style="color:#c0392b">Confirm Cancellation</h2>
+        <p>
+          Are you sure you want to cancel your <strong>[% membership.plan.name | html %]</strong> membership?
+        </p>
+        <ul style="margin:0.5rem 0 1rem 1.5rem;color:#555">
+          <li>Your access will remain active until the end of your current billing period.</li>
+          <li>After cancellation you will be downgraded to the free tier.</li>
+          <li>Any unused coins or credits will remain in your account.</li>
+        </ul>
+
+        <form method="post" action="[% c.uri_for('/membership/cancel') %]">
+          <input type="hidden" name="membership_id" value="[% membership.id %]">
+
+          <div class="form-field" style="margin-bottom:1rem">
+            <label for="cancellation_reason"><strong>Reason for cancelling</strong> (optional):</label>
+            <textarea id="cancellation_reason" name="cancellation_reason"
+                      rows="3" style="width:100%;margin-top:0.4rem;padding:0.5rem;border:1px solid var(--border-color,#ccc);border-radius:4px"
+                      placeholder="Help us improve — why are you cancelling?"></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn"
+                    style="background:#e74c3c;color:#fff;border:none;padding:0.6rem 1.2rem">
+              Yes, Cancel My Membership
+            </button>
+            <a href="[% c.uri_for('/membership/account') %]" class="btn btn-secondary">
+              Keep My Membership
+            </a>
+          </div>
+        </form>
+      </div>
+
+      [% ELSE %]
+      <div class="content-section">
+        <p class="empty-state">No membership found to cancel.</p>
+        <div class="form-actions">
+          <a href="[% c.uri_for('/membership/account') %]" class="btn btn-primary">Go to Account</a>
+        </div>
+      </div>
+      [% END %]
+
+    </div>
+  </div>
+</div>

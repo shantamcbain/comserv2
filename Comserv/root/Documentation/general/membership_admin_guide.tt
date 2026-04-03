@@ -1,0 +1,361 @@
+[% META
+        title = "Membership Admin Guide"
+   description = "Guide for site administrators: managing plans, pricing, subscribers, cost tracking, and payment provider configuration"
+   roles = "admin,site_admin"
+   TemplateType = "Documentation"
+   category = "general"
+   page_version = "1.0"
+   last_updated = "2026-04-03"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/general/membership_admin_guide.tt,v 1.0 2026/04/03 shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--primary-color); font-family: var(--header-font);">Membership Admin Guide</h1>
+
+    <div style="color: var(--text-muted-color); font-size: var(--font-size-small); margin-bottom: var(--spacing-large);">
+        Last Updated: 2026-04-03 | Version: 1.0 | Audience: Site Admins | Status: Active
+    </div>
+
+    <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); border-radius: 4px; margin-bottom: var(--spacing-large);">
+        <strong style="color: var(--text-color);">Access:</strong>
+        <p style="color: var(--text-color); margin: var(--spacing-small) 0 0 0; line-height: 1.5;">
+            The admin panel is at <a href="/membership/admin" style="color: var(--link-color);">/membership/admin</a>. You must have the <code>admin</code> or <code>site_admin</code> role on this site to access it.
+        </p>
+    </div>
+
+    <!-- TABLE OF CONTENTS -->
+    <div id="toc" style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-bottom: var(--spacing-large);">
+        <h3 style="margin-top: 0; color: var(--primary-color);">Table of Contents</h3>
+        <ul style="list-style-position: inside; color: var(--text-color);">
+            <li><a href="#plans" style="color: var(--link-color); text-decoration: none;">Managing Membership Plans</a></li>
+            <li><a href="#pricing" style="color: var(--link-color); text-decoration: none;">Geographic Pricing</a></li>
+            <li><a href="#subscribers" style="color: var(--link-color); text-decoration: none;">Viewing &amp; Managing Subscribers</a></li>
+            <li><a href="#access" style="color: var(--link-color); text-decoration: none;">Granting &amp; Revoking Access</a></li>
+            <li><a href="#costs" style="color: var(--link-color); text-decoration: none;">Cost Tracking</a></li>
+            <li><a href="#paypal" style="color: var(--link-color); text-decoration: none;">PayPal Configuration</a></li>
+            <li><a href="#patreon" style="color: var(--link-color); text-decoration: none;">Patreon Configuration</a></li>
+            <li><a href="#coins" style="color: var(--link-color); text-decoration: none;">Internal Coins (Admin Actions)</a></li>
+            <li><a href="#benefactor" style="color: var(--link-color); text-decoration: none;">Benefactor / Sponsored Access</a></li>
+            <li><a href="#roles" style="color: var(--link-color); text-decoration: none;">Integration with Roles</a></li>
+            <li><a href="#troubleshooting" style="color: var(--link-color); text-decoration: none;">Troubleshooting</a></li>
+        </ul>
+    </div>
+
+    <!-- MANAGING PLANS -->
+    <div id="plans" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Managing Membership Plans</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Plans are managed at <a href="/membership/admin/manage_plans" style="color: var(--link-color);">/membership/admin/manage_plans</a>.
+        </p>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Creating a Plan</h3>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">Click <em>Create New Plan</em> and fill in:</p>
+        <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+            <thead>
+                <tr style="background-color: var(--primary-color); color: white;">
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: left;">Field</th>
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: left;">Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>name</code></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Display name (e.g. "Supporter")</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>slug</code></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">URL-safe identifier (e.g. "supporter") — used in CSS classes and URLs</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>price_monthly_usd</code></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Base monthly price in USD (regional overrides set separately)</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>price_annual_usd</code></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Annual price (should be ~15–20% cheaper than 12 × monthly)</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>ai_models_allowed</code></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">JSON array of Ollama model names (e.g. <code>["llama3.2","phi3"]</code>). Leave empty to allow all.</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Feature flags</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>has_beekeeping</code>, <code>has_planning</code>, <code>has_hosting</code>, <code>has_email</code>, <code>has_domain</code>, <code>has_currency</code> — toggle which services this plan enables</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>sort_order</code></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Display order on the Plans page (lower number = shown first)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Editing &amp; Disabling Plans</h3>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Click <em>Edit</em> next to any plan to change its details. Use <em>Toggle Active</em> to hide a plan from new subscribers without deleting it. Existing active subscribers on a disabled plan are not affected until their membership expires.
+        </p>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            <strong>Deleting a plan</strong> is only possible if no active memberships reference it.
+        </p>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- PRICING -->
+    <div id="pricing" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Geographic Pricing</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Manage regional price overrides at <a href="/membership/admin/pricing" style="color: var(--link-color);">/membership/admin/pricing</a>.
+        </p>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Each row in the pricing table links a <code>plan_id</code> to a <code>region_code</code> (ISO-3166-1 alpha-2 country code, or <code>DEFAULT</code> for a global fallback) and provides override monthly/annual prices in any currency.
+        </p>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Price Resolution Order</h3>
+        <ol style="color: var(--text-color); font-family: var(--body-font); line-height: 1.8;">
+            <li>Exact country match (e.g., <code>IN</code> for India)</li>
+            <li><code>DEFAULT</code> row if no country match</li>
+            <li>Base USD price from the plan itself if no pricing row exists</li>
+        </ol>
+
+        <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); border-radius: 4px; margin-top: var(--spacing-medium);">
+            <strong style="color: var(--text-color);">Tip:</strong>
+            <p style="color: var(--text-color); margin: var(--spacing-small) 0 0 0; line-height: 1.5;">Add a <code>DEFAULT</code> row at a lower price than the USD base to create a global reduced price for all non-specifically-listed regions. Then add specific rows for high-income countries at the full rate.</p>
+        </div>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- SUBSCRIBERS -->
+    <div id="subscribers" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Viewing &amp; Managing Subscribers</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            The subscriber list at <a href="/membership/admin/subscribers" style="color: var(--link-color);">/membership/admin/subscribers</a> shows all current and expired memberships for this site. You can filter by plan and status.
+        </p>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Click on a subscriber row to view their details page, which shows:
+        </p>
+        <ul style="color: var(--text-color); font-family: var(--body-font); line-height: 1.8;">
+            <li>Current plan and expiry date</li>
+            <li>Payment provider and last transaction</li>
+            <li>Active service access rows</li>
+            <li>Coin balance</li>
+            <li>Options to manually grant/revoke access, extend, or cancel</li>
+        </ul>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- GRANT / REVOKE -->
+    <div id="access" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Granting &amp; Revoking Access</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            From a subscriber's detail page you can use <em>Grant Access</em> or <em>Revoke Access</em> to manually control access to individual services regardless of plan. This is useful for:
+        </p>
+        <ul style="color: var(--text-color); font-family: var(--body-font); line-height: 1.8;">
+            <li>Giving a beta tester access to a feature before it is in the plan</li>
+            <li>Manually activating a membership for a user who paid via an offline method</li>
+            <li>Revoking a specific service for a user without cancelling their whole membership</li>
+        </ul>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            All manual access changes are logged with the admin's username for audit purposes.
+        </p>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- COST TRACKING -->
+    <div id="costs" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Cost Tracking</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Use <a href="/membership/admin/cost_tracking" style="color: var(--link-color);">/membership/admin/cost_tracking</a> to record operational expenses. The dashboard shows:
+        </p>
+        <ul style="color: var(--text-color); font-family: var(--body-font); line-height: 1.8;">
+            <li>Monthly and annual cost totals (hosting, bandwidth, AI hardware, third-party services)</li>
+            <li>Revenue from memberships</li>
+            <li>Surplus or deficit — helping you decide whether pricing is sustainable</li>
+        </ul>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Adding a Cost Entry</h3>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Go to <a href="/membership/admin/add_cost" style="color: var(--link-color);">/membership/admin/add_cost</a> and enter:
+        </p>
+        <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+            <thead>
+                <tr style="background-color: var(--primary-color); color: white;">
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: left;">Field</th>
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: left;">Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>cost_type</code></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Category: hosting, bandwidth, hardware, software, support, other</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>amount_usd</code></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Cost in USD</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>period</code></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Month and year this cost applies to (YYYY-MM)</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>description</code></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Free-text note (e.g. "AWS EC2 invoice #1234")</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); border-radius: 4px; margin-top: var(--spacing-medium);">
+            <strong style="color: var(--text-color);">Why track costs?</strong>
+            <p style="color: var(--text-color); margin: var(--spacing-small) 0 0 0; line-height: 1.5;">Transparent cost data lets you price plans accurately and show the community that membership fees are going directly to keeping the site alive. Cost + revenue data can also be made visible to members to build trust.</p>
+        </div>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- PAYPAL -->
+    <div id="paypal" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">PayPal Configuration</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Configure PayPal at <a href="/membership/admin/paypal_settings" style="color: var(--link-color);">/membership/admin/paypal_settings</a>.
+        </p>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">Required settings (all stored as environment variables — never in the database):</p>
+        <ul style="color: var(--text-color); font-family: var(--body-font); line-height: 1.8;">
+            <li><code>PAYPAL_CLIENT_ID</code> — from your PayPal developer account</li>
+            <li><code>PAYPAL_SECRET</code> — PayPal API secret</li>
+            <li><code>PAYPAL_MODE</code> — <code>sandbox</code> for testing, <code>live</code> for production</li>
+            <li><code>PAYPAL_IPN_URL</code> — must be set to <code>https://yoursite.com/payment/paypal_ipn</code> in your PayPal account's IPN settings</li>
+        </ul>
+        <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); border-radius: 4px; margin-top: var(--spacing-medium);">
+            <strong style="color: var(--text-color);">IPN Verification:</strong>
+            <p style="color: var(--text-color); margin: var(--spacing-small) 0 0 0; line-height: 1.5;">The system verifies every IPN message by posting it back to PayPal before acting on it. Duplicate IPN messages are silently ignored (idempotent by transaction ID).</p>
+        </div>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- PATREON -->
+    <div id="patreon" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Patreon Configuration</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Configure Patreon at <a href="/membership/admin/patreon_settings" style="color: var(--link-color);">/membership/admin/patreon_settings</a>.
+        </p>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">Required environment variables:</p>
+        <ul style="color: var(--text-color); font-family: var(--body-font); line-height: 1.8;">
+            <li><code>PATREON_CLIENT_ID</code></li>
+            <li><code>PATREON_CLIENT_SECRET</code></li>
+            <li><code>PATREON_REDIRECT_URI</code> — set to <code>https://yoursite.com/payment/patreon_callback</code></li>
+        </ul>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            On the settings page you can also define the Patreon tier → membership plan mapping. For example: "Patron ($5/month)" maps to the "Supporter" plan.
+        </p>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- COINS ADMIN -->
+    <div id="coins" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Internal Coins (Admin Actions)</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Admins can grant coins to any user via the <code>earn</code> action at <a href="/currency/earn" style="color: var(--link-color);">/currency/earn</a>. This is useful for:
+        </p>
+        <ul style="color: var(--text-color); font-family: var(--body-font); line-height: 1.8;">
+            <li>Rewarding community contributions (documentation, moderation, content)</li>
+            <li>Compensating a member who had a billing issue</li>
+            <li>Funding a sponsored/benefactor membership</li>
+        </ul>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Every coin grant writes an audit record with your admin username, the amount, and the reason. All coin balances are protected by database-level locking to prevent race conditions.
+        </p>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- BENEFACTOR -->
+    <div id="benefactor" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Benefactor / Sponsored Access</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            The benefactor contribution feature at <a href="/membership/admin/benefactor_contribution" style="color: var(--link-color);">/membership/admin/benefactor_contribution</a> allows a member or donor to pay for another member's access. This is central to global affordability — someone in a wealthy country can sponsor access for someone who cannot afford it.
+        </p>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            As an admin you can:
+        </p>
+        <ul style="color: var(--text-color); font-family: var(--body-font); line-height: 1.8;">
+            <li>Record a benefactor payment and apply it to a target user's membership</li>
+            <li>Grant coins funded by a benefactor contribution</li>
+            <li>Set up a pool of sponsored memberships that users can apply for via HelpDesk</li>
+        </ul>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- ROLES -->
+    <div id="roles" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Integration with Roles</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            The membership system works alongside the existing role system — it does not replace it. The two interact as follows:
+        </p>
+        <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+            <thead>
+                <tr style="background-color: var(--primary-color); color: white;">
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: left;">Role</th>
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: left;">Membership check?</th>
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: left;">Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">admin</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Bypassed</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Global admins always have full access to everything</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">site_admin</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Bypassed</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Site admins always have full access on their site</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">user (authenticated)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Applied</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Access to gated services depends on active membership plan</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">anonymous</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Redirected to login</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Membership requires being logged in</td>
+                </tr>
+            </tbody>
+        </table>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Service gate checks always call <code>Membership->check_access()</code> first. If the user is an admin, the method returns true immediately without touching the database.
+        </p>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- TROUBLESHOOTING -->
+    <div id="troubleshooting" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Troubleshooting</h2>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">A user paid but their membership did not activate</h3>
+        <ol style="color: var(--text-color); font-family: var(--body-font); line-height: 1.8;">
+            <li>Check the PayPal IPN logs — look for a transaction with the user's email and the plan amount.</li>
+            <li>If the IPN was received but rejected, check whether <code>PAYPAL_MODE</code> is set correctly (sandbox vs. live).</li>
+            <li>Manually grant the membership from the subscriber detail page and note the PayPal transaction ID in the notes field.</li>
+        </ol>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Patreon users not getting membership benefits</h3>
+        <ol style="color: var(--text-color); font-family: var(--body-font); line-height: 1.8;">
+            <li>Ask the user to disconnect and reconnect their Patreon from <a href="/membership/account" style="color: var(--link-color);">My Account</a>.</li>
+            <li>Verify the Patreon tier mapping is configured correctly in Patreon Settings.</li>
+            <li>Check that the user's Patreon pledge is in <em>active</em> state (not pending or declined).</li>
+        </ol>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">A gated page is accessible to free users</h3>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Verify that the controller's <code>auto</code> method calls <code>check_access</code> correctly. Check that the service name string matches exactly what is stored in <code>membership_service_access</code>. Flush the session cache if stale data is suspected.
+        </p>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">A paid user cannot access a gated page</h3>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Go to their subscriber detail page and check whether their <code>membership_service_access</code> rows exist and are in <em>active</em> status. If not, use <em>Grant Access</em> to re-provision the service, then investigate why <code>provision_services</code> did not run correctly.
+        </p>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+</div>
