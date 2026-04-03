@@ -1,14 +1,7 @@
 [%# Edit Roles Template for Documentation %]
 [% META title = 'Edit Documentation Roles' %]
-
-<div style="margin-bottom: 20px;">
-    <a href="[% c.uri_for('/Documentation/manage_config') %]" 
-       style="padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; display: inline-block;">
-        Open Full Configuration Manager
-    </a>
-</div>
 [% META description = 'Edit roles for a documentation page' %]
-[% PageVersion = 'admin/documentation/edit_roles.tt,v 1.01 2025/10/15 14:09:39 system Exp system ' %]
+[% PageVersion = 'admin/documentation/edit_roles.tt,v 1.02 2026/03/24 compact layout' %]
 
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
@@ -16,298 +9,233 @@
 
 <head>
     <style>
-        .edit-roles-container {
-            max-width: 800px;
-            margin: 20px auto;
-            padding: 20px;
+        .er-wrap {
+            max-width: 900px;
+            margin: 10px auto;
             font-family: Arial, sans-serif;
-            background: #f8f9fa;
         }
-        
-        .page-info {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .page-info h2 {
-            color: #333;
-            margin-bottom: 10px;
-        }
-        
-        .page-path {
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 15px;
-        }
-        
-        .roles-form-container {
-            background: white;
-            border-radius: 8px;
-            padding: 25px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .form-section {
-            margin-bottom: 20px;
-        }
-        
-        .form-section label {
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 10px;
-            display: block;
-        }
-        
-        .roles-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .role-option {
+
+        .er-topbar {
             display: flex;
-            align-items: center;
-            padding: 10px;
-            border: 2px solid #e1e5e9;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .er-title-block h2 { margin: 0 0 2px; font-size: 1.2em; color: #333; }
+        .er-title-block h3 { margin: 0 0 2px; font-size: 1em; color: #444; }
+        .er-title-block .er-path { font-size: 12px; color: #666; }
+
+        .er-topbar-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+        .er-main {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            align-items: start;
+        }
+
+        .er-card {
+            background: #fff;
+            border: 1px solid #dee2e6;
             border-radius: 6px;
-            background: #f8f9fa;
-            transition: all 0.3s ease;
-            cursor: pointer;
+            padding: 14px 16px;
         }
-        
-        .role-option:hover {
-            border-color: #667eea;
-            background: #f0f4ff;
+
+        .er-card h4 {
+            margin: 0 0 10px;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #495057;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 6px;
         }
-        
-        .role-option.selected {
-            border-color: #667eea;
-            background: #e3f2fd;
-        }
-        
-        .role-checkbox {
-            margin-right: 8px;
-        }
-        
-        .role-label {
-            font-size: 14px;
-            font-weight: 500;
-            color: #333;
-            text-transform: capitalize;
-            cursor: pointer;
-        }
-        
-        .role-description {
-            font-size: 12px;
-            color: #666;
-            margin-top: 2px;
-        }
-        
-        .current-roles {
-            background: #e8f5e8;
-            border-radius: 6px;
-            padding: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .current-roles h4 {
-            color: #2e7d32;
-            margin-bottom: 10px;
-        }
-        
-        .current-role-badges {
+
+        .er-current-badges {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
+            gap: 6px;
+            margin-bottom: 12px;
         }
-        
-        .current-role-badge {
-            background: #2e7d32;
-            color: white;
-            padding: 4px 12px;
+
+        .er-badge {
+            background: #343a40;
+            color: #fff;
+            padding: 3px 10px;
             border-radius: 12px;
             font-size: 12px;
-            font-weight: 500;
         }
-        
-        .form-actions {
+
+        .er-help-list {
+            font-size: 12px;
+            color: #555;
+            line-height: 1.7;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .er-help-list li strong { color: #333; }
+
+        /* Role checkboxes grid */
+        .er-roles-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .er-role-option {
             display: flex;
-            gap: 15px;
-            justify-content: flex-start;
             align-items: center;
-            margin-top: 25px;
+            gap: 8px;
+            padding: 8px 10px;
+            border: 2px solid #dee2e6;
+            border-radius: 5px;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.15s ease;
         }
-        
+
+        .er-role-option:hover { border-color: #2c7be5; background: #e8f0fe; }
+        .er-role-option.selected { border-color: #2c7be5; background: #dceeff; }
+
+        .er-role-option input[type="checkbox"] { margin: 0; cursor: pointer; }
+
+        .er-role-label { font-size: 13px; font-weight: 500; color: #333; text-transform: capitalize; cursor: pointer; line-height: 1.2; }
+        .er-role-desc  { font-size: 11px; color: #888; }
+
+        .er-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 4px;
+        }
+
         .btn {
-            padding: 10px 20px;
+            padding: 7px 16px;
             border: none;
-            border-radius: 6px;
-            font-size: 14px;
+            border-radius: 5px;
+            font-size: 13px;
             font-weight: 500;
             cursor: pointer;
             text-decoration: none;
             display: inline-block;
-            text-align: center;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
         }
-        
-        .btn-primary {
-            background: #667eea;
-            color: white;
+        .btn-primary  { background: #2c7be5; color: #fff; }
+        .btn-primary:hover { background: #1a68c7; color: #fff; }
+        .btn-success  { background: #28a745; color: #fff; }
+        .btn-success:hover { background: #1e7e34; color: #fff; }
+        .btn-secondary { background: #e2e8f0; color: #4a5568; }
+        .btn-secondary:hover { background: #cbd5e0; }
+
+        .er-alert {
+            padding: 10px 14px;
+            border-radius: 5px;
+            margin-bottom: 12px;
+            font-size: 13px;
         }
-        
-        .btn-primary:hover {
-            background: #5a67d8;
-        }
-        
-        .btn-secondary {
-            background: #e2e8f0;
-            color: #4a5568;
-        }
-        
-        .btn-secondary:hover {
-            background: #cbd5e0;
-        }
-        
-        .success-message, .error-message {
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-        }
-        
-        .success-message {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        
-        .error-message {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        
-        .role-help {
-            background: #fff3cd;
-            color: #856404;
-            padding: 15px;
-            border-radius: 6px;
-            border: 1px solid #ffeaa7;
-            margin-bottom: 20px;
-            font-size: 14px;
-            line-height: 1.5;
-        }
-        
-        @media (max-width: 768px) {
-            .roles-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .form-actions {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .btn {
-                width: 100%;
-                margin-bottom: 10px;
-            }
+        .er-alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .er-alert-error   { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+        @media (max-width: 640px) {
+            .er-main { grid-template-columns: 1fr; }
+            .er-roles-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 
-<div class="edit-roles-container">
-    <div class="page-info">
-        <h2>Edit Documentation Roles</h2>
-        <h3>[% page_title %]</h3>
-        <div class="page-path">
-            <strong>File Path:</strong> [% page_metadata.path %]
+<div class="er-wrap">
+
+    [% IF success_message %]
+        <div class="er-alert er-alert-success">[% success_message %]</div>
+    [% END %]
+    [% IF error_message %]
+        <div class="er-alert er-alert-error">[% error_message %]</div>
+    [% END %]
+
+    <div class="er-topbar">
+        <div class="er-title-block">
+            <h2>Edit Documentation Roles</h2>
+            <h3>[% page_title %]</h3>
+            <div class="er-path"><strong>Path:</strong> [% page_metadata.path %]</div>
+        </div>
+        <div class="er-topbar-actions">
+            <a href="[% c.uri_for('/Documentation/manage_config') %]" class="btn btn-primary">Full Config Manager</a>
         </div>
     </div>
-    
-    [% IF success_message %]
-        <div class="success-message">
-            [% success_message %]
-        </div>
-    [% END %]
-    
-    [% IF error_message %]
-        <div class="error-message">
-            [% error_message %]
-        </div>
-    [% END %]
-    
-    <div class="roles-form-container">
-        <div class="role-help">
-            <strong>Role Permissions:</strong><br>
-            • <strong>Normal/User</strong> - Basic authenticated users<br>
-            • <strong>Editor</strong> - Content editors and content managers<br>
-            • <strong>Admin</strong> - System administrators with full access<br>
-            • <strong>Developer</strong> - Developers and technical staff<br><br>
-            <em>Select the roles that should have access to this documentation page.</em>
-        </div>
-        
-        <div class="current-roles">
-            <h4>Current Access Roles</h4>
-            <div class="current-role-badges">
+
+    <div class="er-main">
+
+        <!-- Left: current roles + help -->
+        <div class="er-card">
+            <h4>Current Access</h4>
+            <div class="er-current-badges">
                 [% IF current_roles.size > 0 %]
                     [% FOREACH role IN current_roles %]
-                        <span class="current-role-badge">[% role | ucfirst %]</span>
+                        <span class="er-badge">[% role | ucfirst %]</span>
                     [% END %]
                 [% ELSE %]
-                    <span class="current-role-badge">No Roles Set</span>
+                    <span class="er-badge" style="background:#6c757d;">No Roles Set</span>
                 [% END %]
             </div>
+            <h4>Role Reference</h4>
+            <ul class="er-help-list">
+                <li><strong>Normal / User</strong> — basic authenticated users</li>
+                <li><strong>Editor</strong> — content managers</li>
+                <li><strong>Developer</strong> — technical staff</li>
+                <li><strong>Admin</strong> — system administrators</li>
+                <li><strong>CSC Admin</strong> — full system access</li>
+            </ul>
         </div>
-        
-        <form method="POST" action="/Documentation/update_roles/[% page_name | uri %]" class="roles-form">
-            <div class="form-section">
-                <label>Select Roles That Can Access This Documentation:</label>
-                
-                <div class="roles-grid">
+
+        <!-- Right: form -->
+        <div class="er-card">
+            <h4>Select Roles</h4>
+            <form method="POST" action="/Documentation/update_roles/[% page_name | uri %]">
+                <div class="er-roles-grid">
                     [% FOREACH role IN available_roles %]
                         [% is_checked = 0 %]
                         [% FOREACH current_role IN current_roles %]
-                            [% IF current_role == role %]
-                                [% is_checked = 1 %]
-                                [% LAST %]
+                            [% IF current_role == role %][% is_checked = 1 %][% LAST %]
                             [% END %]
                         [% END %]
-                        
-                        <div class="role-option [% IF is_checked %]selected[% END %]" onclick="toggleRole(this)">
-                            <input type="checkbox" 
-                                   name="roles" 
-                                   value="[% role %]" 
+                        <div class="er-role-option [% IF is_checked %]selected[% END %]" onclick="toggleRole(this)">
+                            <input type="checkbox"
+                                   name="roles"
+                                   value="[% role %]"
                                    id="role_[% role %]"
-                                   class="role-checkbox"
                                    [% IF is_checked %]checked[% END %]>
-                            <label for="role_[% role %]" class="role-label">
-                                [% role | ucfirst %]
+                            <label for="role_[% role %]">
+                                <div class="er-role-label">[% role | ucfirst %]</div>
                                 [% IF role == 'normal' || role == 'user' %]
-                                    <div class="role-description">Basic users</div>
+                                    <div class="er-role-desc">Basic users</div>
                                 [% ELSIF role == 'editor' %]
-                                    <div class="role-description">Content managers</div>
+                                    <div class="er-role-desc">Content managers</div>
                                 [% ELSIF role == 'admin' %]
-                                    <div class="role-description">Administrators</div>
+                                    <div class="er-role-desc">Administrators</div>
                                 [% ELSIF role == 'developer' %]
-                                    <div class="role-description">Technical staff</div>
+                                    <div class="er-role-desc">Technical staff</div>
+                                [% ELSIF role == 'csc_admin' %]
+                                    <div class="er-role-desc">Full access</div>
                                 [% END %]
                             </label>
                         </div>
                     [% END %]
                 </div>
-            </div>
-            
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Save Role Changes</button>
-                <a href="/Documentation/manage_config?file=[% page_name | uri %]" class="btn btn-primary" style="background: #48bb78;">Manage File Config</a>
-                <a href="/Documentation" class="btn btn-secondary">Cancel</a>
-            </div>
-        </form>
+
+                <div class="er-actions">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <a href="/Documentation/manage_config?file=[% page_name | uri %]" class="btn btn-success">Manage File Config</a>
+                    <a href="/Documentation" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+
     </div>
 </div>
 
@@ -315,22 +243,6 @@
 function toggleRole(element) {
     const checkbox = element.querySelector('input[type="checkbox"]');
     checkbox.checked = !checkbox.checked;
-    
-    if (checkbox.checked) {
-        element.classList.add('selected');
-    } else {
-        element.classList.remove('selected');
-    }
+    element.classList.toggle('selected', checkbox.checked);
 }
-
-// Initialize selected states on page load
-document.addEventListener('DOMContentLoaded', function() {
-    const roleOptions = document.querySelectorAll('.role-option');
-    roleOptions.forEach(option => {
-        const checkbox = option.querySelector('input[type="checkbox"]');
-        if (checkbox.checked) {
-            option.classList.add('selected');
-        }
-    });
-});
 </script>

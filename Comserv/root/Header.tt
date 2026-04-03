@@ -30,10 +30,20 @@
         <meta name="description" content="[% http_header_description %]">
     [% END %]
     [%- SET site_favicon = c.stash.site_favicon || '' -%]
-    [% IF site_favicon %]
+    [%- SET req_port      = c.stash.req_port || 0 -%]
+    [%- SET fav_bg        = c.stash.favicon_bg_color || '' -%]
+    [%- SET site_name_enc = SiteName | uri -%]
+    [%- SET fallback_icon = site_favicon
+            ? site_favicon
+            : '/favicon/site/' _ site_name_enc -%]
+    [% IF req_port %]
+    [%- SET port_icon_url = '/favicon/port/' _ req_port _ (fav_bg ? '?bg=' _ fav_bg : '') -%]
+    <link rel="icon" type="image/svg+xml" href="[% port_icon_url %]">
+    <link rel="alternate icon" sizes="32x32" href="[% fallback_icon %]">
+    [% ELSIF site_favicon %]
     <link rel="shortcut icon" href="[% site_favicon %]">
     [% ELSE %]
-    <link rel="shortcut icon" href="/static/images/favicon.ico">
+    <link rel="icon" type="image/svg+xml" href="/favicon/site/[% site_name_enc %]">
     [% END %]
     [% IF SiteName == "CSC" %]
         [% embed('CSCWHMCSInterface') %]
@@ -117,6 +127,12 @@
     <!-- Back to Top Button CSS -->
     <link rel="stylesheet" type="text/css" href="/static/css/back-to-top.css?v=[% USE date; date.format(date.now, '%s') %]">
 
+    [% IF is_admin %]
+    <!-- Admin-only Health Monitoring -->
+    <link rel="stylesheet" type="text/css" href="/static/css/admin.css">
+    <script src="/static/js/HealthMonitor.js"></script>
+    [% END %]
+
     <!-- JavaScript dependencies (no jQuery - using vanilla JavaScript) -->
     <script src="/static/js/sub-menu.js"></script>
     <script src="/static/js/menu.js"></script>
@@ -134,4 +150,6 @@
             }
         }
     </script>
+    <!-- AI utilities - loaded globally so the chat widget works on all pages -->
+    <script src="/static/js/ai-common.js"></script>
 </head>

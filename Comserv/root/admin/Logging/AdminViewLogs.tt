@@ -1,0 +1,41 @@
+[% META
+   title = "View Log Content"
+   description = "View the content of a specific log file"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Admin"
+   page_version = "0.01"
+   last_updated = "2026-03-08"
+%]
+[% PageVersion = 'admin/Logging/AdminViewLogs.tt,v 0.01 2026/03/08 Zencoder Exp Zencoder' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>View Log: [% log_name | html %]</h1>
+        <h2 class="page-subtitle">Path: [% log_path | html %]</h2>
+    </div>
+
+    [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+
+    <div class="content-container">
+        <div class="content-primary">
+            
+            <div class="content-section">
+                <p class="info-text">Showing last 500 lines of the log file.</p>
+                <div class="code-block" style="background: #f8f9fa; padding: 15px; border: 1px solid #dee2e6; border-radius: 4px; max-height: 600px; overflow-y: auto; font-family: monospace; white-space: pre-wrap;">
+                    [% content | html %]
+                </div>
+            </div>
+
+            <div class="page-footer">
+                <div class="footer-actions">
+                    <a href="[% c.uri_for('/admin/logging') %]" class="btn btn-secondary">Back to Logging Admin</a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>

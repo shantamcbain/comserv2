@@ -26,6 +26,33 @@ Dedicated controller for schema comparison and bidirectional synchronization bet
 
 =cut
 
+sub begin :Private {
+    my ($self, $c) = @_;
+
+    my $username = $c->session->{username} // '';
+    my $roles    = $c->session->{roles}    || [];
+    my @role_list = ref($roles) eq 'ARRAY' ? @$roles : split /,/, $roles;
+    my $has_admin = grep { lc($_) eq 'admin' } @role_list;
+
+    return 1 if $has_admin;
+    return 1 if $username && $username ne 'Guest';
+
+    my $is_ajax = ($c->req->header('X-Requested-With') // '') eq 'XMLHttpRequest'
+               || ($c->req->content_type // '') =~ m{application/json}i;
+
+    if ($is_ajax || $c->req->method ne 'GET') {
+        $c->response->status(401);
+        $c->stash(json => { success => 0, error => 'Not authenticated. Please log in first.' });
+        $c->forward('View::JSON');
+        $c->detach;
+        return;
+    }
+
+    $c->flash->{error_msg} = 'Please log in as an administrator to access schema comparison.';
+    $c->res->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+    $c->detach;
+}
+
 sub admin_auth {
     my ($self) = @_;
     return Comserv::Util::AdminAuth->new();
@@ -78,24 +105,18 @@ sub sync_table_to_result :Path('/schema-comparison/sync_table_to_result') :Args(
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
         "Starting sync_table_to_result action");
     
-    # Check admin auth with fallback
-    my $is_auth = 0;
-    if ($c->session->{username} && $c->session->{user_id}) {
-        if ($c->session->{is_admin} || (ref($c->session->{roles}) eq 'ARRAY' && grep(/admin/i, @{$c->session->{roles}})) || 
-            ($c->session->{roles} && $c->session->{roles} =~ /\badmin\b/i) ||
-            (ref($c->session->{user_groups}) eq 'ARRAY' && grep(/admin/i, @{$c->session->{user_groups}})) ||
-            ($c->session->{user_groups} && $c->session->{user_groups} =~ /\badmin\b/i)) {
-            $is_auth = 1;
+    {
+        my $ok    = $self->admin_auth->check_admin_access($c, 'sync_table_to_result');
+        my $roles = $c->session->{roles} || [];
+        $ok ||= (ref($roles) eq 'ARRAY' && grep { lc($_) eq 'admin' } @$roles);
+        $ok ||= (!ref($roles) && $roles =~ /\badmin\b/i);
+        $ok ||= $c->session->{is_admin};
+        unless ($ok) {
+            $c->response->status(403);
+            $c->stash(json => { success => 0, error => 'Access denied' });
+            $c->forward('View::JSON');
+            return;
         }
-    } elsif ($c->user && $c->user->check_roles(qw/admin/)) {
-        $is_auth = 1;
-    }
-    
-    unless ($is_auth) {
-        $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied' });
-        $c->forward('View::JSON');
-        return;
     }
     
     my $json_data;
@@ -415,11 +436,23 @@ sub sync_unique_constraint_to_result :Path('/schema-comparison/sync_unique_const
             $table_schema = $self->get_forager_table_schema($c, $table_name);
         }
         
+        # Match by name first; for 'unnamed' also match by column set (MySQL auto-naming)
         my ($constraint) = grep { ($_->{name} || 'unnamed') eq $constraint_name } @{$table_schema->{unique_constraints} || []};
+        unless ($constraint && $constraint_name eq 'unnamed') {
+            # Also try column-based match when constraint_name is 'unnamed'
+            if ($constraint_name eq 'unnamed') {
+                ($constraint) = @{$table_schema->{unique_constraints} || []};
+            }
+        }
         die "Constraint '$constraint_name' not found in database" unless $constraint;
         
         my $cols_list = '[' . join(', ', map { "'$_'" } @{$constraint->{columns}}) . ']';
-        my $new_call = "__PACKAGE__->add_unique_constraint('$constraint_name' => $cols_list);";
+        # Use unnamed format (no name) when constraint_name is 'unnamed' or matches a column name
+        my $is_unnamed = ($constraint_name eq 'unnamed')
+            || (grep { $_ eq $constraint_name } @{$constraint->{columns}});
+        my $new_call = $is_unnamed
+            ? "__PACKAGE__->add_unique_constraint($cols_list);"
+            : "__PACKAGE__->add_unique_constraint('$constraint_name' => $cols_list);";
         
         my $result_table_mapping = $self->build_result_table_mapping($c, $database);
         my $table_key = lc($table_name);
@@ -427,10 +460,14 @@ sub sync_unique_constraint_to_result :Path('/schema-comparison/sync_unique_const
         
         my $content = read_file($result_file_path);
         
-        if ($content =~ /__PACKAGE__->add_unique_constraint\s*\(\s*['"]\Q$constraint_name\E['"]\s*=>\s*\[.*?\]\s*\)\s*;/s) {
-            $content =~ s/__PACKAGE__->add_unique_constraint\s*\(\s*['"]\Q$constraint_name\E['"]\s*=>\s*\[.*?\]\s*\)\s*;/ $new_call/s;
+        # Try to replace existing: named format
+        if (!$is_unnamed && $content =~ /__PACKAGE__->add_unique_constraint\s*\(\s*['"]\Q$constraint_name\E['"]\s*=>\s*\[.*?\]\s*\)\s*;/s) {
+            $content =~ s/__PACKAGE__->add_unique_constraint\s*\(\s*['"]\Q$constraint_name\E['"]\s*=>\s*\[.*?\]\s*\)\s*;/$new_call/s;
+        # Try to replace existing: unnamed format (no name argument)
+        } elsif ($is_unnamed && $content =~ /__PACKAGE__->add_unique_constraint\s*\(\s*\[.*?\]\s*\)\s*;/s) {
+            $content =~ s/__PACKAGE__->add_unique_constraint\s*\(\s*\[.*?\]\s*\)\s*;/$new_call/s;
         } else {
-            # Add after set_primary_key or add_columns
+            # Insert after set_primary_key or add_columns
             if ($content =~ /(__PACKAGE__->set_primary_key\s*\(.*?\)\s*;)/s) {
                 my $match = $1;
                 $content =~ s/\Q$match\E/$match\n$new_call/s;
@@ -525,24 +562,18 @@ sub sync_result_to_table :Path('/schema-comparison/sync_result_to_table') :Args(
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_result_to_table',
         "Starting sync_result_to_table action");
     
-    # Check admin auth with fallback
-    my $is_auth = 0;
-    if ($c->session->{username} && $c->session->{user_id}) {
-        if ($c->session->{is_admin} || (ref($c->session->{roles}) eq 'ARRAY' && grep(/admin/i, @{$c->session->{roles}})) || 
-            ($c->session->{roles} && $c->session->{roles} =~ /\badmin\b/i) ||
-            (ref($c->session->{user_groups}) eq 'ARRAY' && grep(/admin/i, @{$c->session->{user_groups}})) ||
-            ($c->session->{user_groups} && $c->session->{user_groups} =~ /\badmin\b/i)) {
-            $is_auth = 1;
+    {
+        my $ok    = $self->admin_auth->check_admin_access($c, 'sync_result_to_table');
+        my $roles = $c->session->{roles} || [];
+        $ok ||= (ref($roles) eq 'ARRAY' && grep { lc($_) eq 'admin' } @$roles);
+        $ok ||= (!ref($roles) && $roles =~ /\badmin\b/i);
+        $ok ||= $c->session->{is_admin};
+        unless ($ok) {
+            $c->response->status(403);
+            $c->stash(json => { success => 0, error => 'Access denied' });
+            $c->forward('View::JSON');
+            return;
         }
-    } elsif ($c->user && $c->user->check_roles(qw/admin/)) {
-        $is_auth = 1;
-    }
-    
-    unless ($is_auth) {
-        $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied' });
-        $c->forward('View::JSON');
-        return;
     }
     
     my $json_data;
@@ -627,24 +658,18 @@ sub create_result_from_table :Path('/schema-comparison/create_result_from_table'
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_result_from_table',
         "Starting create_result_from_table action");
     
-    # Check admin auth with fallback
-    my $is_auth = 0;
-    if ($c->session->{username} && $c->session->{user_id}) {
-        if ($c->session->{is_admin} || (ref($c->session->{roles}) eq 'ARRAY' && grep(/admin/i, @{$c->session->{roles}})) || 
-            ($c->session->{roles} && $c->session->{roles} =~ /\badmin\b/i) ||
-            (ref($c->session->{user_groups}) eq 'ARRAY' && grep(/admin/i, @{$c->session->{user_groups}})) ||
-            ($c->session->{user_groups} && $c->session->{user_groups} =~ /\badmin\b/i)) {
-            $is_auth = 1;
+    {
+        my $ok    = $self->admin_auth->check_admin_access($c, 'create_result_from_table');
+        my $roles = $c->session->{roles} || [];
+        $ok ||= (ref($roles) eq 'ARRAY' && grep { lc($_) eq 'admin' } @$roles);
+        $ok ||= (!ref($roles) && $roles =~ /\badmin\b/i);
+        $ok ||= $c->session->{is_admin};
+        unless ($ok) {
+            $c->response->status(403);
+            $c->stash(json => { success => 0, error => 'Access denied' });
+            $c->forward('View::JSON');
+            return;
         }
-    } elsif ($c->user && $c->user->check_roles(qw/admin/)) {
-        $is_auth = 1;
-    }
-    
-    unless ($is_auth) {
-        $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied' });
-        $c->forward('View::JSON');
-        return;
     }
     
     my $json_data;
@@ -738,40 +763,30 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
         "Starting create_table_from_result action");
     
-    # Debug logging for authentication check
-    my $username = $c->session->{username} || 'undefined';
-    my $user_id = $c->session->{user_id} || 'undefined';
-    my $is_admin_flag = $c->session->{is_admin} || 'undefined';
-    my $roles = $c->session->{roles} || 'undefined';
-    my $user_groups = $c->session->{user_groups} || 'undefined';
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-        "Auth debug - username: $username, user_id: $user_id, is_admin: $is_admin_flag, roles: $roles, user_groups: $user_groups");
-    
-    # Check auth - use both session-based and Catalyst user
-    my $is_auth = 0;
-    if ($c->session->{username} && $c->session->{user_id}) {
-        # Session-based auth
-        if ($c->session->{is_admin} || (ref($c->session->{roles}) eq 'ARRAY' && grep(/admin/i, @{$c->session->{roles}})) || 
-            ($c->session->{roles} && $c->session->{roles} =~ /\badmin\b/i)) {
-            $is_auth = 1;
-        } elsif (ref($c->session->{user_groups}) eq 'ARRAY' && grep(/admin/i, @{$c->session->{user_groups}})) {
-            $is_auth = 1;
-        } elsif ($c->session->{user_groups} && $c->session->{user_groups} =~ /\badmin\b/i) {
-            $is_auth = 1;
-        }
+    my $is_auth = $self->admin_auth->check_admin_access($c, 'create_table_from_result');
+    if (!$is_auth) {
+        my $roles = $c->session->{roles} || [];
+        $is_auth = 1 if ref($roles) eq 'ARRAY' && grep { lc($_) eq 'admin' } @$roles;
+        $is_auth = 1 if !ref($roles) && $roles =~ /\badmin\b/i;
+        $is_auth = 1 if $c->session->{is_admin};
     }
-    
-    # Fallback: check Catalyst user object if available
-    if (!$is_auth && $c->user) {
-        $is_auth = $c->user->check_roles(qw/admin/);
-    }
-    
     unless ($is_auth) {
+        my $roles     = $c->session->{roles} || [];
+        my $roles_str = ref($roles) eq 'ARRAY' ? join(',', @$roles) : ($roles // '');
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_table_from_result',
-            "Access denied - authentication failed. Session: username=$username, is_admin=$is_admin_flag, roles=$roles");
+            "Access denied: username=" . ($c->session->{username} // 'UNSET')
+            . " roles=$roles_str is_admin=" . ($c->session->{is_admin} // 'UNSET'));
         $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied - admin role required' });
+        $c->stash(json => {
+            success  => 0,
+            error    => 'Access denied - admin role required',
+            debug    => {
+                username  => $c->session->{username} // 'UNSET',
+                roles     => $roles_str,
+                is_admin  => $c->session->{is_admin} // 'UNSET',
+                sitename  => $c->session->{SiteName} // 'UNSET',
+            },
+        });
         $c->forward('View::JSON');
         return;
     }
@@ -858,24 +873,30 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
                 # Generate and execute the deployment SQL for just this table
                 my @statements = $schema->deployment_statements('MySQL');
                 
-                # Filter to only statements that create the target table
-                my @table_statements = grep { /CREATE TABLE.*\Q$table_name\E/i } @statements;
+                # Filter to only statements that create the target table (exact match with backtick delimiters)
+                my @table_statements = grep { /CREATE TABLE\s+`\Q$table_name\E`/i } @statements;
                 
                 if (@table_statements) {
+                    $dbh->do('SET FOREIGN_KEY_CHECKS=0');
                     foreach my $statement (@table_statements) {
-                        $dbh->do($statement);
+                        # Strip CONSTRAINT lines to avoid FK formation errors (type/charset mismatches)
+                        my $safe_statement = _strip_fk_constraints($statement);
+                        $dbh->do($safe_statement);
                     }
+                    $dbh->do('SET FOREIGN_KEY_CHECKS=1');
                     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
                         "Successfully created table '$table_name' from Result class '$class_name' using SQL deployment");
                 } else {
                     # Fallback: Try the full deploy if we can't isolate the statement
+                    $dbh->do('SET FOREIGN_KEY_CHECKS=0');
                     $schema->deploy();
+                    $dbh->do('SET FOREIGN_KEY_CHECKS=1');
                     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
                         "Successfully created table '$table_name' from Result class '$class_name' using schema->deploy()");
                 }
             } catch {
                 my $deploy_error = $_;
-                # Check if it's a permission/privilege error
+                eval { $dbh->do('SET FOREIGN_KEY_CHECKS=1') };
                 if ($deploy_error =~ /access denied|permission/i) {
                     die "Database user does not have CREATE TABLE privileges for table '$table_name': $deploy_error";
                 } else {
@@ -904,6 +925,170 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
         $c->stash(json => { success => 0, error => $error });
     };
     
+    $c->forward('View::JSON');
+}
+
+=head2 remove_field_from_result
+
+Remove a field definition from a Result file
+
+=cut
+
+sub remove_field_from_result :Path('/schema-comparison/remove_field_from_result') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $json_data;
+    try {
+        local $/;
+        my $body = $c->req->body;
+        $json_data = decode_json(<$body>) if $body;
+    } catch {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => "Invalid JSON: $_" });
+        $c->forward('View::JSON');
+        return;
+    };
+
+    my $table_name = $json_data->{table_name};
+    my $field_name  = $json_data->{field_name};
+    my $database    = $json_data->{database};
+
+    unless ($table_name && $field_name && $database) {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => 'Missing required parameters: table_name, field_name, database' });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    try {
+        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        my $result_file_path = $result_table_mapping->{lc($table_name)}->{result_path};
+
+        die "Result file not found for table '$table_name'" unless $result_file_path && -f $result_file_path;
+
+        my $content = read_file($result_file_path);
+
+        # Make a backup first
+        write_file("$result_file_path.bak", $content);
+
+        # Remove the field from add_columns block using balanced-brace extraction
+        if ($content =~ /(__PACKAGE__->add_columns\s*\()(.*?)(\s*\)\s*;)/s) {
+            my ($prefix, $cols, $suffix) = ($1, $2, $3);
+            my $original_cols = $cols;
+
+            # Find and remove: optional comma before, fieldname => { ... }, trailing comma/whitespace
+            # Pattern: optional leading comma+whitespace, fieldname => {balanced}, optional trailing comma
+            my $found = 0;
+            my $new_cols = '';
+            my $pos = 0;
+            while ($cols =~ /\b(\w+)\s*=>\s*\{/g) {
+                my $fname = $1;
+                my $fstart = pos($cols) - length($fname) - length(' => {') + 1;
+                my $brace_start = pos($cols);
+                my $depth = 1;
+                my $i = $brace_start;
+                while ($i < length($cols) && $depth > 0) {
+                    my $ch = substr($cols, $i, 1);
+                    $depth++ if $ch eq '{';
+                    $depth-- if $ch eq '}';
+                    $i++;
+                }
+                # $i is now one past the closing '}'
+                if ($fname eq $field_name) {
+                    # Remove this field: capture text before and after
+                    my $before = substr($cols, 0, $fstart);
+                    my $after  = substr($cols, $i);
+                    # Strip trailing comma from $before or leading comma from $after
+                    $before =~ s/,\s*$//s;
+                    $after  =~ s/^\s*,//s;
+                    $cols = $before . $after;
+                    $found = 1;
+                    last;
+                }
+                pos($cols) = $i;
+            }
+
+            die "Field '$field_name' not found in Result file add_columns" unless $found;
+
+            my $new_content = $prefix . $cols . $suffix;
+            $content =~ s/__PACKAGE__->add_columns\s*\(.*?\)\s*;/$new_content/s;
+            write_file($result_file_path, $content);
+
+            $c->stash(json => {
+                success => 1,
+                message => "Field '$field_name' removed from Result file (backup at $result_file_path.bak)"
+            });
+        } else {
+            die "Could not parse add_columns block in Result file";
+        }
+    } catch {
+        $c->response->status(500);
+        $c->stash(json => { success => 0, error => "Error removing field from Result: $_" });
+    };
+
+    $c->forward('View::JSON');
+}
+
+=head2 remove_field_from_table
+
+Drop a column from the database table (ALTER TABLE DROP COLUMN)
+
+=cut
+
+sub remove_field_from_table :Path('/schema-comparison/remove_field_from_table') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $json_data;
+    try {
+        local $/;
+        my $body = $c->req->body;
+        $json_data = decode_json(<$body>) if $body;
+    } catch {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => "Invalid JSON: $_" });
+        $c->forward('View::JSON');
+        return;
+    };
+
+    my $table_name  = $json_data->{table_name};
+    my $field_name  = $json_data->{field_name};
+    my $database    = $json_data->{database};
+    my $confirmed   = $json_data->{confirmed};
+
+    unless ($table_name && $field_name && $database) {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => 'Missing required parameters: table_name, field_name, database' });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    unless ($confirmed) {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => 'Confirmation required to drop a column' });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    try {
+        my $model_name = $database eq 'ency' ? 'DBEncy' : 'DBForager';
+        my $dbh = $c->model($model_name)->schema->storage->dbh;
+
+        my $sql = "ALTER TABLE `$table_name` DROP COLUMN `$field_name`";
+        $dbh->do($sql);
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'remove_field_from_table',
+            "Dropped column '$field_name' from table '$table_name' in $database: $sql");
+
+        $c->stash(json => {
+            success => 1,
+            message => "Column '$field_name' dropped from table '$table_name'",
+            sql => $sql
+        });
+    } catch {
+        $c->response->status(500);
+        $c->stash(json => { success => 0, error => "Error dropping column: $_" });
+    };
+
     $c->forward('View::JSON');
 }
 
@@ -1248,7 +1433,13 @@ sub generate_result_file_content {
     
     foreach my $constraint (@{$db_schema->{unique_constraints}}) {
         my $col_list = join(', ', map { "'$_'" } @{$constraint->{columns}});
-        $content .= "__PACKAGE__->add_unique_constraint('$constraint->{name}' => [$col_list]);\n";
+        # If the index name matches a column name, MySQL auto-named it - use unnamed format
+        my $is_auto_named = grep { $_ eq $constraint->{name} } @{$constraint->{columns}};
+        if ($is_auto_named || !$constraint->{name} || $constraint->{name} eq 'unnamed') {
+            $content .= "__PACKAGE__->add_unique_constraint([$col_list]);\n";
+        } else {
+            $content .= "__PACKAGE__->add_unique_constraint('$constraint->{name}' => [$col_list]);\n";
+        }
     }
     
     $content .= "\n1;\n";
@@ -1409,7 +1600,21 @@ sub get_ency_table_schema {
                 constraint_name => $row->{CONSTRAINT_NAME}
             };
         }
-        
+
+        my $idx_sth = $dbh->prepare("SHOW INDEX FROM `$table_name` WHERE Non_unique = 0 AND Key_name != 'PRIMARY'");
+        $idx_sth->execute();
+        my %unique_idx_seq;
+        while (my $row = $idx_sth->fetchrow_hashref()) {
+            $unique_idx_seq{$row->{Key_name}}{$row->{Seq_in_index}} = $row->{Column_name};
+        }
+        foreach my $idx_name (sort keys %unique_idx_seq) {
+            my @cols = map { $unique_idx_seq{$idx_name}{$_} } sort { $a <=> $b } keys %{$unique_idx_seq{$idx_name}};
+            push @{$schema_info->{unique_constraints}}, {
+                name => $idx_name,
+                columns => \@cols
+            };
+        }
+
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_ency_table_schema', 
             "Error getting ency table schema for $table_name: $_");
@@ -1480,7 +1685,21 @@ sub get_forager_table_schema {
                 constraint_name => $row->{CONSTRAINT_NAME}
             };
         }
-        
+
+        my $idx_sth = $dbh->prepare("SHOW INDEX FROM `$table_name` WHERE Non_unique = 0 AND Key_name != 'PRIMARY'");
+        $idx_sth->execute();
+        my %unique_idx_seq;
+        while (my $row = $idx_sth->fetchrow_hashref()) {
+            $unique_idx_seq{$row->{Key_name}}{$row->{Seq_in_index}} = $row->{Column_name};
+        }
+        foreach my $idx_name (sort keys %unique_idx_seq) {
+            my @cols = map { $unique_idx_seq{$idx_name}{$_} } sort { $a <=> $b } keys %{$unique_idx_seq{$idx_name}};
+            push @{$schema_info->{unique_constraints}}, {
+                name => $idx_name,
+                columns => \@cols
+            };
+        }
+
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_forager_table_schema', 
             "Error getting forager table schema for $table_name: $_");
@@ -1683,40 +1902,68 @@ sub find_schema_differences {
     }
     
     # Compare Unique Constraints
-    # This is more complex because they have names
-    my %db_uniques = map { ($_->{name} || 'unnamed') => join(',', sort @{$_->{columns}}) } @{$db_schema->{unique_constraints} || []};
+    # DB constraints use MySQL index names; Result file unnamed constraints use 'unnamed' key.
+    # We match by name first, then fall back to column-set matching for 'unnamed' Result constraints.
+    my %db_uniques     = map { ($_->{name} || 'unnamed') => join(',', sort @{$_->{columns}}) } @{$db_schema->{unique_constraints}   || []};
     my %result_uniques = map { ($_->{name} || 'unnamed') => join(',', sort @{$_->{columns}}) } @{$result_schema->{unique_constraints} || []};
-    
+
+    # Build reverse lookup: column-set => db constraint name (for unnamed matching)
+    my %db_cols_to_name = reverse %db_uniques;
+
+    my %matched_db;    # db names that have been matched
+    my %matched_result; # result names that have been matched
+
+    # First pass: exact name matches
     foreach my $name (keys %db_uniques) {
-        if (!exists $result_uniques{$name}) {
-            push @differences, {
-                type => 'unique_constraint_missing_in_result',
-                attribute => "add_unique_constraint ($name)",
-                table_value => $db_uniques{$name},
-                result_value => undef,
-                description => "Unique constraint '$name' missing in Result file"
-            };
-        } elsif ($db_uniques{$name} ne $result_uniques{$name}) {
-            push @differences, {
-                type => 'unique_constraint_mismatch',
-                attribute => "add_unique_constraint ($name)",
-                table_value => $db_uniques{$name},
-                result_value => $result_uniques{$name},
-                description => "Unique constraint '$name' column mismatch"
-            };
+        if (exists $result_uniques{$name}) {
+            $matched_db{$name} = 1;
+            $matched_result{$name} = 1;
+            if ($db_uniques{$name} ne $result_uniques{$name}) {
+                push @differences, {
+                    type => 'unique_constraint_mismatch',
+                    attribute => "add_unique_constraint ($name)",
+                    table_value => $db_uniques{$name},
+                    result_value => $result_uniques{$name},
+                    description => "Unique constraint '$name' column mismatch"
+                };
+            }
         }
     }
-    
-    foreach my $name (keys %result_uniques) {
-        if (!exists $db_uniques{$name}) {
-            push @differences, {
-                type => 'unique_constraint_missing_in_table',
-                attribute => "add_unique_constraint ($name)",
-                table_value => undef,
-                result_value => $result_uniques{$name},
-                description => "Unique constraint '$name' exists in Result file but not in database"
-            };
+
+    # Second pass: match 'unnamed' Result constraints to DB constraints by column set
+    foreach my $rname (keys %result_uniques) {
+        next if $matched_result{$rname};
+        my $rcols = $result_uniques{$rname};
+        if (exists $db_cols_to_name{$rcols}) {
+            my $db_name = $db_cols_to_name{$rcols};
+            $matched_db{$db_name} = 1;
+            $matched_result{$rname} = 1;
+            # Columns match - constraint exists in both, just named differently (OK)
         }
+    }
+
+    # Report DB constraints not matched
+    foreach my $name (keys %db_uniques) {
+        next if $matched_db{$name};
+        push @differences, {
+            type => 'unique_constraint_missing_in_result',
+            attribute => "add_unique_constraint ($name)",
+            table_value => $db_uniques{$name},
+            result_value => undef,
+            description => "Unique constraint '$name' missing in Result file"
+        };
+    }
+
+    # Report Result constraints not matched
+    foreach my $name (keys %result_uniques) {
+        next if $matched_result{$name};
+        push @differences, {
+            type => 'unique_constraint_missing_in_table',
+            attribute => "add_unique_constraint ($name)",
+            table_value => undef,
+            result_value => $result_uniques{$name},
+            description => "Unique constraint '$name' exists in Result file but not in database"
+        };
     }
     
     return \@differences;
@@ -1863,22 +2110,37 @@ sub get_result_file_schema {
 sub parse_result_file_columns {
     my ($self, $text) = @_;
     my $columns = {};
-    while ($text =~ /(\w+)\s*=>\s*\{([\s\S]*?)\}(?=\s*,\s*\w+\s*=>|\s*,\s*$|\s*\))/g) {
-        my ($name, $def) = ($1, $2);
-        my $info = {};
-        while ($def =~ /(\w+)\s*=>\s*(?:['"]([^'"]+)['"]|(\d+)|\\['"]([^'"]+)['"]|\{([\s\S]*?)\})/g) {
-            my $attr = $1;
-            my $val = $2 // $3 // $4 // $5;
-            # If the value was captured from \'...' syntax, mark it as a scalar ref
-            if (defined $4) {
-                # This was \'SOMETHING', which is a scalar reference in Perl
-                # Store the actual string value
-                $info->{$attr} = $val;
-            } else {
-                $info->{$attr} = $val;
-            }
+
+    # Use balanced-brace extraction so nested hashes (e.g. extra => { list => [...] })
+    # don't cut the column definition short.
+    while ($text =~ /\b(\w+)\s*=>\s*\{/g) {
+        my $col_name = $1;
+        my $start    = pos($text);  # character position right after the opening '{'
+
+        # Walk forward counting braces to find the matching '}'
+        my $depth = 1;
+        my $i     = $start;
+        while ($i < length($text) && $depth > 0) {
+            my $ch = substr($text, $i, 1);
+            $depth++ if $ch eq '{';
+            $depth-- if $ch eq '}';
+            $i++;
         }
-        $columns->{$name} = $info;
+
+        my $def = substr($text, $start, $i - $start - 1);  # content between { }
+
+        # Advance the /g position past the closing '}' so the next iteration
+        # starts after this column's block.
+        pos($text) = $i;
+
+        my $info = {};
+        # Parse key => value pairs inside the column definition.
+        # Handles: 'string', "string", bare number, \'scalar ref', and { nested hash }
+        while ($def =~ /(\w+)\s*=>\s*(?:\\?['"]([^'"]+)['"]|(\d+)|\{([^{}]*)\})/g) {
+            my ($attr, $str_val, $num_val, $hash_val) = ($1, $2, $3, $4);
+            $info->{$attr} = $str_val // $num_val // $hash_val;
+        }
+        $columns->{$col_name} = $info;
     }
     return $columns;
 }
@@ -1939,6 +2201,20 @@ This library is free software. You can redistribute it and/or modify
 it under the same terms as Perl itself.
 
 =cut
+
+sub _strip_fk_constraints {
+    my ($sql) = @_;
+    my @lines = split /\n/, $sql;
+    my @kept;
+    for my $line (@lines) {
+        next if $line =~ /^\s*CONSTRAINT\s+/i;
+        next if $line =~ /^\s*INDEX\s+.*_idx_/i && $line =~ /REFERENCES/i;
+        push @kept, $line;
+    }
+    my $result = join "\n", @kept;
+    $result =~ s/,(\s*\n\s*\))/\n)/g;
+    return $result;
+}
 
 __PACKAGE__->meta->make_immutable;
 

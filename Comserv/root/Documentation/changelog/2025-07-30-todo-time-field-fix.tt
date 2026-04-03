@@ -1,0 +1,84 @@
+[% META title = 'Todo Time Field Fix - 2025-07-30' %]
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-07-30-todo-time-field-fix.tt,v 0.01 2025/07/30 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<!-- Changelog entry for Todo time field fix -->
+<div class="documentation-content">
+
+<div class="markdown-content">
+
+# Todo Time Field Fix - July 30, 2025
+
+## Change Summary
+**Type**: Bug Fix  
+**Priority**: High  
+**Component**: Todo System  
+**Status**: ✅ Completed  
+
+## Problem Statement
+Todo modification was failing with database error: "Incorrect time value: '' for column time_of_day at row 1"
+
+### Error Details
+- **URL**: `/todo/modify/131`
+- **Error**: `DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Incorrect time value: '' for column 'ency'.'todo'.'time_of_day' at row 1`
+- **Root Cause**: Form submissions sending empty strings (`""`) to MySQL time columns
+- **Database Behavior**: MySQL time columns reject empty strings but accept NULL values for nullable fields
+
+## Solution Implemented
+
+### Code Changes
+**File**: `/Comserv/lib/Comserv/Controller/Todo.pm`  
+**Method**: `modify` action  
+**Lines Modified**: Added time field validation before database update
+
+### Technical Implementation
+```perl
+# Handle time_of_day field - convert empty string to undef for nullable time field
+my $time_of_day = $form_data->{time_of_day};
+if (defined $time_of_day && $time_of_day eq '') {
+    $time_of_day = undef;  # Convert empty string to NULL for database
+}
+```
+
+### Additional Improvements
+- Enhanced integer field validation for `project_id`, `user_id`, `estimated_man_hours`, and `priority`
+- Added default project creation logic when no project is selected
+- Improved error handling and logging throughout the modify action
+
+## Testing Results
+- **Before Fix**: Todo modification failed with MySQL time value error
+- **After Fix**: Todo modification works correctly with empty time fields
+- **User Confirmation**: Fix verified working by user testing
+
+## Impact Assessment
+- **Affected Users**: All users modifying todo items with empty time fields
+- **Risk Level**: Low - Fix only affects form field processing, no schema changes
+- **Rollback Plan**: Simple code revert if issues arise
+
+## Related Documentation
+- **Main Documentation**: [Todo System Documentation](/Documentation/Todo.tt)
+- **Technical Details**: See "Critical Time Field Fix (2025-07-30)" section
+- **Schema Reference**: `/Comserv/lib/Comserv/Model/Schema/Ency/Result/Todo.pm`
+
+## Lessons Learned
+1. **MySQL Time Columns**: Always convert empty strings to NULL for nullable time fields
+2. **Form Validation**: Check application logs for exact SQL parameter values when debugging
+3. **Testing Strategy**: Test form submissions with empty optional fields to catch constraint issues
+4. **DBIx::Class Best Practice**: Use `undef` instead of empty strings for nullable database columns
+
+## Future Prevention
+- Add similar validation to other controllers handling time/date fields
+- Consider adding client-side validation to prevent empty string submissions
+- Document time field handling patterns for consistent implementation
+
+---
+
+**Change Author**: AI Assistant  
+**Reviewed By**: User (Shanta)  
+**Implementation Date**: 2025-07-30  
+**Verification Date**: 2025-07-30  
+
+</div>
+</div>

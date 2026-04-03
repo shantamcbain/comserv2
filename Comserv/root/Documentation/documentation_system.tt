@@ -1,0 +1,646 @@
+[% PageVersion = 'Comserv/root/Documentation/documentation_system.tt,v 0.02 2024/05/31 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation System' %]
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="documentation-page">
+    <div class="doc-header">
+        <h1>Documentation System</h1>
+        
+        <div class="doc-meta">
+            <span class="updated">Last Updated: May 15, 2025</span>
+            <span class="author">Author: Shanta</span>
+            <span class="status">Status: Active</span>
+        </div>
+    </div>
+
+    <div class="doc-section">
+        <h2>Overview</h2>
+        <p>The Comserv documentation system provides a structured way to organize and access documentation for different sites, roles, and modules. This document explains how the documentation system works, including visibility rules and organization principles.</p>
+    </div>
+
+    <div class="doc-section">
+        <h2>Documentation Types</h2>
+        <p>The system supports several types of documentation:</p>
+        
+        <div class="doc-subsection">
+            <h3>1. General Application Documentation</h3>
+            <ul>
+                <li>Common features like login, profile customization, etc.</li>
+                <li>Visible to all sites and users</li>
+                <li>Located in the main Documentation directory</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>2. Site-Specific Documentation</h3>
+            <ul>
+                <li>Documentation specific to a particular site (e.g., MCOOP, CSC)</li>
+                <li>Only visible to users of that specific site</li>
+                <li>Located in the <code>Documentation/sites/{site_name}</code> directory</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>3. Role-Specific Documentation</h3>
+            <ul>
+                <li>Documentation targeted at specific user roles (admin, developer, etc.)</li>
+                <li>Only visible to users with the appropriate role</li>
+                <li>Located in the <code>Documentation/roles/{role_name}</code> directory</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>4. Module Documentation</h3>
+            <ul>
+                <li>Documentation for specific system modules</li>
+                <li>Visibility depends on module access permissions</li>
+                <li>Located in the main Documentation directory or module-specific directories</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>5. Controller Documentation</h3>
+            <ul>
+                <li>Documentation for system controllers</li>
+                <li>Located in the <code>Documentation/controllers</code> directory</li>
+                <li>Primarily for developers and administrators</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>6. Changelog Documentation</h3>
+            <ul>
+                <li>Documentation of system changes and updates</li>
+                <li>Located in the <code>Documentation/changelog</code> directory</li>
+                <li>Helps track system evolution and recent updates</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="doc-section">
+        <h2>Visibility Rules</h2>
+        <p>The documentation system applies the following visibility rules:</p>
+        
+        <div class="doc-subsection">
+            <h3>1. CSC Site Administrators</h3>
+            <ul>
+                <li>Can see ALL documentation across all sites and roles</li>
+                <li>This is the only user group with complete documentation access</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>2. Site-Specific Visibility</h3>
+            <ul>
+                <li>Users can only see documentation for their current site</li>
+                <li>General documentation (site = 'all') is visible to all sites</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>3. Role-Based Visibility</h3>
+            <ul>
+                <li>Users can only see documentation appropriate for their role</li>
+                <li>Higher roles can see documentation for lower roles (e.g., admins can see user docs)</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>4. Module-Specific Visibility</h3>
+            <ul>
+                <li>Module documentation visibility follows the same site and role rules</li>
+                <li>Additional module-specific permissions may apply</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="doc-section">
+        <h2>Documentation Organization</h2>
+        <p>Documentation is organized into the following categories:</p>
+        
+        <div class="doc-subsection">
+            <h3>1. User Guides</h3>
+            <ul>
+                <li>Basic documentation for end users</li>
+                <li>Includes getting started guides and FAQs</li>
+                <li>Visible to all user roles</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>2. Administrator Guides</h3>
+            <ul>
+                <li>Documentation for system administrators</li>
+                <li>Includes installation and configuration guides</li>
+                <li>Only visible to users with admin role</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>3. Developer Documentation</h3>
+            <ul>
+                <li>Technical documentation for developers</li>
+                <li>Includes API references and coding standards</li>
+                <li>Only visible to users with developer role</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>4. Tutorials</h3>
+            <ul>
+                <li>Step-by-step guides for common tasks</li>
+                <li>Visibility depends on the complexity of the task</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>5. Site-Specific Documentation</h3>
+            <ul>
+                <li>Documentation specific to the current site</li>
+                <li>Only visible to users of that site</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>6. Module Documentation</h3>
+            <ul>
+                <li>Documentation for specific system modules</li>
+                <li>Visibility depends on module access permissions</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>7. Controllers Documentation</h3>
+            <ul>
+                <li>Documentation for system controllers</li>
+                <li>Only visible to developers and administrators</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>8. Models Documentation</h3>
+            <ul>
+                <li>Documentation for system models</li>
+                <li>Only visible to developers and administrators</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>9. Changelog</h3>
+            <ul>
+                <li>System changes and updates</li>
+                <li>Only visible to developers and administrators</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>10. Proxmox Documentation</h3>
+            <ul>
+                <li>Documentation for Proxmox virtualization environment</li>
+                <li>Only visible to administrators</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="doc-section">
+        <h2>File Formats</h2>
+        <p>The documentation system supports multiple file formats:</p>
+        
+        <div class="doc-subsection">
+            <h3>1. Template Toolkit (.tt)</h3>
+            <ul>
+                <li>Recommended format for documentation</li>
+                <li>Used for documentation that requires dynamic content</li>
+                <li>Can include variables, conditionals, and other TT features</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>2. Markdown (.md)</h3>
+            <ul>
+                <li>Alternative format for simpler documentation</li>
+                <li>Rendered with syntax highlighting and formatting</li>
+                <li>Less flexible than .tt files but easier to write</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>3. Other Formats</h3>
+            <ul>
+                <li>JSON, HTML, CSS, and other formats are supported</li>
+                <li>Served with appropriate content types</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="doc-section">
+        <h2>Configuration</h2>
+        <p>The documentation system uses a JSON configuration file to manage documentation categories and file paths:</p>
+        
+        <div class="doc-subsection">
+            <h3>1. documentation_config.json</h3>
+            <ul>
+                <li>Located in the <code>Documentation</code> directory</li>
+                <li>Defines documentation categories and their properties</li>
+                <li>Maps documentation keys to file paths</li>
+                <li>Allows for centralized management of documentation structure</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>2. Configuration Structure</h3>
+            <ul>
+                <li>Categories section defines all documentation categories</li>
+                <li>Default paths section maps documentation keys to file paths</li>
+                <li>This structure allows for easy reorganization of documentation</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>3. Updating Configuration</h3>
+            <ul>
+                <li>When adding new documentation, update the configuration file</li>
+                <li>When moving files, update the paths in the configuration</li>
+                <li>Ensure all paths are correct and point to existing files</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="doc-section">
+        <h2>Best Practices</h2>
+        <p>When creating documentation, follow these best practices:</p>
+        
+        <div class="doc-subsection">
+            <h3>1. Proper Placement</h3>
+            <ul>
+                <li>Place documentation in the appropriate directory based on its type</li>
+                <li>Use the site-specific directory for site-specific documentation</li>
+                <li>Use the role-specific directory for role-specific documentation</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>2. Clear Metadata</h3>
+            <ul>
+                <li>Include a clear title, last updated date, and author</li>
+                <li>Specify the status (Active, Draft, Deprecated)</li>
+                <li>Include version information if applicable</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>3. Structured Content</h3>
+            <ul>
+                <li>Use proper HTML structure for .tt files</li>
+                <li>Include a table of contents for longer documents</li>
+                <li>Use code blocks with proper formatting for code examples</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>4. Comprehensive Coverage</h3>
+            <ul>
+                <li>Cover all aspects of the feature or module</li>
+                <li>Include examples and use cases</li>
+                <li>Address common questions and issues</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>5. Regular Updates</h3>
+            <ul>
+                <li>Keep documentation up-to-date with system changes</li>
+                <li>Note the last updated date in the metadata</li>
+                <li>Archive or clearly mark deprecated documentation</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>6. Configuration Management</h3>
+            <ul>
+                <li>Update the documentation_config.json file when adding or moving documentation</li>
+                <li>Ensure all paths in the configuration file are correct</li>
+                <li>Test documentation visibility after configuration changes</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Adding New Documentation</h2>
+        <p>To add new documentation to the system:</p>
+        
+        <div class="doc-subsection">
+            <h3>1. Determine the Type</h3>
+            <p>Is it general, site-specific, role-specific, or module-specific?</p>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>2. Choose the Location</h3>
+            <ul>
+                <li>Place the file in the appropriate directory</li>
+                <li>Use a descriptive filename with the appropriate extension</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>3. Include Metadata</h3>
+            <p>Add title, author, date, and status at the top of the document</p>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>4. Write the Content</h3>
+            <ul>
+                <li>Follow the structured content guidelines</li>
+                <li>Include all necessary information</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>5. Update Configuration</h3>
+            <ul>
+                <li>Add the document to the documentation_config.json file</li>
+                <li>Specify the correct path and category</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>6. Test Visibility</h3>
+            <ul>
+                <li>Verify that the document is visible to the intended audience</li>
+                <li>Check that it appears in the appropriate category</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Accessing Documentation</h2>
+        <p>Users can access documentation through:</p>
+        
+        <div class="doc-subsection">
+            <h3>1. Documentation Index</h3>
+            <ul>
+                <li>Available at <code>/documentation</code></li>
+                <li>Shows all documentation visible to the current user</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>2. Direct URLs</h3>
+            <ul>
+                <li>Access specific documents via <code>/documentation/page_name</code></li>
+                <li>File extensions are optional (e.g., <code>/documentation/user_guide</code> or <code>/documentation/user_guide.md</code>)</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>3. Category Pages</h3>
+            <ul>
+                <li>Access category-specific documentation via <code>/documentation/category/category_name</code></li>
+                <li>Shows all documents in that category visible to the current user</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>4. Search</h3>
+            <ul>
+                <li>Use the documentation search feature to find specific content</li>
+                <li>Searches only within documentation visible to the current user</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Technical Implementation</h2>
+        <p>The documentation system is implemented in the <code>Documentation.pm</code> controller with these key components:</p>
+        
+        <div class="doc-subsection">
+            <h3>1. Scanning Mechanism</h3>
+            <ul>
+                <li>Scans documentation directories on application startup</li>
+                <li>Builds metadata for each documentation file</li>
+                <li>Uses the documentation_config.json file for configuration</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>2. Filtering Logic</h3>
+            <ul>
+                <li>Filters documentation based on user role and site</li>
+                <li>Special case for CSC site admins who can see everything</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>3. Rendering System</h3>
+            <ul>
+                <li>Renders Markdown files with proper formatting</li>
+                <li>Processes Template Toolkit files with the TT view</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>4. Access Control</h3>
+            <ul>
+                <li>Enforces visibility rules based on site and role</li>
+                <li>Provides appropriate error messages for unauthorized access</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>5. Modular Template Structure</h3>
+            <ul>
+                <li>The main <code>index.tt</code> file has been refactored to improve maintainability</li>
+                <li>Each documentation category now has its own separate template file</li>
+                <li>This modular approach makes it easier to update specific sections without affecting others</li>
+                <li>Template includes are used to assemble the complete documentation interface</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Template Structure</h2>
+        <p>The documentation system's template structure has been refactored to improve maintainability and organization:</p>
+        
+        <div class="doc-subsection">
+            <h3>1. Main Index Template</h3>
+            <ul>
+                <li>The main <code>index.tt</code> file now serves as a container for the documentation interface</li>
+                <li>It includes modular template components for different sections</li>
+                <li>This approach reduces complexity and makes the code more maintainable</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>2. Category Templates</h3>
+            <p>Each documentation category has its own dedicated template file. For example:</p>
+            <ul>
+                <li><code>user_guides.tt</code> - Template for user documentation</li>
+                <li><code>admin_guides.tt</code> - Template for administrator documentation</li>
+                <li><code>developer_guides.tt</code> - Template for developer documentation</li>
+                <li><code>tutorials.tt</code> - Template for tutorials</li>
+                <li><code>site_specific.tt</code> - Template for site-specific documentation</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>3. Shared Components</h3>
+            <ul>
+                <li>Common UI elements are extracted into reusable components</li>
+                <li>This includes navigation, search, and filtering controls</li>
+                <li>These components can be included in multiple templates</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>4. Benefits of Modular Structure</h3>
+            <ul>
+                <li>Easier maintenance: Changes to one category don't affect others</li>
+                <li>Better organization: Code is logically grouped by functionality</li>
+                <li>Improved readability: Smaller, focused template files</li>
+                <li>Easier collaboration: Multiple developers can work on different sections</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Debugging</h2>
+        <p>The documentation system includes debugging features to help troubleshoot issues:</p>
+        
+        <div class="doc-subsection">
+            <h3>1. Debug Mode</h3>
+            <ul>
+                <li>Enable debug mode to see detailed information about documentation loading</li>
+                <li>Debug messages are pushed to the stash and displayed in the template</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>2. Logging</h3>
+            <ul>
+                <li>The system logs documentation scanning and categorization</li>
+                <li>Check the application log for errors and warnings</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>3. Configuration Validation</h3>
+            <ul>
+                <li>The system validates the documentation_config.json file</li>
+                <li>Errors in the configuration are logged</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Future Enhancements</h2>
+        <p>Planned enhancements for the documentation system include:</p>
+        
+        <div class="doc-subsection">
+            <h3>1. Improved Search</h3>
+            <ul>
+                <li>Full-text search across all documentation</li>
+                <li>Advanced filtering options</li>
+                <li>Search result highlighting</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>2. Version Control</h3>
+            <ul>
+                <li>Track document versions over time</li>
+                <li>Allow viewing of historical documentation versions</li>
+                <li>Compare changes between versions</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>3. Enhanced Categorization</h3>
+            <ul>
+                <li>Additional metadata for documentation files</li>
+                <li>More flexible categorization options</li>
+                <li>User-defined tags and categories</li>
+            </ul>
+        </div>
+        
+        <div class="doc-subsection">
+            <h3>4. Documentation Analytics</h3>
+            <ul>
+                <li>Track which documentation pages are most viewed</li>
+                <li>Identify documentation gaps based on search queries</li>
+                <li>Improve documentation based on usage patterns</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<style>
+    .documentation-page {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+    }
+    
+    .doc-header {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .doc-header h1 {
+        margin-bottom: 10px;
+        color: #0056b3;
+    }
+    
+    .doc-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        font-size: 0.9em;
+        color: #666;
+    }
+    
+    .doc-section {
+        margin-bottom: 30px;
+    }
+    
+    .doc-section h2 {
+        color: #0056b3;
+        margin-bottom: 15px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .doc-subsection {
+        margin-left: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .doc-subsection h3 {
+        color: #333;
+        margin: 10px 0;
+    }
+    
+    ul, ol {
+        margin-left: 20px;
+        margin-bottom: 15px;
+    }
+    
+    li {
+        margin-bottom: 5px;
+    }
+    
+    code {
+        background: #f4f4f4;
+        padding: 2px 5px;
+        border-radius: 3px;
+        font-family: monospace;
+    }
+</style>

@@ -1,0 +1,110 @@
+=head1 NAME
+
+Comserv::Util::PDFConverter - Convert PDF files to web-viewable content
+
+=head1 DESCRIPTION
+
+This module provides functionality to convert PDF files to web-viewable content.
+It extracts each page as an image and creates HTML files for viewing.
+
+=head1 SYNOPSIS
+
+    use Comserv::Util::PDFConverter;
+    
+    my $converter = Comserv::Util::PDFConverter->new();
+    
+    my $result = $converter->convert_pdf_to_web(
+        pdf_path => '/path/to/file.pdf',
+        output_dir => '/path/to/output',
+        base_name => 'presentation',
+        format => 'jpg',      # optional, default: jpg
+        quality => 85,        # optional, default: 85
+        dpi => 200,           # optional, default: 200
+        width => 1024         # optional, default: no resize
+    );
+    
+    if ($result->{status} eq 'success') {
+        print "Converted PDF: $result->{html_file}\n";
+        print "Metadata file: $result->{metadata_file}\n";
+        print "Number of slides: $result->{slide_count}\n";
+    } else {
+        die "Error: $result->{message}\n";
+    }
+
+=head1 METHODS
+
+=head2 new
+
+Creates a new PDFConverter object.
+
+    my $converter = Comserv::Util::PDFConverter->new();
+
+=head2 convert_pdf_to_web
+
+Converts a PDF file to web-viewable format.
+
+Parameters:
+
+=over 4
+
+=item * C<pdf_path> - Path to the PDF file
+
+=item * C<output_dir> - Directory where output files will be stored
+
+=item * C<base_name> - Base name for output files
+
+=item * C<format> - Image format (jpg or png, default: jpg)
+
+=item * C<quality> - Image quality 1-100 (default: 85)
+
+=item * C<dpi> - DPI for rendering (default: 200)
+
+=item * C<width> - Width to resize images (optional)
+
+=back
+
+Returns a hashref with:
+
+=over 4
+
+=item * C<status> - 'success' or 'error'
+
+=item * C<message> - Description of result or error
+
+=item * C<html_file> - Path to the generated HTML file (if successful)
+
+=item * C<metadata_file> - Path to the generated metadata JSON file (if successful)
+
+=item * C<slide_count> - Number of slides converted (if successful)
+
+=back
+
+=head1 REQUIREMENTS
+
+This module requires the following Perl modules:
+
+=over 4
+
+=item * PDF::API2
+
+=item * PDF::TextBlock
+
+=item * GD
+
+=item * GD::Text
+
+=item * File::Path
+
+=item * File::Spec
+
+=item * JSON
+
+=item * Log::Log4perl
+
+=back
+
+=head1 AUTHOR
+
+Comserv Development Team
+
+=cut

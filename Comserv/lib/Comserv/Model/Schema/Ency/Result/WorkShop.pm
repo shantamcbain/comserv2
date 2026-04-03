@@ -45,6 +45,7 @@ __PACKAGE__->add_columns(
     },
     max_participants => {
         data_type => 'integer',
+        is_nullable => 1,
     },
     status => {
         data_type => 'enum',
@@ -72,6 +73,12 @@ __PACKAGE__->add_columns(
     site_id => {
         data_type => 'integer',
         is_nullable => 1,
+    },
+    registration_fee => {
+        data_type     => 'decimal',
+        size          => [10, 2],
+        default_value => '0.00',
+        is_nullable   => 1,
     },
 );
 

@@ -27,6 +27,9 @@ __PACKAGE__->register_class('AiMessage', 'Comserv::Model::Schema::Ency::Result::
 __PACKAGE__->register_class('ProjectDocumentationMapping', 'Comserv::Model::Schema::Ency::Result::ProjectDocumentationMapping');
 __PACKAGE__->register_class('ApiToken', 'Comserv::Model::Schema::Ency::Result::ApiToken');
 __PACKAGE__->register_class('UserApiKeys', 'Comserv::Model::Schema::Ency::Result::UserApiKeys');
+__PACKAGE__->register_class('SystemLog', 'Comserv::Model::Schema::Ency::Result::SystemLog');
+__PACKAGE__->register_class('HealthAlert', 'Comserv::Model::Schema::Ency::Result::HealthAlert');
+__PACKAGE__->register_class('SiteConfig', 'Comserv::Model::Schema::Ency::Result::SiteConfig');
 
 # Register Workshop system classes
 __PACKAGE__->register_class('WorkshopContent', 'Comserv::Model::Schema::Ency::Result::WorkshopContent');
@@ -34,6 +37,7 @@ __PACKAGE__->register_class('WorkshopEmail', 'Comserv::Model::Schema::Ency::Resu
 __PACKAGE__->register_class('WorkshopRole', 'Comserv::Model::Schema::Ency::Result::WorkshopRole');
 __PACKAGE__->register_class('SiteWorkshop', 'Comserv::Model::Schema::Ency::Result::SiteWorkshop');
 __PACKAGE__->register_class('WorkshopResource', 'Comserv::Model::Schema::Ency::Result::WorkshopResource');
+__PACKAGE__->register_class('WorkshopMailTemplate', 'Comserv::Model::Schema::Ency::Result::WorkshopMailTemplate');
 
 # Register Membership system classes
 __PACKAGE__->register_class('MembershipPlan', 'Comserv::Model::Schema::Ency::Result::MembershipPlan');
@@ -49,6 +53,15 @@ __PACKAGE__->register_class('MembershipPromoCode', 'Comserv::Model::Schema::Ency
 __PACKAGE__->register_class('PaymentTransaction', 'Comserv::Model::Schema::Ency::Result::PaymentTransaction');
 __PACKAGE__->register_class('InternalCurrencyAccount', 'Comserv::Model::Schema::Ency::Result::InternalCurrencyAccount');
 __PACKAGE__->register_class('InternalCurrencyTransaction', 'Comserv::Model::Schema::Ency::Result::InternalCurrencyTransaction');
+
+# Register Inventory system classes
+__PACKAGE__->register_class('InventoryItem', 'Comserv::Model::Schema::Ency::Result::InventoryItem');
+__PACKAGE__->register_class('InventorySupplier', 'Comserv::Model::Schema::Ency::Result::InventorySupplier');
+__PACKAGE__->register_class('InventoryLocation', 'Comserv::Model::Schema::Ency::Result::InventoryLocation');
+__PACKAGE__->register_class('InventoryStockLevel', 'Comserv::Model::Schema::Ency::Result::InventoryStockLevel');
+__PACKAGE__->register_class('InventoryTransaction', 'Comserv::Model::Schema::Ency::Result::InventoryTransaction');
+__PACKAGE__->register_class('InventoryAssignment', 'Comserv::Model::Schema::Ency::Result::InventoryAssignment');
+__PACKAGE__->register_class('InventoryItemSupplier', 'Comserv::Model::Schema::Ency::Result::InventoryItemSupplier');
 
 __PACKAGE__->meta->make_immutable(inline_constructor => 0);
 1;

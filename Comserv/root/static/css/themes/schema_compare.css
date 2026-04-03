@@ -491,6 +491,23 @@
     transform: rotate(90deg);
 }
 
+/* Section and group content collapsed by default */
+.section-content {
+    display: none;
+}
+
+.section-content.expanded {
+    display: block;
+}
+
+.table-group-content {
+    display: none;
+}
+
+.table-group-content.expanded {
+    display: block;
+}
+
 /* Field Comparison Content */
 .field-comparison-content {
     display: none;

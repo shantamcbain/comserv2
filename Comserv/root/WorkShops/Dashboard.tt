@@ -145,7 +145,7 @@
                                     <a href="/workshop/files/[% workshop.id %]" class="btn btn-sm" title="Files">📎 Files</a>
                                     <a href="/workshop/participants/[% workshop.id %]" class="btn btn-sm" title="Participants">👥 People</a>
                                     <a href="/workshop/compose_email/[% workshop.id %]" class="btn btn-sm" title="Email">✉️ Email</a>
-                                    <form method="POST" action="/workshop/delete/[% workshop.id %]" style="display:inline;" onsubmit="return confirm('Delete this workshop? This cannot be undone.');">
+                                    <form method="POST" action="/workshop/delete/[% workshop.id %]" onsubmit="return confirm('Delete this workshop? This cannot be undone.');">
                                         <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                                     </form>
                                 </td>

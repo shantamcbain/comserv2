@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.74' %]
-[% date_iso = '2026/02/21' %]
-[% formatted_date = 'February 21, 2026' %]
+[% version = '0.75' %]
+[% date_iso = '2026/03/20' %]
+[% formatted_date = 'March 20, 2026' %]
 [% time = '16:30:00' %]
-[% change_log = 'Users: 3-Step Self-Registration COMPLETE - Refactored existing register.tt and do_create_account, created VerifyEmail.tt and CompleteProfile.tt (PascalCase). Clean URLs (/register, /verify_email, /complete_profile). Reused existing code, deleted duplicates. Phase 2 in progress. Next: Enhanced login (email/username support).' %]
+[% change_log = 'Planning System Migration: DB-driven model now live for all sites via DailyPlan.tt. Non-CSC sites see DB plans only. CSC sees DB plans + this legacy text section. SiteName-based access controls implemented. Plan creation form live at /admin/plan/create. Normal/user/editor roles now have planning access. NEXT: migrate remaining text groups below into DB records, then remove text section entirely.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -140,7 +140,87 @@ last_updated = '2026/02/08'
 </style>
 
 <div class="container">
-    <h1>Planning </h1>
+    <h1>Planning (CSC — Legacy Text View)</h1>
+
+    <!-- YOU ARE HERE banner -->
+    <div style="background:#cce5ff;border:1px solid #004085;border-radius:6px;padding:10px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:0.9em;">
+            <strong>📍 YOU ARE HERE:</strong>
+            Step 3 of 7 — <em>Refactor MasterPlanCoordination to coordinator-only role</em> &nbsp;·&nbsp;
+            <a href="#anchor-planning-system-project" style="color:#004085;font-weight:bold;">View full plan status ↓</a>
+        </span>
+        <span style="font-size:0.82em;color:#004085;">
+            Branch: <code>planningsystem-59ae</code> &nbsp;·&nbsp;
+            <a href="/Documentation/DailyPlan#planning" style="color:#004085;">Back to DB view</a>
+        </span>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         MIGRATION STATUS — March 2026
+         This section is ONLY visible to CSC users. All other sites now
+         see the DB-driven plan list at the top of the PLANNING tab.
+         Goal: migrate all groups below into DB records, then delete this file.
+    ═══════════════════════════════════════════════════════════════ -->
+    <div style="background:#fff3cd;border:2px solid #ffc107;border-radius:6px;padding:14px 18px;margin-bottom:18px;">
+        <strong>⚠️ LEGACY TEXT PLANNING — BEING MIGRATED</strong>
+        <p style="margin:6px 0 0;">This text-based planning view is <strong>CSC-admin-only</strong> and is being replaced by the DB-driven plan list above.
+        Non-CSC sites (BMaster, Shanta, etc.) no longer see this section — they use the database model only.
+        The goal is to enter each project/plan below into the database, then remove this entire section.</p>
+        <p style="margin:6px 0 0;">
+            <strong>Current migration progress:</strong>
+            <span style="background:#28a745;color:#fff;padding:1px 7px;border-radius:3px;font-size:0.85em;">DB Model LIVE ✓</span>
+            <span style="background:#ffc107;color:#333;padding:1px 7px;border-radius:3px;font-size:0.85em;">Migrating projects ⏳</span>
+            <span style="background:#6c757d;color:#fff;padding:1px 7px;border-radius:3px;font-size:0.85em;">Remove text view 🔜</span>
+        </p>
+        <p style="margin:8px 0 0;font-size:0.9em;">
+            <strong>What "Start Next Step" means:</strong>
+            The Zenflow task listed for each group has phases. "Start Next Step" = the next unchecked phase box in that group's task plan.
+            Before starting, verify: (1) all previous phase boxes are ✅, (2) no blocking dependencies are open,
+            (3) the feature branch for that task is active (check port assignments in Active Zenflow Workflows below).
+        </p>
+    </div>
+
+    <!-- HOW TO ADD A PLAN (Plan vs Project) -->
+    <details style="background:var(--secondary-color);border:1px solid var(--border-color);border-radius:6px;padding:0;margin-bottom:18px;">
+        <summary style="padding:12px 16px;cursor:pointer;font-weight:bold;">📖 How to Add a Plan — Plan vs Project (click to expand)</summary>
+        <div style="padding:14px 16px;font-size:0.93em;line-height:1.6;">
+            <h4 style="margin-top:0;">Plan vs Project — what's the difference?</h4>
+            <table style="border-collapse:collapse;width:100%;font-size:0.92em;">
+                <thead>
+                    <tr style="background:var(--primary-color);color:#fff;">
+                        <th style="padding:8px 12px;text-align:left;">Concept</th>
+                        <th style="padding:8px 12px;text-align:left;">Plan</th>
+                        <th style="padding:8px 12px;text-align:left;">Project</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">What it is</td>
+                        <td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">A time-boxed focus sprint or theme (e.g. "Q2 Hive Expansion")</td>
+                        <td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">A deliverable system or feature (e.g. "Planning System", "AI Chat")</td></tr>
+                    <tr><td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">Answers</td>
+                        <td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">"What are we focusing on right now?"</td>
+                        <td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">"What are we building?"</td></tr>
+                    <tr><td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">Scoped to</td>
+                        <td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">SiteName, has priority + status + dates</td>
+                        <td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">Has project code, developer, todos</td></tr>
+                    <tr><td style="padding:6px 12px;">Linked via</td>
+                        <td style="padding:6px 12px;" colspan="2">Many-to-many <code>daily_plan_projects</code> join table — one plan can span multiple projects</td></tr>
+                </tbody>
+            </table>
+            <h4 style="margin-top:14px;">Steps to add a Plan (DB-driven):</h4>
+            <ol style="margin:0;padding-left:20px;">
+                <li>Click <strong>+ New Plan</strong> at the top of the PLANNING tab (or go to <a href="/admin/plan/create">/admin/plan/create</a>).</li>
+                <li>Fill in: <strong>Plan Name</strong> (required), Description, Status (active/paused/completed), Priority (1=highest), Start Date, Due Date.</li>
+                <li>The plan is automatically scoped to your <strong>SiteName</strong> — CSC admins can see all sites; other admins see only their own.</li>
+                <li>After saving, add <strong>Todos</strong> to the plan via the Todo System (<a href="/todo/addtodo">/todo/addtodo</a>) — link the todo to the plan.</li>
+                <li>To add a <strong>Project</strong> to the plan, use the project DB (<a href="/project">/project</a>) and associate via <code>daily_plan_projects</code>.</li>
+            </ol>
+            <p style="margin:10px 0 0;font-size:0.88em;color:var(--text-muted-color);">
+                <strong>Routes:</strong> Admin access via <code>/admin</code> | User profile &amp; role info at <code>/user/profile</code> |
+                Roles with planning access: admin, developer, devops, editor, user, normal (all above member).
+            </p>
+        </div>
+    </details>
 
     <div class="row">
         <div class="col-12">
@@ -148,6 +228,13 @@ last_updated = '2026/02/08'
             <details class="nav-jump" open>
                 <summary>🎯 Quick Jump to Priority (Click to Toggle)</summary>
                 <div class="jump-links-container">
+                    <div class="jump-line" style="background:#d4edda;padding:4px 8px;border-radius:3px;margin-bottom:6px;">
+                        <strong>📅 <a href="/Documentation/DailyPlan#planning" class="jump-link">DB-Driven Plans (live)</a></strong>:
+                        <a href="/admin/plan/create" class="jump-link">+ New Plan</a> |
+                        <a href="/Documentation/DailyPlan#planning" class="jump-link">View All Plans</a> |
+                        <a href="/todo" class="jump-link">Todo System</a> |
+                        <a href="/todo/addtodo" class="jump-link">+ Add Todo</a>
+                    </div>
                     <div class="jump-line">
                         <strong><a href="#group-docker-k8s" class="jump-link">🐳 Docker and K8s Management</a></strong>:
                         <a href="#anchor-project-config-test" class="jump-link">ProjectConfig</a>
@@ -168,17 +255,16 @@ last_updated = '2026/02/08'
                         <a href="#anchor-priority-3" class="jump-link">UpdateFormat</a>
                     </div>
                     <div class="jump-line">
-                        <strong><a href="#group-planning" class="jump-link">📅 Planning System</a></strong>:
-                        <a href="#planning-system-project" class="jump-link">ProjectDetails</a> |
-                        <a href="#all-projects-list" class="jump-link">AllProjects</a> |
-                        <a href="#anchor-phase0-complete" class="jump-link">Phase0</a> |
-                        <a href="#anchor-phase1" class="jump-link">Phase1</a> |
-                        <a href="#anchor-phase2" class="jump-link">Phase2</a> |
-                        <a href="#anchor-dailyplan-improvements" class="jump-link">DailyPlanUI</a> |
-                        <a href="#anchor-dynamic-daily" class="jump-link">DynamicDailyView</a> |
-                        <a href="#anchor-priority-12" class="jump-link">ThemeSync</a> |
-                        <a href="#anchor-priority-5" class="jump-link">CriticalFlagging</a> |
-                        <a href="#anchor-priority-6" class="jump-link">IntegrateTodo</a>
+                        <strong><a href="#group-planning" class="jump-link">📅 Planning System</a></strong>
+                        <span style="background:#28a745;color:#fff;padding:0 5px;border-radius:3px;font-size:0.8em;">DB LIVE</span>:
+                        <a href="#anchor-planning-system-project" class="jump-link">ProjectDetails</a> |
+                        <a href="#anchor-all-projects-list" class="jump-link">AllProjects</a> |
+                        <a href="#anchor-phase1" class="jump-link">DBEnvMgmt⏳</a> |
+                        <a href="#anchor-phase2" class="jump-link">SchemaModels🔜</a> |
+                        <a href="#anchor-priority-5" class="jump-link">PlanController🔜</a> |
+                        <a href="#anchor-dailyplan-improvements" class="jump-link">DailyPlanUI🔜</a> |
+                        <a href="#anchor-priority-6" class="jump-link">IntegrateTodo🔜</a> |
+                        <a href="/Documentation/DailyPlan" class="jump-link">DynamicView↗</a>
                     </div>
                     <div class="jump-line">
                         <strong><a href="#group-sync" class="jump-link">🔄 Synchronization & Standards</a></strong>:
@@ -218,10 +304,6 @@ last_updated = '2026/02/08'
                         <strong><a href="#group-todo" class="jump-link">✅ Todo System</a></strong>:
                         <a href="#anchor-todo-plan" class="jump-link">TodoSystemUpdate</a>
                     </div>
-                    <div class="jump-line">
-                        <strong><a href="#css-themes-workflow" class="jump-link">🎨 CSS Themes</a></strong>:
-                        <a href="#css-themes-workflow" class="jump-link">ThemeWorkflow</a>
-                    </div>
                 </div>
             </details>
         </div>
@@ -248,6 +330,7 @@ last_updated = '2026/02/08'
                 <li><strong>Users:</strong> <a href="[% base_url %]4005/user/dashboard" target="_blank">users-e5b8</a> <em>(port 4005)</em> - User & Admin Management System with Email Verification and Role Management</li>
                 <li><strong>ProjectConfig:</strong> <a href="[% base_url %]3000/Documentation/DailyPlan" target="_blank">set-up-project-config-d327</a> <em>(ports 3000, 5000)</em> - Zenflow Project Configuration & Docker Container Testing</li>
                 <li><strong>FileManagement:</strong> <a href="[% base_url %]4006/admin/planning" target="_blank">new-task-bb05</a> <em>(port 4006)</em> - NFS-backed File Management System with multi-tier access control, duplicate detection, and workshop file sharing across SiteNames</li>
+                <li><strong>UnifiedMailSystem:</strong> <a href="[% base_url %]4007/Documentation/DailyPlan" target="_blank">unified-mail-system-site-managed-2c53</a> <em>(port 4007)</em> - Unified Mail System — Site-Managed SMTP with PMG + Harper Integration</li>
             </ul>
             
             <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 10px; margin-top: 10px;">
@@ -255,14 +338,6 @@ last_updated = '2026/02/08'
             </div>
         </div>
     </details>
-
-    <div id="anchor-dynamic-daily" class="nav-anchor"></div>
-    <div id="dynamic-daily" class="doc-section">
-        <h2>Dynamic Daily Tasks</h2>
-        <div class="dynamic-container">
-            [% INCLUDE 'todo/day.tt' %]
-        </div>
-    </div>
 
     <div id="planning" class="doc-section">
         <h2>Planning lists</h2>
@@ -564,10 +639,103 @@ last_updated = '2026/02/08'
             </details>
 
             <div id="anchor-priority-schema" class="nav-anchor"></div>
-            <details id="priority-schema-system" class="priority-container">
-                <summary class="priority-summary">📊 Schema System Plan & Enhancements</summary>
+            <details id="priority-schema-system" class="priority-container" open>
+                <summary class="priority-summary">📊 Schema Management System Enhancement</summary>
                 <div class="priority-content">
-                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span></p>
+                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Current Step:</strong> Requirements ✅ Complete</p>
+                    <p><strong>Overall Progress:</strong> 25% (1 of 4 workflow steps complete)</p>
+                    
+                    <h4>🎯 Project Overview</h4>
+                    <p>Enhance the existing database schema management system to provide comprehensive tools for managing all databases used by the Comserv application. Fix critical bugs, add missing features (API, CLI, table renaming, multi-site support, Result file editor), and improve navigation and documentation.</p>
+                    
+                    <h4>📋 Workflow Steps</h4>
+                    <ul>
+                        <li>✅ <strong>Step 1: Requirements</strong> - COMPLETED (2026-02-05)
+                            <ul>
+                                <li>Created comprehensive PRD at <code>.zenflow/tasks/schema-managment-system-7eb3/requirements.md</code></li>
+                                <li>Analyzed existing codebase (SchemaComparison.pm, RemoteDB.pm, schema_compare.tt)</li>
+                                <li>Documented 5 critical bugs to fix and 6 major features to add</li>
+                                <li>Added workflow tracking requirements (Section 3.6)</li>
+                            </ul>
+                        </li>
+                        <li>🔄 <strong>Step 2: Technical Specification</strong> - PENDING
+                            <ul>
+                                <li>Define implementation approach</li>
+                                <li>Design API endpoints and CLI tool architecture</li>
+                                <li>Plan database schema changes if needed</li>
+                                <li>Deliverable: <code>spec.md</code></li>
+                            </ul>
+                        </li>
+                        <li>⏭️ <strong>Step 3: Planning</strong> - NOT STARTED
+                            <ul>
+                                <li>Break down work into concrete implementation tasks</li>
+                                <li>Estimate time and dependencies</li>
+                                <li>Create detailed task list</li>
+                            </ul>
+                        </li>
+                        <li>⏭️ <strong>Step 4: Implementation</strong> - NOT STARTED
+                            <ul>
+                                <li>Execute planned tasks</li>
+                                <li>Run tests and validation</li>
+                                <li>Update documentation</li>
+                            </ul>
+                        </li>
+                    </ul>
+                    
+                    <h4>🔧 Problems to Fix (Critical Bugs)</h4>
+                    <ul>
+                        <li><strong>P1:</strong> Creating field in Result file shows "no result file" until manual refresh (DBIx::Class schema reload issue)</li>
+                        <li><strong>P2:</strong> System shows "Total Databases: 2" but only displays one (192.168.1.198) - missing configured servers</li>
+                        <li><strong>P3:</strong> Missing pages (Result editor, table manager, API explorer, CLI interface)</li>
+                        <li><strong>P4:</strong> Poor navigation in admin interface</li>
+                        <li><strong>P5:</strong> Insufficient documentation in /Documentation/ system</li>
+                    </ul>
+                    
+                    <h4>✨ Features to Add</h4>
+                    <ul>
+                        <li><strong>F1:</strong> REST API and CLI tool for AI/automation</li>
+                        <li><strong>F2:</strong> Table renaming with automatic relationship updates</li>
+                        <li><strong>F3:</strong> Create database tables from Result files</li>
+                        <li><strong>F4:</strong> Multi-site database isolation (private copies per site)</li>
+                        <li><strong>F5:</strong> Browser-based Result file editor with syntax highlighting</li>
+                        <li><strong>F6:</strong> Workflow tracking in DailyPlan.tt and Planning.tt (this document)</li>
+                    </ul>
+                    
+                    <h4>📁 Artifacts & Links</h4>
+                    <ul>
+                        <li><a href="/Documentation/AI_ASSISTANTS_IDE_INTEGRATION_AUDIT.md">Requirements Document (PRD)</a> - <code>.zenflow/tasks/schema-managment-system-7eb3/requirements.md</code></li>
+                        <li><a href="/admin/schema_compare">Current Schema Compare Interface</a> - Working baseline</li>
+                        <li>Source: <code>Comserv/lib/Comserv/Controller/Admin/SchemaComparison.pm</code> (1816 lines, extensive sync logic)</li>
+                        <li>Template: <code>Comserv/root/admin/schema_compare.tt</code> (1716 lines, field comparison UI)</li>
+                        <li>DB Config: <code>Comserv/db_config.template.json</code> (multi-server support)</li>
+                    </ul>
+                    
+                    <h4>🔗 Code Reuse Strategy</h4>
+                    <p>Maximum leverage of existing code from SchemaComparison.pm:</p>
+                    <ul>
+                        <li><code>sync_table_to_result</code>, <code>sync_result_to_table</code> - Bidirectional sync</li>
+                        <li><code>create_result_from_table</code>, <code>create_table_from_result</code> - Creation operations</li>
+                        <li><code>get_all_result_files</code> - Result file scanning</li>
+                        <li>RemoteDB.pm - Multi-server connection management</li>
+                    </ul>
+                    
+                    <h4>⏱️ Timeline Estimate</h4>
+                    <ul>
+                        <li>Requirements: ✅ Complete (2 hours actual)</li>
+                        <li>Technical Spec: 3-4 hours (estimated)</li>
+                        <li>Planning: 2-3 hours (estimated)</li>
+                        <li>Implementation: 20-30 hours (estimated, depends on feature prioritization)</li>
+                    </ul>
+                    
+                    <h4>🎯 Success Criteria</h4>
+                    <ul>
+                        <li>All 5 critical bugs fixed and validated</li>
+                        <li>API endpoints functional and documented (OpenAPI/Swagger)</li>
+                        <li>CLI tool working with basic commands</li>
+                        <li>Multi-site support tested with 2+ sites</li>
+                        <li>Result file editor saves without errors</li>
+                        <li>Documentation complete in /Documentation/ system</li>
+                    </ul>
                 </div>
             </details>
 
@@ -687,12 +855,12 @@ last_updated = '2026/02/08'
                                 <li>⏳ Verify database entries and Planning.tt rendering</li>
                             </ul>
                         </li>
-                        <li><strong>Phase 1: Domain Detection Middleware</strong> (ID 159) - <span class="status-pending">PENDING</span>
+                        <li><strong>Phase 1: Domain Detection Middleware</strong> (ID 159) - <span class="status-completed">COMPLETED</span>
                             <ul>
-                                <li>Create domain configuration file</li>
-                                <li>Implement ApiDomainDetector middleware</li>
-                                <li>Register middleware in Catalyst</li>
-                                <li>Write unit tests</li>
+                                <li>✅ Create domain configuration file (<code>Comserv/config/api_domains.json</code>)</li>
+                                <li>✅ Implement <code>ApiDomainDetector</code> utility (<code>Comserv/Util/ApiDomainDetector.pm</code>)</li>
+                                <li>✅ No Catalyst registration needed — utility pattern (like ApiTokenValidator)</li>
+                                <li>✅ Write unit tests (<code>t/util/api_domain_detector.t</code>)</li>
                             </ul>
                         </li>
                         <li><strong>Phase 2: Controller Refactoring</strong> (ID 160) - <span class="status-pending">PENDING</span>
@@ -710,11 +878,13 @@ last_updated = '2026/02/08'
                                 <li>Test external access</li>
                             </ul>
                         </li>
-                        <li><strong>Phase 4: CLI Tool Development</strong> (ID 162) - <span class="status-pending">PENDING</span>
+                        <li><strong>Phase 4: CLI Tool Development</strong> (ID 162) - <span class="status-inprogress">IN PROGRESS</span>
                             <ul>
-                                <li>Create CLI script structure</li>
-                                <li>Implement CLI commands</li>
-                                <li>Add authentication support</li>
+                                <li>✅ Create <code>~/.comserv/credentials</code> (chmod 600) with API token + api_url</li>
+                                <li>✅ Create <code>Comserv::Util::ApiCredentials</code> — reads credentials file with env var overrides</li>
+                                <li>✅ Generate CLI Development Token (DB id=1, expires 2027-03-24)</li>
+                                <li>Create CLI script (<code>Comserv/script/comserv-api-cli</code>)</li>
+                                <li>Implement CLI commands (todos list, todo create/get/update, project get)</li>
                                 <li>Implement output formatting and error handling</li>
                                 <li>Test all CLI commands</li>
                             </ul>
@@ -793,9 +963,108 @@ last_updated = '2026/02/08'
             <summary class="group-header">📅 Planning System</summary>
             <div class="priority-content">
 
-            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0 COMPLETE</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
-            <p><strong>Zenflow Task:</strong> <code>new-task-3cda</code> (port 4000) | <strong>Branch:</strong> <code>new-task-3cda</code></p>
-            <p><em>Note: Planning System project not yet created in database. Create project record and update this section with project ID.</em></p>
+            <!-- ═══════════════════════════════════════
+                 PROJECT DETAILS & CURRENT PLAN STATUS
+                 Mirrors plan.md (planningsystem-59ae)
+            ═══════════════════════════════════════ -->
+            <div id="anchor-planning-system-project" class="nav-anchor"></div>
+            <div style="background:var(--bg-secondary);border:1px solid var(--primary-color);border-radius:6px;padding:16px;margin-bottom:18px;">
+                <h3 style="margin:0 0 8px;font-size:1.1em;">📋 Planning System — Project Summary</h3>
+                <p style="margin:0 0 10px;font-size:0.92em;">
+                    <strong>Goal:</strong> Migrate all planning from text-based .tt files to a fully DB-driven system with SiteName-based access controls,
+                    role-based visibility, developer time logging, and a points-based payment system. Each SiteName gets its own plan view.
+                    CSC retains access to this legacy text section during migration; all other sites see DB plans only.
+                </p>
+                <p style="margin:0 0 6px;font-size:0.88em;">
+                    <strong>Zenflow task:</strong> <code>planningsystem-59ae</code> |
+                    <strong>Branch:</strong> <code>planningsystem-59ae</code> (port 4001) |
+                    <strong>Priority:</strong> HIGH |
+                    <a href="/Documentation" style="color:var(--primary-color);">All Docs</a> |
+                    <a href="/Documentation/MasterPlanCoordination" style="color:var(--primary-color);">Master Plan</a>
+                </p>
+
+                <!-- BRANCHES TO CONSOLIDATE -->
+                <details style="margin:10px 0 0;">
+                    <summary style="cursor:pointer;font-size:0.88em;font-weight:bold;color:var(--text-muted-color);">🔀 Branch Consolidation Status</summary>
+                    <div style="font-size:0.85em;padding:8px 0 0;line-height:2;">
+                        <span style="background:#28a745;color:#fff;padding:1px 6px;border-radius:3px;">merged</span> <code>cssthemes-9195</code> — CSS themes<br>
+                        <span style="background:#ffc107;color:#333;padding:1px 6px;border-radius:3px;">coordinate</span> <code>membership-1304</code> — roles/membership (needed for role-based access docs step)<br>
+                        <span style="background:#ffc107;color:#333;padding:1px 6px;border-radius:3px;">coordinate</span> <code>aichatsystem-ef4e</code> — AI chat (port 4001 originally)<br>
+                        <span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">handoff</span> pointsystem (new branch) — Developer points &amp; payments step<br>
+                        <span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">handoff</span> <code>api-bc05</code> — API work (independent)<br>
+                    </div>
+                </details>
+
+                <!-- CURRENT PLAN STEPS (mirrors plan.md planningsystem-59ae) -->
+                <h4 style="margin:16px 0 8px;font-size:0.95em;">📌 Plan Steps — Current State</h4>
+                <table style="width:100%;border-collapse:collapse;font-size:0.88em;">
+                    <thead>
+                        <tr style="background:var(--primary-color);color:#fff;">
+                            <th style="padding:6px 10px;text-align:left;width:30%;">Step</th>
+                            <th style="padding:6px 10px;text-align:left;width:15%;">Status</th>
+                            <th style="padding:6px 10px;text-align:left;">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom:1px solid var(--border-color);">
+                            <td style="padding:6px 10px;font-weight:bold;">1. Implementation</td>
+                            <td style="padding:6px 10px;"><span style="background:#28a745;color:#fff;padding:1px 6px;border-radius:3px;">✅ DONE</span></td>
+                            <td style="padding:6px 10px;">SiteName access gates, DB plan list in DailyPlan.tt, 'normal' role, plan create form, UserSiteRole login merge</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border-color);background:var(--bg-secondary);">
+                            <td style="padding:6px 10px;font-weight:bold;">2. Migrate DailyPlan.tt to DB coordinator</td>
+                            <td style="padding:6px 10px;"><span style="background:#28a745;color:#fff;padding:1px 6px;border-radius:3px;">✅ DONE</span></td>
+                            <td style="padding:6px 10px;">
+                                ✅ SiteName routing, CSC-only tabs wrapped<br>
+                                ✅ DB active_priorities live (replaces hardcoded lists)<br>
+                                ✅ Gantt tab added (all sites); | json filter fixed<br>
+                                ✅ Stale text tabs removed; Phase 0 collapsed with DB migration note<br>
+                                ✅ Hash→tab JS: quick links now auto-switch to correct tab<br>
+                                ✅ Sub-project accordion in Planning tab (todo 510)<br>
+                                ✅ Plan-project link form + /admin/plan/link_project route (todo 511)
+                            </td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border-color);">
+                            <td style="padding:6px 10px;">3. Refactor MasterPlanCoordination</td>
+                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
+                            <td style="padding:6px 10px;">Coordinator-only role; link to DB records. Blocked by: step 2 complete.</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border-color);background:var(--bg-secondary);">
+                            <td style="padding:6px 10px;">4. Role-Based Access Documentation</td>
+                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
+                            <td style="padding:6px 10px;">Role matrix: CSC admin → all, SiteName admin → own site. Coordinate with <code>membership-1304</code>.</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border-color);">
+                            <td style="padding:6px 10px;">5. DB Schema verification</td>
+                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
+                            <td style="padding:6px 10px;">Verify <code>dailyplan</code>, <code>dailyplan_entry</code> tables in production. Update DocumentationConfig.json.</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border-color);background:var(--bg-secondary);">
+                            <td style="padding:6px 10px;">6. Developer Points &amp; Payments</td>
+                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
+                            <td style="padding:6px 10px;">4 new DB tables, PointsLedger utility, hooks into Todo/Plan create. Handoff to <code>pointsystem-XXXX</code> branch.</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border-color);">
+                            <td style="padding:6px 10px;">7. Test &amp; Verify</td>
+                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
+                            <td style="padding:6px 10px;">Manual tests: CSC text+DB, non-CSC DB-only, plan creation, role access, points system.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div style="margin-top:12px;padding:10px 14px;background:#d4edda;border:1px solid #28a745;border-radius:4px;font-size:0.9em;">
+                    <strong>▶ Next: Step 3 — Refactor MasterPlanCoordination</strong>
+                    <ul style="margin:6px 0 0;padding-left:18px;line-height:1.8;">
+                        <li>Remove inline task detail from <code>MasterPlanCoordination.tt</code></li>
+                        <li>Replace with links to individual plan files / DB records</li>
+                        <li>Add dependency list (#11 Architecture Phase 2 as blocker)</li>
+                        <li>Coordinate with <code>membership-1304</code> branch for role definitions</li>
+                    </ul>
+                </div>
+            </div>
+
+            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS — Step 3 of 7 (Step 2 DONE)</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
+            <p><strong>Zenflow Task:</strong> <code>planningsystem-59ae</code> (port 4001) | <strong>Branch:</strong> <code>planningsystem-59ae</code></p>
 
             <p><strong>Objective:</strong> Migrate planning system from text-based files to database-driven dynamic system with role-based access control, audit trails, and integration with project management.</p>
 
@@ -939,12 +1208,17 @@ last_updated = '2026/02/08'
                 <p style="color: #d9534f;"><strong>Error:</strong> Unable to fetch Planning System project from database. [% error.info %]</p>
             [% END %]
 
-            <h4>🚀 Implementation Workflow: Phases P0-P14 (Text-Based Detail View)</h4>
-            <p><em>Note: These text-based phase details are maintained for reference. Once Planning System project is created in database, the container above will show the database-driven version alongside these details.</em></p>
+            <h4>🚀 Implementation Workflow: Phases P0-P14 (Text Reference — being migrated to DB)</h4>
+            <p style="background:#d4edda;border:1px solid #28a745;border-radius:4px;padding:8px 12px;font-size:0.9em;">
+                <strong>📊 DB-tracked:</strong> These phases are now tracked as DB todos 502–516 under
+                <a href="/project/details?project_id=138" style="color:#155724;">Planning System project (id=138)</a> →
+                sub-projects 186–190. View them via the <a href="/Documentation/DailyPlan#planning" style="color:#155724;">PLANNING tab</a>.
+                As each phase is completed and verified in DB, its text section below will be removed.
+            </p>
 
             <div id="anchor-phase0-complete" class="nav-anchor"></div>
             <!-- Phase 0: Planning System Analysis & Integration Mapping -->
-            <details class="phase-container" style="margin: 15px 0; border: 2px solid #4CAF50; padding: 10px; background: #e8f5e9;" open>
+            <details class="phase-container" style="margin: 15px 0; border: 2px solid #4CAF50; padding: 10px; background: #e8f5e9;">
                         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
                             ✅ Phase 0: Planning System Analysis & Integration Mapping (COMPLETE)
                         </summary>
@@ -1073,6 +1347,7 @@ last_updated = '2026/02/08'
                     </details>
 
                     <!-- Phase 5: Plan Controller -->
+                    <div id="anchor-priority-5" class="nav-anchor"></div>
                     <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
                         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
                             ⏳ Phase 5: Plan Controller (PENDING)
@@ -1097,6 +1372,7 @@ last_updated = '2026/02/08'
                     </details>
 
                     <!-- Phase 6: Daily Plan Template -->
+                    <div id="anchor-dailyplan-improvements" class="nav-anchor"></div>
                     <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
                         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
                             ⏳ Phase 6: Daily Plan Template (PENDING)
@@ -1209,6 +1485,7 @@ last_updated = '2026/02/08'
                     </details>
 
                     <!-- Phase 11: Todo Controller Integration -->
+                    <div id="anchor-priority-6" class="nav-anchor"></div>
                     <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
                         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
                             ⏳ Phase 11: Todo Controller Integration (PENDING)
@@ -2291,15 +2568,15 @@ last_updated = '2026/02/08'
                                 </div>
                             </div>
                             
-                            <div class="project-description" style="background: #fff; padding: 15px; border-left: 4px solid #007bff; margin-bottom: 15px;">
-                                <h4 style="margin-top: 0;">Project Description</h4>
-                                <div style="white-space: pre-wrap; font-family: monospace; font-size: 0.9em; line-height: 1.6;">
+                            <div class="project-description content-section">
+                                <h4>Project Description</h4>
+                                <div class="code-block" style="white-space: pre-wrap; line-height: 1.6;">
 [% project.description %]
                                 </div>
                             </div>
                             
                             [% IF project.comments %]
-                            <div class="project-comments" style="background: #fffbea; padding: 10px; border-left: 4px solid #ffc107; margin-bottom: 15px; font-size: 0.9em;">
+                            <div class="project-comments alert alert-warning" style="font-size: 0.9em;">
                                 <strong>📝 Notes:</strong> [% project.comments %]
                             </div>
                             [% END %]
@@ -2621,107 +2898,10 @@ last_updated = '2026/02/08'
         <p><strong>API returns 401:</strong> Check token validity.</p>
     </div>
 
-    <!-- ============================================================
-         CSS THEMES WORKFLOW
-         ============================================================ -->
-    <div id="css-themes-workflow" class="doc-section">
-        <h2>CSS Themes System — Workflow &amp; Planning</h2>
-        <p>
-            This section records the planning and implementation workflow for the CSS Theme Management system.
-            For the end-user admin guide see
-            <a href="[% c.uri_for('/Documentation/CssThemes') %]">CssThemes documentation</a>
-            or click <em>View Documentation</em> from the Theme Management page.
-        </p>
-
-        <details class="priority-item" open>
-            <summary class="priority-summary">CSS Theme System — Feature Overview &amp; Goals</summary>
-            <div class="priority-content">
-                <h4>Objective</h4>
-                <p>Allow the SiteName admin to manage the visual appearance of their site entirely from within the browser — no SSH, no file editing, no deployment required.</p>
-
-                <h4>Key Capabilities</h4>
-                <ul>
-                    <li><strong>Choose</strong> — Pick any of the pre-installed themes (default, CSC, APIS, USBM, MCoop, dark, ve7tit) and apply it with one click.</li>
-                    <li><strong>Modify</strong> — Edit the CSS variables or raw CSS of an existing theme using the interactive editor or the raw CSS textarea, with a live preview.</li>
-                    <li><strong>Create</strong> — Build a brand-new theme via the Theme Creator form (full variable control + live preview) or the Quick Custom Theme colour-picker shortcut.</li>
-                    <li><strong>Document</strong> — In-system admin guide (<code>admin/documentation/CssThemes.tt</code>) accessible directly from the Theme Management page.</li>
-                </ul>
-
-                <h4>Implementation Summary</h4>
-                <table class="table table-sm table-bordered">
-                    <thead class="table-light">
-                        <tr><th>Component</th><th>File</th><th>Change</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Theme Config Model</td>
-                            <td><code>Comserv/lib/Comserv/Model/ThemeConfig.pm</code></td>
-                            <td>Added <code>set_site_theme</code>, <code>create_theme</code>, <code>generate_all_theme_css</code>, <code>_write_theme_css</code>, <code>update_theme</code> methods.</td>
-                        </tr>
-                        <tr>
-                            <td>Admin Theme Controller</td>
-                            <td><code>Comserv/lib/Comserv/Controller/Admin/Theme.pm</code></td>
-                            <td>Added <code>create_theme</code> (GET/POST) and <code>details</code> routes. Fixed <code>create_custom_theme</code> call signature.</td>
-                        </tr>
-                        <tr>
-                            <td>Theme Index Template</td>
-                            <td><code>Comserv/root/admin/theme/index.tt</code></td>
-                            <td>Replaced with a 4-step workflow UI: Choose → Modify → Create → Apply.</td>
-                        </tr>
-                        <tr>
-                            <td>Create Theme Template</td>
-                            <td><code>Comserv/root/admin/theme/create_theme.tt</code></td>
-                            <td>New full-featured theme creation form with live colour preview.</td>
-                        </tr>
-                        <tr>
-                            <td>Admin Documentation</td>
-                            <td><code>Comserv/root/admin/documentation/CssThemes.tt</code></td>
-                            <td>New in-system admin guide covering all four workflow steps, variable reference, and FAQ.</td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <h4>URL Map</h4>
-                <table class="table table-sm table-bordered table-striped">
-                    <thead class="table-light">
-                        <tr><th>URL</th><th>Method</th><th>Purpose</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr><td><code>/admin/theme</code></td><td>GET</td><td>Theme Management dashboard</td></tr>
-                        <tr><td><code>/admin/theme/update</code></td><td>POST</td><td>Apply existing theme to current site</td></tr>
-                        <tr><td><code>/admin/theme/create</code></td><td>GET / POST</td><td>Create brand-new theme</td></tr>
-                        <tr><td><code>/admin/theme/create_custom</code></td><td>POST</td><td>Quick custom theme (colour pickers)</td></tr>
-                        <tr><td><code>/admin/theme/edit/$theme</code></td><td>GET / POST</td><td>Raw CSS editor</td></tr>
-                        <tr><td><code>/admin/theme/edit_css_interactive/$theme</code></td><td>GET / POST</td><td>Interactive CSS editor with live preview</td></tr>
-                        <tr><td><code>/admin/theme/update_css/$theme</code></td><td>POST</td><td>Save raw CSS changes</td></tr>
-                        <tr><td><code>/admin/theme/details/$theme</code></td><td>GET</td><td>View theme details &amp; metadata</td></tr>
-                    </tbody>
-                </table>
-
-                <h4>Data Storage</h4>
-                <ul>
-                    <li><strong>Theme definitions</strong> — <code>Comserv/root/static/config/theme_definitions.json</code> (JSON; contains <code>themes</code> map and <code>site_themes</code> map).</li>
-                    <li><strong>Compiled CSS</strong> — <code>Comserv/root/static/css/themes/&lt;theme-name&gt;.css</code> (auto-regenerated on save).</li>
-                </ul>
-
-                <h4>Future Improvements</h4>
-                <ul>
-                    <li>Per-site theme isolation so modifying a shared theme cannot affect other sites (copy-on-write approach).</li>
-                    <li>Theme versioning / rollback history.</li>
-                    <li>Import / export theme as a JSON file.</li>
-                    <li>Preview theme on the actual live site in an iframe before applying.</li>
-                    <li>Role-based theme restrictions (e.g. developer can edit, admin can only choose).</li>
-                </ul>
-            </div>
-        </details>
-    </div>
-
     <div id="see-also" class="doc-section">
         <h2>See Also</h2>
         <ul>
             <li><a href="/Documentation/TodoSystemComprehensive">Todo System Documentation</a></li>
-            <li><a href="[% c.uri_for('/Documentation/CssThemes') %]">CSS Theme System — Admin Guide</a></li>
-            <li><a href="[% c.uri_for('/admin/theme') %]">Theme Management</a></li>
         </ul>
     </div>
 

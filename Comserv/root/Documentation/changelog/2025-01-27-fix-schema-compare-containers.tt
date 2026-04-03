@@ -1,0 +1,68 @@
+[% PageVersion = '2025-01-27-fix-schema-compare-containers.tt,v 1.0 2025/01/27 Assistant Exp Assistant' %]
+
+<h1>Fix Schema Compare Container Display Issues</h1>
+
+<h2>Date: 2025-01-27</h2>
+<h2>Author: Assistant</h2>
+<h2>Type: Bug Fix</h2>
+
+<h3>Problem Description</h3>
+<p>The schema comparison tool had several display issues:</p>
+<ul>
+    <li>Database containers were showing as "normally open" instead of "normally closed"</li>
+    <li>Table containers were not displaying field comparison content properly</li>
+    <li>Result files were not showing field attributes correctly</li>
+    <li>Tables without result files were also missing field display</li>
+</ul>
+
+<h3>Root Cause</h3>
+<p>The template was rendering database sections with the "expanded" class by default, causing them to appear open instead of closed. Additionally, there were CSS issues with the field comparison content display.</p>
+
+<h3>Changes Made</h3>
+
+<h4>1. Fixed Database Container Default State</h4>
+<p><strong>File:</strong> <code>/admin/schema_compare.tt</code></p>
+<ul>
+    <li>Changed database section chevron icons from <code>fa-chevron-down</code> to <code>fa-chevron-right</code></li>
+    <li>Removed <code>expanded</code> class from <code>section-content</code> divs</li>
+    <li>Applied to both Ency and Forager database sections</li>
+</ul>
+
+<h4>2. Updated CSS for Proper Container Behavior</h4>
+<p><strong>File:</strong> <code>/static/css/themes/schema_compare.css</code></p>
+<ul>
+    <li>Changed <code>.section-content</code> from <code>max-height: 0; overflow: hidden</code> to <code>display: none</code></li>
+    <li>Updated <code>.section-content.expanded</code> to use <code>display: block</code></li>
+    <li>Fixed <code>.field-comparison-content</code> padding issues</li>
+    <li>Ensured proper display behavior for collapsed/expanded states</li>
+</ul>
+
+<h3>Expected Behavior After Fix</h3>
+<ul>
+    <li>Database containers (Ency and Forager) start in closed state</li>
+    <li>Clicking database headers toggles container open/closed with proper chevron rotation</li>
+    <li>Table containers within databases also start closed</li>
+    <li>Clicking table headers loads and displays field comparison data</li>
+    <li>Field attributes are properly displayed for tables with result files</li>
+    <li>Tables without result files show appropriate "create result file" options</li>
+</ul>
+
+<h3>Testing</h3>
+<p>To test the fix:</p>
+<ol>
+    <li>Navigate to <code>/admin/schema_compare</code></li>
+    <li>Verify both database containers start closed (chevron pointing right)</li>
+    <li>Click database headers to expand (chevron should rotate to point down)</li>
+    <li>Verify table groups are visible when database is expanded</li>
+    <li>Click individual table headers to view field comparisons</li>
+    <li>Verify field comparison data loads and displays properly</li>
+</ol>
+
+<h3>Files Modified</h3>
+<ul>
+    <li><code>Comserv/root/admin/schema_compare.tt</code> - Fixed default container states</li>
+    <li><code>Comserv/root/static/css/themes/schema_compare.css</code> - Updated CSS for proper display behavior</li>
+</ul>
+
+<h3>Related Issues</h3>
+<p>This fix addresses the schema comparison tool's container display issues and ensures proper field-by-field comparison functionality for database table synchronization.</p>

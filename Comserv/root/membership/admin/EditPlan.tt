@@ -1,5 +1,5 @@
 [% META
-   title = action == 'create' ? "Create Membership Plan" : "Edit Membership Plan"
+   title = "Membership Plan"
    description = "Create or edit a membership plan"
    roles = "admin,site_admin"
    TemplateType = "Application"
@@ -7,6 +7,7 @@
    page_version = "0.01"
    last_updated = "2026-03-18"
 %]
+[% SET title = action == 'create' ? "Create Membership Plan" : "Edit Membership Plan" %]
 [% PageVersion = 'membership/admin/EditPlan.tt,v 0.01 2026/03/18' %]
 [% IF debug_mode == 1 %][% PageVersion %][% END %]
 

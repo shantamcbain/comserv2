@@ -1,0 +1,188 @@
+[%
+   title = "Log Audit & Health Dashboard"
+   description = "Audit system_log table, view health alerts, and prune old records"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Admin"
+   page_version = "0.02"
+   last_updated = "2026-03-13"
+%]
+[% PageVersion = 'admin/Logging/LogAudit.tt,v 0.02 2026/03/13 Zencoder Exp Zencoder' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<style>
+.page-header-actions  { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
+.stats-row            { display:flex; gap:30px; flex-wrap:wrap; }
+.alert-warning-box    { padding:10px; background:#fff3cd; border:1px solid #ffc107; border-radius:4px; margin-bottom:15px; }
+.prune-form-row       { display:flex; flex-wrap:wrap; gap:15px; margin-bottom:15px; }
+.prune-input          { width:100px; }
+.prune-note           { margin-left:10px; color:#666; }
+.stat-large           { font-size:2em; font-weight:bold; }
+.lookback-form        { margin-bottom:10px; }
+.prune-eligible       { color:orange; }
+.prune-total-val      { color:red; }
+.table-foot-bold      { font-weight:bold; }
+.form-inline          { display:inline; }
+.nowrap               { white-space:nowrap; }
+.urgency-critical     { color:red; }
+.urgency-high         { color:orange; }
+.urgency-medium       { color:goldenrod; }
+.urgency-low          { color:inherit; }
+tr.level-debug        { color:#888; }
+tr.level-info         { color:#000; }
+tr.level-warn         { background:#fff8e1; }
+tr.level-error        { background:#fdecea; }
+tr.level-critical     { background:#f8d7da; font-weight:bold; }
+.btn-sm               { padding:2px 8px; font-size:0.85em; }
+.btn-danger           { background:#dc3545; color:#fff; border-color:#dc3545; }
+.docker-grid          { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:10px; }
+.docker-card          { border:1px solid #ccc; border-radius:6px; padding:12px 16px; min-width:200px; flex:1; }
+.docker-healthy       { border-color:#28a745; background:#f0fff4; }
+.docker-unhealthy     { border-color:#dc3545; background:#fff5f5; }
+.docker-none          { border-color:#6c757d; background:#f8f9fa; }
+.docker-name          { font-weight:bold; font-size:1.05em; }
+.docker-badge         { display:inline-block; padding:2px 8px; border-radius:10px; font-size:0.8em; font-weight:bold; }
+.badge-healthy        { background:#28a745; color:#fff; }
+.badge-unhealthy      { background:#dc3545; color:#fff; }
+.badge-none           { background:#6c757d; color:#fff; }
+.docker-detail        { font-size:0.85em; color:#555; margin-top:4px; }
+.docker-lastcheck     { font-size:0.78em; color:#888; margin-top:4px; font-style:italic; word-break:break-all; }
+.stats-loading        { color:#888; font-style:italic; padding:20px 0; }
+</style>
+
+<div class="app-container">
+    <div class="page-header page-header-actions">
+        <h1>Log Audit &amp; Health Dashboard</h1>
+        <a href="[% c.uri_for('/admin/logging') %]" class="btn btn-secondary">&larr; Back to Logging</a>
+    </div>
+
+    [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+    [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+    [% IF c.flash.info_msg %]<div class="info" style="padding:8px;background:#d1ecf1;border:1px solid #bee5eb;border-radius:4px;margin-bottom:10px">[% c.flash.info_msg | html %]</div>[% END %]
+    [% IF page_error %]
+    <div class="error"><strong>Notice:</strong> [% page_error | html %]
+        Some sections below may be incomplete. The system administrator has been notified.</div>
+    [% END %]
+
+    <!-- ================================================================
+         DOCKER CONTAINER HEALTH  (rendered first — no DB dependency)
+         ================================================================ -->
+    <div class="content-section">
+        <h2>Docker Container Health</h2>
+
+        [%# Macro to render a single container card %]
+        [% MACRO container_card(ct) BLOCK %]
+            [% SET hclass = (ct.health == 'healthy') ? 'docker-healthy'
+                          : (ct.health == 'unhealthy') ? 'docker-unhealthy'
+                          : 'docker-none' %]
+            [% SET bclass = (ct.health == 'healthy') ? 'badge-healthy'
+                          : (ct.health == 'unhealthy') ? 'badge-unhealthy'
+                          : 'badge-none' %]
+            <div class="docker-card [% hclass %]">
+                <div class="docker-name">[% ct.name | html %]
+                    <span class="docker-badge [% bclass %]">[% ct.health | html %]</span>
+                </div>
+                <div class="docker-detail">Status: [% ct.status_str | html %]</div>
+                [% IF ct.last_output %]
+                <div class="docker-lastcheck">Last check: [% ct.last_output | html %]</div>
+                [% END %]
+                [% IF ct.timestamp %]
+                <div class="docker-lastcheck">Reported: [% ct.timestamp | html %]</div>
+                [% END %]
+            </div>
+        [% END %]
+
+        <!-- Local (this server) -->
+        [% IF docker_health && docker_health.size %]
+        <h3>This server ([% system_identifier || 'local' %])</h3>
+        <div class="docker-grid">
+            [% FOR ct IN docker_health %][% container_card(ct) %][% END %]
+        </div>
+        [% ELSE %]
+        <p class="docker-detail">No comserv containers running locally on this server.</p>
+        [% END %]
+
+        <!-- Cross-server Docker health from shared DB (written by each server's comserv_server.pl) -->
+        [% IF docker_health_db && docker_health_db.size %]
+        <h3>All Servers — from system_log (updated every eval cycle)</h3>
+        [% FOR srv IN docker_health_db %]
+        <h4 style="margin:10px 0 4px">[% srv.system_identifier | html %]</h4>
+        <div class="docker-grid">
+            [% FOR ct IN srv.containers %][% container_card(ct) %][% END %]
+        </div>
+        [% END %]
+        [% ELSE %]
+        <p class="docker-detail"><em>No cross-server Docker data in system_log yet.
+            Production will appear here once its comserv_server.pl eval cycle runs.</em></p>
+        [% END %]
+
+    </div>
+
+    <!-- Active filter notice -->
+    [% IF filter_system || filter_level %]
+    <div class="content-section" style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:10px 16px;">
+        <strong>&#x1F50D; Filtered view</strong>
+        [% IF filter_system %]&nbsp;&mdash; System: <code>[% filter_system | html %]</code>[% END %]
+        [% IF filter_level %]&nbsp;&mdash; Level: <code>[% filter_level | html %]</code>[% END %]
+        &nbsp;<a href="[% c.uri_for('/admin/logging/audit') %]" style="font-size:0.85em">&times; Clear filter</a>
+    </div>
+    [% END %]
+
+    <!-- Look-back window selector -->
+    <div class="content-section">
+        <form method="get" action="[% c.uri_for('/admin/logging/audit') %]" class="lookback-form">
+            [% IF filter_system %]<input type="hidden" name="system" value="[% filter_system | html %]">[% END %]
+            [% IF filter_level  %]<input type="hidden" name="level"  value="[% filter_level  | html %]">[% END %]
+            <label><strong>Look-back window:</strong></label>
+            <select name="hours" onchange="this.form.submit()">
+                [% FOR h IN [1, 6, 12, 24, 48, 168] %]
+                    <option value="[% h %]" [% IF h == hours %]selected[% END %]>
+                        [% IF h < 24 %][% h %] hour[% IF h > 1 %]s[% END %]
+                        [% ELSIF h == 24 %]24 h (1 day)
+                        [% ELSIF h == 48 %]48 h (2 days)
+                        [% ELSE %]7 days
+                        [% END %]
+                    </option>
+                [% END %]
+            </select>
+        </form>
+    </div>
+
+    <!-- Async-loaded audit statistics and health alerts -->
+    <div id="audit-stats-container">
+        <p class="stats-loading">&#8987; Loading audit statistics&hellip;</p>
+    </div>
+
+</div>
+
+<script>
+(function() {
+    var hours = [% hours | html %];
+    var url   = '[% c.uri_for('/admin/logging/audit/stats') %]?hours=' + hours
+        [% IF filter_system %] + '&system=' + encodeURIComponent('[% filter_system | html %]')[% END %]
+        [% IF filter_level  %] + '&level='  + encodeURIComponent('[% filter_level  | html %]')[% END %];
+    fetch(url, { credentials: 'same-origin', redirect: 'manual' })
+        .then(function(r) {
+            if (r.type === 'opaqueredirect' || r.status === 0 || (r.status >= 300 && r.status < 400)) {
+                document.getElementById('audit-stats-container').innerHTML =
+                    '<div class="error">Session expired — please <a href="/user/login?destination=[% c.req.uri | uri | html %]">log in again</a> to view audit statistics.</div>';
+                return;
+            }
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.text();
+        })
+        .then(function(html) {
+            if (html !== undefined) {
+                document.getElementById('audit-stats-container').innerHTML = html;
+            }
+        })
+        .catch(function(err) {
+            document.getElementById('audit-stats-container').innerHTML =
+                '<div class="error">Could not load audit statistics: ' + err + '</div>';
+        });
+})();
+</script>
+
+

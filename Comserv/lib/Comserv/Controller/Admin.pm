@@ -19,6 +19,7 @@ use File::Spec;
 use Digest::SHA qw(sha256_hex);
 use File::Find;
 use Module::Load;
+use POSIX qw(_exit);
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -951,6 +952,7 @@ sub planning :Path('/admin/planning') :Args(0) {
         $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
+
     $c->stash(template => 'admin/documentation/Planning.tt');
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'planning',
         "Rendering admin/documentation/Planning.tt");
@@ -1098,9 +1100,12 @@ sub logs :Path('/admin/logs') :Args(0) {
         return;
     }
     
-    # Get log file parameter
-    my $log_file = $c->req->param('file') || 'catalyst.log';
-    
+    # Get log file parameter — sanitize to basename only, no path traversal
+    my $log_file_raw = $c->req->param('file') || 'catalyst.log';
+    (my $log_file = $log_file_raw) =~ s{[/\\]}{}g;
+    $log_file =~ s/\.\.\///g;
+    $log_file = 'catalyst.log' unless $log_file =~ /^[\w.\-]+\.log$/;
+
     # Get available log files
     my @log_files = ();
     eval {
@@ -1111,15 +1116,22 @@ sub logs :Path('/admin/logs') :Args(0) {
             closedir($dh);
         }
     };
-    
+
+    # Validate that the requested file is actually in the list
+    my %valid_files = map { $_ => 1 } @log_files;
+    $log_file = 'catalyst.log' unless $valid_files{$log_file};
+
     # Get log content
     my $log_content = '';
     eval {
         my $log_path = $c->path_to('logs', $log_file);
         if (-f $log_path) {
-            # Get the last 1000 lines of the log file
-            my $tail_output = `tail -n 1000 $log_path`;
-            $log_content = $tail_output;
+            # Read last 1000 lines without shell interpolation
+            open(my $fh, '<', $log_path) or die "Cannot open log: $!";
+            my @lines = <$fh>;
+            close $fh;
+            my $start = @lines > 1000 ? @lines - 1000 : 0;
+            $log_content = join('', @lines[$start..$#lines]);
         }
     };
     
@@ -1141,6 +1153,508 @@ sub logs :Path('/admin/logs') :Args(0) {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logs',
         "Completed logs action");
+}
+
+# Admin security scan
+sub security_scan :Path('/admin/security-scan') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'security_scan',
+        "Starting security_scan action");
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'security_scan')) {
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+
+    my @known_targets = (
+        # ── Production public sites ─────────────────────────────────────────
+        { label => 'PROD: coop.computersystemconsulting.ca (MCoop)', url => 'http://coop.computersystemconsulting.ca',  site => 'MCoop'      },
+        { label => 'PROD: usbm.ca (USBM)',                           url => 'http://usbm.ca',                           site => 'USBM'       },
+        { label => 'PROD: 3d.usbm.ca (3d)',                          url => 'http://3d.usbm.ca',                        site => '3d'         },
+        { label => 'PROD: shamanbotanicals.ca (SB)',                  url => 'http://shamanbotanicals.ca',               site => 'SB'         },
+        { label => 'PROD: ve7tit.com (VE7TIT)',                      url => 'http://ve7tit.com',                        site => 'VE7TIT'     },
+        { label => 'PROD: weaverbeck.com (WeaverBeck)',              url => 'http://weaverbeck.com',                    site => 'WeaverBeck' },
+        { label => 'PROD: altpowerstore.com',                        url => 'http://altpowerstore.com',                 site => 'none'       },
+        # ── Dev main app (port 3001) — host selects site ────────────────────
+        { label => 'DEV:3001 workstation.local (none)',              url => 'http://workstation.local:3001',            site => 'none'       },
+        { label => 'DEV:3001 coop.workstation (MCoop)',              url => 'http://coop.workstation:3001',             site => 'MCoop'      },
+        { label => 'DEV:3001 usbm.local (USBM)',                     url => 'http://usbm.local:3001',                   site => 'USBM'       },
+        { label => 'DEV:3001 3d.local (3d)',                         url => 'http://3d.local:3001',                     site => '3d'         },
+        { label => 'DEV:3001 bmaster.workstation (BMaster)',         url => 'http://bmaster.workstation:3001',          site => 'BMaster'    },
+        { label => 'DEV:3001 ve7tit.local (VE7TIT)',                 url => 'http://ve7tit.local:3001',                 site => 'VE7TIT'     },
+        # ── Docker prod (port 3000) ──────────────────────────────────────────
+        { label => 'DOCKER:3000 workstation.local (none)',           url => 'http://workstation.local:3000',            site => 'none'       },
+        { label => 'DOCKER:3000 coop.workstation (MCoop)',           url => 'http://coop.workstation:3000',             site => 'MCoop'      },
+        { label => 'DOCKER:3000 usbm.local (USBM)',                  url => 'http://usbm.local:3000',                   site => 'USBM'       },
+        # ── Docker dev (port 5000) ───────────────────────────────────────────
+        { label => 'DOCKER:5000 workstation.local (none)',           url => 'http://workstation.local:5000',            site => 'none'       },
+        { label => 'DOCKER:5000 usbm.local (USBM)',                  url => 'http://usbm.local:5000',                   site => 'USBM'       },
+        # ── Worktrees from planning (port 4000–4021) ─────────────────────────
+        { label => 'WT:4001 PlanningSystem',                         url => 'http://workstation.local:4001',            site => 'none'       },
+        { label => 'WT:4002 SchemaManagement',                       url => 'http://workstation.local:4002',            site => 'none'       },
+        { label => 'WT:4003 InfrastructureHA',                       url => 'http://workstation.local:4003',            site => 'none'       },
+        { label => 'WT:4004 WorkShops',                              url => 'http://workstation.local:4004',            site => 'none'       },
+        { label => 'WT:4005 Users',                                  url => 'http://workstation.local:4005',            site => 'none'       },
+        { label => 'WT:4006 FileManagement',                         url => 'http://workstation.local:4006',            site => 'none'       },
+        { label => 'WT:4007 UnifiedMail',                            url => 'http://workstation.local:4007',            site => 'none'       },
+        { label => 'WT:4008 Membership',                             url => 'http://workstation.local:4008',            site => 'none'       },
+        { label => 'WT:4009 PointSystem',                            url => 'http://workstation.local:4009',            site => 'none'       },
+        { label => 'WT:4010 AIChatSystem',                           url => 'http://workstation.local:4010',            site => 'none'       },
+        { label => 'WT:4011 CssThemes',                              url => 'http://workstation.local:4011',            site => 'none'       },
+        { label => 'WT:4012 ENCY',                                   url => 'http://workstation.local:4012',            site => 'none'       },
+        { label => 'WT:4013 HelpDesk',                               url => 'http://workstation.local:4013',            site => 'none'       },
+        { label => 'WT:4014 HealthPlanning',                         url => 'http://workstation.local:4014',            site => 'none'       },
+        { label => 'WT:4015 ProdServerHealth',                       url => 'http://workstation.local:4015',            site => 'none'       },
+        { label => 'WT:4016 Security',                               url => 'http://workstation.local:4016',            site => 'none'       },
+        { label => 'WT:4017 Documentation',                          url => 'http://workstation.local:4017',            site => 'none'       },
+        { label => 'WT:4018 APISystem',                              url => 'http://workstation.local:4018',            site => 'none'       },
+        { label => 'WT:4019 BMaster',                                url => 'http://workstation.local:4019',            site => 'none'       },
+        { label => 'WT:4020 AIChatPlanInt',                          url => 'http://workstation.local:4020',            site => 'none'       },
+        { label => 'WT:4021 Inventory',                              url => 'http://workstation.local:4021',            site => 'none'       },
+    );
+
+    my $scan_results = undef;
+    my $scan_output  = '';
+    my $scan_error   = '';
+
+    if ($c->req->method eq 'POST') {
+        my $target_url = $c->req->param('target_url') // '';
+        my $site_name  = $c->req->param('site_name')  // 'none';
+        my $max_pages  = $c->req->param('max_pages')  // 100;
+
+        # Sanitize inputs
+        $target_url =~ s/\s+//g;
+        $site_name  =~ s/[^a-zA-Z0-9._-]//g;
+        $max_pages  = int($max_pages);
+        $max_pages  = 50  if $max_pages < 1;
+        $max_pages  = 500 if $max_pages > 500;
+
+        unless ($target_url =~ m{^https?://[\w.\-]+(:\d+)?(/.*)?$}) {
+            $c->stash->{error_msg} = 'Invalid target URL. Must be http:// or https:// with a hostname.';
+            $c->stash(template => 'admin/security_scan.tt', known_targets => \@known_targets);
+            return;
+        }
+
+        my $report_file = File::Spec->catfile($c->path_to(''), 'security_crawl_report.json');
+        my $script      = File::Spec->catfile($c->path_to('script'), 'security_crawl.pl');
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'security_scan',
+            "Running security scan: url=$target_url site=$site_name max=$max_pages");
+
+        eval {
+            open(my $pipe, '-|',
+                'perl', $script,
+                '--url',    $target_url,
+                '--site',   $site_name,
+                '--max',    $max_pages,
+                '--output', $report_file,
+            ) or die "Cannot run scan script: $!";
+            while (my $line = <$pipe>) {
+                $scan_output .= $line;
+            }
+            close($pipe);
+        };
+        if ($@) {
+            $scan_error = $@;
+        }
+
+        if (-f $report_file) {
+            eval {
+                my $json_text = do { local $/; open(my $fh, '<', $report_file) or die $!; <$fh> };
+                $scan_results = decode_json($json_text);
+            };
+            $scan_error .= $@ if $@;
+        }
+
+        $c->stash(
+            scan_target  => $target_url,
+            scan_site    => $site_name,
+            scan_output  => $scan_output,
+            scan_error   => $scan_error,
+            scan_results => $scan_results,
+        );
+    }
+
+    $c->stash(
+        template      => 'admin/security_scan.tt',
+        known_targets => \@known_targets,
+    );
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'security_scan',
+        "Completed security_scan action");
+}
+
+# Security scan — start background scan (POST), returns JSON immediately
+sub security_scan_start :Path('/admin/security-scan-start') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'security_scan_start')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ error => 'Access denied' }));
+        return;
+    }
+
+    my $target_url = $c->req->param('target_url') // '';
+    my $site_name  = $c->req->param('site_name')  // 'none';
+    my $max_pages  = $c->req->param('max_pages')  // 100;
+    my $use_auth   = $c->req->param('use_auth')   // 0;
+
+    $target_url =~ s/\s+//g;
+    $site_name  =~ s/[^a-zA-Z0-9._-]//g;
+    $max_pages  = int($max_pages);
+    $max_pages  = 50  if $max_pages < 1;
+    $max_pages  = 500 if $max_pages > 500;
+
+    unless ($target_url =~ m{^https?://[\w.\-]+(:\d+)?(/.*)?$}) {
+        $c->response->body(encode_json({ error => 'Invalid URL' }));
+        return;
+    }
+
+    # When authenticated mode is requested, forward the caller's Cookie header
+    # to the scan script so it runs as the current logged-in user.
+    my $auth_cookie = '';
+    if ($use_auth) {
+        $auth_cookie = $c->req->header('Cookie') // '';
+        $auth_cookie =~ s/[\r\n]//g;  # strip any newlines (header injection guard)
+    }
+
+    my $out_file  = '/tmp/comserv_security_scan.txt';
+    my $json_file = '/tmp/comserv_security_scan.json';
+    my $script    = File::Spec->catfile($c->path_to('script'), 'security_crawl.pl');
+
+    unlink $out_file, $json_file;
+
+    my $pid = fork();
+    if (!defined $pid) {
+        $c->response->body(encode_json({ error => "fork failed: $!" }));
+        return;
+    }
+
+    if ($pid == 0) {
+        open(STDOUT, '>', $out_file) or exit 1;
+        open(STDERR, '>&STDOUT');
+        my @cmd = ('perl', $script,
+            '--url',    $target_url,
+            '--site',   $site_name,
+            '--max',    $max_pages,
+            '--output', $json_file,
+        );
+        push @cmd, '--auth-cookie', $auth_cookie if $auth_cookie;
+        exec(@cmd);
+        exit 1;
+    }
+
+    # Reap child automatically so it doesn't become a zombie
+    local $SIG{CHLD} = 'IGNORE';
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'security_scan_start',
+        "Started background scan pid=$pid url=$target_url site=$site_name max=$max_pages auth=" . ($auth_cookie ? 'yes' : 'no'));
+
+    $c->response->body(encode_json({ started => 1, pid => $pid, auth_mode => $auth_cookie ? 1 : 0 }));
+}
+
+# Security scan — poll for new output lines (GET)
+sub security_scan_poll :Path('/admin/security-scan-poll') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'security_scan_poll')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ error => 'Access denied' }));
+        return;
+    }
+
+    my $offset    = int($c->req->param('offset') // 0);
+    my $out_file  = '/tmp/comserv_security_scan.txt';
+    my $json_file = '/tmp/comserv_security_scan.json';
+
+    my @new_lines;
+    my $new_offset = $offset;
+
+    if (-f $out_file) {
+        open(my $fh, '<', $out_file);
+        seek($fh, $offset, 0);
+        while (my $line = <$fh>) {
+            chomp $line;
+            $line =~ s/\r//g;
+            push @new_lines, $line;
+        }
+        $new_offset = tell($fh);
+        close($fh);
+    }
+
+    my $done    = 0;
+    my $results = undef;
+
+    if (-f $out_file) {
+        my $content = '';
+        if (open(my $f, '<', $out_file)) { local $/; $content = <$f> // ''; close($f); }
+        if ($content =~ /Full report written/) {
+            $done = 1;
+            if (-f $json_file) {
+                eval {
+                    my $jt = do { local $/; open(my $f, '<', $json_file) or die; <$f> };
+                    $results = decode_json($jt);
+                };
+            }
+        }
+    }
+
+    my %resp = (lines => \@new_lines, offset => $new_offset, done => $done);
+    if ($done && $results) {
+        $resp{results} = $results;
+        # Return the archive file that was written (last one in the archive dir)
+        my $archive_dir = $c->path_to('logs', 'security_scans');
+        if (-d $archive_dir) {
+            my @files = sort glob("$archive_dir/*.json");
+            $resp{archive_file} = $files[-1] if @files;
+        }
+    }
+    $c->response->body(encode_json(\%resp));
+}
+
+# Security scan — list archived scan reports (GET, returns JSON)
+sub security_scan_history :Path('/admin/security-scan-history') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'security_scan_history')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ error => 'Access denied' }));
+        return;
+    }
+
+    my $archive_dir = $c->path_to('logs', 'security_scans');
+    my @scans;
+
+    if (-d $archive_dir) {
+        for my $file (reverse sort glob("$archive_dir/*.json")) {
+            my $name = $file; $name =~ s|.*/||;
+            my $size = -s $file;
+            my $mtime = (stat $file)[9];
+            eval {
+                my $json_text = do { local $/; open(my $f, '<', $file) or die; <$f> };
+                my $data = decode_json($json_text);
+                push @scans, {
+                    file      => $name,
+                    scan_time => $data->{scan_time} // '',
+                    base_url  => $data->{base_url}  // '',
+                    sitename  => $data->{sitename}  // '',
+                    summary   => $data->{summary}   // {},
+                    size      => $size,
+                };
+            };
+            push @scans, { file => $name, size => $size, error => $@ } if $@;
+        }
+    }
+
+    $c->response->body(encode_json({ scans => \@scans }));
+}
+
+# Security scan — load a specific archived report (GET, returns JSON)
+sub security_scan_load :Path('/admin/security-scan-load') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'security_scan_load')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ error => 'Access denied' }));
+        return;
+    }
+
+    my $file = $c->req->param('file') // '';
+    $file =~ s|[^a-zA-Z0-9._-]||g;
+
+    unless ($file =~ /\.json$/) {
+        $c->response->body(encode_json({ error => 'Invalid file name' }));
+        return;
+    }
+
+    my $archive_dir = $c->path_to('logs', 'security_scans');
+    my $path = "$archive_dir/$file";
+
+    unless (-f $path) {
+        $c->response->body(encode_json({ error => 'File not found' }));
+        return;
+    }
+
+    eval {
+        my $json_text = do { local $/; open(my $f, '<', $path) or die $!; <$f> };
+        my $data = decode_json($json_text);
+        $c->response->body(encode_json($data));
+    };
+    if ($@) {
+        $c->response->body(encode_json({ error => "Cannot read file: $@" }));
+    }
+}
+
+# Security scan — create todos from a scan archive (POST, returns JSON)
+sub security_scan_create_todos :Path('/admin/security-scan-create-todos') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'security_scan_create_todos')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ error => 'Access denied' }));
+        return;
+    }
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body(encode_json({ error => 'POST required' }));
+        return;
+    }
+
+    my $file = $c->req->param('file') // '';
+    $file =~ s|[^a-zA-Z0-9._-]||g;
+
+    my $data;
+    if ($file && $file =~ /\.json$/) {
+        my $path = $c->path_to('logs', 'security_scans', $file);
+        unless (-f $path) {
+            $c->response->body(encode_json({ error => "File not found: $file" }));
+            return;
+        }
+        eval {
+            my $json_text = do { local $/; open(my $f, '<', $path) or die $!; <$f> };
+            $data = decode_json($json_text);
+        };
+        if ($@) {
+            $c->response->body(encode_json({ error => "Cannot read file: $@" }));
+            return;
+        }
+    } else {
+        my $live = '/tmp/comserv_security_scan.json';
+        unless (-f $live) {
+            $c->response->body(encode_json({ error => 'No scan results available. Run a scan first.' }));
+            return;
+        }
+        eval {
+            my $json_text = do { local $/; open(my $f, '<', $live) or die $!; <$f> };
+            $data = decode_json($json_text);
+        };
+        if ($@) {
+            $c->response->body(encode_json({ error => "Cannot read live scan: $@" }));
+            return;
+        }
+    }
+
+    my $findings  = $data->{findings} // [];
+    my $sitename  = $data->{sitename} // 'none';
+    my $scan_url  = $data->{base_url} // '';
+    my $scan_time = $data->{scan_time} // '';
+
+    my $schema    = $c->model('DBEncy');
+    my $todo_rs   = $schema->resultset('Todo');
+    my $today     = DateTime->now->ymd;
+    my $due       = DateTime->now->add(days => 14)->ymd;
+    my $poster    = $c->session->{username} // 'security_scan';
+
+    # Priority map: critical findings get priority 1, broken links get priority 3
+    my %priority_for = (
+        EXPOSED_SENSITIVE    => 1,
+        EXPOSED_POST_ACCEPTED => 1,
+        LEAK_STACK_TRACE     => 1,
+        SERVER_ERROR         => 2,
+        NOT_FOUND            => 3,
+    );
+
+    my $created = 0;
+    my $skipped = 0;
+    my @created_subjects;
+
+    for my $f (@$findings) {
+        my $result   = $f->{result} // '';
+        my $url      = $f->{url}    // '';
+        my $from_url = $f->{from_url} // '';
+        my $phase    = $f->{phase}  // '';
+
+        next unless $result && $url;
+
+        # Only create todos for actionable findings
+        my $is_security = ($result =~ /^EXPOSED|LEAK_STACK_TRACE/);
+        my $is_broken   = ($result eq 'NOT_FOUND' && $phase eq 'crawl' && $from_url);
+        next unless ($is_security || $is_broken);
+
+        # Build subject (max 240 chars)
+        my $path = $url; $path =~ s|^\Q$scan_url\E||; $path ||= $url;
+        my $subject;
+        if ($is_broken) {
+            my $from_path = $from_url; $from_path =~ s|^\Q$scan_url\E||; $from_path ||= $from_url;
+            $subject = "Dead link: $path (on $from_path)";
+        } else {
+            $subject = "Security [$result]: $path";
+        }
+        $subject = substr($subject, 0, 240) if length($subject) > 240;
+
+        # Skip if an open todo with the same subject already exists for this site
+        my $existing = $todo_rs->search({
+            sitename => $sitename,
+            subject  => $subject,
+            status   => { -not_in => ['Delivered', 'Cancelled'] },
+        })->first;
+        if ($existing) {
+            $skipped++;
+            next;
+        }
+
+        my $priority = $priority_for{$result} // 2;
+        my $description = $is_broken
+            ? "Dead link found by security crawler on $scan_time.\nURL: $url\nFound on page: $from_url\nScan target: $scan_url"
+            : "Security finding from crawler on $scan_time.\nResult: $result\nURL: $url\nPhase: $phase\nScan target: $scan_url"
+                . ($f->{snippet} ? "\n\nSnippet:\n" . $f->{snippet} : '');
+
+        eval {
+            $todo_rs->create({
+                sitename            => $sitename,
+                subject             => $subject,
+                description         => $description,
+                status              => 'Requested',
+                priority            => $priority,
+                start_date          => $today,
+                due_date            => $due,
+                reporter            => 'security_scan',
+                username_of_poster  => $poster,
+                group_of_poster     => 'admin',
+                project_code        => 'security',
+                last_mod_by         => $poster,
+                last_mod_date       => $today,
+                date_time_posted    => $today,
+                share               => 0,
+                user_id             => 0,
+                project_id          => 0,
+            });
+            $created++;
+            push @created_subjects, $subject;
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'security_scan_create_todos', "Failed to create todo for $url: $@");
+        }
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'security_scan_create_todos',
+        "Created $created todos, skipped $skipped duplicates from scan: $scan_url");
+
+    $c->response->body(encode_json({
+        created  => $created,
+        skipped  => $skipped,
+        subjects => \@created_subjects,
+    }));
 }
 
 # Admin backup and restore
@@ -1374,6 +1888,7 @@ sub network_devices_forward :Path('/admin/network_devices_old') :Args(0) {
 # Database Schema Comparison functionality (with alias)
 sub compare_schema :Path('/admin/compare_schema') :Args(0) {
     my ($self, $c) = @_;
+    $c->stash(template => 'admin/schema_compare.tt');
     $c->forward('schema_compare');
 }
 
@@ -4785,6 +5300,7 @@ sub docker_containers :Path('/admin/docker-containers') :Args(0) {
     # Check if we're inside a Docker container
     my $docker_available = ! -f '/.dockerenv';
 
+
     $c->stash(
         template => 'admin/docker_containers.tt',
         docker_available => $docker_available,
@@ -4798,6 +5314,14 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_list',
         "Docker list API called");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_list')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     # Check if we're inside a Docker container
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
@@ -4844,6 +5368,7 @@ sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
 
     my $admin_auth_vol = Comserv::Util::AdminAuth->new();
     unless ($admin_auth_vol->check_admin_access($c, 'docker_volumes')) {
+        $c->response->status(403);
         $c->response->body('{"success": false, "error": "Authentication required"}');
         $c->response->content_type('application/json');
         return;
@@ -4911,26 +5436,47 @@ sub docker_restart :Path('/admin/docker-restart') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_restart',
         "Docker restart requested for service: $service");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_restart')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
         return;
     }
     
-    my $cmd = $service eq 'all' 
-        ? 'cd ~/PycharmProjects/comserv2 && docker compose restart 2>&1'
-        : "cd ~/PycharmProjects/comserv2 && docker compose restart $service 2>&1";
-    
-    my $output = `$cmd`;
-    my $exit_code = $? >> 8;
-    
-    my $result = {
-        success => $exit_code == 0 ? \1 : \0,
-        stdout => $output,
-        exit_code => $exit_code
-    };
-    
-    $c->response->body(encode_json($result));
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
+
+    my $docker = '/usr/local/bin/docker';
+    $docker = 'docker' unless -x $docker;
+
+    my ($output, $exit_code);
+    if ($service eq 'all') {
+        my $home = $ENV{HOME} || '/home/shanta';
+        my $compose_dir = "$home/PycharmProjects/comserv2";
+        $output = `cd '$compose_dir' && $docker compose restart 2>&1`;
+        $exit_code = $? >> 8;
+    } else {
+        $output = `$docker restart '$service' 2>&1`;
+        $exit_code = $? >> 8;
+        if ($exit_code != 0) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'docker_restart',
+                "docker restart $service failed (exit $exit_code): $output");
+        }
+    }
+    $output //= "(no output captured — docker may not be in PATH)";
+
+    $c->response->body(encode_json({
+        success   => $exit_code == 0 ? \1 : \0,
+        stdout    => $output,
+        exit_code => $exit_code,
+        ($exit_code != 0 ? (error => $output) : ()),
+    }));
     $c->response->content_type('application/json');
 }
 
@@ -4940,26 +5486,39 @@ sub docker_start :Path('/admin/docker-start') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_start',
         "Docker start requested for service: $service");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_start')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
         return;
     }
     
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
+    my $docker = '/usr/local/bin/docker';
+    $docker = 'docker' unless -x $docker;
+    my $home = $ENV{HOME} || '/home/shanta';
+    my $compose_dir = "$home/PycharmProjects/comserv2";
     my $cmd = $service eq 'all'
-        ? 'cd ~/PycharmProjects/comserv2 && docker compose start 2>&1'
-        : "cd ~/PycharmProjects/comserv2 && docker compose start $service 2>&1";
-    
-    my $output = `$cmd`;
+        ? "cd '$compose_dir' && $docker compose start 2>&1"
+        : "$docker start '$service' 2>&1";
+
+    my $output    = `$cmd`;
+    $output //= "(no output captured — docker may not be in PATH)";
     my $exit_code = $? >> 8;
-    
-    my $result = {
-        success => $exit_code == 0 ? \1 : \0,
-        stdout => $output,
-        exit_code => $exit_code
-    };
-    
-    $c->response->body(encode_json($result));
+
+    $c->response->body(encode_json({
+        success   => $exit_code == 0 ? \1 : \0,
+        stdout    => $output,
+        exit_code => $exit_code,
+        ($exit_code != 0 ? (error => $output) : ()),
+    }));
     $c->response->content_type('application/json');
 }
 
@@ -4969,26 +5528,39 @@ sub docker_stop :Path('/admin/docker-stop') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_stop',
         "Docker stop requested for service: $service");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_stop')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
         return;
     }
     
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
+    my $docker = '/usr/local/bin/docker';
+    $docker = 'docker' unless -x $docker;
+    my $home = $ENV{HOME} || '/home/shanta';
+    my $compose_dir = "$home/PycharmProjects/comserv2";
     my $cmd = $service eq 'all'
-        ? 'cd ~/PycharmProjects/comserv2 && docker compose stop 2>&1'
-        : "cd ~/PycharmProjects/comserv2 && docker compose stop $service 2>&1";
-    
-    my $output = `$cmd`;
+        ? "cd '$compose_dir' && $docker compose stop 2>&1"
+        : "$docker stop '$service' 2>&1";
+
+    my $output    = `$cmd`;
+    $output //= "(no output captured — docker may not be in PATH)";
     my $exit_code = $? >> 8;
-    
-    my $result = {
-        success => $exit_code == 0 ? \1 : \0,
-        stdout => $output,
-        exit_code => $exit_code
-    };
-    
-    $c->response->body(encode_json($result));
+
+    $c->response->body(encode_json({
+        success   => $exit_code == 0 ? \1 : \0,
+        stdout    => $output,
+        exit_code => $exit_code,
+        ($exit_code != 0 ? (error => $output) : ()),
+    }));
     $c->response->content_type('application/json');
 }
 
@@ -4998,12 +5570,21 @@ sub docker_up :Path('/admin/docker-up') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_up',
         "Docker up requested for service: $service");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_up')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
         return;
     }
     
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
     my $cmd = $service eq 'all'
         ? 'cd ~/PycharmProjects/comserv2 && docker compose up -d 2>&1'
         : "cd ~/PycharmProjects/comserv2 && docker compose up -d $service 2>&1";
@@ -5027,14 +5608,23 @@ sub docker_logs :Path('/admin/docker-logs') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_logs',
         "Docker logs requested for service: $service");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_logs')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
         return;
     }
     
-    # Get lines parameter from query string, default to 100
-    my $lines = $c->req->params->{lines} || 100;
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
+    my $lines = int($c->req->params->{lines} || 100);
+    $lines = 100 unless $lines > 0 && $lines <= 10000;
     
     my $cmd = "cd ~/PycharmProjects/comserv2 && docker compose logs --tail=$lines $service 2>&1";
     my $output = `$cmd`;
@@ -5056,13 +5646,21 @@ sub docker_rebuild :Path('/admin/docker-rebuild') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_rebuild',
         "Docker rebuild requested for service: $service");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_rebuild')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
         return;
     }
     
-    # Rebuild with --no-cache and --progress=plain for detailed output
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
     my $cmd = $service eq 'all'
         ? 'cd ~/PycharmProjects/comserv2 && docker compose build --no-cache --progress=plain 2>&1'
         : "cd ~/PycharmProjects/comserv2 && docker compose build --no-cache --progress=plain $service 2>&1";
@@ -5086,6 +5684,14 @@ sub docker_prune :Path('/admin/docker-prune') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_prune',
         "Docker prune requested");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_prune')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
@@ -5125,6 +5731,14 @@ sub docker_system_df :Path('/admin/docker-system-df') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_system_df',
         "Docker system df requested");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_system_df')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
@@ -5150,12 +5764,21 @@ sub docker_save_image :Path('/admin/docker-save-image') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_save_image',
         "Docker save image requested for service: $service");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_save_image')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
         return;
     }
     
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
     my $timestamp = time();
     my $export_dir = "$ENV{HOME}/docker-exports";
     system("mkdir -p $export_dir") unless -d $export_dir;
@@ -5184,6 +5807,14 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_test_ssh',
         "Docker SSH connection test requested");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_test_ssh')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
@@ -5194,6 +5825,16 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
     my $ssh_port = $c->req->params->{ssh_port} || 22;
     my $ssh_password = $c->req->params->{ssh_password} || '';
     my $save_credentials = $c->req->params->{save_credentials} || '';
+
+    # Validate ssh_target: must be user@hostname format with safe characters only
+    unless ($ssh_target =~ /^[a-zA-Z0-9_\-]+\@[a-zA-Z0-9_\-\.]+$/) {
+        $c->response->body('{"success": false, "error": "Invalid SSH target format (expected user@hostname)"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    # Validate port is a number
+    $ssh_port = int($ssh_port);
+    $ssh_port = 22 unless $ssh_port > 0 && $ssh_port <= 65535;
     
     if (!$ssh_target) {
         $c->response->body('{"success": false, "error": "SSH target not specified"}');
@@ -5215,8 +5856,9 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
         return;
     }
     
-    # Use sshpass for password-based SSH
-    my $cmd = qq(sshpass -p '$ssh_password' ssh -p $ssh_port -o ConnectTimeout=5 -o StrictHostKeyChecking=no $ssh_target "echo 'SSH connection successful'; docker --version; docker compose version" 2>&1);
+    # Use SSHPASS env var to avoid password on command line (prevents shell injection)
+    local $ENV{SSHPASS} = $ssh_password;
+    my $cmd = qq(sshpass -e ssh -p $ssh_port -o ConnectTimeout=5 -o StrictHostKeyChecking=no $ssh_target "echo 'SSH connection successful'; docker --version; docker compose version" 2>&1);
     my $output = `$cmd`;
     my $exit_code = $? >> 8;
     
@@ -5258,57 +5900,345 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
     $c->response->content_type('application/json');
 }
 
+sub docker_load_credentials :Path('/admin/docker-load-credentials') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_load_credentials')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my $creds_file = ($ENV{HOME} || '/home/shanta') . '/.comserv/secrets/ssh_credentials.json';
+    my $creds = {};
+    if (-f $creds_file && open my $fh, '<', $creds_file) {
+        local $/;
+        my $json = <$fh>;
+        close $fh;
+        $creds = eval { decode_json($json) } || {};
+    }
+
+    $c->response->body(encode_json({
+        success      => \1,
+        ssh_target   => $creds->{ssh_target}   || 'ubuntu@192.168.1.126',
+        ssh_port     => $creds->{ssh_port}     || 22,
+        ssh_password => $creds->{ssh_password} || '',
+    }));
+    $c->response->content_type('application/json');
+}
+
 sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Args(0) {
     my ($self, $c) = @_;
-    
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_deploy_to_production',
-        "Docker deploy to production requested");
-    
+        "Docker Hub build+push+deploy requested by " . ($c->user ? $c->user->username : 'unknown'));
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_deploy_to_production')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
         return;
     }
-    
-    my $ssh_target = $c->req->params->{ssh_target} || '';
-    my $ssh_port = $c->req->params->{ssh_port} || 22;
-    my $ssh_password = $c->req->params->{ssh_password} || '';
-    my $production_directory = $c->req->params->{production_directory} || '~/PycharmProjects/comserv2';
-    my $service = $c->req->params->{service} || 'web-prod';
-    
-    if (!$ssh_target) {
-        $c->response->body('{"success": false, "error": "SSH target not specified"}');
-        $c->response->content_type('application/json');
-        return;
+
+    my $ssh_target    = $c->req->params->{ssh_target}   || 'ubuntu@192.168.1.126';
+    my $form_password = $c->req->params->{ssh_password} || '';
+
+    my $ssh_password = '';
+    my $home     = $ENV{HOME} || '/home/shanta';
+    my $creds_file = "$home/.comserv/secrets/ssh_credentials.json";
+    if (-f $creds_file && open my $cf, '<', $creds_file) {
+        local $/;
+        my $json = <$cf>;
+        close $cf;
+        my $creds = eval { decode_json($json) };
+        if ($creds && $creds->{ssh_password}) {
+            $ssh_password = $creds->{ssh_password};
+            $ssh_target   = $creds->{ssh_target} if $creds->{ssh_target};
+        }
     }
-    
+    $ssh_password ||= $form_password;
+
     if (!$ssh_password) {
-        $c->response->body('{"success": false, "error": "SSH password required"}');
+        $c->response->body('{"success": false, "error": "SSH password required — use Test Connection to save credentials first"}');
         $c->response->content_type('application/json');
         return;
     }
-    
-    # Parse user@host format
-    my ($user, $host) = $ssh_target =~ /^([^@]+)@(.+)$/;
-    unless ($user && $host) {
-        $c->response->body('{"success": false, "error": "SSH target must be in format: user@hostname"}');
+
+    my ($ssh_user, $ssh_host) = $ssh_target =~ /^([a-zA-Z0-9_\-]+)\@([a-zA-Z0-9_\-\.]+)$/;
+    unless ($ssh_user && $ssh_host) {
+        $c->response->body('{"success": false, "error": "SSH target must be user\@hostname"}');
         $c->response->content_type('application/json');
         return;
     }
-    
-    my $script_path = "$FindBin::Bin/deploy_docker_to_production.pl";
-    my $cmd = "SSHPASS='$ssh_password' perl $script_path --host=$host --user=$user --port=$ssh_port --service=$service --directory='$production_directory' 2>&1";
-    
-    my $output = `$cmd`;
-    my $exit_code = $? >> 8;
-    
-    my $result = {
-        success => $exit_code == 0 ? \1 : \0,
-        output => $output,
-        exit_code => $exit_code
+
+    my $repo_dir     = "$home/PycharmProjects/comserv2";
+    my $comserv_dir  = "$repo_dir/Comserv";
+    my $prod_compose = 'docker-compose.prod.yml';
+    my $hub_image    = 'shantamcsbain/comserv-web-prod:latest';
+
+    my $deploy_log_dir = "$repo_dir/deploy-logs";
+    mkdir $deploy_log_dir unless -d $deploy_log_dir;
+
+    my @t_stamp = localtime();
+    my $ts = sprintf('%04d%02d%02d-%02d%02d%02d',
+        $t_stamp[5]+1900, $t_stamp[4]+1, $t_stamp[3],
+        $t_stamp[2], $t_stamp[1], $t_stamp[0]);
+    my $log_file     = "$deploy_log_dir/deploy-$ts.log";
+    my $latest_link  = "$deploy_log_dir/latest.log";
+    my $pid_file     = '/tmp/comserv-hub-deploy.pid';
+    my $logpath_file = '/tmp/comserv-hub-deploy.logpath';
+
+    unlink $logpath_file;
+    unlink $pid_file;
+    if (open my $lp, '>', $logpath_file) { print $lp $log_file; close $lp; }
+
+    my $git_commit = `cd '$repo_dir' && git rev-parse --short HEAD 2>/dev/null`; chomp $git_commit;
+    my $git_branch = `cd '$repo_dir' && git rev-parse --abbrev-ref HEAD 2>/dev/null`; chomp $git_branch;
+    my @t = gmtime(); my $build_date = sprintf('%04d-%02d-%02dT%02d:%02d:%02dZ',
+        $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
+    my $build_host = `hostname 2>/dev/null`; chomp $build_host;
+
+    my $version_data = {
+        commit     => $git_commit  || 'unknown',
+        branch     => $git_branch  || 'unknown',
+        build_date => $build_date,
+        build_host => $build_host  || 'workstation',
     };
-    
-    $c->response->body(encode_json($result));
+    if (open my $vf, '>', "$comserv_dir/version.json") {
+        print $vf encode_json($version_data);
+        close $vf;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_deploy_to_production',
+        "Starting deploy: commit=$git_commit branch=$git_branch image=$hub_image target=$ssh_target log=$log_file");
+
+    my $pid = fork();
+    if (!defined $pid) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'docker_deploy_to_production',
+            "Failed to fork background deploy process");
+        $c->response->body('{"success": false, "error": "Failed to fork background process"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    if ($pid == 0) {
+        open(STDOUT, '>', $log_file) or _exit(1);
+        open(STDERR, '>&STDOUT')     or _exit(1);
+        $| = 1;
+
+        print "=== Comserv Production Deploy via Docker Hub ===\n";
+        print "Started   : " . scalar(localtime) . "\n";
+        print "Commit    : $git_commit ($git_branch)\n";
+        print "Build date: $build_date\n";
+        print "Image     : $hub_image\n";
+        print "SSH target: $ssh_target\n";
+        print "Log file  : $log_file\n";
+        print "=" x 60 . "\n\n";
+
+        print "--- Pre-flight: Checking Docker Hub credentials ---\n";
+
+        my $logged_in     = 0;
+        my $creds_method  = 'unknown';
+        my $docker_cfg    = ($ENV{HOME} || '/home/shanta') . '/.docker/config.json';
+        if (open my $dcf, '<', $docker_cfg) {
+            local $/; my $raw = <$dcf>; close $dcf;
+            my $dcfg = eval { decode_json($raw) } || {};
+            my $creds_store = $dcfg->{credsStore} || '';
+            my $auths       = $dcfg->{auths}       || {};
+
+            if ($creds_store) {
+                $creds_method = "credential helper (credsStore: $creds_store)";
+                my $helper = "docker-credential-$creds_store";
+                my $cred_out = `echo 'https://index.docker.io/v1/' | $helper get 2>/dev/null`;
+                if ($cred_out && $cred_out =~ /"Username"\s*:\s*"([^"]+)"/) {
+                    print "✅ Logged in via $creds_method as: $1\n\n";
+                    $logged_in = 1;
+                } else {
+                    print "⚠️  Credential helper ($helper) did not return credentials\n";
+                }
+            } elsif (exists $auths->{'https://index.docker.io/v1/'}) {
+                $creds_method = 'config.json auth entry';
+                print "✅ Docker Hub auth entry found in config.json\n\n";
+                $logged_in = 1;
+            } else {
+                print "⚠️  No Docker Hub credentials found in $docker_cfg\n";
+            }
+        } else {
+            print "⚠️  Cannot read $docker_cfg\n";
+        }
+
+        unless ($logged_in) {
+            print "   Push may fail — run: docker login -u shantamcsbain\n";
+            print "   (continuing anyway)\n";
+        }
+        print "\n";
+
+        print "--- Step 1: Building production image ($hub_image) ---\n";
+        print "    compose: $comserv_dir/$prod_compose\n\n";
+        my $build_exit = system('docker', 'compose',
+            '-f', "$comserv_dir/$prod_compose",
+            '--project-directory', $comserv_dir,
+            'build', '--progress=plain');
+        $build_exit >>= 8;
+        if ($build_exit != 0) {
+            print "\n❌ BUILD FAILED (exit $build_exit)\n";
+            _exit(1);
+        }
+        print "\n✅ Build complete\n\n";
+
+        print "--- Step 2: Pushing to Docker Hub ($hub_image) ---\n";
+        my $push_exit = system('docker', 'compose',
+            '-f', "$comserv_dir/$prod_compose",
+            '--project-directory', $comserv_dir,
+            'push');
+        $push_exit >>= 8;
+        if ($push_exit != 0) {
+            print "\n❌ PUSH FAILED (exit $push_exit)\n";
+            print "Fix: run 'docker login -u shantamcsbain' on the workstation terminal\n";
+            print "     then click Auto Deploy again\n";
+            _exit(1);
+        }
+        print "\n✅ Push to Docker Hub complete — $hub_image updated\n\n";
+
+        print "--- Step 3: Triggering deploy on $ssh_target ---\n";
+        print "    Running: /opt/comserv/Comserv/deploy.sh\n";
+        local $ENV{SSHPASS} = $ssh_password;
+        my $ssh_exit = system('sshpass', '-e', 'ssh',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            $ssh_target,
+            '/opt/comserv/Comserv/deploy.sh');
+        $ssh_exit >>= 8;
+        if ($ssh_exit != 0) {
+            print "\n⚠️  SSH TRIGGER FAILED (exit $ssh_exit)\n";
+            print "Production cron will auto-deploy within 10 minutes anyway.\n";
+            print "Manual: ssh $ssh_target '/opt/comserv/Comserv/deploy.sh'\n";
+        } else {
+            print "\n✅ Production server deploy triggered successfully\n";
+        }
+        print "\n";
+
+        print "=== DEPLOYMENT COMPLETE at " . scalar(localtime) . " ===\n";
+        print "Log saved: $log_file\n";
+
+        unlink $latest_link if -l $latest_link;
+        symlink $log_file, $latest_link;
+
+        _exit($ssh_exit != 0 ? 2 : 0);
+    }
+
+    if (open my $fh, '>', $pid_file) { print $fh $pid; close $fh; }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_deploy_to_production',
+        "Background deploy forked: pid=$pid log=$log_file");
+
+    $c->response->body(encode_json({
+        success  => \1,
+        message  => 'Deployment started in background',
+        log_file => $log_file,
+        image    => $hub_image,
+    }));
+    $c->response->content_type('application/json');
+}
+
+sub docker_deploy_status :Path('/admin/docker-deploy-status') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_deploy_status')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my $logpath_file = '/tmp/comserv-hub-deploy.logpath';
+    my $pid_file     = '/tmp/comserv-hub-deploy.pid';
+
+    my $log_file = '';
+    if (-f $logpath_file && open my $lp, '<', $logpath_file) {
+        chomp($log_file = <$lp>);
+        close $lp;
+    }
+
+    my $output = '';
+    if ($log_file && -f $log_file && open my $fh, '<', $log_file) {
+        local $/;
+        $output = <$fh>;
+        close $fh;
+    }
+
+    my $is_running = 0;
+    if (-f $pid_file && open my $fh, '<', $pid_file) {
+        my $pid = <$fh>;
+        close $fh;
+        chomp $pid if defined $pid;
+        $is_running = 1 if $pid && $pid =~ /^\d+$/ && kill(0, $pid);
+    }
+
+    $c->response->body(encode_json({
+        success    => \1,
+        output     => $output,
+        is_running => $is_running ? \1 : \0,
+        log_file   => $log_file,
+    }));
+    $c->response->content_type('application/json');
+}
+
+sub docker_deploy_history :Path('/admin/docker-deploy-history') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_deploy_history')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my $home         = $ENV{HOME} || '/home/shanta';
+    my $deploy_log_dir = "$home/PycharmProjects/comserv2/deploy-logs";
+    my $latest_link    = "$deploy_log_dir/latest.log";
+
+    my @logs = ();
+    if (-d $deploy_log_dir) {
+        opendir my $dh, $deploy_log_dir or do {};
+        my @files = sort { $b cmp $a }
+                    grep { /^deploy-\d{8}-\d{6}\.log$/ }
+                    readdir $dh;
+        closedir $dh;
+        @logs = map { "$deploy_log_dir/$_" } @files[0..4];
+        @logs = grep { -f $_ } @logs;
+    }
+
+    my $latest_content = '';
+    my $latest_file    = '';
+    if (-f $latest_link && -l $latest_link) {
+        $latest_file = readlink($latest_link) || '';
+    } elsif (@logs) {
+        $latest_file = $logs[0];
+    }
+    if ($latest_file && -f $latest_file && open my $fh, '<', $latest_file) {
+        local $/;
+        $latest_content = <$fh>;
+        close $fh;
+    }
+
+    $c->response->body(encode_json({
+        success        => \1,
+        latest_file    => $latest_file,
+        latest_content => $latest_content,
+        log_files      => \@logs,
+    }));
     $c->response->content_type('application/json');
 }
 
@@ -5318,6 +6248,14 @@ sub docker_ssh_terminal :Path('/admin/docker-ssh-terminal') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_ssh_terminal',
         "SSH Terminal WebSocket requested");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_ssh_terminal')) {
+        $c->response->status(403);
+        $c->response->status(403);
+        $c->response->body('Access denied: admin required');
+        return;
+    }
+
     # Get parameters from query string
     my $ssh_target = $c->req->params->{ssh_target} || 'ubuntu@192.168.1.126';
     my $ssh_port = $c->req->params->{ssh_port} || 22;
