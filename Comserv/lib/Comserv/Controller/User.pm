@@ -1413,7 +1413,11 @@ sub admin_send_password_reset :Local {
     }
 
     my $return_to = $c->req->param('return_to') || '/user/edit_user/' . $user_id;
-    $c->response->redirect($c->uri_for($return_to));
+    if ($return_to =~ m{^https?://}) {
+        $c->response->redirect($return_to);
+    } else {
+        $c->response->redirect($c->uri_for($return_to));
+    }
 }
 
 sub admin_resend_verification :Local {
@@ -1460,7 +1464,11 @@ sub admin_resend_verification :Local {
     }
 
     my $return_to = $c->req->param('return_to') || '/admin/users';
-    $c->response->redirect($c->uri_for($return_to));
+    if ($return_to =~ m{^https?://}) {
+        $c->response->redirect($return_to);
+    } else {
+        $c->response->redirect($c->uri_for($return_to));
+    }
 }
 
 sub complete_profile :Local {
