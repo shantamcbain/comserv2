@@ -18,7 +18,8 @@
     [% END %]
 
     <div class="ticket-search">
-        <form method="get" action="[% c.uri_for('/HelpDesk/ticket/view') %]">
+        <form method="get" id="ticket-lookup-form"
+              onsubmit="event.preventDefault(); var n=document.getElementById('ticket_id').value.trim(); if(n) window.location='/HelpDesk/ticket/view/'+encodeURIComponent(n);">
             <div class="form-inline">
                 <label for="ticket_id">Find Ticket by Number:</label>
                 <input type="text" id="ticket_id" name="ticket_number" class="form-control"
