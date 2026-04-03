@@ -665,24 +665,23 @@ sub generate :Local :Args(0) {
                     } else {
                         push @trace, "💾 '$use_model' already in memory — no cold-start needed";
                     }
-                    # Renew keep_alive — no prompt so Ollama just refreshes timer without generating
-                    eval {
-                        my $ping_ua  = LWP::UserAgent->new(timeout => 10);
-                        my $ping_url = "http://$current_host:" . ($current_port || 11434) . "/api/generate";
-                        my $ping_payload = encode_json({
-                            model      => $use_model,
-                            keep_alive => '2h',
-                        });
-                        $ping_ua->post($ping_url, 'Content-Type' => 'application/json', Content => $ping_payload);
-                        push @trace, "🔁 keep_alive renewed for '$use_model'";
-                    };
+                    # Renew keep_alive asynchronously — fork so it never delays the chat request
+                    my $ping_url = "http://$current_host:" . ($current_port || 11434) . "/api/generate";
+                    my $ping_payload = encode_json({ model => $use_model, keep_alive => '2h' });
+                    my $ping_pid = fork();
+                    if (defined $ping_pid && $ping_pid == 0) {
+                        my $child_ua = LWP::UserAgent->new(timeout => 15);
+                        $child_ua->post($ping_url, 'Content-Type' => 'application/json', Content => $ping_payload);
+                        exit 0;
+                    }
+                    push @trace, "🔁 keep_alive renewal dispatched async for '$use_model'";
                 }
             }
 
             # Use a longer timeout when model is NOT in memory (cold start: load + generate)
             my $is_cold_start = !grep { ($_ && ref $_ ? $_->{name} : $_) eq $use_model }
                                       @{ $fast_check->get_running_models() || [] };
-            my $timeout_secs = $is_cold_start ? 600 : 300;
+            my $timeout_secs = $is_cold_start ? 600 : 480;
             push @trace, $is_cold_start
                 ? "🧊 Cold start detected — timeout extended to ${timeout_secs}s"
                 : "🔥 Model warm — timeout ${timeout_secs}s";
@@ -1832,24 +1831,23 @@ sub chat :Local :Args(0) {
                     } else {
                         push @chat_trace, "💾 '$chat_use_model' already in memory — no cold-start needed";
                     }
-                    # Renew keep_alive — no prompt so Ollama just refreshes timer without generating
-                    eval {
-                        my $ping_ua  = LWP::UserAgent->new(timeout => 10);
-                        my $ping_url = "http://$current_host:" . ($current_port || 11434) . "/api/generate";
-                        my $ping_payload = encode_json({
-                            model      => $chat_use_model,
-                            keep_alive => '2h',
-                        });
-                        $ping_ua->post($ping_url, 'Content-Type' => 'application/json', Content => $ping_payload);
-                        push @chat_trace, "🔁 keep_alive renewed for '$chat_use_model'";
-                    };
+                    # Renew keep_alive asynchronously — fork so it never delays the chat request
+                    my $chat_ping_url = "http://$current_host:" . ($current_port || 11434) . "/api/generate";
+                    my $chat_ping_payload = encode_json({ model => $chat_use_model, keep_alive => '2h' });
+                    my $chat_ping_pid = fork();
+                    if (defined $chat_ping_pid && $chat_ping_pid == 0) {
+                        my $child_ua = LWP::UserAgent->new(timeout => 15);
+                        $child_ua->post($chat_ping_url, 'Content-Type' => 'application/json', Content => $chat_ping_payload);
+                        exit 0;
+                    }
+                    push @chat_trace, "🔁 keep_alive renewal dispatched async for '$chat_use_model'";
                 }
             }
 
             # Use a longer timeout for cold starts (model not in memory)
             my $chat_running = eval { $avail_check->get_running_models() } || [];
             my $chat_cold = !grep { ($_ && ref $_ ? $_->{name} : $_) eq $chat_use_model } @$chat_running;
-            my $chat_timeout = $chat_cold ? 600 : 300;
+            my $chat_timeout = $chat_cold ? 600 : 480;
             push @chat_trace, $chat_cold
                 ? "🧊 Cold start — timeout extended to ${chat_timeout}s"
                 : "🔥 Model warm — timeout ${chat_timeout}s";
@@ -3712,7 +3710,20 @@ sub _build_role_system_prompt {
     $page_title //= '';
 
     my $base_url = '';
-    eval { $base_url = $c->uri_for('/') . ''; $base_url =~ s{/$}{}; };
+    eval {
+        my $req       = $c->request;
+        my $fwd_host  = $req->header('X-Forwarded-Host')  || $req->header('HTTP_X_FORWARDED_HOST');
+        my $fwd_proto = $req->header('X-Forwarded-Proto') || $req->header('HTTP_X_FORWARDED_PROTO') || '';
+        if ($fwd_host) {
+            my $scheme = $fwd_proto || ($req->secure ? 'https' : 'http');
+            $base_url = "$scheme://$fwd_host";
+        } else {
+            $base_url = $c->uri_for('/') . '';
+            $base_url =~ s{/$}{};
+            $base_url =~ s{^(https?://[^:/]+):\d+}{$1}
+                unless $base_url =~ m{://[^:/]+:(80|443)(?:/|$)};
+        }
+    };
 
     my @role_list = ref($roles) eq 'ARRAY' ? @$roles : split(/\s*,\s*/, $roles || '');
     my $is_admin = grep { /^(admin|developer|editor)$/i } @role_list;
