@@ -1,0 +1,262 @@
+[% PageVersion = 'WorkShops/display.tt,v 0.02 2024/07/01 ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="display-container">
+    <div class="presentation-header">
+        <h1>[% title || metadata.title || presentation_name.replace('_', ' ').ucfirst %]</h1>
+        <div class="presentation-actions">
+            <a href="[% c.uri_for('/workshop/files') %]" class="action-link files-link">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                    <polyline points="13 2 13 9 20 9"></polyline>
+                </svg>
+                All Files
+            </a>
+            <a href="[% c.uri_for('/workshop/presentations') %]" class="action-link presentations-link">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                </svg>
+                All Presentations
+            </a>
+            <a href="[% c.uri_for('/workshop') %]" class="action-link back-link">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back to Workshops
+            </a>
+        </div>
+    </div>
+    
+    <div class="presentation-info-bar">
+        [% IF metadata.slides_count %]
+        <div class="info-item">
+            <span class="info-label">Slides:</span>
+            <span class="info-value">[% metadata.slides_count %]</span>
+        </div>
+        [% END %]
+        
+        [% IF metadata.original_file %]
+        <div class="info-item">
+            <span class="info-label">Original File:</span>
+            <span class="info-value">[% metadata.original_file %]</span>
+            <a href="[% c.uri_for('/workshop/download', { file => metadata.original_file }) %]" class="download-link">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Download
+            </a>
+        </div>
+        [% END %]
+    </div>
+    
+    <div class="presentation-frame-container">
+        <iframe src="[% presentation_url %]" class="presentation-frame" allowfullscreen></iframe>
+    </div>
+    
+    <div class="presentation-controls">
+        <a href="[% presentation_url %]" class="control-button open-button" target="_blank">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+            Open in New Tab
+        </a>
+    </div>
+    
+    [% IF metadata.description %]
+    <div class="presentation-description">
+        <h2>Description</h2>
+        <p>[% metadata.description %]</p>
+    </div>
+    [% END %]
+</div>
+
+<style>
+    .display-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .presentation-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    
+    @media (max-width: 768px) {
+        .presentation-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        .presentation-actions {
+            margin-top: 15px;
+            width: 100%;
+        }
+    }
+    
+    .presentation-header h1 {
+        color: #2c3e50;
+        margin: 0;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #3498db;
+    }
+    
+    .presentation-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .action-link {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 8px 12px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: background-color 0.2s, color 0.2s;
+    }
+    
+    .files-link {
+        background-color: #ff9800;
+        color: white;
+    }
+    
+    .files-link:hover {
+        background-color: #e68a00;
+    }
+    
+    .presentations-link {
+        background-color: #2196F3;
+        color: white;
+    }
+    
+    .presentations-link:hover {
+        background-color: #0b7dda;
+    }
+    
+    .back-link {
+        background-color: #607d8b;
+        color: white;
+    }
+    
+    .back-link:hover {
+        background-color: #546e7a;
+    }
+    
+    .presentation-info-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+    
+    .info-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .info-label {
+        font-weight: bold;
+        color: #6c757d;
+    }
+    
+    .info-value {
+        color: #343a40;
+    }
+    
+    .download-link {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        color: #2196F3;
+        text-decoration: none;
+        margin-left: 8px;
+    }
+    
+    .download-link:hover {
+        text-decoration: underline;
+    }
+    
+    .presentation-frame-container {
+        position: relative;
+        padding-bottom: 56.25%; /* 16:9 aspect ratio */
+        height: 0;
+        overflow: hidden;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background-color: #fff;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .presentation-frame {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+    }
+    
+    .presentation-controls {
+        display: flex;
+        justify-content: center;
+        margin-top: 20px;
+    }
+    
+    .control-button {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 10px 15px;
+        background-color: #2196F3;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        font-weight: 500;
+        transition: background-color 0.2s;
+    }
+    
+    .control-button:hover {
+        background-color: #0b7dda;
+    }
+    
+    .presentation-description {
+        margin-top: 30px;
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        border-left: 4px solid #3498db;
+    }
+    
+    .presentation-description h2 {
+        font-size: 1.2em;
+        color: #2c3e50;
+        margin-top: 0;
+        margin-bottom: 15px;
+        border-bottom: 1px solid #e9ecef;
+        padding-bottom: 8px;
+    }
+    
+    .presentation-description p {
+        color: #495057;
+        line-height: 1.5;
+    }
+</style>

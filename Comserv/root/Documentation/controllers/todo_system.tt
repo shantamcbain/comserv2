@@ -1,0 +1,222 @@
+[% PageVersion = 'Comserv/root/Documentation/controllers/todo_system.tt,v 1.0 2025/01/27 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Todo System Documentation' %]
+
+<!-- Documentation page for Todo System -->
+<div class="documentation-content">
+
+<div class="markdown-content">
+
+<div class="apiary-container">
+
+<header class="feature-header">
+    <h1><i class="fas fa-tasks"></i> Todo System Documentation</h1>
+    <p class="feature-description">Comprehensive guide to the Comserv Todo Management System</p>
+    <div class="context-info">
+        <span class="context-label">Controller:</span> Comserv::Controller::Todo
+        <span class="context-label">Model:</span> Comserv::Model::Todo
+        <span class="context-label">Database:</span> ency.todo
+    </div>
+</header>
+
+<section id="overview" class="feature-section">
+    <h2><i class="fas fa-info-circle"></i> System Overview</h2>
+    <p>The Todo System provides comprehensive task management capabilities for the Comserv platform, including task creation, assignment, tracking, and reporting.</p>
+    
+    <div class="feature-grid">
+        <div class="feature-card">
+            <h3><i class="fas fa-plus"></i> Task Creation</h3>
+            <p>Create new tasks with detailed information including priorities, due dates, and project assignments.</p>
+        </div>
+        <div class="feature-card">
+            <h3><i class="fas fa-edit"></i> Task Management</h3>
+            <p>Update task status, modify details, and track progress through completion.</p>
+        </div>
+        <div class="feature-card">
+            <h3><i class="fas fa-calendar"></i> Calendar Views</h3>
+            <p>View tasks by day, week, or month with integrated calendar functionality.</p>
+        </div>
+        <div class="feature-card">
+            <h3><i class="fas fa-filter"></i> Advanced Filtering</h3>
+            <p>Filter tasks by project, status, priority, and custom search criteria.</p>
+        </div>
+    </div>
+</section>
+
+<section id="recent-updates" class="feature-section">
+    <h2><i class="fas fa-clock"></i> Recent Updates (2025-01-27)</h2>
+    
+    <div class="update-card success">
+        <h3><i class="fas fa-shield-alt"></i> Enhanced Error Handling</h3>
+        <p><strong>Issue Fixed:</strong> Database constraint errors during record updates</p>
+        <ul>
+            <li><strong>Root Cause:</strong> Empty form fields overwriting existing data with empty strings</li>
+            <li><strong>Solution:</strong> Field preservation logic - keeps existing values when form fields are empty</li>
+            <li><strong>Implementation:</strong> <code>project_id => $form_data->{project_id} || $todo->project_id</code></li>
+        </ul>
+    </div>
+    
+    <div class="update-card info">
+        <h3><i class="fas fa-envelope"></i> Admin Notification System</h3>
+        <p><strong>New Feature:</strong> Automatic error reporting and admin alerts</p>
+        <ul>
+            <li><strong>Email Notifications:</strong> Admins receive immediate alerts for database errors</li>
+            <li><strong>Error Context:</strong> Full details including user, timestamp, URL, and form data</li>
+            <li><strong>Security:</strong> Sensitive fields excluded from notifications</li>
+            <li><strong>Fallback Logging:</strong> Complete error details logged if email fails</li>
+        </ul>
+    </div>
+    
+    <div class="update-card warning">
+        <h3><i class="fas fa-user-friends"></i> Improved User Experience</h3>
+        <p><strong>Enhancement:</strong> User-friendly error messages replace technical database errors</p>
+        <ul>
+            <li><strong>Clear Messages:</strong> "Invalid project selection. Please choose a valid project or leave it blank."</li>
+            <li><strong>Form Preservation:</strong> User's work is preserved when errors occur</li>
+            <li><strong>Actionable Guidance:</strong> Users receive clear instructions on how to fix issues</li>
+        </ul>
+    </div>
+</section>
+
+<section id="controller-methods" class="feature-section">
+    <h2><i class="fas fa-code"></i> Controller Methods</h2>
+    
+    <div class="method-grid">
+        <div class="method-card">
+            <h3>index / todo</h3>
+            <p><strong>Path:</strong> <code>/todo</code></p>
+            <p>Main todo listing with filtering and search capabilities</p>
+        </div>
+        
+        <div class="method-card">
+            <h3>details</h3>
+            <p><strong>Path:</strong> <code>/todo/details/{id}</code></p>
+            <p>View and edit individual todo items</p>
+        </div>
+        
+        <div class="method-card">
+            <h3>modify</h3>
+            <p><strong>Path:</strong> <code>/todo/modify/{id}</code></p>
+            <p>Update existing todo records with enhanced error handling</p>
+        </div>
+        
+        <div class="method-card">
+            <h3>create</h3>
+            <p><strong>Path:</strong> <code>/todo/create</code></p>
+            <p>Create new todo items</p>
+        </div>
+        
+        <div class="method-card">
+            <h3>day</h3>
+            <p><strong>Path:</strong> <code>/todo/day/{date}</code></p>
+            <p>Daily view of todos due or starting on specific date</p>
+        </div>
+        
+        <div class="method-card">
+            <h3>week</h3>
+            <p><strong>Path:</strong> <code>/todo/week/{date}</code></p>
+            <p>Weekly calendar view of todos</p>
+        </div>
+        
+        <div class="method-card">
+            <h3>month</h3>
+            <p><strong>Path:</strong> <code>/todo/month/{date}</code></p>
+            <p>Monthly calendar view with todo distribution</p>
+        </div>
+        
+        <div class="method-card">
+            <h3>get_overdue_todos</h3>
+            <p><strong>Type:</strong> Private method</p>
+            <p>Retrieves overdue todos for dashboard display</p>
+        </div>
+    </div>
+</section>
+
+<section id="error-handling" class="feature-section">
+    <h2><i class="fas fa-exclamation-triangle"></i> Error Handling System</h2>
+    
+    <h3>Database Error Management</h3>
+    <div class="code-block">
+        <h4>Field Preservation Logic</h4>
+        <pre><code>project_id => $form_data->{project_id} || $todo->project_id,
+user_id    => $form_data->{user_id} || 1,
+share      => $form_data->{share} || 0,</code></pre>
+    </div>
+    
+    <h3>User-Friendly Error Messages</h3>
+    <ul>
+        <li><strong>Invalid Project:</strong> "Invalid project selection. Please choose a valid project or leave it blank."</li>
+        <li><strong>Invalid User:</strong> "Invalid user selection. Please choose a valid user."</li>
+        <li><strong>Data Too Long:</strong> "One or more fields contain too much text. Please shorten your input."</li>
+        <li><strong>Required Fields:</strong> "Required fields are missing. Please fill in all required information."</li>
+    </ul>
+    
+    <h3>Admin Notification Method</h3>
+    <div class="code-block">
+        <h4>_notify_admin_of_error</h4>
+        <pre><code>sub _notify_admin_of_error :Private {
+    my ($self, $c, $record_id, $error_msg, $form_data) = @_;
+    
+    # Email notification with full context
+    # Detailed logging for administrator review
+    # Security: excludes sensitive fields
+}</code></pre>
+    </div>
+</section>
+
+<section id="future-enhancements" class="feature-section">
+    <h2><i class="fas fa-lightbulb"></i> Future Enhancements</h2>
+    
+    <div class="enhancement-card">
+        <h3><i class="fas fa-robot"></i> Automated Todo Creation</h3>
+        <p><strong>Proposed Feature:</strong> AI-driven todo creation from system errors and user requests</p>
+        <ul>
+            <li>Global error catching system that creates todos for critical issues</li>
+            <li>AI prompt interface for creating todos from natural language</li>
+            <li>Integration with HelpDesk system for support ticket conversion</li>
+            <li>Automated assignment based on error type and system component</li>
+        </ul>
+        <p><strong>Status:</strong> <span class="status-pending">Planned for next development session</span></p>
+    </div>
+    
+    <div class="enhancement-card">
+        <h3><i class="fas fa-chart-line"></i> Advanced Analytics</h3>
+        <p>Enhanced reporting and analytics for todo completion rates, user productivity, and project progress tracking.</p>
+    </div>
+    
+    <div class="enhancement-card">
+        <h3><i class="fas fa-bell"></i> Real-time Notifications</h3>
+        <p>Push notifications for due dates, assignments, and status changes.</p>
+    </div>
+</section>
+
+<section id="technical-notes" class="feature-section">
+    <h2><i class="fas fa-cogs"></i> Technical Implementation Notes</h2>
+    
+    <h3>Database Schema</h3>
+    <p><strong>Table:</strong> <code>ency.todo</code></p>
+    <p><strong>Key Fields:</strong> record_id (PK), project_id (FK), user_id (FK), sitename, status, priority</p>
+    
+    <h3>Security</h3>
+    <ul>
+        <li>Admin role required for all todo operations</li>
+        <li>Session-based authentication</li>
+        <li>Site-specific data isolation</li>
+    </ul>
+    
+    <h3>Performance Considerations</h3>
+    <ul>
+        <li>Database queries optimized with proper indexing</li>
+        <li>Prefetch relationships for efficient data loading</li>
+        <li>Calendar views use date-range filtering</li>
+    </ul>
+</section>
+
+</div>
+
+</div>
+
+</div>

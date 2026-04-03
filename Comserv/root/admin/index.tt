@@ -228,6 +228,10 @@
                         <i class="fas fa-archive"></i>
                         <span>Backup Management</span>
                     </a>
+                    <a href="[% c.uri_for('/admin/security-scan') %]" class="admin-link">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>Security Scan</span>
+                    </a>
                 </div>
             </div>
         </div>

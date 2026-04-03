@@ -1,0 +1,346 @@
+[% PageVersion = 'WorkShops/uploaded_files.tt,v 0.01 2024/07/01 ' %]
+[% IF debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+
+<h1>Workshop Presentation Files</h1>
+
+<div class="files-container">
+    <div class="files-actions">
+        <a href="/workshop/upload" class="button upload-button">Upload New File</a>
+        <a href="/workshop/presentations" class="button list-button">View Presentations</a>
+        <a href="/workshop" class="button return-button">Return to Workshops</a>
+    </div>
+    
+    [% IF is_admin && debug_info %]
+    <div class="admin-debug">
+        <h3>Admin Debug Information</h3>
+        <pre>[% debug_info %]</pre>
+    </div>
+    [% END %]
+    
+    <div class="file-types">
+        <h2>Uploaded Files</h2>
+        <p>These are the presentation files that have been uploaded to the system.</p>
+        
+        [% IF files.size > 0 %]
+        <table class="files-table">
+            <thead>
+                <tr>
+                    <th>File Name</th>
+                    <th>Type</th>
+                    <th>Size</th>
+                    <th>Upload Date</th>
+                    <th>Owner</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                [% FOREACH file IN files %]
+                <tr>
+                    <td>[% file.name %]</td>
+                    <td>[% file.extension %]</td>
+                    <td>[% file.size_formatted %]</td>
+                    <td>[% file.mtime_formatted %]</td>
+                    <td>[% file.owner %]</td>
+                    <td>
+                        [% IF file.has_html %]
+                        <span class="status converted">Converted</span>
+                        [% ELSE %]
+                        <span class="status needs-conversion">Needs Conversion</span>
+                        [% END %]
+                    </td>
+                    <td class="actions">
+                        <a href="/workshop/download?file=[% file.name %]" class="action-link download-link">Download</a>
+                        
+                        [% IF file.has_html %]
+                        <a href="/workshop/display/[% file.base_name %]" class="action-link view-link">View</a>
+                        [% ELSE %]
+                            [% IF file.can_edit %]
+                            <form method="POST" action="/workshop/convert" class="inline-form">
+                                <input type="hidden" name="file_path" value="[% file.path %]">
+                                <input type="hidden" name="base_name" value="[% file.base_name %]">
+                                <button type="submit" class="action-button convert-button">Convert</button>
+                            </form>
+                            [% END %]
+                        [% END %]
+                        
+                        [% IF file.can_edit %]
+                        <form method="POST" action="/workshop/delete_file" class="inline-form">
+                            <input type="hidden" name="file_path" value="[% file.path %]">
+                            <button type="submit" class="action-button delete-button" onclick="return confirm('Are you sure you want to delete this file?')">Delete</button>
+                        </form>
+                        [% END %]
+                    </td>
+                </tr>
+                [% END %]
+            </tbody>
+        </table>
+        [% ELSE %]
+        <div class="no-files">
+            <p>No files have been uploaded yet.</p>
+            <a href="/workshop/upload" class="button upload-button">Upload Your First File</a>
+        </div>
+        [% END %]
+    </div>
+    
+    <div class="file-types">
+        <h2>Converted Presentations</h2>
+        <p>These presentations have been converted to web format and are ready to view.</p>
+        
+        [% IF converted_files.size > 0 %]
+        <table class="files-table">
+            <thead>
+                <tr>
+                    <th>Presentation Name</th>
+                    <th>Original File</th>
+                    <th>Slides</th>
+                    <th>Conversion Date</th>
+                    <th>Owner</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                [% FOREACH file IN converted_files %]
+                <tr>
+                    <td>[% file.title || file.name %]</td>
+                    <td>[% file.original_file || 'N/A' %]</td>
+                    <td>[% file.slides || 'Unknown' %]</td>
+                    <td>[% file.mtime_formatted %]</td>
+                    <td>[% file.owner %]</td>
+                    <td class="actions">
+                        <a href="/workshop/display/[% file.base_name %]" class="action-link view-link">View</a>
+                        [% IF file.can_edit %]
+                        <form method="POST" action="/workshop/delete_converted" class="inline-form">
+                            <input type="hidden" name="base_name" value="[% file.base_name %]">
+                            <button type="submit" class="action-button delete-button" onclick="return confirm('Are you sure you want to delete this converted presentation?')">Delete</button>
+                        </form>
+                        [% END %]
+                    </td>
+                </tr>
+                [% END %]
+            </tbody>
+        </table>
+        [% ELSE %]
+        <div class="no-files">
+            <p>No presentations have been converted yet.</p>
+            <p>Upload a file and convert it to create your first web presentation.</p>
+        </div>
+        [% END %]
+    </div>
+</div>
+
+<style>
+    .files-container {
+        margin: 20px 0;
+    }
+    
+    .files-actions {
+        margin-bottom: 30px;
+    }
+    
+    .button {
+        display: inline-block;
+        padding: 8px 15px;
+        background-color: #4CAF50;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        margin-right: 10px;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    
+    .button:hover {
+        background-color: #45a049;
+    }
+    
+    .upload-button {
+        background-color: #ff9800;
+    }
+    
+    .upload-button:hover {
+        background-color: #e68a00;
+    }
+    
+    .list-button {
+        background-color: #2196F3;
+    }
+    
+    .list-button:hover {
+        background-color: #0b7dda;
+    }
+    
+    .return-button {
+        background-color: #607d8b;
+    }
+    
+    .return-button:hover {
+        background-color: #546e7a;
+    }
+    
+    .file-types {
+        margin-bottom: 40px;
+        background-color: #f9f9f9;
+        padding: 20px;
+        border-radius: 8px;
+    }
+    
+    .file-types h2 {
+        color: #333;
+        margin-top: 0;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .file-types > p {
+        color: #666;
+        margin-bottom: 20px;
+    }
+    
+    .files-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+        background-color: white;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .files-table th, .files-table td {
+        border: 1px solid #ddd;
+        padding: 12px;
+        text-align: left;
+    }
+    
+    .files-table th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+    }
+    
+    .files-table tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+    
+    .files-table tr:hover {
+        background-color: #f5f5f5;
+    }
+    
+    .status {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: bold;
+    }
+    
+    .status.converted {
+        background-color: #dff0d8;
+        color: #3c763d;
+    }
+    
+    .status.needs-conversion {
+        background-color: #fcf8e3;
+        color: #8a6d3b;
+    }
+    
+    .actions {
+        white-space: nowrap;
+    }
+    
+    .action-link, .action-button {
+        display: inline-block;
+        padding: 6px 10px;
+        margin: 0 3px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 12px;
+        font-weight: bold;
+        text-align: center;
+    }
+    
+    .download-link {
+        background-color: #4CAF50;
+        color: white;
+    }
+    
+    .download-link:hover {
+        background-color: #45a049;
+    }
+    
+    .view-link {
+        background-color: #2196F3;
+        color: white;
+    }
+    
+    .view-link:hover {
+        background-color: #0b7dda;
+    }
+    
+    .convert-button {
+        background-color: #ff9800;
+        color: white;
+        border: none;
+        cursor: pointer;
+    }
+    
+    .convert-button:hover {
+        background-color: #e68a00;
+    }
+    
+    .delete-button {
+        background-color: #f44336;
+        color: white;
+        border: none;
+        cursor: pointer;
+    }
+    
+    .delete-button:hover {
+        background-color: #d32f2f;
+    }
+    
+    .inline-form {
+        display: inline-block;
+    }
+    
+    .no-files {
+        text-align: center;
+        padding: 30px;
+        background-color: #fff;
+        border-radius: 8px;
+        color: #666;
+        margin-top: 20px;
+    }
+    
+    .no-files p {
+        margin-bottom: 15px;
+    }
+    
+    /* Admin debug box styling */
+    .admin-debug {
+        margin: 20px 0;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+    
+    .admin-debug h3 {
+        margin-top: 0;
+        color: #333;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 8px;
+        margin-bottom: 10px;
+    }
+    
+    .admin-debug pre {
+        background-color: #fff;
+        padding: 10px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 14px;
+        overflow-x: auto;
+        white-space: pre-wrap;
+    }
+</style>

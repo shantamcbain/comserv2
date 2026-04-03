@@ -1,0 +1,70 @@
+[% META
+   title = "Constituents - Encyclopedia of Biological Life"
+   description = "Browse all chemical constituents in the ENCY encyclopedia"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-02"
+%]
+[% PageVersion = 'ENCY/ConstituentList.tt,v 0.01 2026/04/02' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.success_msg %]
+<div class="alert alert-success">[% c.flash.success_msg | html %]</div>
+[% END %]
+[% IF c.flash.error_msg %]
+<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
+[% END %]
+
+<h1>Constituents</h1>
+
+<p><a href="[% c.uri_for('/ENCY') %]">&larr; Back to Encyclopedia</a></p>
+
+[% roles = c.session.roles;
+   is_admin = 0;
+   FOREACH r IN roles;
+     IF r == 'admin'; is_admin = 1; END;
+   END;
+%]
+[% IF is_admin %]
+<a href="[% c.uri_for('/ENCY/Constituent/add') %]" class="btn btn-primary">Add Constituent</a>
+[% END %]
+
+<form method="get" action="[% c.uri_for('/ENCY/Constituent') %]">
+    <label>Chemical Class:
+        <input type="text" name="chemical_class" value="[% chemical_class | html %]" size="30" />
+    </label>
+    <input type="submit" value="Filter" class="btn btn-default" />
+    <a href="[% c.uri_for('/ENCY/Constituent') %]">Clear</a>
+</form>
+
+[% IF constituents && constituents.size %]
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <th>Name</th>
+        <th>Common Name</th>
+        <th>Chemical Class</th>
+        <th>Chemical Formula</th>
+        <th></th>
+    </tr>
+    [% FOREACH constituent IN constituents %]
+    <tr>
+        <td>[% constituent.name | html %]</td>
+        <td>[% constituent.common_name | html %]</td>
+        <td>[% constituent.chemical_class | html %]</td>
+        <td>[% constituent.chemical_formula | html %]</td>
+        <td><a href="[% c.uri_for('/ENCY/Constituent', constituent.record_id) %]">Details</a></td>
+    </tr>
+    [% END %]
+</table>
+[% ELSE %]
+<p>No constituents found in the database.</p>
+[% END %]
+
+[% IF ai_fallback %]
+<div class="alert alert-info" style="margin-top:1em;">
+  No local results for &ldquo;[% ai_query | html %]&rdquo;.
+  <a href="/AI/chat?prompt=Tell+me+about+[% ai_query | uri %]+in+the+context+of+the+encyclopedia">Ask AI</a>
+</div>
+[% END %]

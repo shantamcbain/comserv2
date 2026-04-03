@@ -1,0 +1,39 @@
+[% META title = 'Edit Mailing List' %]
+
+<div class="admin-content">
+    <div class="admin-header">
+        <h1>Edit Mailing List</h1>
+        <div class="admin-actions">
+            <a href="[% c.uri_for('/mail/lists') %]" class="btn btn-secondary">Back to Lists</a>
+        </div>
+    </div>
+
+    [% IF c.flash.error_msg %]<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>[% END %]
+
+    <div class="admin-card">
+        <form method="POST" action="[% c.uri_for('/mail/lists', list.id, 'edit') %]" class="admin-form">
+            <div class="form-group">
+                <label for="name">List Name <span style="color:red;">*</span></label>
+                <input type="text" id="name" name="name" required value="[% list.name | html %]">
+            </div>
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea id="description" name="description" rows="3">[% list.description | html %]</textarea>
+            </div>
+            <div class="form-group">
+                <label for="list_email">List Email Address</label>
+                <input type="email" id="list_email" name="list_email" value="[% list.list_email | html %]">
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="is_software_only" value="1" [% list.is_software_only ? 'checked' : '' %]>
+                    Software-only list (no Virtualmin server list)
+                </label>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+                <a href="[% c.uri_for('/mail/lists') %]" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
