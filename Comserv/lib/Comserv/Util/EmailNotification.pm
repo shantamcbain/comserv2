@@ -506,7 +506,23 @@ sub get_smtp_config {
             $config{$cfg->config_key} = $cfg->config_value;
         }
     }
-    
+
+    if ($config{smtp_host}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
+            "Using configured smtp_host '$config{smtp_host}' for site '$sitename'");
+    } else {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_smtp_config',
+            "No smtp_host in DB for site '$sitename' — using harper fallback");
+        $config{smtp_host} = 'harper.whc.ca';
+        $config{smtp_port} = 465;
+        $config{smtp_ssl}  = 'ssl';
+        $config{smtp_from} = $config{smtp_from} || 'noreply@computersystemconsulting.ca';
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
+        "SMTP config for '$sitename': host=$config{smtp_host} port=" . ($config{smtp_port}||25) .
+        " from=" . ($config{smtp_from}||'(none)'));
+
     return \%config;
 }
 
