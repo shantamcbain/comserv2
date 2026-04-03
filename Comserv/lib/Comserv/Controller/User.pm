@@ -1210,19 +1210,136 @@ sub verify_email :Local {
                 "AUDIT: Email verified user_id=$user_id ip=$verify_ip");
             
             delete $c->session->{verification_code_display};
+            delete $c->session->{verify_fail_count};
             $c->response->redirect($c->uri_for('/user/complete_profile'));
         } else {
+            my $fail_count = ($c->session->{verify_fail_count} || 0) + 1;
+            $c->session->{verify_fail_count} = $fail_count;
+
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'verify_email',
-                "Invalid or expired verification code for user ID: $user_id");
-            
+                "Invalid or expired verification code for user_id=$user_id fail_count=$fail_count ip=" . ($c->req->address || 'unknown'));
+
+            my $reason = ($code && length($code) == 6)
+                ? 'Wrong or expired code entered'
+                : 'Malformed code entered';
+
+            if ($fail_count >= 2) {
+                eval {
+                    $self->email_notification->send_admin_verification_alert($c, $user, $reason);
+                };
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'verify_email',
+                    "Admin verification alert sent for user_id=$user_id") unless $@;
+            }
+
             $c->stash(
-                error_msg => 'Invalid or expired verification code. Please try again.',
-                template => 'user/VerifyEmail.tt'
+                error_msg  => 'Invalid or expired verification code. You can request a new code below.',
+                code_failed => 1,
+                template   => 'user/VerifyEmail.tt',
             );
         }
     } else {
         $c->stash(template => 'user/VerifyEmail.tt');
     }
+}
+
+sub resend_verification_code :Local {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{verification_user_id}) {
+        $c->flash->{error_msg} = 'No active registration found. Please register again.';
+        $c->response->redirect($c->uri_for('/user/register'));
+        return;
+    }
+
+    my $user_id = $c->session->{verification_user_id};
+    my $user    = $c->model('DBEncy::User')->find($user_id);
+
+    unless ($user) {
+        $c->flash->{error_msg} = 'User not found. Please register again.';
+        $c->response->redirect($c->uri_for('/user/register'));
+        return;
+    }
+
+    my $recent_count = eval {
+        $user->verification_codes->search({
+            created_at => { '>=' => DateTime->now->subtract(minutes => 2)->strftime('%Y-%m-%d %H:%M:%S') },
+            verified_at => undef,
+        })->count;
+    } || 0;
+
+    if ($recent_count > 0) {
+        $c->flash->{error_msg} = 'A code was sent very recently. Please wait 2 minutes before requesting another.';
+        $c->response->redirect($c->uri_for('/user/verify_email'));
+        return;
+    }
+
+    my $new_code;
+    eval {
+        $new_code = $self->user_verification->generate_verification_code();
+        $self->user_verification->create_verification_code($user, $new_code);
+        $self->email_notification->send_verification_email($c, $user, $new_code);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resend_verification_code',
+            "Failed to resend code for user_id=$user_id: $@");
+        $c->flash->{error_msg} = 'Failed to send a new code. Please try again or contact support.';
+    } else {
+        $c->session->{verification_code_display} = $new_code;
+        $c->session->{email_sent}     = 1;
+        $c->session->{verify_fail_count} = 0;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resend_verification_code',
+            "AUDIT: Verification code resent user_id=$user_id ip=" . ($c->req->address || 'unknown'));
+        $c->flash->{success_msg} = 'A new verification code has been sent to your email address.';
+    }
+
+    $c->response->redirect($c->uri_for('/user/verify_email'));
+}
+
+sub admin_resend_verification :Local {
+    my ($self, $c) = @_;
+
+    my $roles = $c->session->{roles} || [];
+    my @roles_list = ref $roles eq 'ARRAY' ? @$roles : split /,/, ($roles || '');
+    unless (grep { lc($_) eq 'admin' || lc($_) eq 'site_admin' } @roles_list) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $user_id = $c->req->param('user_id');
+    unless ($user_id && $user_id =~ /^\d+$/) {
+        $c->flash->{error_msg} = 'Invalid or missing user ID.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $user = $c->model('DBEncy::User')->find($user_id);
+    unless ($user) {
+        $c->flash->{error_msg} = "User #$user_id not found.";
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $new_code;
+    eval {
+        $new_code = $self->user_verification->generate_verification_code();
+        $self->user_verification->create_verification_code($user, $new_code);
+        $self->email_notification->send_verification_email($c, $user, $new_code);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_resend_verification',
+            "Admin failed to resend code for user_id=$user_id: $@");
+        $c->flash->{error_msg} = 'Failed to send verification code to ' . $user->email . ': ' . $@;
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_resend_verification',
+            "AUDIT: Admin " . ($c->session->{username} || '?') . " resent verification code "
+            . "to user_id=$user_id email=" . $user->email
+            . " admin_ip=" . ($c->req->address || 'unknown'));
+        $c->flash->{success_msg} = 'Verification code resent to ' . $user->email . '.';
+    }
+
+    my $return_to = $c->req->param('return_to') || '/admin/users';
+    $c->response->redirect($c->uri_for($return_to));
 }
 
 sub complete_profile :Local {
