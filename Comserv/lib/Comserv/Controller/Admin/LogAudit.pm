@@ -18,8 +18,13 @@ has 'logging' => (
 sub index :Path('/admin/logging/audit') :Args(0) {
     my ($self, $c) = @_;
 
-    my $hours = int($c->req->param('hours') || 24);
+    my $hours  = int($c->req->param('hours')  || 24);
     $hours = 24 unless $hours > 0 && $hours <= 720;
+
+    my $filter_system = $c->req->param('system') // '';
+    my $filter_level  = $c->req->param('level')  // '';
+    $filter_system =~ s/[^\w\.\-:]//g;
+    $filter_level  =~ s/[^A-Z]//g;
 
     # Local Docker containers (fast — direct docker ps)
     my $docker_health = [];
@@ -38,6 +43,8 @@ sub index :Path('/admin/logging/audit') :Args(0) {
         docker_health    => $docker_health,
         docker_health_db => $docker_health_db,
         hours            => $hours,
+        filter_system    => $filter_system,
+        filter_level     => $filter_level,
     );
 }
 
@@ -49,13 +56,21 @@ sub stats :Path('/admin/logging/audit/stats') :Args(0) {
     my $hours = int($c->req->param('hours') || 24);
     $hours = 24 unless $hours > 0 && $hours <= 720;
 
+    my $filter_system = $c->req->param('system') // '';
+    my $filter_level  = $c->req->param('level')  // '';
+    $filter_system =~ s/[^\w\.\-:]//g;
+    $filter_level  =~ s/[^A-Z]//g;
+
     my $audit      = {};
     my $alerts     = [];
     my $page_error = '';
 
     eval {
         my $schema = $c->model('DBEncy');
-        $audit = Comserv::Util::HealthLogger->audit_stats($schema, hours => $hours);
+        $audit = Comserv::Util::HealthLogger->audit_stats($schema, hours => $hours,
+            ($filter_system ? (system => $filter_system) : ()),
+            ($filter_level  ? (level  => $filter_level)  : ()),
+        );
     };
     if ($@) {
         my $err = "$@";
@@ -94,11 +109,13 @@ sub stats :Path('/admin/logging/audit/stats') :Args(0) {
 
         my $vars = {
             %{ $c->stash },
-            c          => $c,
-            audit      => $audit,
-            alerts     => $alerts,
-            hours      => $hours,
-            page_error => $page_error,
+            c             => $c,
+            audit         => $audit,
+            alerts        => $alerts,
+            hours         => $hours,
+            filter_system => $filter_system,
+            filter_level  => $filter_level,
+            page_error    => $page_error,
         };
         $tt->process('admin/Logging/LogAuditStats.tt', $vars, \$body)
             or die $tt->error;
