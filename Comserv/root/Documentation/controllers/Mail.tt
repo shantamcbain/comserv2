@@ -1,0 +1,157 @@
+[% PageVersion = 'Comserv/root/Documentation/controllers/Mail.tt,v 0.01 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Mail Controller Documentation' %]
+
+<div class="documentation-content">
+
+<div class="markdown-content">
+
+<h2>Overview</h2>
+
+The Mail controller manages email functionality and mailing list operations in the Comserv application. It handles SMTP configuration, email sending, mailing list management, and newsletter subscriptions.
+
+<h2>Key Features</h2>
+
+<ul>
+<li><strong>SMTP Configuration</strong>: Site-specific email server settings</li>
+<li><strong>Email Sending</strong>: Welcome emails and notifications</li>
+<li><strong>Mailing List Management</strong>: Create, view, and manage mailing lists</li>
+<li><strong>Newsletter Subscriptions</strong>: Public newsletter signup functionality</li>
+<li><strong>Mail Account Creation</strong>: Integration with Virtualmin API</li>
+</ul>
+
+<h2>Methods</h2>
+
+<h3>Core Email Methods</h3>
+
+<ul>
+<li><code>index</code>: Main mail interface page</li>
+<li><code>send_welcome_email</code>: Send welcome email to new users</li>
+<li><code>add_mail_config_form</code>: Display SMTP configuration form</li>
+<li><code>add_mail_config</code>: Process SMTP configuration updates</li>
+<li><code>create_mail_account</code>: Create email accounts via Virtualmin API</li>
+</ul>
+
+<h3>Mailing List Management</h3>
+
+<ul>
+<li><code>mailing_lists</code>: Display all mailing lists for current site</li>
+<li><code>create_list</code>: Create new mailing list (GET: form, POST: process)</li>
+<li><code>get_available_lists</code>: Private method to fetch active lists for site</li>
+</ul>
+
+<h3>Newsletter Functionality</h3>
+
+<ul>
+<li><code>newsletter_signup</code>: Public newsletter subscription endpoint</li>
+<li><strong>Duplicate Prevention</strong>: Handles existing users and email storage</li>
+<li><strong>Session Integration</strong>: Stores email for future registration</li>
+</ul>
+
+<h2>Mailing List System</h2>
+
+<h3>List Creation</h3>
+<ul>
+<li><strong>Route</strong>: <code>/mail/lists/create</code></li>
+<li><strong>Access</strong>: Admin users only</li>
+<li><strong>Fields</strong>: Name, description, list_email, is_software_only</li>
+<li><strong>Auto-activation</strong>: New lists are active by default</li>
+</ul>
+
+<h3>List Management</h3>
+<ul>
+<li><strong>Route</strong>: <code>/mail/lists</code></li>
+<li><strong>Display</strong>: All active lists for current site</li>
+<li><strong>Sorting</strong>: Alphabetical by name</li>
+</ul>
+
+<h3>Newsletter Integration</h3>
+<ul>
+<li><strong>Auto-creation</strong>: "Newsletter" list created on first signup</li>
+<li><strong>User Handling</strong>: Different logic for existing vs new users</li>
+<li><strong>Session Storage</strong>: Email stored for registration completion</li>
+</ul>
+
+<h2>SMTP Configuration</h2>
+
+<h3>Configuration Fields</h3>
+<ul>
+<li><code>smtp_host</code>: Mail server hostname</li>
+<li><code>smtp_port</code>: Mail server port</li>
+<li><code>smtp_username</code>: Authentication username</li>
+<li><code>smtp_password</code>: Authentication password</li>
+<li><code>smtp_from</code>: Default from address</li>
+<li><code>smtp_ssl</code>: SSL/TLS configuration</li>
+</ul>
+
+<h3>Storage</h3>
+<ul>
+<li><strong>Table</strong>: SiteConfig</li>
+<li><strong>Site-specific</strong>: Each site has independent SMTP settings</li>
+<li><strong>Key-value pairs</strong>: Each setting stored as separate config record</li>
+</ul>
+
+<h2>Integration Points</h2>
+
+<h3>User Controller Integration</h3>
+<ul>
+<li><strong>Registration</strong>: User controller calls <code>get_available_lists</code></li>
+<li><strong>Settings</strong>: User settings display mailing list subscriptions</li>
+<li><strong>Default Lists</strong>: User controller creates announcement list subscriptions</li>
+</ul>
+
+<h3>Database Models</h3>
+<ul>
+<li><strong>MailingList</strong>: List definitions and metadata</li>
+<li><strong>MailingListSubscription</strong>: User-list relationships</li>
+<li><strong>SiteConfig</strong>: SMTP configuration storage</li>
+</ul>
+
+<h2>Security Features</h2>
+
+<h3>Access Control</h3>
+<ul>
+<li><strong>Admin Only</strong>: List creation restricted to admin users</li>
+<li><strong>Site Isolation</strong>: Users only see lists for their site</li>
+<li><strong>Input Validation</strong>: Email format and required field checking</li>
+</ul>
+
+<h3>Error Handling</h3>
+<ul>
+<li><strong>Comprehensive Logging</strong>: All operations logged with context</li>
+<li><strong>Graceful Degradation</strong>: Email failures don't break core functionality</li>
+<li><strong>User Feedback</strong>: Clear success/error messages</li>
+</ul>
+
+<h2>Templates</h2>
+
+<ul>
+<li><code>mail/mailing_lists.tt</code>: List management interface</li>
+<li><code>mail/create_list.tt</code>: List creation form</li>
+<li><code>mail/add_mail_config_form.tt</code>: SMTP configuration form</li>
+<li><code>user/mail.tt</code>: Main mail interface</li>
+</ul>
+
+<h2>Future Enhancements</h2>
+
+<h3>Planned Features</h3>
+<ul>
+<li><strong>Campaign Management</strong>: Email composition and sending interface</li>
+<li><strong>Subscriber Management</strong>: Bulk operations and list management</li>
+<li><strong>Analytics</strong>: Open rates, click tracking, and reporting</li>
+<li><strong>Templates</strong>: Rich email templates and content management</li>
+</ul>
+
+<h3>Technical Improvements</h3>
+<ul>
+<li><strong>Queue System</strong>: Background email processing</li>
+<li><strong>Bounce Handling</strong>: Automatic unsubscribe for bounced emails</li>
+<li><strong>API Integration</strong>: External email service providers</li>
+</ul>
+
+</div>
+
+</div>

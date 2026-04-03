@@ -1,0 +1,48 @@
+[% PageVersion = 'WorkShops/error.tt,v 0.01 2024/06/10 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+
+<div class="error-container">
+    <h1>Error</h1>
+    
+    [% IF error %]
+        <p class="error-message">[% error %]</p>
+    [% ELSE %]
+        <p class="error-message">An unexpected error occurred.</p>
+    [% END %]
+    
+    <a href="/workshop" class="back-button">Back to Workshops</a>
+</div>
+
+<style>
+    .error-container {
+        max-width: 600px;
+        margin: 50px auto;
+        padding: 20px;
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        border-radius: 5px;
+        text-align: center;
+    }
+    
+    .error-message {
+        color: #721c24;
+        font-size: 18px;
+        margin: 20px 0;
+    }
+    
+    .back-button {
+        display: inline-block;
+        padding: 10px 15px;
+        background-color: #007bff;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        margin-top: 20px;
+    }
+    
+    .back-button:hover {
+        background-color: #0069d9;
+    }
+</style>

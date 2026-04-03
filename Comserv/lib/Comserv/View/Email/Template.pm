@@ -1,36 +1,12 @@
 package Comserv::View::Email::Template;
 use Moose;
 use namespace::autoclean;
+use Comserv::Util::Logging;
 
-# Array to store debug messages
-has '_debug_msgs' => (
-    is => 'rw',
-    isa => 'ArrayRef',
-    default => sub { [] }
+has '_app_logging' => (
+    is      => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
 );
-
-# Helper method to add debug messages
-sub add_debug_msg {
-    my ($self, $msg) = @_;
-    push @{$self->_debug_msgs}, $msg;
-    return;
-}
-
-# Helper method for detailed logging
-sub log_with_details {
-    my ($self, $c, $message, $details) = @_;
-    
-    # Log the main message
-    $c->log->info($message);
-    
-    # Log each detail on a separate line
-    if ($details && ref($details) eq 'HASH') {
-        foreach my $key (sort keys %$details) {
-            my $value = defined $details->{$key} ? $details->{$key} : 'undef';
-            $c->log->info("  $key: $value");
-        }
-    }
-}
 
 BEGIN {
     # Try to load the real module
@@ -49,68 +25,30 @@ BEGIN {
         # Override process method to add debugging and fallback
         # ONLY when the parent class is successfully loaded
         around 'process' => sub {
-            my ($orig, $self, $c, $args) = @_;
-            
-            # Store debug messages in stash for debugging
-            $c->stash->{debug_msg} = $self->_debug_msgs;
-            
-            # Log with details for debugging
-            $self->log_with_details($c, "Processing email template request", {
-                to => $args->{to},
-                subject => $args->{subject},
-                template => $args->{template},
-            });
-            
-            # If we're using the real module, try to use it
-            if ($self->can($orig)) {
-                eval {
-                    $self->add_debug_msg("Attempting to send email using Catalyst::View::Email::Template");
-                    return $self->$orig($c, $args);
-                };
-                if ($@) {
-                    my $error = $@;
-                    $c->log->warn("Failed to send email using Catalyst::View::Email::Template: $error");
-                    $self->add_debug_msg("Failed to send email: $error");
-                    # Fall through to the fallback implementation
-                } else {
-                    # If it worked, return success
-                    return 1;
-                }
-            } else {
-                $self->add_debug_msg("Email template functionality not available: Catalyst::View::Email::Template not installed");
-            }
-            
-            # Fallback implementation - just log the email details
-            $c->log->info("Email template would be sent (fallback mode):");
-            $c->log->info("  To: " . ($args->{to} || 'not specified'));
-            $c->log->info("  Subject: " . ($args->{subject} || 'not specified'));
-            $c->log->info("  Template: " . ($args->{template} || 'not specified'));
-            
-            # Try to render the template if Template Toolkit is available
-            my $body = '';
+            my ($orig, $self, $c) = @_;
+
+            # Email config comes from $c->stash->{email}
+            my $email_stash = $c->stash->{email} || {};
+            my $to       = $email_stash->{to}       || '?';
+            my $subject  = $email_stash->{subject}  || '?';
+            my $template = $email_stash->{template} || '?';
+
+            $self->_app_logging->log_with_details($c, 'info', __FILE__, __LINE__, 'Email::Template',
+                "Processing email: to=$to subject=$subject template=$template");
+
             eval {
-                require Template;
-                $self->add_debug_msg("Template Toolkit loaded, attempting to render template");
-                my $tt = Template->new({
-                    INCLUDE_PATH => [
-                        eval { Comserv->path_to('root') } || 'root',
-                    ],
-                    WRAPPER => 'email/wrapper.tt',
-                });
-                my $template = $args->{template};
-                my $vars = $args->{template_vars} || {};
-                $tt->process($template, $vars, \$body) || die $tt->error();
+                $self->$orig($c);
             };
             if ($@) {
-                my $tt_error = $@;
-                $c->log->warn("Failed to render email template: $tt_error");
-                $self->add_debug_msg("Template rendering failed: $tt_error");
-                $body = "Template rendering failed. Template: " . ($args->{template} || 'not specified');
+                my $error = "$@";
+                $self->_app_logging->log_with_details($c, 'error', __FILE__, __LINE__, 'Email::Template',
+                    "SMTP send failed: to=$to subject=$subject error=$error");
+                # Do NOT re-throw — let caller's eval catch success/failure via return value
+                return 0;
             }
-            
-            $c->log->info("  Body: " . substr($body, 0, 100) . "...");
-            
-            return 1;  # Return success even if sending failed
+            $self->_app_logging->log_with_details($c, 'info', __FILE__, __LINE__, 'Email::Template',
+                "SMTP send OK via PMG: to=$to subject=$subject");
+            return 1;
         };
     }
 }
@@ -129,7 +67,7 @@ if (__PACKAGE__->can('config')) {
         sender => {
             mailer => 'SMTP',
             mailer_args => {
-                host => 'localhost',
+                host => '192.168.1.128',  # PMG relay
                 port => 25,
             }
         },

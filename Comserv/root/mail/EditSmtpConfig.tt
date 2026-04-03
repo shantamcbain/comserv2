@@ -33,14 +33,14 @@
     
     <label for="smtp_port">SMTP Port:</label>
     <select id="smtp_port" name="smtp_port" required>
-        <option value="587" [% smtp_config.smtp_port == 587 ? 'selected' : '' %]>587 (TLS/STARTTLS - Recommended)</option>
-        <option value="465" [% smtp_config.smtp_port == 465 ? 'selected' : '' %]>465 (SSL/TLS)</option>
-        <option value="25" [% smtp_config.smtp_port == 25 ? 'selected' : '' %]>25 (Standard/No Encryption)</option>
+        <option value="465" [% smtp_config.smtp_port == 465 ? 'selected' : '' %]>465 (SSL/TLS — harper.whc.ca)</option>
+        <option value="587" [% smtp_config.smtp_port == 587 ? 'selected' : '' %]>587 (STARTTLS)</option>
+        <option value="25" [% smtp_config.smtp_port == 25 ? 'selected' : '' %]>25 (Plain — LAN relay only)</option>
         <option value="2525" [% smtp_config.smtp_port == 2525 ? 'selected' : '' %]>2525 (Alternative)</option>
     </select><br>
     
-    <label for="smtp_username">SMTP Username:</label>
-    <input type="text" id="smtp_username" name="smtp_username" value="[% smtp_config.smtp_username || '' %]"><br>
+    <label for="smtp_user">SMTP Username:</label>
+    <input type="text" id="smtp_user" name="smtp_user" value="[% smtp_config.smtp_user || smtp_config.smtp_username || '' %]"><br>
     
     <label for="smtp_password">SMTP Password:</label>
     <input type="password" id="smtp_password" name="smtp_password" placeholder="Leave blank to keep current password">
@@ -50,7 +50,8 @@
     <input type="email" id="smtp_from" name="smtp_from" value="[% smtp_config.smtp_from || '' %]"><br>
     
     <label for="smtp_ssl">Use SSL:</label>
-    <input type="checkbox" id="smtp_ssl" name="smtp_ssl" value="1" [% smtp_config.smtp_ssl ? 'checked' : '' %]><br>
+    <input type="checkbox" id="smtp_ssl" name="smtp_ssl" value="ssl" [% smtp_config.smtp_ssl ? 'checked' : '' %]>
+    <small style="color:#666;"> (required for port 465)</small><br>
     
     <div style="margin-top: 20px;">
         <input type="submit" value="Update Configuration">

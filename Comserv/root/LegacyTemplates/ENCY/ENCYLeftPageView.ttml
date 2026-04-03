@@ -1,0 +1,212 @@
+[%
+
+# the ENCY  Left Page template
+#	$Id: LeftPageView.ttml,v 1.3 2001/12/07 03:59:16 shanta Exp $	
+
+%]
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+
+<table width="100%" border="0" cellspacing="0" cellpadding="0">
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+ <tr>  
+   <td >
+[% embed('LogOnLeftView') %]
+ 
+    <font   class="LeftSideBarHeaderStyle"> </font>
+</td>
+ </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+  <tr>  
+   <td >
+          <a href="/cgi-bin/ENCY/ency.cgi?[% session_string %]" > <font   class="LeftSideBarNavStyle">ENCY Home</font></a><br>
+    </td>
+    </tr>
+   <td >
+           <a href="http://forager.com" ><font   class="LeftSideBarNavStyle"> Forager </font></a><br>
+
+
+    </td>
+    </tr>
+    <td >
+           <a href="/cgi-bin/FAQ/faq.cgi" ><font   class="LeftSideBarNavStyle"> ENCY FAQ </font></a><br>
+
+
+    </td>
+    </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+[% embed('NewsLinksView') %]
+  <tr>  
+   <td >
+   
+       <font class="LeftSideBarHeaderStyle" >Resources and Tools</font><br>
+    </td>
+    </tr>
+  <tr>  
+  <td>	<A HREF = "/cgi-bin/ENCY/formulas.cgi?[% session_string %]" target="_content"><font   class="LeftSideBarNavStyle"> Formulas</font></a>
+  </td>
+    </tr>
+  <tr>  
+    
+  <td>	<A HREF = "/cgi-bin/ENCY/deseases.cgi?[% session_string %]" target="_content"><font   class="LeftSideBarNavStyle"> Diseases</font></a>
+  </td>
+ </tr>
+  <tr>  
+   <td><a href="/cgi-bin/ENCY/herbs.cgi?view=BasicDataView&[% session_string %]" target="_Blank" ><font class="LeftSideBarNavStyle" > Herbal Database</font></a></td>
+ </tr>
+  <tr>  
+  <td>	<A HREF = "/cgi-bin/ENCY/herbs.cgi?show_herb_urls=on&[% session_string %]&columns_to_view=fname"<font   class="LeftSideBarNavStyle"> Herbs by Botanical Names</font></a>
+  </td>
+ </tr>
+  <tr>  
+  <td>	<A HREF = "herbs.cgi?show_herb_urls=on&[% session_string %]&columns_to_view=key_name&sort_field1=key_name"<font   class="LeftSideBarNavStyle"> Herbs by Common Names</font></a>
+  </td>
+ </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+
+   <tr>  
+   <td>&nbsp;</td>
+ </tr>
+  <tr>  
+  <td>	<A HREF = "/cgi-bin/ENCY/ency_url.cgi?show_devel_urls=on&search1=ENCY&searchfield=owner&[% session_string %]&view=LinkListView&columns_to_view=name&columns_to_view=url"><font   class="LeftSideBarNavStyle"> ENCY Links</font></a>
+  </td>
+ </tr>
+  <tr>  
+   <td>&nbsp;</td>
+ </tr>
+
+  <tr>  
+   <td >
+          <a href="/cgi-bin/CSC/csc.cgi?view=CSCHome&[% session_string %]" > <font   class="LeftSideBarNavStyle">Tech Support Home</font></a><br>
+    </td>
+    </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+ <tr>
+
+[% IF group =='admin'%]
+  <tr>  
+   <td >
+   
+       <font class="LeftSideBarHeaderStyle" >Admin Tools</font><br>
+    </td>
+    </tr>
+  <tr>  
+  <td>	<A HREF = "/cgi-bin/ENCY/deseases_admin_debug.cgi?[% session_string %]" target="_content"><font   class="LeftSideBarNavStyle"> Diseases Admin</font></a>
+  </td>
+ </tr>
+  <tr>  
+  <td>	<A HREF = "/cgi-bin/FAQ/faq_manager.cgi?[% session_string %]" target="_content"><font   class="LeftSideBarNavStyle"> FAQ  Admin</font></a>
+  </td>
+  <tr>  
+  <td>	<A HREF = "/cgi-bin/ENCY/formulas_admin.cgi?[% session_string %]" target="_content"><font   class="LeftSideBarNavStyle"> Formulas  Admin</font></a>
+  </td>
+  <tr>  
+  <td>	<A HREF = "/cgi-bin/ENCY/herbs_admin.cgi?[% session_string %]" target="_content"><font   class="LeftSideBarNavStyle">Herbs Admin</font></a>
+  </td>
+ </tr>
+  <tr>  
+  <td>	<A HREF = "/cgi-bin/ENCY/reference_admin.cgi?[% session_string %]" target="_content"><font   class="LeftSideBarNavStyle">Reference Admin</font></a>
+  </td>
+ </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+
+<tr>	      	
+  <td>
+      <font class="LeftSideBarHeaderStyle" >ADD Tools</font><br>
+
+      	</td>
+ </tr>      	
+  <tr>
+	 <td>
+<a href="/cgi-bin/ENCY/address_book.cgi?display_add_form=on&[% session_string %]" target='_Blank'"><font   class="LeftSideBarNavStyle">Author </font></a>
+      	</td>
+ </tr>      	
+  <tr>
+	 <td>
+<a href="/cgi-bin/ENCY/books.cgi?display_add_form=on&[% session_string %]" target='_Blank'"><font   class="LeftSideBarNavStyle">Book </font></a>
+      	</td>
+ </tr>      	
+  <tr>
+	 <td>
+<a href="/cgi-bin/ENCY/deseases_admin.cgi?display_add_form=on&[% session_string %]" target='_Blank'"><font   class="LeftSideBarNavStyle">Desease </font></a>
+      	</td>
+ </tr>      	
+  <tr>
+	 <td>
+<a href="/cgi-bin/ENCY/formula_admin.cgi?display_add_form=on&[% session_string %]" target='_Blank'"><font   class="LeftSideBarNavStyle">Formula </font></a>
+      	</td>
+ </tr>      	
+  <tr>
+	 <td>
+<a href="/cgi-bin/ENCY/herbs_admin.cgi?display_add_form=on&[% session_string %]" target='_Blank'"><font   class="LeftSideBarNavStyle">Herb </font></a>
+      	</td>
+ </tr>      	
+  <tr>
+	 <td>
+<a href="/cgi-bin/ENCY/address_book.cgi?display_add_form=on&[% session_string %]" target='_Blank'"><font   class="LeftSideBarNavStyle">Publisher </font></a>
+      	</td>
+ </tr>      	
+      	
+  <tr>
+	 <td>
+<a href="/cgi-bin/ENCY/refrence_admin.cgi?display_add_form=on&[% session_string %]" target='_Blank'"><font   class="LeftSideBarNavStyle">Reference Admin</font></a>
+      	</td>
+ </tr>      	
+  <tr>
+	 <td>
+<a href="/cgi-bin/ENCY/glossary_admin.cgi?display_add_form=on&[% session_string %]" target='_Blank'"><font   class="LeftSideBarNavStyle"> Glossary Admin</font></a>
+      	</td>
+ </tr>      	
+  
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+   
+[% embed('CSCAdminLinks') %]
+
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+
+[% END %]
+[% # end CSC admin links %]
+
+ <tr>
+  <td>
+[% embed('TabBarIconView.ttml') %]
+
+    </td>
+    </tr>
+ 
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+<tr>    
+          			<td width="1">&nbsp;<img SRC="http://d2earth.net/msfree.gif" ALT="100% Micro\$oft free!">
+
+</td>
+</tr>
+
+
+</table>

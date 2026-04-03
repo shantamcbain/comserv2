@@ -4,8 +4,8 @@
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
-[% SET roles = c.session.roles || [] %]
-[% SET is_admin = roles.grep('admin').size > 0 ? 1 : 0 %]
+[% SET roles = c.stash.user_roles || c.session.roles || [] %]
+[% SET is_admin = c.stash.is_admin || roles.grep('admin').size > 0 ? 1 : 0 %]
 
 <!-- Add Font Awesome for the paint brush icon -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -117,6 +117,34 @@ header nav#main-menu {
 header h1 {
     margin: 0 !important;
     padding: 10px !important;
+    font-size: clamp(1rem, 4vw, 1.5rem) !important;
+    word-break: break-word !important;
+}
+
+/* ---- Mobile nav toggle button ---- */
+.nav-toggle {
+    display: none;
+    background: var(--button-bg, #f0f0f0);
+    color: var(--button-text, #333);
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 20px;
+    cursor: pointer;
+    line-height: 1;
+    margin: 4px 8px;
+}
+
+@media (max-width: 768px) {
+    .nav-toggle { display: inline-block; }
+    .server-info { font-size: 11px; }
+    .server-info > div {
+        text-align: left !important;
+        white-space: normal !important;
+        word-break: break-word;
+        line-height: 1.6;
+    }
+    #css-edit-toggle { display: block; margin: 4px 0 0 0; }
 }
 </style>
 
@@ -130,7 +158,8 @@ header h1 {
     <div style="text-align: right;">
         Domain: <strong>[% c.req.uri.host %]</strong> | 
         Client IP: <strong>[% c.req.address %]</strong> | 
-        Server: <strong>[% app_workflow %] ([% c.forward('/get_server_ip') %])</strong> |
+        Server: <strong>[% system_identifier || app_workflow %]</strong> | Workflow: [% app_workflow %] ([% c.forward('/get_server_ip') %]) |
+        [% IF app_version %]Build: <strong title="Commit: [% app_version.commit %] | Branch: [% app_version.branch %] | Host: [% app_version.build_host %]" style="cursor:help;">[% app_version.build_date | replace('T',' ') | replace(':\d\dZ','') %] UTC</strong> | Git: <strong>[% app_version.branch %]</strong>@<code style="font-size:0.85em;">[% app_version.commit %]</code> | [% END %]
         Databases: [% IF db_connections && db_connections.size > 0 %][% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% ELSE %]<em>none configured</em>[% END %] |
         DB Env: <span class="db-env-indicator db-env-[% active_db_environment || 'production' %]">[% SET env = active_db_environment || 'production' %][% env.upper %]</span>
         [% IF c.session.debug_mode == 1 %] | [% END %] |
@@ -177,6 +206,37 @@ header h1 {
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // --- Hamburger nav toggle ---
+    const navToggle = document.querySelector('.nav-toggle');
+    const menuList  = document.getElementById('main-menu-list');
+    if (navToggle && menuList) {
+        navToggle.addEventListener('click', function() {
+            const open = menuList.classList.toggle('nav-open');
+            navToggle.setAttribute('aria-expanded', open);
+            navToggle.textContent = open ? '\u2715' : '\u2630';
+        });
+        // Touch-friendly dropdown: tap dropbtn to open, tap outside to close
+        document.querySelectorAll('.dropbtn').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                if (window.innerWidth > 768) return;
+                const li = btn.closest('.horizontal-dropdown');
+                const wasOpen = li.classList.contains('touch-open');
+                document.querySelectorAll('.horizontal-dropdown.touch-open').forEach(function(el) {
+                    el.classList.remove('touch-open');
+                });
+                if (!wasOpen) { li.classList.add('touch-open'); e.preventDefault(); }
+            });
+        });
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#main-menu')) {
+                document.querySelectorAll('.horizontal-dropdown.touch-open').forEach(function(el) {
+                    el.classList.remove('touch-open');
+                });
+            }
+        });
+    }
+
+    // --- Theme editor toggle ---
     const toggleBtn = document.getElementById('css-edit-toggle');
     if (toggleBtn) {
         toggleBtn.addEventListener('click', function(e) {
@@ -208,10 +268,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <header>
     <h1>
-        Welcome [% IF roles.grep('admin').size %]
-[% c.session.first_name %] [% c.session.last_name %] Administrator
-[% ELSIF roles.grep('user').size %]
- [% c.session.first_name %] [% c.session.last_name %] User
+        Welcome [% IF c.session.username %]
+[% c.session.first_name || c.session.username %] [% c.session.last_name %][% IF is_admin %] Administrator[% END %]
 [% ELSE %]
  Guest
 [% END %] to [% site_display_name || SiteDisplayName || c.stash.site_display_name || c.stash.SiteDisplayName || c.session.site_display_name || SiteName || c.session.SiteName || 'this site' %]!
@@ -224,7 +282,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     <!-- Main Menu -->
     <nav id="main-menu">
-        <ul class="horizontal-menu">
+        <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="main-menu-list">&#9776;</button>
+        <ul class="horizontal-menu" id="main-menu-list">
             <li class="horizontal-dropdown">
                 <a href="[% c.session.return_url %]" class="dropbtn">Back</a>
             </li>
@@ -240,6 +299,7 @@ document.addEventListener('DOMContentLoaded', function() {
         [% IF is_admin %]
             [% INCLUDE 'Navigation/admintopmenu.tt' %]
         [% END %]
+        [% INCLUDE 'Navigation/TopDropListPlanning.tt' %]
         [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
         [% INCLUDE 'Navigation/TopDropListWorkshop.tt' %]
         </ul>

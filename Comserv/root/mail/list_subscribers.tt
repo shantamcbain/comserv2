@@ -1,0 +1,39 @@
+[% META title = 'Subscribers — ' _ list_name %]
+
+<div class="admin-content">
+    <div class="admin-header">
+        <h1>Subscribers: [% list_name | html %]</h1>
+        <div class="admin-actions">
+            <a href="[% c.uri_for('/mail/lists') %]" class="btn btn-secondary">Back to Lists</a>
+        </div>
+    </div>
+
+    [% IF subscribers.size %]
+    <div class="admin-card">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Source</th>
+                </tr>
+            </thead>
+            <tbody>
+            [% FOREACH sub IN subscribers %]
+            <tr>
+                <td>[% sub.user.username | html %]</td>
+                <td>[% sub.user.first_name | html %] [% sub.user.last_name | html %]</td>
+                <td>[% sub.user.email | html %]</td>
+                <td>[% sub.source | html %]</td>
+            </tr>
+            [% END %]
+            </tbody>
+        </table>
+    </div>
+    [% ELSE %]
+    <div class="admin-card">
+        <p>No active subscribers on this list.</p>
+    </div>
+    [% END %]
+</div>

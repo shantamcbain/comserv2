@@ -1,7 +1,20 @@
-<!-- File: /home/shanta/PycharmProjects/comserv/Comserv/root/ENCY/index.tt -->
-[% PageVersion = 'ENCY/index.tt,v 0.02 2024/05/22 Shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
+[% META
+   title = "Encyclopedia of Biological Life"
+   description = "ENCY: A comprehensive reference for herbs, animals, insects, diseases, symptoms, and constituents"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.03"
+   last_updated = "2026-04-02"
+%]
+[% PageVersion = 'ENCY/index.tt,v 0.03 2026/04/02' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.success_msg %]
+<div class="alert alert-success">[% c.flash.success_msg | html %]</div>
+[% END %]
+[% IF c.flash.error_msg %]
+<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
 [% END %]
 <div align="center">
     [% IF username %]
@@ -18,9 +31,39 @@
 
 <p>ENCY provides a comprehensive reference to natural health that evolves with your needs. We continuously update the information in this reference, drawing from herbals, medical texts and journals, growers, foragers, herbalists, and even our users. We strive to verify all information to the best of our ability.</p>
 
-<p>
-    <a href="/ENCY/BotanicalNameView">Botanical Name View</a>
-</p>
+<div class="ency-search-box" style="margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 6px;">
+    <form method="post" action="/ENCY/search">
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" name="search_string" placeholder="Search herbs, animals, insects, diseases, symptoms, constituents, glossary..." style="flex: 1; padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" />
+            <button type="submit" style="padding: 8px 16px; background: #4a7c59; color: white; border: none; border-radius: 4px; cursor: pointer;">Search</button>
+        </div>
+    </form>
+</div>
+
+<div class="ency-nav-cards" style="display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0;">
+    <a href="/ENCY/Herb" style="display: block; padding: 12px 18px; background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 6px; text-decoration: none; color: #2e7d32; font-weight: bold;">Herbs</a>
+    <a href="/ENCY/Animal" style="display: block; padding: 12px 18px; background: #e3f2fd; border: 1px solid #90caf9; border-radius: 6px; text-decoration: none; color: #1565c0; font-weight: bold;">Animals</a>
+    <a href="/ENCY/Insect" style="display: block; padding: 12px 18px; background: #fff8e1; border: 1px solid #ffe082; border-radius: 6px; text-decoration: none; color: #e65100; font-weight: bold;">Insects</a>
+    <a href="/ENCY/Disease" style="display: block; padding: 12px 18px; background: #fce4ec; border: 1px solid #f48fb1; border-radius: 6px; text-decoration: none; color: #880e4f; font-weight: bold;">Diseases</a>
+    <a href="/ENCY/Symptom" style="display: block; padding: 12px 18px; background: #f3e5f5; border: 1px solid #ce93d8; border-radius: 6px; text-decoration: none; color: #4a148c; font-weight: bold;">Symptoms</a>
+    <a href="/ENCY/Constituent" style="display: block; padding: 12px 18px; background: #e0f7fa; border: 1px solid #80deea; border-radius: 6px; text-decoration: none; color: #006064; font-weight: bold;">Constituents</a>
+    <a href="/ENCY/Glossary" style="display: block; padding: 12px 18px; background: #f1f8e9; border: 1px solid #c5e1a5; border-radius: 6px; text-decoration: none; color: #33691e; font-weight: bold;">Glossary</a>
+    <a href="/ENCY/BotanicalNameView" style="display: block; padding: 12px 18px; background: #f9fbe7; border: 1px solid #dce775; border-radius: 6px; text-decoration: none; color: #827717; font-weight: bold;">Botanical Names</a>
+</div>
+
+[% IF c.session.roles.grep('^admin$').size %]
+<div class="ency-admin-panel" style="margin: 20px 0; padding: 12px; background: #fff3e0; border: 1px solid #ffcc02; border-radius: 6px;">
+    <strong>Admin:</strong>
+    <a href="/ENCY/Herb/add" style="margin: 0 8px;">+ Herb</a> |
+    <a href="/ENCY/Animal/add" style="margin: 0 8px;">+ Animal</a> |
+    <a href="/ENCY/Insect/add" style="margin: 0 8px;">+ Insect</a> |
+    <a href="/ENCY/Disease/add" style="margin: 0 8px;">+ Disease</a> |
+    <a href="/ENCY/Symptom/add" style="margin: 0 8px;">+ Symptom</a> |
+    <a href="/ENCY/Constituent/add" style="margin: 0 8px;">+ Constituent</a> |
+    <a href="/ENCY/Glossary/add" style="margin: 0 8px;">+ Glossary Term</a>
+</div>
+[% END %]
+
 <p>
     <a href="/workshop">Workshops</a>
 </p>

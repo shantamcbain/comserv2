@@ -1,21 +1,51 @@
 [% META title = 'Create New Support Ticket' %]
-[% PageVersion = 'CSC/HelpDesk/new_ticket.tt,v 0.01 2025/04/18 shanta Exp shanta ' %]
+[% PageVersion = 'CSC/HelpDesk/new_ticket.tt,v 0.02 2026/03/26 shanta Exp shanta ' %]
 
 [% IF c.session.debug_mode == 1 %]
  <br>[% PageVersion %]</br>
  [% IF debug_msg %]<div class="debug-message">[% debug_msg %]</div>[% END %]
 [% END %]
 
+<script>
+    window.HELPDESK_PRESCREEN = true;
+    window.HELPDESK_PRESCREEN_PAGE_PATH  = '/HelpDesk/ticket/new';
+    window.HELPDESK_PRESCREEN_PAGE_TITLE = 'Support Ticket Pre-screening';
+</script>
+
 <div class="helpdesk-container">
     <h1>Create New Support Ticket</h1>
-    
-    <div class="ticket-form">
+
+    <div id="hd-prescreen-banner" class="hd-prescreen-banner">
+        <div class="hd-prescreen-icon">🤖</div>
+        <div class="hd-prescreen-text">
+            <strong>Get instant help from our AI assistant</strong><br>
+            Describe your issue in the chat below — the AI may be able to solve it right away
+            without needing to submit a ticket.
+        </div>
+        <button type="button" id="hd-open-ai-btn" class="btn btn-ai">
+            💬 Ask AI Assistant
+        </button>
+    </div>
+
+    <div class="hd-divider">
+        <span>— or —</span>
+    </div>
+
+    <div id="hd-ticket-toggle" class="hd-ticket-toggle">
+        <button type="button" id="hd-show-form-btn" class="btn btn-secondary">
+            📝 Skip AI — Submit Ticket Directly
+        </button>
+    </div>
+
+    <div id="ticket-form-section" class="ticket-form" style="display:none;">
+        <h2>New Support Ticket</h2>
         <form method="post" action="[% c.uri_for('/HelpDesk/ticket/submit') %]">
             <div class="form-group">
                 <label for="subject">Subject:</label>
-                <input type="text" id="subject" name="subject" class="form-control" required>
+                <input type="text" id="subject" name="subject" class="form-control" required
+                       placeholder="Brief description of your issue">
             </div>
-            
+
             <div class="form-group">
                 <label for="category">Category:</label>
                 <select id="category" name="category" class="form-control" required>
@@ -27,7 +57,7 @@
                     <option value="other">Other</option>
                 </select>
             </div>
-            
+
             <div class="form-group">
                 <label for="priority">Priority:</label>
                 <select id="priority" name="priority" class="form-control" required>
@@ -38,17 +68,18 @@
                     <option value="critical">Critical</option>
                 </select>
             </div>
-            
+
             <div class="form-group">
                 <label for="description">Description:</label>
-                <textarea id="description" name="description" class="form-control" rows="6" required></textarea>
+                <textarea id="description" name="description" class="form-control" rows="6" required
+                          placeholder="Provide as much detail as possible about your issue..."></textarea>
             </div>
-            
+
             <div class="form-group">
                 <label for="attachment">Attachment (optional):</label>
                 <input type="file" id="attachment" name="attachment" class="form-control-file">
             </div>
-            
+
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Submit Ticket</button>
                 <a href="[% c.uri_for('/HelpDesk') %]" class="btn btn-secondary">Cancel</a>
@@ -57,64 +88,166 @@
     </div>
 </div>
 
+<script>
+(function() {
+    var openBtn  = document.getElementById('hd-open-ai-btn');
+    var showBtn  = document.getElementById('hd-show-form-btn');
+    var formSec  = document.getElementById('ticket-form-section');
+
+    if (openBtn) {
+        openBtn.addEventListener('click', function() {
+            if (typeof window.openHelpDeskChat === 'function') {
+                window.openHelpDeskChat();
+            } else {
+                var toggleBtn = document.querySelector('.chat-button');
+                if (toggleBtn) toggleBtn.click();
+            }
+            openBtn.textContent = '💬 AI Chat is open below ↘';
+            openBtn.disabled = true;
+        });
+    }
+
+    if (showBtn) {
+        showBtn.addEventListener('click', function() {
+            formSec.style.display = 'block';
+            formSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            showBtn.style.display = 'none';
+            var stillNeedLink = document.getElementById('hd-still-need-link');
+            if (stillNeedLink) stillNeedLink.style.display = 'none';
+        });
+    }
+
+    window.showHelpDeskTicketForm = function() {
+        formSec.style.display = 'block';
+        formSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (showBtn) showBtn.style.display = 'none';
+    };
+})();
+</script>
+
 <style>
     .helpdesk-container {
         max-width: 800px;
         margin: 0 auto;
         padding: 20px;
     }
-    
-    .ticket-form {
-        background-color: #f8f9fa;
-        padding: 20px;
-        border-radius: 5px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+
+    .hd-prescreen-banner {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        background-color: var(--secondary-color, #f0f8ff);
+        border: 1px solid var(--border-color, #cce0ff);
+        border-left: 4px solid var(--nav-bg, #ccffff);
+        border-radius: 6px;
+        padding: 16px 20px;
+        margin-bottom: 20px;
     }
-    
+
+    .hd-prescreen-icon {
+        font-size: 2em;
+        flex-shrink: 0;
+    }
+
+    .hd-prescreen-text {
+        flex: 1;
+        font-size: 0.95em;
+        color: var(--text-color, #333);
+        line-height: 1.5;
+    }
+
+    .hd-divider {
+        text-align: center;
+        color: var(--text-muted-color, #888);
+        margin: 16px 0;
+        font-size: 0.9em;
+    }
+
+    .hd-ticket-toggle {
+        text-align: center;
+        margin-bottom: 24px;
+    }
+
+    .ticket-form {
+        background-color: var(--secondary-color, #f8f9fa);
+        padding: 24px;
+        border-radius: 6px;
+        border: 1px solid var(--border-color, #ddd);
+        margin-top: 10px;
+    }
+
+    .ticket-form h2 {
+        margin-top: 0;
+        margin-bottom: 20px;
+        font-size: 1.2em;
+        color: var(--text-color, #333);
+    }
+
     .form-group {
         margin-bottom: 20px;
     }
-    
+
     .form-control {
         width: 100%;
         padding: 8px;
-        border: 1px solid #ced4da;
+        border: 1px solid var(--button-border, #ced4da);
         border-radius: 4px;
+        background-color: var(--background-color, #fff);
+        color: var(--text-color, #333);
+        font-family: inherit;
+        box-sizing: border-box;
     }
-    
+
     .form-control-file {
         padding: 8px 0;
     }
-    
+
     label {
         display: block;
         margin-bottom: 5px;
         font-weight: bold;
+        color: var(--text-color, #333);
     }
-    
+
     .form-actions {
         margin-top: 30px;
     }
-    
+
     .btn {
         display: inline-block;
         padding: 8px 16px;
         text-decoration: none;
         border-radius: 4px;
         margin-right: 10px;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 0.95em;
+        border: 1px solid transparent;
     }
-    
+
+    .btn-ai {
+        background-color: var(--nav-bg, #ccffff);
+        color: var(--nav-text, var(--text-color, #000));
+        border-color: var(--border-color, #aaa);
+        white-space: nowrap;
+    }
+    .btn-ai:hover:not(:disabled) { opacity: 0.85; }
+    .btn-ai:disabled { opacity: 0.5; cursor: default; }
+
     .btn-primary {
-        background-color: #007bff;
-        color: white;
-        border: none;
+        background-color: var(--button-bg, #f2f2f2);
+        color: var(--button-text, #000);
+        border-color: var(--button-border, #ccc);
     }
-    
+    .btn-primary:hover { background-color: var(--button-hover-bg, #e0e0e0); }
+
     .btn-secondary {
-        background-color: #6c757d;
-        color: white;
+        background-color: var(--secondary-color, #e9ecef);
+        color: var(--text-color, #333);
+        border-color: var(--button-border, #ccc);
     }
-    
+    .btn-secondary:hover { opacity: 0.85; }
+
     .debug-message {
         background-color: #f8d7da;
         color: #721c24;

@@ -2,6 +2,7 @@ package Comserv::Controller::Payment;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::PointSystem;
 use DateTime;
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -192,9 +193,9 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
         my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
         $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
         $plan = $c->model('DBEncy')->resultset('MembershipPlan')->find($plan_id) if $plan_id;
-        $account = $c->model('DBEncy')->resultset('InternalCurrencyAccount')->search(
-            { user_id => $c->session->{user_id} }
-        )->single;
+        my $ps = Comserv::Util::PointSystem->new(c => $c);
+        my $balance = $ps->balance($c->session->{user_id});
+        $account = { balance => $balance };
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'internal_checkout',
@@ -221,27 +222,17 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
 
         eval {
             $schema->txn_do(sub {
+                my $ledger_row;
                 if ($final_price > 0) {
-                    unless ($account) {
-                        die "No coin account found. Please contact support to get coins.\n";
-                    }
-                    if ($account->balance < $final_price) {
-                        die sprintf("Insufficient coins. You have %.2f but need %.2f.\n",
-                            $account->balance, $final_price);
-                    }
-
-                    my $new_balance = $account->balance - $final_price;
-                    $account->update({ balance => $new_balance, lifetime_spent => $account->lifetime_spent + $final_price });
-
-                    $c->model('DBEncy')->resultset('InternalCurrencyTransaction')->create({
-                        from_user_id     => $c->session->{user_id},
-                        to_user_id       => undef,
+                    my $ps = Comserv::Util::PointSystem->new(c => $c);
+                    my ($ok, $err) = $ps->debit(
+                        user_id          => $c->session->{user_id},
                         amount           => $final_price,
                         transaction_type => 'spend',
-                        balance_after    => $new_balance,
                         description      => 'Membership: ' . $plan->name . ' (' . $billing_cycle . ')',
                         reference_type   => 'membership',
-                    });
+                    );
+                    die $err . "\n" unless $ok;
                 }
 
                 my $expires_at = undef;
@@ -307,7 +298,8 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
                     payable_type => 'membership',
                     payable_id   => $plan->id,
                     amount       => $final_price,
-                    currency     => $plan->price_currency,
+                    amount_cad   => $final_price,
+                    currency     => $plan->price_currency || 'CAD',
                     provider     => 'internal',
                     status       => 'completed',
                     description  => 'Membership: ' . $plan->name . ' (' . $billing_cycle . ')'
@@ -403,17 +395,70 @@ sub _paypal_url {
 }
 
 # ============================================================
+# Balance — member point balance and transaction history
+# ============================================================
+sub balance :Path('balance') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_login($c);
+
+    my $user_id  = $c->session->{user_id};
+    my $ps       = Comserv::Util::PointSystem->new(c => $c);
+
+    my $bal      = 0;
+    my $lifetime_earned = 0;
+    my $lifetime_spent  = 0;
+    my @ledger;
+    my $display  = {};
+
+    eval {
+        my $acct = $c->model('DBEncy')->resultset('PointAccount')
+            ->find({ user_id => $user_id });
+        if ($acct) {
+            $bal            = $acct->balance + 0;
+            $lifetime_earned = $acct->lifetime_earned + 0;
+            $lifetime_spent  = $acct->lifetime_spent  + 0;
+        }
+
+        @ledger = $ps->ledger_for_user($user_id, 25)->all;
+
+        $display = $ps->display_amount(
+            points    => $bal,
+            site_name => $c->stash->{SiteName},
+        );
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'balance',
+            "Error loading balance page: $@");
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'balance',
+        "Balance page for user_id=$user_id balance=$bal");
+
+    $c->stash(
+        template        => 'payment/Balance.tt',
+        balance         => $bal,
+        lifetime_earned => $lifetime_earned,
+        lifetime_spent  => $lifetime_spent,
+        ledger          => \@ledger,
+        display         => $display,
+    );
+    $c->forward($c->view('TT'));
+}
+
+# ============================================================
 # Buy Coins — GET: show packages  POST: launch PayPal form
 # ============================================================
 sub buy_coins :Path('buy/coins') :Args(0) {
     my ($self, $c) = @_;
     return unless $self->_require_login($c);
 
-    my $account;
+    my $balance = 0;
+    my @packages;
     eval {
-        $account = $c->model('DBEncy')->resultset('InternalCurrencyAccount')->search(
-            { user_id => $c->session->{user_id} }
-        )->single;
+        my $ps = Comserv::Util::PointSystem->new(c => $c);
+        $balance  = $ps->balance($c->session->{user_id});
+        @packages = $c->model('DBEncy')->resultset('PointPackage')
+            ->search({ is_active => 1 }, { order_by => 'sort_order' })->all;
     };
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'buy_coins',
@@ -421,8 +466,8 @@ sub buy_coins :Path('buy/coins') :Args(0) {
 
     $c->stash(
         template     => 'payment/BuyCoins.tt',
-        packages     => \@COIN_PACKAGES,
-        account      => $account,
+        packages     => \@packages,
+        balance      => $balance,
         paypal_url   => $self->_paypal_url($c),
         paypal_cfg   => $self->_paypal_config($c),
         return_url   => $c->uri_for('/payment/paypal/coins_return')->as_string,
@@ -603,39 +648,28 @@ sub paypal_coins_cancel :Path('paypal/coins_cancel') :Args(0) {
 sub _credit_coins {
     my ($self, $c, $user_id, $coins, $provider, $tx_id, $description) = @_;
 
-    my $schema = $c->model('DBEncy')->schema;
-    $schema->txn_do(sub {
-        my $acct = $schema->resultset('InternalCurrencyAccount')->find_or_create(
-            { user_id => $user_id },
-            { key => 'primary' }
-        );
-        my $new_balance = ($acct->balance || 0) + $coins;
-        $acct->update({
-            balance        => $new_balance,
-            lifetime_earned => ($acct->lifetime_earned || 0) + $coins,
-        });
+    my $ps = Comserv::Util::PointSystem->new(c => $c);
+    my $ledger = $ps->credit(
+        user_id          => $user_id,
+        amount           => $coins,
+        transaction_type => 'purchase',
+        description      => $description,
+    );
 
-        $schema->resultset('InternalCurrencyTransaction')->create({
-            to_user_id       => $user_id,
-            from_user_id     => undef,
-            amount           => $coins,
-            transaction_type => 'earn',
-            balance_after    => $new_balance,
-            description      => $description,
-            reference_type   => 'purchase',
-        });
-
-        $schema->resultset('PaymentTransaction')->create({
-            user_id      => $user_id,
-            payable_type => 'coins',
-            payable_id   => $coins,
-            amount       => $coins,
-            currency     => 'COINS',
-            provider     => $provider,
-            status       => 'completed',
-            description  => $description,
-            ip_address   => eval { $c->req->address } || undef,
-        });
+    $c->model('DBEncy')->resultset('PaymentTransaction')->create({
+        user_id                 => $user_id,
+        payable_type            => 'point_purchase',
+        payable_id              => undef,
+        amount                  => $coins,
+        amount_cad              => $coins,
+        currency                => 'CAD',
+        provider                => $provider,
+        provider_transaction_id => $tx_id || undef,
+        status                  => 'completed',
+        description             => $description,
+        points_credited         => $coins,
+        point_ledger_id         => $ledger->id,
+        ip_address              => eval { $c->req->address } || undef,
     });
 }
 

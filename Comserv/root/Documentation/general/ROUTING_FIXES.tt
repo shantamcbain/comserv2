@@ -1,0 +1,121 @@
+[% PageVersion = 'Comserv/root/Documentation/general/ROUTING_FIXES.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Routing Fixes for MCoop Controller' %]
+
+<!-- Documentation page for ROUTING_FIXES -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Summary of Changes</h2>
+
+
+
+This document outlines the changes made to fix the routing issues with the MCoop controller, specifically for the Server Room Plan page.
+
+
+
+<h3>1. MCoop Controller Updates</h3>
+
+
+
+<ul><li>Enhanced the namespace configuration to ensure proper routing</li></ul>
+
+<ul><li>Added multiple route definitions for the server room plan:</li></ul>
+
+<ul><li style="margin-left: 20px">Standard route: <code>/mcoop/server-room-plan</code></li></ul>
+
+<ul><li style="margin-left: 20px">Direct access route: <code>/server-room-plan</code></li></ul>
+
+<ul><li style="margin-left: 20px">Chained route: <code>/mcoop/server-room-plan</code> (using the base method)</li></ul>
+
+<ul><li>Improved the base method to properly set up the MCoop site context</li></ul>
+
+<ul><li>Added detailed logging to help diagnose any future routing issues</li></ul>
+
+
+
+<h3>2. Root Controller Updates</h3>
+
+
+
+<ul><li>Removed temporary emergency routes that were handling MCoop functionality</li></ul>
+
+<ul><li>Added proper forwarding methods that redirect to the MCoop controller</li></ul>
+
+<ul><li>Updated the default 404 handler to properly forward MCoop-related requests</li></ul>
+
+<ul><li>Improved error handling for MCoop paths</li></ul>
+
+
+
+<h3>3. Template Updates</h3>
+
+
+
+<ul><li>Updated all links in the templates to use the correct paths:</li></ul>
+
+<ul><li style="margin-left: 20px">Changed <code>/server-room-plan</code> to <code>/mcoop/server-room-plan</code> in the navigation</li></ul>
+
+<ul><li style="margin-left: 20px">Updated the admin dropdown menu links</li></ul>
+
+<ul><li style="margin-left: 20px">Fixed links in the main content area</li></ul>
+
+
+
+<h2>Architectural Improvements</h2>
+
+
+
+These changes follow the proper architectural pattern where:
+
+
+
+<ol><li>Each site's functionality is encapsulated in its own controller</li></ol>
+
+<ol><li>The Root controller only forwards to the appropriate site controller</li></ol>
+
+<ol><li>Routes are defined in the controller that owns the functionality</li></ol>
+
+<ol><li>Multiple route definitions provide flexibility in URL structure</li></ol>
+
+
+
+<h2>Testing</h2>
+
+
+
+To test these changes:
+
+
+
+<ol><li>Access <code>/mcoop</code> to verify the MCoop home page loads correctly</li></ol>
+
+<ol><li>Click on the Server Room Plan links to verify they work</li></ol>
+
+<ol><li>Try accessing <code>/mcoop/server-room-plan</code> directly</li></ol>
+
+<ol><li>Try accessing <code>/server-room-plan</code> directly (should forward to the MCoop controller)</li></ol>
+
+
+
+<h2>Future Considerations</h2>
+
+
+
+<ol><li>Consider implementing a more robust routing system that automatically maps site-specific URLs</li></ol>
+
+<ol><li>Add more comprehensive logging for route resolution</li></ol>
+
+<ol><li>Create a centralized route registry to avoid duplication</li></ol>
+
+</div>

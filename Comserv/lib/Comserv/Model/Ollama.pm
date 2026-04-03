@@ -50,14 +50,14 @@ Comserv::Model::Ollama - Catalyst Model for Ollama API integration
     
     # Using remote server
     my $ollama_remote = Comserv::Model::Ollama->new(
-        host => '192.168.1.171',
+        host => '192.168.1.199',
         model => 'llama3.1',
         timeout => 120
     );
     
     # Or specify endpoint directly (legacy method)
     my $ollama_legacy = Comserv::Model::Ollama->new(
-        endpoint => 'http://192.168.1.171:11434/api/generate',
+        endpoint => 'http://192.168.1.199:11434/api/generate',
         model => 'llama3.1',
         timeout => 120
     );
@@ -69,7 +69,7 @@ It handles HTTP communication, streaming responses, error handling, and
 parsing of structured data from LLM responses.
 
 The module supports connecting to Ollama servers on both localhost and remote hosts
-(e.g., 192.168.1.171). You can specify the host and port separately, or provide a
+(e.g., 192.168.1.199). You can specify the host and port separately, or provide a
 complete endpoint URL. The endpoint is automatically built from the host and port
 if not explicitly provided.
 
@@ -80,8 +80,8 @@ if not explicitly provided.
 has 'host' => (
     is => 'rw',
     isa => 'Str',
-    default => 'localhost',
-    documentation => 'Ollama server host (localhost or 192.168.1.171)'
+    default => '192.168.1.199',
+    documentation => 'Ollama server host (default: 192.168.1.199 — overridden by comserv.conf <Ollama> block)'
 );
 
 has 'port' => (
@@ -131,8 +131,8 @@ has 'temperature' => (
 has 'max_tokens' => (
     is => 'rw',
     isa => 'Int',
-    default => 2048,
-    documentation => 'Maximum tokens in response'
+    default => 800,
+    documentation => 'Maximum tokens in response (keep low for CPU inference speed)'
 );
 
 has 'ua' => (
@@ -260,12 +260,14 @@ sub query {
     
     # Build the request payload
     my $payload = {
-        model => $self->model,
-        prompt => $prompt,
-        stream => $self->stream ? JSON::true : JSON::false,
-        options => {
+        model      => $self->model,
+        prompt     => $prompt,
+        stream     => $self->stream ? JSON::true : JSON::false,
+        keep_alive => '2h',
+        options    => {
             temperature => $self->temperature,
             num_predict => $self->max_tokens,
+            num_ctx     => 4096,
         }
     };
     
@@ -295,7 +297,8 @@ sub query {
     $req->header('Content-Type' => 'application/json');
     $req->content($json_payload);
     
-    # Send the request
+    # Send the request — sync UA timeout each time so callers can change $self->timeout
+    $self->ua->timeout($self->timeout);
     my $response;
     try {
         $response = $self->ua->request($req);
@@ -398,12 +401,14 @@ sub chat {
     
     # Build the request payload
     my $payload = {
-        model => $self->model,
-        messages => $messages,
-        stream => $self->stream ? JSON::true : JSON::false,
-        options => {
+        model      => $self->model,
+        messages   => $messages,
+        stream     => $self->stream ? JSON::true : JSON::false,
+        keep_alive => '2h',
+        options    => {
             temperature => $self->temperature,
             num_predict => $self->max_tokens,
+            num_ctx     => 4096,
         }
     };
     
@@ -427,7 +432,8 @@ sub chat {
     $req->header('Content-Type' => 'application/json');
     $req->content($json_payload);
     
-    # Send the request
+    # Send the request — sync UA timeout each time so callers can change $self->timeout
+    $self->ua->timeout($self->timeout);
     my $response;
     try {
         $response = $self->ua->request($req);
@@ -1088,6 +1094,90 @@ the Ollama website.
 
 =cut
 
+=head2 unload_model
+
+Force-unload a model from Ollama's memory by sending a generate request with
+keep_alive => 0.  This frees RAM/VRAM so a new model can be loaded.
+
+    $ollama->unload_model(model => 'llama3.1:latest');
+
+=cut
+
+sub unload_model {
+    my ($self, %args) = @_;
+
+    my $model_name = $args{model} || $self->model;
+    unless ($model_name) {
+        return { success => 0, error => 'No model name provided' };
+    }
+
+    my $endpoint = $self->endpoint;
+    $endpoint =~ s/\/api\/chat$/\/api\/generate/;
+    $endpoint =~ s/\/api\/generate$/\/api\/generate/;
+
+    my $payload = {
+        model      => $model_name,
+        prompt     => '',
+        keep_alive => 0,
+    };
+
+    my $req = HTTP::Request->new(POST => $endpoint);
+    $req->header('Content-Type' => 'application/json');
+    $req->content(encode_json($payload));
+
+    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'unload_model',
+        "Unloading model '$model_name' from memory (keep_alive=0)");
+
+    my $orig_timeout = $self->ua->timeout;
+    $self->ua->timeout(30);
+    my $response;
+    eval { $response = $self->ua->request($req); };
+    $self->ua->timeout($orig_timeout);
+
+    if ($@ || !$response || !$response->is_success) {
+        my $err = $@ || ($response ? $response->status_line : 'no response');
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'unload_model',
+            "Unload request failed (non-fatal): $err");
+        return { success => 0, error => $err };
+    }
+
+    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'unload_model',
+        "Model '$model_name' unloaded successfully");
+    return { success => 1, message => "Model '$model_name' unloaded from memory" };
+}
+
+=head2 get_running_models
+
+Query Ollama's /api/ps endpoint to see which models are currently loaded in memory.
+
+    my $running = $ollama->get_running_models();
+    # returns arrayref of { name, size_vram, ... }
+
+=cut
+
+sub get_running_models {
+    my ($self) = @_;
+
+    my $endpoint = $self->endpoint;
+    $endpoint =~ s/\/api\/(generate|chat)$/\/api\/ps/;
+
+    my $req = HTTP::Request->new(GET => $endpoint);
+
+    my $orig_timeout = $self->ua->timeout;
+    $self->ua->timeout(10);
+    my $response;
+    eval { $response = $self->ua->request($req); };
+    $self->ua->timeout($orig_timeout);
+
+    return [] if $@ || !$response || !$response->is_success;
+
+    my $data;
+    eval { $data = decode_json($response->content); };
+    return [] if $@;
+
+    return $data->{models} || [];
+}
+
 sub list_available_models {
     my ($self) = @_;
     
@@ -1275,7 +1365,7 @@ Helper method to change the Ollama server host and automatically rebuild the end
     $ollama->set_host('localhost');
     
     # Switch to remote server
-    $ollama->set_host('192.168.1.171');
+    $ollama->set_host('192.168.1.199');
 
 This method updates both the host attribute and clears the endpoint cache so it will
 be rebuilt with the new host on the next access.

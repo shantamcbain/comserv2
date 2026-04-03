@@ -1,0 +1,41 @@
+<div class="health-dash-panel">
+    <div class="health-dash-header">
+        <span>&#128268; Hardware Monitor</span>
+        <a href="[% c.uri_for('/admin/hardware_monitor') %]" class="health-dash-link">View All &rsaquo;</a>
+    </div>
+    [% IF hardware_latest && hardware_latest.size %]
+    <div class="health-dash-grid">
+        [% FOR m IN hardware_latest %]
+        <div class="health-dash-card level-[% m.level %]">
+            <div class="hd-host">[% m.hostname | html %]</div>
+            <div class="hd-metric">[% m.metric_name | html %]</div>
+            <div class="hd-value">
+                [% IF m.metric_value.defined %][% m.metric_value %][% IF m.unit %]&thinsp;[% m.unit | html %][% END %]
+                [% ELSIF m.metric_text %][% m.metric_text | html %]
+                [% ELSE %]&mdash;[% END %]
+            </div>
+        </div>
+        [% END %]
+    </div>
+    [% ELSE %]
+    <p class="health-dash-empty">
+        No data yet &mdash; run <code>script/hardware_monitor.pl</code> and apply the migration.
+        <a href="[% c.uri_for('/admin/hardware_monitor') %]">Open monitor</a>
+    </p>
+    [% END %]
+</div>
+<style>
+.health-dash-panel      { border:1px solid #ddd; border-radius:6px; margin-bottom:16px; overflow:hidden; }
+.health-dash-header     { background:#3a5a78; color:#fff; padding:8px 14px; display:flex; justify-content:space-between; align-items:center; font-weight:bold; }
+.health-dash-link       { color:#cde; font-size:.85em; text-decoration:none; }
+.health-dash-link:hover { color:#fff; }
+.health-dash-grid       { display:flex; flex-wrap:wrap; gap:6px; padding:10px; background:#f9f9f9; }
+.health-dash-card       { border-left:3px solid #4caf50; background:#fff; border-radius:4px; padding:6px 10px; min-width:120px; }
+.health-dash-card.level-warn     { border-left-color:#ff9800; background:#fff8e1; }
+.health-dash-card.level-error    { border-left-color:#f44336; background:#fdecea; }
+.health-dash-card.level-critical { border-left-color:#b71c1c; background:#f8d7da; }
+.hd-host   { font-size:.72em; color:#888; }
+.hd-metric { font-size:.78em; color:#555; }
+.hd-value  { font-size:1.1em; font-weight:bold; }
+.health-dash-empty { padding:10px 14px; color:#888; font-size:.9em; }
+</style>

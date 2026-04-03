@@ -1,0 +1,97 @@
+[% PageVersion = 'Comserv/root/mail/newsletter_signup.tt,v 1.0 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<!-- Newsletter Signup Form - appears on every page until user logs in -->
+[% UNLESS c.session.username %]
+<div class="newsletter-signup-banner">
+    <div class="newsletter-content">
+        <h3>Stay Updated!</h3>
+        <p>Subscribe to our newsletter for the latest updates and announcements.</p>
+        <form method="post" action="[% c.uri_for('/mail/newsletter_signup') %]" class="newsletter-form">
+            <input type="email" name="email" placeholder="Enter your email address" required>
+            <button type="submit" class="btn btn-primary">Subscribe</button>
+        </form>
+        <small>You can unsubscribe at any time. <a href="[% c.uri_for('/user/register') %]">Register for full access</a></small>
+    </div>
+    <button class="newsletter-close" onclick="hideNewsletterBanner()">&times;</button>
+</div>
+
+<script>
+function hideNewsletterBanner() {
+    document.querySelector('.newsletter-signup-banner').style.display = 'none';
+    // Store in session storage to remember user's choice
+    sessionStorage.setItem('newsletter_banner_hidden', 'true');
+}
+
+// Check if user previously closed the banner
+if (sessionStorage.getItem('newsletter_banner_hidden') === 'true') {
+    document.addEventListener('DOMContentLoaded', function() {
+        var banner = document.querySelector('.newsletter-signup-banner');
+        if (banner) banner.style.display = 'none';
+    });
+}
+</script>
+[% END %]
+
+<!-- Newsletter Modal (available for all users) -->
+<div id="newsletterModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Newsletter Signup</h2>
+            <span class="close" onclick="hideNewsletterModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p>Stay updated with our latest news and announcements!</p>
+            <form method="post" action="[% c.uri_for('/mail/newsletter_signup') %]" class="newsletter-modal-form">
+                <div class="form-group">
+                    <label for="modal-email">Email Address:</label>
+                    <input type="email" id="modal-email" name="email" placeholder="Enter your email address" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Subscribe</button>
+                    <button type="button" class="btn btn-secondary" onclick="hideNewsletterModal()">Cancel</button>
+                </div>
+            </form>
+            [% UNLESS c.session.username %]
+            <p class="signup-note">
+                <small>Don't have an account? <a href="[% c.uri_for('/user/register') %]">Register here</a> for full access to our services.</small>
+            </p>
+            [% END %]
+        </div>
+    </div>
+</div>
+
+<script>
+function showNewsletterModal() {
+    document.getElementById('newsletterModal').style.display = 'block';
+    // Track modal opens for analytics
+    trackNewsletterModalOpen();
+}
+
+function hideNewsletterModal() {
+    document.getElementById('newsletterModal').style.display = 'none';
+}
+
+// Close modal when clicking outside of it
+window.onclick = function(event) {
+    var modal = document.getElementById('newsletterModal');
+    if (event.target == modal) {
+        hideNewsletterModal();
+    }
+}
+
+// Enhanced tracking with domain-specific localStorage
+function trackNewsletterModalOpen() {
+    var domain = window.location.hostname;
+    var storageKey = 'newsletter_modal_opens_' + domain;
+    var opens = parseInt(localStorage.getItem(storageKey) || '0') + 1;
+    localStorage.setItem(storageKey, opens.toString());
+    
+    // Log for debugging if available
+    if (typeof console !== 'undefined' && console.log) {
+        console.log('Newsletter modal opened ' + opens + ' times on ' + domain);
+    }
+}
+</script>

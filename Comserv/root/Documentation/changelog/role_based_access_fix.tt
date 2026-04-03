@@ -1,0 +1,163 @@
+[% PageVersion = 'Documentation/changelog/role_based_access_fix.tt,v 1.0 2024/05/31 shanta Exp ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Role-Based Access Fix' %]
+
+<div class="documentation-page">
+    <div class="doc-header">
+        <h1>Documentation Access Control Fix</h1>
+        
+        <div class="doc-meta">
+            <span class="date">May 31, 2024</span>
+            <span class="author">System Administrator</span>
+            <span class="status">Fixed</span>
+        </div>
+    </div>
+    
+    <div class="changelog-section">
+        <h2>Issue: Role-Based Access Control Not Working Properly</h2>
+        <p>Fixed an issue where users with the 'admin' role in their roles array were not being correctly granted access to admin documentation. The issue was caused by the system only checking a single display role instead of checking all roles in the user's roles array.</p>
+        
+        <h3>Problem Details:</h3>
+        <ul>
+            <li>Users with multiple roles (including 'admin') were being shown the error message: "You don't have permission to view this documentation page."</li>
+            <li>The error page was showing "User Role: user" even when the session roles included 'admin'</li>
+            <li>The system was determining access based on a single display role rather than checking all roles</li>
+        </ul>
+    </div>
+    
+    <div class="changelog-section">
+        <h2>Changes Made</h2>
+        
+        <h3>1. Updated Role Handling</h3>
+        <ul>
+            <li>Modified the Documentation controller to properly handle users with multiple roles</li>
+            <li>Changed how the admin status is determined - now properly checks if 'admin' is in the roles array</li>
+            <li>Added clear comments to prevent future regressions</li>
+        </ul>
+        
+        <h3>2. Improved Error Template</h3>
+        <ul>
+            <li>Updated the error.tt template to show all user roles instead of a single role</li>
+            <li>Changed label from "User Role:" to "Roles:" to better reflect the actual data</li>
+            <li>Improved how the debug section checks for admin/developer roles</li>
+        </ul>
+        
+        <h3>3. Additional Changes</h3>
+        <ul>
+            <li>Updated file path examples in the debug section to show .tt files instead of .md files</li>
+            <li>Changed references from 'normal' role to 'user' role for consistency</li>
+            <li>Added more detailed logging to help troubleshoot any future issues</li>
+        </ul>
+    </div>
+    
+    <div class="changelog-section">
+        <h2>Files Modified</h2>
+        <ul>
+            <li><code>Comserv/lib/Comserv/Controller/Documentation.pm</code> - Updated role handling logic</li>
+            <li><code>Comserv/root/Documentation/error.tt</code> - Updated error template to show all roles</li>
+        </ul>
+    </div>
+    
+    <div class="changelog-section">
+        <h2>Technical Implementation Details</h2>
+        <p>The key to the fix was ensuring that access control is based on checking all roles in the user's roles array rather than using a single "primary" role. This ensures that users with multiple roles (e.g., both 'user' and 'admin') are properly granted access based on their highest privilege level.</p>
+        
+        <h3>Role Detection Code:</h3>
+        <pre><code># Check if admin is one of the roles
+if (grep { lc($_) eq 'admin' } @user_roles) {
+    $user_role = 'admin';
+    $is_admin = 1;
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'view',
+        "Admin role found in session roles");
+}</code></pre>
+        
+        <h3>Error Template Improvement:</h3>
+        <pre><code>&lt;div class="role-info"&gt;
+    &lt;span class="label"&gt;Roles:&lt;/span&gt;
+    &lt;span class="value"&gt;
+        [% IF user_roles && user_roles.size > 0 %]
+            [% user_roles.join(', ') %]
+        [% ELSIF c.session.roles && c.session.roles.size > 0 %]
+            [% c.session.roles.join(', ') %]
+        [% ELSE %]
+            user
+        [% END %]
+    &lt;/span&gt;
+&lt;/div&gt;</code></pre>
+    </div>
+</div>
+
+<style>
+    .documentation-page {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+    }
+    
+    .doc-header {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .doc-header h1 {
+        color: #0056b3;
+        margin-bottom: 20px;
+    }
+    
+    .doc-meta {
+        display: flex;
+        gap: 20px;
+        color: #666;
+        font-size: 0.9em;
+    }
+    
+    .changelog-section {
+        margin-bottom: 30px;
+    }
+    
+    .changelog-section h2 {
+        color: #0056b3;
+        margin-bottom: 15px;
+    }
+    
+    .changelog-section h3 {
+        color: #333;
+        margin: 20px 0 10px 0;
+    }
+    
+    code {
+        background: #f4f4f4;
+        padding: 2px 5px;
+        border-radius: 3px;
+        font-family: monospace;
+    }
+    
+    pre {
+        background: #f8f9fa;
+        border: 1px solid #eaecef;
+        border-radius: 3px;
+        padding: 15px;
+        margin: 15px 0;
+        overflow-x: auto;
+    }
+    
+    pre code {
+        background: transparent;
+        padding: 0;
+    }
+    
+    ul {
+        margin-left: 20px;
+        margin-bottom: 15px;
+    }
+    
+    li {
+        margin-bottom: 5px;
+    }
+</style>

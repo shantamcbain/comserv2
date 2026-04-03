@@ -70,6 +70,12 @@ nav {
     font-weight: bold;
 }
 
+a.submenu-header {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
 .submenu {
     display: none;
     position: absolute;

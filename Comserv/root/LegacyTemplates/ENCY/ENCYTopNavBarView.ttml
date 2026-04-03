@@ -1,0 +1,47 @@
+[% #CSC CSCTopNavBarView
+#	$Id: ENCYTopNavBarView.ttml,v 1.2 2002/05/13 19:45:57 shanta Exp $	
+
+# this template generates the top of HTML,
+
+# if -PAGE_TITLE is defined, it gets used in the <title>
+
+# if -SCRIPT_DISPLAY_NAME is defined, it gets used in the <title>
+
+# if -CSS_VIEW_URL is defined, the CSS link is created.
+
+# if -APPLICATION_SUB_MENU_VIEW_NAME is defined, the corresponding
+# template gets embedded
+
+# also see various other logo values below
+
+#Set needed values
+
+%]
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% site = data.site_name %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+
+<tr>
+<td>
+
+[% embed('ENCYSiteNaveView') %] 
+    </TD>
+
+
+[% IF group == 'ENCYadmin' OR username == 'Shanta' %]
+<td>
+[% embed('ENCYAddListView.ttml') %]
+[% #Target ="_Blank">%]
+   </TD>
+[% END %] 
+</TR>
+ 

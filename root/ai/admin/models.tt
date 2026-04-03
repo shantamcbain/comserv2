@@ -1,0 +1,262 @@
+[% INCLUDE Documentation/ApplicationTtTemplate.tt %]
+
+[% BLOCK page_content %]
+<div class="container">
+    <h1>AI Model Configurations</h1>
+    <p>Manage AI model configurations for different roles and agent types. Add, edit, or delete models from the list below.</p>
+    
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModelModal">
+                Add New Model
+            </button>
+        </div>
+    </div>
+    
+    [% IF models %]
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Model Name</th>
+                <th>Role</th>
+                <th>Agent Type</th>
+                <th>Enabled</th>
+                <th>API Endpoint</th>
+                <th>Priority</th>
+                <th>Capabilities</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% FOREACH model IN models %]
+            <tr>
+                <td>[% model.id %]</td>
+                <td>[% model.model_name %]</td>
+                <td>[% model.role %]</td>
+                <td>[% model.agent_type %]</td>
+                <td>
+                    <span class="badge [% IF model.enabled %]bg-success[% ELSE %]bg-danger[% END %]">
+                        [% IF model.enabled %]Yes[% ELSE %]No[% END %]
+                    </span>
+                </td>
+                <td>[% model.api_endpoint %]</td>
+                <td>[% model.priority %]</td>
+                <td>
+                    [% IF model.capabilities %]
+                        <ul class="list-unstyled mb-0">
+                            [% FOREACH cap IN model.capabilities %]
+                                <li><small class="text-muted">[% cap %]</small></li>
+                            [% END %]
+                        </ul>
+                    [% ELSE %]
+                        <span class="text-muted">None</span>
+                    [% END %]
+                </td>
+                <th>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="editModel([% model.id %])">Edit</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteModel([% model.id %], '[% model.model_name | html %]')">Delete</button>
+                </th>
+            </tr>
+            [% END %]
+        </tbody>
+    </table>
+    [% ELSE %]
+    <div class="alert alert-info">No model configurations found. Add one to get started.</div>
+    [% END %]
+</div>
+
+<!-- Add Model Modal -->
+<div class="modal fade" id="addModelModal" tabindex="-1" aria-labelledby="addModelModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addModelModalLabel">Add New AI Model</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addModelForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="model_name" class="form-label">Model Name <span class="text-danger">*</span></label>
+                        <select class="form-select" id="model_name" name="model_name" required>
+                            <option value="">Select a Model</option>
+                            [% FOREACH grok_model IN grok_models %]
+                                <option value="[% grok_model.name %]">[% grok_model.name %] ([% grok_model.type %])</option>
+                            [% END %]
+                            <option value="custom">Custom (Enter Manually)</option>
+                        </select>
+                        <input type="text" class="form-control mt-2 d-none" id="custom_model_name" name="model_name" placeholder="Enter custom model name">
+                        <div class="form-text">Choose from available xAI Grok models or enter a custom one.</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="api_endpoint" class="form-label">API Endpoint <span class="text-danger">*</span></label>
+                        <input type="url" class="form-control" id="api_endpoint" name="api_endpoint" value="https://api.x.ai/v1/chat/completions" required>
+                        <div class="form-text">Default for xAI Grok API.</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="role" class="form-label">Role <span class="text-danger">*</span></label>
+                        <select class="form-select" id="role" name="role" required>
+                            <option value="">Select Role</option>
+                            <option value="user">User</option>
+                            <option value="normal">Normal</option>
+                            <option value="developer">Developer</option>
+                            <option value="editor">Editor</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="agent_type" class="form-label">Agent Type <span class="text-danger">*</span></label>
+                        <select class="form-select" id="agent_type" name="agent_type" required>
+                            <option value="">Select Agent Type</option>
+                            <option value="helpdesk">HelpDesk</option>
+                            <option value="ency">Encyclopedia</option>
+                            <option value="developer">Developer</option>
+                            <option value="coding">Coding</option>
+                            <option value="editor">Content Editor</option>
+                            <option value="documentation">Documentation</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="enabled" class="form-label">Enabled</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="enabled" name="enabled" value="1" checked>
+                            <label class="form-check-label" for="enabled">Enable this model</label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="temperature" class="form-label">Temperature (0.0 - 2.0)</label>
+                        <input type="number" class="form-control" id="temperature" name="temperature" value="0.7" min="0" max="2" step="0.1">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="max_tokens" class="form-label">Max Tokens</label>
+                        <input type="number" class="form-control" id="max_tokens" name="max_tokens" value="2048" min="1">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="priority" class="form-label">Priority (Lower = Higher Priority)</label>
+                        <input type="number" class="form-control" id="priority" name="priority" value="1" min="1">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="api_key" class="form-label">API Key (Optional - Encrypted)</label>
+                        <input type="password" class="form-control" id="api_key" name="api_key" placeholder="Enter API key if required">
+                        <div class="form-text">This will be encrypted and stored securely.</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Capabilities</label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="search_docs" name="search_docs_automatically" value="1" checked>
+                                    <label class="form-check-label" for="search_docs">Search Docs Automatically</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="web_search" name="allow_web_search" value="1">
+                                    <label class="form-check-label" for="web_search">Allow Web Search</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="code_search" name="allow_code_search" value="1">
+                                    <label class="form-check-label" for="code_search">Allow Code Search</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Model</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Model Modal (Similar structure, populated via JS) -->
+<div class="modal fade" id="editModelModal" tabindex="-1" aria-labelledby="editModelModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editModelModalLabel">Edit AI Model</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editModelForm">
+                <div class="modal-body">
+                    <!-- Fields similar to add form, with hidden ID -->
+                    <input type="hidden" id="edit_id" name="id">
+                    <!-- ... (copy add form fields here, but pre-populated via JS) ... -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Model</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // JS for handling custom model input
+    document.getElementById('model_name').addEventListener('change', function() {
+        const customInput = document.getElementById('custom_model_name');
+        if (this.value === 'custom') {
+            customInput.classList.remove('d-none');
+            customInput.required = true;
+        } else {
+            customInput.classList.add('d-none');
+            customInput.required = false;
+            document.getElementById('custom_model_name').value = '';
+        }
+    });
+
+    // Handle form submission for add
+    document.getElementById('addModelForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        if (formData.get('model_name') === 'custom') {
+            formData.set('model_name', document.getElementById('custom_model_name').value);
+        }
+        fetch('/ai/admin/add_model', {
+            method: 'POST',
+            body: formData
+        }).then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload(); // Reload to show new model
+            } else {
+                alert('Error: ' + data.error);
+            }
+        });
+    });
+
+    // Placeholder functions for edit/delete - implement similarly
+    function editModel(id) {
+        // Fetch model data via AJAX and populate edit modal
+        fetch(`/ai/admin/get_model/${id}`).then(/* ... */);
+    }
+    function deleteModel(id, name) {
+        if (confirm(`Delete ${name}?`)) {
+            fetch(`/ai/admin/delete_model`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `id=${id}`
+            }).then(response => response.json())
+            .then(data => {
+                if (data.success) location.reload();
+                else alert('Error: ' + data.error);
+            });
+        }
+    }
+</script>
+
+[% END %]

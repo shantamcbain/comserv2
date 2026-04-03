@@ -1,0 +1,70 @@
+[% META
+   title = "Insects - Encyclopedia of Biological Life"
+   description = "Browse all insects in the ENCY encyclopedia"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-02"
+%]
+[% PageVersion = 'ENCY/InsectList.tt,v 0.01 2026/04/02' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.success_msg %]
+<div class="alert alert-success">[% c.flash.success_msg | html %]</div>
+[% END %]
+[% IF c.flash.error_msg %]
+<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
+[% END %]
+
+<h1>Insects</h1>
+
+<p><a href="[% c.uri_for('/ENCY') %]">&larr; Back to Encyclopedia</a></p>
+
+[% roles = c.session.roles;
+   is_admin = 0;
+   FOREACH r IN roles;
+     IF r == 'admin'; is_admin = 1; END;
+   END;
+%]
+[% IF is_admin %]
+<a href="[% c.uri_for('/ENCY/Insect/add') %]" class="btn btn-primary">Add Insect</a>
+[% END %]
+
+<form method="get" action="[% c.uri_for('/ENCY/Insect') %]">
+    <label>Ecological Role:
+        <input type="text" name="ecological_role" value="[% ecological_role | html %]" size="20" />
+    </label>
+    <input type="submit" value="Filter" class="btn btn-default" />
+    <a href="[% c.uri_for('/ENCY/Insect') %]">Clear</a>
+</form>
+
+[% IF insects && insects.size %]
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <th>Common Name</th>
+        <th>Order</th>
+        <th>Ecological Role</th>
+        <th>Distribution</th>
+        <th></th>
+    </tr>
+    [% FOREACH insect IN insects %]
+    <tr>
+        <td>[% insect.common_name | html %]</td>
+        <td>[% insect.order_name | html %]</td>
+        <td>[% insect.ecological_role | html %]</td>
+        <td>[% insect.distribution | html %]</td>
+        <td><a href="[% c.uri_for('/ENCY/Insect', insect.record_id) %]">Details</a></td>
+    </tr>
+    [% END %]
+</table>
+[% ELSE %]
+<p>No insects found in the database.</p>
+[% END %]
+
+[% IF ai_fallback %]
+<div class="alert alert-info" style="margin-top:1em;">
+  No local results for &ldquo;[% ai_query | html %]&rdquo;.
+  <a href="/AI/chat?prompt=Tell+me+about+[% ai_query | uri %]+in+the+context+of+the+encyclopedia">Ask AI</a>
+</div>
+[% END %]
