@@ -1,0 +1,323 @@
+[% META
+        title = "Membership User Guide"
+   description = "Complete guide to membership plans, payment options, internal coins, and managing your account"
+   roles = "all"
+   TemplateType = "Documentation"
+   category = "general"
+   page_version = "1.0"
+   last_updated = "2026-04-03"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/general/membership_user_guide.tt,v 1.0 2026/04/03 shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--primary-color); font-family: var(--header-font);">Membership User Guide</h1>
+
+    <div style="color: var(--text-muted-color); font-size: var(--font-size-small); margin-bottom: var(--spacing-large);">
+        Last Updated: 2026-04-03 | Version: 1.0 | Status: Active
+    </div>
+
+    <!-- TABLE OF CONTENTS -->
+    <div id="toc" style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-bottom: var(--spacing-large);">
+        <h3 style="margin-top: 0; color: var(--primary-color);">Table of Contents</h3>
+        <ul style="list-style-position: inside; color: var(--text-color);">
+            <li><a href="#overview" style="color: var(--link-color); text-decoration: none;">What is Membership?</a></li>
+            <li><a href="#plans" style="color: var(--link-color); text-decoration: none;">Membership Plans</a></li>
+            <li><a href="#joining" style="color: var(--link-color); text-decoration: none;">How to Join</a></li>
+            <li><a href="#payment" style="color: var(--link-color); text-decoration: none;">Payment Methods</a></li>
+            <li><a href="#coins" style="color: var(--link-color); text-decoration: none;">Internal Coins</a></li>
+            <li><a href="#services" style="color: var(--link-color); text-decoration: none;">Services Included</a></li>
+            <li><a href="#ai-models" style="color: var(--link-color); text-decoration: none;">AI Model Access</a></li>
+            <li><a href="#account" style="color: var(--link-color); text-decoration: none;">Managing Your Account</a></li>
+            <li><a href="#pricing" style="color: var(--link-color); text-decoration: none;">Pricing &amp; Global Affordability</a></li>
+            <li><a href="#cancel" style="color: var(--link-color); text-decoration: none;">Cancelling or Upgrading</a></li>
+            <li><a href="#faq" style="color: var(--link-color); text-decoration: none;">Common Questions</a></li>
+        </ul>
+    </div>
+
+    <!-- OVERVIEW -->
+    <div id="overview" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">What is Membership?</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Membership gives you expanded access to this site's features. Every site built on our platform can define its own membership tiers — so benefits vary by site. At the core, membership is designed to be <strong>affordable for everyone</strong>, regardless of where you live. Pricing adjusts based on your region so that the cost is always fair.
+        </p>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            You always start on a <strong>Free tier</strong>. You can use the site without ever paying anything. Membership plans simply unlock more of what the site has to offer.
+        </p>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- PLANS -->
+    <div id="plans" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Membership Plans</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Each site defines its own plans. Typical tiers include:
+        </p>
+        <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+            <thead>
+                <tr style="background-color: var(--primary-color); color: white;">
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: left;">Tier</th>
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: left;">Typical Features</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); font-weight: bold;">Free</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Basic site access, read-only features, limited AI model access</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); font-weight: bold;">Supporter</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Full site access, more AI models, internal coin allowance, priority support</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); font-weight: bold;">Member</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">All Supporter features + beekeeping module, planning tools, subdomain/email address on site domain</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); font-weight: bold;">Pro / Business</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">All Member features + hosting space, custom domain, access to all AI models, service-earning capabilities</td>
+                </tr>
+            </tbody>
+        </table>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Visit <a href="/membership/plans" style="color: var(--link-color);">/membership/plans</a> to see the exact plans and prices available on this site.
+        </p>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- JOINING -->
+    <div id="joining" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">How to Join</h2>
+        <ol style="color: var(--text-color); font-family: var(--body-font); line-height: 1.8;">
+            <li><strong>Create an account</strong> — register at <a href="/user/register" style="color: var(--link-color);">/user/register</a> if you don't have one yet.</li>
+            <li><strong>Browse plans</strong> — go to <a href="/membership/plans" style="color: var(--link-color);">/membership/plans</a> and review what each tier offers.</li>
+            <li><strong>Choose a plan</strong> — click the plan you want and select a billing period (monthly or annual).</li>
+            <li><strong>Choose a payment method</strong> — PayPal, Patreon, or internal coins (see Payment Methods below).</li>
+            <li><strong>Confirm</strong> — after payment your membership activates within minutes and your new features are immediately available.</li>
+        </ol>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- PAYMENT -->
+    <div id="payment" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Payment Methods</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">We support several ways to pay for membership:</p>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">PayPal</h3>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Pay securely through PayPal. You do not need a PayPal account — you can use a credit or debit card through PayPal's guest checkout. After payment you are redirected back to the site and your membership activates automatically.
+        </p>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Patreon</h3>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            If you are already a Patreon supporter, you can link your Patreon account to receive membership benefits matching your patron tier. Go to <a href="/membership/account" style="color: var(--link-color);">My Account</a> and select <em>Connect Patreon</em>.
+        </p>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Internal Coins</h3>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            The site has an internal coin system. You can buy coins with PayPal or earn them by contributing to the community. Coins can then be spent on membership subscriptions and other services without needing to use PayPal every time.
+            See the <a href="#coins" style="color: var(--link-color);">Internal Coins</a> section for details.
+        </p>
+
+        <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); border-radius: 4px; margin-top: var(--spacing-medium);">
+            <strong style="color: var(--text-color);">Note on promo codes:</strong>
+            <p style="color: var(--text-color); margin: var(--spacing-small) 0 0 0; line-height: 1.5;">If you have a promo code, enter it on the payment page before completing checkout. Promo codes can give a percentage discount, a fixed amount off, or free months.</p>
+        </div>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- COINS -->
+    <div id="coins" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Internal Coins</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Coins are the site's internal currency. They let you pay for services, memberships, and other features without needing an external payment provider every time. Your coin balance is shown in the navigation bar when you are logged in.
+        </p>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Getting Coins</h3>
+        <ul style="color: var(--text-color); font-family: var(--body-font); line-height: 1.8;">
+            <li><strong>Buy coins</strong> — visit <a href="/currency/purchase" style="color: var(--link-color);">/currency/purchase</a> and pay with PayPal.</li>
+            <li><strong>Earn coins</strong> — site admins can grant coins as a reward for contributions, content creation, or community support.</li>
+            <li><strong>Receive coins</strong> — other members can transfer coins to you.</li>
+        </ul>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Using Coins</h3>
+        <ul style="color: var(--text-color); font-family: var(--body-font); line-height: 1.8;">
+            <li>Select <em>Pay with coins</em> during checkout for membership or other services.</li>
+            <li>Transfer coins to other members at <a href="/currency/transfer" style="color: var(--link-color);">/currency/transfer</a>.</li>
+            <li>View your full coin history at <a href="/currency/history" style="color: var(--link-color);">/currency/history</a>.</li>
+        </ul>
+
+        <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); border-radius: 4px; margin-top: var(--spacing-medium);">
+            <strong style="color: var(--text-color);">Coins are not cryptocurrency.</strong>
+            <p style="color: var(--text-color); margin: var(--spacing-small) 0 0 0; line-height: 1.5;">Coins exist only within this site and have no external monetary value. They cannot be withdrawn as cash.</p>
+        </div>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- SERVICES -->
+    <div id="services" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Services Included</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Depending on the plan you choose, you may gain access to:
+        </p>
+        <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+            <thead>
+                <tr style="background-color: var(--primary-color); color: white;">
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: left;">Service</th>
+                    <th style="padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: left;">Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Advanced AI Models</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Access to more powerful Ollama models beyond the free tier selection</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Email Address</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">A yourname@sitename email address (where supported by the site)</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Hosting / Subdomain</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Web hosting space and/or a subdomain under the site's domain</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Beekeeping Module</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Full access to the Apiary hive-management and beekeeping tracking system</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Planning System</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">AI-assisted planning tools for projects, schedules, and goals</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Internal Currency</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Ability to earn and transfer coins for contributing services to other members</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Service Addition</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Ability to list your own services and get paid in coins from other members</td>
+                </tr>
+            </tbody>
+        </table>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Not all services are available on every site. The plan page will show exactly what is included for this site.
+        </p>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- AI MODELS -->
+    <div id="ai-models" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">AI Model Access</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            This platform uses <strong>Ollama</strong> — locally-hosted, privacy-first AI models. No data is sent to external AI companies. The specific models available depend on the site and your membership tier:
+        </p>
+        <ul style="color: var(--text-color); font-family: var(--body-font); line-height: 1.8;">
+            <li><strong>Free tier</strong>: Access to lightweight, fast models (e.g., Llama 3.2 3B, Phi-3 Mini)</li>
+            <li><strong>Supporter / Member</strong>: Mid-range models with better reasoning (e.g., Llama 3.1 8B, Mistral 7B)</li>
+            <li><strong>Pro / Business</strong>: Full access including the most capable available models (e.g., Llama 3.1 70B, Mixtral)</li>
+        </ul>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Your AI chat interface automatically shows only the models your plan allows. Admins and site owners always see all available models.
+        </p>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- ACCOUNT -->
+    <div id="account" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Managing Your Account</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Visit <a href="/membership/account" style="color: var(--link-color);">My Membership Account</a> to:
+        </p>
+        <ul style="color: var(--text-color); font-family: var(--body-font); line-height: 1.8;">
+            <li>See your current plan, expiry date, and renewal status</li>
+            <li>View which services are active on your account</li>
+            <li>Check your coin balance and recent transactions</li>
+            <li>Connect or disconnect Patreon</li>
+            <li>Configure autopay settings (PayPal recurring or coin auto-deduct)</li>
+            <li>Upgrade, downgrade, or cancel your membership</li>
+        </ul>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- PRICING -->
+    <div id="pricing" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Pricing &amp; Global Affordability</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            We believe good tools should be accessible to everyone. Membership prices are:
+        </p>
+        <ul style="color: var(--text-color); font-family: var(--body-font); line-height: 1.8;">
+            <li><strong>Regionally adjusted</strong> — prices automatically reflect local purchasing power. A member in a lower-income country pays a lower price for the same plan.</li>
+            <li><strong>Transparent</strong> — the plan page always shows the price in your local context.</li>
+            <li><strong>Annually discounted</strong> — choosing annual billing typically saves 15–20% compared to monthly.</li>
+            <li><strong>Cost-tracked</strong> — site admins monitor real operating costs so pricing stays sustainable and fair.</li>
+        </ul>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            If you believe the price shown is not right for your region, contact the site admin through the <a href="/helpdesk" style="color: var(--link-color);">HelpDesk</a>.
+        </p>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- CANCEL / UPGRADE -->
+    <div id="cancel" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Cancelling or Upgrading</h2>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Upgrading</h3>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Go to <a href="/membership/upgrade" style="color: var(--link-color);">/membership/upgrade</a> to move to a higher plan. You will be charged only for the remaining period at the new rate. New services activate immediately.
+        </p>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Cancelling</h3>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Go to <a href="/membership/cancel" style="color: var(--link-color);">/membership/cancel</a> to stop your membership. Your current tier remains active until the end of the paid period. After expiry you revert to the Free tier — no services are deleted, just access is reduced. There is a short grace period before premium services are fully disabled.
+        </p>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Downgrading</h3>
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            Contact the site admin via <a href="/helpdesk" style="color: var(--link-color);">HelpDesk</a> to arrange a downgrade to a lower paid tier mid-cycle.
+        </p>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+    <!-- COMMON QUESTIONS -->
+    <div id="faq" style="margin-bottom: var(--spacing-large);">
+        <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Common Questions</h2>
+
+        <div style="margin-bottom: var(--spacing-medium);">
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Do I need a membership to use this site?</h4>
+            <p style="color: var(--text-color); font-family: var(--body-font);">No. The Free tier gives you basic access without any payment. Membership unlocks additional features.</p>
+        </div>
+
+        <div style="margin-bottom: var(--spacing-medium);">
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Is my payment information stored on this site?</h4>
+            <p style="color: var(--text-color); font-family: var(--body-font);">No. All payment processing is handled by PayPal or Patreon. We never store your card details.</p>
+        </div>
+
+        <div style="margin-bottom: var(--spacing-medium);">
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Can I pay with cryptocurrency?</h4>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Not directly. The site's internal coins are not cryptocurrency. If you hold crypto you could convert it to PayPal funds externally and pay that way.</p>
+        </div>
+
+        <div style="margin-bottom: var(--spacing-medium);">
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">What happens when my membership expires?</h4>
+            <p style="color: var(--text-color); font-family: var(--body-font);">You receive a short grace period. After that, premium services are suspended and you return to the Free tier. Your data is not deleted.</p>
+        </div>
+
+        <div style="margin-bottom: var(--spacing-medium);">
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Can I earn coins instead of paying with money?</h4>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Yes, if the site has community contribution features enabled. Admins can award coins for content, support, and other contributions. Earned coins can pay for membership.</p>
+        </div>
+
+        <div style="margin-bottom: var(--spacing-medium);">
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">My region is not listed — what price applies?</h4>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The system will apply the nearest applicable regional price, or a global default. Contact the site admin if the price seems incorrect for your situation.</p>
+        </div>
+
+        <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+            More questions? Ask our AI assistant in the chat, or <a href="/helpdesk" style="color: var(--link-color);">open a HelpDesk ticket</a>.
+        </p>
+        <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+    </div>
+
+</div>
