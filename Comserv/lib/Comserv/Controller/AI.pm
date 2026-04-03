@@ -3710,7 +3710,24 @@ sub _build_role_system_prompt {
     $page_title //= '';
 
     my $base_url = '';
-    eval { $base_url = $c->uri_for('/') . ''; $base_url =~ s{/$}{}; };
+    eval {
+        # Prefer X-Forwarded-Host/Proto headers when behind a reverse proxy
+        # so the AI never suggests internal ports (e.g. :5000) to users.
+        my $req    = $c->request;
+        my $fwd_host  = $req->header('X-Forwarded-Host')  || $req->header('HTTP_X_FORWARDED_HOST');
+        my $fwd_proto = $req->header('X-Forwarded-Proto') || $req->header('HTTP_X_FORWARDED_PROTO') || '';
+        if ($fwd_host) {
+            my $scheme = $fwd_proto || ($req->secure ? 'https' : 'http');
+            $base_url = "$scheme://$fwd_host";
+        } else {
+            $base_url = $c->uri_for('/') . '';
+            $base_url =~ s{/$}{};
+            # Strip non-standard ports that are internal/proxy ports
+            # If the port is not 80 (http) or 443 (https), remove it.
+            $base_url =~ s{^(https?://[^:/]+):\d+}{$1}
+                unless $base_url =~ m{://[^:/]+:(80|443)(?:/|$)};
+        }
+    };
 
     my @role_list = ref($roles) eq 'ARRAY' ? @$roles : split(/\s*,\s*/, $roles || '');
     my $is_admin = grep { /^(admin|developer|editor)$/i } @role_list;
