@@ -118,7 +118,31 @@ sub plans :Local :Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'plans',
         "Membership plans page called");
-    $c->forward('index');
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $plans     = [];
+
+    eval {
+        my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
+        if ($site) {
+            my @rows = $c->model('DBEncy')->resultset('MembershipPlan')->search(
+                { site_id => $site->id, is_active => 1 },
+                { order_by => 'sort_order' }
+            )->all;
+            $plans = \@rows;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'plans',
+            "Could not load membership plans: $@");
+    }
+
+    $c->stash(
+        template  => 'membership/Plans.tt',
+        plans     => $plans,
+        site_name => $site_name,
+    );
+    $c->forward($c->view('TT'));
 }
 
 sub account :Local :Args(0) {
@@ -272,6 +296,150 @@ sub subscribe :Local :Args(0) {
         template    => 'membership/Subscribe.tt',
         plan        => $plan,
         patreon_cfg => $patreon_cfg,
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub plan_details :Local :Args(1) {
+    my ($self, $c, $plan_id) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'plan_details',
+        "Membership plan_details called for plan_id=$plan_id");
+
+    my $plan = undef;
+    eval {
+        $plan = $c->model('DBEncy')->resultset('MembershipPlan')->find($plan_id);
+    };
+    if ($@) {
+        my $err = "$@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'plan_details',
+            "Error loading plan: $err");
+    }
+
+    unless ($plan) {
+        $c->flash->{error_msg} = "Plan not found.";
+        $c->response->redirect($c->uri_for('/membership'));
+        return;
+    }
+
+    my $site_name   = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $patreon_cfg = $self->_get_patreon_config($c, $site_name);
+
+    $c->stash(
+        template    => 'membership/PlanDetails.tt',
+        plan        => $plan,
+        patreon_cfg => $patreon_cfg,
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub cancel :Local :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'cancel',
+        "Membership cancel page called");
+
+    unless ($c->session->{username}) {
+        $c->flash->{error_msg} = "Please log in to manage your membership.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $membership_id = $c->req->param('membership_id');
+    unless ($membership_id && $membership_id =~ /^\d+$/) {
+        $c->flash->{error_msg} = 'Invalid membership.';
+        $c->response->redirect($c->uri_for('/membership/account'));
+        return;
+    }
+
+    my $mem;
+    eval {
+        $mem = $c->model('DBEncy')->resultset('UserMembership')->find($membership_id);
+    };
+    unless ($mem && $mem->user_id == $c->session->{user_id}) {
+        $c->flash->{error_msg} = 'Membership not found.';
+        $c->response->redirect($c->uri_for('/membership/account'));
+        return;
+    }
+
+    if ($c->req->method eq 'POST') {
+        my $reason = $c->req->param('cancellation_reason') || '';
+        eval {
+            $mem->update({
+                status              => 'cancelled',
+                cancelled_at        => \'NOW()',
+                cancellation_reason => $reason,
+            });
+        };
+        if ($@) {
+            my $err = "$@";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'cancel',
+                "Error cancelling membership: $err");
+            $c->flash->{error_msg} = 'Could not cancel membership. Please contact support.';
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'cancel',
+                "Membership id=$membership_id cancelled for user_id=" . $c->session->{user_id});
+            $c->flash->{success_msg} = 'Your membership has been cancelled.';
+        }
+        $c->response->redirect($c->uri_for('/membership/account'));
+        return;
+    }
+
+    $c->stash(
+        template   => 'membership/Cancel.tt',
+        membership => $mem,
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub upgrade :Local :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'upgrade',
+        "Membership upgrade page called");
+
+    unless ($c->session->{username}) {
+        $c->session->{post_login_redirect} = $c->req->uri->as_string;
+        $c->flash->{error_msg} = "Please log in to upgrade your membership.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $site_name  = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $user_id    = $c->session->{user_id};
+    my $plans      = [];
+    my $current_membership = undef;
+
+    eval {
+        my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
+        if ($site) {
+            $current_membership = $c->model('DBEncy')->resultset('UserMembership')->search(
+                {
+                    user_id => $user_id,
+                    site_id => $site->id,
+                    status  => [qw(active grace)],
+                },
+                { order_by => { -desc => 'created_at' }, rows => 1, prefetch => 'plan' }
+            )->single;
+
+            my @rows = $c->model('DBEncy')->resultset('MembershipPlan')->search(
+                { site_id => $site->id, is_active => 1 },
+                { order_by => 'sort_order' }
+            )->all;
+            $plans = \@rows;
+        }
+    };
+    if ($@) {
+        my $err = "$@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'upgrade',
+            "Error loading upgrade options: $err");
+        $c->stash->{error_msg} = 'Could not load upgrade options.';
+    }
+
+    my $patreon_cfg = $self->_get_patreon_config($c, $site_name);
+
+    $c->stash(
+        template           => 'membership/Upgrade.tt',
+        plans              => $plans,
+        current_membership => $current_membership,
+        patreon_cfg        => $patreon_cfg,
     );
     $c->forward($c->view('TT'));
 }
