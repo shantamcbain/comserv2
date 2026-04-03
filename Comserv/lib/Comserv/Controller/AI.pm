@@ -771,8 +771,8 @@ sub generate :Local :Args(0) {
             # CPU Ollama prefill at ~46 tok/s: 3 000 tokens = ~65s — safe under 300s timeout.
             # Pass 1: trim history messages.  Pass 1.5: drop oldest history pairs.
             # Pass 2: strip page_content from system.  Pass 3: hard-cap system prompt.
-            my $BUDGET_CHARS  = 12_000;
-            my $SYS_MAX_CHARS =  8_000;  # system prompt hard cap (nav guide can be 30K+)
+            my $BUDGET_CHARS  =  8_000;
+            my $SYS_MAX_CHARS =  4_000;  # system prompt hard cap (nav guide can be 30K+)
             my $raw_total_gen = 0;
             $raw_total_gen += length($_->{content} || '') for @ollama_msgs;
             if ($raw_total_gen > $BUDGET_CHARS) {
@@ -1657,9 +1657,10 @@ sub chat :Local :Args(0) {
     # This is the single most important context source — the AI can see exactly what
     # the user sees (buttons, tables, links, labels) without any keyword matching.
     if ($chat_page_content && length($chat_page_content) > 20) {
+        (my $clean_page = $chat_page_content) =~ s{(https?://[^:/\s]+):\d{4,5}(/[^\s]*)?}{$1$2}g;
         my $page_snippet = "--- Current Page Content (what the user sees on screen) ---\n"
                          . "URL: $chat_page_path\n\n"
-                         . $chat_page_content
+                         . $clean_page
                          . "\n--- End of Page Content ---";
         push @system_parts, $page_snippet;
     }
@@ -1864,8 +1865,8 @@ sub chat :Local :Args(0) {
             # 300s timeout even with generation.  Over-budget → trim history content first.
             # Pass 1: trim messages.  Pass 1.5: drop oldest history pairs.
             # Pass 2: strip page_content.  Pass 3: hard-cap system prompt.
-            my $BUDGET_CHARS  = 12_000;
-            my $SYS_MAX_CHARS_CHAT = 8_000;
+            my $BUDGET_CHARS  =  8_000;
+            my $SYS_MAX_CHARS_CHAT = 4_000;
             my $raw_total = 0;
             $raw_total += length($_->{content} || '') for @ollama_messages;
             if ($raw_total > $BUDGET_CHARS) {
@@ -3711,9 +3712,7 @@ sub _build_role_system_prompt {
 
     my $base_url = '';
     eval {
-        # Prefer X-Forwarded-Host/Proto headers when behind a reverse proxy
-        # so the AI never suggests internal ports (e.g. :5000) to users.
-        my $req    = $c->request;
+        my $req       = $c->request;
         my $fwd_host  = $req->header('X-Forwarded-Host')  || $req->header('HTTP_X_FORWARDED_HOST');
         my $fwd_proto = $req->header('X-Forwarded-Proto') || $req->header('HTTP_X_FORWARDED_PROTO') || '';
         if ($fwd_host) {
@@ -3722,8 +3721,6 @@ sub _build_role_system_prompt {
         } else {
             $base_url = $c->uri_for('/') . '';
             $base_url =~ s{/$}{};
-            # Strip non-standard ports that are internal/proxy ports
-            # If the port is not 80 (http) or 443 (https), remove it.
             $base_url =~ s{^(https?://[^:/]+):\d+}{$1}
                 unless $base_url =~ m{://[^:/]+:(80|443)(?:/|$)};
         }
@@ -3776,6 +3773,7 @@ ACTION
              . "  - Project todos: $base_url/todo/list?project_id=N (use real ID from live data, never literal 'ID')\n"
              . "Do NOT refuse to answer general knowledge questions. "
              . "Do NOT invent live application data — direct the user to the relevant URL instead. "
+             . "Do NOT dump or list all navigation links/URLs in your response — only include the one or two most relevant links for the user's actual question. "
              . $web_search_note . "\n"
              . "NAVIGATION: When the user says 'take me to', 'open', 'go to', or 'show me' a page, "
              . "reply with the exact URL from the navigation guide below.\n"
@@ -3813,6 +3811,7 @@ ACTION
     return "You are a helpful assistant for logged-in users of this application. "
          . "Answer ALL questions to the best of your ability — application help, general technical questions, software how-tos, etc. "
          . "Do not invent live application data; if you don't know something specific to this app, say so and link to the relevant section. "
+         . "Do NOT dump or list all navigation links/URLs in your response — only include the one or two most relevant links for the user's actual question. "
          . "NAVIGATION: When the user says 'take me to', 'open', 'go to', 'navigate to', or 'show me' a page, "
          . "respond with the URL from the navigation guide so the application can automatically navigate there. "
          . "Use the exact URL from the list — the application will redirect the browser for you. "
