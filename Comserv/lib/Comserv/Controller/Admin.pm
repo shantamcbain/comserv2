@@ -5452,20 +5452,24 @@ sub docker_restart :Path('/admin/docker-restart') :Args(1) {
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
 
+    my $docker = '/usr/local/bin/docker';
+    $docker = 'docker' unless -x $docker;
+
     my ($output, $exit_code);
     if ($service eq 'all') {
         my $home = $ENV{HOME} || '/home/shanta';
         my $compose_dir = "$home/PycharmProjects/comserv2";
-        $output = `cd '$compose_dir' && docker compose restart 2>&1`;
+        $output = `cd '$compose_dir' && $docker compose restart 2>&1`;
         $exit_code = $? >> 8;
     } else {
-        $output = `docker restart '$service' 2>&1`;
+        $output = `$docker restart '$service' 2>&1`;
         $exit_code = $? >> 8;
         if ($exit_code != 0) {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'docker_restart',
                 "docker restart $service failed (exit $exit_code): $output");
         }
     }
+    $output //= "(no output captured — docker may not be in PATH)";
 
     $c->response->body(encode_json({
         success   => $exit_code == 0 ? \1 : \0,
@@ -5497,13 +5501,16 @@ sub docker_start :Path('/admin/docker-start') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
+    my $docker = '/usr/local/bin/docker';
+    $docker = 'docker' unless -x $docker;
     my $home = $ENV{HOME} || '/home/shanta';
     my $compose_dir = "$home/PycharmProjects/comserv2";
     my $cmd = $service eq 'all'
-        ? "cd '$compose_dir' && docker compose start 2>&1"
-        : "docker start '$service' 2>&1";
+        ? "cd '$compose_dir' && $docker compose start 2>&1"
+        : "$docker start '$service' 2>&1";
 
     my $output    = `$cmd`;
+    $output //= "(no output captured — docker may not be in PATH)";
     my $exit_code = $? >> 8;
 
     $c->response->body(encode_json({
@@ -5536,13 +5543,16 @@ sub docker_stop :Path('/admin/docker-stop') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
+    my $docker = '/usr/local/bin/docker';
+    $docker = 'docker' unless -x $docker;
     my $home = $ENV{HOME} || '/home/shanta';
     my $compose_dir = "$home/PycharmProjects/comserv2";
     my $cmd = $service eq 'all'
-        ? "cd '$compose_dir' && docker compose stop 2>&1"
-        : "docker stop '$service' 2>&1";
+        ? "cd '$compose_dir' && $docker compose stop 2>&1"
+        : "$docker stop '$service' 2>&1";
 
     my $output    = `$cmd`;
+    $output //= "(no output captured — docker may not be in PATH)";
     my $exit_code = $? >> 8;
 
     $c->response->body(encode_json({
