@@ -39,7 +39,6 @@ __PACKAGE__->config(
     encoding => 'UTF-8',
     debug => $ENV{CATALYST_DEBUG} // 0,
     default_view => 'TT',
-    using_frontend_proxy => 1,
     'Plugin::Log::Dispatch' => {
         dispatchers => [
             {
