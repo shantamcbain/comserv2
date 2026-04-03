@@ -274,7 +274,6 @@ sub do_login :Local {
             my $status = $user->status || '';
 
             if ($status eq 'pending_setup') {
-                # Admin-invited user — redirect to username/password setup
                 $c->session->{setup_email} = $user->email;
                 my $setup_url = (!$user->username)
                     ? $c->uri_for('/user/complete_username_setup', { email => $user->email })
@@ -285,9 +284,6 @@ sub do_login :Local {
                 return;
 
             } elsif ($status eq 'pending_verification') {
-                # Self-registered user entering verification code at login screen
-                # (e.g. session expired between steps 1 and 2)
-                # Re-establish session context and redirect to complete_profile
                 $c->session->{verification_user_id} = $user->id;
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
                     "Valid code for pending_verification user '" . ($user->email||'') . "', redirecting to complete_profile");
@@ -300,10 +296,22 @@ sub do_login :Local {
                 return;
             }
         } else {
+            my $user_status = $user->status || '';
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
-                "Invalid or expired verification code for '$username'");
-            $c->flash->{error_msg} = 'Invalid or expired verification code.';
-            $c->res->redirect($c->uri_for('/user/login'));
+                "Invalid or expired verification code for '$username' (status=$user_status)");
+
+            my $is_expired = $code_rec ? $self->user_verification->is_expired($code_rec) : 0;
+            my $err = $is_expired
+                ? 'Your verification code has expired.'
+                : 'That verification code is not valid.';
+
+            $c->stash(
+                error_msg                => "$err You can request a new code to be sent to your email.",
+                show_resend_verification => 1,
+                prefill_username         => $username,
+                template                 => 'user/login.tt',
+            );
+            $c->forward($c->view('TT'));
             return;
         }
     }
@@ -399,23 +407,25 @@ sub do_login :Local {
         # Authentication failed — determine the specific reason for better UX
         my $fail_ip  = $c->req->address || 'unknown';
         my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-        my $fail_msg = 'Invalid username or password.';
+
+        my %fail_stash = (prefill_username => $username, template => 'user/login.tt');
 
         if ($user) {
-            # User account exists — check specific status and site access
+            my $user_status = $user->status || '';
 
-            if ($user->status && $user->status eq 'pending_verification') {
-                $fail_msg = 'Your registration is not yet complete. Enter your 6-digit verification code (from your confirmation email) in the password field above to continue setting up your account.';
+            if ($user_status eq 'pending_verification') {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
                     "AUDIT: Login denied user_id=" . $user->id . " ip=$fail_ip reason=pending_verification");
+                $fail_stash{error_msg}                = 'Your account has not been verified yet. Your verification code may have expired — you can request a new one below.';
+                $fail_stash{show_resend_verification} = 1;
 
-            } elsif ($user->status && $user->status eq 'pending_setup') {
-                $fail_msg = 'Your account setup is incomplete. Please check your invitation email for the 6-digit code and enter it in the password field above to finish setting up your account.';
+            } elsif ($user_status eq 'pending_setup') {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
                     "AUDIT: Login denied user_id=" . $user->id . " ip=$fail_ip reason=pending_setup");
+                $fail_stash{error_msg}                = 'Your account setup is incomplete. Please check your invitation email for a 6-digit code and enter it in the password field, or request a new code below.';
+                $fail_stash{show_resend_verification} = 1;
 
             } else {
-                # Active account — check if they have access to the current SiteName
                 my $has_site_access = 0;
                 eval {
                     my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
@@ -430,11 +440,9 @@ sub do_login :Local {
                 };
 
                 if (!$has_site_access) {
-                    $fail_msg = "You do not currently have access to $sitename. Please contact the site administrator to request access.";
+                    $fail_stash{error_msg} = "You do not currently have access to $sitename. Please contact the site administrator to request access.";
                     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
                         "AUDIT: Login denied user_id=" . $user->id . " username='" . ($user->username||'') . "' ip=$fail_ip reason=no_site_access sitename=$sitename");
-
-                    # Notify the SiteName admin about this access attempt
                     eval {
                         my $site_obj = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
                         my $admin_email = ($site_obj && $site_obj->mail_to_admin)
@@ -446,38 +454,29 @@ sub do_login :Local {
                         $self->email_notification->send_error_notification($c, $admin_email,
                             "Login attempt — no $sitename access",
                             "A registered user attempted to log in to $sitename but does not have site access.\n\n"
-                            . "User: $display_name\n"
-                            . "Email: " . ($user->email || 'N/A') . "\n"
-                            . "Username: " . ($user->username || 'N/A') . "\n"
-                            . "IP Address: $fail_ip\n\n"
+                            . "User: $display_name\nEmail: " . ($user->email || 'N/A')
+                            . "\nUsername: " . ($user->username || 'N/A')
+                            . "\nIP Address: $fail_ip\n\n"
                             . "If this person should have access, grant it via the Admin User Management screen."
                         );
                     };
-                    if ($@) {
-                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
-                            "Could not send no-site-access notification to admin: $@");
-                    }
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                        "Could not send no-site-access notification: $@") if $@;
+
                 } else {
-                    # Has site access but wrong password
                     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
                         "AUDIT: Login failed user_id=" . $user->id . " ip=$fail_ip reason=wrong_password sitename=$sitename");
-                    # Generic message — don't reveal that the user exists
-                    $fail_msg = 'Invalid username or password.';
+                    $fail_stash{error_msg}              = 'Invalid password. If you have forgotten your password, you can reset it below.';
+                    $fail_stash{show_forgot_password}   = 1;
                 }
             }
         } else {
-            # User not found at all
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
                 "AUDIT: Login failed username='$username' ip=$fail_ip reason=user_not_found");
-            # Generic message — don't reveal whether the user exists
-            $fail_msg = 'Invalid username or password.';
+            $fail_stash{error_msg} = 'Invalid username or password.';
         }
 
-        $c->stash(
-            error_msg        => $fail_msg,
-            prefill_username => $username,
-            template         => 'user/login.tt',
-        );
+        $c->stash(%fail_stash);
         $c->forward($c->view('TT'));
         return;
     }
@@ -1293,6 +1292,128 @@ sub resend_verification_code :Local {
     }
 
     $c->response->redirect($c->uri_for('/user/verify_email'));
+}
+
+sub resend_code_by_username :Local {
+    my ($self, $c) = @_;
+
+    return unless $self->_validate_csrf($c, 'resend_code_by_username', '/user/login');
+
+    my $input = $c->req->param('username') // '';
+    $input =~ s/^\s+|\s+$//g;
+
+    unless ($input) {
+        $c->flash->{error_msg} = 'Please enter your username or email address.';
+        $c->res->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $user;
+    eval {
+        if ($input =~ /@/) {
+            $user = $c->model('DBEncy::User')->find({ email => $input });
+        } else {
+            $user = $c->model('DBEncy::User')->find({ username => $input });
+            $user ||= $c->model('DBEncy::User')->find({ email => $input });
+        }
+    };
+
+    my $generic_ok = 'If that account exists and is awaiting verification, a new code has been sent.';
+
+    unless ($user) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resend_code_by_username',
+            "Resend requested for unknown input='$input'");
+        $c->flash->{success_msg} = $generic_ok;
+        $c->res->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $user_status = $user->status || '';
+    unless ($user_status eq 'pending_verification' || $user_status eq 'pending_setup') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resend_code_by_username',
+            "Resend ignored for user_id=" . $user->id . " (status=$user_status)");
+        $c->flash->{success_msg} = $generic_ok;
+        $c->res->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $recent_count = eval {
+        $user->verification_codes->search({
+            created_at  => { '>=' => DateTime->now->subtract(minutes => 2)->strftime('%Y-%m-%d %H:%M:%S') },
+            verified_at => undef,
+        })->count;
+    } || 0;
+
+    if ($recent_count > 0) {
+        $c->flash->{error_msg} = 'A code was sent very recently. Please wait 2 minutes before requesting another.';
+        $c->res->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    eval {
+        my $new_code = $self->user_verification->generate_verification_code();
+        $self->user_verification->create_verification_code($user, $new_code);
+        $self->email_notification->send_verification_email($c, $user, $new_code);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resend_code_by_username',
+            "AUDIT: Verification code resent via login page user_id=" . $user->id
+            . " ip=" . ($c->req->address || 'unknown'));
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resend_code_by_username',
+            "Failed to resend code for user_id=" . $user->id . ": $@");
+        $c->flash->{error_msg} = 'Failed to send a new code. Please try again or contact support.';
+        $c->res->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    $c->flash->{success_msg} = $generic_ok;
+    $c->res->redirect($c->uri_for('/user/login'));
+}
+
+sub admin_send_password_reset :Local {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'admin_send_password_reset')) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $user_id = $c->req->param('user_id');
+    unless ($user_id && $user_id =~ /^\d+$/) {
+        $c->flash->{error_msg} = 'Invalid or missing user ID.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $user = $c->model('DBEncy::User')->find($user_id);
+    unless ($user) {
+        $c->flash->{error_msg} = "User #$user_id not found.";
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    eval {
+        my $token      = $self->user_verification->generate_reset_token();
+        $self->user_verification->create_reset_token($user, $token);
+        my $reset_link = $c->uri_for('/user/reset_password', { token => $token });
+        $self->email_notification->send_password_reset_email($c, $user, $reset_link);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_send_password_reset',
+            "Admin failed to send password reset for user_id=$user_id: $@");
+        $c->flash->{error_msg} = 'Failed to send password reset email to ' . $user->email . ': ' . $@;
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_send_password_reset',
+            "AUDIT: Admin " . ($c->session->{username} || '?') . " sent password reset"
+            . " to user_id=$user_id email=" . $user->email
+            . " admin_ip=" . ($c->req->address || 'unknown'));
+        $c->flash->{success_msg} = 'Password reset email sent to ' . $user->email . '.';
+    }
+
+    my $return_to = $c->req->param('return_to') || '/user/edit_user/' . $user_id;
+    $c->response->redirect($c->uri_for($return_to));
 }
 
 sub admin_resend_verification :Local {
