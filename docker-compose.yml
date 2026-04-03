@@ -40,11 +40,12 @@ services:
       context: ./Comserv
       dockerfile: Dockerfile
     container_name: comserv-web-dev
-    restart: always
+    restart: unless-stopped
     labels:
       - "description=Development web server (port 3000) with live code reload and debugging"
     environment:
       CATALYST_ENV: development
+      PLACK_ENV: development
       CATALYST_DEBUG: 1
       CATALYST_HOME: /opt/comserv
       WEB_PORT: 3000
@@ -105,7 +106,7 @@ services:
       context: ./Comserv
       dockerfile: Dockerfile
     container_name: comserv-web-prod
-    restart: always
+    restart: unless-stopped
     labels:
       - "description=Production web server (port 5000) with Starman workers via Supervisor"
     environment:
