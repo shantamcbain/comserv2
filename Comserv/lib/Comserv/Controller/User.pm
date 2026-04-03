@@ -1410,7 +1410,7 @@ sub admin_send_password_reset :Local {
     eval {
         my $token      = $self->user_verification->generate_reset_token();
         $self->user_verification->create_reset_token($user, $token);
-        my $reset_link = $c->uri_for('/user/reset_password', { token => $token });
+        my $reset_link = $self->_public_reset_link($c, $token);
         $self->email_notification->send_password_reset_email($c, $user, $reset_link);
     };
     if ($@) {
@@ -2721,7 +2721,7 @@ sub forgot_password :Local {
                 my $token = $self->user_verification->generate_reset_token();
                 $self->user_verification->create_reset_token($user, $token);
 
-                my $reset_link = $c->uri_for('/user/reset_password', { token => $token });
+                my $reset_link = $self->_public_reset_link($c, $token);
                 my $req_ip = $c->req->address || 'unknown';
 
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'forgot_password',
@@ -3260,6 +3260,19 @@ sub _load_available_roles {
         default_roles => \@default_roles,
         site_roles    => \@site_specific,
     };
+}
+
+sub _public_reset_link {
+    my ($self, $c, $token) = @_;
+    my $hostname = $c->stash->{HostName} // '';
+    $hostname =~ s{/+$}{};
+    if ($hostname =~ m{^https?://}) {
+        return $hostname . '/user/reset_password?token=' . $token;
+    }
+    if ($hostname && $hostname =~ m{^[a-zA-Z0-9]}) {
+        return 'https://' . $hostname . '/user/reset_password?token=' . $token;
+    }
+    return $c->uri_for('/user/reset_password', { token => $token });
 }
 
 __PACKAGE__->meta->make_immutable;
