@@ -23,7 +23,6 @@ use lib "$Bin/../local/lib/perl5";
 
 use Comserv::Model::Schema::Forager;
 use Comserv::Model::Schema::Ency;
-use Comserv::Model::RemoteDB;
 
 my $DRY_RUN = grep { /--dry-run/ } @ARGV;
 my $VERBOSE = grep { /--verbose/ } @ARGV;
@@ -31,27 +30,25 @@ my $FORCE   = grep { /--force/   } @ARGV;
 
 my $LEGACY_DIR = "$Bin/../root/LegacyStaticPages/ency";
 
+my $DB_HOST = '192.168.1.198';
+my $DB_USER = 'shanta_forager';
+my $DB_PASS = 'UA=nPF8*m+T#';
+
 print "=== USBM Herb Seeder ===\n";
 print "Dry run mode\n" if $DRY_RUN;
 print "\n";
 
-my $remote = Comserv::Model::RemoteDB->new;
-
-my $fconn = $remote->get_connection_info('DBForager')
-    or die "Cannot get Forager DB connection info\n";
 my $forager = Comserv::Model::Schema::Forager->connect(
-    $fconn->{dsn}, $fconn->{user}, $fconn->{pass},
-    { RaiseError => 1, AutoCommit => 1 }
+    "dbi:mysql:database=shanta_forager;host=$DB_HOST;port=3306",
+    $DB_USER, $DB_PASS, { RaiseError => 1, AutoCommit => 1 }
 ) or die "Cannot connect to Forager schema\n";
 
-my $econn = $remote->get_connection_info('DBEncy')
-    or die "Cannot get Ency DB connection info\n";
 my $ency = Comserv::Model::Schema::Ency->connect(
-    $econn->{dsn}, $econn->{user}, $econn->{pass},
-    { RaiseError => 1, AutoCommit => 1 }
+    "dbi:mysql:database=ency;host=$DB_HOST;port=3306",
+    $DB_USER, $DB_PASS, { RaiseError => 1, AutoCommit => 1 }
 ) or die "Cannot connect to Ency schema\n";
 
-print "Connected to databases.\n\n";
+print "Connected to databases ($DB_HOST).\n\n";
 
 # ── Pre-seed the known reference books ─────────────────────────────────────
 my %REF_BOOKS = (
@@ -72,25 +69,25 @@ my %ref_id_cache;
 
 unless ($DRY_RUN) {
     print "Pre-seeding reference books...\n";
+    my $dbh = $ency->storage->dbh;
     for my $num (sort keys %REF_BOOKS) {
         my $title = $REF_BOOKS{$num};
-        my $existing = $ency->resultset('Reference')->search(
-            { title => $title }, { rows => 1 }
-        )->first;
-        if ($existing) {
-            $ref_id_cache{$num} = $existing->reference_id;
-            print "  EXISTS [$existing->reference_id]: $title\n" if $VERBOSE;
+        my ($existing_id) = $dbh->selectrow_array(
+            "SELECT reference_id FROM reference WHERE reference_system = ? LIMIT 1",
+            {}, $num
+        );
+        if ($existing_id) {
+            $ref_id_cache{$num} = $existing_id;
+            print "  EXISTS [$existing_id]: $title\n" if $VERBOSE;
         } else {
             eval {
-                my $ref = $ency->resultset('Reference')->create({
-                    reference_system  => $num,
-                    title             => $title,
-                    sitename          => 'ENCY',
-                    username_of_poster => 'seeder',
-                    date_time_posted  => scalar localtime,
-                });
-                $ref_id_cache{$num} = $ref->reference_id;
-                print "  CREATED [$ref->reference_id]: $title\n" if $VERBOSE;
+                $dbh->do(
+                    "INSERT INTO reference (reference_system, sitename, username_of_poster, date_time_posted) VALUES (?, ?, ?, ?)",
+                    {}, $num, 'ENCY', 'seeder', scalar localtime
+                );
+                my $new_id = $dbh->last_insert_id(undef, undef, undef, undef);
+                $ref_id_cache{$num} = $new_id;
+                print "  CREATED [$new_id]: $title\n" if $VERBOSE;
             };
             warn "  Warning: could not create reference '$title': $@\n" if $@;
         }
@@ -140,7 +137,7 @@ for my $file (@herb_files) {
         # ── Find or create herb record ──────────────────────────────────────
         my $existing = $forager->resultset('Herb')->search(
             { botanical_name => { like => '%' . $parsed->{botanical_name} . '%' } },
-            { rows => 1 }
+            { rows => 1, order_by => 'record_id' }
         )->first;
 
         my $herb;
@@ -173,7 +170,7 @@ for my $file (@herb_files) {
                 herb_id        => $herb_id,
                 constituent_id => $constituent->record_id,
                 plant_part     => '',
-            }, { rows => 1 })->first;
+            }, { rows => 1, order_by => 'id' })->first;
             unless ($exists) {
                 $ency->resultset('HerbConstituent')->create({
                     herb_id        => $herb_id,
@@ -195,13 +192,13 @@ for my $file (@herb_files) {
                     common_name    => { like => "%$cond%" },
                     scientific_name => { like => "%$cond%" },
                 ]},
-                { rows => 1 }
+                { rows => 1, order_by => 'record_id' }
             )->first;
             next unless $disease;
             my $exists = $ency->resultset('HerbDisease')->search({
                 herb_id   => $herb_id,
                 disease_id => $disease->record_id,
-            }, { rows => 1 })->first;
+            }, { rows => 1, order_by => 'id' })->first;
             unless ($exists) {
                 $ency->resultset('HerbDisease')->create({
                     herb_id           => $herb_id,
@@ -262,11 +259,13 @@ sub parse_herb_htm {
                 ComServ|WebMaster|dateMod|document\.|window\.|Copyright/xi
     } @lines;
 
-    # Find start of herb content
+    # Find start of herb content — require colon to distinguish nav link from section header
     my $start = 0;
     for my $i (0..$#lines) {
-        if ($lines[$i] =~ /BOTANICAL\s+NAME/i) { $start = $i; last; }
+        if ($lines[$i] =~ /^BOTANICAL\s+NAMES?\s*:/i) { $start = $i; last; }
     }
+    # If no uppercase colon form found, skip this file
+    return undef unless $start;
     @lines = @lines[$start..$#lines];
 
     my %herb = (
@@ -326,13 +325,15 @@ sub parse_herb_htm {
     );
 
     my $current_field = undef;
-    my @section_pats  = map { qr/^($_)\s*:?\s*(.*)?$/i } keys %section_map;
 
     LINE: for my $line (@lines) {
-        # Check if line starts a new section
+        # Stop at footer
+        last if $line =~ /^ENCY Home Page|^What's New at ENCY|^ComServ\.|^Copyright/i;
+        # Check if line starts a new section (must have colon to avoid nav-bar false positives)
         for my $pat_key (keys %section_map) {
-            if ($line =~ /^($pat_key)\s*:?\s*(.*)?$/i) {
+            if ($line =~ /^($pat_key)\s*:(.*)?$/i) {
                 my $rest = $2 // '';
+                $rest =~ s/^\s+//;
                 $current_field = $section_map{$pat_key};
                 if (defined $current_field && $rest =~ /\S/) {
                     $herb{$current_field} .= ($herb{$current_field} ? ' ' : '') . $rest;
@@ -342,7 +343,6 @@ sub parse_herb_htm {
         }
         # Append to current field
         if (defined $current_field && $line =~ /\S/) {
-            next if $line =~ /^ENCY Home Page|^What's New at ENCY/i;
             $herb{$current_field} .= ($herb{$current_field} ? ' ' : '') . $line;
         }
     }
@@ -375,11 +375,11 @@ sub parse_herb_htm {
         @{$herb{condition_list}} = grep { !$seen{lc $_}++ } @{$herb{condition_list}};
     }
 
-    # ── Parse formula cross-references
-    if ($herb{formulas} =~ /Formula\s*#?\s*(\d+)/i) {
-        while ($herb{formulas} =~ /Formula\s*#?\s*0*(\d+)\s*([^.;\n]*)/gi) {
-            push @{$herb{formula_refs}}, "Formula #$1 $2";
-        }
+    # ── Parse formula cross-references (split on each "Formula #NN" occurrence)
+    while ($herb{formulas} =~ /Formula\s+#?\s*0*(\d+)\s+([^F]*?)(?=Formula\s+#|\z)/gi) {
+        my ($num, $title) = ($1, $2);
+        $title =~ s/\s+/ /g; $title =~ s/^\s+|\s+$//g;
+        push @{$herb{formula_refs}}, "Formula #$num $title";
     }
 
     # ── Parse reference numbers and map to known books
@@ -394,41 +394,50 @@ sub parse_herb_htm {
     return \%herb;
 }
 
+sub clean_text {
+    my ($s) = @_;
+    return '' unless defined $s;
+    $s =~ s/[^\x00-\x7F]/?/g;
+    return $s;
+}
+
 sub build_herb_data {
     my ($p) = @_;
+    $p = { map { $_ => clean_text($p->{$_}) } keys %$p };
     return {
         botanical_name     => $p->{botanical_name}    || '',
         common_names       => substr($p->{common_names}      || '', 0, 1000),
-        ident_character    => $p->{ident_character}   || undef,
-        stem               => $p->{stem}              || undef,
-        leaves             => $p->{leaves}            || undef,
-        flowers            => $p->{flowers}           || undef,
-        root               => $p->{root}              || undef,
-        fruit              => $p->{fruit}             || undef,
-        taste              => $p->{taste}             || undef,
-        odour              => $p->{odour}             || undef,
-        distribution       => $p->{distribution}      || undef,
-        parts_used         => $p->{parts_used}        || undef,
-        constituents       => $p->{constituents}      || undef,
-        solvents           => $p->{solvents}          || undef,
-        therapeutic_action => $p->{therapeutic_action}|| undef,
-        medical_uses       => $p->{medical_uses}      || undef,
-        homiopathic        => $p->{homiopathic}       || undef,
-        chinese            => $p->{chinese}           || undef,
-        contra_indications => $p->{contra_indications}|| undef,
+        ident_character    => $p->{ident_character}   || '',
+        stem               => $p->{stem}              || '',
+        leaves             => $p->{leaves}            || '',
+        flowers            => substr($p->{flowers}    || '', 0, 1000),
+        root               => $p->{root}              || '',
+        fruit              => $p->{fruit}             || '',
+        taste              => $p->{taste}             || '',
+        odour              => substr($p->{odour}      || '', 0, 100),
+        distribution       => substr($p->{distribution} || '', 0, 1000),
+        parts_used         => $p->{parts_used}        || '',
+        constituents       => $p->{constituents}      || '',
+        solvents           => substr($p->{solvents}   || '', 0, 100),
+        therapeutic_action => substr($p->{therapeutic_action}|| '', 0, 250),
+        medical_uses       => $p->{medical_uses}      || '',
+        homiopathic        => $p->{homiopathic}       || '',
+        chinese            => $p->{chinese}           || '',
+        contra_indications => substr($p->{contra_indications}|| '', 0, 150),
         preparation        => substr($p->{preparation}|| '', 0, 150),
-        dosage             => $p->{dosage}            || undef,
-        administration     => $p->{administration}    || undef,
-        notes              => $p->{notes}             || undef,
-        formulas           => $p->{formulas}          || undef,
-        vetrinary          => $p->{vetrinary}         || undef,
-        non_med            => $p->{non_med}           || undef,
-        culinary           => $p->{culinary}          || undef,
-        cultivation        => $p->{cultivation}       || undef,
-        sister_plants      => $p->{sister_plants}     || undef,
-        history            => $p->{history}           || undef,
-        harvest            => $p->{harvest}           || undef,
-        reference          => $p->{reference}         || undef,
+        dosage             => $p->{dosage}            || '',
+        administration     => $p->{administration}    || '',
+        comments           => $p->{notes}             || '',
+        formulas           => $p->{formulas}          || '',
+        vetrinary          => $p->{vetrinary}         || '',
+        non_med            => $p->{non_med}           || '',
+        culinary           => substr($p->{culinary}   || '', 0, 500),
+        cultivation        => $p->{cultivation}       || '',
+        sister_plants      => substr($p->{sister_plants} || '', 0, 100),
+        history            => $p->{history}           || '',
+        harvest            => $p->{harvest}           || '',
+        reference          => $p->{reference}         || '',
+        url                => '',
         username_of_poster => 'seeder',
         group_of_poster    => 'admin',
         date_time_posted   => scalar localtime,
@@ -436,7 +445,9 @@ sub build_herb_data {
         pollennotes        => '',
         nectarnotes        => '',
         apis               => '',
-        preparation        => substr($p->{preparation} || '', 0, 150),
+        pollinator         => '',
+        nectar             => 0,
+        pollen             => 0,
     };
 }
 
@@ -449,7 +460,7 @@ sub find_or_create_constituent {
     my $constituent;
     eval {
         $constituent = $ency_schema->resultset('Constituent')->search(
-            { name => { like => $name } }, { rows => 1 }
+            { name => { like => $name } }, { rows => 1, order_by => 'record_id' }
         )->first;
     } or do {};
 
