@@ -26,16 +26,19 @@
         btn.disabled = true;
         document.getElementById('ency-ai-raw').style.display = 'none';
 
-        var providerSel = document.getElementById('ai-provider');
-        var selectedProvider = providerSel ? providerSel.value : 'ollama';
-        var providerParts = (selectedProvider || 'ollama').split('|');
-        var providerName = providerParts[0] || 'ollama';
-        var modelName = providerParts[1] || null;
+        var modelSel = document.getElementById('model-select');
+        var providerName = 'grok';
+        var modelName = 'grok-3-mini';
+        if (modelSel && modelSel.selectedIndex >= 0) {
+            var selOpt = modelSel.options[modelSel.selectedIndex];
+            providerName = selOpt.getAttribute('data-provider') || 'grok';
+            modelName = selOpt.value || 'grok-3-mini';
+        }
 
         var isGrok = (providerName === 'grok');
-        statusEl.textContent = isGrok
-            ? 'Asking AI (Grok)\u2026'
-            : 'Asking AI (Ollama \u2014 may take 30\u201390 seconds)\u2026';
+        var providerLabel = isGrok ? ('Grok (' + modelName + ')') : ('Ollama (' + modelName + ')');
+        statusEl.textContent = 'Asking AI via ' + providerLabel + '\u2026';
+        if (!isGrok) { statusEl.textContent += ' \u2014 may take 30\u201390 seconds'; }
 
         var controller = new AbortController();
         var timeoutMs = isGrok ? 30000 : 120000;
@@ -124,7 +127,7 @@
             clearTimeout(timeoutId);
             btn.disabled = false;
             if (err.name === 'AbortError') {
-                statusEl.textContent = 'Request timed out (' + Math.round(timeoutMs/1000) + 's). Try switching to Grok in the chat widget, or try again.';
+                statusEl.textContent = 'Request timed out (' + Math.round(timeoutMs/1000) + 's) using ' + providerLabel + '. Try again, or select a different model in the chat widget above.';
             } else {
                 statusEl.textContent = 'Request failed: ' + err.message;
             }
