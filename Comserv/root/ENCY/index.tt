@@ -122,7 +122,22 @@ function encyAskAI() {
     var q = document.getElementById('ency-ai-query').value.trim();
     if (!q) return;
     var ctx = '[% IF site_lc == "bmaster" %]bee health, bee forage plants, and apiary management[% ELSIF site_lc == "forager" %]wild plant foraging, edible and medicinal plants[% ELSIF site_lc == "usbm" %]the Universal System of Biological Medicine, herbal formulas, and multi-practitioner healthcare[% ELSE %]the Encyclopedia of Biological Life covering herbs, animals, diseases, constituents, and natural health[% END %]';
-    window.open('/ai?prompt=' + encodeURIComponent('In the context of ' + ctx + ', please tell me about: ' + q), '_blank');
+    var fullQuery = 'In the context of ' + ctx + ', tell me about: ' + q;
+
+    var chatBtn  = document.getElementById('chat-button');
+    var msgInput = document.getElementById('message-input');
+    var sendBtn  = document.getElementById('send-message');
+
+    if (chatBtn && msgInput) {
+        if (chatBtn.style.display !== 'none') { chatBtn.click(); }
+        setTimeout(function() {
+            msgInput.value = fullQuery;
+            msgInput.dispatchEvent(new Event('input'));
+            msgInput.focus();
+        }, 150);
+    } else {
+        window.open('/ai?prompt=' + encodeURIComponent(fullQuery), '_blank');
+    }
 }
 document.getElementById('ency-ai-query').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') encyAskAI();
