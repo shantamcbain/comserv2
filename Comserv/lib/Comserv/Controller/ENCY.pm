@@ -1232,7 +1232,6 @@ sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
             chemical_class         => $p->{chemical_class}         // '',
             iupac_name             => $p->{iupac_name}             // '',
             cas_number             => $p->{cas_number}             // '',
-            molecular_weight       => $p->{molecular_weight}       // '',
             therapeutic_action     => $p->{therapeutic_action}     // '',
             toxicity               => $p->{toxicity}               // '',
             solubility             => $p->{solubility}             // '',
@@ -1249,6 +1248,10 @@ sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
             group_of_poster        => $c->session->{group},
             date_time_posted       => \'NOW()',
         };
+
+        my $mw_add = $p->{molecular_weight} // '';
+        ($mw_add) = ($mw_add =~ /(\d+(?:\.\d+)?)/);
+        $data->{molecular_weight} = defined $mw_add ? $mw_add : undef;
 
         unless ($data->{name}) {
             $c->stash(
@@ -1328,7 +1331,6 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
             chemical_class         => $p->{chemical_class}         // '',
             iupac_name             => $p->{iupac_name}             // '',
             cas_number             => $p->{cas_number}             // '',
-            molecular_weight       => $p->{molecular_weight}       // '',
             therapeutic_action     => $p->{therapeutic_action}     // '',
             toxicity               => $p->{toxicity}               // '',
             solubility             => $p->{solubility}             // '',
@@ -1341,6 +1343,10 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
             url                    => $p->{url}                    // '',
             reference              => $p->{reference}              // '',
         };
+
+        my $mw_raw = $p->{molecular_weight} // '';
+        ($mw_raw) = ($mw_raw =~ /(\d+(?:\.\d+)?)/);
+        $data->{molecular_weight} = defined $mw_raw ? $mw_raw : undef;
 
         my ($status, $msg) = $c->model('ENCYModel')->update_constituent($c, $record_id, $data);
 
