@@ -33,7 +33,7 @@
 
 <p><a href="[% c.uri_for('/ENCY/Constituent') %]">&larr; Back to Constituents</a>
 [% IF is_admin && !edit_mode && constituent.record_id %]
-  | <a href="[% c.uri_for('/ENCY/Constituent/edit') %]" onclick="document.cookie='record_id=[% constituent.record_id %]'">Edit</a>
+  | <a href="[% c.uri_for('/ENCY/Constituent/edit', { record_id => constituent.record_id }) %]">Edit</a>
 [% END %]
 </p>
 
@@ -170,7 +170,18 @@
             [% IF edit_mode %]
             <textarea name="found_in_herbs" rows="3" cols="60">[% constituent.found_in_herbs | html %]</textarea>
             [% ELSE %]
-            [% constituent.found_in_herbs | html %]
+            [% IF linked_herbs && linked_herbs.size %]
+                [% FOREACH lh IN linked_herbs %]
+                    [% IF lh.url %]
+                        <a href="[% lh.url | html %]">[% lh.name | html %]</a>
+                    [% ELSE %]
+                        [% lh.name | html %] <a href="[% c.uri_for('/ENCY/Herb/add', { common_names => lh.name }) %]" title="Add this herb to ENCY" style="font-size:0.8em;">[+]</a>
+                    [% END %]
+                    [% UNLESS loop.last %], [% END %]
+                [% END %]
+            [% ELSIF constituent.found_in_herbs %]
+                [% constituent.found_in_herbs | html %]
+            [% END %]
             [% END %]
         </td>
     </tr>
@@ -190,7 +201,18 @@
             [% IF edit_mode %]
             <textarea name="found_in_drugs" rows="3" cols="60">[% constituent.found_in_drugs | html %]</textarea>
             [% ELSE %]
-            [% constituent.found_in_drugs | html %]
+            [% IF linked_drugs && linked_drugs.size %]
+                [% FOREACH ld IN linked_drugs %]
+                    [% IF ld.url %]
+                        <a href="[% ld.url | html %]">[% ld.name | html %]</a>
+                    [% ELSE %]
+                        [% ld.name | html %]
+                    [% END %]
+                    [% UNLESS loop.last %], [% END %]
+                [% END %]
+            [% ELSIF constituent.found_in_drugs %]
+                [% constituent.found_in_drugs | html %]
+            [% END %]
             [% END %]
         </td>
     </tr>
@@ -250,21 +272,21 @@
             [% END %]
         </td>
     </tr>
-    [% IF edit_mode %]
     <tr>
         <td><strong>Image</strong></td>
         <td>
+            [% IF edit_mode %]
             <input type="text" name="image" value="[% constituent.image | html %]" size="60" />
+            <span style="font-size:0.85em;color:#666;"> (paste a Wikipedia or PubChem image URL; AI can suggest one)</span>
+            [% ELSE %]
+            [% IF constituent.image %]
+            [% ency_img_tag(constituent.image, 300, 300) %]
+            [% ELSE %]
+            <span style="color:#999;font-style:italic;">No image — edit to add one (AI can suggest a PubChem image URL)</span>
+            [% END %]
+            [% END %]
         </td>
     </tr>
-    [% ELSE %]
-    [% IF constituent.image %]
-    <tr>
-        <td><strong>Image</strong></td>
-        <td>[% ency_img_tag(constituent.image, 300, 300) %]</td>
-    </tr>
-    [% END %]
-    [% END %]
 </table>
 
 [% IF edit_mode %]

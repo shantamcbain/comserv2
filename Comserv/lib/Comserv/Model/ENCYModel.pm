@@ -657,13 +657,16 @@ sub get_symptom_related {
 sub add_constituent {
     my ($self, $c, $data) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_constituent', "Adding new constituent: " . ($data->{name} || ''));
+    my $new_rec;
     eval {
-        $self->ency_schema->resultset('Constituent')->create($data);
+        $new_rec = $self->ency_schema->resultset('Constituent')->create($data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_constituent', "Constituent added successfully.");
     } or do {
         my $error = $@ || 'Unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_constituent', "Error adding constituent: $error");
+        return (0, $error);
     };
+    return (1, $new_rec ? $new_rec->record_id : undef);
 }
 
 sub update_constituent {
@@ -738,6 +741,97 @@ sub search_constituents {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'search_constituents', "Error searching constituents: $error");
     };
     return \@results;
+}
+
+sub resolve_names_to_herbs {
+    my ($self, $c, $text) = @_;
+    return [] unless $text && length($text) > 0;
+    my @results;
+    for my $name (split /[,;\n]+/, $text) {
+        $name =~ s/^\s+|\s+$//g;
+        next unless length($name) > 2;
+        my $herb = eval {
+            $self->forager_schema->resultset('Herb')->search(
+                { -or => [
+                    botanical_name => { like => "%$name%" },
+                    common_names   => { like => "%$name%" },
+                ]},
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        push @results, {
+            name => $name,
+            herb => $herb,
+            url  => $herb ? '/ENCY/Herb/' . $herb->record_id : undef,
+        };
+    }
+    return \@results;
+}
+
+sub resolve_names_to_drugs {
+    my ($self, $c, $text) = @_;
+    return [] unless $text && length($text) > 0;
+    my @results;
+    for my $name (split /[,;\n]+/, $text) {
+        $name =~ s/^\s+|\s+$//g;
+        next unless length($name) > 2;
+        my $drug = eval {
+            $self->ency_schema->resultset('Drug')->search(
+                { -or => [
+                    brand_name   => { like => "%$name%" },
+                    generic_name => { like => "%$name%" },
+                ]},
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        push @results, {
+            name => $name,
+            drug => $drug,
+            url  => $drug ? '/ENCY/Drug/' . $drug->record_id : undef,
+        };
+    }
+    return \@results;
+}
+
+sub auto_link_herb_constituent {
+    my ($self, $c, $constituent_id, $herb_text) = @_;
+    return unless $constituent_id && $herb_text;
+    my $linked = 0;
+    for my $name (split /[,;\n]+/, $herb_text) {
+        $name =~ s/^\s+|\s+$//g;
+        next unless length($name) > 2;
+        eval {
+            my $herb = $self->forager_schema->resultset('Herb')->search(
+                { -or => [
+                    botanical_name => { like => "%$name%" },
+                    common_names   => { like => "%$name%" },
+                ]},
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+            if ($herb) {
+                my $existing = $self->ency_schema->resultset('HerbConstituent')->search(
+                    {
+                        herb_id        => $herb->record_id,
+                        constituent_id => $constituent_id,
+                        plant_part     => '',
+                    },
+                    { rows => 1 }
+                )->first;
+                unless ($existing) {
+                    $self->ency_schema->resultset('HerbConstituent')->create({
+                        herb_id        => $herb->record_id,
+                        constituent_id => $constituent_id,
+                        plant_part     => '',
+                    });
+                }
+                $linked++;
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto_link_herb_constituent', "Could not link herb '$name': $@");
+        }
+    }
+    return $linked;
 }
 
 sub get_constituent_related {
