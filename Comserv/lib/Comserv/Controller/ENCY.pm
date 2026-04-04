@@ -78,7 +78,8 @@ sub drugs_alias        : Path('/ENCY/drugs')               : Args(0) { $_[1]->re
 sub formulas_alias     : Path('/ENCY/formulas')            : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Formula')) }
 sub glossary_alias     : Path('/ENCY/glossary')            : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Glossary')) }
 sub recipes_alias      : Path('/ENCY/recipes')             : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Formula')) }
-sub pollinators_alias  : Path('/ENCY/pollinators')         : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/bee_pasture_view')) }
+sub pollinators_alias  : Path('/ENCY/pollinators')         : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/BeePastureView')) }
+sub bee_pasture_alias  : Path('/ENCY/bee_pasture_view')    : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/BeePastureView')) }
 sub therapeutic_alias  : Path('/ENCY/therapeutic_actions') : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Constituent')) }
 sub medicinal_alias    : Path('/ENCY/medicinal_properties'): Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/search', { q => 'medicinal' })) }
 sub birds_alias        : Path('/ENCY/birds')               : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Animal', { kingdom => 'Aves' })) }
@@ -1408,10 +1409,19 @@ sub glossary_list : Path('/ENCY/Glossary') : Args(0) {
     my $opts = {};
     $opts->{letter} = $letter if $letter && $letter =~ /^[A-Za-z]$/;
     my $terms = $c->model('ENCYModel')->list_glossary($c, $opts);
+
+    my %glossary_by_letter;
+    for my $entry (@$terms) {
+        my $first = uc(substr($entry->term, 0, 1));
+        $first = '#' unless $first =~ /^[A-Z]$/;
+        push @{ $glossary_by_letter{$first} }, $entry;
+    }
+
     $c->stash(
-        terms    => $terms,
-        letter   => $letter,
-        template => 'ENCY/GlossaryList.tt',
+        terms              => $terms,
+        glossary_by_letter => \%glossary_by_letter,
+        letter             => $letter,
+        template           => 'ENCY/GlossaryList.tt',
     );
 }
 
