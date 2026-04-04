@@ -750,14 +750,19 @@ sub resolve_names_to_herbs {
     for my $name (split /[,;\n]+/, $text) {
         $name =~ s/^\s+|\s+$//g;
         next unless length($name) > 2;
+
+        my ($botanical, $common) = ($name, undef);
+        if ($name =~ /^([^(]+?)\s*\(([^)]+)\)\s*$/) {
+            $botanical = $1;
+            $common    = $2;
+            $botanical =~ s/\s+$//;
+        }
+
         my $herb = eval {
-            $self->forager_schema->resultset('Herb')->search(
-                { -or => [
-                    botanical_name => { like => "%$name%" },
-                    common_names   => { like => "%$name%" },
-                ]},
-                { rows => 1, order_by => 'record_id' }
-            )->first;
+            my $rs = $self->forager_schema->resultset('Herb');
+            $rs->search({ botanical_name => { like => "%$botanical%" } }, { rows => 1, order_by => 'record_id' })->first
+            || ($common && $rs->search({ common_names => { like => "%$common%" } }, { rows => 1, order_by => 'record_id' })->first)
+            || $rs->search({ -or => [ botanical_name => { like => "%$name%" }, common_names => { like => "%$name%" } ] }, { rows => 1, order_by => 'record_id' })->first;
         };
         push @results, {
             name => $name,
