@@ -22,7 +22,6 @@
 
         <!-- Community Services (previously in Global) -->
         <a href="/mail"><i class="icon-mail"></i>Mail</a>
-        <a href="/jobs"><i class="icon-briefcase"></i>Jobs</a>
         <a href="/join"><i class="icon-user-plus"></i>Join</a>
         
         [% IF c.session.username %]
