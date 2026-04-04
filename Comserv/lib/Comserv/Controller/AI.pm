@@ -97,6 +97,29 @@ sub index :Path :Args(0) {
     # Get or set the current Ollama configuration
     my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
 
+    # Filter installed Ollama models by membership-allowed models for non-privileged users
+    unless ($can_select_model) {
+        my $user_id = $c->session->{user_id};
+        my $site_id = $c->session->{SiteID};
+        if ($user_id && $site_id && $installed_models && @$installed_models) {
+            eval {
+                my $allowed = $c->model('Membership')->get_allowed_ai_models($c, $user_id, $site_id);
+                if ($allowed && @$allowed) {
+                    my %allowed_set = map { $_ => 1 } @$allowed;
+                    my @filtered = grep {
+                        my $name = ref($_) ? ($_->{name} || '') : ($_ || '');
+                        $allowed_set{$name};
+                    } @$installed_models;
+                    $installed_models = \@filtered if @filtered;
+                }
+            };
+            if (my $err = $@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'index', "Could not filter AI models by membership: $err");
+            }
+        }
+    }
+
     # Check if user has external API keys configured (grok, openai, etc.)
     # Admins can use any active key, other users only their own key
     my @external_models;
@@ -872,7 +895,8 @@ sub generate :Local :Args(0) {
                 'generate', "Tier-1 SUCCESS elapsed=${query_elapsed}s model=$model_used");
 
             # ── Tier 2: escalate to large model if quality is poor ────────────
-            if (!$manual_model && $tier_large ne $use_model
+            # Guests are locked to tier_small — never escalate (saves resources).
+            if (!$manual_model && !$is_guest && $tier_large ne $use_model
                 && $self->_assess_response_quality($r_text, $prompt) eq 'poor')
             {
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
@@ -1966,7 +1990,8 @@ sub chat :Local :Args(0) {
                     : $ai_response);
 
             # ── Tier 2: Escalate to large model if quality is poor ────────────
-            if (!$manual_model && $tier_large ne $tier_small
+            # Guests are locked to tier_small — never escalate (saves resources).
+            if (!$manual_model && !$is_guest && $tier_large ne $tier_small
                 && $self->_assess_response_quality($ai_response, $prompt) eq 'poor')
             {
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
