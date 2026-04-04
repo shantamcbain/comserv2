@@ -18,28 +18,60 @@
 (function() {
     function encyAiFill() {
         var name = document.getElementById('ency-ai-entity-name').value.trim();
-        if (!name) { alert('Please enter an entity name.'); return; }
+        if (!name) { alert('Please enter an entity name to look up.'); return; }
         var promptEl = document.getElementById('ency-ai-prompt-data');
         var systemPrompt = promptEl ? promptEl.getAttribute('data-prompt') : '';
         var statusEl = document.getElementById('ency-ai-status');
         var btn = document.getElementById('ency-ai-ask-btn');
-        statusEl.textContent = 'Asking AI\u2026';
         btn.disabled = true;
         document.getElementById('ency-ai-raw').style.display = 'none';
 
-        fetch('/ai/chat', {
+        var providerSel = document.getElementById('ai-provider');
+        var selectedProvider = providerSel ? providerSel.value : 'ollama';
+        var providerParts = (selectedProvider || 'ollama').split('|');
+        var providerName = providerParts[0] || 'ollama';
+        var modelName = providerParts[1] || null;
+
+        var isGrok = (providerName === 'grok');
+        statusEl.textContent = isGrok
+            ? 'Asking AI (Grok)\u2026'
+            : 'Asking AI (Ollama \u2014 may take 30\u201390 seconds)\u2026';
+
+        var controller = new AbortController();
+        var timeoutMs = isGrok ? 30000 : 120000;
+        var timeoutId = setTimeout(function() {
+            controller.abort();
+        }, timeoutMs);
+
+        var payload = {
+            prompt: 'Return ONLY a raw JSON object (no markdown, no code blocks, no explanation) with encyclopedia fields for: ' + name + '. Required fields: ' + systemPrompt,
+            system: 'You are an encyclopedia data assistant. Return ONLY a raw JSON object with the requested fields filled in for the named entity. No markdown, no code fences, no prose \u2014 pure JSON only.',
+            provider: providerName,
+            page_path: window.location.pathname,
+            page_title: document.title
+        };
+        if (modelName) { payload.model = modelName; }
+
+        fetch('/ai/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                prompt: 'Return ONLY a raw JSON object (no markdown, no code blocks, no explanation) with encyclopedia fields for: ' + name + '. Required fields: ' + systemPrompt,
-                system: 'You are an encyclopedia data assistant. Return ONLY a raw JSON object with the requested fields filled in for the named entity. No markdown, no code fences, no prose \u2014 pure JSON only.'
-            })
+            credentials: 'include',
+            signal: controller.signal,
+            body: JSON.stringify(payload)
         })
-        .then(function(r) { return r.json(); })
+        .then(function(r) {
+            return r.text().then(function(text) {
+                try { return JSON.parse(text); }
+                catch(e) { throw new Error('Server returned non-JSON (HTTP ' + r.status + ')'); }
+            });
+        })
         .then(function(data) {
+            clearTimeout(timeoutId);
             btn.disabled = false;
             if (!data.success) {
                 statusEl.textContent = 'AI error: ' + (data.error || 'unknown error');
+                document.getElementById('ency-ai-raw-text').textContent = JSON.stringify(data, null, 2);
+                document.getElementById('ency-ai-raw').style.display = '';
                 return;
             }
             var raw = (data.response || '').trim();
@@ -63,12 +95,17 @@
                 });
                 statusEl.textContent = 'Filled ' + filled + ' field(s). Please review carefully before saving.';
             } catch(e) {
-                statusEl.textContent = 'Could not parse JSON from AI response. See raw response above.';
+                statusEl.textContent = 'Could not parse JSON. See raw response above.';
             }
         })
         .catch(function(err) {
+            clearTimeout(timeoutId);
             btn.disabled = false;
-            document.getElementById('ency-ai-status').textContent = 'Request failed: ' + err;
+            if (err.name === 'AbortError') {
+                statusEl.textContent = 'Request timed out (' + Math.round(timeoutMs/1000) + 's). Try switching to Grok in the chat widget, or try again.';
+            } else {
+                statusEl.textContent = 'Request failed: ' + err.message;
+            }
         });
     }
 
