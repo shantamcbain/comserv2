@@ -55,8 +55,16 @@ sub index :Path('/ENCY') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Entered index method');
     $c->session->{MailServer} = "http://webmail.usbm.ca";
 
-    # The index action will display the 'index.tt' template
-    $c->stash(template => 'ENCY/index.tt');
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'ENCY';
+    my $roles    = $c->session->{roles} || [];
+    my $is_admin = (ref $roles ? grep { $_ eq 'admin' } @$roles
+                               : grep { $_ eq 'admin' } split(/\s*,\s*/, $roles)) ? 1 : 0;
+
+    $c->stash(
+        SiteName  => $sitename,
+        is_admin  => $is_admin,
+        template  => 'ENCY/index.tt',
+    );
 }
 # Add this subroutine to handle the '/ENCY/add_herb' path
 
