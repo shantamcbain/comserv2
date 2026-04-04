@@ -1870,7 +1870,7 @@ sub edit_drug : Path('/ENCY/Drug/edit') : Args(0) {
         return;
     }
 
-    my $record_id = $c->session->{record_id};
+    my $record_id = $c->request->param('record_id') || $c->session->{record_id};
 
     unless (defined $record_id && $record_id =~ /^\d+$/) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_drug',

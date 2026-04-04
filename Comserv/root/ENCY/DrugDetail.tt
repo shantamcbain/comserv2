@@ -36,7 +36,7 @@
 
 <p><a href="[% c.uri_for('/ENCY/Drug') %]">&larr; Back to Drugs</a>
 [% IF is_admin && !edit_mode && drug.record_id %]
-  | <a href="[% c.uri_for('/ENCY/Drug/edit') %]">Edit</a>
+  | <a href="[% c.uri_for('/ENCY/Drug/edit', { record_id => drug.record_id }) %]">Edit</a>
 [% END %]
 </p>
 
