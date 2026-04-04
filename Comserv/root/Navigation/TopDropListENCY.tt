@@ -1,4 +1,4 @@
-[% PageVersion = 'Navigation/TopDropListENCY.tt,v 0.02 2026/04/04 shanta Exp shanta ' %]
+[% PageVersion = 'Navigation/TopDropListENCY.tt,v 0.03 2026/04/04 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [%# PageVersion %]
 [% END %]
@@ -7,7 +7,7 @@
 <li class="horizontal-dropdown">
     <a href="/ENCY" class="dropbtn"><i class="icon-ency"></i>ENCY</a>
     <div class="dropdown-content">
-        <!-- Core ENCY Navigation -->
+        <!-- Core — visible to everyone -->
         <a href="/ENCY"><i class="icon-home"></i>ENCY Home</a>
         <a href="/ENCY/search"><i class="icon-search"></i>Search Encyclopedia</a>
 
@@ -15,7 +15,7 @@
 
         <!-- Biological Categories -->
         <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-biology"></i>Biological Categories</span>
+            <span class="submenu-header"><i class="icon-biology"></i>Biological</span>
             <div class="submenu">
                 <a href="/ENCY/botanical_name_view"><i class="icon-plant"></i>Plants &amp; Herbs</a>
                 <a href="/ENCY/Animal"><i class="icon-animal"></i>Animals</a>
@@ -26,9 +26,9 @@
 
         <!-- Therapeutic & Medicinal -->
         <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-medical"></i>Therapeutic Resources</span>
+            <span class="submenu-header"><i class="icon-medical"></i>Therapeutic</span>
             <div class="submenu">
-                <a href="/ENCY/Constituent"><i class="icon-chemistry"></i>Chemical Constituents</a>
+                <a href="/ENCY/Constituent"><i class="icon-chemistry"></i>Constituents</a>
                 <a href="/ENCY/Disease"><i class="icon-disease"></i>Diseases</a>
                 <a href="/ENCY/Symptom"><i class="icon-symptom"></i>Symptoms</a>
                 <a href="/ENCY/Drug"><i class="icon-medicine"></i>Drugs &amp; Pharmaceuticals</a>
@@ -47,17 +47,17 @@
             </div>
         </div>
 
-        [% IF c.session.username %]
+        [%# Editor role: can add/edit entries %]
+        [% IF c.session.roles && (c.session.roles.grep('editor').size || c.session.roles.grep('admin').size) %]
         <div class="dropdown-divider"></div>
-
-        <!-- User Management Options -->
         <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-user-manage"></i>Manage ENCY</span>
+            <span class="submenu-header"><i class="icon-edit"></i>Add Entries</span>
             <div class="submenu">
                 <a href="/ENCY/add_herb"><i class="icon-add"></i>Add Herb</a>
                 <a href="/ENCY/Animal/add"><i class="icon-add"></i>Add Animal</a>
                 <a href="/ENCY/Insect/add"><i class="icon-add"></i>Add Insect</a>
                 <a href="/ENCY/Disease/add"><i class="icon-add"></i>Add Disease</a>
+                <a href="/ENCY/Symptom/add"><i class="icon-add"></i>Add Symptom</a>
                 <a href="/ENCY/Constituent/add"><i class="icon-add"></i>Add Constituent</a>
                 <a href="/ENCY/Drug/add"><i class="icon-add"></i>Add Drug</a>
                 <a href="/ENCY/Formula/add"><i class="icon-add"></i>Add Formula</a>
@@ -66,9 +66,10 @@
         </div>
         [% END %]
 
-        [% IF c.session.roles.grep('admin').size %]
+        [%# Admin: link to admin desktop ENCY section %]
+        [% IF c.session.roles && c.session.roles.grep('admin').size %]
         <div class="dropdown-divider"></div>
-        <a href="/admin"><i class="icon-admin"></i>ENCY Administration</a>
+        <a href="/admin/ency"><i class="icon-admin"></i>ENCY Administration</a>
         [% END %]
     </div>
 </li>
