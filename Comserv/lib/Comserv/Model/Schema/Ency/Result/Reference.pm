@@ -6,8 +6,7 @@ use base 'DBIx::Class::Core';
 
 __PACKAGE__->load_components('InflateColumn::DateTime', 'TimeStamp');
 __PACKAGE__->table('reference');
-__PACKAGE__->add_columns(
-    reference_id => {
+__PACKAGE__->add_columns(reference_id => {
         data_type         => 'int',
         size              => 11,
         is_auto_increment => 1,
@@ -24,7 +23,8 @@ __PACKAGE__->add_columns(
         is_nullable => 1,
     },
     publisher_id => {
-        data_type   => 'integer',
+        data_type => 'int(11)',
+        size => 11,
         is_nullable => 1,
     },
     publication_date => {
@@ -59,6 +59,16 @@ __PACKAGE__->add_columns(
         size        => 30,
         is_nullable => 1,
     },
+    author => {
+        data_type => 'varchar(500)',
+        size => 500,
+        is_nullable => 1,
+    },
+    publisher => {
+        data_type => 'varchar(255)',
+        size => 255,
+        is_nullable => 1,
+    }
 );
 __PACKAGE__->set_primary_key('reference_id');
 

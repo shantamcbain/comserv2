@@ -657,13 +657,16 @@ sub get_symptom_related {
 sub add_constituent {
     my ($self, $c, $data) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_constituent', "Adding new constituent: " . ($data->{name} || ''));
+    my $new_rec;
     eval {
-        $self->ency_schema->resultset('Constituent')->create($data);
+        $new_rec = $self->ency_schema->resultset('Constituent')->create($data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_constituent', "Constituent added successfully.");
     } or do {
         my $error = $@ || 'Unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_constituent', "Error adding constituent: $error");
+        return (0, $error);
     };
+    return (1, $new_rec ? $new_rec->record_id : undef);
 }
 
 sub update_constituent {
@@ -738,6 +741,102 @@ sub search_constituents {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'search_constituents', "Error searching constituents: $error");
     };
     return \@results;
+}
+
+sub resolve_names_to_herbs {
+    my ($self, $c, $text) = @_;
+    return [] unless $text && length($text) > 0;
+    my @results;
+    for my $name (split /[,;\n]+/, $text) {
+        $name =~ s/^\s+|\s+$//g;
+        next unless length($name) > 2;
+
+        my ($botanical, $common) = ($name, undef);
+        if ($name =~ /^([^(]+?)\s*\(([^)]+)\)\s*$/) {
+            $botanical = $1;
+            $common    = $2;
+            $botanical =~ s/\s+$//;
+        }
+
+        my $herb = eval {
+            my $rs = $self->forager_schema->resultset('Herb');
+            $rs->search({ botanical_name => { like => "%$botanical%" } }, { rows => 1, order_by => 'record_id' })->first
+            || ($common && $rs->search({ common_names => { like => "%$common%" } }, { rows => 1, order_by => 'record_id' })->first)
+            || $rs->search({ -or => [ botanical_name => { like => "%$name%" }, common_names => { like => "%$name%" } ] }, { rows => 1, order_by => 'record_id' })->first;
+        };
+        push @results, {
+            name => $name,
+            herb => $herb,
+            url  => $herb ? '/ENCY/Herb/' . $herb->record_id : undef,
+        };
+    }
+    return \@results;
+}
+
+sub resolve_names_to_drugs {
+    my ($self, $c, $text) = @_;
+    return [] unless $text && length($text) > 0;
+    my @results;
+    for my $name (split /[,;\n]+/, $text) {
+        $name =~ s/^\s+|\s+$//g;
+        next unless length($name) > 2;
+        my $drug = eval {
+            $self->ency_schema->resultset('Drug')->search(
+                { -or => [
+                    brand_name   => { like => "%$name%" },
+                    generic_name => { like => "%$name%" },
+                ]},
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        push @results, {
+            name => $name,
+            drug => $drug,
+            url  => $drug ? '/ENCY/Drug/' . $drug->record_id : undef,
+        };
+    }
+    return \@results;
+}
+
+sub auto_link_herb_constituent {
+    my ($self, $c, $constituent_id, $herb_text) = @_;
+    return unless $constituent_id && $herb_text;
+    my $linked = 0;
+    for my $name (split /[,;\n]+/, $herb_text) {
+        $name =~ s/^\s+|\s+$//g;
+        next unless length($name) > 2;
+        eval {
+            my $herb = $self->forager_schema->resultset('Herb')->search(
+                { -or => [
+                    botanical_name => { like => "%$name%" },
+                    common_names   => { like => "%$name%" },
+                ]},
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+            if ($herb) {
+                my $existing = $self->ency_schema->resultset('HerbConstituent')->search(
+                    {
+                        herb_id        => $herb->record_id,
+                        constituent_id => $constituent_id,
+                        plant_part     => '',
+                    },
+                    { rows => 1 }
+                )->first;
+                unless ($existing) {
+                    $self->ency_schema->resultset('HerbConstituent')->create({
+                        herb_id        => $herb->record_id,
+                        constituent_id => $constituent_id,
+                        plant_part     => '',
+                    });
+                }
+                $linked++;
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto_link_herb_constituent', "Could not link herb '$name': $@");
+        }
+    }
+    return $linked;
 }
 
 sub get_constituent_related {
@@ -1023,6 +1122,277 @@ sub link_herb_category {
 sub unlink_herb_category {
     my ($self, $c, $criteria) = @_;
     return $self->_unlink_junction($c, 'HerbCategory', $criteria, 'unlink_herb_category');
+}
+
+sub add_drug {
+    my ($self, $c, $data) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_drug', "Adding new drug: " . ($data->{brand_name} || ''));
+    my $record;
+    eval {
+        $record = $self->ency_schema->resultset('Drug')->create($data);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_drug', "Drug added successfully.");
+    } or do {
+        my $error = $@ || 'Unknown error';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_drug', "Error adding drug: $error");
+        return (0, "Failed to add drug: $error");
+    };
+    return (1, "Drug added successfully.", $record ? $record->record_id : undef);
+}
+
+sub update_drug {
+    my ($self, $c, $id, $data) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_drug', "Updating drug with ID: $id");
+    unless ($id) {
+        return (0, "Missing record ID.");
+    }
+    unless (ref($data) eq 'HASH') {
+        return (0, "Invalid data structure (Expected HASHREF).");
+    }
+    my $record = $self->ency_schema->resultset('Drug')->find($id);
+    unless ($record) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_drug', "No drug found with ID: $id");
+        return (0, "Drug with ID $id not found.");
+    }
+    eval {
+        $record->update($data);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_drug', "Drug with ID $id updated successfully.");
+    } or do {
+        my $error = $@ || 'Unknown error';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_drug', "Failed to update drug with ID $id: $error");
+        return (0, "Failed to update drug with ID $id: $error");
+    };
+    return (1, "Drug with ID $id updated successfully.");
+}
+
+sub get_drug_by_id {
+    my ($self, $c, $id) = @_;
+    my $record = $self->ency_schema->resultset('Drug')->find($id);
+    if ($record) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_drug_by_id', "Drug with ID $id fetched successfully.");
+    } else {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_drug_by_id', "No drug found with ID: $id");
+    }
+    return $record;
+}
+
+sub list_drugs {
+    my ($self, $c, $opts) = @_;
+    $opts ||= {};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'list_drugs', "Listing drugs");
+    my $where = $opts->{where} || {};
+    my %attrs;
+    $attrs{order_by} = $opts->{order_by} || 'brand_name';
+    $attrs{rows}     = $opts->{rows}     if $opts->{rows};
+    $attrs{page}     = $opts->{page}     if $opts->{page};
+    my @results;
+    eval {
+        @results = $self->ency_schema->resultset('Drug')->search($where, \%attrs)->all;
+    } or do {
+        my $error = $@ || 'Unknown error';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_drugs', "Error listing drugs: $error");
+        die $error;
+    };
+    return \@results;
+}
+
+sub search_drugs {
+    my ($self, $c, $query) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'search_drugs', "Searching drugs for: $query");
+    my @results;
+    eval {
+        @results = $self->ency_schema->resultset('Drug')->search(
+            { -or => [
+                brand_name   => { like => "%$query%" },
+                generic_name => { like => "%$query%" },
+                inn_name     => { like => "%$query%" },
+                indications  => { like => "%$query%" },
+            ]},
+            { order_by => 'brand_name' }
+        )->all;
+    } or do {
+        my $error = $@ || 'Unknown error';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'search_drugs', "Error searching drugs: $error");
+    };
+    return \@results;
+}
+
+sub get_drug_related {
+    my ($self, $c, $id) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_drug_related', "Fetching related data for drug ID: $id");
+    my %related;
+    eval {
+        my @drug_diseases = $self->ency_schema->resultset('DrugDisease')->search({ drug_id => $id })->all;
+        if (@drug_diseases) {
+            my @disease_ids = map { $_->disease_id } @drug_diseases;
+            my @diseases = $self->ency_schema->resultset('Disease')->search({ record_id => { -in => \@disease_ids } })->all;
+            $related{diseases} = \@diseases;
+        } else {
+            $related{diseases} = [];
+        }
+
+        my @drug_symptoms = $self->ency_schema->resultset('DrugSymptom')->search({ drug_id => $id })->all;
+        if (@drug_symptoms) {
+            my @symptom_ids = map { $_->symptom_id } @drug_symptoms;
+            my @symptoms = $self->ency_schema->resultset('Symptom')->search({ record_id => { -in => \@symptom_ids } })->all;
+            $related{symptoms} = \@symptoms;
+        } else {
+            $related{symptoms} = [];
+        }
+
+        my @drug_herb_ints = $self->ency_schema->resultset('DrugHerbInteraction')->search({ drug_id => $id })->all;
+        if (@drug_herb_ints) {
+            $related{herb_interactions} = \@drug_herb_ints;
+        } else {
+            $related{herb_interactions} = [];
+        }
+    } or do {
+        my $error = $@ || 'Unknown error';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_drug_related', "Error fetching drug related data: $error");
+    };
+    return \%related;
+}
+
+sub link_drug_disease {
+    my ($self, $c, $data) = @_;
+    return $self->_link_junction($c, 'DrugDisease', $data, 'link_drug_disease');
+}
+
+sub unlink_drug_disease {
+    my ($self, $c, $criteria) = @_;
+    return $self->_unlink_junction($c, 'DrugDisease', $criteria, 'unlink_drug_disease');
+}
+
+sub link_drug_constituent {
+    my ($self, $c, $data) = @_;
+    return $self->_link_junction($c, 'DrugConstituent', $data, 'link_drug_constituent');
+}
+
+sub unlink_drug_constituent {
+    my ($self, $c, $criteria) = @_;
+    return $self->_unlink_junction($c, 'DrugConstituent', $criteria, 'unlink_drug_constituent');
+}
+
+sub link_drug_symptom {
+    my ($self, $c, $data) = @_;
+    return $self->_link_junction($c, 'DrugSymptom', $data, 'link_drug_symptom');
+}
+
+sub unlink_drug_symptom {
+    my ($self, $c, $criteria) = @_;
+    return $self->_unlink_junction($c, 'DrugSymptom', $criteria, 'unlink_drug_symptom');
+}
+
+sub link_drug_herb_interaction {
+    my ($self, $c, $data) = @_;
+    return $self->_link_junction($c, 'DrugHerbInteraction', $data, 'link_drug_herb_interaction');
+}
+
+sub unlink_drug_herb_interaction {
+    my ($self, $c, $criteria) = @_;
+    return $self->_unlink_junction($c, 'DrugHerbInteraction', $criteria, 'unlink_drug_herb_interaction');
+}
+
+sub add_formula {
+    my ($self, $c, $data) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_formula', "Adding formula: " . ($data->{name} || ''));
+    my $record;
+    eval {
+        $record = $self->ency_schema->resultset('Formula')->create($data);
+    } or do {
+        my $error = $@ || 'Unknown error';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_formula', "Error: $error");
+        return (0, "Failed to add formula: $error");
+    };
+    return (1, "Formula added.", $record ? $record->record_id : undef);
+}
+
+sub update_formula {
+    my ($self, $c, $id, $data) = @_;
+    my $record = $self->ency_schema->resultset('Formula')->find($id);
+    return (0, "Formula $id not found.") unless $record;
+    eval { $record->update($data); } or do {
+        my $error = $@ || 'Unknown error';
+        return (0, "Failed to update formula $id: $error");
+    };
+    return (1, "Formula $id updated.");
+}
+
+sub get_formula_by_id {
+    my ($self, $c, $id) = @_;
+    my $record;
+    eval { $record = $self->ency_schema->resultset('Formula')->find($id); } or do {};
+    return $record;
+}
+
+sub list_formulas {
+    my ($self, $c, $opts) = @_;
+    $opts ||= {};
+    my $where = $opts->{where} || {};
+    my %attrs = ( order_by => $opts->{order_by} || { -asc => 'formula_number' } );
+    $attrs{rows} = $opts->{rows} if $opts->{rows};
+    $attrs{page} = $opts->{page} if $opts->{page};
+    my @results;
+    eval {
+        @results = $self->ency_schema->resultset('Formula')->search($where, \%attrs)->all;
+    } or do {
+        my $err = $@ || 'unknown';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_formulas', "Error: $err");
+        die $err;
+    };
+    return \@results;
+}
+
+sub search_formulas {
+    my ($self, $c, $query) = @_;
+    my @results;
+    eval {
+        @results = $self->ency_schema->resultset('Formula')->search(
+            { -or => [
+                name        => { like => "%$query%" },
+                indications => { like => "%$query%" },
+                herbs_raw   => { like => "%$query%" },
+            ]},
+            { order_by => { -asc => 'formula_number' } }
+        )->all;
+    } or do {};
+    return \@results;
+}
+
+sub get_formula_with_herbs {
+    my ($self, $c, $id) = @_;
+    my $formula = $self->get_formula_by_id($c, $id);
+    return unless $formula;
+    my @herb_links;
+    eval {
+        @herb_links = $self->ency_schema->resultset('FormulaHerb')->search(
+            { formula_id => $id },
+            { order_by => 'id' }
+        )->all;
+    } or do {};
+    my @disease_links;
+    eval {
+        @disease_links = $self->ency_schema->resultset('FormulaDisease')->search(
+            { formula_id => $id },
+            { order_by => 'id' }
+        )->all;
+    } or do {};
+    return ($formula, \@herb_links, \@disease_links);
+}
+
+sub find_herb_by_name {
+    my ($self, $c, $name) = @_;
+    return undef unless $name && length($name) > 2;
+    my $herb;
+    eval {
+        $herb = $self->forager_schema->resultset('Herb')->search(
+            { -or => [
+                botanical_name => { like => "%$name%" },
+                common_names   => { like => "%$name%" },
+            ]},
+            { rows => 1 }
+        )->first;
+    } or do {};
+    return $herb;
 }
 
 __PACKAGE__->meta->make_immutable;

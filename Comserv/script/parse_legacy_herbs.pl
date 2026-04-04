@@ -138,9 +138,10 @@ for my $file (@files) {
              medical_uses, homiopathic, chinese, contra_indications,
              preparation, dosage, administration, formulas,
              vetrinary, non_med, culinary, cultivation, sister_plants,
-             history, harvest, reference, url,
-             username_of_poster, group_of_poster, date_time_posted, share, sitename)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+             history, harvest, comments, reference, url,
+             username_of_poster, group_of_poster, date_time_posted, share,
+             pollennotes, nectarnotes, apis, pollinator, nectar, pollen)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
             undef,
             $herb->{botanical_name}     // '',
             $herb->{key_name}           // '',
@@ -173,13 +174,14 @@ for my $file (@files) {
             $herb->{sister_plants}      // '',
             $herb->{history}            // '',
             $herb->{harvest}            // '',
+            $herb->{comments}           // '',
             $herb->{reference}          // '',
             "/ENCY/legacy/$fname",
             'legacy_import',
             'admin',
             $now,
             1,
-            'ENCY',
+            '', '', '', '', 0, 0,
         );
         print "INSERTED: $fname ($herb->{botanical_name})\n";
         $inserted++;
