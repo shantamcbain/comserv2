@@ -39,22 +39,22 @@ __PACKAGE__->add_columns(
     },
     formulation => {
         data_type   => 'varchar',
-        size        => 100,
+        size        => 255,
         is_nullable => 1,
     },
     strength => {
         data_type   => 'varchar',
-        size        => 100,
+        size        => 255,
         is_nullable => 1,
     },
     package_size => {
         data_type   => 'varchar',
-        size        => 100,
+        size        => 255,
         is_nullable => 1,
     },
     route_of_administration => {
         data_type   => 'varchar',
-        size        => 100,
+        size        => 255,
         is_nullable => 1,
     },
     prescription_status => {
@@ -140,18 +140,16 @@ __PACKAGE__->add_columns(
         is_nullable => 1,
     },
     duration_typical => {
-        data_type   => 'varchar',
-        size        => 100,
+        data_type   => 'text',
         is_nullable => 1,
     },
     storage => {
-        data_type   => 'varchar',
-        size        => 255,
+        data_type   => 'text',
         is_nullable => 1,
     },
     pregnancy_category => {
         data_type   => 'varchar',
-        size        => 10,
+        size        => 255,
         is_nullable => 1,
     },
     breastfeeding_notes => {
