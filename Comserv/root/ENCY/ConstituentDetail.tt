@@ -111,8 +111,9 @@
         <td>
             [% IF edit_mode %]
             <input type="text" name="molecular_weight" value="[% constituent.molecular_weight | html %]" size="15" />
+            <span style="font-size:0.85em;color:#666;"> g/mol (numbers only — units stripped automatically)</span>
             [% ELSE %]
-            [% constituent.molecular_weight | html %]
+            [% IF constituent.molecular_weight %][% constituent.molecular_weight | html %] g/mol[% END %]
             [% END %]
         </td>
     </tr>
