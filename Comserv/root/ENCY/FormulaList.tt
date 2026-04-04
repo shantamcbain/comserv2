@@ -1,0 +1,80 @@
+[% META
+   title = "Formulas - Encyclopedia of Biological Life"
+   description = "Browse USBM herbal formulas in the ENCY encyclopedia"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-04"
+%]
+[% PageVersion = 'ENCY/FormulaList.tt,v 0.01 2026/04/04' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.success_msg %]
+<div class="alert alert-success">[% c.flash.success_msg | html %]</div>
+[% END %]
+[% IF c.flash.error_msg || error_msg %]
+<div class="alert alert-danger">[% c.flash.error_msg || error_msg | html %]</div>
+[% END %]
+[% IF db_error %]
+<div class="alert alert-warning" style="font-family:monospace;font-size:0.9em;">[% db_error | html %]</div>
+[% END %]
+
+<h1>Herbal Formulas</h1>
+<p>Traditional herbal combinations from the USBM legacy archive with indications, preparation methods, and dosage guidance.</p>
+
+<p><a href="[% c.uri_for('/ENCY') %]">&larr; Back to Encyclopedia</a></p>
+
+[% roles = c.session.roles;
+   is_admin = 0;
+   FOREACH r IN roles;
+     IF r == 'admin'; is_admin = 1; END;
+   END;
+%]
+[% IF is_admin %]
+<a href="[% c.uri_for('/ENCY/Formula/add') %]" class="btn btn-primary">Add Formula</a>
+[% END %]
+
+<form method="get" action="[% c.uri_for('/ENCY/Formula') %]" style="margin:1em 0;">
+    <label>Search:
+        <input type="text" name="q" value="[% search_query | html %]" size="35" placeholder="condition, herb name..." />
+    </label>
+    <input type="submit" value="Search" class="btn btn-default" />
+    [% IF search_query %]<a href="[% c.uri_for('/ENCY/Formula') %]">Clear</a>[% END %]
+</form>
+
+[% IF ai_fallback %]
+<div class="alert alert-info">
+    No local formula results for &ldquo;[% ai_query | html %]&rdquo;.
+    <a href="/AI/chat?prompt=Tell+me+about+herbal+formulas+for+[% ai_query | uri %]">Ask AI</a>
+</div>
+[% END %]
+
+[% IF formulas && formulas.size %]
+<table border="1" cellpadding="4" cellspacing="0" style="width:100%;border-collapse:collapse;">
+    <tr style="background:#f5f5f5;">
+        <th>#</th>
+        <th>Name / Indications</th>
+        <th>Herbs</th>
+        <th>Preparation</th>
+        <th></th>
+    </tr>
+    [% FOREACH f IN formulas %]
+    <tr>
+        <td style="white-space:nowrap;">[% f.formula_number | html %]</td>
+        <td>
+            <strong>[% f.name | html %]</strong>
+            [% IF f.indications %]<br/><small style="color:#555;">[% f.indications.substr(0,120) | html %][% IF f.indications.length > 120 %]&hellip;[% END %]</small>[% END %]
+        </td>
+        <td style="font-size:0.9em;">[% f.herbs_raw ? f.herbs_raw.substr(0,100) : '' | html %][% IF f.herbs_raw && f.herbs_raw.length > 100 %]&hellip;[% END %]</td>
+        <td style="font-size:0.9em;">[% f.preparation ? f.preparation.substr(0,80) : '' | html %][% IF f.preparation && f.preparation.length > 80 %]&hellip;[% END %]</td>
+        <td><a href="[% c.uri_for('/ENCY/Formula/' _ f.record_id) %]">Details</a></td>
+    </tr>
+    [% END %]
+</table>
+[% ELSE %]
+<p>No formulas found in the database.</p>
+[% IF is_admin %]
+<p>Run the seeder to import legacy formulas: <code>perl Comserv/script/seed_formulas.pl --dry-run</code></p>
+[% END %]
+[% END %]

@@ -135,33 +135,32 @@ Get list of available weather providers
 
 sub get_weather_providers {
     my ($self) = @_;
-    
-    my $schema = $self->_get_schema;
-    
-    eval {
+
+    my $default_providers = [
+        {
+            provider_name   => 'openweathermap',
+            api_base_url    => 'https://api.openweathermap.org/data/2.5',
+            documentation_url => 'https://openweathermap.org/api'
+        },
+        {
+            provider_name   => 'weatherapi',
+            api_base_url    => 'https://api.weatherapi.com/v1',
+            documentation_url => 'https://www.weatherapi.com/docs/'
+        }
+    ];
+
+    my $schema = eval { $self->_get_schema };
+    return $default_providers if $@ || !$schema;
+
+    my $result = eval {
         my @providers = $schema->resultset('WeatherProviders')->search(
             { is_active => 1 },
             { order_by => 'provider_name' }
         );
-        
         return [ map { $_->get_inflated_columns } @providers ];
     };
-    
-    if ($@) {
-        # Return default providers if table doesn't exist
-        return [
-            {
-                provider_name => 'openweathermap',
-                api_base_url => 'https://api.openweathermap.org/data/2.5',
-                documentation_url => 'https://openweathermap.org/api'
-            },
-            {
-                provider_name => 'weatherapi',
-                api_base_url => 'https://api.weatherapi.com/v1',
-                documentation_url => 'https://www.weatherapi.com/docs/'
-            }
-        ];
-    }
+
+    return ($@ || !$result) ? $default_providers : $result;
 }
 
 __PACKAGE__->meta->make_immutable;

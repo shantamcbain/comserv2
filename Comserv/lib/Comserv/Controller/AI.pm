@@ -895,7 +895,8 @@ sub generate :Local :Args(0) {
                 'generate', "Tier-1 SUCCESS elapsed=${query_elapsed}s model=$model_used");
 
             # ── Tier 2: escalate to large model if quality is poor ────────────
-            if (!$manual_model && $tier_large ne $use_model
+            # Guests are locked to tier_small — never escalate (saves resources).
+            if (!$manual_model && !$is_guest && $tier_large ne $use_model
                 && $self->_assess_response_quality($r_text, $prompt) eq 'poor')
             {
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
@@ -1989,7 +1990,8 @@ sub chat :Local :Args(0) {
                     : $ai_response);
 
             # ── Tier 2: Escalate to large model if quality is poor ────────────
-            if (!$manual_model && $tier_large ne $tier_small
+            # Guests are locked to tier_small — never escalate (saves resources).
+            if (!$manual_model && !$is_guest && $tier_large ne $tier_small
                 && $self->_assess_response_quality($ai_response, $prompt) eq 'poor')
             {
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
