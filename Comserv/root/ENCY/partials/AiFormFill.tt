@@ -68,8 +68,9 @@
         .then(function(data) {
             clearTimeout(timeoutId);
             btn.disabled = false;
+            var modelUsed = data.model || (isGrok ? 'Grok' : 'Ollama');
             if (!data.success) {
-                statusEl.textContent = 'AI error: ' + (data.error || 'unknown error');
+                statusEl.textContent = 'AI error (' + modelUsed + '): ' + (data.error || 'unknown error');
                 document.getElementById('ency-ai-raw-text').textContent = JSON.stringify(data, null, 2);
                 document.getElementById('ency-ai-raw').style.display = '';
                 return;
@@ -80,20 +81,41 @@
             var jsonStart = raw.indexOf('{');
             var jsonEnd   = raw.lastIndexOf('}');
             if (jsonStart === -1 || jsonEnd === -1) {
-                statusEl.textContent = 'AI did not return JSON. See raw response above.';
+                statusEl.textContent = '[' + modelUsed + '] AI did not return JSON. See raw response above.';
                 return;
             }
             try {
                 var fields = JSON.parse(raw.substring(jsonStart, jsonEnd + 1));
                 var filled = 0;
+                var skipped = [];
                 Object.keys(fields).forEach(function(key) {
                     var el = document.querySelector('[name="' + key + '"]');
-                    if (el && fields[key] !== null && fields[key] !== undefined && fields[key] !== '') {
-                        el.value = fields[key];
+                    if (!el || fields[key] === null || fields[key] === undefined || fields[key] === '') return;
+                    var val = String(fields[key]);
+                    if (el.tagName === 'SELECT') {
+                        var matched = false;
+                        for (var i = 0; i < el.options.length; i++) {
+                            var optVal = el.options[i].value.toLowerCase();
+                            var optText = el.options[i].text.toLowerCase();
+                            var aiVal = val.toLowerCase();
+                            if (optVal === aiVal || optText === aiVal ||
+                                optVal === aiVal.replace(/\s*(only|required|status)\s*/gi,'').trim() ||
+                                aiVal.indexOf(optVal) !== -1) {
+                                el.selectedIndex = i;
+                                matched = true;
+                                filled++;
+                                break;
+                            }
+                        }
+                        if (!matched) { skipped.push(key + '=' + val); }
+                    } else {
+                        el.value = val;
                         filled++;
                     }
                 });
-                statusEl.textContent = 'Filled ' + filled + ' field(s). Please review carefully before saving.';
+                var msg = 'Model: ' + modelUsed + ' \u2014 Filled ' + filled + ' field(s). Review carefully \u2014 AI data may be approximate.';
+                if (skipped.length) { msg += ' (Skipped: ' + skipped.join(', ') + ')'; }
+                statusEl.textContent = msg;
             } catch(e) {
                 statusEl.textContent = 'Could not parse JSON. See raw response above.';
             }
