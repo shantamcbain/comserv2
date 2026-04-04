@@ -37,7 +37,7 @@
 function csAskAI() {
     var q = document.getElementById('cs-ai-query').value.trim();
     if (!q) return;
-    window.open('/AI/chat?prompt=' + encodeURIComponent('Tell me about this [% entity_name | html %] in the context of natural health and biological medicine: ' + q), '_blank');
+    window.open('/ai?prompt=' + encodeURIComponent('Tell me about this [% entity_name | html %] in the context of natural health and biological medicine: ' + q), '_blank');
 }
 document.getElementById('cs-ai-query').addEventListener('keypress', function(e) { if (e.key === 'Enter') csAskAI(); });
 </script>
