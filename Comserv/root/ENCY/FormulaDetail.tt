@@ -1,0 +1,193 @@
+[% META
+   title = "Formula Detail - Encyclopedia of Biological Life"
+   description = "View and edit USBM herbal formula details in the ENCY encyclopedia"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-04"
+%]
+[% PageVersion = 'ENCY/FormulaDetail.tt,v 0.01 2026/04/04' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF success_msg || c.flash.success_msg %]
+<div class="alert alert-success">[% success_msg || c.flash.success_msg | html %]</div>
+[% END %]
+[% IF error_msg || c.flash.error_msg %]
+<div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
+[% END %]
+
+[% roles = c.session.roles;
+   is_admin = 0;
+   FOREACH r IN roles;
+     IF r == 'admin'; is_admin = 1; END;
+   END;
+%]
+
+[% IF edit_mode %]
+<h1>Editing Formula [% formula.formula_number | html %]: [% formula.name | html %]</h1>
+[% ELSE %]
+<h1>Formula [% formula.formula_number | html %]: [% formula.name | html %]</h1>
+[% END %]
+
+<p>
+    <a href="[% c.uri_for('/ENCY/Formula') %]">&larr; Back to Formulas</a>
+    [% IF is_admin && !edit_mode && formula.record_id %]
+    | <a href="[% c.uri_for('/ENCY/Formula/edit', { record_id => formula.record_id }) %]">Edit</a>
+    [% END %]
+</p>
+
+[% IF edit_mode %]
+<form action="[% IF formula.record_id %][% c.uri_for('/ENCY/Formula/edit') %][% ELSE %][% c.uri_for('/ENCY/Formula/add') %][% END %]" method="post">
+[% IF formula.record_id %]
+<input type="hidden" name="record_id" value="[% formula.record_id %]" />
+[% END %]
+[% END %]
+
+<h2>Identification</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Formula #</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="formula_number" value="[% formula.formula_number | html %]" size="10" />[% ELSE %][% formula.formula_number | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Name / Indications</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="name" value="[% formula.name | html %]" size="80" />[% ELSE %][% formula.name | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Conditions / Indications</strong></td>
+        <td>[% IF edit_mode %]<textarea name="indications" rows="3" cols="70">[% formula.indications | html %]</textarea>[% ELSE %][% formula.indications | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Description</strong></td>
+        <td>[% IF edit_mode %]<textarea name="description" rows="4" cols="70">[% formula.description | html %]</textarea>[% ELSE %][% formula.description | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Source</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="source" value="[% formula.source | html %]" size="40" />[% ELSE %][% formula.source | html %][% END %]</td>
+    </tr>
+</table>
+
+<h2>Herbs in Formula</h2>
+[% IF herb_links && herb_links.size %]
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr style="background:#f5f5f5;">
+        <th>Quantity</th>
+        <th>Herb (Botanical)</th>
+        <th>Common Name</th>
+        <th>Plant Part</th>
+        <th>ENCY Link</th>
+    </tr>
+    [% FOREACH h IN herb_links %]
+    <tr>
+        <td>[% h.quantity | html %]</td>
+        <td>[% h.botanical_name_raw | html %]</td>
+        <td>[% h.herb_name_raw | html %]</td>
+        <td>[% h.plant_part | html %]</td>
+        <td>
+            [% IF h.herb_id %]
+            <a href="[% c.uri_for('/ENCY/herb_detail/' _ h.herb_id) %]">View Herb</a>
+            [% ELSE %]
+            <span style="color:#aaa;">not linked</span>
+            [% END %]
+        </td>
+    </tr>
+    [% END %]
+</table>
+[% ELSIF formula.herbs_raw %]
+<pre style="background:#f9f9f9;padding:0.5em;border:1px solid #ddd;font-size:0.9em;">[% formula.herbs_raw | html %]</pre>
+[% ELSE %]
+<p><em>No herbs recorded.</em></p>
+[% END %]
+
+[% IF edit_mode %]
+<p><strong>Herbs (raw text — one per line, e.g. "2 tsp Echinacea purpurea (coneflower) root"):</strong><br/>
+<textarea name="herbs_raw" rows="8" cols="70">[% formula.herbs_raw | html %]</textarea></p>
+[% END %]
+
+<h2>Preparation</h2>
+[% IF edit_mode %]
+<textarea name="preparation" rows="5" cols="70">[% formula.preparation | html %]</textarea>
+[% ELSE %]
+<p>[% formula.preparation || '<em>Not specified.</em>' | html %]</p>
+[% END %]
+
+<h2>Dosage</h2>
+[% IF edit_mode %]
+<textarea name="dosage" rows="3" cols="70">[% formula.dosage | html %]</textarea>
+[% ELSE %]
+<p>[% formula.dosage || '<em>Not specified.</em>' | html %]</p>
+[% END %]
+
+<h2>Administration</h2>
+[% IF edit_mode %]
+<textarea name="administration" rows="3" cols="70">[% formula.administration | html %]</textarea>
+[% ELSE %]
+<p>[% formula.administration || '<em>Not specified.</em>' | html %]</p>
+[% END %]
+
+[% IF disease_links && disease_links.size %]
+<h2>Related Conditions</h2>
+<ul>
+    [% FOREACH d IN disease_links %]
+    <li>
+        [% IF d.disease_id %]
+        <a href="[% c.uri_for('/ENCY/Disease/' _ d.disease_id) %]">[% d.condition_name | html %]</a>
+        [% ELSE %]
+        [% d.condition_name | html %]
+        [% END %]
+    </li>
+    [% END %]
+</ul>
+[% END %]
+
+<h2>Notes &amp; References</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Notes</strong></td>
+        <td>[% IF edit_mode %]<textarea name="notes" rows="3" cols="70">[% formula.notes | html %]</textarea>[% ELSE %][% formula.notes | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Reference</strong></td>
+        <td>[% IF edit_mode %]<textarea name="reference" rows="2" cols="70">[% formula.reference | html %]</textarea>[% ELSE %][% formula.reference | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>URL</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="url" value="[% formula.url | html %]" size="60" />[% ELSE %][% IF formula.url %]<a href="[% formula.url | html %]" target="_blank">[% formula.url | html %]</a>[% END %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Image</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="image" value="[% formula.image | html %]" size="60" />
+            [% ELSE %]
+            [% IF formula.image %]<img src="[% formula.image | html %]" alt="Formula image" style="max-width:300px;max-height:200px;" />[% END %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Site Name</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="sitename" value="[% formula.sitename || 'ENCY' | html %]" size="20" />[% ELSE %][% formula.sitename | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Source File</strong></td>
+        <td>[% formula.source_file | html %]</td>
+    </tr>
+    <tr>
+        <td><strong>Date Posted</strong></td>
+        <td>[% formula.date_time_posted | html %]</td>
+    </tr>
+    <tr>
+        <td><strong>Posted By</strong></td>
+        <td>[% formula.username_of_poster | html %]</td>
+    </tr>
+</table>
+
+[% IF edit_mode %]
+[% INCLUDE 'ENCY/partials/AiFormFill.tt' %]
+<p>
+    <input type="submit" value="Save Formula" class="btn btn-success" />
+    <a href="[% IF formula.record_id %][% c.uri_for('/ENCY/Formula/' _ formula.record_id) %][% ELSE %][% c.uri_for('/ENCY/Formula') %][% END %]" class="btn btn-default">Cancel</a>
+</p>
+</form>
+[% END %]
