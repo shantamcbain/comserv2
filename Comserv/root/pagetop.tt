@@ -289,12 +289,15 @@ document.addEventListener('DOMContentLoaded', function() {
             </li>
         [% INCLUDE 'Navigation/TopDropListMain.tt' %]
         [% INCLUDE 'Navigation/TopDropListLogin.tt' %]
-        [% INCLUDE 'Navigation/TopDropListGlobal.tt' %]
+        [%# Global discontinued — Mail/Jobs/Join moved to Main %]
+        [% IF 0 %][% INCLUDE 'Navigation/TopDropListGlobal.tt' %][% END %]
         [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
         [% INCLUDE 'Navigation/TopDropListMember.tt' %]
-        [% INCLUDE 'Navigation/TopDropListIT.tt' %]
         [% INCLUDE 'Navigation/TopDropListENCY.tt' %]
-        <!-- TopDropListCoop.tt has been removed and merged into admintopmenu.tt -->
+        [% INCLUDE 'Navigation/TopDropListWeather.tt' %]
+        [%# IT discontinued — IT content moved to HelpDesk submenu %]
+        [% IF 0 %][% INCLUDE 'Navigation/TopDropListIT.tt' %][% END %]
+        [%# Coop removed and merged into admintopmenu.tt %]
 
         [% IF is_admin %]
             [% INCLUDE 'Navigation/admintopmenu.tt' %]
