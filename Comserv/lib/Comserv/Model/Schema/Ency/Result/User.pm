@@ -138,6 +138,16 @@ __PACKAGE__->has_many(
     { 'foreign.user_id' => 'self.id' }
 );
 
+__PACKAGE__->has_many(
+    'posted_jobs' => 'Comserv::Model::Schema::Ency::Result::Job',
+    { 'foreign.posted_by_user_id' => 'self.id' },
+);
+
+__PACKAGE__->has_many(
+    'job_applications' => 'Comserv::Model::Schema::Ency::Result::JobApplication',
+    { 'foreign.user_id' => 'self.id' },
+);
+
 # Add method to check password (needed for authentication)
 sub check_password {
     my ($self, $password) = @_;
