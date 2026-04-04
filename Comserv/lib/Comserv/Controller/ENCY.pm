@@ -66,6 +66,26 @@ sub index :Path('/ENCY') :Args(0) {
         template  => 'ENCY/index.tt',
     );
 }
+
+sub plants             : Path('/ENCY/plants')              : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/botanical_name_view')) }
+sub herbs_alias        : Path('/ENCY/herbs')               : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/botanical_name_view')) }
+sub animals_alias      : Path('/ENCY/animals')             : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Animal')) }
+sub insects_alias      : Path('/ENCY/insects')             : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Insect')) }
+sub constituents_alias : Path('/ENCY/constituents')        : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Constituent')) }
+sub diseases_alias     : Path('/ENCY/diseases')            : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Disease')) }
+sub symptoms_alias     : Path('/ENCY/symptoms')            : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Symptom')) }
+sub drugs_alias        : Path('/ENCY/drugs')               : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Drug')) }
+sub formulas_alias     : Path('/ENCY/formulas')            : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Formula')) }
+sub glossary_alias     : Path('/ENCY/glossary')            : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Glossary')) }
+sub recipes_alias      : Path('/ENCY/recipes')             : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Formula')) }
+sub pollinators_alias  : Path('/ENCY/pollinators')         : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/bee_pasture_view')) }
+sub therapeutic_alias  : Path('/ENCY/therapeutic_actions') : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Constituent')) }
+sub medicinal_alias    : Path('/ENCY/medicinal_properties'): Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/search', { q => 'medicinal' })) }
+sub birds_alias        : Path('/ENCY/birds')               : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Animal', { kingdom => 'Aves' })) }
+sub fungi_alias        : Path('/ENCY/fungi')               : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/search', { q => 'fungi' })) }
+sub ecosystems_alias   : Path('/ENCY/ecosystems')          : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/search', { q => 'ecosystem' })) }
+sub conservation_alias : Path('/ENCY/conservation')        : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/search', { q => 'conservation' })) }
+sub cultivation_alias  : Path('/ENCY/cultivation')         : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/search', { q => 'cultivation' })) }
 # Add this subroutine to handle the '/ENCY/add_herb' path
 
 sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
