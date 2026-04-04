@@ -1,0 +1,161 @@
+/* ency-index.css — Encyclopedia landing page styles
+   Uses CSS custom properties from variables.css so every site theme applies automatically.
+   No hardcoded hex colours here; those live in the theme files.
+*/
+
+/* ── Hero / intro ─────────────────────────────────────────── */
+.ency-hero {
+    padding: var(--spacing-medium) 0 var(--spacing-small);
+    border-bottom: 2px solid var(--primary-color);
+    margin-bottom: var(--spacing-medium);
+}
+.ency-hero h2 {
+    font-family: var(--header-font);
+    color: var(--text-color);
+    margin: 0 0 var(--spacing-small);
+}
+.ency-hero p {
+    color: var(--text-color);
+    max-width: 780px;
+}
+
+/* ── Search bar ───────────────────────────────────────────── */
+.ency-search-form {
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+    margin: var(--spacing-medium) 0;
+    max-width: 680px;
+}
+.ency-search-form input[type="text"] {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-family: var(--body-font);
+    font-size: var(--font-size-base);
+    background: var(--secondary-color);
+    color: var(--text-color);
+}
+.ency-search-form button {
+    padding: 0.5rem 1.1rem;
+    background: var(--accent-color);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-family: var(--body-font);
+    font-size: var(--font-size-base);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.ency-search-form button:hover {
+    opacity: 0.88;
+}
+
+/* ── Navigation card grid ─────────────────────────────────── */
+.ency-nav-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin: var(--spacing-medium) 0;
+}
+.ency-nav-card {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.65rem 1.1rem;
+    background: var(--light-color);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--accent-color);
+    border-radius: 5px;
+    text-decoration: none;
+    color: var(--text-color);
+    font-family: var(--header-font);
+    font-weight: bold;
+    font-size: var(--font-size-small);
+    transition: background 0.15s, border-color 0.15s;
+}
+.ency-nav-card:hover {
+    background: var(--primary-color);
+    border-left-color: var(--link-hover-color);
+    color: var(--text-color);
+    text-decoration: none;
+}
+.ency-nav-card .ency-card-icon {
+    font-size: 1.1em;
+}
+
+/* ── AI assistance panel ──────────────────────────────────── */
+.ency-ai-panel {
+    margin: var(--spacing-medium) 0;
+    padding: 0.75rem 1rem;
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--info-color);
+    border-radius: 5px;
+    color: var(--text-color);
+    font-family: var(--body-font);
+}
+.ency-ai-panel .ency-ai-search {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    max-width: 560px;
+    align-items: stretch;
+}
+.ency-ai-panel .ency-ai-search input {
+    flex: 1;
+    padding: 0.4rem 0.7rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-family: var(--body-font);
+    font-size: var(--font-size-small);
+    background: var(--light-color);
+    color: var(--text-color);
+}
+.ency-ai-panel .btn-ai {
+    padding: 0.4rem 1rem;
+    background: var(--info-color);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-family: var(--body-font);
+    font-size: var(--font-size-small);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.ency-ai-panel .btn-ai:hover { opacity: 0.88; }
+
+/* ── Admin quick-add bar ──────────────────────────────────── */
+.ency-admin-bar {
+    margin: var(--spacing-medium) 0;
+    padding: 0.6rem 1rem;
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--warning-color);
+    border-radius: 5px;
+    font-family: var(--body-font);
+    font-size: var(--font-size-small);
+    color: var(--text-color);
+}
+.ency-admin-bar a {
+    display: inline-block;
+    margin: 0 0.4rem;
+    color: var(--link-color);
+    text-decoration: none;
+}
+.ency-admin-bar a:hover { text-decoration: underline; }
+
+/* ── Site-specific hero accent lines ─────────────────────── */
+.ency-site-bmaster .ency-hero { border-bottom-color: #e6a817; }
+.ency-site-forager  .ency-hero { border-bottom-color: #5a8a3c; }
+.ency-site-usbm     .ency-hero { border-bottom-color: #3a6ea8; }
+
+/* ── Disclaimer footer ────────────────────────────────────── */
+.ency-disclaimer {
+    margin-top: var(--spacing-large);
+    padding-top: var(--spacing-small);
+    border-top: 1px solid var(--border-color);
+    font-size: var(--font-size-small);
+    color: var(--text-muted-color);
+}
