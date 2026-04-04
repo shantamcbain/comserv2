@@ -37,7 +37,21 @@
 function csAskAI() {
     var q = document.getElementById('cs-ai-query').value.trim();
     if (!q) return;
-    window.open('/ai?prompt=' + encodeURIComponent('Tell me about this [% entity_name | html %] in the context of natural health and biological medicine: ' + q), '_blank');
+    var fullQuery = 'Tell me about this [% entity_name | html %] in the context of natural health and biological medicine: ' + q;
+
+    var chatBtn  = document.getElementById('chat-button');
+    var msgInput = document.getElementById('message-input');
+
+    if (chatBtn && msgInput) {
+        if (chatBtn.style.display !== 'none') { chatBtn.click(); }
+        setTimeout(function() {
+            msgInput.value = fullQuery;
+            msgInput.dispatchEvent(new Event('input'));
+            msgInput.focus();
+        }, 150);
+    } else {
+        window.open('/ai?prompt=' + encodeURIComponent(fullQuery), '_blank');
+    }
 }
 document.getElementById('cs-ai-query').addEventListener('keypress', function(e) { if (e.key === 'Enter') csAskAI(); });
 </script>
