@@ -1984,6 +1984,81 @@ sub practitioner_type_detail : Path('/ENCY/PractitionerType') : Args(1) {
     $c->response->redirect($c->uri_for('/ENCY/PractitionerType'), 302);
 }
 
+sub api_resolve : Path('/ENCY/api/resolve') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    my $type  = $c->request->param('type')  || '';
+    my $query = $c->request->param('q')     || '';
+    unless ($type && length($query) >= 2) {
+        $c->response->body('{"results":[]}');
+        return;
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_resolve', "Resolving type=$type q=$query");
+    my @results;
+    eval {
+        my $model = $c->model('ENCYModel');
+        if ($type eq 'herb') {
+            my @rows = $model->forager_schema->resultset('Herb')->search(
+                { -or => [
+                    common_name    => { like => "%$query%" },
+                    botanical_name => { like => "%$query%" },
+                ]},
+                { rows => 8, order_by => 'common_name' }
+            )->all;
+            @results = map { {
+                id         => $_->record_id,
+                name       => $_->common_name // '',
+                secondary  => $_->botanical_name // '',
+                url        => '/ENCY/herb_detail/' . $_->record_id,
+            } } @rows;
+        } elsif ($type eq 'disease') {
+            my @rows = $model->ency_schema->resultset('Disease')->search(
+                { common_name => { like => "%$query%" } },
+                { rows => 8, order_by => 'common_name' }
+            )->all;
+            @results = map { {
+                id        => $_->record_id,
+                name      => $_->common_name // '',
+                secondary => $_->disease_type // '',
+                url       => '/ENCY/Disease/' . $_->record_id,
+            } } @rows;
+        } elsif ($type eq 'symptom') {
+            my @rows = $model->ency_schema->resultset('Symptom')->search(
+                { -or => [
+                    name        => { like => "%$query%" },
+                    common_name => { like => "%$query%" },
+                ]},
+                { rows => 8, order_by => 'name' }
+            )->all;
+            @results = map { {
+                id        => $_->record_id,
+                name      => $_->name // '',
+                secondary => $_->body_system // '',
+                url       => '/ENCY/Symptom/' . $_->record_id,
+            } } @rows;
+        } elsif ($type eq 'constituent') {
+            my @rows = $model->ency_schema->resultset('Constituent')->search(
+                { -or => [
+                    name        => { like => "%$query%" },
+                    common_name => { like => "%$query%" },
+                ]},
+                { rows => 8, order_by => 'name' }
+            )->all;
+            @results = map { {
+                id        => $_->record_id,
+                name      => $_->name // '',
+                secondary => $_->chemical_class // '',
+                url       => '/ENCY/Constituent/' . $_->record_id,
+            } } @rows;
+        }
+    } or do {
+        my $err = $@ || 'unknown';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_resolve', "Resolve error: $err");
+    };
+    require JSON;
+    $c->response->body(JSON::encode_json({ results => \@results }));
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
