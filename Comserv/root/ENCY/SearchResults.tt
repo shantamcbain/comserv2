@@ -35,7 +35,7 @@
 [% IF ai_fallback %]
 <div class="alert alert-info" style="padding: 12px; background: #e3f2fd; border: 1px solid #90caf9; border-radius: 6px; margin: 16px 0;">
     No local results found for &ldquo;<em>[% ai_query | html %]</em>&rdquo;.
-    <a href="/AI/chat?prompt=Tell+me+about+[% ai_query | uri %]+in+the+context+of+the+encyclopedia">Ask AI</a>
+    <a href="/ai?prompt=Tell+me+about+[% ai_query | uri %]+in+the+context+of+the+encyclopedia">Ask AI</a>
 </div>
 [% END %]
 
@@ -215,6 +215,35 @@
             <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% entry.definition.substr(0, 120) | html %][% entry.definition.length > 120 ? '...' : '' %]</td>
             <td style="padding:6px 10px; border-bottom:1px solid #eee;">
                 <a href="/ENCY/Glossary/[% entry.record_id %]">Details</a>
+            </td>
+        </tr>
+        [% END %]
+    </tbody>
+</table>
+[% END %]
+
+[%# ── Drugs ─────────────────────────────────────────────── %]
+[% IF search_results.drugs.size %]
+<h2>Drugs &amp; Pharmaceuticals ([% search_results.drugs.size %])</h2>
+<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+    <thead>
+        <tr style="background:#ede7f6;">
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Brand Name</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Generic Name</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Drug Class</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Rx/OTC</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        [% FOREACH drug IN search_results.drugs %]
+        <tr>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;"><strong>[% drug.brand_name | html %]</strong></td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% drug.generic_name | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% drug.drug_class | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% drug.prescription_status | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">
+                <a href="/ENCY/Drug/[% drug.record_id %]">Details</a>
             </td>
         </tr>
         [% END %]
