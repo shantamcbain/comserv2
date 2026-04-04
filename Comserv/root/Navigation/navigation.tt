@@ -17,8 +17,8 @@
         <!-- Login/Logout -->
         [% INCLUDE 'Navigation/TopDropListLogin.tt' %]
         
-        [%# Global Menu discontinued — Mail/Jobs/Join moved to Main; IT moved to HelpDesk submenu %]
-        [%# [% INCLUDE 'Navigation/TopDropListGlobal.tt' %] %]
+        [%# Global Menu discontinued — Mail/Jobs/Join moved to Main %]
+        [% IF 0 %][% INCLUDE 'Navigation/TopDropListGlobal.tt' %][% END %]
         
         <!-- Hosted Menu -->
         [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
@@ -33,7 +33,7 @@
         [% INCLUDE 'Navigation/TopDropListWeather.tt' %]
         
         [%# IT Menu discontinued — IT content moved to HelpDesk submenu %]
-        [%# [% INCLUDE 'Navigation/TopDropListIT.tt' %] %]
+        [% IF 0 %][% INCLUDE 'Navigation/TopDropListIT.tt' %][% END %]
         
         <!-- Admin Menu (only for admin users) -->
         [% user_roles = c.controller('Navigation').get_user_roles(c) %]
