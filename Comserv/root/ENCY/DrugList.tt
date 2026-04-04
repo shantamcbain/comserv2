@@ -1,0 +1,71 @@
+[% META
+   title = "Drugs - Encyclopedia of Biological Life"
+   description = "Browse pharmaceutical drugs in the ENCY encyclopedia"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-04"
+%]
+[% PageVersion = 'ENCY/DrugList.tt,v 0.01 2026/04/04' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.success_msg %]
+<div class="alert alert-success">[% c.flash.success_msg | html %]</div>
+[% END %]
+[% IF c.flash.error_msg %]
+<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
+[% END %]
+
+<h1>Drugs &amp; Pharmaceuticals</h1>
+
+<p><a href="[% c.uri_for('/ENCY') %]">&larr; Back to Encyclopedia</a></p>
+
+[% IF is_admin %]
+<a href="[% c.uri_for('/ENCY/Drug/add') %]" class="btn btn-primary">Add Drug</a>
+[% END %]
+
+<form method="get" action="[% c.uri_for('/ENCY/Drug') %]">
+    <label>Drug Class:
+        <input type="text" name="drug_class" value="[% drug_class | html %]" size="25" />
+    </label>
+    <input type="submit" value="Filter" class="btn btn-default" />
+    <a href="[% c.uri_for('/ENCY/Drug') %]">Clear</a>
+</form>
+
+[% IF drugs && drugs.size %]
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <th>Brand Name</th>
+        <th>Generic Name</th>
+        <th>Drug Class</th>
+        <th>Formulation</th>
+        <th>Strength</th>
+        <th>Rx/OTC</th>
+        <th></th>
+    </tr>
+    [% FOREACH drug IN drugs %]
+    <tr>
+        <td><strong>[% drug.brand_name | html %]</strong></td>
+        <td>[% drug.generic_name | html %]</td>
+        <td>[% drug.drug_class | html %]</td>
+        <td>[% drug.formulation | html %]</td>
+        <td>[% drug.strength | html %]</td>
+        <td>[% drug.prescription_status | html %]</td>
+        <td><a href="[% c.uri_for('/ENCY/Drug', drug.record_id) %]">Details</a></td>
+    </tr>
+    [% END %]
+</table>
+[% ELSE %]
+<p>No drugs found in the database.</p>
+[% IF is_admin %]
+<p>Be the first to add a drug: <a href="[% c.uri_for('/ENCY/Drug/add') %]">Add Drug</a></p>
+[% END %]
+[% END %]
+
+[% IF ai_fallback %]
+<div class="alert alert-info" style="margin-top:1em;">
+  No local results for &ldquo;[% ai_query | html %]&rdquo;.
+  <a href="/ai?prompt=Tell+me+about+[% ai_query | uri %]+as+a+pharmaceutical+drug+including+its+indications+and+herbal+alternatives">Ask AI</a>
+</div>
+[% END %]
