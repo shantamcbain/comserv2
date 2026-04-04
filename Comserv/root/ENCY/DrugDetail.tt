@@ -102,7 +102,7 @@
     </tr>
     <tr>
         <td><strong>DIN Number</strong></td>
-        <td>[% IF edit_mode %]<input type="text" name="din_number" value="[% drug.din_number | html %]" size="20" />[% ELSE %][% drug.din_number | html %][% END %]</td>
+        <td>[% IF edit_mode %]<input type="text" name="din_number" value="[% drug.din_number | html %]" size="20" /> <small style="color:#888;">Health Canada DIN — verify at <a href="https://health-products.canada.ca/dpd-bdpp/index-eng.jsp" target="_blank">canada.ca/dpd</a></small>[% ELSE %][% drug.din_number | html %][% END %]</td>
     </tr>
     <tr>
         <td><strong>NDC Code</strong></td>
@@ -214,7 +214,9 @@
 <table border="1" cellpadding="4" cellspacing="0">
     <tr>
         <td><strong>Herbal Alternatives</strong></td>
-        <td>[% IF edit_mode %]<textarea name="herbal_alternatives" rows="5" cols="60">[% drug.herbal_alternatives | html %]</textarea>[% ELSE %][% drug.herbal_alternatives | html %][% END %]</td>
+        <td>[% IF edit_mode %]<textarea name="herbal_alternatives" rows="5" cols="60">[% drug.herbal_alternatives | html %]</textarea>
+            <br/><small style="color:#888;">List herbs by common or botanical name. Cross-references to ENCY herb records added in future release. Also see Herb-Drug Interactions table for linked herb data.</small>
+        [% ELSE %][% drug.herbal_alternatives | html %][% END %]</td>
     </tr>
     <tr>
         <td><strong>Naturopathic Notes</strong></td>
@@ -226,7 +228,9 @@
 <table border="1" cellpadding="4" cellspacing="0">
     <tr>
         <td><strong>Reference</strong></td>
-        <td>[% IF edit_mode %]<textarea name="reference" rows="3" cols="60">[% drug.reference | html %]</textarea>[% ELSE %][% drug.reference | html %][% END %]</td>
+        <td>[% IF edit_mode %]<textarea name="reference" rows="3" cols="60">[% drug.reference | html %]</textarea>
+            <br/><small style="color:#888;">Free-text citation. Formal reference linking to the ENCY reference library is planned. You can save partially and return to add more — data is preserved incrementally.</small>
+        [% ELSE %][% drug.reference | html %][% END %]</td>
     </tr>
     <tr>
         <td><strong>URL</strong></td>
