@@ -70,6 +70,7 @@
   <a href="[% c.uri_for('/ENCY/Disease') %]" class="ency-nav-card"><span class="ency-card-icon">🔬</span> Bee &amp; Plant Diseases</a>
   <a href="[% c.uri_for('/ENCY/Animal') %]" class="ency-nav-card"><span class="ency-card-icon">🦎</span> Animals</a>
   <a href="[% c.uri_for('/ENCY/Constituent') %]" class="ency-nav-card"><span class="ency-card-icon">⚗</span> Constituents</a>
+  <a href="[% c.uri_for('/ENCY/Drug') %]" class="ency-nav-card"><span class="ency-card-icon">💊</span> Drugs &amp; Treatments</a>
   <a href="[% c.uri_for('/ENCY/Glossary') %]" class="ency-nav-card"><span class="ency-card-icon">📖</span> Glossary</a>
 
 [% ELSIF site_lc == 'forager' %]
