@@ -1358,7 +1358,7 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
                 "Failed to update constituent: $msg");
             $c->stash(
                 error_msg   => "Failed to update constituent: $msg",
-                constituent => { %{ $constituent->get_columns }, %$data },
+                constituent => { $constituent->get_columns, %$data },
                 edit_mode   => 1,
                 template    => 'ENCY/ConstituentDetail.tt',
             );
