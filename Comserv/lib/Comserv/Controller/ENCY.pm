@@ -1676,6 +1676,84 @@ sub legacy : Path('/ENCY/legacy') : Args(1) {
     );
 }
 
+sub herb_list : Path('/ENCY/Herb') : Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'herb_list', 'Entered herb_list');
+    my $forager_data = $c->model('DBForager')->get_herbal_data();
+    $c->stash(herbal_data => $forager_data, template => 'ENCY/BotanicalNameView.tt');
+}
+
+sub herb_detail_by_id : Path('/ENCY/Herb') : Args(1) {
+    my ($self, $c, $id) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'herb_detail_by_id', "Herb id: $id");
+    $c->response->redirect($c->uri_for('/ENCY/herb_detail', $id), 301);
+}
+
+sub drug_list : Path('/ENCY/Drug') : Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'drug_list', 'Drug list not yet implemented');
+    $c->stash(
+        entity_name => 'Drug',
+        entity_desc => 'Pharmaceutical drugs and medicinal products — brand name, generic name, indications, contraindications, interactions, and herbal alternatives.',
+        add_url     => '/ENCY/Drug/add',
+        template    => 'ENCY/ComingSoon.tt',
+    );
+}
+
+sub drug_detail : Path('/ENCY/Drug') : Args(1) {
+    my ($self, $c, $id) = @_;
+    $c->response->redirect($c->uri_for('/ENCY/Drug'), 302);
+}
+
+sub add_drug : Path('/ENCY/Drug/add') : Args(0) {
+    my ($self, $c) = @_;
+    $c->stash(
+        entity_name => 'Drug',
+        entity_desc => 'Pharmaceutical drugs and medicinal products.',
+        template    => 'ENCY/ComingSoon.tt',
+    );
+}
+
+sub formula_list : Path('/ENCY/Formula') : Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'formula_list', 'Formula list not yet implemented');
+    $c->stash(
+        entity_name => 'Formula',
+        entity_desc => 'USBM herbal formulas — named combinations of herbs with specific indications, preparation methods, and dosage guidance.',
+        add_url     => '/ENCY/Formula/add',
+        template    => 'ENCY/ComingSoon.tt',
+    );
+}
+
+sub formula_detail : Path('/ENCY/Formula') : Args(1) {
+    my ($self, $c, $id) = @_;
+    $c->response->redirect($c->uri_for('/ENCY/Formula'), 302);
+}
+
+sub add_formula : Path('/ENCY/Formula/add') : Args(0) {
+    my ($self, $c) = @_;
+    $c->stash(
+        entity_name => 'Formula',
+        entity_desc => 'USBM herbal formulas.',
+        template    => 'ENCY/ComingSoon.tt',
+    );
+}
+
+sub practitioner_type_list : Path('/ENCY/PractitionerType') : Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'practitioner_type_list', 'PractitionerType list not yet implemented');
+    $c->stash(
+        entity_name => 'Practitioner Type',
+        entity_desc => 'Types of healthcare practitioners — allopathic physicians, naturopaths, herbalists, homeopaths, TCM practitioners, Ayurvedic practitioners — and how each approaches diagnosis and treatment.',
+        template    => 'ENCY/ComingSoon.tt',
+    );
+}
+
+sub practitioner_type_detail : Path('/ENCY/PractitionerType') : Args(1) {
+    my ($self, $c, $id) = @_;
+    $c->response->redirect($c->uri_for('/ENCY/PractitionerType'), 302);
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
