@@ -7,30 +7,37 @@ use lib "$Bin/../local/lib/perl5";
 
 use Comserv::Model::Schema::Ency;
 use Comserv::Model::Schema::Forager;
-use Comserv::Model::RemoteDB;
 
 my $LEGACY_DIR = "$Bin/../root/LegacyStaticPages/ency";
 my $DRY_RUN    = grep { /--dry-run/ } @ARGV;
 my $VERBOSE    = grep { /--verbose/ } @ARGV;
 my $FORCE      = grep { /--force/   } @ARGV;
 
+my $DB_HOST = '192.168.1.198';
+my $DB_USER = 'shanta_forager';
+my $DB_PASS = 'UA=nPF8*m+T#';
+
 print "=== USBM Formula Seeder ===\n";
 print "Dry run mode\n" if $DRY_RUN;
 
-my $remote = Comserv::Model::RemoteDB->new;
-my $conn   = $remote->get_connection_info('DBEncy')
-    or die "Cannot get Ency DB connection info\n";
 my $ency_schema = Comserv::Model::Schema::Ency->connect(
-    $conn->{dsn}, $conn->{user}, $conn->{pass}, { RaiseError => 1, AutoCommit => 1 }
+    "dbi:mysql:database=ency;host=$DB_HOST;port=3306",
+    $DB_USER, $DB_PASS, { RaiseError => 1, AutoCommit => 1 }
 ) or die "Cannot connect to Ency schema\n";
 
-my $fconn = $remote->get_connection_info('DBForager')
-    or die "Cannot get Forager DB connection info\n";
 my $forager_schema = Comserv::Model::Schema::Forager->connect(
-    $fconn->{dsn}, $fconn->{user}, $fconn->{pass}, { RaiseError => 1, AutoCommit => 1 }
+    "dbi:mysql:database=shanta_forager;host=$DB_HOST;port=3306",
+    $DB_USER, $DB_PASS, { RaiseError => 1, AutoCommit => 1 }
 ) or die "Cannot connect to Forager schema\n";
 
-print "Connected to databases.\n";
+print "Connected to databases ($DB_HOST).\n";
+
+sub clean_text {
+    my ($s) = @_;
+    return '' unless defined $s;
+    $s =~ s/[^\x00-\x7F]/?/g;
+    return $s;
+}
 
 my @formula_files = sort glob("$LEGACY_DIR/usbmf*.htm");
 print "Found " . scalar(@formula_files) . " formula files.\n\n";
@@ -66,16 +73,16 @@ for my $file (@formula_files) {
             my $image = find_image($forager_schema, $parsed->{herb_names});
 
             my $formula = $ency_schema->resultset('Formula')->create({
-                formula_number     => $parsed->{formula_number},
-                name               => $parsed->{name},
-                indications        => $parsed->{indications},
-                description        => $parsed->{description},
-                herbs_raw          => $parsed->{herbs_raw},
-                preparation        => $parsed->{preparation},
-                dosage             => $parsed->{dosage},
-                administration     => $parsed->{administration},
-                notes              => $parsed->{notes},
-                reference          => $parsed->{reference},
+                formula_number     => clean_text($parsed->{formula_number}),
+                name               => clean_text($parsed->{name}),
+                indications        => clean_text($parsed->{indications}),
+                description        => clean_text($parsed->{description}),
+                herbs_raw          => clean_text($parsed->{herbs_raw}),
+                preparation        => clean_text($parsed->{preparation}),
+                dosage             => clean_text($parsed->{dosage}),
+                administration     => clean_text($parsed->{administration}),
+                notes              => clean_text($parsed->{notes}),
+                reference          => clean_text($parsed->{reference}),
                 source             => 'USBM Legacy',
                 source_file        => $filename,
                 image              => $image,
@@ -324,7 +331,7 @@ sub find_herb_id {
                     botanical_name => { like => "%$name%" },
                     common_names   => { like => "%$name%" },
                 ]},
-                { rows => 1 }
+                { rows => 1, order_by => 'record_id' }
             )->first;
         } or do {};
         last if $herb;
@@ -338,7 +345,7 @@ sub find_disease_id {
     eval {
         $disease = $schema->resultset('Disease')->search(
             { common_name => { like => "%$condition%" } },
-            { rows => 1 }
+            { rows => 1, order_by => 'record_id' }
         )->first;
     } or do {};
     return $disease ? $disease->record_id : undef;
@@ -356,7 +363,7 @@ sub find_image {
                     botanical_name => { like => "%$name%" },
                     common_names   => { like => "%$name%" },
                 ]},
-                { rows => 1 }
+                { rows => 1, order_by => 'record_id' }
             )->first;
         } or do {};
         if ($herb && $herb->image && length($herb->image) > 3) {
