@@ -33,7 +33,7 @@
 <p>
     <a href="[% c.uri_for('/ENCY/Formula') %]">&larr; Back to Formulas</a>
     [% IF is_admin && !edit_mode && formula.record_id %]
-    | <a href="[% c.uri_for('/ENCY/Formula/edit') %]">Edit</a>
+    | <a href="[% c.uri_for('/ENCY/Formula/edit', { record_id => formula.record_id }) %]">Edit</a>
     [% END %]
 </p>
 
