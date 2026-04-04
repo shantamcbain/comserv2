@@ -1967,26 +1967,166 @@ sub edit_drug : Path('/ENCY/Drug/edit') : Args(0) {
 
 sub formula_list : Path('/ENCY/Formula') : Args(0) {
     my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'formula_list', 'Formula list not yet implemented');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'formula_list', 'Formula list');
+    my $roles    = $c->session->{roles} || [];
+    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    my $q = $c->request->param('q') || '';
+    my $formulas;
+    eval {
+        my $model = $c->model('ENCYModel');
+        if ($q) {
+            $formulas = $model->search_formulas($c, $q);
+        } else {
+            $formulas = $model->list_formulas($c, {});
+        }
+    };
+    if ($@) {
+        $c->stash(db_error => "Database error loading formulas: $@");
+        $formulas = [];
+    }
+    my $ai_fallback = ($q && (!$formulas || !@$formulas)) ? 1 : 0;
     $c->stash(
-        entity_name => 'Formula',
-        entity_desc => 'USBM herbal formulas — named combinations of herbs with specific indications, preparation methods, and dosage guidance.',
-        add_url     => '/ENCY/Formula/add',
-        template    => 'ENCY/ComingSoon.tt',
+        formulas      => $formulas,
+        search_query  => $q,
+        is_admin      => $is_admin,
+        ai_fallback   => $ai_fallback,
+        ai_query      => $q,
+        template      => 'ENCY/FormulaList.tt',
     );
 }
 
 sub formula_detail : Path('/ENCY/Formula') : Args(1) {
     my ($self, $c, $id) = @_;
-    $c->response->redirect($c->uri_for('/ENCY/Formula'), 302);
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'formula_detail', "Formula detail id=$id");
+    my $roles    = $c->session->{roles} || [];
+    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    my ($formula, $herb_links, $disease_links) = $c->model('ENCYModel')->get_formula_with_herbs($c, $id);
+    unless ($formula) {
+        $c->stash(error_msg => "Formula $id not found.", template => 'ENCY/FormulaList.tt');
+        return;
+    }
+    if ($is_admin && $c->request->method eq 'POST' && $c->request->param('set_edit')) {
+        $c->session->{formula_record_id} = $id;
+        $c->response->redirect($c->uri_for('/ENCY/Formula/edit'));
+        return;
+    }
+    $c->stash(
+        formula       => $formula,
+        herb_links    => $herb_links,
+        disease_links => $disease_links,
+        is_admin      => $is_admin,
+        edit_mode     => 0,
+        template      => 'ENCY/FormulaDetail.tt',
+    );
 }
 
 sub add_formula : Path('/ENCY/Formula/add') : Args(0) {
     my ($self, $c) = @_;
+    my $roles    = $c->session->{roles} || [];
+    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    unless ($is_admin) {
+        $c->stash(error_msg => 'Admin access required.', template => 'ENCY/FormulaList.tt');
+        return;
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_formula', 'Add formula');
+    if ($c->request->method eq 'POST') {
+        my $data = {
+            formula_number     => $c->request->param('formula_number') || undef,
+            name               => $c->request->param('name')               || '',
+            indications        => $c->request->param('indications')        || undef,
+            description        => $c->request->param('description')        || undef,
+            herbs_raw          => $c->request->param('herbs_raw')          || undef,
+            preparation        => $c->request->param('preparation')        || undef,
+            dosage             => $c->request->param('dosage')             || undef,
+            administration     => $c->request->param('administration')     || undef,
+            notes              => $c->request->param('notes')              || undef,
+            reference          => $c->request->param('reference')          || undef,
+            url                => $c->request->param('url')                || undef,
+            image              => $c->request->param('image')              || undef,
+            sitename           => $c->request->param('sitename')           || 'ENCY',
+            source             => $c->request->param('source')             || 'USBM Legacy',
+            username_of_poster => $c->session->{username}                 || '',
+            group_of_poster    => $c->session->{group}                    || '',
+            date_time_posted   => scalar localtime,
+            share              => 0,
+        };
+        unless ($data->{name}) {
+            $c->stash(error_msg => 'Formula name is required.', formula => bless($data, 'HASH'), edit_mode => 1, is_admin => $is_admin, template => 'ENCY/FormulaDetail.tt');
+            return;
+        }
+        my ($ok, $msg, $new_id) = $c->model('ENCYModel')->add_formula($c, $data);
+        if ($ok) {
+            $c->flash->{success_msg} = "Formula added successfully.";
+            $c->response->redirect($c->uri_for('/ENCY/Formula/' . $new_id));
+        } else {
+            $c->stash(error_msg => "Could not save formula: $msg", formula => bless($data, 'HASH'), edit_mode => 1, is_admin => $is_admin, template => 'ENCY/FormulaDetail.tt');
+        }
+        return;
+    }
     $c->stash(
-        entity_name => 'Formula',
-        entity_desc => 'USBM herbal formulas.',
-        template    => 'ENCY/ComingSoon.tt',
+        formula   => {},
+        edit_mode => 1,
+        is_admin  => $is_admin,
+        ency_ai_prompt => 'name, formula_number, indications, description, herbs_raw (one herb per line with quantity and botanical name), preparation, dosage, administration, notes, reference',
+        template  => 'ENCY/FormulaDetail.tt',
+    );
+}
+
+sub edit_formula : Path('/ENCY/Formula/edit') : Args(0) {
+    my ($self, $c) = @_;
+    my $roles    = $c->session->{roles} || [];
+    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    unless ($is_admin) {
+        $c->stash(error_msg => 'Admin access required.', template => 'ENCY/FormulaList.tt');
+        return;
+    }
+    my $id = $c->session->{formula_record_id} || $c->request->param('record_id');
+    unless ($id) {
+        $c->response->redirect($c->uri_for('/ENCY/Formula'));
+        return;
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_formula', "Edit formula id=$id");
+    if ($c->request->method eq 'POST') {
+        my $data = {
+            formula_number     => $c->request->param('formula_number') || undef,
+            name               => $c->request->param('name')               || '',
+            indications        => $c->request->param('indications')        || undef,
+            description        => $c->request->param('description')        || undef,
+            herbs_raw          => $c->request->param('herbs_raw')          || undef,
+            preparation        => $c->request->param('preparation')        || undef,
+            dosage             => $c->request->param('dosage')             || undef,
+            administration     => $c->request->param('administration')     || undef,
+            notes              => $c->request->param('notes')              || undef,
+            reference          => $c->request->param('reference')          || undef,
+            url                => $c->request->param('url')                || undef,
+            image              => $c->request->param('image')              || undef,
+            sitename           => $c->request->param('sitename')           || 'ENCY',
+            source             => $c->request->param('source')             || undef,
+        };
+        my ($ok, $msg) = $c->model('ENCYModel')->update_formula($c, $id, $data);
+        if ($ok) {
+            $c->flash->{success_msg} = "Formula updated successfully.";
+            $c->response->redirect($c->uri_for('/ENCY/Formula/' . $id));
+        } else {
+            my ($formula, $herb_links, $disease_links) = $c->model('ENCYModel')->get_formula_with_herbs($c, $id);
+            $c->stash(error_msg => "Could not update formula: $msg", formula => $formula, herb_links => $herb_links, disease_links => $disease_links, edit_mode => 1, is_admin => $is_admin, template => 'ENCY/FormulaDetail.tt');
+        }
+        return;
+    }
+    my ($formula, $herb_links, $disease_links) = $c->model('ENCYModel')->get_formula_with_herbs($c, $id);
+    unless ($formula) {
+        $c->flash->{error_msg} = "Formula $id not found.";
+        $c->response->redirect($c->uri_for('/ENCY/Formula'));
+        return;
+    }
+    $c->stash(
+        formula       => $formula,
+        herb_links    => $herb_links,
+        disease_links => $disease_links,
+        edit_mode     => 1,
+        is_admin      => $is_admin,
+        ency_ai_prompt => 'name, formula_number, indications, description, herbs_raw (one herb per line with quantity and botanical name), preparation, dosage, administration, notes, reference',
+        template      => 'ENCY/FormulaDetail.tt',
     );
 }
 
