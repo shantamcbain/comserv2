@@ -13,8 +13,11 @@
 [% IF c.flash.success_msg %]
 <div class="alert alert-success">[% c.flash.success_msg | html %]</div>
 [% END %]
-[% IF c.flash.error_msg %]
-<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
+[% IF c.flash.error_msg || error_msg %]
+<div class="alert alert-danger">[% c.flash.error_msg || error_msg | html %]</div>
+[% END %]
+[% IF db_error %]
+<div class="alert alert-warning" style="font-family:monospace;font-size:0.9em;">[% db_error | html %]</div>
 [% END %]
 
 <h1>Drugs &amp; Pharmaceuticals</h1>

@@ -1698,11 +1698,21 @@ sub drug_list : Path('/ENCY/Drug') : Args(0) {
     my $where = {};
     my $drug_class = $c->request->param('drug_class');
     $where->{drug_class} = $drug_class if $drug_class;
-    my $drugs = $c->model('ENCYModel')->list_drugs($c, { where => $where });
-    my $roles    = $c->session->{roles} || [];
+    my $roles     = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    my $db_error;
+    my $drugs;
+    eval {
+        $drugs = $c->model('ENCYModel')->list_drugs($c, { where => $where });
+    } or do {
+        my $err = $@ || 'Unknown DB error';
+        $db_error = "Database error: $err — the drug table may not exist yet. Admin: run schema compare to create ency_drug_tb.";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'drug_list', $err);
+        $drugs = [];
+    };
     $c->stash(
         drugs     => $drugs,
+        db_error  => $db_error,
         is_admin  => (grep { $_ eq 'admin' } @role_list) ? 1 : 0,
         template  => 'ENCY/DrugList.tt',
     );
@@ -1816,10 +1826,21 @@ sub add_drug : Path('/ENCY/Drug/add') : Args(0) {
             return;
         }
 
-        $c->model('ENCYModel')->add_drug($c, $data);
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_drug', "Drug added: " . ($data->{brand_name} || $data->{generic_name}));
+        my ($ok, $msg, $new_id) = $c->model('ENCYModel')->add_drug($c, $data);
+        $self->logging->log_with_details($c, $ok ? 'info' : 'error', __FILE__, __LINE__, 'add_drug',
+            ($ok ? "Drug added: " : "Drug add FAILED: ") . ($data->{brand_name} || $data->{generic_name}));
+        unless ($ok) {
+            $c->stash(
+                error_msg => "Could not save drug: $msg",
+                drug      => $data,
+                edit_mode => 1,
+                ency_ai_prompt => q{brand_name, generic_name},
+                template  => 'ENCY/DrugDetail.tt',
+            );
+            return;
+        }
         $c->flash->{success_msg} = 'Drug added successfully.';
-        $c->response->redirect($c->uri_for('/ENCY/Drug'));
+        $c->response->redirect($c->uri_for('/ENCY/Drug', $new_id ? ($new_id) : ()));
         return;
     }
 
