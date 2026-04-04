@@ -67,6 +67,48 @@ tr.level-critical     { background:#f8d7da; font-weight:bold; }
     [% END %]
 
     <!-- ================================================================
+         ALERT ENTRIES — shown when arriving via a health-alert link
+         ================================================================ -->
+    [% IF recent_alerts && recent_alerts.size %]
+    <div class="content-section" style="background:#f8d7da;border:2px solid #dc3545;border-radius:6px;padding:14px 18px;margin-bottom:16px;">
+        <h2 style="color:#721c24;margin-top:0;">&#x1F6A8; Recent Alert Entries
+            [% IF filter_system %]&nbsp;&mdash; <code>[% filter_system | html %]</code>[% END %]
+            [% IF filter_level %]&nbsp;&mdash; Level: <code>[% filter_level | html %]</code>[% END %]
+            <small style="font-size:0.7em;font-weight:normal;color:#856404;">(last 30 min, newest first)</small>
+        </h2>
+        <p style="color:#721c24;margin-top:0;font-size:0.9em;">
+            These are the log entries that triggered the health alert notification.
+        </p>
+        <table style="width:100%;border-collapse:collapse;font-size:0.88em;">
+            <thead>
+                <tr style="background:#dc3545;color:#fff;">
+                    <th style="padding:4px 8px;white-space:nowrap;">Time</th>
+                    <th style="padding:4px 8px;white-space:nowrap;">Level</th>
+                    <th style="padding:4px 8px;white-space:nowrap;">System</th>
+                    <th style="padding:4px 8px;white-space:nowrap;">Subroutine</th>
+                    <th style="padding:4px 8px;">Message</th>
+                </tr>
+            </thead>
+            <tbody>
+                [% FOR row IN recent_alerts %]
+                [% lvl = row.level.upper %]
+                <tr style="border-bottom:1px solid #f5c6cb;[% IF lvl == 'CRITICAL' %]background:#f5c6cb;font-weight:bold;[% ELSE %]background:#fff5f5;[% END %]">
+                    <td style="padding:4px 8px;white-space:nowrap;">[% row.timestamp | html %]</td>
+                    <td style="padding:4px 8px;white-space:nowrap;color:[% lvl == 'CRITICAL' ? '#721c24' : '#856404' %];font-weight:bold;">[% lvl | html %]</td>
+                    <td style="padding:4px 8px;white-space:nowrap;font-size:0.85em;">[% row.system_identifier | html %]</td>
+                    <td style="padding:4px 8px;white-space:nowrap;font-size:0.85em;font-family:monospace;">[% row.subroutine | html %]</td>
+                    <td style="padding:4px 8px;word-break:break-word;">[% row.message | html %]</td>
+                </tr>
+                [% END %]
+            </tbody>
+        </table>
+        [% IF recent_alerts.size >= 20 %]
+        <p style="margin-top:8px;font-size:0.85em;color:#721c24;">Showing 20 most recent. Adjust the look-back window below to see more.</p>
+        [% END %]
+    </div>
+    [% END %]
+
+    <!-- ================================================================
          DOCKER CONTAINER HEALTH  (rendered first — no DB dependency)
          ================================================================ -->
     <div class="content-section">
