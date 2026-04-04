@@ -1193,5 +1193,108 @@ sub unlink_drug_herb_interaction {
     return $self->_unlink_junction($c, 'DrugHerbInteraction', $criteria, 'unlink_drug_herb_interaction');
 }
 
+sub add_formula {
+    my ($self, $c, $data) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_formula', "Adding formula: " . ($data->{name} || ''));
+    my $record;
+    eval {
+        $record = $self->ency_schema->resultset('Formula')->create($data);
+    } or do {
+        my $error = $@ || 'Unknown error';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_formula', "Error: $error");
+        return (0, "Failed to add formula: $error");
+    };
+    return (1, "Formula added.", $record ? $record->record_id : undef);
+}
+
+sub update_formula {
+    my ($self, $c, $id, $data) = @_;
+    my $record = $self->ency_schema->resultset('Formula')->find($id);
+    return (0, "Formula $id not found.") unless $record;
+    eval { $record->update($data); } or do {
+        my $error = $@ || 'Unknown error';
+        return (0, "Failed to update formula $id: $error");
+    };
+    return (1, "Formula $id updated.");
+}
+
+sub get_formula_by_id {
+    my ($self, $c, $id) = @_;
+    my $record;
+    eval { $record = $self->ency_schema->resultset('Formula')->find($id); } or do {};
+    return $record;
+}
+
+sub list_formulas {
+    my ($self, $c, $opts) = @_;
+    $opts ||= {};
+    my $where = $opts->{where} || {};
+    my %attrs = ( order_by => $opts->{order_by} || { -asc => 'formula_number' } );
+    $attrs{rows} = $opts->{rows} if $opts->{rows};
+    $attrs{page} = $opts->{page} if $opts->{page};
+    my @results;
+    eval {
+        @results = $self->ency_schema->resultset('Formula')->search($where, \%attrs)->all;
+    } or do {
+        my $err = $@ || 'unknown';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_formulas', "Error: $err");
+        die $err;
+    };
+    return \@results;
+}
+
+sub search_formulas {
+    my ($self, $c, $query) = @_;
+    my @results;
+    eval {
+        @results = $self->ency_schema->resultset('Formula')->search(
+            { -or => [
+                name        => { like => "%$query%" },
+                indications => { like => "%$query%" },
+                herbs_raw   => { like => "%$query%" },
+            ]},
+            { order_by => { -asc => 'formula_number' } }
+        )->all;
+    } or do {};
+    return \@results;
+}
+
+sub get_formula_with_herbs {
+    my ($self, $c, $id) = @_;
+    my $formula = $self->get_formula_by_id($c, $id);
+    return unless $formula;
+    my @herb_links;
+    eval {
+        @herb_links = $self->ency_schema->resultset('FormulaHerb')->search(
+            { formula_id => $id },
+            { order_by => 'id' }
+        )->all;
+    } or do {};
+    my @disease_links;
+    eval {
+        @disease_links = $self->ency_schema->resultset('FormulaDisease')->search(
+            { formula_id => $id },
+            { order_by => 'id' }
+        )->all;
+    } or do {};
+    return ($formula, \@herb_links, \@disease_links);
+}
+
+sub find_herb_by_name {
+    my ($self, $c, $name) = @_;
+    return undef unless $name && length($name) > 2;
+    my $herb;
+    eval {
+        $herb = $self->forager_schema->resultset('Herb')->search(
+            { -or => [
+                botanical_name => { like => "%$name%" },
+                common_names   => { like => "%$name%" },
+            ]},
+            { rows => 1 }
+        )->first;
+    } or do {};
+    return $herb;
+}
+
 __PACKAGE__->meta->make_immutable;
 1;
