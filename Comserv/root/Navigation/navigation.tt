@@ -17,20 +17,23 @@
         <!-- Login/Logout -->
         [% INCLUDE 'Navigation/TopDropListLogin.tt' %]
         
-        <!-- Global Menu -->
-        [% INCLUDE 'Navigation/TopDropListGlobal.tt' %]
+        [%# Global Menu discontinued — Mail/Jobs/Join moved to Main; IT moved to HelpDesk submenu %]
+        [%# [% INCLUDE 'Navigation/TopDropListGlobal.tt' %] %]
         
         <!-- Hosted Menu -->
         [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
         
         <!-- Member Menu -->
         [% INCLUDE 'Navigation/TopDropListMember.tt' %]
+
+        <!-- ENCY Encyclopedia -->
+        [% INCLUDE 'Navigation/TopDropListENCY.tt' %]
         
         <!-- Weather Menu -->
         [% INCLUDE 'Navigation/TopDropListWeather.tt' %]
         
-        <!-- IT Menu -->
-        [% INCLUDE 'Navigation/TopDropListIT.tt' %]
+        [%# IT Menu discontinued — IT content moved to HelpDesk submenu %]
+        [%# [% INCLUDE 'Navigation/TopDropListIT.tt' %] %]
         
         <!-- Admin Menu (only for admin users) -->
         [% user_roles = c.controller('Navigation').get_user_roles(c) %]
