@@ -108,7 +108,15 @@
                 Object.keys(fields).forEach(function(key) {
                     var el = document.querySelector('[name="' + key + '"]');
                     if (!el || fields[key] === null || fields[key] === undefined || fields[key] === '') return;
-                    var val = String(fields[key]);
+                    var raw = fields[key];
+                    var val;
+                    if (Array.isArray(raw)) {
+                        val = raw.join('\n');
+                    } else if (typeof raw === 'object') {
+                        val = Object.entries(raw).map(function(e){ return e[0] + ': ' + e[1]; }).join('\n');
+                    } else {
+                        val = String(raw);
+                    }
                     if (el.tagName === 'SELECT') {
                         var matched = false;
                         for (var i = 0; i < el.options.length; i++) {
@@ -158,7 +166,8 @@
 
         function addTask(label, fieldText, type) {
             if (!fieldText) return;
-            var terms = fieldText.split(/[,;\n]+/).map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 2; });
+            var text = Array.isArray(fieldText) ? fieldText.join(', ') : String(fieldText);
+            var terms = text.split(/[,;\n]+/).map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 2; });
             terms.forEach(function(term) {
                 tasks.push({ label: label, term: term, type: type });
             });
