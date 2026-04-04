@@ -1192,10 +1192,14 @@ sub constituent_detail : Path('/ENCY/Constituent') : Args(1) {
 
     $c->session->{record_id} = $id;
     my $related = $c->model('ENCYModel')->get_constituent_related($c, $id);
+    my $linked_herbs = $c->model('ENCYModel')->resolve_names_to_herbs($c, $constituent->found_in_herbs);
+    my $linked_drugs = $c->model('ENCYModel')->resolve_names_to_drugs($c, $constituent->found_in_drugs);
     $c->stash(
         constituent      => $constituent,
         related_diseases => $related->{diseases}  // [],
         related_symptoms => $related->{symptoms}  // [],
+        linked_herbs     => $linked_herbs,
+        linked_drugs     => $linked_drugs,
         edit_mode        => 0,
         template         => 'ENCY/ConstituentDetail.tt',
     );
@@ -1256,7 +1260,10 @@ sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
             return;
         }
 
-        $c->model('ENCYModel')->add_constituent($c, $data);
+        my ($ok, $new_id) = $c->model('ENCYModel')->add_constituent($c, $data);
+        if ($ok && $new_id && $data->{found_in_herbs}) {
+            $c->model('ENCYModel')->auto_link_herb_constituent($c, $new_id, $data->{found_in_herbs});
+        }
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_constituent', "Constituent added: $data->{name}");
         $c->flash->{success_msg} = 'Constituent added successfully.';
         $c->response->redirect($c->uri_for('/ENCY/Constituent'));
@@ -1266,7 +1273,7 @@ sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
     $self->_stash_image_files($c);
     $c->stash(
         edit_mode       => 1,
-        ency_ai_prompt  => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs, found_in_foods, found_in_drugs, pharmacological_effects, research_notes, reference, url',
+        ency_ai_prompt  => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs (comma-separated herb names), found_in_foods (comma-separated food names), found_in_drugs (comma-separated drug/medication names), pharmacological_effects, research_notes, image (Wikipedia or PubChem image URL if available), url (PubChem or authoritative source URL), reference (PubChem CID, Wikipedia article, or citation)',
         template        => 'ENCY/ConstituentDetail.tt',
     );
 }
@@ -1289,7 +1296,7 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
         return;
     }
 
-    my $record_id = $c->session->{record_id};
+    my $record_id = $c->request->param('record_id') || $c->session->{record_id};
 
     unless (defined $record_id && $record_id =~ /^\d+$/) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_constituent',
@@ -1338,6 +1345,9 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
         my ($status, $msg) = $c->model('ENCYModel')->update_constituent($c, $record_id, $data);
 
         if ($status) {
+            if ($data->{found_in_herbs}) {
+                $c->model('ENCYModel')->auto_link_herb_constituent($c, $record_id, $data->{found_in_herbs});
+            }
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_constituent',
                 "Constituent updated successfully for record_id: $record_id");
             $c->flash->{success_msg} = "Constituent details updated successfully.";
@@ -1360,7 +1370,7 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
     $c->stash(
         constituent     => $constituent,
         edit_mode       => 1,
-        ency_ai_prompt  => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs, found_in_foods, found_in_drugs, pharmacological_effects, research_notes, reference, url',
+        ency_ai_prompt  => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs (comma-separated herb names), found_in_foods (comma-separated food names), found_in_drugs (comma-separated drug/medication names), pharmacological_effects, research_notes, image (Wikipedia or PubChem image URL if available), url (PubChem or authoritative source URL), reference (PubChem CID, Wikipedia article, or citation)',
         template        => 'ENCY/ConstituentDetail.tt',
     );
 }
