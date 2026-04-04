@@ -1578,17 +1578,19 @@ sub search :Path('/ENCY/search') :Args(0) {
 
     my $ency_model = $c->model('ENCYModel');
 
-    my $herbs       = $query ? $c->model('DBForager')->searchHerbs($c, $query) : [];
-    my $animals     = $query ? $ency_model->search_animals($c, $query)     : [];
-    my $insects     = $query ? $ency_model->search_insects($c, $query)     : [];
-    my $diseases    = $query ? $ency_model->search_diseases($c, $query)    : [];
-    my $symptoms    = $query ? $ency_model->search_symptoms($c, $query)    : [];
+    my $herbs        = $query ? $c->model('DBForager')->searchHerbs($c, $query) : [];
+    my $animals      = $query ? $ency_model->search_animals($c, $query)      : [];
+    my $insects      = $query ? $ency_model->search_insects($c, $query)      : [];
+    my $diseases     = $query ? $ency_model->search_diseases($c, $query)     : [];
+    my $symptoms     = $query ? $ency_model->search_symptoms($c, $query)     : [];
     my $constituents = $query ? $ency_model->search_constituents($c, $query) : [];
-    my $glossary    = $query ? $ency_model->search_glossary($c, $query)    : [];
+    my $glossary     = $query ? $ency_model->search_glossary($c, $query)     : [];
+    my $drugs        = $query ? $ency_model->search_drugs($c, $query)        : [];
 
     my $total_results = scalar(@$herbs) + scalar(@$animals) + scalar(@$insects)
                       + scalar(@$diseases) + scalar(@$symptoms)
-                      + scalar(@$constituents) + scalar(@$glossary);
+                      + scalar(@$constituents) + scalar(@$glossary)
+                      + scalar(@$drugs);
 
     my $ai_fallback = ($query && $total_results == 0) ? 1 : 0;
 
@@ -1601,6 +1603,7 @@ sub search :Path('/ENCY/search') :Args(0) {
             symptoms     => $symptoms,
             constituents => $constituents,
             glossary     => $glossary,
+            drugs        => $drugs,
         },
         herbal_data    => $herbs,
         search_query   => $query,
@@ -1691,26 +1694,253 @@ sub herb_detail_by_id : Path('/ENCY/Herb') : Args(1) {
 
 sub drug_list : Path('/ENCY/Drug') : Args(0) {
     my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'drug_list', 'Drug list not yet implemented');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'drug_list', 'Entered drug_list');
+    my $where = {};
+    my $drug_class = $c->request->param('drug_class');
+    $where->{drug_class} = $drug_class if $drug_class;
+    my $drugs = $c->model('ENCYModel')->list_drugs($c, { where => $where });
+    my $roles    = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
     $c->stash(
-        entity_name => 'Drug',
-        entity_desc => 'Pharmaceutical drugs and medicinal products — brand name, generic name, indications, contraindications, interactions, and herbal alternatives.',
-        add_url     => '/ENCY/Drug/add',
-        template    => 'ENCY/ComingSoon.tt',
+        drugs     => $drugs,
+        is_admin  => (grep { $_ eq 'admin' } @role_list) ? 1 : 0,
+        template  => 'ENCY/DrugList.tt',
     );
 }
 
 sub drug_detail : Path('/ENCY/Drug') : Args(1) {
     my ($self, $c, $id) = @_;
-    $c->response->redirect($c->uri_for('/ENCY/Drug'), 302);
+
+    unless (defined $id && $id =~ /^\d+$/) {
+        $c->response->status(400);
+        $c->response->body('Invalid drug ID');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'drug_detail', "Fetching drug ID: $id");
+    my $drug = $c->model('ENCYModel')->get_drug_by_id($c, $id);
+
+    unless ($drug) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'drug_detail', "Drug not found for ID: $id");
+        $c->response->status(404);
+        $c->stash(
+            error_message => "Drug record #$id was not found.",
+            template      => 'error.tt',
+        );
+        return;
+    }
+
+    $c->session->{record_id} = $id;
+    my $related = $c->model('ENCYModel')->get_drug_related($c, $id);
+    $c->stash(
+        drug             => $drug,
+        related_diseases => $related->{diseases}         // [],
+        related_symptoms => $related->{symptoms}         // [],
+        herb_interactions => $related->{herb_interactions} // [],
+        edit_mode        => 0,
+        template         => 'ENCY/DrugDetail.tt',
+    );
 }
 
 sub add_drug : Path('/ENCY/Drug/add') : Args(0) {
     my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/Drug/add' }));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' } @role_list) {
+        $c->stash(
+            error_msg => "You do not have permission to add drugs.",
+            template  => 'ENCY/DrugList.tt',
+        );
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $data = {
+            brand_name              => $p->{brand_name}              // '',
+            generic_name            => $p->{generic_name}            // '',
+            inn_name                => $p->{inn_name}                // '',
+            drug_class              => $p->{drug_class}              // '',
+            drug_subclass           => $p->{drug_subclass}           // '',
+            formulation             => $p->{formulation}             // '',
+            strength                => $p->{strength}                // '',
+            package_size            => $p->{package_size}            // '',
+            route_of_administration => $p->{route_of_administration} // '',
+            prescription_status     => $p->{prescription_status}     // 'Rx',
+            din_number              => $p->{din_number}              // '',
+            ndc_code                => $p->{ndc_code}                // '',
+            atc_code                => $p->{atc_code}                // '',
+            manufacturer            => $p->{manufacturer}            // '',
+            active_ingredients      => $p->{active_ingredients}      // '',
+            inactive_ingredients    => $p->{inactive_ingredients}    // '',
+            mechanism_of_action     => $p->{mechanism_of_action}     // '',
+            pharmacokinetics        => $p->{pharmacokinetics}        // '',
+            pharmacodynamics        => $p->{pharmacodynamics}        // '',
+            indications             => $p->{indications}             // '',
+            contraindications       => $p->{contraindications}       // '',
+            warnings                => $p->{warnings}                // '',
+            side_effects            => $p->{side_effects}            // '',
+            drug_interactions       => $p->{drug_interactions}       // '',
+            herb_drug_interactions  => $p->{herb_drug_interactions}  // '',
+            dosage_adult            => $p->{dosage_adult}            // '',
+            dosage_pediatric        => $p->{dosage_pediatric}        // '',
+            dosage_geriatric        => $p->{dosage_geriatric}        // '',
+            duration_typical        => $p->{duration_typical}        // '',
+            storage                 => $p->{storage}                 // '',
+            pregnancy_category      => $p->{pregnancy_category}      // '',
+            breastfeeding_notes     => $p->{breastfeeding_notes}     // '',
+            herbal_alternatives     => $p->{herbal_alternatives}     // '',
+            naturopathic_notes      => $p->{naturopathic_notes}      // '',
+            image                   => $p->{image}                   // '',
+            url                     => $p->{url}                     // '',
+            reference               => $p->{reference}               // '',
+            sitename                => $p->{sitename}                // 'ENCY',
+            username_of_poster      => $c->session->{username},
+            group_of_poster         => $c->session->{group},
+            date_time_posted        => \'NOW()',
+        };
+
+        unless ($data->{brand_name} || $data->{generic_name}) {
+            $c->stash(
+                error_msg => "Brand name or generic name is required.",
+                drug      => $data,
+                edit_mode => 1,
+                template  => 'ENCY/DrugDetail.tt',
+            );
+            return;
+        }
+
+        $c->model('ENCYModel')->add_drug($c, $data);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_drug', "Drug added: " . ($data->{brand_name} || $data->{generic_name}));
+        $c->flash->{success_msg} = 'Drug added successfully.';
+        $c->response->redirect($c->uri_for('/ENCY/Drug'));
+        return;
+    }
+
+    $self->_stash_image_files($c);
     $c->stash(
-        entity_name => 'Drug',
-        entity_desc => 'Pharmaceutical drugs and medicinal products.',
-        template    => 'ENCY/ComingSoon.tt',
+        edit_mode      => 1,
+        ency_ai_prompt => 'brand_name, generic_name, inn_name, drug_class, formulation, strength, route_of_administration, prescription_status, din_number, atc_code, manufacturer, active_ingredients, mechanism_of_action, pharmacokinetics, indications, contraindications, warnings, side_effects, drug_interactions, herb_drug_interactions, dosage_adult, dosage_pediatric, pregnancy_category, herbal_alternatives, naturopathic_notes',
+        template       => 'ENCY/DrugDetail.tt',
+    );
+}
+
+sub edit_drug : Path('/ENCY/Drug/edit') : Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/Drug/edit' }));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' } @role_list) {
+        $c->stash(
+            error_msg => "You do not have permission to edit drugs.",
+            template  => 'ENCY/DrugList.tt',
+        );
+        return;
+    }
+
+    my $record_id = $c->session->{record_id};
+
+    unless (defined $record_id && $record_id =~ /^\d+$/) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_drug',
+            "Invalid or missing record_id in session.");
+        $c->stash(
+            error_msg => "Invalid or missing drug record for editing. Please try again.",
+            template  => 'ENCY/DrugList.tt',
+        );
+        return;
+    }
+
+    my $drug = $c->model('ENCYModel')->get_drug_by_id($c, $record_id);
+    unless ($drug) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_drug',
+            "Drug not found for record_id: $record_id");
+        $c->stash(
+            error_msg => "Drug not found in the database. Please try again.",
+            template  => 'ENCY/DrugList.tt',
+        );
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $data = {
+            brand_name              => $p->{brand_name}              // '',
+            generic_name            => $p->{generic_name}            // '',
+            inn_name                => $p->{inn_name}                // '',
+            drug_class              => $p->{drug_class}              // '',
+            drug_subclass           => $p->{drug_subclass}           // '',
+            formulation             => $p->{formulation}             // '',
+            strength                => $p->{strength}                // '',
+            package_size            => $p->{package_size}            // '',
+            route_of_administration => $p->{route_of_administration} // '',
+            prescription_status     => $p->{prescription_status}     // 'Rx',
+            din_number              => $p->{din_number}              // '',
+            ndc_code                => $p->{ndc_code}                // '',
+            atc_code                => $p->{atc_code}                // '',
+            manufacturer            => $p->{manufacturer}            // '',
+            active_ingredients      => $p->{active_ingredients}      // '',
+            inactive_ingredients    => $p->{inactive_ingredients}    // '',
+            mechanism_of_action     => $p->{mechanism_of_action}     // '',
+            pharmacokinetics        => $p->{pharmacokinetics}        // '',
+            pharmacodynamics        => $p->{pharmacodynamics}        // '',
+            indications             => $p->{indications}             // '',
+            contraindications       => $p->{contraindications}       // '',
+            warnings                => $p->{warnings}                // '',
+            side_effects            => $p->{side_effects}            // '',
+            drug_interactions       => $p->{drug_interactions}       // '',
+            herb_drug_interactions  => $p->{herb_drug_interactions}  // '',
+            dosage_adult            => $p->{dosage_adult}            // '',
+            dosage_pediatric        => $p->{dosage_pediatric}        // '',
+            dosage_geriatric        => $p->{dosage_geriatric}        // '',
+            duration_typical        => $p->{duration_typical}        // '',
+            storage                 => $p->{storage}                 // '',
+            pregnancy_category      => $p->{pregnancy_category}      // '',
+            breastfeeding_notes     => $p->{breastfeeding_notes}     // '',
+            herbal_alternatives     => $p->{herbal_alternatives}     // '',
+            naturopathic_notes      => $p->{naturopathic_notes}      // '',
+            image                   => $p->{image}                   // '',
+            url                     => $p->{url}                     // '',
+            reference               => $p->{reference}               // '',
+        };
+
+        my ($status, $msg) = $c->model('ENCYModel')->update_drug($c, $record_id, $data);
+
+        if ($status) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_drug',
+                "Drug updated successfully for record_id: $record_id");
+            $c->flash->{success_msg} = "Drug details updated successfully.";
+            $c->response->redirect($c->uri_for('/ENCY/Drug', $record_id));
+            return;
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_drug',
+                "Failed to update drug: $msg");
+            $c->stash(
+                error_msg => "Failed to update drug: $msg",
+                drug      => { %{ $drug->get_columns }, %$data },
+                edit_mode => 1,
+                template  => 'ENCY/DrugDetail.tt',
+            );
+            return;
+        }
+    }
+
+    $self->_stash_image_files($c);
+    $c->stash(
+        drug           => $drug,
+        edit_mode      => 1,
+        ency_ai_prompt => 'brand_name, generic_name, inn_name, drug_class, formulation, strength, route_of_administration, prescription_status, din_number, atc_code, manufacturer, active_ingredients, mechanism_of_action, pharmacokinetics, indications, contraindications, warnings, side_effects, drug_interactions, herb_drug_interactions, dosage_adult, dosage_pediatric, pregnancy_category, herbal_alternatives, naturopathic_notes',
+        template       => 'ENCY/DrugDetail.tt',
     );
 }
 
