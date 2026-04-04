@@ -5,14 +5,20 @@ use warnings;
 use FindBin;
 use lib "$FindBin::Bin/../lib";
 
-use Comserv::Model::DBEncy;
-use Try::Tiny;
+use DBI;
+
+my $DB_HOST = $ENV{DB_HOST} || '192.168.1.198';
+my $DB_USER = $ENV{DB_USER} || 'shanta_forager';
+my $DB_PASS = $ENV{DB_PASS} || 'UA=nPF8*m+T#';
+my $DB_NAME = $ENV{DB_NAME} || 'ency';
 
 print "Populating weather providers table...\n";
 
-# Initialize the database model
-my $db_model = Comserv::Model::DBEncy->new;
-my $schema = $db_model->schema;
+my $dbh = DBI->connect(
+    "dbi:mysql:database=$DB_NAME;host=$DB_HOST;port=3306",
+    $DB_USER, $DB_PASS,
+    { RaiseError => 1, AutoCommit => 1, mysql_enable_utf8 => 1 }
+) or die "Cannot connect: $DBI::errstr\n";
 
 # Weather providers data
 my @providers = (
@@ -54,39 +60,39 @@ my @providers = (
     }
 );
 
-try {
-    # Check if table exists and has data
-    my $existing_count = $schema->resultset('WeatherProviders')->count;
-    
+eval {
+    my ($existing_count) = $dbh->selectrow_array('SELECT COUNT(*) FROM weather_providers');
     if ($existing_count > 0) {
-        print "Weather providers table already has $existing_count records. Skipping population.\n";
-        print "Use --force flag to repopulate (not implemented in this script).\n";
+        print "weather_providers already has $existing_count records. Skipping.\n";
+        $dbh->disconnect;
         exit 0;
     }
-    
-    # Insert providers
-    foreach my $provider_data (@providers) {
-        my $provider = $schema->resultset('WeatherProviders')->create($provider_data);
-        print "Created provider: " . $provider->provider_name . " (ID: " . $provider->id . ")\n";
-    }
-    
-    print "\nSuccessfully populated weather providers table with " . scalar(@providers) . " providers.\n";
-    
-} catch {
-    my $error = $_;
-    if ($error =~ /doesn't exist/) {
-        print "ERROR: WeatherProviders table doesn't exist yet.\n";
-        print "Please create the weather tables first using the admin schema comparison tool.\n";
-        print "Navigate to: /admin/schema_comparison\n";
-        print "Then create tables for: WeatherProviders, WeatherConfig, WeatherData\n";
-    } else {
-        print "ERROR: Failed to populate weather providers: $error\n";
-    }
-    exit 1;
 };
+if ($@) {
+    print "ERROR checking table (may not exist yet): $@\n";
+    print "Please run schema compare in /admin/schema_comparison first.\n";
+    $dbh->disconnect;
+    exit 1;
+}
 
-print "\nWeather providers population completed successfully!\n";
-print "\nYou can now:\n";
-print "1. Go to /Weather/configuration to set up your weather API\n";
-print "2. Test your API configuration\n";
-print "3. Start using weather features\n";
+foreach my $p (@providers) {
+    eval {
+        $dbh->do(
+            'INSERT INTO weather_providers
+             (provider_name, api_base_url, requires_api_key, supports_current,
+              supports_forecast, supports_historical, rate_limit_per_minute,
+              rate_limit_per_day, documentation_url, is_active)
+             VALUES (?,?,?,?,?,?,?,?,?,?)',
+            undef,
+            $p->{provider_name}, $p->{api_base_url}, $p->{requires_api_key},
+            $p->{supports_current}, $p->{supports_forecast}, $p->{supports_historical},
+            $p->{rate_limit_per_minute}, $p->{rate_limit_per_day},
+            $p->{documentation_url}, $p->{is_active},
+        );
+        print "Created provider: $p->{provider_name}\n";
+    };
+    warn "ERROR inserting $p->{provider_name}: $@\n" if $@;
+}
+
+$dbh->disconnect;
+print "\nDone. Go to /Weather/configuration to set your API key.\n";
