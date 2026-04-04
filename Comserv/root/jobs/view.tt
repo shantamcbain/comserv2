@@ -14,9 +14,9 @@
   <div class="page-header">
     <h1>[% job.title | html %]</h1>
     <div class="header-actions">
-      <a href="[% c.uri_for('/job') %]" class="btn btn-secondary">&larr; Back to Jobs</a>
+      <a href="[% c.uri_for('/jobs') %]" class="btn btn-secondary">&larr; Back to Jobs</a>
       [% IF job.status == 'open' %]
-        <a href="[% c.uri_for('/job/apply', [job.id]) %]" class="btn btn-primary">Apply Now</a>
+        <a href="[% c.uri_for('/jobs/apply', [job.id]) %]" class="btn btn-primary">Apply Now</a>
       [% END %]
     </div>
   </div>
@@ -95,7 +95,7 @@
       [% SET is_poster = (c.session.user_id && job.posted_by && job.posted_by.id == c.session.user_id) %]
       [% IF is_poster && job.status == 'open' %]
       <div class="content-section">
-        <a href="[% c.uri_for('/job/close', [job.id]) %]" class="btn btn-warning"
+        <a href="[% c.uri_for('/jobs/close', [job.id]) %]" class="btn btn-warning"
            onclick="return confirm('Close this job posting?')">Close Job</a>
       </div>
       [% END %]
@@ -123,7 +123,7 @@
               <td>[% app.status | ucfirst | html %]</td>
               <td style="font-size:0.85em">[% app.created_at | html %]</td>
               <td>
-                <form method="post" action="[% c.uri_for('/job/application/update', [app.id]) %]" style="display:inline">
+                <form method="post" action="[% c.uri_for('/jobs/application/update', [app.id]) %]" style="display:inline">
                   <select name="status" class="form-control" style="display:inline;width:auto">
                     [% FOREACH s IN ['pending','reviewed','interviewed','hired','rejected'] %]
                     <option value="[% s %]" [% IF app.status == s %]selected[% END %]>[% s | ucfirst %]</option>

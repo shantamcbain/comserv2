@@ -12,7 +12,7 @@
 <div class="app-container">
   <div class="page-header">
     <h1>Apply: [% job.title | html %]</h1>
-    <a href="[% c.uri_for('/job/view', [job.id]) %]" class="btn btn-secondary">&larr; Back to Job</a>
+    <a href="[% c.uri_for('/jobs/view', [job.id]) %]" class="btn btn-secondary">&larr; Back to Job</a>
   </div>
 
   <div class="content-container">
@@ -33,7 +33,7 @@
         </div>
         [% END %]
 
-        <form method="post" action="[% c.uri_for('/job/apply', [job.id]) %]">
+        <form method="post" action="[% c.uri_for('/jobs/apply', [job.id]) %]">
 
           <div class="form-group">
             <label for="applicant_name">Full Name <span class="required">*</span></label>
@@ -66,7 +66,7 @@
 
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">Submit Application</button>
-            <a href="[% c.uri_for('/job/view', [job.id]) %]" class="btn btn-secondary">Cancel</a>
+            <a href="[% c.uri_for('/jobs/view', [job.id]) %]" class="btn btn-secondary">Cancel</a>
           </div>
 
         </form>
