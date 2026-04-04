@@ -21,9 +21,9 @@ __PACKAGE__->add_columns(reference_id => {
         data_type   => 'varchar',
         size        => 500,
         is_nullable => 1,
-    },
-    publisher_id => {
-        data_type   => 'integer',
+    }publisher_id => {
+        data_type => 'int(11)',
+        size => 11,
         is_nullable => 1,
     },
     publication_date => {
