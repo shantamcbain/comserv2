@@ -163,6 +163,48 @@ sub get_weather_providers {
     return ($@ || !$result) ? $default_providers : $result;
 }
 
+sub get_cached_weather_data {
+    my ($self, $data_type, $max_age_minutes) = @_;
+
+    my $schema = eval { $self->_get_schema };
+    return undef if $@ || !$schema;
+
+    my $result = eval {
+        my $cutoff = DateTime->now->subtract(minutes => $max_age_minutes)->epoch;
+        $schema->resultset('WeatherData')->search(
+            { data_type => $data_type, fetched_at => { '>=' => $cutoff } },
+            { order_by => { -desc => 'fetched_at' }, rows => 1 }
+        )->first;
+    };
+    return undef if $@ || !$result;
+
+    my $raw = eval { JSON->new->utf8->decode($result->data_json) };
+    return $@ ? undef : $raw;
+}
+
+sub cache_weather_data {
+    my ($self, $config_id, $data_type, $data) = @_;
+
+    my $schema = eval { $self->_get_schema };
+    return 0 if $@ || !$schema;
+
+    eval {
+        $schema->resultset('WeatherData')->create({
+            config_id  => $config_id,
+            data_type  => $data_type,
+            data_json  => JSON->new->utf8->encode($data),
+            fetched_at => time(),
+        });
+        1;
+    } or do { return 0 };
+    return 1;
+}
+
+sub track_api_usage {
+    my ($self, $config_id, $api_service) = @_;
+    return 1;
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
