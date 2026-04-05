@@ -632,10 +632,18 @@ sub build_project_tree :Private {
     # Create an array of todo hashrefs with only the needed attributes
     my @todo_hashrefs = ();
     foreach my $todo (@todos) {
-        # Safely get accumulated_time (may not exist in all schemas)
         my $accumulated_time = 0;
-        eval { $accumulated_time = $todo->accumulated_time || 0; };
-        
+        eval {
+            my $t = $todo->accumulative_time;
+            if ($t) {
+                if ($t =~ /^(\d+):(\d+):(\d+)$/) {
+                    $accumulated_time = $1 * 3600 + $2 * 60 + $3;
+                } elsif ($t =~ /^\d+$/) {
+                    $accumulated_time = $t + 0;
+                }
+            }
+        };
+
         push @todo_hashrefs, {
             id => $todo->id,
             record_id => $todo->record_id,
