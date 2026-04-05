@@ -210,6 +210,7 @@ sub list_animals {
     my @results;
     eval {
         @results = $self->ency_schema->resultset('Animal')->search($where, \%attrs)->all;
+        1;
     } or do {
         my $error = $@ || 'Unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_animals', "Error listing animals: $error");
@@ -229,6 +230,7 @@ sub search_animals {
             ]},
             { order_by => 'common_name' }
         )->all;
+        1;
     } or do {
         my $error = $@ || 'Unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'search_animals', "Error searching animals: $error");
@@ -329,6 +331,7 @@ sub list_insects {
     my @results;
     eval {
         @results = $self->ency_schema->resultset('Insect')->search($where, \%attrs)->all;
+        1;
     } or do {
         my $error = $@ || 'Unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_insects', "Error listing insects: $error");
@@ -348,6 +351,7 @@ sub search_insects {
             ]},
             { order_by => 'common_name' }
         )->all;
+        1;
     } or do {
         my $error = $@ || 'Unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'search_insects', "Error searching insects: $error");
@@ -448,6 +452,7 @@ sub list_diseases {
     my @results;
     eval {
         @results = $self->ency_schema->resultset('Disease')->search($where, \%attrs)->all;
+        1;
     } or do {
         my $error = $@ || 'Unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_diseases', "Error listing diseases: $error");
@@ -467,6 +472,7 @@ sub search_diseases {
             ]},
             { order_by => 'common_name' }
         )->all;
+        1;
     } or do {
         my $error = $@ || 'Unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'search_diseases', "Error searching diseases: $error");
@@ -589,6 +595,7 @@ sub list_symptoms {
     my @results;
     eval {
         @results = $self->ency_schema->resultset('Symptom')->search($where, \%attrs)->all;
+        1;
     } or do {
         my $error = $@ || 'Unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_symptoms', "Error listing symptoms: $error");
@@ -608,6 +615,7 @@ sub search_symptoms {
             ]},
             { order_by => 'name' }
         )->all;
+        1;
     } or do {
         my $error = $@ || 'Unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'search_symptoms', "Error searching symptoms: $error");
@@ -717,6 +725,7 @@ sub list_constituents {
     my @results;
     eval {
         @results = $self->ency_schema->resultset('Constituent')->search($where, \%attrs)->all;
+        1;
     } or do {
         my $error = $@ || 'Unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_constituents', "Error listing constituents: $error");
@@ -736,6 +745,7 @@ sub search_constituents {
             ]},
             { order_by => 'name' }
         )->all;
+        1;
     } or do {
         my $error = $@ || 'Unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'search_constituents', "Error searching constituents: $error");
@@ -938,6 +948,7 @@ sub list_glossary {
     my @results;
     eval {
         @results = $self->ency_schema->resultset('Glossary')->search($where, \%attrs)->all;
+        1;
     } or do {
         my $error = $@ || 'Unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_glossary', "Error listing glossary terms: $error");
@@ -958,6 +969,7 @@ sub search_glossary {
             ]},
             { order_by => 'term' }
         )->all;
+        1;
     } or do {
         my $error = $@ || 'Unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'search_glossary', "Error searching glossary: $error");
@@ -1187,6 +1199,7 @@ sub list_drugs {
     my @results;
     eval {
         @results = $self->ency_schema->resultset('Drug')->search($where, \%attrs)->all;
+        1;
     } or do {
         my $error = $@ || 'Unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_drugs', "Error listing drugs: $error");
@@ -1209,6 +1222,7 @@ sub search_drugs {
             ]},
             { order_by => 'brand_name' }
         )->all;
+        1;
     } or do {
         my $error = $@ || 'Unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'search_drugs', "Error searching drugs: $error");
@@ -1334,6 +1348,7 @@ sub list_formulas {
     my @results;
     eval {
         @results = $self->ency_schema->resultset('Formula')->search($where, \%attrs)->all;
+        1;
     } or do {
         my $err = $@ || 'unknown';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_formulas', "Error: $err");
@@ -1354,6 +1369,7 @@ sub search_formulas {
             ]},
             { order_by => { -asc => 'formula_number' } }
         )->all;
+        1;
     } or do {};
     return \@results;
 }
@@ -1368,6 +1384,7 @@ sub get_formula_with_herbs {
             { formula_id => $id },
             { order_by => 'id' }
         )->all;
+        1;
     } or do {};
     my @disease_links;
     eval {
@@ -1375,6 +1392,7 @@ sub get_formula_with_herbs {
             { formula_id => $id },
             { order_by => 'id' }
         )->all;
+        1;
     } or do {};
     return ($formula, \@herb_links, \@disease_links);
 }
