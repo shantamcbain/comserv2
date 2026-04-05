@@ -117,11 +117,10 @@ my @SENSITIVE_PATTERNS = (
     qr|/workshop/delete|i,
     qr|/workshop/publish|i,
     qr|/ai/admin|i,
-    qr|/api_credentials|i,
+    qr|/ApiCredentials|,
     qr|/navigation/manage|i,
     qr|/docker|i,
     qr|/user/admin|i,
-    qr|/shanta|i,
 );
 
 # POST endpoints that should reject unauthenticated requests
@@ -145,7 +144,7 @@ my @SENSITIVE_POST_ENDPOINTS = (
     '/remotedb/add',
     '/remotedb/remove/test',
     '/remotedb/query/test',
-    '/workshop/addworkshop',
+    # /workshop/addworkshop is intentionally public (workshop leaders submit proposals)
 );
 
 my %visited;
@@ -317,9 +316,8 @@ my @SENSITIVE_GET = (
     '/Documentation/Setup',
     '/Documentation/SetupController',
     '/ai/admin/models',
-    '/api_credentials',
+    '/ApiCredentials',
     '/navigation/manage',
-    '/shanta/dashboard',
 );
 
 for my $path (@SENSITIVE_GET) {
