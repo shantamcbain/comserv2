@@ -7,6 +7,7 @@ use DateTime::Format::Strptime;
 use Data::Dumper;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::PointSystem;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -231,6 +232,34 @@ sub update :Path('/log/update') :Args(0) {
 
     # Call the modify method on the Log model instance
     $log_model->modify($c, $record_id, $new_values);
+
+    # When a log entry is closed (status=3/DONE), apply points billing/earning
+    if ($status == 3) {
+        eval {
+            my $updated_log = $c->model('DBEncy')->resultset('Log')->find($record_id);
+            if ($updated_log && !$updated_log->points_processed) {
+                my $ps = Comserv::Util::PointSystem->new(c => $c);
+                my ($ok, $err) = $ps->bill_time_log($updated_log);
+                if ($ok) {
+                    $self->logging->log_with_details(
+                        $c, 'info', __FILE__, __LINE__, 'update',
+                        "Points processed for log #$record_id"
+                    );
+                } elsif ($err && $err ne 'already processed' && $err ne 'zero duration — nothing to bill') {
+                    $self->logging->log_with_details(
+                        $c, 'warn', __FILE__, __LINE__, 'update',
+                        "Points processing skipped for log #$record_id: $err"
+                    );
+                }
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details(
+                $c, 'error', __FILE__, __LINE__, 'update',
+                "Points billing error for log #$record_id: $@"
+            );
+        }
+    }
 
     # Redirect to the log details page after successful update
     $c->response->redirect($c->uri_for("/log", { record_id => $record_id }));
