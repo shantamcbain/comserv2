@@ -1994,7 +1994,7 @@
     // Try to resolve a navigation intent query to a list of {label,url} matches
     function resolveNavIntent(rawQuery) {
         const q = rawQuery
-            .replace(/^(open|go to|take me to|navigate to|visit|switch to|switch|bring me to|load)\s+/i, '')
+            .replace(/^(goto|go to|open|take me to|navigate to|visit|switch to|switch|bring me to|load)\s*/i, '')
             .replace(/^(the|a|an)\s+/i, '')
             .replace(/[^\w\s]/g, ' ')
             .replace(/\s+/g, ' ')
