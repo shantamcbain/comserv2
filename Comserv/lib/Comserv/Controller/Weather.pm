@@ -377,35 +377,44 @@ sub _check_weather_config {
     
     my $user_id = $c->session->{user_id};
     my $site_id = $c->session->{site_id};
-    
-    # Ensure weather tables exist
-    $self->_ensure_weather_tables($c);
-    
+
     my $config = try {
         return $self->weather_model->get_weather_config($user_id, $site_id);
     } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_check_weather_config', 
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_check_weather_config',
             "Error checking weather config: $_");
         return undef;
     };
-    
+
     if ($config && $config->{api_key}) {
+        $c->session->{weather_api_service}    = $config->{api_service};
+        $c->session->{weather_api_configured} = 1;
         return {
             api_configured => 1,
-            api_service => $config->{api_service},
-            location_set => $config->{location_value} ? 1 : 0,
-            last_update => $config->{updated_at},
-            status => 'configured'
-        };
-    } else {
-        return {
-            api_configured => 0,
-            api_service => 'none',
-            location_set => 0,
-            last_update => undef,
-            status => 'not_configured'
+            api_service    => $config->{api_service},
+            location_set   => $config->{location_value} ? 1 : 0,
+            last_update    => $config->{updated_at},
+            status         => 'configured'
         };
     }
+
+    if ($c->session->{weather_api_configured}) {
+        return {
+            api_configured => 1,
+            api_service    => $c->session->{weather_api_service} || 'openweathermap',
+            location_set   => 1,
+            last_update    => undef,
+            status         => 'configured'
+        };
+    }
+
+    return {
+        api_configured => 0,
+        api_service    => 'none',
+        location_set   => 0,
+        last_update    => undef,
+        status         => 'not_configured'
+    };
 }
 
 sub _get_sample_weather_data {
