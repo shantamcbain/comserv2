@@ -64,9 +64,10 @@ Get the active weather configuration for a specific user and site
 
 sub get_weather_config {
     my ($self, $user_id, $site_id) = @_;
-    
-    my $schema = $self->_get_schema;
-    
+
+    my $schema = eval { $self->_get_schema };
+    return undef if $@ || !$schema;
+
     eval {
         my $config = $schema->resultset('WeatherConfig')->search(
             { 
@@ -94,8 +95,9 @@ Save or update weather configuration for a specific user and site
 
 sub save_weather_config {
     my ($self, $config, $user_id, $site_id) = @_;
-    
-    my $schema = $self->_get_schema;
+
+    my $schema = eval { $self->_get_schema };
+    return undef if $@ || !$schema;
     
     eval {
         # First, deactivate all existing configs for this user and site
