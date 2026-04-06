@@ -33,7 +33,7 @@
         </div>
     </header>
 
-    [% IF current_weather && current_weather.temperature.defined && current_weather.data_source ne 'MOCK_DATA' %]
+    [% IF current_weather && current_weather.temperature.defined && current_weather.data_source != 'MOCK_DATA' %]
 
     <!-- Current conditions hero -->
     <div class="weather-hero">
