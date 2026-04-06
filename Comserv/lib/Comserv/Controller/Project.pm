@@ -3,6 +3,8 @@ use Moose;
 use namespace::autoclean;
 use DateTime;
 use Data::Dumper;
+use Try::Tiny;
+use POSIX qw(strftime);
 use Comserv::Util::Logging;
 use Comserv::Controller::Site;
 BEGIN { extends 'Catalyst::Controller'; }
@@ -162,10 +164,59 @@ sub  create_project :Local :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_project',
         "Project created with ID: " . $project->id);
 
+    $self->_create_governance_ticket($c, $project);
+
     $c->flash->{success_message} = 'Project added successfully';
     $c->res->redirect($c->uri_for($self->action_for('project')));
 }
 
+
+sub _create_governance_ticket {
+    my ($self, $c, $project) = @_;
+
+    my $site_name    = $project->sitename || 'unknown';
+    my $project_name = $project->name     || '(unnamed)';
+    my $project_id   = $project->id;
+    my $project_code = $project->project_code || '';
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_create_governance_ticket',
+        "Creating governance HelpDesk ticket for project id=$project_id on site=$site_name");
+
+    try {
+        my $schema  = $c->model('DBEncy')->schema;
+        my $ticket_rs = $schema->resultset('SupportTicket');
+
+        my $ticket_number = 'CSC-GOV-' . strftime('%Y%m%d', localtime) . '-' . sprintf('%04d', $project_id);
+
+        $ticket_rs->create({
+            ticket_number => $ticket_number,
+            site_name     => 'CSC',
+            user_id       => undef,
+            username      => $c->session->{username} || 'system',
+            email         => '',
+            subject       => "New project created: $project_name (site: $site_name)",
+            description   => "A new project has been created and requires CSC awareness.\n\n"
+                           . "Project ID    : $project_id\n"
+                           . "Project Name  : $project_name\n"
+                           . "Project Code  : $project_code\n"
+                           . "Site          : $site_name\n"
+                           . "Created by    : " . ($c->session->{username} || 'system') . "\n"
+                           . "Created at    : " . strftime('%Y-%m-%d %H:%M:%S', localtime) . "\n\n"
+                           . "Please review and ensure proper governance procedures are followed.",
+            category      => 'project_governance',
+            priority      => 'medium',
+            status        => 'open',
+            created_at    => strftime('%Y-%m-%d %H:%M:%S', localtime),
+        });
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_create_governance_ticket',
+            "Governance ticket $ticket_number created for project id=$project_id");
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_create_governance_ticket',
+            "Could not create governance ticket for project id=$project_id: $_"
+            . " (run schema_compare to create support_tickets table if missing)");
+    };
+}
 
 sub project :Path('project') :Args(0) {
     my ( $self, $c ) = @_;
