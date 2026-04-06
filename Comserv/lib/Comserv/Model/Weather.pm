@@ -8,23 +8,22 @@ use Comserv::Util::Logging;
 
 extends 'Catalyst::Model';
 
-=head1 NAME
-
-Comserv::Model::Weather - Weather Data Model
-
-=head1 DESCRIPTION
-
-This model handles weather configuration and data storage operations using the existing DBEncy schema.
-
-=cut
-
 has 'logging' => (
-    is => 'ro',
+    is      => 'ro',
     default => sub { Comserv::Util::Logging->instance }
 );
 
 sub _get_schema {
-    my $self = shift;
+    my ($self, $c) = @_;
+
+    if ($c && ref($c) && $c->can('model')) {
+        my $db_model = eval { $c->model('DBEncy') };
+        if (!$@ && $db_model && $db_model->can('schema')) {
+            my $schema = eval { $db_model->schema };
+            return $schema if !$@ && $schema;
+        }
+    }
+
     require Comserv::Model::RemoteDB;
     require Comserv::Model::Schema::Ency;
 
@@ -37,35 +36,26 @@ sub _get_schema {
     my $conn    = $connection_info->{config};
     my $db_type = $conn->{db_type} || 'mysql';
 
-    my $dsn;
     my %opts = (RaiseError => 1, PrintError => 0, AutoCommit => 1);
 
     if ($db_type eq 'sqlite') {
-        $dsn = "dbi:SQLite:dbname=" . $conn->{database_path};
+        my $dsn = "dbi:SQLite:dbname=" . $conn->{database_path};
         return Comserv::Model::Schema::Ency->connect($dsn, '', '', \%opts);
     }
 
     my $driver = 'MariaDB';
     eval { require DBD::MariaDB; 1 } or do { $driver = 'mysql' };
-    $dsn = "dbi:$driver:database=$conn->{database};host=$conn->{host};port=$conn->{port}";
+    my $dsn = "dbi:$driver:database=$conn->{database};host=$conn->{host};port=$conn->{port}";
 
     return Comserv::Model::Schema::Ency->connect(
         $dsn, $conn->{username}, $conn->{password}, \%opts
     );
 }
 
-=head1 METHODS
-
-=head2 get_weather_config
-
-Get the active weather configuration for a specific user and site
-
-=cut
-
 sub get_weather_config {
-    my ($self, $user_id, $site_id) = @_;
+    my ($self, $c, $user_id, $site_id) = @_;
 
-    my $schema = eval { $self->_get_schema };
+    my $schema = eval { $self->_get_schema($c) };
     return undef if $@ || !$schema;
 
     my $config;
@@ -77,8 +67,7 @@ sub get_weather_config {
 
         for my $where (@priorities) {
             my $row = $schema->resultset('WeatherConfig')->search(
-                $where,
-                { order_by => { -desc => 'id' }, rows => 1 }
+                $where
             )->first;
             if ($row) {
                 $config = { $row->get_inflated_columns };
@@ -90,71 +79,55 @@ sub get_weather_config {
     return $config;
 }
 
-=head2 save_weather_config
-
-Save or update weather configuration for a specific user and site
-
-=cut
-
 sub save_weather_config {
-    my ($self, $config, $user_id, $site_id) = @_;
+    my ($self, $c, $config, $user_id, $site_id) = @_;
 
-    my $schema = eval { $self->_get_schema };
+    my $schema = eval { $self->_get_schema($c) };
     return undef if $@ || !$schema;
-    
+
     eval {
-        # First, deactivate all existing configs for this user and site
         $schema->resultset('WeatherConfig')->search({
             user_id => $user_id,
             site_id => $site_id
         })->update({ is_active => 0 });
-        
-        # Insert new configuration
+
         my $new_config = $schema->resultset('WeatherConfig')->create({
-            user_id => $user_id,
-            site_id => $site_id,
-            api_service => $config->{api_service},
-            api_key => $config->{api_key},
-            location_method => $config->{location_method},
-            location_value => $config->{location_value},
-            country_code => $config->{country_code} || 'US',
-            update_interval => $config->{update_interval} || 30,
+            user_id           => $user_id,
+            site_id           => $site_id,
+            api_service       => $config->{api_service},
+            api_key           => $config->{api_key},
+            location_method   => $config->{location_method},
+            location_value    => $config->{location_value},
+            country_code      => $config->{country_code}      || 'US',
+            update_interval   => $config->{update_interval}   || 30,
             temperature_units => $config->{temperature_units} || 'metric',
-            language => $config->{language} || 'en',
-            is_active => 1
+            language          => $config->{language}          || 'en',
+            is_active         => 1
         });
-        
+
         return $new_config->id;
     };
-    
-    if ($@) {
-        die "Error saving weather configuration: $@";
-    }
+
+    die "Error saving weather configuration: $@" if $@;
 }
 
-=head2 get_weather_providers
-
-Get list of available weather providers
-
-=cut
-
 sub get_weather_providers {
-    my ($self) = @_;
+    my ($self, $c) = @_;
 
     my $default_providers = [
         {
-            provider_name   => 'openweathermap',
-            api_base_url    => 'https://api.openweathermap.org/data/2.5',
+            provider_name     => 'openweathermap',
+            api_base_url      => 'https://api.openweathermap.org/data/2.5',
             documentation_url => 'https://openweathermap.org/api'
         },
         {
-            provider_name   => 'weatherapi',
-            api_base_url    => 'https://api.weatherapi.com/v1',
+            provider_name     => 'weatherapi',
+            api_base_url      => 'https://api.weatherapi.com/v1',
             documentation_url => 'https://www.weatherapi.com/docs/'
         }
     ];
 
-    my $schema = eval { $self->_get_schema };
+    my $schema = eval { $self->_get_schema($c) };
     return $default_providers if $@ || !$schema;
 
     my $result = eval {
@@ -162,24 +135,23 @@ sub get_weather_providers {
             { is_active => 1 },
             { order_by => 'provider_name' }
         );
-        return [ map { $_->get_inflated_columns } @providers ];
+        return [ map { { $_->get_inflated_columns } } @providers ];
     };
 
     return ($@ || !$result) ? $default_providers : $result;
 }
 
 sub get_cached_weather_data {
-    my ($self, $data_type, $max_age_minutes) = @_;
+    my ($self, $c, $data_type, $max_age_minutes) = @_;
 
-    my $schema = eval { $self->_get_schema };
+    my $schema = eval { $self->_get_schema($c) };
     return undef if $@ || !$schema;
 
     my $result;
     eval {
         my $cutoff = DateTime->now->subtract(minutes => $max_age_minutes)->strftime('%Y-%m-%d %H:%M:%S');
         $result = $schema->resultset('WeatherData')->search(
-            { data_type => $data_type, retrieved_at => { '>=' => $cutoff } },
-            { order_by => { -desc => 'retrieved_at' }, rows => 1 }
+            { data_type => $data_type, retrieved_at => { '>=' => $cutoff } }
         )->first;
         1;
     };
@@ -189,14 +161,17 @@ sub get_cached_weather_data {
 }
 
 sub cache_weather_data {
-    my ($self, $config_id, $data_type, $data) = @_;
+    my ($self, $c, $config_id, $data_type, $data) = @_;
 
-    my $schema = eval { $self->_get_schema };
+    my $schema = eval { $self->_get_schema($c) };
     return 0 if $@ || !$schema;
+
+    my $now = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
 
     my %row = (
         config_id             => $config_id,
         data_type             => $data_type,
+        retrieved_at          => $now,
         temperature           => $data->{temperature},
         feels_like            => $data->{feels_like},
         humidity              => $data->{humidity},
@@ -228,9 +203,9 @@ sub cache_weather_data {
 }
 
 sub record_weather_history {
-    my ($self, $config_id, $data) = @_;
+    my ($self, $c, $config_id, $data) = @_;
 
-    my $schema = eval { $self->_get_schema };
+    my $schema = eval { $self->_get_schema($c) };
     return 0 if $@ || !$schema;
 
     eval {
@@ -253,30 +228,26 @@ sub record_weather_history {
 }
 
 sub get_weather_history {
-    my ($self, $config_id, $limit) = @_;
+    my ($self, $c, $config_id, $limit) = @_;
     $limit //= 48;
 
-    my $schema = eval { $self->_get_schema };
+    my $schema = eval { $self->_get_schema($c) };
     return [] if $@ || !$schema;
 
     my @rows;
     eval {
         @rows = $schema->resultset('WeatherHistory')->search(
-            { config_id => $config_id },
-            { order_by => { -asc => 'recorded_at' }, rows => $limit }
+            { config_id => $config_id }
         )->all;
         1;
     };
     return [] if $@;
 
-    return [ map {
-        my %cols = $_->get_inflated_columns;
-        \%cols
-    } @rows ];
+    return [ map { my %cols = $_->get_inflated_columns; \%cols } @rows ];
 }
 
 sub track_api_usage {
-    my ($self, $config_id, $api_service) = @_;
+    my ($self, $c, $config_id, $api_service) = @_;
     return 1;
 }
 
