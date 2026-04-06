@@ -26,6 +26,7 @@
                 <a href="/Documentation/DailyPlan"><i class="icon-calendar"></i>Daily Plan</a>
                 <a href="/admin/git_pull"><i class="icon-git"></i>Git Pull</a>
                 <a href="/log"><i class="icon-log"></i>Open Log</a>
+                <a href="/Documentation/Planning"><i class="icon-planning"></i>Planning</a>
                 <a href='/ProxyManager'><i class="icon-proxy"></i>Proxy Manager</a>
                 <a href='/admin/view_log'><i class="icon-view"></i>View Log</a>
             </div>
@@ -36,7 +37,8 @@
             <span class="submenu-header"><a href="/ai" class="dropbtn"><i class="icon-ai"></i>AI Assistant</a></span>
             <div class="submenu">
                 <a href="/ai"><i class="icon-chat"></i>AI Chat Interface</a>
-                <a href="/ai/query_form"><i class="icon-form"></i>AI Query Form</a>
+                <a href="/ai/conversations"><i class="icon-history"></i>Chat History</a>
+                <a href="/ai/manage_api_keys"><i class="icon-key"></i>Manage API Keys</a>
                 <a href="/ai/check_status"><i class="icon-status"></i>Check AI Status</a>
                 <a href="/ai/models"><i class="icon-model"></i>Model Management</a>
                 [% IF c.session.roles.grep('admin').size %]
@@ -52,16 +54,18 @@
         <div class="submenu-item">
             <span class="submenu-header"><a href="/documentation" class="dropbtn"><i class="icon-documentation"></i>Documentation</a></span>
             <div class="submenu">
-                <a href="/documentation"><i class="icon-list"></i>All Documentation</a>
-                <a href="/documentation?category=user_guides"><i class="icon-user-guide"></i>User Guides</a>
                 <a href="/documentation?category=admin_guides"><i class="icon-admin-guide"></i>Admin Guides</a>
-                <a href="/documentation?category=tutorials"><i class="icon-tutorial"></i>Tutorials</a>
+                <a href="/documentation"><i class="icon-list"></i>All Documentation</a>
                 <a href="/documentation?category=changelog"><i class="icon-changelog"></i>Changelog</a>
+                <a href="/Documentation/DailyPlan"><i class="icon-calendar"></i>Daily Plan</a>
+                <a href="/Documentation/Planning"><i class="icon-planning"></i>Planning</a>
+                <a href="/documentation?category=tutorials"><i class="icon-tutorial"></i>Tutorials</a>
+                <a href="/documentation?category=user_guides"><i class="icon-user-guide"></i>User Guides</a>
                 [% IF c.session.roles.grep('admin').size || c.session.roles.grep('developer').size %]
                     <div class="submenu-section">
                         <span class="submenu-section-title">Admin Resources</span>
-                        <a href="/documentation/linux_commands"><i class="icon-terminal"></i>Linux Commands</a>
                         <a href="/admin/edit_documentation"><i class="icon-edit"></i>Edit Documentation</a>
+                        <a href="/documentation/linux_commands"><i class="icon-terminal"></i>Linux Commands</a>
                     </div>
                 [% END %]
             </div>
@@ -72,31 +76,33 @@
             <span class="submenu-header"><a href="/site/list_domains"><i class="icon-domain"></i>Domain Selection</a></span>
             <div class="submenu">
                 <div class="domain-list-container">
-                    <!-- Production Sites -->
-                    <div class="submenu-section">
-                        <span class="submenu-section-title">Production Sites</span>
-                        <a href="?site=BMaster" class="site-dropdown-item" onclick="activateSite('BMaster')">BMaster</a>
-                        <a href="?site=CSC" class="site-dropdown-item" onclick="activateSite('CSC')">CSC</a>
-                        <a href="?site=Monashee" class="site-dropdown-item" onclick="activateSite('Monashee')">Monashee</a>
-                        <a href="?site=Forager" class="site-dropdown-item" onclick="activateSite('Forager')">Forager</a>
-                        <a href="?site=Shanta" class="site-dropdown-item" onclick="activateSite('Shanta')">Shanta</a>
-                        <a href="?site=SunFire" class="site-dropdown-item" onclick="activateSite('SunFire')">SunFire</a>
-                        <a href="?site=USBM" class="site-dropdown-item" onclick="activateSite('USBM')">USBM</a>
-                        <a href="?site=WB" class="site-dropdown-item" onclick="activateSite('wb')">WeaverBeck.com</a>
-                    </div>
-                    
-                    <!-- Local Development -->
-                    <div class="submenu-section">
-                        <span class="submenu-section-title">Local Development</span>
-                        <a href="http://bmaster.local:3000" class="site-dropdown-item">BMaster.local</a>
-                        <a href="http://comserv.local:3000" class="site-dropdown-item">CSC local</a>
-                        <a href="http://shanta.local:3000" class="site-dropdown-item">Shanta.local</a>
-                        <a href="http://ve7tit.local:3000" class="site-dropdown-item" target="_blank">ve7tit.local</a>
-                    </div>
-                    
+                    <!-- Sites from sitedomain table — grouped by site name -->
+                    [% SET current_site_name = '' %]
+                    [% FOREACH row = c.stash.dbi.query("SELECT s.name AS site_name, sd.domain FROM sites s JOIN sitedomain sd ON sd.site_id = s.id ORDER BY s.name, sd.domain") %]
+                        [% IF row.site_name != current_site_name %]
+                            [% IF current_site_name != '' %]
+                            </div>
+                            </div>
+                            [% END %]
+                            [% SET current_site_name = row.site_name %]
+                            <div class="submenu-section">
+                            <span class="submenu-section-title">[% row.site_name %]</span>
+                            <div class="site-domain-group">
+                        [% END %]
+                        <span class="site-domain-row">
+                            <span class="site-domain-label">[% row.domain %]</span>
+                            <a href="http://[% row.domain %]:3000" class="site-port-link" target="_blank" title="Port 3000">:3000</a>
+                            <a href="http://[% row.domain %]:3001" class="site-port-link" target="_blank" title="Port 3001">:3001</a>
+                        </span>
+                    [% END %]
+                    [% IF current_site_name != '' %]
+                            </div>
+                            </div>
+                    [% END %]
+
                     <!-- Other Options -->
                     <div class="submenu-section">
-                        <span class="submenu-section-title">Other Options</span>
+                        <span class="submenu-section-title">Switch Site Context</span>
                         <a href="?site=Dev" class="site-dropdown-item" onclick="activateSite('Dev')">Development</a>
                         <a href="?site=None" class="site-dropdown-item" onclick="activateSite('None')">None</a>
                         <a href="/?site=home" class="site-dropdown-item" onclick="activateSite('home')">Default home</a>
@@ -250,6 +256,7 @@
                 <!-- Docker/Infrastructure Management -->
                 <div class="submenu-section">
                     <span class="submenu-section-title">Infrastructure Management</span>
+                    <a href="/admin/hardware_monitor"><i class="icon-server"></i>Hardware Monitor</a>
                     <a href="/admin/infrastructure"><i class="icon-cluster"></i>K8s Clusters</a>
                     <a href="/admin/docker-containers"><i class="icon-docker"></i>Docker Containers</a>
                 </div>

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Deep teal bg — ham radio callsign site -->
+  <rect width="32" height="32" rx="4" fill="#004d5c"/>
+  <!-- Antenna mast -->
+  <line x1="16" y1="28" x2="16" y2="10" stroke="#ccffff" stroke-width="2" stroke-linecap="round"/>
+  <!-- Antenna crossbar -->
+  <line x1="10" y1="14" x2="22" y2="14" stroke="#ccffff" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Radio wave arcs (signals emanating from top of antenna) -->
+  <path d="M11 9 Q16 5 21 9" stroke="#FF9900" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M8 7 Q16 1 24 7" stroke="#FF9900" stroke-width="1.2" fill="none" stroke-linecap="round" opacity="0.7"/>
+  <!-- Callsign text -->
+  <text x="16" y="27" text-anchor="middle" font-family="monospace,sans-serif" font-weight="bold" font-size="5.5" fill="#ccffff">VE7TIT</text>
+</svg>

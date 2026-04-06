@@ -1,0 +1,301 @@
+[% META
+   title = "Insect Detail - Encyclopedia of Biological Life"
+   description = "View and edit insect details in the ENCY encyclopedia"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-02"
+%]
+[% PageVersion = 'ENCY/InsectDetail.tt,v 0.01 2026/04/02' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[% PROCESS 'ENCY/ImageHelper.tt' %]
+
+[% IF success_msg || c.flash.success_msg %]
+<div class="alert alert-success">[% success_msg || c.flash.success_msg | html %]</div>
+[% END %]
+[% IF error_msg || c.flash.error_msg %]
+<div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
+[% END %]
+
+[% roles = c.session.roles;
+   is_admin = 0;
+   FOREACH r IN roles;
+     IF r == 'admin'; is_admin = 1; END;
+   END;
+%]
+
+[% IF edit_mode %]
+<h1>Editing Insect: [% insect.common_name | html %]</h1>
+[% ELSE %]
+<h1>[% insect.common_name | html %]</h1>
+[% END %]
+
+<p><a href="[% c.uri_for('/ENCY/Insect') %]">&larr; Back to Insects</a>
+[% IF is_admin && !edit_mode && insect.record_id %]
+  | <a href="[% c.uri_for('/ENCY/Insect/edit') %]" onclick="document.cookie='record_id=[% insect.record_id %]'">Edit</a>
+[% END %]
+</p>
+
+[% IF edit_mode %]
+<form action="[% c.uri_for('/ENCY/Insect/edit') %]" method="post">
+[% ELSE %]
+<form action="[% c.uri_for('/ENCY/Insect/add') %]" method="post">
+[% END %]
+
+<h2>Taxonomy</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Common Name</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="common_name" value="[% insect.common_name | html %]" size="50" />
+            [% ELSE %]
+            [% insect.common_name | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Scientific Name</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="scientific_name" value="[% insect.scientific_name | html %]" size="50" />
+            [% ELSE %]
+            [% insect.scientific_name | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Order</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="order_name" value="[% insect.order_name | html %]" size="50" />
+            [% ELSE %]
+            [% insect.order_name | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Family</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="family_name" value="[% insect.family_name | html %]" size="50" />
+            [% ELSE %]
+            [% insect.family_name | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Genus</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="genus" value="[% insect.genus | html %]" size="30" />
+            [% ELSE %]
+            [% insect.genus | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Species</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="species" value="[% insect.species | html %]" size="30" />
+            [% ELSE %]
+            [% insect.species | html %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+<h2>Ecology</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Ecological Role</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="ecological_role" rows="3" cols="60">[% insect.ecological_role | html %]</textarea>
+            [% ELSE %]
+            [% insect.ecological_role | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Habitat</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="habitat" rows="3" cols="60">[% insect.habitat | html %]</textarea>
+            [% ELSE %]
+            [% insect.habitat | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Distribution</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="distribution" rows="3" cols="60">[% insect.distribution | html %]</textarea>
+            [% ELSE %]
+            [% insect.distribution | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Lifecycle</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="lifecycle" rows="3" cols="60">[% insect.lifecycle | html %]</textarea>
+            [% ELSE %]
+            [% insect.lifecycle | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Behavior</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="behavior" rows="3" cols="60">[% insect.behavior | html %]</textarea>
+            [% ELSE %]
+            [% insect.behavior | html %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+<h2>Pollination / Pest Notes</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Plants Foraged</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="plants_foraged" rows="3" cols="60">[% insect.plants_foraged | html %]</textarea>
+            [% ELSE %]
+            [% insect.plants_foraged | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Plants Damaged</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="plants_damaged" rows="3" cols="60">[% insect.plants_damaged | html %]</textarea>
+            [% ELSE %]
+            [% insect.plants_damaged | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Honey Production</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="honey_production" rows="3" cols="60">[% insect.honey_production | html %]</textarea>
+            [% ELSE %]
+            [% insect.honey_production | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Pollination Notes</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="pollination_notes" rows="3" cols="60">[% insect.pollination_notes | html %]</textarea>
+            [% ELSE %]
+            [% insect.pollination_notes | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Pest Notes</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="pest_notes" rows="3" cols="60">[% insect.pest_notes | html %]</textarea>
+            [% ELSE %]
+            [% insect.pest_notes | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Beneficial Notes</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="beneficial_notes" rows="3" cols="60">[% insect.beneficial_notes | html %]</textarea>
+            [% ELSE %]
+            [% insect.beneficial_notes | html %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+<h2>Additional Information</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>History</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="history" rows="4" cols="60">[% insect.history | html %]</textarea>
+            [% ELSE %]
+            [% insect.history | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Reference</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="reference" rows="3" cols="60">[% insect.reference | html %]</textarea>
+            [% ELSE %]
+            [% insect.reference | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>URL</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="url" value="[% insect.url | html %]" size="60" />
+            [% ELSE %]
+            [% IF insect.url %]<a href="[% insect.url | html %]" target="_blank">[% insect.url | html %]</a>[% END %]
+            [% END %]
+        </td>
+    </tr>
+    [% IF edit_mode %]
+    <tr>
+        <td><strong>Image</strong></td>
+        <td>
+            <input type="text" name="image" value="[% insect.image | html %]" size="60" />
+        </td>
+    </tr>
+    [% ELSE %]
+    [% IF insect.image %]
+    <tr>
+        <td><strong>Image</strong></td>
+        <td>[% ency_img_tag(insect.image, 300, 300) %]</td>
+    </tr>
+    [% END %]
+    [% END %]
+</table>
+
+[% IF related_herbs && related_herbs.size %]
+<h2>Related Plants</h2>
+<ul>
+    [% FOREACH herb IN related_herbs %]
+    <li><a href="[% c.uri_for('/ENCY/herb_detail', herb.record_id) %]">[% herb.botanical_name | html %] ([% herb.common_names | html %])</a></li>
+    [% END %]
+</ul>
+[% END %]
+
+[% IF related_diseases && related_diseases.size %]
+<h2>Related Diseases</h2>
+<ul>
+    [% FOREACH disease IN related_diseases %]
+    <li><a href="[% c.uri_for('/ENCY/Disease', disease.record_id) %]">[% disease.common_name | html %]</a></li>
+    [% END %]
+</ul>
+[% END %]
+
+[% IF edit_mode %]
+[% PROCESS 'ENCY/partials/AiFormFill.tt' %]
+<br/>
+<input type="submit" value="[% IF insect.record_id %]Update Insect[% ELSE %]Add Insect[% END %]" class="btn btn-primary" />
+<a href="[% c.uri_for('/ENCY/Insect') %]" class="btn btn-default">Cancel</a>
+</form>
+[% END %]

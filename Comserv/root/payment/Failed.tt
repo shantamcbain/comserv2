@@ -1,0 +1,29 @@
+[% META
+   title = "Payment Failed"
+   description = "Payment could not be completed"
+   roles = "guest,user,admin"
+   TemplateType = "Application"
+   category = "Payment"
+   page_version = "0.01"
+   last_updated = "2026-04-03"
+%]
+<div class="app-container">
+  <div class="page-header">
+    <h1>Payment Failed</h1>
+  </div>
+  <div class="content-container">
+    <div class="content-primary">
+      <div class="content-section">
+        <div class="error-box" style="padding:2em;border:1px solid #d9534f;border-radius:8px;background:#fdf2f2;text-align:center">
+          <h2 style="color:#a94442">&#10007; Payment Unsuccessful</h2>
+          <p>[% message | html %]</p>
+          <p>No charges have been applied to your account. Please try again or choose a different payment method.</p>
+          <div class="form-actions" style="margin-top:1.5em">
+            <a href="[% c.uri_for('/membership') %]" class="btn btn-primary">← Back to Plans</a>
+            <a href="[% c.uri_for('/') %]" class="btn btn-secondary">Home</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

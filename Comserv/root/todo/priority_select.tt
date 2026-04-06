@@ -1,0 +1,4 @@
+[%# Shared priority option list. Requires: build_priority (hash), current_priority (value). %]
+[% FOREACH key IN build_priority.keys.sort %]
+<option value="[% key %]"[% IF key == current_priority %] selected[% END %]>[% key %] — [% build_priority.$key %]</option>
+[% END %]

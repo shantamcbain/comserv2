@@ -73,6 +73,7 @@
 
     <form method="POST" action="/workshop/resource_scan_nfs"
           onsubmit="return confirm('Start NFS scan with these settings?');">
+        <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
 
         <!-- Scan Source -->
         <div class="sync-section">

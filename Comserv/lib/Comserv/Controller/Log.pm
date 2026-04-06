@@ -7,6 +7,7 @@ use DateTime::Format::Strptime;
 use Data::Dumper;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::PointSystem;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -45,7 +46,7 @@ sub index :Path('/log') :Args(0) {
     unless ($admin_auth->check_admin_access($c, 'log_index')) {
         $c->flash->{error_msg} = 'You must be an administrator to view logs.';
         $c->response->redirect($c->uri_for('/user/login'));
-        return;
+        $c->detach();
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Accessed log index");
@@ -86,7 +87,7 @@ sub details :Path('/log/details') :Args(0) {
     unless ($admin_auth->check_admin_access($c, 'log_details')) {
         $c->flash->{error_msg} = 'You must be an administrator to view log details.';
         $c->response->redirect($c->uri_for('/user/login'));
-        return;
+        $c->detach();
     }
 
     my $record_id = $c->request->body_parameters->{record_id};
@@ -116,7 +117,7 @@ sub update :Path('/log/update') :Args(0) {
     unless ($admin_auth->check_admin_access($c, 'log_update')) {
         $c->flash->{error_msg} = 'You must be an administrator to update log entries.';
         $c->response->redirect($c->uri_for('/user/login'));
-        return;
+        $c->detach();
     }
 
     # Get the record_id from the form data
@@ -232,6 +233,34 @@ sub update :Path('/log/update') :Args(0) {
     # Call the modify method on the Log model instance
     $log_model->modify($c, $record_id, $new_values);
 
+    # When a log entry is closed (status=3/DONE), apply points billing/earning
+    if ($status == 3) {
+        eval {
+            my $updated_log = $c->model('DBEncy')->resultset('Log')->find($record_id);
+            if ($updated_log && !$updated_log->points_processed) {
+                my $ps = Comserv::Util::PointSystem->new(c => $c);
+                my ($ok, $err) = $ps->bill_time_log($updated_log);
+                if ($ok) {
+                    $self->logging->log_with_details(
+                        $c, 'info', __FILE__, __LINE__, 'update',
+                        "Points processed for log #$record_id"
+                    );
+                } elsif ($err && $err ne 'already processed' && $err ne 'zero duration — nothing to bill') {
+                    $self->logging->log_with_details(
+                        $c, 'warn', __FILE__, __LINE__, 'update',
+                        "Points processing skipped for log #$record_id: $err"
+                    );
+                }
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details(
+                $c, 'error', __FILE__, __LINE__, 'update',
+                "Points billing error for log #$record_id: $@"
+            );
+        }
+    }
+
     # Redirect to the log details page after successful update
     $c->response->redirect($c->uri_for("/log", { record_id => $record_id }));
 }
@@ -239,6 +268,12 @@ sub update :Path('/log/update') :Args(0) {
 # This method will only display the form
 sub log_form :Path('/log/log_form') :Args() {
     my ($self, $c) = @_;
+
+    unless ($c->session->{username} && $c->session->{username} ne 'anonymous') {
+        $c->response->redirect($c->uri_for('/user/login'));
+        $c->detach();
+    }
+
     my $schema = $c->model('DBEncy');
 
     my $todo_record_id = $c->request->parameters->{todo_record_id} || '';
@@ -265,34 +300,37 @@ sub log_form :Path('/log/log_form') :Args() {
     # Create form_data for project_list.tt and site_list.tt
     my $form_data = {};
 
-    # Set parent_id in form_data if todo_record has a project_id
+    # Set project_id in form_data if todo_record has a project_id
     if ($todo_record && $todo_record->project_id) {
-        $form_data->{parent_id} = $todo_record->project_id;
+        $form_data->{project_id} = $todo_record->project_id;
         $self->logging->log_with_details(
             $c, 'info', __FILE__, __LINE__, 'log_form',
             "Located project ID for form_data: " . $todo_record->project_id
         );
     }
 
+    # Allow GET params to pre-fill the form when no todo is linked
+    my $p = $c->request->parameters;
+
     # Add the priority, status, and record_id to the stash
     $c->stash(
         build_priority => $self->priority,
         build_status   => $self->status,
-        priority       => $todo_record ? $todo_record->priority : '',
-        status         => $todo_record ? $todo_record->status : '',
-        project_id     => $todo_record ? $todo_record->project_id : '',
-        todo_record_id => $todo_record ? $todo_record->record_id : $todo_record_id,
-        start_date     => $todo_record ? $todo_record->start_date : '',
-        site_name      => $todo_record ? $todo_record->sitename : $c->session->{SiteName},
-        due_date       => $todo_record ? $todo_record->due_date : '',
-        abstract       => $todo_record ? $todo_record->subject : '',
-        details        => $todo_record ? $todo_record->description : '',
-        comments       => $todo_record ? $todo_record->comments : '',
-        start_time     => $current_time_short, # Set start_time to current time
-        end_time       => $current_time_short, # Set end_time to current time
-        projects       => $projects,     # Add projects for selection
-        sites          => $sites,        # Add sites for selection
-        form_data      => $form_data,    # Add form_data for project_list.tt and site_list.tt
+        priority       => $todo_record ? $todo_record->priority   : ($p->{priority} || ''),
+        status         => $todo_record ? $todo_record->status     : ($p->{status}   || ''),
+        project_id     => $todo_record ? $todo_record->project_id : ($p->{project_id} || ''),
+        todo_record_id => $todo_record ? $todo_record->record_id  : $todo_record_id,
+        start_date     => $todo_record ? $todo_record->start_date : ($p->{start_date} || DateTime->now->ymd),
+        site_name      => $todo_record ? $todo_record->sitename   : ($p->{site_name} || $c->session->{SiteName}),
+        due_date       => $todo_record ? $todo_record->due_date   : ($p->{due_date}  || DateTime->now->ymd),
+        abstract       => $todo_record ? $todo_record->subject    : ($p->{abstract}  || ''),
+        details        => $todo_record ? $todo_record->description: ($p->{details}   || ''),
+        comments       => $todo_record ? $todo_record->comments   : ($p->{comments}  || ''),
+        start_time     => $current_time_short,
+        end_time       => $current_time_short,
+        projects       => $projects,
+        sites          => $sites,
+        form_data      => $form_data,
     );
 
     # Render the form
@@ -308,8 +346,8 @@ sub create_log :Path('/log/create_log') :Args() {
 
     # Retrieve start_date from form data
     my $start_date = $c->request->body_parameters->{start_date};
-    # Set owner to 'none' if it's not provided
-    my $owner = $c->request->body_parameters->{owner} || 'none';
+    # Set username to session user if not provided
+    my $username = $c->session->{username} || $c->request->body_parameters->{username} || 'none';
 
     # Check if start_date is empty
     if ($start_date eq '') {
@@ -332,19 +370,20 @@ sub create_log :Path('/log/create_log') :Args() {
         my $site_controller = $c->controller('Site');
         my $sites = $site_controller->fetch_available_sites($c);
 
-        # Get the parent_id from the form (used by project_list.tt)
-        my $parent_id = $c->request->body_parameters->{parent_id};
+        # Get the project_id from the form (used by project_list.tt)
+        my $parent_id = $c->request->body_parameters->{project_id}
+                     || $c->request->body_parameters->{parent_id};
 
         # Create form_data for project_list.tt and site_list.tt
         my $form_data = {
-            parent_id => $parent_id,
+            project_id => $parent_id,
             sitename => $c->request->body_parameters->{sitename}
         };
 
         # Stash the form data
         $c->stash(
             todo_record_id => $c->request->body_parameters->{todo_record_id},
-            owner          => $c->request->body_parameters->{owner} || 'none',
+            username       => $c->session->{username} || $c->request->body_parameters->{username} || 'none',
             sitename       => $c->session->{SiteName},
             start_date     => $start_date,
             due_date       => $c->request->body_parameters->{due_date},
@@ -444,37 +483,33 @@ sub create_log :Path('/log/create_log') :Args() {
     );
 
     my $logEntry = $rs->create({
-        todo_record_id  => $c->request->body_parameters->{todo_record_id},
-        owner           => $owner,
-        sitename        => $sitename,
-        start_date      => $start_date || $current_date,
-        project_code    => $project_id, # Use project_id from project_list.tt
-        due_date        => $c->request->body_parameters->{due_date},
-        abstract        => $subject,
-        details         => $c->request->body_parameters->{details},
-        start_time      => $start_time, # Now has a default value if empty
-        end_time        => $end_time,   # Now has a default value if empty
-        time            => $time_diff,
-        group_of_poster => $group_of_poster, # Use the converted string value
-        status          => $c->request->body_parameters->{status},
-        priority        => $c->request->body_parameters->{priority},
-        last_mod_by     => $c->session->{username},
-        last_mod_date   => DateTime->now->ymd,
-        comments        => $c->request->body_parameters->{comments}
+        todo_record_id   => $c->request->body_parameters->{todo_record_id},
+        username         => $username,
+        sitename         => $sitename,
+        start_date       => $start_date || $current_date,
+        project_code     => $project_id,
+        due_date         => $c->request->body_parameters->{due_date},
+        abstract         => $subject,
+        details          => $c->request->body_parameters->{details},
+        start_time       => $start_time,
+        end_time         => $end_time,
+        time             => $time_diff,
+        group_of_poster  => $group_of_poster,
+        status           => $c->request->body_parameters->{status},
+        priority         => $c->request->body_parameters->{priority},
+        last_mod_by      => $c->session->{username},
+        last_mod_date    => DateTime->now->ymd,
+        comments         => $c->request->body_parameters->{comments},
+        points_processed => 0,
     });
 
     # Log the success event
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_log', "Log entry created successfully: ID " . $logEntry->id);
 
-    # Redirect to the referring page and retain necessary parameters
-    my $referer = $c->request->referer || '/';
-    my $redirect_url = $referer;
-    $redirect_url .= "?record_id=" . $logEntry->id if $logEntry->id;
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_log', "Redirecting to: $redirect_url");
     $c->flash->{success_msg} = 'Log entry created successfully';
 
-    # Redirect back to the todo details page
-    $c->response->redirect($c->uri_for('/todo/details', { record_id => $logEntry->todo_record_id }));
+    # Redirect to /log after save
+    $c->response->redirect($c->uri_for('/log'));
 }
 
 __PACKAGE__->meta->make_immutable;

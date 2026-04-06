@@ -3,7 +3,7 @@
 # Startup wrapper for Comserv Starman server
 
 CATALYST_HOME=${CATALYST_HOME:-/opt/comserv}
-PLACK_ENV="${PLACK_ENV:-deployment}"
+PLACK_ENV="${PLACK_ENV:-${CATALYST_ENV:-deployment}}"
 PORT="${WEB_PORT:-3000}"
 WORKERS="${STARMAN_WORKERS:-5}"
 
@@ -18,11 +18,15 @@ echo "  WORKERS       : $WORKERS"
 echo "========================================"
 
 if [ "$PLACK_ENV" = "development" ]; then
-  echo "[startup-wrapper] Development mode — using Catalyst dev server"
-  exec perl -I"$CATALYST_HOME/lib" "$CATALYST_HOME/script/comserv_server.pl" \
-    -p "$PORT" \
-    -h 0.0.0.0 \
-    -r
+  echo "[startup-wrapper] Development mode — using plackup with auto-restart on file change"
+  exec perl -I"$CATALYST_HOME/lib" -S plackup \
+    --host 0.0.0.0 \
+    --port "$PORT" \
+    --reload \
+    --watch "$CATALYST_HOME/lib" \
+    --watch "$CATALYST_HOME/root" \
+    --watch "$CATALYST_HOME/config" \
+    "$CATALYST_HOME/script/comserv_server.psgi"
 else
   echo "[startup-wrapper] Production mode — starting Starman on :$PORT with $WORKERS workers"
   exec perl -S starman \

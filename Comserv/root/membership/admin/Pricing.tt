@@ -1,0 +1,166 @@
+[% META
+   title = "Geographic Pricing"
+   description = "Configure purchasing power parity pricing per plan and region"
+   roles = "admin,site_admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-04-03"
+%]
+[% PageVersion = 'membership/admin/Pricing.tt,v 0.01 2026/04/03' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Geographic Pricing</h1>
+    [% IF site %]<p>Site: <strong>[% site.name | html %]</strong></p>[% END %]
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <a href="[% c.uri_for('/membership/admin') %]" class="btn btn-secondary">← Back to Admin</a>
+      </div>
+
+      <div class="content-section">
+        <h2>Select Plan</h2>
+        <form method="get" action="[% c.uri_for('/membership/admin/pricing') %]">
+          <div class="form-row">
+            <div class="form-field">
+              <label for="plan_id">Plan</label>
+              <select id="plan_id" name="plan_id" onchange="this.form.submit()">
+                <option value="">-- Choose a plan --</option>
+                [% FOREACH plan IN plans %]
+                <option value="[% plan.id %]" [% 'selected' IF selected_plan_id AND selected_plan_id == plan.id %]>
+                  [% plan.name | html %] ([% plan.slug | html %])
+                </option>
+                [% END %]
+              </select>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      [% IF selected_plan_id %]
+
+      <div class="content-section">
+        <h2>Add / Update Pricing</h2>
+        <p style="font-size:0.9em;color:#555;">
+          Use ISO 3166-1 alpha-2 country codes (e.g. <code>CA</code>, <code>IN</code>, <code>BR</code>).
+          Use <code>DEFAULT</code> to set the fallback price for regions not listed.
+          Prices override the base plan price for users in that region.
+        </p>
+        <form method="post" action="[% c.uri_for('/membership/admin/pricing') %]">
+          <input type="hidden" name="action" value="add">
+          <input type="hidden" name="plan_id" value="[% selected_plan_id | html %]">
+          <div class="form-row">
+            <div class="form-field">
+              <label for="region_code">Region Code *</label>
+              <input type="text" id="region_code" name="region_code" required maxlength="10"
+                     placeholder="e.g. IN, BR, DEFAULT">
+            </div>
+            <div class="form-field">
+              <label for="price_monthly">Monthly Price *</label>
+              <input type="number" id="price_monthly" name="price_monthly" step="0.01" min="0" required
+                     placeholder="0.00">
+            </div>
+            <div class="form-field">
+              <label for="price_annual">Annual Price</label>
+              <input type="number" id="price_annual" name="price_annual" step="0.01" min="0"
+                     placeholder="0.00">
+            </div>
+            <div class="form-field">
+              <label for="currency">Currency</label>
+              <select id="currency" name="currency">
+                <option value="USD">USD</option>
+                <option value="CAD">CAD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+                <option value="INR">INR</option>
+                <option value="BRL">BRL</option>
+                <option value="MXN">MXN</option>
+                <option value="AUD">AUD</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">Save Pricing</button>
+        </form>
+      </div>
+
+      <div class="content-section">
+        <h2>Current Pricing Overrides</h2>
+        [% IF pricing_rows.size %]
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Region</th>
+                <th>Monthly</th>
+                <th>Annual</th>
+                <th>Currency</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              [% FOREACH row IN pricing_rows %]
+              <tr>
+                <td><code>[% row.region_code | html %]</code></td>
+                <td>[% row.price_monthly %]</td>
+                <td>[% row.price_annual %]</td>
+                <td>[% row.currency | html %]</td>
+                <td>
+                  <form method="post" action="[% c.uri_for('/membership/admin/pricing') %]" style="display:inline">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="pricing_id" value="[% row.id %]">
+                    <input type="hidden" name="plan_id" value="[% selected_plan_id | html %]">
+                    <button type="submit" class="btn btn-small btn-danger"
+                            onclick="return confirm('Delete pricing for [% row.region_code | html %]?')">Delete</button>
+                  </form>
+                </td>
+              </tr>
+              [% END %]
+            </tbody>
+          </table>
+        </div>
+        [% ELSE %]
+        <p class="empty-state">No regional pricing overrides for this plan. The base plan price applies globally.</p>
+        [% END %]
+      </div>
+
+      [% END %]
+
+    </div>
+
+    <div class="content-secondary">
+      <div class="content-section">
+        <h3>Purchasing Power Parity</h3>
+        <p style="font-size:0.85em;line-height:1.8;">
+          PPP pricing adjusts the cost based on the economic conditions in a member's country.
+          This makes your platform affordable globally while keeping revenue sustainable.
+        </p>
+        <h4 style="margin-top:1em;">Suggested PPP Multipliers</h4>
+        <ul style="font-size:0.85em;line-height:1.8;">
+          <li><strong>IN (India):</strong> ~20–30% of USD price</li>
+          <li><strong>BR (Brazil):</strong> ~30–40% of USD price</li>
+          <li><strong>MX (Mexico):</strong> ~35–45% of USD price</li>
+          <li><strong>PL (Poland):</strong> ~40–55% of USD price</li>
+          <li><strong>TR (Turkey):</strong> ~15–25% of USD price</li>
+          <li><strong>ZA (South Africa):</strong> ~25–35% of USD price</li>
+          <li><strong>NG (Nigeria):</strong> ~10–20% of USD price</li>
+          <li><strong>CA (Canada):</strong> ~90–110% of USD price</li>
+          <li><strong>AU (Australia):</strong> ~85–100% of USD price</li>
+          <li><strong>GB (UK):</strong> ~90–105% of USD price</li>
+          <li><strong>EU (Europe):</strong> ~85–110% of USD price</li>
+        </ul>
+        <p style="font-size:0.85em;color:#666;">
+          Source: World Bank PPP data. Adjust based on your actual user demographics.
+        </p>
+      </div>
+    </div>
+
+  </div>
+</div>

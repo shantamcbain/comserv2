@@ -1,0 +1,136 @@
+[% META
+   title = "My Point Balance"
+   description = "View your point balance and transaction history"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "Payment"
+   page_version = "0.01"
+   last_updated = "2026-03-26"
+%]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>My Point Balance</h1>
+    <p>1 point = 1 Canadian Dollar (CAD). Points are used to pay for memberships and services.</p>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <h2>Current Balance</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem;margin-top:0.75rem">
+
+          <div style="border:2px solid var(--accent-color,#FFB900);border-radius:8px;padding:1.25rem;text-align:center;background:rgba(255,255,255,0.9)">
+            <div style="font-size:0.85em;color:var(--text-muted-color,#666);text-transform:uppercase;letter-spacing:0.05em">Balance</div>
+            <div style="font-size:2em;font-weight:bold;color:var(--success-color,#27ae60);margin:0.25rem 0">
+              [% balance | format('%.2f') %]
+            </div>
+            <div style="font-size:0.85em;color:var(--text-muted-color,#666)">points</div>
+            [% IF display.formatted %]
+            <div style="font-size:0.9em;color:var(--text-muted-color,#666);margin-top:0.25rem">
+              ≈ [% display.formatted | html %] [% display.currency | html %]
+            </div>
+            [% END %]
+          </div>
+
+          <div style="border:1px solid var(--border-color,#ccc);border-radius:8px;padding:1.25rem;text-align:center;background:rgba(255,255,255,0.9)">
+            <div style="font-size:0.85em;color:var(--text-muted-color,#666);text-transform:uppercase;letter-spacing:0.05em">Total Earned</div>
+            <div style="font-size:1.6em;font-weight:bold;color:var(--text-color,#333);margin:0.25rem 0">
+              [% lifetime_earned | format('%.2f') %]
+            </div>
+            <div style="font-size:0.85em;color:var(--text-muted-color,#666)">points</div>
+          </div>
+
+          <div style="border:1px solid var(--border-color,#ccc);border-radius:8px;padding:1.25rem;text-align:center;background:rgba(255,255,255,0.9)">
+            <div style="font-size:0.85em;color:var(--text-muted-color,#666);text-transform:uppercase;letter-spacing:0.05em">Total Spent</div>
+            <div style="font-size:1.6em;font-weight:bold;color:var(--text-color,#333);margin:0.25rem 0">
+              [% lifetime_spent | format('%.2f') %]
+            </div>
+            <div style="font-size:0.85em;color:var(--text-muted-color,#666)">points</div>
+          </div>
+
+        </div>
+
+        <div style="margin-top:1rem">
+          <a href="[% c.uri_for('/payment/buy/coins') %]" class="btn btn-primary">Buy More Points</a>
+        </div>
+      </div>
+
+      <div class="content-section">
+        <h2>Recent Transactions</h2>
+        [% IF ledger.size %]
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:0.9em">
+            <thead>
+              <tr style="border-bottom:2px solid var(--border-color,#ccc);text-align:left">
+                <th style="padding:0.5rem 0.75rem">Date</th>
+                <th style="padding:0.5rem 0.75rem">Type</th>
+                <th style="padding:0.5rem 0.75rem">Description</th>
+                <th style="padding:0.5rem 0.75rem;text-align:right">Amount</th>
+                <th style="padding:0.5rem 0.75rem;text-align:right">Balance After</th>
+              </tr>
+            </thead>
+            <tbody>
+            [% FOREACH entry IN ledger %]
+              [% is_credit = (entry.to_user_id == c.session.user_id) %]
+              <tr style="border-bottom:1px solid var(--border-color,#eee);
+                         background:[% loop.odd ? 'transparent' : 'rgba(0,0,0,0.02)' %]">
+                <td style="padding:0.5rem 0.75rem;white-space:nowrap;color:var(--text-muted-color,#666)">
+                  [% entry.created_at %]
+                </td>
+                <td style="padding:0.5rem 0.75rem">
+                  <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.8em;font-weight:bold;
+                               background:[% is_credit ? '#e8f5e9' : '#fff3e0' %];
+                               color:[% is_credit ? '#2e7d32' : '#e65100' %]">
+                    [% entry.transaction_type | html %]
+                  </span>
+                </td>
+                <td style="padding:0.5rem 0.75rem;color:var(--text-color,#333)">
+                  [% entry.description | html %]
+                </td>
+                <td style="padding:0.5rem 0.75rem;text-align:right;font-weight:bold;
+                           color:[% is_credit ? 'var(--success-color,#27ae60)' : '#e65100' %]">
+                  [% is_credit ? '+' : '-' %][% entry.amount | format('%.2f') %]
+                </td>
+                <td style="padding:0.5rem 0.75rem;text-align:right;color:var(--text-muted-color,#666)">
+                  [% entry.balance_after | format('%.2f') %]
+                </td>
+              </tr>
+            [% END %]
+            </tbody>
+          </table>
+        </div>
+        [% ELSE %]
+        <p style="color:var(--text-muted-color,#666)">No transactions yet.</p>
+        [% END %]
+      </div>
+
+    </div>
+
+    <div class="content-secondary">
+      <div class="content-section">
+        <h2>About Points</h2>
+        <ul>
+          <li><strong>1 point = 1 CAD</strong></li>
+          <li>Points work across all member sites</li>
+          <li>Use points to pay for memberships, workshops, and services</li>
+          <li>New accounts receive <strong>100 free points</strong> on signup</li>
+          <li>Points never expire</li>
+        </ul>
+        <hr style="margin:0.75rem 0;border:none;border-top:1px solid var(--border-color,#ccc)">
+        <p>
+          <a href="[% c.uri_for('/payment/buy/coins') %]" class="btn btn-primary" style="width:100%;text-align:center;display:block">
+            Buy Points
+          </a>
+        </p>
+        <p style="margin-top:0.5rem">
+          <a href="[% c.uri_for('/membership/account') %]" style="font-size:0.9em">← Back to My Account</a>
+        </p>
+      </div>
+    </div>
+
+  </div>
+</div>
