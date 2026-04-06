@@ -41,7 +41,7 @@
               <a href="[% c.uri_for('/jobs/view', [job.id]) %]"><strong>[% job.title | html %]</strong></a>
               [% IF job.remote %]<span class="badge badge-info" style="margin-left:0.5em">Remote</span>[% END %]
             </td>
-            <td>[% job.location || '—' | html %]</td>
+            <td>[% job.location ? job.location | html : '—' %]</td>
             <td>
               [% IF job.payment_type == 'points' %]
                 <span class="badge badge-success">Points ([% job.point_rate | format('%.0f') %]/hr)</span>
