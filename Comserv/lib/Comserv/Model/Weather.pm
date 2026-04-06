@@ -174,17 +174,18 @@ sub get_cached_weather_data {
     my $schema = eval { $self->_get_schema };
     return undef if $@ || !$schema;
 
-    my $result = eval {
-        my $cutoff = DateTime->now->subtract(minutes => $max_age_minutes)->epoch;
-        $schema->resultset('WeatherData')->search(
-            { data_type => $data_type, fetched_at => { '>=' => $cutoff } },
-            { order_by => { -desc => 'fetched_at' }, rows => 1 }
+    my $result;
+    eval {
+        my $cutoff = DateTime->now->subtract(minutes => $max_age_minutes)->strftime('%Y-%m-%d %H:%M:%S');
+        $result = $schema->resultset('WeatherData')->search(
+            { data_type => $data_type, retrieved_at => { '>=' => $cutoff } },
+            { order_by => { -desc => 'retrieved_at' }, rows => 1 }
         )->first;
+        1;
     };
     return undef if $@ || !$result;
 
-    my $raw = eval { JSON->new->utf8->decode($result->data_json) };
-    return $@ ? undef : $raw;
+    return { $result->get_inflated_columns };
 }
 
 sub cache_weather_data {
@@ -193,13 +194,34 @@ sub cache_weather_data {
     my $schema = eval { $self->_get_schema };
     return 0 if $@ || !$schema;
 
+    my %row = (
+        config_id             => $config_id,
+        data_type             => $data_type,
+        temperature           => $data->{temperature},
+        feels_like            => $data->{feels_like},
+        humidity              => $data->{humidity},
+        pressure              => $data->{pressure},
+        wind_speed            => $data->{wind_speed},
+        wind_direction        => $data->{wind_direction},
+        wind_gust             => $data->{wind_gust},
+        visibility            => $data->{visibility},
+        condition_main        => $data->{condition_main},
+        condition_description => $data->{condition_description},
+        weather_icon          => $data->{weather_icon},
+        cloudiness            => $data->{cloudiness},
+        precipitation         => $data->{precipitation},
+        location_name         => $data->{location_name},
+        sunrise               => $data->{sunrise},
+        sunset                => $data->{sunset},
+        raw_data              => JSON->new->utf8->encode($data->{raw_data} || {}),
+    );
+    delete $row{$_} for grep { !defined $row{$_} } keys %row;
+
     eval {
-        $schema->resultset('WeatherData')->create({
-            config_id  => $config_id,
-            data_type  => $data_type,
-            data_json  => JSON->new->utf8->encode($data),
-            fetched_at => time(),
-        });
+        $schema->resultset('WeatherData')->update_or_create(
+            \%row,
+            { key => 'idx_config_type' }
+        );
         1;
     } or do { return 0 };
     return 1;
