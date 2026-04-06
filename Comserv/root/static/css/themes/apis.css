@@ -2,6 +2,10 @@
 :root {
   --accent-color: #FF9900;
   --background-color: #f9f06b;
+  --background-image: url(/static/images/BMaster/honey2.jpg);
+  --background-repeat: repeat;
+  --background-attachment: scroll;
+  --background-size: auto;
   --body-font: Arial, sans-serif;
   --border-color: #e5a50a;
   --button-bg: #e5a50a;
@@ -30,8 +34,4 @@
   --table-header-bg: #f2f2f2;
   --text-color: #000000;
   --warning-color: red;
-}
-
-body {
-  background-image: url(../images/BMaster/honey2.jpg);
 }
