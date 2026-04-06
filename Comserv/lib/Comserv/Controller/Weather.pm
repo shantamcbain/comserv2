@@ -92,12 +92,12 @@ sub index :Path('/Weather') :Args(0) {
         }
 
         $weather_config = try {
-            $self->weather_model->get_weather_config();
+            $self->weather_model->get_weather_config($c);
         } catch { undef };
 
         if ($weather_config) {
             $history_data = try {
-                $self->weather_model->get_weather_history($weather_config->{id}, 48);
+                $self->weather_model->get_weather_history($c, $weather_config->{id}, 48);
             } catch { [] };
         }
     }
@@ -201,7 +201,7 @@ sub configuration :Path('/Weather/configuration') :Args(0) {
     my $current_config = $self->_get_weather_configuration($c);
     
     # Get available weather providers
-    my $providers = $self->weather_model->get_weather_providers();
+    my $providers = $self->weather_model->get_weather_providers($c);
 
     # Stash data for template
     $c->stash(
@@ -392,7 +392,7 @@ sub _check_weather_config {
     my $site_id = $c->session->{site_id};
 
     my $config = try {
-        return $self->weather_model->get_weather_config($user_id, $site_id);
+        return $self->weather_model->get_weather_config($c, $user_id, $site_id);
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_check_weather_config',
             "Error checking weather config: $_");
@@ -441,7 +441,7 @@ sub poll_now :Path('/Weather/poll') :Args(0) {
     }
 
     my $config = try {
-        $self->weather_model->get_weather_config();
+        $self->weather_model->get_weather_config($c);
     } catch { undef };
 
     unless ($config && $config->{api_key}) {
@@ -454,8 +454,8 @@ sub poll_now :Path('/Weather/poll') :Args(0) {
         $self->weather_api->api_key($config->{api_key});
         $self->weather_api->api_service($config->{api_service} || 'openweathermap');
         my $data = $self->weather_api->get_current_weather($config);
-        $self->weather_model->cache_weather_data($config->{id}, 'current', $data);
-        $self->weather_model->record_weather_history($config->{id}, $data);
+        $self->weather_model->cache_weather_data($c, $config->{id}, 'current', $data);
+        $self->weather_model->record_weather_history($c, $config->{id}, $data);
         $c->session->{last_weather} = $self->_format_weather_response($data);
         return $data;
     } catch {
@@ -498,7 +498,7 @@ sub _get_current_weather {
     
     # Try to get cached data first
     my $cached_data = try {
-        return $self->weather_model->get_cached_weather_data('current', 30);
+        return $self->weather_model->get_cached_weather_data($c, 'current', 30);
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_get_current_weather', 
             "Error getting cached weather data: $_");
@@ -506,61 +506,33 @@ sub _get_current_weather {
     };
     
     if ($cached_data) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_get_current_weather', 
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_get_current_weather',
             'Using cached weather data');
         return $self->_format_weather_response($cached_data);
     }
-    
-    # Get fresh data from API
-    my $config = try {
-        return $self->weather_model->get_weather_config();
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_get_current_weather', 
-            "Error getting weather config: $_");
-        return undef;
-    };
-    
-    unless ($config && $config->{api_key}) {
-        # Return mock data if not configured
-        return {
-            temperature => 20,
-            condition => 'Configuration Required',
-            humidity => 0,
-            wind_speed => 0,
-            description => 'Weather API not configured',
-            icon => 'unknown',
-            timestamp => time(),
-            data_source => 'MOCK_DATA',
-            location => 'Unknown Location'
-        };
+
+    # Cache is stale or empty — return older data if available (cron poller updates the cache)
+    my $stale_data = try {
+        $self->weather_model->get_cached_weather_data($c, 'current', 1440);
+    } catch { undef };
+
+    if ($stale_data) {
+        $stale_data->{data_source} = 'CACHED_FALLBACK';
+        return $self->_format_weather_response($stale_data);
     }
-    
-    my $weather_data = try {
-        my $data = $self->weather_api->get_current_weather($config);
-        
-        # Cache the data
-        $self->weather_model->cache_weather_data($config->{id}, 'current', $data);
-        
-        # Track API usage
-        $self->weather_model->track_api_usage($config->{id}, $config->{api_service});
-        
-        return $data;
-    } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_get_current_weather', 
-            "Error getting current weather: $error");
-        
-        # Try to return the most recent cached data even if expired
-        my $fallback_data = $self->weather_model->get_cached_weather_data('current', 1440); # 24 hours
-        if ($fallback_data) {
-            $fallback_data->{data_source} = 'CACHED_FALLBACK';
-            return $self->_format_weather_response($fallback_data);
-        }
-        
-        die $error;
+
+    # No data at all — return mock placeholder
+    return {
+        temperature => undef,
+        condition   => 'No Data',
+        humidity    => undef,
+        wind_speed  => undef,
+        description => 'Run the weather poller to fetch live data',
+        icon        => undef,
+        timestamp   => time(),
+        data_source => 'MOCK_DATA',
+        location    => 'Unknown Location'
     };
-    
-    return $weather_data;
 }
 
 sub _get_forecast_data {
@@ -568,7 +540,7 @@ sub _get_forecast_data {
     
     # Try to get cached data first
     my $cached_data = try {
-        return $self->weather_model->get_cached_weather_data('forecast', 60); # 1 hour cache
+        return $self->weather_model->get_cached_weather_data($c, 'forecast', 60); # 1 hour cache
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_get_forecast_data', 
             "Error getting cached forecast data: $_");
@@ -583,7 +555,7 @@ sub _get_forecast_data {
     
     # Get fresh data from API
     my $config = try {
-        return $self->weather_model->get_weather_config();
+        return $self->weather_model->get_weather_config($c);
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_get_forecast_data', 
             "Error getting weather config: $_");
@@ -617,10 +589,10 @@ sub _get_forecast_data {
         my $data = $self->weather_api->get_forecast_weather($config);
         
         # Cache the data
-        $self->weather_model->cache_weather_data($config->{id}, 'forecast', $data);
+        $self->weather_model->cache_weather_data($c, $config->{id}, 'forecast', $data);
         
         # Track API usage
-        $self->weather_model->track_api_usage($config->{id}, $config->{api_service});
+        $self->weather_model->track_api_usage($c, $config->{id}, $config->{api_service});
         
         return $data;
     } catch {
@@ -629,7 +601,7 @@ sub _get_forecast_data {
             "Error getting forecast data: $error");
         
         # Try to return the most recent cached data even if expired
-        my $fallback_data = $self->weather_model->get_cached_weather_data('forecast', 1440); # 24 hours
+        my $fallback_data = $self->weather_model->get_cached_weather_data($c, 'forecast', 1440); # 24 hours
         if ($fallback_data) {
             $fallback_data->{data_source} = 'CACHED_FALLBACK';
             return $self->_format_forecast_response($fallback_data);
@@ -649,7 +621,7 @@ sub _get_weather_configuration {
     my $site_id = $c->session->{site_id};
     
     my $config = try {
-        return $self->weather_model->get_weather_config($user_id, $site_id);
+        return $self->weather_model->get_weather_config($c, $user_id, $site_id);
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_get_weather_configuration', 
             "Error getting weather configuration: $_");
@@ -711,7 +683,7 @@ sub _handle_configuration_save {
     $self->_ensure_weather_tables($c);
     
     my $result = try {
-        my $config_id = $self->weather_model->save_weather_config($config, $user_id, $site_id);
+        my $config_id = $self->weather_model->save_weather_config($c, $config, $user_id, $site_id);
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_handle_configuration_save', 
             "Weather configuration saved with ID: $config_id for user: $user_id, site: $site_id");

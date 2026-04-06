@@ -125,6 +125,7 @@ for my $config (@configs) {
     my %row = (
         config_id             => $config_id,
         data_type             => 'current',
+        retrieved_at          => strftime('%Y-%m-%d %H:%M:%S', localtime),
         temperature           => $data->{main}{temp},
         feels_like            => $data->{main}{feels_like},
         humidity              => $data->{main}{humidity},
