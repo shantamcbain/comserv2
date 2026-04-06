@@ -2595,15 +2595,81 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
 
     # ── Project dependencies (cross-project blocking) ─────────────────────────
     my @project_deps;
+    my $auto_resolved_count = 0;
+    my $auto_detected_count = 0;
+    my @done_statuses_dep   = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+
     eval {
+        my $prs  = $c->model('DBEncy')->resultset('Project');
+        my $tdrs = $c->model('DBEncy')->resultset('Todo');
+
+        # ── Step 1: Auto-detect cross-project todo-level blocks ────────────────
+        # Find todos with blocked_by_todo_id pointing to a todo in a DIFFERENT project
+        my @blocked_todos = $tdrs->search(
+            {
+                'me.blocked_by_todo_id' => { '!=' => undef },
+                'me.status'             => { -not_in => \@done_statuses_dep },
+                'me.project_id'         => { '!=' => undef },
+            }
+        )->all;
+
+        for my $blocked (@blocked_todos) {
+            my $blocker_todo_id = $blocked->blocked_by_todo_id // next;
+            my $blocker = eval { $tdrs->find($blocker_todo_id) };
+            next unless $blocker && $blocker->project_id;
+            next if $blocker->project_id == $blocked->project_id;
+
+            my $bs = $blocker->status // 0;
+            next if ($bs == 3 || $bs == 4 || $bs =~ /^(done|completed|closed)$/i);
+
+            my $existing = eval {
+                $c->model('DBEncy')->resultset('ProjectDependency')->find({
+                    project_id    => $blocked->project_id,
+                    depends_on_id => $blocker->project_id,
+                })
+            };
+            unless ($existing) {
+                eval {
+                    $c->model('DBEncy')->resultset('ProjectDependency')->create({
+                        project_id      => $blocked->project_id,
+                        depends_on_id   => $blocker->project_id,
+                        dependency_type => 'blocks',
+                        status          => 'active',
+                        sitename        => $sitename,
+                        created_by      => 'auto-detect',
+                        description     => "Auto-detected: '"
+                            . ($blocked->subject // '?') . "' blocked by '"
+                            . ($blocker->subject // '?') . "'",
+                    });
+                    $auto_detected_count++;
+                };
+            }
+        }
+
+        # ── Step 2: Fetch active deps and auto-resolve completed ones ──────────
         my @dep_rows = $c->model('DBEncy')->resultset('ProjectDependency')->search(
             { status => 'active' },
             { order_by => { -asc => 'project_id' } }
         )->all;
 
         my %proj_name_cache;
-        my $prs = $c->model('DBEncy')->resultset('Project');
         for my $dep (@dep_rows) {
+            # Check if the blocking project still has open todos
+            my $open_count = eval {
+                $tdrs->search({
+                    project_id => $dep->depends_on_id,
+                    status     => { -not_in => \@done_statuses_dep },
+                })->count
+            } // 1;
+
+            if (defined $open_count && $open_count == 0) {
+                eval {
+                    $dep->update({ status => 'resolved', resolved_at => \'NOW()' });
+                };
+                $auto_resolved_count++;
+                next;
+            }
+
             my %d = $dep->get_columns;
             for my $fid ($d{project_id}, $d{depends_on_id}) {
                 unless (exists $proj_name_cache{$fid}) {
@@ -2618,7 +2684,7 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     };
     if ($@) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
-            "Could not fetch project dependencies: $@");
+            "Could not fetch/process project dependencies: $@");
     }
 
     # Pass all date information and todos to template
@@ -2663,8 +2729,10 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         todos           => $all_todos_calendar,    # For week.tt
         todos_for_today => $todos_for_today,       # For day view
         active_priorities    => \@active_priorities,    # DB-driven priority list for TODAY'S FOCUS
-        project_deps         => \@project_deps,         # Cross-project blocking dependencies
-        active_blockers      => [ grep { $_->{dependency_type} eq 'blocks' && $_->{status} eq 'active' } @project_deps ],
+        project_deps          => \@project_deps,
+        active_blockers       => [ grep { $_->{dependency_type} eq 'blocks' && $_->{status} eq 'active' } @project_deps ],
+        dep_auto_resolved     => $auto_resolved_count,
+        dep_auto_detected     => $auto_detected_count,
 
         template => 'admin/documentation/DailyPlan.tt'
     );
