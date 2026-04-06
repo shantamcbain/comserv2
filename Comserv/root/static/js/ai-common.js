@@ -36,13 +36,13 @@ const AIUtils = {
      */
     renderTextWithLinks: function(text) {
         if (!text) return '';
-        // Tokenise: split on markdown links [label](url) and bare URLs
-        const TOKEN_RE = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)|(https?:\/\/[^\s<>")\]]+)/g;
+        // Tokenise: markdown links [label](url), bare https:// URLs, bare /paths
+        // Group 1+2 = markdown link, group 3 = bare URL, group 4 = bare /path
+        const TOKEN_RE = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)|(https?:\/\/[^\s<>")\]]+)|(\/[a-zA-Z][a-zA-Z0-9_\-/.?=&#%]*)/g;
         let result = '';
         let lastIndex = 0;
         let match;
         while ((match = TOKEN_RE.exec(text)) !== null) {
-            // Escape and flush the plain text before this match
             if (match.index > lastIndex) {
                 result += this.escapeHtml(text.slice(lastIndex, match.index));
             }
@@ -53,16 +53,24 @@ const AIUtils = {
                 const sameOrigin = url.startsWith(window.location.origin + '/') || url.startsWith('/');
                 const target = sameOrigin ? '_self' : '_blank';
                 result += `<a href="${url}" target="${target}" rel="noopener noreferrer">${label}</a>`;
-            } else {
-                // Bare URL
+            } else if (match[3] !== undefined) {
+                // Bare https:// URL
                 const url = this.escapeHtml(match[3]);
                 const sameOrigin = url.startsWith(window.location.origin + '/');
                 const target = sameOrigin ? '_self' : '_blank';
                 result += `<a href="${url}" target="${target}" rel="noopener noreferrer">${url}</a>`;
+            } else if (match[4] !== undefined) {
+                // Bare /path — only linkify if preceded by whitespace, line start, or punctuation
+                const path = match[4];
+                const preceding = match.index > 0 ? text[match.index - 1] : ' ';
+                if (/[\s(,:\n]/.test(preceding)) {
+                    result += `<a href="${this.escapeHtml(path)}" target="_self" rel="noopener noreferrer">${this.escapeHtml(path)}</a>`;
+                } else {
+                    result += this.escapeHtml(path);
+                }
             }
             lastIndex = TOKEN_RE.lastIndex;
         }
-        // Flush any remaining plain text
         if (lastIndex < text.length) {
             result += this.escapeHtml(text.slice(lastIndex));
         }

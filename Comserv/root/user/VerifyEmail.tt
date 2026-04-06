@@ -23,8 +23,13 @@
         
         <div class="content-primary">
             
-            [% IF error_msg %]
+            [% IF flash.error_msg %]
+                <div class="error">[% flash.error_msg %]</div>
+            [% ELSIF error_msg %]
                 <div class="error">[% error_msg %]</div>
+            [% END %]
+            [% IF flash.success_msg %]
+                <div class="success">[% flash.success_msg %]</div>
             [% END %]
 
             [% SET code_display = c.session.verification_code_display %]
@@ -52,7 +57,7 @@
                         <div class="form-row">
                             <div class="form-field">
                                 <label for="code">Verification Code (6 digits)</label>
-                                <input type="text" id="code" name="code" class="form-input" maxlength="6" pattern="\d{6}" placeholder="000000" required>
+                                <input type="text" id="code" name="code" class="form-input" maxlength="6" pattern="\d{6}" placeholder="000000" required autocomplete="one-time-code">
                             </div>
                         </div>
                     </div>
@@ -62,6 +67,17 @@
                         <a href="[% c.uri_for('/user/register') %]" class="btn btn-secondary">Start Over</a>
                     </div>
                 </form>
+            </div>
+
+            <div class="resend-section" style="margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--border-color);">
+                <p><strong>Didn't receive a code?</strong> You can request a new one:</p>
+                <form method="post" action="[% c.uri_for('/user/resend_verification_code') %]">
+                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
+                    <button type="submit" class="btn btn-secondary">Send New Code</button>
+                </form>
+                <p style="margin-top:0.5rem; font-size:0.9em; color:var(--text-muted);">
+                    Codes expire after 24 hours. A new code can only be sent once every 2 minutes.
+                </p>
             </div>
             
         </div>

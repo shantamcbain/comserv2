@@ -1,0 +1,291 @@
+[% META
+   title = "Drug Detail - Encyclopedia of Biological Life"
+   description = "View and edit pharmaceutical drug details in the ENCY encyclopedia"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-04"
+%]
+[% PageVersion = 'ENCY/DrugDetail.tt,v 0.01 2026/04/04' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF success_msg || c.flash.success_msg %]
+<div class="alert alert-success">[% success_msg || c.flash.success_msg | html %]</div>
+[% END %]
+[% IF error_msg || c.flash.error_msg %]
+<div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
+[% END %]
+
+[% roles = c.session.roles;
+   is_admin = 0;
+   FOREACH r IN roles;
+     IF r == 'admin'; is_admin = 1; END;
+   END;
+%]
+
+[% IF edit_mode %]
+<h1>Editing Drug: [% drug.brand_name || drug.generic_name | html %]</h1>
+[% ELSE %]
+<h1>[% drug.brand_name | html %]
+  [% IF drug.generic_name && drug.generic_name != drug.brand_name %]
+    <small>([% drug.generic_name | html %])</small>
+  [% END %]
+</h1>
+[% END %]
+
+<p><a href="[% c.uri_for('/ENCY/Drug') %]">&larr; Back to Drugs</a>
+[% IF is_admin && !edit_mode && drug.record_id %]
+  | <a href="[% c.uri_for('/ENCY/Drug/edit', { record_id => drug.record_id }) %]">Edit</a>
+[% END %]
+</p>
+
+[% IF edit_mode %]
+<form action="[% IF drug.record_id %][% c.uri_for('/ENCY/Drug/edit') %][% ELSE %][% c.uri_for('/ENCY/Drug/add') %][% END %]" method="post">
+[% IF drug.record_id %]
+<input type="hidden" name="record_id" value="[% drug.record_id %]" />
+[% END %]
+[% END %]
+
+<h2>Identification</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Brand Name</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="brand_name" value="[% drug.brand_name | html %]" size="50" />[% ELSE %][% drug.brand_name | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Generic Name</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="generic_name" value="[% drug.generic_name | html %]" size="50" />[% ELSE %][% drug.generic_name | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>INN Name</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="inn_name" value="[% drug.inn_name | html %]" size="50" />[% ELSE %][% drug.inn_name | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Drug Class</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="drug_class" value="[% drug.drug_class | html %]" size="40" />[% ELSE %][% drug.drug_class | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Drug Subclass</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="drug_subclass" value="[% drug.drug_subclass | html %]" size="50" />[% ELSE %][% drug.drug_subclass | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Formulation</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="formulation" value="[% drug.formulation | html %]" size="30" />[% ELSE %][% drug.formulation | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Strength</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="strength" value="[% drug.strength | html %]" size="30" />[% ELSE %][% drug.strength | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Package Size</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="package_size" value="[% drug.package_size | html %]" size="20" />[% ELSE %][% drug.package_size | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Route of Administration</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="route_of_administration" value="[% drug.route_of_administration | html %]" size="30" />[% ELSE %][% drug.route_of_administration | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Prescription Status</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <select name="prescription_status">
+                <option value="Rx"[% IF drug.prescription_status == 'Rx' %] selected[% END %]>Rx (Prescription Only)</option>
+                <option value="OTC"[% IF drug.prescription_status == 'OTC' %] selected[% END %]>OTC (Over the Counter)</option>
+                <option value="Schedule"[% IF drug.prescription_status == 'Schedule' %] selected[% END %]>Scheduled</option>
+                <option value="Controlled"[% IF drug.prescription_status == 'Controlled' %] selected[% END %]>Controlled</option>
+            </select>
+            [% ELSE %]
+            [% drug.prescription_status | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>DIN Number</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="din_number" value="[% drug.din_number | html %]" size="20" /> <small style="color:#888;">Health Canada DIN — verify at <a href="https://health-products.canada.ca/dpd-bdpp/index-eng.jsp" target="_blank">canada.ca/dpd</a></small>[% ELSE %][% drug.din_number | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>NDC Code</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="ndc_code" value="[% drug.ndc_code | html %]" size="20" />[% ELSE %][% drug.ndc_code | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>ATC Code</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="atc_code" value="[% drug.atc_code | html %]" size="20" />[% ELSE %][% drug.atc_code | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Manufacturer</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="manufacturer" value="[% drug.manufacturer | html %]" size="50" />[% ELSE %][% drug.manufacturer | html %][% END %]</td>
+    </tr>
+</table>
+
+<h2>Composition</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Active Ingredients</strong></td>
+        <td>[% IF edit_mode %]<textarea name="active_ingredients" rows="4" cols="60">[% drug.active_ingredients | html %]</textarea>[% ELSE %][% drug.active_ingredients | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Inactive Ingredients</strong></td>
+        <td>[% IF edit_mode %]<textarea name="inactive_ingredients" rows="4" cols="60">[% drug.inactive_ingredients | html %]</textarea>[% ELSE %][% drug.inactive_ingredients | html %][% END %]</td>
+    </tr>
+</table>
+
+<h2>Pharmacology</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Mechanism of Action</strong></td>
+        <td>[% IF edit_mode %]<textarea name="mechanism_of_action" rows="5" cols="60">[% drug.mechanism_of_action | html %]</textarea>[% ELSE %][% drug.mechanism_of_action | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Pharmacokinetics</strong></td>
+        <td>[% IF edit_mode %]<textarea name="pharmacokinetics" rows="5" cols="60">[% drug.pharmacokinetics | html %]</textarea>[% ELSE %][% drug.pharmacokinetics | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Pharmacodynamics</strong></td>
+        <td>[% IF edit_mode %]<textarea name="pharmacodynamics" rows="5" cols="60">[% drug.pharmacodynamics | html %]</textarea>[% ELSE %][% drug.pharmacodynamics | html %][% END %]</td>
+    </tr>
+</table>
+
+<h2>Clinical Use</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Indications</strong></td>
+        <td>[% IF edit_mode %]<textarea name="indications" rows="5" cols="60">[% drug.indications | html %]</textarea>[% ELSE %][% drug.indications | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Contraindications</strong></td>
+        <td>[% IF edit_mode %]<textarea name="contraindications" rows="4" cols="60">[% drug.contraindications | html %]</textarea>[% ELSE %][% drug.contraindications | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Warnings</strong></td>
+        <td>[% IF edit_mode %]<textarea name="warnings" rows="4" cols="60">[% drug.warnings | html %]</textarea>[% ELSE %][% drug.warnings | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Side Effects</strong></td>
+        <td>[% IF edit_mode %]<textarea name="side_effects" rows="5" cols="60">[% drug.side_effects | html %]</textarea>[% ELSE %][% drug.side_effects | html %][% END %]</td>
+    </tr>
+</table>
+
+<h2>Dosage</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Adult Dosage</strong></td>
+        <td>[% IF edit_mode %]<textarea name="dosage_adult" rows="4" cols="60">[% drug.dosage_adult | html %]</textarea>[% ELSE %][% drug.dosage_adult | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Pediatric Dosage</strong></td>
+        <td>[% IF edit_mode %]<textarea name="dosage_pediatric" rows="3" cols="60">[% drug.dosage_pediatric | html %]</textarea>[% ELSE %][% drug.dosage_pediatric | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Geriatric Dosage</strong></td>
+        <td>[% IF edit_mode %]<textarea name="dosage_geriatric" rows="3" cols="60">[% drug.dosage_geriatric | html %]</textarea>[% ELSE %][% drug.dosage_geriatric | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Typical Duration</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="duration_typical" value="[% drug.duration_typical | html %]" size="40" />[% ELSE %][% drug.duration_typical | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Storage</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="storage" value="[% drug.storage | html %]" size="60" />[% ELSE %][% drug.storage | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Pregnancy Category</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="pregnancy_category" value="[% drug.pregnancy_category | html %]" size="10" />[% ELSE %][% drug.pregnancy_category | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Breastfeeding Notes</strong></td>
+        <td>[% IF edit_mode %]<textarea name="breastfeeding_notes" rows="3" cols="60">[% drug.breastfeeding_notes | html %]</textarea>[% ELSE %][% drug.breastfeeding_notes | html %][% END %]</td>
+    </tr>
+</table>
+
+<h2>Interactions</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Drug-Drug Interactions</strong></td>
+        <td>[% IF edit_mode %]<textarea name="drug_interactions" rows="5" cols="60">[% drug.drug_interactions | html %]</textarea>[% ELSE %][% drug.drug_interactions | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Herb-Drug Interactions</strong></td>
+        <td>[% IF edit_mode %]<textarea name="herb_drug_interactions" rows="5" cols="60">[% drug.herb_drug_interactions | html %]</textarea>[% ELSE %][% drug.herb_drug_interactions | html %][% END %]</td>
+    </tr>
+</table>
+
+<h2>Integrative &amp; Natural Health Perspective</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Herbal Alternatives</strong></td>
+        <td>[% IF edit_mode %]<textarea name="herbal_alternatives" rows="5" cols="60">[% drug.herbal_alternatives | html %]</textarea>
+            <br/><small style="color:#888;">List herbs by common or botanical name. Cross-references to ENCY herb records added in future release. Also see Herb-Drug Interactions table for linked herb data.</small>
+        [% ELSE %][% drug.herbal_alternatives | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>Naturopathic Notes</strong></td>
+        <td>[% IF edit_mode %]<textarea name="naturopathic_notes" rows="5" cols="60">[% drug.naturopathic_notes | html %]</textarea>[% ELSE %][% drug.naturopathic_notes | html %][% END %]</td>
+    </tr>
+</table>
+
+<h2>References &amp; Metadata</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Reference</strong></td>
+        <td>[% IF edit_mode %]<textarea name="reference" rows="3" cols="60">[% drug.reference | html %]</textarea>
+            <br/><small style="color:#888;">Free-text citation. Formal reference linking to the ENCY reference library is planned. You can save partially and return to add more — data is preserved incrementally.</small>
+        [% ELSE %][% drug.reference | html %][% END %]</td>
+    </tr>
+    <tr>
+        <td><strong>URL</strong></td>
+        <td>[% IF edit_mode %]<input type="text" name="url" value="[% drug.url | html %]" size="60" />[% ELSE %][% IF drug.url %]<a href="[% drug.url | html %]" target="_blank">[% drug.url | html %]</a>[% END %][% END %]</td>
+    </tr>
+    [% IF edit_mode %]
+    <tr>
+        <td><strong>Site Name</strong></td>
+        <td><input type="text" name="sitename" value="[% drug.sitename || 'ENCY' | html %]" size="20" /></td>
+    </tr>
+    [% END %]
+</table>
+
+[% IF related_diseases && related_diseases.size %]
+<h2>Related Diseases / Conditions</h2>
+<ul>
+    [% FOREACH disease IN related_diseases %]
+    <li><a href="[% c.uri_for('/ENCY/Disease', disease.record_id) %]">[% disease.common_name | html %]</a></li>
+    [% END %]
+</ul>
+[% END %]
+
+[% IF related_symptoms && related_symptoms.size %]
+<h2>Related Symptoms</h2>
+<ul>
+    [% FOREACH symptom IN related_symptoms %]
+    <li><a href="[% c.uri_for('/ENCY/Symptom', symptom.record_id) %]">[% symptom.name | html %]</a></li>
+    [% END %]
+</ul>
+[% END %]
+
+[% IF herb_interactions && herb_interactions.size %]
+<h2>Herb-Drug Interactions</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <th>Herb</th>
+        <th>Interaction Type</th>
+        <th>Severity</th>
+        <th>Clinical Significance</th>
+    </tr>
+    [% FOREACH hi IN herb_interactions %]
+    <tr>
+        <td>[% hi.herb_id | html %]</td>
+        <td>[% hi.interaction_type | html %]</td>
+        <td>[% hi.severity | html %]</td>
+        <td>[% hi.clinical_significance | html %]</td>
+    </tr>
+    [% END %]
+</table>
+[% END %]
+
+[% IF edit_mode %]
+[% PROCESS 'ENCY/partials/AiFormFill.tt' %]
+<br/>
+<input type="submit" value="[% IF drug.record_id %]Update Drug[% ELSE %]Add Drug[% END %]" class="btn btn-primary" />
+<a href="[% c.uri_for('/ENCY/Drug') %]" class="btn btn-default">Cancel</a>
+</form>
+[% END %]

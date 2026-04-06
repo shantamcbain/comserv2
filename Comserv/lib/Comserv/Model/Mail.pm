@@ -1,12 +1,11 @@
 package Comserv::Model::Mail;
 use Moose;
 use namespace::autoclean;
-use Email::Simple;
-use Email::Sender::Simple qw(sendmail);
-use Email::Sender::Transport::SMTP;
 use Try::Tiny;
 use LWP::UserAgent;
 use HTTP::Request;
+use Email::MIME;
+use Encode qw(encode);
 use Comserv::Util::Logging;
 use Comserv::Util::HealthLogger;
 extends 'Catalyst::Model';
@@ -21,8 +20,12 @@ sub send_email {
     my ($self, $c, $to, $subject, $body, $site_id, $opts) = @_;
     $opts ||= {};
     
-    # Use site_id from parameter or session
-    $site_id //= $c->session->{site_id};
+    # Use site_id from parameter or session — use || not // so empty string falls through
+    $site_id ||= $c->session->{site_id};
+    $site_id ||= $c->stash->{site_id};
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+        "Resolved site_id=" . ($site_id // 'undef') . " (will look up SMTP config from DB)");
     
     # Log the email attempt
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email', 
@@ -39,14 +42,9 @@ sub send_email {
         return;
     }
 
-    # Use Net::SMTP for more reliable email sending
+    # Use Net::SMTP for reliable email sending
     require Net::SMTP;
-    require MIME::Lite;
-    require Authen::SASL;
-    
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-        "Using Net::SMTP for email sending");
-    
+
     my $system_from  = $smtp_config->{from} || 'noreply@computersystemconsulting.ca';
     my $leader_name  = $opts->{leader_name}  || '';
     my $leader_email = $opts->{reply_to}     || '';  # leader's real email
@@ -63,38 +61,62 @@ sub send_email {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
         "Email envelope: MAIL FROM=<$smtp_from> From-header='$from_header' To=<$to>");
 
-    # Create a MIME::Lite message
-    my $msg = MIME::Lite->new(
+    # Build headers for Email::MIME
+    my @headers = (
         From    => $from_header,
         To      => $to,
         Subject => $subject,
-        Type    => 'text/plain',
-        Data    => $body
     );
-    
+    push @headers, ('Reply-To' => $leader_email) if $leader_email;
+
+    # Create Email::MIME message (Email::MIME is installed; MIME::Lite is not)
+    my $msg = Email::MIME->create(
+        header_str => \@headers,
+        attributes => {
+            encoding => 'quoted-printable',
+            charset  => 'UTF-8',
+        },
+        body_str => $body,
+    );
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+        "Message built: From='$from_header' To='$to' Subject='$subject'" .
+        ($leader_email ? " Reply-To='$leader_email'" : ''));
+
     try {
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-            "SMTP settings: " . $smtp_config->{host} . ":" . $smtp_config->{port} .
-            ", SSL: " . ($smtp_config->{ssl} // 'none'));
-        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+            "Connecting to SMTP: " . $smtp_config->{host} . ":" . $smtp_config->{port} .
+            " ssl=" . ($smtp_config->{ssl} || 'none') .
+            " auth=" . ($smtp_config->{user} ? 'yes('.$smtp_config->{user}.')' : 'no'));
+
+        # Determine SSL mode:
+        #   ssl='ssl' or port 465 → SSL at connect time (implicit TLS)
+        #   ssl='starttls' or port 587 → plain connect then STARTTLS
+        #   anything else → plain (port 25, no encryption — LAN relay only)
+        my $ssl_setting = lc($smtp_config->{ssl} // '');
+        my $port        = $smtp_config->{port} || 25;
+        my $use_ssl     = ($ssl_setting eq 'ssl' || $port == 465) ? 1 : 0;
+        my $use_starttls = ($ssl_setting eq 'starttls' || $port == 587) ? 1 : 0;
+
         # Connect to the SMTP server
         my $smtp = Net::SMTP->new(
             $smtp_config->{host},
-            Port    => $smtp_config->{port},
-            Debug   => 0,
+            Port    => $port,
+            SSL     => $use_ssl,
+            Debug   => 1,
             Timeout => 15
         );
         
         unless ($smtp) {
-            die "CONNECT failed: Could not connect to " . $smtp_config->{host} . ":" . $smtp_config->{port} . ": $!";
+            die "CONNECT failed: Could not connect to " . $smtp_config->{host} . ":$port"
+              . ($use_ssl ? " (SSL)" : "") . ": $!";
         }
         
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-            "SMTP CONNECT OK: " . $smtp_config->{host} . ":" . $smtp_config->{port});
+            "SMTP CONNECT OK: " . $smtp_config->{host} . ":$port" . ($use_ssl ? " (SSL)" : ""));
         
-        # Start TLS if needed
-        my $ssl_setting = $smtp_config->{ssl} // '';
-        if ($ssl_setting eq 'starttls' || $ssl_setting eq '1') {
+        # STARTTLS upgrade if needed (port 587 / explicit TLS)
+        if ($use_starttls) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
                 "SMTP STARTTLS begin");
             $smtp->starttls() or die "STARTTLS failed: " . $smtp->message();
@@ -102,14 +124,20 @@ sub send_email {
                 "SMTP STARTTLS OK");
         }
         
-        # Authenticate if credentials are provided
-        if ($smtp_config->{username} && $smtp_config->{password}) {
+        # Authenticate if credentials are provided (PMG relay at port 25 needs no auth)
+        if ($smtp_config->{user} && $smtp_config->{password}) {
+            require Authen::SASL;
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-                "SMTP AUTH as " . $smtp_config->{username});
-            $smtp->auth($smtp_config->{username}, $smtp_config->{password})
+                "SMTP AUTH as " . $smtp_config->{user});
+            $smtp->auth($smtp_config->{user}, $smtp_config->{password})
                 or die "AUTH failed: " . $smtp->message();
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
                 "SMTP AUTH OK");
+        } else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_email',
+                "SMTP no-auth: user='" . ($smtp_config->{user} // '') . "' password=" .
+                ($smtp_config->{password} ? '(set)' : '(NOT SET)') .
+                " — harper will reject if auth required");
         }
         
         # MAIL FROM
@@ -125,7 +153,7 @@ sub send_email {
         $smtp->to($to) or do {
             my $msg_detail = $smtp->message() || 'no response';
             $smtp->quit();
-            die "RCPT TO failed for <$to>: $msg_detail";
+            die "RCPT TO failed for [$to]: $msg_detail";
         };
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
             "SMTP RCPT TO accepted for <$to>");
@@ -134,7 +162,8 @@ sub send_email {
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
             "SMTP DATA begin for <$to>");
         $smtp->data() or die "DATA cmd failed: " . $smtp->message();
-        $smtp->datasend($msg->as_string()) or die "DATASEND failed: " . $smtp->message();
+        # Encode to UTF-8 bytes — Net::SMTP::datasend cannot handle wide-character Perl strings
+        $smtp->datasend(encode('UTF-8', $msg->as_string())) or die "DATASEND failed: " . $smtp->message();
         $smtp->dataend() or die "DATAEND failed: " . $smtp->message();
         $smtp->quit();
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
@@ -208,92 +237,110 @@ sub get_smtp_config {
         return $self->_get_fallback_smtp_config($c, $site_id);
     }
 
-    # Retrieve SMTP configuration for the given site_id
+    # Retrieve SMTP configuration for the given site_id.
+    # DB keys: smtp_host, smtp_port, smtp_user, smtp_password, smtp_from, smtp_ssl
+    # Internal keys (in returned hashref): host, port, user, password, from, ssl
+    # NOTE: user, password, ssl are optional — PMG relay (192.168.1.128:25) needs no auth
     my %smtp_config;
-    for my $key (qw(host port username password from ssl)) {
+    for my $key (qw(host port user password from ssl)) {
+        my $db_key = "smtp_$key";
         my $config;
         eval {
-            $config = $config_rs->find({ site_id => $site_id, config_key => "smtp_$key" });
+            $config = $config_rs->find({ site_id => $site_id, config_key => $db_key });
         };
-        
+
         if ($@) {
             my $error_msg = $@;
-            
             if ($error_msg =~ /Table.*ency\.site_config.*doesn.*exist/i) {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config', 
-                    "CRITICAL: Table 'ency.site_config' doesn't exist when accessing smtp_$key for site_id $site_id. " .
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config',
+                    "CRITICAL: Table 'ency.site_config' doesn't exist when accessing $db_key for site_id $site_id. " .
                     "Mail system is incorrectly connecting to localhost instead of production database server (192.168.1.198). " .
                     "Full error: $error_msg");
             } else {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_smtp_config',
-                    "Database error accessing smtp_$key for site_id $site_id: $error_msg — using PMG fallback");
+                    "Database error accessing $db_key for site_id $site_id: $error_msg — using PMG fallback");
             }
-            
             return $self->_get_fallback_smtp_config($c, $site_id);
         }
-        
-        # Skip optional fields like ssl
-        next if !$config && $key eq 'ssl';
-        
-        # Return fallback if any required config is missing
-        unless ($config) {
+
+        # user, password, ssl are optional — skip if not configured.
+        # Also check legacy key 'smtp_username' for backwards compatibility with old DB data.
+        if (!$config && $key eq 'user') {
+            eval {
+                $config = $config_rs->find({ site_id => $site_id, config_key => 'smtp_username' });
+            };
+            if ($config) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
+                    "Found legacy key 'smtp_username' for site_id $site_id (should be 'smtp_user')");
+            }
+        }
+        if (!$config && ($key eq 'ssl' || $key eq 'user' || $key eq 'password')) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_smtp_config',
-                "Missing SMTP config key: smtp_$key for site_id $site_id — using PMG fallback");
+                "Optional $db_key not set for site_id $site_id — skipping");
+            $smtp_config{$key} = '' if $key eq 'ssl';
+            next;
+        }
+
+        # Required fields: host, port, from — fall back to PMG if missing
+        unless ($config) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_smtp_config',
+                "Required $db_key missing for site_id $site_id — using PMG fallback");
             return $self->_get_fallback_smtp_config($c, $site_id);
         }
-        
+
         $smtp_config{$key} = $config->config_value;
-        
-        # Route all outbound mail through the PMG relay (192.168.1.128)
-        # rather than connecting directly to external SMTP servers
-        if ($key eq 'host') {
-            my $original_host = $smtp_config{$key};
-            if ($original_host eq 'mail1.ht.home') {
-                $smtp_config{$key} = '192.168.1.128';
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
-                    "Redirecting mail1.ht.home through PMG relay 192.168.1.128");
-            } elsif ($original_host ne '192.168.1.128' && $original_host ne '192.168.1.129') {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
-                    "Redirecting external SMTP host '$original_host' through PMG relay 192.168.1.128");
-                $smtp_config{$key} = '192.168.1.128';
-            }
-        }
-        # PMG relay uses port 25, no SSL, no auth — override port and ssl from DB config
-        if ($key eq 'port') {
-            $smtp_config{$key} = 25;
-        }
-        if ($key eq 'ssl') {
-            $smtp_config{$key} = '';
-        }
     }
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config', 
-        "Successfully retrieved SMTP config for site_id $site_id");
-    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
+        "SMTP config resolved for site_id $site_id: host=" . ($smtp_config{host} // 'undef') .
+        " port=" . ($smtp_config{port} // 'undef') .
+        " from=" . ($smtp_config{from} // 'undef') .
+        " ssl=" . ($smtp_config{ssl} // 'none') .
+        " auth=" . ($smtp_config{user} ? 'yes' : 'no'));
+
     return \%smtp_config;
 }
 
 # Fallback SMTP configuration when database config is unavailable
 sub _get_fallback_smtp_config {
     my ($self, $c, $site_id) = @_;
-    
-    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_fallback_smtp_config', 
-        "Using fallback SMTP config for site_id $site_id");
-    
-    # Provide default mail server configuration - relay through PMG
-    my $fallback_config = {
-        host => '192.168.1.128',  # PMG (Proxmox Mail Gateway) relay
-        port => 25,
-        username => '',
+
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_fallback_smtp_config',
+        "No SMTP config for site_id '$site_id' — trying CSC (site_id=1) credentials as system fallback");
+
+    # Try to load CSC's (site_id=1) SMTP config from DB — it has real credentials for harper
+    if ($c && ref($c) && $c->can('model')) {
+        my %csc_config;
+        eval {
+            my $config_rs = $c->model('DBEncy')->resultset('SiteConfig');
+            for my $key (qw(host port user password from ssl)) {
+                my $db_key = "smtp_$key";
+                my $row = $config_rs->find({ site_id => 1, config_key => $db_key });
+                $row ||= $config_rs->find({ site_id => 1, config_key => 'smtp_username' })
+                    if $key eq 'user';
+                $csc_config{$key} = $row ? $row->config_value : '';
+            }
+        };
+        if (!$@ && $csc_config{host} && $csc_config{user} && $csc_config{password}) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_fallback_smtp_config',
+                "Using CSC SMTP credentials as fallback: host=$csc_config{host} port=$csc_config{port} user=$csc_config{user}");
+            return \%csc_config;
+        }
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_fallback_smtp_config',
+            "CSC fallback also unavailable (DB error or missing keys)" . ($@ ? ": $@" : ''));
+    }
+
+    # Last resort: anonymous — will only work if harper allows unauthenticated relay (it doesn't)
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_get_fallback_smtp_config',
+        "No authenticated SMTP config available — anonymous fallback will fail on harper:465");
+    return {
+        host     => 'harper.whc.ca',
+        port     => 465,
+        ssl      => 'ssl',
+        user     => '',
         password => '',
-        from => "noreply\@computersystemconsulting.ca",
-        ssl => ''
+        from     => 'noreply@computersystemconsulting.ca',
     };
-    
-    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_fallback_smtp_config', 
-        "Fallback config provided - mail server: " . $fallback_config->{host});
-    
-    return $fallback_config;
 }
 
 # New method to create mail accounts via Virtualmin API

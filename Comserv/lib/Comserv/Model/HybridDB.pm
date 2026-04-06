@@ -5,7 +5,7 @@ use warnings;
 use base 'Catalyst::Model';
 use DBI;
 use DBD::SQLite;
-use DBD::mysql;
+use DBD::MariaDB;
 use Try::Tiny;
 use File::Spec;
 use JSON;

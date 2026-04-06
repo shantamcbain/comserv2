@@ -1,0 +1,66 @@
+[%
+
+# the ENCY template
+#	$Id: ENCYHomeView.ttml,v 1.2 2002/05/13 19:25:15 shanta Exp $	
+#file location/cgi-bin/HTMLTemplates/ENCY
+%]
+[% PROCESS DefaultDbi.ttml %]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','ENCY Home page.']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% LastUpdate = data.last_update %]
+   [% SiteLastUpdate = data.site_last_update %]
+
+<div ALIGN="center">
+	[% IF username %]
+
+<h3 > Hello  [% firstname%]  [% lastname%]! Welcome to The Encyclopaedia of Biological life!</h3>
+	  
+
+	[% ELSE %]
+
+	<h3>  Hello! Welcome to The Encyclopaedia of Biological life!</h3
+
+	[% END %]
+
+</div>
+<div ALIGN="center">
+<A NAME="PageTop"></A>
+</div>
+
+
+
+     
+        <h2>Your dynamic link to alternate health information.</h2>
+      
+      <p>ENCY brings you the a compressive reference to natural health that evolves 
+        to your needs. We are constantly updating the information in this reference. 
+        Information comes from herbals, Medical text and journals, growers, foragers, 
+        herbalist, even our users. We try to verify all information the best we 
+        can. 
+      <p>All references of uses are for information only. You should consult your 
+        practitioner team before using any products for your health. This applies 
+        to all treatments and therapies that you may be considering in your personal 
+        health program. 
+      <p>Our practitioner profiles will help you to know what to expect from each 
+        practitioner type and how they can help you in your health care program. 
+ <div ALIGN="center">
+<a href="../CSC/helpdesk.cgi?[% session_string %]" target="_Blank" > HelpDesk</a>
+<p>Last Updated: [% SiteLastUpdate  %] 
+
+[% embed('CSCCopyRight') %]
+[% embed(data.page_bottom_view) %]
+

@@ -19,17 +19,14 @@
   <div class="content-container">
     <div class="content-primary">
 
-      <!-- ── Site Credits ────────────────────────────── -->
+      <!-- ── Points Balance ─────────────────────────── -->
       <div class="content-section">
-        <h2>Site Credits (Coins)</h2>
-        [% IF currency_account %]
-        <p>Balance: <strong style="font-size:1.15em;color:var(--success-color,#27ae60)">[% currency_account.balance %] coins</strong></p>
-        [% ELSE %]
-        <p style="color:#888">No coin account yet.</p>
-        [% END %]
+        <h2>My Points</h2>
+        <p>Balance: <strong style="font-size:1.15em;color:var(--success-color,#27ae60)">[% point_balance | format('%.2f') %] points</strong></p>
+        <p style="font-size:0.85em;color:#888">1 point = 1 CAD &mdash; use points to pay for memberships and services.</p>
         <div class="form-actions">
-          <a href="[% c.uri_for('/payment/buy/coins') %]" class="btn btn-primary">Buy Coins</a>
-          <a href="[% c.uri_for('/currency') %]" class="btn btn-secondary">Transaction History</a>
+          <a href="[% c.uri_for('/payment/buy/coins') %]" class="btn btn-primary">Buy Points</a>
+          <a href="[% c.uri_for('/payment/balance') %]" class="btn btn-secondary">Transaction History</a>
         </div>
       </div>
 
@@ -42,7 +39,7 @@
         [%# Compute days-until-expiry and whether balance covers renewal %]
         [% SET days_left = 9999 %]
         [% SET renewal_cost = m.billing_cycle == 'annual' ? m.plan.price_annual : m.plan.price_monthly %]
-        [% SET coin_ok = currency_account && currency_account.balance >= renewal_cost %]
+        [% SET coin_ok = point_balance >= renewal_cost %]
 
         <div class="content-section" style="margin-bottom:1rem;border:1px solid var(--border-color,#ddd);border-radius:6px;padding:1rem">
 
@@ -65,9 +62,9 @@
           [% IF m.expires_at && m.status == 'active' && !coin_ok && renewal_cost > 0 %]
           <div style="margin-top:0.75rem;padding:0.6rem 0.9rem;border:1px solid #f0ad4e;border-radius:5px;background:#fffde7;font-size:0.9em">
             <strong>Low balance warning:</strong>
-            Your coin balance ([% currency_account ? currency_account.balance : 0 %] coins) may not cover the
+            Your point balance ([% point_balance | format('%.2f') %] points) may not cover the
             next renewal cost of <strong>[% m.plan.price_currency | html %] [% renewal_cost %]</strong>.
-            <a href="[% c.uri_for('/payment/buy/coins') %]">Top up coins</a> or enable auto-pay below.
+            <a href="[% c.uri_for('/payment/buy/coins') %]">Top up points</a> or enable auto-pay below.
           </div>
           [% END %]
 
@@ -75,6 +72,15 @@
             Provider: [% m.payment_provider | html %] &bull;
             Started: [% m.started_at | html %]
           </div>
+
+          [% IF m.plan.has_hosting %]
+          <div style="margin-top:0.6rem">
+            <a href="[% c.uri_for('/hosting/renew', { site_id => m.site_id }) %]"
+               class="btn btn-secondary" style="font-size:0.88em;padding:0.3rem 0.8rem">
+              Renew Hosting
+            </a>
+          </div>
+          [% END %]
 
           <!-- ── Auto-pay settings ── -->
           <div style="margin-top:1rem;padding:0.75rem;background:rgba(0,0,0,0.03);border-radius:5px;border:1px solid var(--border-color,#e0e0e0)">

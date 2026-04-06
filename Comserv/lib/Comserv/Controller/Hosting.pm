@@ -2,10 +2,12 @@ package Comserv::Controller::Hosting;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::PointSystem;
 use JSON::MaybeXS qw(encode_json decode_json);
 use LWP::UserAgent;
 use Try::Tiny;
 use Config::General;
+use DateTime;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -409,6 +411,108 @@ sub create_proxy :Local :Args(0) {
         );
         return;
     };
+}
+
+# ============================================================
+# renew_hosting — member self-service hosting plan renewal via points
+# GET  /hosting/renew?site_id=N   — show renewal form
+# POST /hosting/renew             — process renewal, debit points
+# ============================================================
+sub renew_hosting :Path('renew') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->flash->{error_msg} = 'Please log in to renew your hosting.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $user_id  = $c->session->{user_id};
+    my $site_id  = $c->req->param('site_id') || 0;
+    my $plan_id  = $c->req->param('plan_id')  || 0;
+    my $billing  = $c->req->param('billing_cycle') || 'monthly';
+
+    my ($membership, $plan, $ps, $balance);
+
+    eval {
+        $ps      = Comserv::Util::PointSystem->new(c => $c);
+        $balance = $ps->balance($user_id);
+
+        $membership = $c->model('DBEncy')->resultset('UserMembership')->search(
+            { 'me.user_id' => $user_id, 'me.site_id' => $site_id },
+            { prefetch => ['plan', 'site'] }
+        )->first if $site_id;
+
+        $plan = $c->model('DBEncy')->resultset('MembershipPlan')->find($plan_id) if $plan_id;
+        $plan ||= $membership->plan if $membership;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'renew_hosting',
+            "Error loading renewal data: $@");
+        $c->flash->{error_msg} = 'Error loading hosting data.';
+        $c->response->redirect($c->uri_for('/membership/account'));
+        return;
+    }
+
+    unless ($membership && $plan) {
+        $c->flash->{error_msg} = 'No active hosting membership found for this site.';
+        $c->response->redirect($c->uri_for('/membership/account'));
+        return;
+    }
+
+    if ($c->req->method eq 'POST') {
+        my $cost = $billing eq 'annual' ? $plan->price_annual : $plan->price_monthly;
+
+        if ($cost > 0) {
+            my ($ok, $err) = $ps->debit(
+                user_id          => $user_id,
+                amount           => $cost,
+                transaction_type => 'spend',
+                description      => 'Hosting renewal: ' . $plan->name
+                                  . ' (' . $billing . ') for site_id=' . $site_id,
+                reference_type   => 'hosting',
+                reference_id     => $site_id,
+            );
+            unless ($ok) {
+                $c->flash->{error_msg} = $err;
+                $c->response->redirect($c->uri_for('/hosting/renew', { site_id => $site_id }));
+                return;
+            }
+        }
+
+        my $new_expiry = $billing eq 'annual'
+            ? DateTime->now->add(years  => 1)->strftime('%Y-%m-%d %H:%M:%S')
+            : DateTime->now->add(months => 1)->strftime('%Y-%m-%d %H:%M:%S');
+
+        $membership->update({
+            plan_id       => $plan->id,
+            billing_cycle => $billing,
+            status        => 'active',
+            expires_at    => $new_expiry,
+        });
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'renew_hosting',
+            "Hosting renewed: user_id=$user_id site_id=$site_id plan=" . $plan->name
+            . " billing=$billing cost=$cost expiry=$new_expiry");
+
+        $c->flash->{success_msg} = 'Hosting renewed until ' . $new_expiry . '.';
+        $c->response->redirect($c->uri_for('/membership/account'));
+        return;
+    }
+
+    my $cost_monthly = $plan->price_monthly;
+    my $cost_annual  = $plan->price_annual;
+
+    $c->stash(
+        template      => 'hosting/RenewHosting.tt',
+        membership    => $membership,
+        plan          => $plan,
+        balance       => $balance,
+        cost_monthly  => $cost_monthly,
+        cost_annual   => $cost_annual,
+        site_id       => $site_id,
+    );
+    $c->forward($c->view('TT'));
 }
 
 __PACKAGE__->meta->make_immutable;

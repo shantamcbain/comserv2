@@ -2,6 +2,7 @@ package Comserv::Controller::Payment;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::PointSystem;
 use DateTime;
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -12,6 +13,68 @@ has 'logging' => (
     is      => 'ro',
     default => sub { Comserv::Util::Logging->instance }
 );
+
+sub _notify_admin_membership {
+    my ($self, $c, $user_id, $plan, $site, $billing_cycle, $price_paid, $currency) = @_;
+    eval {
+        unless (ref $plan) {
+            $plan = $c->model('DBEncy')->resultset('MembershipPlan')->find($plan);
+        }
+        unless (ref $site) {
+            $site = $c->model('DBEncy')->resultset('Site')->find($site);
+        }
+        return unless $plan && $site;
+
+        my $user = $c->model('DBEncy')->resultset('User')->find($user_id);
+        return unless $user;
+
+        my $admin_email = ($site->mail_to_admin)
+            ? $site->mail_to_admin
+            : $c->config->{FallbackSMTP}{username}
+            || 'admin@computersystemconsulting.ca';
+
+        my $site_name  = $site->name;
+        my $user_name  = join(' ', grep { $_ } ($user->first_name, $user->last_name));
+        $user_name   ||= $user->username;
+        my $amount_str = sprintf('%.2f %s', $price_paid || 0,
+                                  $currency || $plan->price_currency || 'USD');
+        my $timestamp  = scalar localtime;
+
+        my $body = <<"END_BODY";
+New Membership Activated — $site_name
+Time: $timestamp
+
+Member : $user_name
+  Username : @{[ $user->username ]}
+  Email    : @{[ $user->email ]}
+  User ID  : $user_id
+
+Plan     : @{[ $plan->name ]}
+Billing  : $billing_cycle
+Amount   : $amount_str
+
+This is an automated notification from the membership system.
+END_BODY
+
+        $c->model('Mail')->send_email(
+            $c,
+            $admin_email,
+            "[Membership] New " . $plan->name . " subscriber on $site_name",
+            $body,
+            eval { $site->id } || undef,
+        );
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            '_notify_admin_membership',
+            "Admin membership notification sent to $admin_email for user_id=$user_id "
+            . "plan=" . $plan->name . " site=$site_name");
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            '_notify_admin_membership',
+            "Could not send admin membership notification: $@");
+    }
+}
 
 sub _alert_admin {
     my ($self, $c, $subject, $body) = @_;
@@ -130,9 +193,9 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
         my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
         $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
         $plan = $c->model('DBEncy')->resultset('MembershipPlan')->find($plan_id) if $plan_id;
-        $account = $c->model('DBEncy')->resultset('InternalCurrencyAccount')->search(
-            { user_id => $c->session->{user_id} }
-        )->single;
+        my $ps = Comserv::Util::PointSystem->new(c => $c);
+        my $balance = $ps->balance($c->session->{user_id});
+        $account = { balance => $balance };
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'internal_checkout',
@@ -159,27 +222,17 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
 
         eval {
             $schema->txn_do(sub {
+                my $ledger_row;
                 if ($final_price > 0) {
-                    unless ($account) {
-                        die "No coin account found. Please contact support to get coins.\n";
-                    }
-                    if ($account->balance < $final_price) {
-                        die sprintf("Insufficient coins. You have %.2f but need %.2f.\n",
-                            $account->balance, $final_price);
-                    }
-
-                    my $new_balance = $account->balance - $final_price;
-                    $account->update({ balance => $new_balance, lifetime_spent => $account->lifetime_spent + $final_price });
-
-                    $c->model('DBEncy')->resultset('InternalCurrencyTransaction')->create({
-                        from_user_id     => $c->session->{user_id},
-                        to_user_id       => undef,
+                    my $ps = Comserv::Util::PointSystem->new(c => $c);
+                    my ($ok, $err) = $ps->debit(
+                        user_id          => $c->session->{user_id},
                         amount           => $final_price,
                         transaction_type => 'spend',
-                        balance_after    => $new_balance,
                         description      => 'Membership: ' . $plan->name . ' (' . $billing_cycle . ')',
                         reference_type   => 'membership',
-                    });
+                    );
+                    die $err . "\n" unless $ok;
                 }
 
                 my $expires_at = undef;
@@ -245,7 +298,8 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
                     payable_type => 'membership',
                     payable_id   => $plan->id,
                     amount       => $final_price,
-                    currency     => $plan->price_currency,
+                    amount_cad   => $final_price,
+                    currency     => $plan->price_currency || 'CAD',
                     provider     => 'internal',
                     status       => 'completed',
                     description  => 'Membership: ' . $plan->name . ' (' . $billing_cycle . ')'
@@ -269,6 +323,9 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
             $c->response->redirect($c->uri_for('/payment/internal/checkout',
                 { plan_id => $plan_id, billing_cycle => $billing_cycle, promo_code => $promo_code }));
         } else {
+            $self->_notify_admin_membership($c,
+                $c->session->{user_id}, $plan, $site,
+                $billing_cycle, $final_price, $plan->price_currency);
             $c->flash->{success_msg} = 'Membership activated! Welcome to ' . $plan->name . '.';
             $c->response->redirect($c->uri_for('/membership/account'));
         }
@@ -338,17 +395,70 @@ sub _paypal_url {
 }
 
 # ============================================================
+# Balance — member point balance and transaction history
+# ============================================================
+sub balance :Path('balance') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_login($c);
+
+    my $user_id  = $c->session->{user_id};
+    my $ps       = Comserv::Util::PointSystem->new(c => $c);
+
+    my $bal      = 0;
+    my $lifetime_earned = 0;
+    my $lifetime_spent  = 0;
+    my @ledger;
+    my $display  = {};
+
+    eval {
+        my $acct = $c->model('DBEncy')->resultset('PointAccount')
+            ->find({ user_id => $user_id });
+        if ($acct) {
+            $bal            = $acct->balance + 0;
+            $lifetime_earned = $acct->lifetime_earned + 0;
+            $lifetime_spent  = $acct->lifetime_spent  + 0;
+        }
+
+        @ledger = $ps->ledger_for_user($user_id, 25)->all;
+
+        $display = $ps->display_amount(
+            points    => $bal,
+            site_name => $c->stash->{SiteName},
+        );
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'balance',
+            "Error loading balance page: $@");
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'balance',
+        "Balance page for user_id=$user_id balance=$bal");
+
+    $c->stash(
+        template        => 'payment/Balance.tt',
+        balance         => $bal,
+        lifetime_earned => $lifetime_earned,
+        lifetime_spent  => $lifetime_spent,
+        ledger          => \@ledger,
+        display         => $display,
+    );
+    $c->forward($c->view('TT'));
+}
+
+# ============================================================
 # Buy Coins — GET: show packages  POST: launch PayPal form
 # ============================================================
 sub buy_coins :Path('buy/coins') :Args(0) {
     my ($self, $c) = @_;
     return unless $self->_require_login($c);
 
-    my $account;
+    my $balance = 0;
+    my @packages;
     eval {
-        $account = $c->model('DBEncy')->resultset('InternalCurrencyAccount')->search(
-            { user_id => $c->session->{user_id} }
-        )->single;
+        my $ps = Comserv::Util::PointSystem->new(c => $c);
+        $balance  = $ps->balance($c->session->{user_id});
+        @packages = $c->model('DBEncy')->resultset('PointPackage')
+            ->search({ is_active => 1 }, { order_by => 'sort_order' })->all;
     };
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'buy_coins',
@@ -356,8 +466,8 @@ sub buy_coins :Path('buy/coins') :Args(0) {
 
     $c->stash(
         template     => 'payment/BuyCoins.tt',
-        packages     => \@COIN_PACKAGES,
-        account      => $account,
+        packages     => \@packages,
+        balance      => $balance,
         paypal_url   => $self->_paypal_url($c),
         paypal_cfg   => $self->_paypal_config($c),
         return_url   => $c->uri_for('/payment/paypal/coins_return')->as_string,
@@ -538,39 +648,42 @@ sub paypal_coins_cancel :Path('paypal/coins_cancel') :Args(0) {
 sub _credit_coins {
     my ($self, $c, $user_id, $coins, $provider, $tx_id, $description) = @_;
 
-    my $schema = $c->model('DBEncy')->schema;
-    $schema->txn_do(sub {
-        my $acct = $schema->resultset('InternalCurrencyAccount')->find_or_create(
-            { user_id => $user_id },
-            { key => 'primary' }
-        );
-        my $new_balance = ($acct->balance || 0) + $coins;
-        $acct->update({
-            balance        => $new_balance,
-            lifetime_earned => ($acct->lifetime_earned || 0) + $coins,
-        });
+    if ($tx_id && $provider) {
+        my $existing = eval {
+            $c->model('DBEncy')->resultset('PaymentTransaction')->search({
+                provider                => $provider,
+                provider_transaction_id => $tx_id,
+            })->first;
+        };
+        if ($existing) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_credit_coins',
+                "Idempotency: skipping duplicate txn provider=$provider tx_id=$tx_id");
+            return;
+        }
+    }
 
-        $schema->resultset('InternalCurrencyTransaction')->create({
-            to_user_id       => $user_id,
-            from_user_id     => undef,
-            amount           => $coins,
-            transaction_type => 'earn',
-            balance_after    => $new_balance,
-            description      => $description,
-            reference_type   => 'purchase',
-        });
+    my $ps = Comserv::Util::PointSystem->new(c => $c);
+    my $ledger = $ps->credit(
+        user_id          => $user_id,
+        amount           => $coins,
+        transaction_type => 'purchase',
+        description      => $description,
+    );
 
-        $schema->resultset('PaymentTransaction')->create({
-            user_id      => $user_id,
-            payable_type => 'coins',
-            payable_id   => $coins,
-            amount       => $coins,
-            currency     => 'COINS',
-            provider     => $provider,
-            status       => 'completed',
-            description  => $description,
-            ip_address   => eval { $c->req->address } || undef,
-        });
+    $c->model('DBEncy')->resultset('PaymentTransaction')->create({
+        user_id                 => $user_id,
+        payable_type            => 'point_purchase',
+        payable_id              => undef,
+        amount                  => $coins,
+        amount_cad              => $coins,
+        currency                => 'CAD',
+        provider                => $provider,
+        provider_transaction_id => $tx_id || undef,
+        status                  => 'completed',
+        description             => $description,
+        points_credited         => $coins,
+        point_ledger_id         => $ledger->id,
+        ip_address              => eval { $c->req->address } || undef,
     });
 }
 
@@ -639,6 +752,9 @@ sub paypal_return :Path('paypal/return') :Args(0) {
                 . "User ID: $user_id\nError: $err");
             $c->flash->{error_msg} = 'Payment received but membership activation failed. Please contact support with reference: ' . ($tx || 'unknown');
         } else {
+            $self->_notify_admin_membership($c,
+                $user_id, $plan_id, $site_id,
+                $billing || 'monthly', undef, undef);
             $c->flash->{success_msg} = 'Payment confirmed via PayPal! Your membership is now active.';
         }
     } else {
@@ -653,6 +769,22 @@ sub paypal_return :Path('paypal/return') :Args(0) {
 sub _activate_paypal_membership {
     my ($self, $c, $user_id, $plan_id, $site_id, $billing, $tx_id) = @_;
     use DateTime;
+
+    if ($tx_id) {
+        my $existing_tx = eval {
+            $c->model('DBEncy')->resultset('PaymentTransaction')->search({
+                provider                => 'paypal',
+                provider_transaction_id => $tx_id,
+                status                  => 'completed',
+            })->first;
+        };
+        if ($existing_tx) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                '_activate_paypal_membership',
+                "Idempotency: tx_id=$tx_id already processed, skipping");
+            return;
+        }
+    }
 
     my $schema = $c->model('DBEncy')->schema;
     $schema->txn_do(sub {
@@ -727,6 +859,288 @@ sub paypal_cancel :Path('paypal/cancel') :Args(0) {
     my ($self, $c) = @_;
     $c->flash->{error_msg} = 'PayPal payment was cancelled.';
     $c->response->redirect($c->uri_for('/membership'));
+}
+
+# ============================================================
+# Patreon OAuth2 callback
+# Patreon redirects here after the user authorises the app.
+# Exchange the code for an access token, fetch patron identity,
+# link the patron to the logged-in user, and activate the
+# matching membership plan (if any).
+# ============================================================
+sub patreon_callback :Path('patreon/callback') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_login($c);
+
+    my $code  = $c->req->param('code')  || '';
+    my $state = $c->req->param('state') || '';
+    my $error = $c->req->param('error') || '';
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'patreon_callback',
+        "Patreon callback received code=" . ($code ? 'present' : 'absent')
+        . " state=$state error=$error");
+
+    if ($error) {
+        $c->stash(
+            template    => 'payment/PatreonCallback.tt',
+            patreon_error => $error,
+            error_desc    => ($c->req->param('error_description') || 'Patreon authorisation denied.'),
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    unless ($code) {
+        $c->stash(
+            template    => 'payment/PatreonCallback.tt',
+            patreon_error => 'missing_code',
+            error_desc    => 'No authorisation code was returned by Patreon.',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    my $site_name = lc($c->stash->{SiteName} || $c->session->{SiteName} || 'csc');
+    my %patreon_cfg;
+    eval {
+        my @rows = $c->model('DBEncy')->resultset('EnvVariable')->search(
+            { key => { -like => "patreon_${site_name}_%" } }
+        )->all;
+        for my $row (@rows) {
+            my $k = $row->key;
+            $k =~ s/^patreon_${site_name}_//;
+            $patreon_cfg{$k} = $row->value;
+        }
+    };
+
+    my $client_id     = $ENV{PATREON_CLIENT_ID}     || $patreon_cfg{client_id}     || '';
+    my $client_secret = $ENV{PATREON_CLIENT_SECRET}  || $patreon_cfg{client_secret} || '';
+    my $redirect_uri  = $ENV{PATREON_REDIRECT_URI}   || $patreon_cfg{redirect_uri}
+                        || $c->uri_for('/payment/patreon/callback')->as_string;
+
+    unless ($client_id && $client_secret) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'patreon_callback',
+            "Patreon not configured for site=$site_name — missing client_id or client_secret");
+        $c->stash(
+            template    => 'payment/PatreonCallback.tt',
+            patreon_error => 'not_configured',
+            error_desc    => 'Patreon integration is not configured for this site.',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    my ($access_token, $patron_id, $patron_email, $patron_tier);
+    my $callback_error;
+
+    eval {
+        require LWP::UserAgent;
+        require HTTP::Request::Common;
+        require JSON;
+
+        my $ua = LWP::UserAgent->new(timeout => 20);
+
+        my $token_resp = $ua->post('https://www.patreon.com/api/oauth2/token', [
+            code          => $code,
+            grant_type    => 'authorization_code',
+            client_id     => $client_id,
+            client_secret => $client_secret,
+            redirect_uri  => $redirect_uri,
+        ]);
+
+        unless ($token_resp->is_success) {
+            die "Token exchange failed: " . $token_resp->status_line . "\n";
+        }
+
+        my $token_data = JSON::decode_json($token_resp->decoded_content);
+        $access_token  = $token_data->{access_token}
+            or die "No access_token in Patreon token response\n";
+
+        my $identity_resp = $ua->get(
+            'https://www.patreon.com/api/oauth2/v2/identity'
+            . '?fields%5Buser%5D=email,full_name,patron_status'
+            . '&include=memberships',
+            Authorization => "Bearer $access_token",
+        );
+
+        unless ($identity_resp->is_success) {
+            die "Identity fetch failed: " . $identity_resp->status_line . "\n";
+        }
+
+        my $identity = JSON::decode_json($identity_resp->decoded_content);
+        my $attrs    = $identity->{data}{attributes} || {};
+        $patron_id    = $identity->{data}{id} || '';
+        $patron_email = $attrs->{email}        || '';
+    };
+    if ($@) {
+        $callback_error = "$@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'patreon_callback',
+            "Patreon API error: $callback_error");
+        $self->_alert_admin($c, 'Patreon callback API failure',
+            "Site: $site_name\nUser ID: " . ($c->session->{user_id} || '?')
+            . "\nError: $callback_error");
+        $c->stash(
+            template    => 'payment/PatreonCallback.tt',
+            patreon_error => 'api_error',
+            error_desc    => 'Could not verify your Patreon account. Please try again.',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    my $plan_id   = $c->req->param('plan_id')      || $state || '';
+    my $billing   = $c->req->param('billing_cycle') || 'monthly';
+    my $linked    = 0;
+
+    eval {
+        my $schema   = $c->model('DBEncy')->schema;
+        my $user_id  = $c->session->{user_id};
+        my $site     = $c->model('DBEncy')->resultset('Site')
+            ->search({ name => { -like => $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC' } })->single;
+
+        $schema->txn_do(sub {
+            my $existing_tx = $schema->resultset('PaymentTransaction')->search({
+                provider                => 'patreon',
+                provider_transaction_id => 'patron-' . $patron_id,
+                status                  => 'completed',
+            })->first;
+
+            unless ($existing_tx) {
+                if ($plan_id && $site) {
+                    my $plan = $schema->resultset('MembershipPlan')->find($plan_id);
+                    if ($plan) {
+                        my $base_price = $billing eq 'annual' ? $plan->price_annual : $plan->price_monthly;
+                        my $expires_at = $billing eq 'annual'
+                            ? DateTime->now->add(years  => 1)->strftime('%Y-%m-%d %H:%M:%S')
+                            : DateTime->now->add(months => 1)->strftime('%Y-%m-%d %H:%M:%S');
+
+                        my $existing_mem = $schema->resultset('UserMembership')->search({
+                            user_id => $user_id,
+                            site_id => $site->id,
+                            status  => ['active', 'grace'],
+                        })->first;
+
+                        if ($existing_mem) {
+                            $existing_mem->update({
+                                plan_id           => $plan->id,
+                                billing_cycle     => $billing,
+                                payment_provider  => 'patreon',
+                                payment_reference => $patron_id,
+                                price_paid        => $base_price,
+                                currency_paid     => $plan->price_currency,
+                                expires_at        => $expires_at,
+                                status            => 'active',
+                            });
+                        } else {
+                            $schema->resultset('UserMembership')->create({
+                                user_id           => $user_id,
+                                plan_id           => $plan->id,
+                                site_id           => $site->id,
+                                billing_cycle     => $billing,
+                                status            => 'active',
+                                payment_provider  => 'patreon',
+                                payment_reference => $patron_id,
+                                price_paid        => $base_price,
+                                currency_paid     => $plan->price_currency,
+                                expires_at        => $expires_at,
+                            });
+                        }
+
+                        my $plan_role = 'member_' . ($plan->slug || lc($plan->name));
+                        my $user_obj  = $schema->resultset('User')->find($user_id);
+                        if ($user_obj) {
+                            my @roles = grep { $_ !~ /^member_/ }
+                                        map  { s/^\s+|\s+$//gr }
+                                        split /,/, ($user_obj->roles || 'normal');
+                            push @roles, $plan_role;
+                            $user_obj->update({ roles => join(',', @roles) });
+                            $c->session->{roles} = \@roles;
+                        }
+
+                        $schema->resultset('PaymentTransaction')->create({
+                            user_id                 => $user_id,
+                            payable_type            => 'membership',
+                            payable_id              => $plan->id,
+                            amount                  => $base_price,
+                            currency                => $plan->price_currency || 'CAD',
+                            provider                => 'patreon',
+                            provider_transaction_id => 'patron-' . $patron_id,
+                            status                  => 'completed',
+                            description             => 'Patreon membership: ' . $plan->name . " ($billing)",
+                            ip_address              => eval { $c->req->address } || undef,
+                        });
+
+                        $linked = 1;
+                    }
+                }
+            } else {
+                $linked = 1;
+            }
+        });
+    };
+    if ($@) {
+        my $err = "$@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'patreon_callback',
+            "Error linking Patreon account: $err");
+        $self->_alert_admin($c, 'Patreon membership activation failed',
+            "Patron ID: $patron_id\nPlan: $plan_id\nError: $err");
+        $c->stash(
+            template     => 'payment/PatreonCallback.tt',
+            patreon_error => 'link_failed',
+            error_desc    => 'Your Patreon account was verified but membership activation failed. Please contact support.',
+            patron_id     => $patron_id,
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'patreon_callback',
+        "Patreon callback success patron_id=$patron_id linked=$linked user_id=" . ($c->session->{user_id} || '?'));
+
+    if ($linked) {
+        $self->_notify_admin_membership($c,
+            $c->session->{user_id}, $plan_id, undef, $billing, undef, 'CAD') if $plan_id;
+        $c->flash->{success_msg} = 'Your Patreon account has been linked and your membership is now active!';
+        $c->response->redirect($c->uri_for('/membership/account'));
+    } else {
+        $c->stash(
+            template      => 'payment/PatreonCallback.tt',
+            patron_id     => $patron_id,
+            patron_email  => $patron_email,
+            plan_id       => $plan_id,
+        );
+        $c->forward($c->view('TT'));
+    }
+}
+
+# ============================================================
+# Generic success / failed landing pages
+# Used when redirecting from payment flows that need a landing
+# ============================================================
+sub success :Path('success') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'success',
+        "Payment success page");
+
+    $c->stash(
+        template => 'payment/Success.tt',
+        message  => ($c->flash->{success_msg} || $c->req->param('message') || 'Your payment was successful.'),
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub failed :Path('failed') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'failed',
+        "Payment failed page");
+
+    $c->stash(
+        template => 'payment/Failed.tt',
+        message  => ($c->flash->{error_msg} || $c->req->param('message') || 'The payment could not be completed.'),
+    );
+    $c->forward($c->view('TT'));
 }
 
 __PACKAGE__->meta->make_immutable;

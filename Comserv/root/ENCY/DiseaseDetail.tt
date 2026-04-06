@@ -1,0 +1,300 @@
+[% META
+   title = "Disease Detail - Encyclopedia of Biological Life"
+   description = "View and edit disease details in the ENCY encyclopedia"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-02"
+%]
+[% PageVersion = 'ENCY/DiseaseDetail.tt,v 0.01 2026/04/02' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[% PROCESS 'ENCY/ImageHelper.tt' %]
+
+[% IF success_msg || c.flash.success_msg %]
+<div class="alert alert-success">[% success_msg || c.flash.success_msg | html %]</div>
+[% END %]
+[% IF error_msg || c.flash.error_msg %]
+<div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
+[% END %]
+
+[% roles = c.session.roles;
+   is_admin = 0;
+   FOREACH r IN roles;
+     IF r == 'admin'; is_admin = 1; END;
+   END;
+%]
+
+[% IF edit_mode %]
+<h1>Editing Disease: [% disease.common_name | html %]</h1>
+[% ELSE %]
+<h1>[% disease.common_name | html %]</h1>
+[% END %]
+
+<p><a href="[% c.uri_for('/ENCY/Disease') %]">&larr; Back to Diseases</a>
+[% IF is_admin && !edit_mode && disease.record_id %]
+  | <a href="[% c.uri_for('/ENCY/Disease/edit') %]" onclick="document.cookie='record_id=[% disease.record_id %]'">Edit</a>
+[% END %]
+</p>
+
+[% IF edit_mode %]
+<form action="[% IF disease.record_id %][% c.uri_for('/ENCY/Disease/edit') %][% ELSE %][% c.uri_for('/ENCY/Disease/add') %][% END %]" method="post">
+[% IF disease.record_id %]
+<input type="hidden" name="record_id" value="[% disease.record_id %]" />
+[% END %]
+[% END %]
+
+<h2>Overview</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Common Name</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="common_name" value="[% disease.common_name | html %]" size="50" />
+            [% ELSE %]
+            [% disease.common_name | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Scientific Name</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="scientific_name" value="[% disease.scientific_name | html %]" size="50" />
+            [% ELSE %]
+            <em>[% disease.scientific_name | html %]</em>
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Disease Type</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="disease_type" value="[% disease.disease_type | html %]" size="30" />
+            [% ELSE %]
+            [% disease.disease_type | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Host Type</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <select name="host_type">
+                <option value="">-- Select --</option>
+                <option value="human"[% IF disease.host_type == 'human' %] selected="selected"[% END %]>Human</option>
+                <option value="animal"[% IF disease.host_type == 'animal' %] selected="selected"[% END %]>Animal</option>
+                <option value="plant"[% IF disease.host_type == 'plant' %] selected="selected"[% END %]>Plant</option>
+                <option value="insect"[% IF disease.host_type == 'insect' %] selected="selected"[% END %]>Insect</option>
+            </select>
+            [% ELSE %]
+            [% disease.host_type | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>ICD Code</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="icd_code" value="[% disease.icd_code | html %]" size="20" />
+            [% ELSE %]
+            [% disease.icd_code | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Distribution</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="distribution" rows="3" cols="60">[% disease.distribution | html %]</textarea>
+            [% ELSE %]
+            [% disease.distribution | html %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+<h2>Causative Agent</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Causative Agent</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="causative_agent" rows="4" cols="60">[% disease.causative_agent | html %]</textarea>
+            [% ELSE %]
+            [% disease.causative_agent | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Transmission</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="transmission" rows="4" cols="60">[% disease.transmission | html %]</textarea>
+            [% ELSE %]
+            [% disease.transmission | html %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+<h2>Symptoms</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Symptoms Description</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="symptoms_description" rows="5" cols="60">[% disease.symptoms_description | html %]</textarea>
+            [% ELSE %]
+            [% disease.symptoms_description | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Diagnosis</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="diagnosis" rows="4" cols="60">[% disease.diagnosis | html %]</textarea>
+            [% ELSE %]
+            [% disease.diagnosis | html %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+[% IF related_symptoms && related_symptoms.size %]
+<h3>Related Symptoms</h3>
+<ul>
+    [% FOREACH symptom IN related_symptoms %]
+    <li><a href="[% c.uri_for('/ENCY/Symptom', symptom.record_id) %]">[% symptom.name | html %][% IF symptom.common_name %] ([% symptom.common_name | html %])[% END %]</a></li>
+    [% END %]
+</ul>
+[% END %]
+
+<h2>Treatment</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Conventional Treatment</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="treatment_conventional" rows="4" cols="60">[% disease.treatment_conventional | html %]</textarea>
+            [% ELSE %]
+            [% disease.treatment_conventional | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Herbal Treatment</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="treatment_herbal" rows="4" cols="60">[% disease.treatment_herbal | html %]</textarea>
+            [% ELSE %]
+            [% disease.treatment_herbal | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Prevention</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="prevention" rows="4" cols="60">[% disease.prevention | html %]</textarea>
+            [% ELSE %]
+            [% disease.prevention | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Prognosis</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="prognosis" rows="3" cols="60">[% disease.prognosis | html %]</textarea>
+            [% ELSE %]
+            [% disease.prognosis | html %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+[% IF related_herbs && related_herbs.size %]
+<h2>Related Herbs</h2>
+<ul>
+    [% FOREACH herb IN related_herbs %]
+    <li><a href="[% c.uri_for('/ENCY/herb_detail', herb.record_id) %]">[% herb.botanical_name | html %] ([% herb.common_names | html %])</a></li>
+    [% END %]
+</ul>
+[% END %]
+
+[% IF related_animals && related_animals.size %]
+<h2>Related Animals</h2>
+<ul>
+    [% FOREACH animal IN related_animals %]
+    <li><a href="[% c.uri_for('/ENCY/Animal', animal.record_id) %]">[% animal.common_name | html %]</a></li>
+    [% END %]
+</ul>
+[% END %]
+
+[% IF related_insects && related_insects.size %]
+<h2>Related Insects</h2>
+<ul>
+    [% FOREACH insect IN related_insects %]
+    <li><a href="[% c.uri_for('/ENCY/Insect', insect.record_id) %]">[% insect.common_name | html %]</a></li>
+    [% END %]
+</ul>
+[% END %]
+
+<h2>Additional Information</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>History</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="history" rows="4" cols="60">[% disease.history | html %]</textarea>
+            [% ELSE %]
+            [% disease.history | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Reference</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="reference" rows="3" cols="60">[% disease.reference | html %]</textarea>
+            [% ELSE %]
+            [% disease.reference | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>URL</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="url" value="[% disease.url | html %]" size="60" />
+            [% ELSE %]
+            [% IF disease.url %]<a href="[% disease.url | html %]" target="_blank">[% disease.url | html %]</a>[% END %]
+            [% END %]
+        </td>
+    </tr>
+    [% IF edit_mode %]
+    <tr>
+        <td><strong>Image</strong></td>
+        <td>
+            <input type="text" name="image" value="[% disease.image | html %]" size="60" />
+        </td>
+    </tr>
+    [% ELSE %]
+    [% IF disease.image %]
+    <tr>
+        <td><strong>Image</strong></td>
+        <td>[% ency_img_tag(disease.image, 300, 300) %]</td>
+    </tr>
+    [% END %]
+    [% END %]
+</table>
+
+[% IF edit_mode %]
+[% PROCESS 'ENCY/partials/AiFormFill.tt' %]
+<br/>
+<input type="submit" value="[% IF disease.record_id %]Update Disease[% ELSE %]Add Disease[% END %]" class="btn btn-primary" />
+<a href="[% c.uri_for('/ENCY/Disease') %]" class="btn btn-default">Cancel</a>
+</form>
+[% END %]

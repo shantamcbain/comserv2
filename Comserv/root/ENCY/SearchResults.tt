@@ -1,0 +1,261 @@
+[% META
+   title = "Search Results - Encyclopedia of Biological Life"
+   description = "Search results across all ENCY entity types"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-02"
+%]
+[% PageVersion = 'ENCY/SearchResults.tt,v 0.01 2026/04/02' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.success_msg %]
+<div class="alert alert-success">[% c.flash.success_msg | html %]</div>
+[% END %]
+[% IF c.flash.error_msg %]
+<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
+[% END %]
+
+<h1>Search Results</h1>
+
+<div class="ency-search-box" style="margin: 16px 0; padding: 12px; background: #f5f5f5; border-radius: 6px;">
+    <form method="post" action="/ENCY/search">
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" name="search_string" value="[% search_query | html %]" placeholder="Search the encyclopedia..." style="flex: 1; padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" />
+            <button type="submit" style="padding: 8px 16px; background: #4a7c59; color: white; border: none; border-radius: 4px; cursor: pointer;">Search</button>
+        </div>
+    </form>
+</div>
+
+[% IF search_query %]
+<p><strong>[% total_results %]</strong> result[% total_results != 1 ? 's' : '' %] found for &ldquo;<em>[% search_query | html %]</em>&rdquo;</p>
+[% END %]
+
+[% IF ai_fallback %]
+<div class="alert alert-info" style="padding: 12px; background: #e3f2fd; border: 1px solid #90caf9; border-radius: 6px; margin: 16px 0;">
+    No local results found for &ldquo;<em>[% ai_query | html %]</em>&rdquo;.
+    <a href="/ai?prompt=Tell+me+about+[% ai_query | uri %]+in+the+context+of+the+encyclopedia">Ask AI</a>
+</div>
+[% END %]
+
+[%# ── Herbs ─────────────────────────────────────────────── %]
+[% IF search_results.herbs.size %]
+<h2>Herbs ([% search_results.herbs.size %])</h2>
+<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+    <thead>
+        <tr style="background:#e8f5e9;">
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Common Name</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Scientific Name</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        [% FOREACH herb IN search_results.herbs %]
+        <tr>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% herb.common_name | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;"><em>[% herb.name | html %]</em></td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">
+                <a href="/ENCY/herb_detail/[% herb.id %]">Details</a>
+            </td>
+        </tr>
+        [% END %]
+    </tbody>
+</table>
+[% END %]
+
+[%# ── Animals ───────────────────────────────────────────── %]
+[% IF search_results.animals.size %]
+<h2>Animals ([% search_results.animals.size %])</h2>
+<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+    <thead>
+        <tr style="background:#e3f2fd;">
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Common Name</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Scientific Name</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        [% FOREACH animal IN search_results.animals %]
+        <tr>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% animal.common_name | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;"><em>[% animal.scientific_name | html %]</em></td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">
+                <a href="/ENCY/Animal/[% animal.record_id %]">Details</a>
+            </td>
+        </tr>
+        [% END %]
+    </tbody>
+</table>
+[% END %]
+
+[%# ── Insects ───────────────────────────────────────────── %]
+[% IF search_results.insects.size %]
+<h2>Insects ([% search_results.insects.size %])</h2>
+<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+    <thead>
+        <tr style="background:#fff8e1;">
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Common Name</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Order</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        [% FOREACH insect IN search_results.insects %]
+        <tr>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% insect.common_name | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% insect.order_name | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">
+                <a href="/ENCY/Insect/[% insect.record_id %]">Details</a>
+            </td>
+        </tr>
+        [% END %]
+    </tbody>
+</table>
+[% END %]
+
+[%# ── Diseases ──────────────────────────────────────────── %]
+[% IF search_results.diseases.size %]
+<h2>Diseases ([% search_results.diseases.size %])</h2>
+<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+    <thead>
+        <tr style="background:#fce4ec;">
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Common Name</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Type</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Host</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        [% FOREACH disease IN search_results.diseases %]
+        <tr>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% disease.common_name | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% disease.disease_type | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% disease.host_type | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">
+                <a href="/ENCY/Disease/[% disease.record_id %]">Details</a>
+            </td>
+        </tr>
+        [% END %]
+    </tbody>
+</table>
+[% END %]
+
+[%# ── Symptoms ──────────────────────────────────────────── %]
+[% IF search_results.symptoms.size %]
+<h2>Symptoms ([% search_results.symptoms.size %])</h2>
+<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+    <thead>
+        <tr style="background:#f3e5f5;">
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Name</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Body System</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Severity</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        [% FOREACH symptom IN search_results.symptoms %]
+        <tr>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% symptom.name | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% symptom.body_system | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% symptom.severity | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">
+                <a href="/ENCY/Symptom/[% symptom.record_id %]">Details</a>
+            </td>
+        </tr>
+        [% END %]
+    </tbody>
+</table>
+[% END %]
+
+[%# ── Constituents ──────────────────────────────────────── %]
+[% IF search_results.constituents.size %]
+<h2>Constituents ([% search_results.constituents.size %])</h2>
+<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+    <thead>
+        <tr style="background:#e0f7fa;">
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Name</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Chemical Class</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Formula</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        [% FOREACH constituent IN search_results.constituents %]
+        <tr>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% constituent.name | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% constituent.chemical_class | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% constituent.chemical_formula | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">
+                <a href="/ENCY/Constituent/[% constituent.record_id %]">Details</a>
+            </td>
+        </tr>
+        [% END %]
+    </tbody>
+</table>
+[% END %]
+
+[%# ── Glossary ──────────────────────────────────────────── %]
+[% IF search_results.glossary.size %]
+<h2>Glossary ([% search_results.glossary.size %])</h2>
+<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+    <thead>
+        <tr style="background:#f1f8e9;">
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Term</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Category</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Definition (preview)</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        [% FOREACH entry IN search_results.glossary %]
+        <tr>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;"><strong>[% entry.term | html %]</strong></td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% entry.category | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% entry.definition.substr(0, 120) | html %][% entry.definition.length > 120 ? '...' : '' %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">
+                <a href="/ENCY/Glossary/[% entry.record_id %]">Details</a>
+            </td>
+        </tr>
+        [% END %]
+    </tbody>
+</table>
+[% END %]
+
+[%# ── Drugs ─────────────────────────────────────────────── %]
+[% IF search_results.drugs.size %]
+<h2>Drugs &amp; Pharmaceuticals ([% search_results.drugs.size %])</h2>
+<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+    <thead>
+        <tr style="background:#ede7f6;">
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Brand Name</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Generic Name</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Drug Class</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Rx/OTC</th>
+            <th style="text-align:left; padding:6px 10px; border-bottom:1px solid #ccc;">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        [% FOREACH drug IN search_results.drugs %]
+        <tr>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;"><strong>[% drug.brand_name | html %]</strong></td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% drug.generic_name | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% drug.drug_class | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">[% drug.prescription_status | html %]</td>
+            <td style="padding:6px 10px; border-bottom:1px solid #eee;">
+                <a href="/ENCY/Drug/[% drug.record_id %]">Details</a>
+            </td>
+        </tr>
+        [% END %]
+    </tbody>
+</table>
+[% END %]
+
+[% IF search_query && total_results == 0 && !ai_fallback %]
+<p style="color:#888;">No results found. Try a different search term.</p>
+[% END %]
+
+<p style="margin-top:20px;"><a href="/ENCY">&larr; Back to Encyclopedia</a></p>
+
+[% embed('CSCCopyRight') %]
+[% embed(data.page_bottom_view) %]

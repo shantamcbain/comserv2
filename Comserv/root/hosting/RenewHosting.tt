@@ -1,0 +1,103 @@
+[%
+   title = "Renew Hosting"
+   description = "Renew your hosting plan using your points balance"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "Hosting"
+   page_version = "0.01"
+   last_updated = "2026-03-26"
+%]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Renew Hosting</h1>
+    <p>Renew your hosting plan using your points balance.</p>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <h2>Current Plan: [% plan.name | html %]</h2>
+        <p>Site: <strong>[% membership.site.name | html %]</strong></p>
+        <p>Status: <strong>[% membership.status | html %]</strong></p>
+        [% IF membership.expires_at %]
+        <p>Expires: <strong>[% membership.expires_at | html %]</strong></p>
+        [% END %]
+      </div>
+
+      <div class="content-section">
+        <h2>Your Balance</h2>
+        <p style="font-size:1.3em;font-weight:bold;color:var(--success-color,#27ae60)">
+          [% balance | format('%.2f') %] points
+        </p>
+        <p style="font-size:0.85em;color:#888">1 point = 1 CAD</p>
+      </div>
+
+      <div class="content-section">
+        <h2>Choose Renewal Period</h2>
+        <form method="post" action="[% c.uri_for('/hosting/renew') %]">
+          <input type="hidden" name="site_id" value="[% site_id | html %]">
+          <input type="hidden" name="plan_id" value="[% plan.id | html %]">
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+
+            <label style="border:2px solid var(--border-color,#ccc);border-radius:8px;padding:1.25rem;cursor:pointer;text-align:center">
+              <input type="radio" name="billing_cycle" value="monthly" checked
+                     style="margin-bottom:0.5rem;display:block;margin-left:auto;margin-right:auto">
+              <div style="font-size:1.2em;font-weight:bold">Monthly</div>
+              <div style="font-size:1.4em;color:var(--accent-color,#FFB900);margin:0.3rem 0">
+                [% cost_monthly %] pts
+              </div>
+              <div style="font-size:0.85em;color:#888">per month</div>
+            </label>
+
+            <label style="border:2px solid var(--border-color,#ccc);border-radius:8px;padding:1.25rem;cursor:pointer;text-align:center">
+              <input type="radio" name="billing_cycle" value="annual"
+                     style="margin-bottom:0.5rem;display:block;margin-left:auto;margin-right:auto">
+              <div style="font-size:1.2em;font-weight:bold">Annual</div>
+              <div style="font-size:1.4em;color:var(--accent-color,#FFB900);margin:0.3rem 0">
+                [% cost_annual %] pts
+              </div>
+              <div style="font-size:0.85em;color:#888">per year</div>
+            </label>
+
+          </div>
+
+          [% IF balance < cost_monthly %]
+          <div style="padding:0.75rem 1rem;border:1px solid #f0ad4e;border-radius:6px;background:#fffde7;margin-bottom:1rem">
+            <strong>Insufficient points.</strong>
+            Your balance ([% balance | format('%.2f') %] pts) is below the monthly renewal cost
+            ([% cost_monthly %] pts).
+            <a href="[% c.uri_for('/payment/buy/coins') %]">Buy more points</a>.
+          </div>
+          [% END %]
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary"
+                    [% IF balance < cost_monthly %]disabled[% END %]>
+              Renew Hosting
+            </button>
+            <a href="[% c.uri_for('/membership/account') %]" class="btn btn-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+
+    </div>
+
+    <div class="content-secondary">
+      <div class="content-section">
+        <h2>About Hosting Plans</h2>
+        <ul>
+          <li>Points are deducted immediately on renewal</li>
+          <li>Annual plans are billed once for 12 months</li>
+          <li><a href="[% c.uri_for('/payment/balance') %]">View transaction history</a></li>
+          <li><a href="[% c.uri_for('/payment/buy/coins') %]">Top up your points</a></li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>

@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "id": "83bd01d6-a220-4d33-86ba-11df533fefb8",
+      "name": "Fix compilation error + start aichatsystem server at port 4002",
+      "description": "Fixed $fast_check→$avail_check in AI.pm chat action (line 1850). Confirmed AI.pm compiles cleanly. Started aichatsystem-ef4e at port 4002. Root cause identified: port 4001 was planningsystem branch, not aichatsystem.",
+      "status": "Completed",
+      "sort_order": 0,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-04-01T06:06:11.607642862Z",
+      "updated_at": "2026-04-01T06:06:15.784383616Z"
+    },
+    {
+      "id": "eb76e394-31c8-4839-abd7-9c351396e7b3",
+      "name": "Test all implemented features at port 4002",
+      "description": "User must test the following at workstation.local:4002 and shanta.local:4002: (1) Chat widget visible on Shanta site with black border, (2) Thinking trace visible on all responses, (3) Errors saved to conversation history, (4) Model keep-alive 2h (no cold-start on warm models), (5) create_todo AI action works when AI is asked to create a todo.",
+      "status": "Pending",
+      "sort_order": 1,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-04-01T06:06:11.607642862Z",
+      "updated_at": "2026-04-01T06:06:11.607642862Z"
+    },
+    {
+      "id": "dd34d544-b915-4a90-9825-ecd199dbd5c5",
+      "name": "Merge aichatsystem-ef4e to main",
+      "description": "Once features are verified at port 4002, merge the branch to main. Key files changed: AI.pm, Ollama.pm, DBEncy.pm, local-chat.js, ai-chat.css, conversations.tt, TopDropListLogin.tt. Update todo #567 description to reflect full scope before merging.",
+      "status": "Pending",
+      "sort_order": 2,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-04-01T06:06:11.607642862Z",
+      "updated_at": "2026-04-01T06:06:11.607642862Z"
+    },
+    {
+      "id": "77a3a5a5-cc4e-4d4b-80db-b4aa05c140c4",
+      "name": "Planning System Integration (sub-task f1874939)",
+      "description": "Begin the 6-step Planning System Integration sub-task: (1) Audit current AI↔Planning state, (2) Add project_id/task_id to ai_conversations, (3) Inject project context into AI prompt, (4) Show AI activity on DailyPlan, (5) Link conversations to tasks, (6) End-to-end test.",
+      "status": "Pending",
+      "sort_order": 3,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-04-01T06:06:11.607642862Z",
+      "updated_at": "2026-04-01T06:06:11.607642862Z"
+    }
+  ]
+}
