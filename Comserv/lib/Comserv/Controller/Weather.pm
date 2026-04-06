@@ -360,18 +360,8 @@ sub save_configuration :Path('/Weather/save_configuration') :Args(0) {
 sub _check_weather_config {
     my ( $self, $c ) = @_;
     
-    # Get user and site context
     my $user_id = $c->session->{user_id};
     my $site_id = $c->session->{site_id};
-    
-    # If no user or site context, return unconfigured status
-    unless ($user_id && $site_id) {
-        return {
-            api_configured => 0,
-            location_set => 0,
-            error => 'User session required for weather configuration'
-        };
-    }
     
     # Ensure weather tables exist
     $self->_ensure_weather_tables($c);
@@ -576,12 +566,7 @@ sub _get_weather_configuration {
     my $site_id = $c->session->{site_id};
     
     my $config = try {
-        # Only get config if we have user and site context
-        if ($user_id && $site_id) {
-            return $self->weather_model->get_weather_config($user_id, $site_id);
-        } else {
-            return undef;
-        }
+        return $self->weather_model->get_weather_config($user_id, $site_id);
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_get_weather_configuration', 
             "Error getting weather configuration: $_");

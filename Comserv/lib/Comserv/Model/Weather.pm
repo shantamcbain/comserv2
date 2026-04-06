@@ -68,23 +68,26 @@ sub get_weather_config {
     my $schema = eval { $self->_get_schema };
     return undef if $@ || !$schema;
 
+    my $config;
     eval {
-        my $config = $schema->resultset('WeatherConfig')->search(
-            { 
-                user_id => $user_id,
-                site_id => $site_id,
-                is_active => 1 
-            },
-            { order_by => { -desc => 'id' }, rows => 1 }
-        )->first;
-        
-        return $config ? $config->get_inflated_columns : undef;
+        my @priorities;
+        push @priorities, { user_id => $user_id, site_id => $site_id, is_active => 1 }
+            if $user_id && $site_id;
+        push @priorities, { user_id => 0, site_id => 0, is_active => 1 };
+
+        for my $where (@priorities) {
+            my $row = $schema->resultset('WeatherConfig')->search(
+                $where,
+                { order_by => { -desc => 'id' }, rows => 1 }
+            )->first;
+            if ($row) {
+                $config = { $row->get_inflated_columns };
+                last;
+            }
+        }
+        1;
     };
-    
-    if ($@) {
-        # Table doesn't exist yet, return undef
-        return undef;
-    }
+    return $config;
 }
 
 =head2 save_weather_config
