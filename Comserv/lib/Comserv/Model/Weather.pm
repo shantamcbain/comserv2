@@ -227,6 +227,54 @@ sub cache_weather_data {
     return 1;
 }
 
+sub record_weather_history {
+    my ($self, $config_id, $data) = @_;
+
+    my $schema = eval { $self->_get_schema };
+    return 0 if $@ || !$schema;
+
+    eval {
+        $schema->resultset('WeatherHistory')->create({
+            config_id             => $config_id,
+            temperature           => $data->{temperature},
+            feels_like            => $data->{feels_like},
+            humidity              => $data->{humidity},
+            pressure              => $data->{pressure},
+            wind_speed            => $data->{wind_speed},
+            cloudiness            => $data->{cloudiness},
+            condition_main        => $data->{condition_main},
+            condition_description => $data->{condition_description},
+            weather_icon          => $data->{weather_icon},
+            location_name         => $data->{location_name},
+        });
+        1;
+    } or return 0;
+    return 1;
+}
+
+sub get_weather_history {
+    my ($self, $config_id, $limit) = @_;
+    $limit //= 48;
+
+    my $schema = eval { $self->_get_schema };
+    return [] if $@ || !$schema;
+
+    my @rows;
+    eval {
+        @rows = $schema->resultset('WeatherHistory')->search(
+            { config_id => $config_id },
+            { order_by => { -asc => 'recorded_at' }, rows => $limit }
+        )->all;
+        1;
+    };
+    return [] if $@;
+
+    return [ map {
+        my %cols = $_->get_inflated_columns;
+        \%cols
+    } @rows ];
+}
+
 sub track_api_usage {
     my ($self, $config_id, $api_service) = @_;
     return 1;

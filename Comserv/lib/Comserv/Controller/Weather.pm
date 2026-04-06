@@ -67,8 +67,8 @@ sub index :Path('/Weather') :Args(0) {
     # Check weather configuration status
     my $config_status = $self->_check_weather_config($c);
 
-    # If configured, get real current weather data
-    my $current_weather;
+    # If configured, get real current weather data + history for chart
+    my ($current_weather, $history_data, $weather_config);
     if ($config_status->{api_configured}) {
         $current_weather = try {
             $self->_get_current_weather($c);
@@ -77,12 +77,24 @@ sub index :Path('/Weather') :Args(0) {
                 "Error getting current weather for index: $_");
             undef;
         };
+
+        $weather_config = try {
+            $self->weather_model->get_weather_config();
+        } catch { undef };
+
+        if ($weather_config) {
+            $history_data = try {
+                $self->weather_model->get_weather_history($weather_config->{id}, 48);
+            } catch { [] };
+        }
     }
 
     # Stash data for template
     $c->stash(
         config_status   => $config_status,
         current_weather => $current_weather,
+        weather_config  => $weather_config,
+        history_data    => $history_data || [],
         template        => 'Weather/index.tt'
     );
 }

@@ -1,31 +1,212 @@
-[% META title = 'Weather Module - Setup & Configuration' %]
+[% META title = 'Weather' %]
 
+[% IF config_status.api_configured %]
+
+<!-- ===== DASHBOARD MODE — shown when weather is configured ===== -->
+<div class="weather-dashboard">
+
+    <header class="weather-header">
+        <div class="weather-header-left">
+            <h1><i class="fas fa-cloud-sun"></i>
+                [% IF current_weather && current_weather.location %]
+                    Weather — [% current_weather.location | html %]
+                [% ELSE %]
+                    Weather Dashboard
+                [% END %]
+            </h1>
+            [% IF current_weather && current_weather.data_source %]
+            <small class="text-muted">
+                [% IF current_weather.data_source == 'DATABASE' || current_weather.data_source == 'CACHED_FALLBACK' %]
+                    <i class="fas fa-database"></i> Updated from database cache
+                [% ELSE %]
+                    <i class="fas fa-wifi"></i> Live from [% current_weather.data_source | html %]
+                [% END %]
+            </small>
+            [% END %]
+        </div>
+        <div class="weather-header-right">
+            [% IF c.session.roles.grep('^admin$').size > 0 || c.session.roles.grep('^Admin$').size > 0 %]
+            <a href="[% c.uri_for('/Weather/configuration') %]" class="btn btn-sm btn-secondary">
+                <i class="fas fa-cog"></i> Settings
+            </a>
+            [% END %]
+        </div>
+    </header>
+
+    [% IF current_weather && current_weather.temperature.defined && current_weather.data_source ne 'MOCK_DATA' %]
+
+    <!-- Current conditions hero -->
+    <div class="weather-hero">
+        <div class="weather-hero-main">
+            <div class="weather-icon-large">
+                [% IF current_weather.icon %]
+                <img src="https://openweathermap.org/img/wn/[% current_weather.icon %]@4x.png"
+                     alt="[% current_weather.condition | html %]">
+                [% ELSE %]
+                <i class="fas fa-cloud-sun"></i>
+                [% END %]
+            </div>
+            <div class="weather-temp-block">
+                <div class="weather-temp-large">[% current_weather.temperature | format('%.1f') %]&deg;C</div>
+                <div class="weather-feels-like">Feels like [% current_weather.feels_like | format('%.1f') %]&deg;C</div>
+                <div class="weather-condition-name">[% current_weather.description || current_weather.condition | html %]</div>
+            </div>
+        </div>
+        <div class="weather-hero-details">
+            <div class="weather-detail-item">
+                <i class="fas fa-tint"></i>
+                <span class="detail-label">Humidity</span>
+                <span class="detail-value">[% current_weather.humidity %]%</span>
+            </div>
+            <div class="weather-detail-item">
+                <i class="fas fa-wind"></i>
+                <span class="detail-label">Wind</span>
+                <span class="detail-value">[% current_weather.wind_speed | format('%.1f') %] m/s</span>
+            </div>
+            [% IF weather_config.location_value %]
+            <div class="weather-detail-item">
+                <i class="fas fa-map-marker-alt"></i>
+                <span class="detail-label">Location</span>
+                <span class="detail-value">[% current_weather.location || weather_config.location_value | html %]</span>
+            </div>
+            [% END %]
+        </div>
+    </div>
+
+    <!-- Temperature history chart -->
+    [% IF history_data && history_data.size > 1 %]
+    <div class="weather-chart-section">
+        <h3><i class="fas fa-chart-line"></i> Temperature History</h3>
+        <canvas id="tempHistoryChart" height="100"></canvas>
+    </div>
+    <script src="/static/js/chart.umd.min.js"></script>
+    <script>
+    (function() {
+        var labels = [% '[' %]
+            [% FOREACH h IN history_data %]
+                "[% h.recorded_at | replace('T', ' ') | replace('\\.000Z', '') | html %]"[% UNLESS loop.last %],[% END %]
+            [% END %]
+        [% ']' %];
+        var temps = [% '[' %]
+            [% FOREACH h IN history_data %][% h.temperature %][% UNLESS loop.last %],[% END %][% END %]
+        [% ']' %];
+        var humidity = [% '[' %]
+            [% FOREACH h IN history_data %][% h.humidity %][% UNLESS loop.last %],[% END %][% END %]
+        [% ']' %];
+
+        new Chart(document.getElementById('tempHistoryChart'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Temperature (°C)',
+                        data: temps,
+                        borderColor: 'rgba(255, 99, 71, 0.9)',
+                        backgroundColor: 'rgba(255, 99, 71, 0.15)',
+                        yAxisID: 'y',
+                        tension: 0.3,
+                        fill: true
+                    },
+                    {
+                        label: 'Humidity (%)',
+                        data: humidity,
+                        borderColor: 'rgba(54, 162, 235, 0.8)',
+                        backgroundColor: 'transparent',
+                        yAxisID: 'y1',
+                        tension: 0.3,
+                        borderDash: [4, 4]
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                    x: { ticks: { maxTicksLimit: 12, maxRotation: 30 } },
+                    y: {
+                        type: 'linear',
+                        position: 'left',
+                        title: { display: true, text: 'Temperature (°C)' }
+                    },
+                    y1: {
+                        type: 'linear',
+                        position: 'right',
+                        title: { display: true, text: 'Humidity (%)' },
+                        min: 0, max: 100,
+                        grid: { drawOnChartArea: false }
+                    }
+                },
+                plugins: {
+                    legend: { position: 'top' }
+                }
+            }
+        });
+    })();
+    </script>
+    [% ELSE %]
+    <div class="weather-chart-section">
+        <p class="text-muted"><i class="fas fa-info-circle"></i>
+            Temperature history chart will appear once more data is collected by the weather poller.
+            [% IF history_data.size == 0 %]
+            The <code>weather_history</code> table may need to be created via schema compare.
+            [% END %]
+        </p>
+    </div>
+    [% END %]
+
+    <!-- Quick links for configured view -->
+    <div class="weather-quick-links">
+        <a href="[% c.uri_for('/Weather/forecast') %]" class="btn btn-primary">
+            <i class="fas fa-calendar-week"></i> 5-Day Forecast
+        </a>
+        <a href="[% c.uri_for('/Weather/current') %]" class="btn btn-outline">
+            <i class="fas fa-code"></i> Current JSON
+        </a>
+        [% IF c.session.username %]
+        <a href="[% c.uri_for('/Weather/configuration') %]" class="btn btn-outline">
+            <i class="fas fa-map-marker-alt"></i> Change Location
+        </a>
+        [% END %]
+    </div>
+
+    [% ELSE %]
+    <!-- Configured but no data yet -->
+    <div class="weather-no-data">
+        <i class="fas fa-spinner fa-spin fa-2x"></i>
+        <p>Weather is configured. Waiting for the first data poll.</p>
+        <p><small>Run <code>perl script/weather_poll.pl</code> or wait for the cron job to execute.</small></p>
+        <a href="[% c.uri_for('/Weather/configuration') %]" class="btn btn-secondary">
+            <i class="fas fa-cog"></i> Review Settings
+        </a>
+    </div>
+    [% END %]
+
+</div><!-- /.weather-dashboard -->
+
+[% ELSE %]
+
+<!-- ===== SETUP MODE — shown when weather is NOT yet configured ===== -->
 <div class="weather-container">
-    <!-- Header Section -->
+
     <header class="weather-header">
         <h1><i class="fas fa-cloud-sun"></i> Weather Module</h1>
         <div class="weather-context">
-            <span class="context-item"><strong>Status:</strong> 
-                [% IF config_status.api_configured %]
-                    <span class="status-active">Configured</span>
-                [% ELSE %]
-                    <span class="status-inactive">Not Configured</span>
-                [% END %]
+            <span class="context-item"><strong>Status:</strong>
+                <span class="status-inactive">Not Configured</span>
             </span>
-            <span class="context-item"><strong>Service:</strong> [% config_status.api_service || 'None' %]</span>
             <span class="context-item"><strong>User:</strong> [% c.session.username || 'Guest' %]</span>
         </div>
     </header>
 
     <div class="feature-grid">
-        
-        <!-- Welcome & Overview -->
+
         <div class="feature-card">
             <div class="feature-header">
                 <h3><i class="fas fa-info-circle feature-icon"></i>Welcome to Weather Integration</h3>
             </div>
             <div class="feature-content">
-                <p>The Weather Module provides real-time weather data integration for your entire application. 
+                <p>The Weather Module provides real-time weather data integration for your entire application.
                    Once configured, weather information will be available across all modules including:</p>
                 <ul class="feature-list">
                     <li>Apiary Management (for beekeeping conditions)</li>
@@ -33,89 +214,9 @@
                     <li>Event Planning</li>
                     <li>General Dashboard Information</li>
                 </ul>
-                <p><strong>Current Status:</strong> 
-                [% IF config_status.api_configured %]
-                    <span class="text-success">Weather service is configured and ready to use.</span>
-                [% ELSE %]
-                    <span class="text-warning">Weather service needs to be configured. Follow the setup guide below.</span>
-                [% END %]
-                </p>
             </div>
         </div>
 
-        <!-- Current Weather Display -->
-        <div class="feature-card">
-            <div class="feature-header">
-                <h3><i class="fas fa-thermometer-half feature-icon"></i>
-                    [% IF current_weather && current_weather.data_source.defined && current_weather.data_source ne 'MOCK_DATA' %]
-                        Current Conditions — [% current_weather.location || config_status.api_service %]
-                    [% ELSE %]
-                        Weather Display Preview
-                    [% END %]
-                </h3>
-            </div>
-            <div class="feature-content">
-                [% IF current_weather && current_weather.temperature.defined && current_weather.data_source ne 'MOCK_DATA' %]
-                <div class="weather-preview">
-                    <div class="weather-display-sample">
-                        <div class="weather-current">
-                            <div class="weather-icon">
-                                [% IF current_weather.icon %]
-                                <img src="https://openweathermap.org/img/wn/[% current_weather.icon %]@2x.png"
-                                     alt="[% current_weather.condition | html %]" style="width:64px;height:64px;">
-                                [% ELSE %]
-                                <i class="fas fa-cloud-sun" style="font-size:3rem;"></i>
-                                [% END %]
-                            </div>
-                            <div class="weather-info">
-                                <div class="weather-temp">[% current_weather.temperature | format('%.1f') %]&deg;C</div>
-                                <div class="weather-condition">[% current_weather.description || current_weather.condition | html %]</div>
-                                <div class="weather-details">
-                                    Humidity: [% current_weather.humidity %]% |
-                                    Wind: [% current_weather.wind_speed | format('%.1f') %] m/s
-                                </div>
-                                [% IF current_weather.data_source %]
-                                <div class="weather-source">
-                                    <small class="text-muted"><i class="fas fa-database"></i>
-                                        [% IF current_weather.data_source == 'CACHED_FALLBACK' %]Cached (may be stale)
-                                        [% ELSIF current_weather.data_source == 'DATABASE' %]From database cache
-                                        [% ELSE %]Live from [% current_weather.data_source | html %]
-                                        [% END %]
-                                    </small>
-                                </div>
-                                [% END %]
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                [% ELSE %]
-                <p>Here's how weather information will appear throughout your application:</p>
-                <div class="weather-preview">
-                    <div class="weather-display-sample">
-                        <div class="weather-current">
-                            <div class="weather-icon"><i class="fas fa-cloud-sun" style="font-size:3rem;"></i></div>
-                            <div class="weather-info">
-                                <div class="weather-temp">18&deg;C</div>
-                                <div class="weather-condition">Clear Sky</div>
-                                <div class="weather-details">Humidity: 45% | Wind: 3.3 m/s NW</div>
-                            </div>
-                        </div>
-                        <div class="weather-note">
-                            <small><i class="fas fa-info-circle"></i>
-                                [% IF config_status.api_configured %]
-                                    Weather data is being fetched. Check back shortly or run the weather poller.
-                                [% ELSE %]
-                                    Sample data. Real weather will appear once configured.
-                                [% END %]
-                            </small>
-                        </div>
-                    </div>
-                </div>
-                [% END %]
-            </div>
-        </div>
-
-        <!-- Setup Guide -->
         <div class="feature-card">
             <div class="feature-header">
                 <h3><i class="fas fa-cog feature-icon"></i>Weather Service Setup Guide</h3>
@@ -126,28 +227,16 @@
                         <div class="step-number">1</div>
                         <div class="step-content">
                             <h4>Choose a Weather Service</h4>
-                            <p>Select from one of these popular weather API providers:</p>
                             <div class="service-options">
                                 <div class="service-option">
-                                    <h5><i class="fas fa-external-link-alt"></i> OpenWeatherMap (Recommended)</h5>
-                                    <p>Free tier: 1,000 calls/day, 60 calls/minute</p>
-                                    <a href="https://openweathermap.org/api" target="_blank" class="btn btn-outline">
-                                        <i class="fas fa-external-link-alt"></i> Sign Up
-                                    </a>
+                                    <h5>OpenWeatherMap <small>(Recommended)</small></h5>
+                                    <p>Free tier: 1,000 calls/day</p>
+                                    <a href="https://openweathermap.org/api" target="_blank" class="btn btn-outline">Sign Up</a>
                                 </div>
                                 <div class="service-option">
-                                    <h5><i class="fas fa-external-link-alt"></i> WeatherAPI</h5>
+                                    <h5>WeatherAPI</h5>
                                     <p>Free tier: 1 million calls/month</p>
-                                    <a href="https://www.weatherapi.com/" target="_blank" class="btn btn-outline">
-                                        <i class="fas fa-external-link-alt"></i> Sign Up
-                                    </a>
-                                </div>
-                                <div class="service-option">
-                                    <h5><i class="fas fa-external-link-alt"></i> AccuWeather</h5>
-                                    <p>Free tier: 50 calls/day</p>
-                                    <a href="https://developer.accuweather.com/" target="_blank" class="btn btn-outline">
-                                        <i class="fas fa-external-link-alt"></i> Sign Up
-                                    </a>
+                                    <a href="https://www.weatherapi.com/" target="_blank" class="btn btn-outline">Sign Up</a>
                                 </div>
                             </div>
                         </div>
@@ -157,12 +246,10 @@
                         <div class="step-number">2</div>
                         <div class="step-content">
                             <h4>Get Your API Key</h4>
-                            <p>After signing up with your chosen service:</p>
                             <ul>
                                 <li>Log into your weather service dashboard</li>
-                                <li>Navigate to API Keys or API Access section</li>
+                                <li>Navigate to API Keys section</li>
                                 <li>Generate a new API key</li>
-                                <li>Copy the API key for the next step</li>
                             </ul>
                         </div>
                     </div>
@@ -171,83 +258,20 @@
                         <div class="step-number">3</div>
                         <div class="step-content">
                             <h4>Configure the Application</h4>
-                            <p>Add your weather configuration to the system:</p>
-                            <div class="config-actions">
-                                <a href="[% c.uri_for('/Weather/configuration') %]" class="btn btn-primary">
-                                    <i class="fas fa-cog"></i> Configure Weather Settings
-                                </a>
-                            </div>
-                            <p><small>You'll need your API key and location information.</small></p>
+                            <a href="[% c.uri_for('/Weather/configuration') %]" class="btn btn-primary">
+                                <i class="fas fa-cog"></i> Configure Weather Settings
+                            </a>
                         </div>
                     </div>
 
                     <div class="setup-step">
                         <div class="step-number">4</div>
                         <div class="step-content">
-                            <h4>Test & Verify</h4>
-                            <p>Once configured, test your weather integration:</p>
-                            <div class="test-actions">
-                                <button class="btn btn-info" id="test-weather-btn">
-                                    <i class="fas fa-flask"></i> Test Weather Connection
-                                </button>
-                                <div id="test-results" class="test-results" style="display: none;"></div>
-                            </div>
+                            <h4>Enable Automatic Data Collection</h4>
+                            <p>Add this to crontab on your primary server to collect weather data every 30 minutes:</p>
+                            <pre><code>*/30 * * * * cd /path/to/Comserv &amp;&amp; perl script/weather_poll.pl >> /var/log/weather_poll.log 2>&amp;1</code></pre>
+                            <p><small>The poller uses a file lock — only one instance runs at a time regardless of how many app servers are running.</small></p>
                         </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Quick Links -->
-        <div class="feature-card">
-            <div class="feature-header">
-                <h3><i class="fas fa-link feature-icon"></i>Quick Access</h3>
-            </div>
-            <div class="feature-content">
-                <div class="quick-links">
-                    <a href="[% c.uri_for('/Weather/current') %]" class="quick-link">
-                        <i class="fas fa-thermometer-half"></i>
-                        <span>Current Weather API</span>
-                        <small>JSON endpoint for current conditions</small>
-                    </a>
-                    <a href="[% c.uri_for('/Weather/forecast') %]" class="quick-link">
-                        <i class="fas fa-calendar-week"></i>
-                        <span>Weather Forecast</span>
-                        <small>5-day weather forecast</small>
-                    </a>
-                    <a href="[% c.uri_for('/Weather/configuration') %]" class="quick-link">
-                        <i class="fas fa-cog"></i>
-                        <span>Configuration</span>
-                        <small>Manage weather settings</small>
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        <!-- Integration Examples -->
-        <div class="feature-card">
-            <div class="feature-header">
-                <h3><i class="fas fa-code feature-icon"></i>Integration Examples</h3>
-            </div>
-            <div class="feature-content">
-                <p>Once configured, you can use weather data in your applications:</p>
-                <div class="code-examples">
-                    <div class="code-example">
-                        <h5>JavaScript (Frontend)</h5>
-                        <pre><code>// Get current weather
-fetch('/Weather/current')
-  .then(response => response.json())
-  .then(weather => {
-    console.log(`Temperature: ${weather.temperature}°C`);
-    console.log(`Condition: ${weather.condition}`);
-  });</code></pre>
-                    </div>
-                    <div class="code-example">
-                        <h5>Template (Backend)</h5>
-                        <pre><code><!-- Include weather in any template -->
-&lt;div class="weather-widget"&gt;
-  &lt;span id="weather-display"&gt;Loading...&lt;/span&gt;
-&lt;/div&gt;</code></pre>
                     </div>
                 </div>
             </div>
@@ -255,72 +279,39 @@ fetch('/Weather/current')
 
     </div>
 
-    <!-- Action Buttons -->
     <div class="feature-actions">
-        [% IF config_status.api_configured %]
-            <a href="[% c.uri_for('/Weather/forecast') %]" class="btn btn-primary">
-                <i class="fas fa-calendar-week"></i> View Forecast
-            </a>
-            <a href="[% c.uri_for('/Weather/configuration') %]" class="btn btn-secondary">
-                <i class="fas fa-cog"></i> Manage Settings
-            </a>
-        [% ELSE %]
-            <a href="[% c.uri_for('/Weather/configuration') %]" class="btn btn-primary">
-                <i class="fas fa-cog"></i> Start Configuration
-            </a>
-        [% END %]
-        <button class="btn btn-info" onclick="window.history.back()">
-            <i class="fas fa-arrow-left"></i> Back
-        </button>
+        <a href="[% c.uri_for('/Weather/configuration') %]" class="btn btn-primary">
+            <i class="fas fa-cog"></i> Start Configuration
+        </a>
     </div>
-</div>
 
-<!-- JavaScript for testing functionality -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const testButton = document.getElementById('test-weather-btn');
-    const testResults = document.getElementById('test-results');
-    
-    if (testButton) {
-        testButton.addEventListener('click', function() {
-            testButton.disabled = true;
-            testButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
-            testResults.style.display = 'block';
-            testResults.innerHTML = '<div class="alert alert-info">Testing weather connection...</div>';
-            
-            fetch('[% c.uri_for("/Weather/current") %]')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        testResults.innerHTML = `
-                            <div class="alert alert-warning">
-                                <strong>Test Result:</strong> ${data.error}<br>
-                                <small>This is expected if weather is not yet configured.</small>
-                            </div>
-                        `;
-                    } else {
-                        testResults.innerHTML = `
-                            <div class="alert alert-success">
-                                <strong>Test Successful!</strong><br>
-                                Temperature: ${data.temperature}°C<br>
-                                Condition: ${data.condition}<br>
-                                Source: ${data.data_source}
-                            </div>
-                        `;
-                    }
-                })
-                .catch(error => {
-                    testResults.innerHTML = `
-                        <div class="alert alert-danger">
-                            <strong>Test Failed:</strong> ${error.message}
-                        </div>
-                    `;
-                })
-                .finally(() => {
-                    testButton.disabled = false;
-                    testButton.innerHTML = '<i class="fas fa-flask"></i> Test Weather Connection';
-                });
-        });
-    }
-});
-</script>
+</div><!-- /.weather-container -->
+
+[% END %]
+
+<style>
+.weather-dashboard { max-width: 960px; margin: 0 auto; padding: 1rem; }
+.weather-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
+.weather-header h1 { margin: 0; }
+.weather-hero { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center;
+    background: var(--card-bg, #f8f9fa); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem;
+    box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+.weather-hero-main { display: flex; align-items: center; gap: 1rem; }
+.weather-icon-large img { width: 96px; height: 96px; }
+.weather-icon-large .fas { font-size: 5rem; color: var(--primary-color, #2196F3); }
+.weather-temp-large { font-size: 3.5rem; font-weight: 700; line-height: 1; }
+.weather-feels-like { color: var(--text-muted, #666); font-size: .95rem; }
+.weather-condition-name { font-size: 1.2rem; text-transform: capitalize; margin-top: .25rem; }
+.weather-hero-details { display: flex; flex-wrap: wrap; gap: 1.5rem; }
+.weather-detail-item { display: flex; flex-direction: column; align-items: center; min-width: 80px; }
+.weather-detail-item .fas { font-size: 1.4rem; color: var(--primary-color, #2196F3); margin-bottom: .25rem; }
+.detail-label { font-size: .75rem; color: var(--text-muted, #666); text-transform: uppercase; letter-spacing: .05em; }
+.detail-value { font-size: 1.1rem; font-weight: 600; }
+.weather-chart-section { background: var(--card-bg, #fff); border-radius: 8px; padding: 1.5rem;
+    margin-bottom: 1.5rem; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+.weather-chart-section h3 { margin-top: 0; margin-bottom: 1rem; }
+.weather-quick-links { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }
+.weather-no-data { text-align: center; padding: 3rem 1rem;
+    background: var(--card-bg, #f8f9fa); border-radius: 8px; }
+.weather-no-data .fas { color: var(--primary-color, #2196F3); margin-bottom: 1rem; }
+</style>

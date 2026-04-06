@@ -152,8 +152,33 @@ for my $config (@configs) {
     };
     if ($@) {
         log_msg("DB write error for config $config_id: $@");
+        next;
+    }
+
+    log_msg("Stored weather for config $config_id: $row{temperature}°C, $row{condition_description}");
+
+    my %hist = (
+        config_id             => $config_id,
+        temperature           => $row{temperature},
+        feels_like            => $row{feels_like},
+        humidity              => $row{humidity},
+        pressure              => $row{pressure},
+        wind_speed            => $row{wind_speed},
+        cloudiness            => $row{cloudiness},
+        condition_main        => $row{condition_main},
+        condition_description => $row{condition_description},
+        weather_icon          => $row{weather_icon},
+        location_name         => $row{location_name},
+    );
+    delete $hist{$_} for grep { !defined $hist{$_} } keys %hist;
+
+    eval {
+        $schema->resultset('WeatherHistory')->create(\%hist);
+    };
+    if ($@) {
+        log_msg("History write skipped for config $config_id (table may not exist yet): $@");
     } else {
-        log_msg("Stored weather for config $config_id: $row{temperature}°C, $row{condition_description}");
+        log_msg("History row inserted for config $config_id.");
     }
 }
 
