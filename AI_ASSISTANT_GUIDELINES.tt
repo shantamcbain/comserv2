@@ -1,0 +1,83 @@
+[% PageVersion = '/home/shanta/PycharmProjects/comserv2/AI_ASSISTANT_GUIDELINES.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'IMPORTANT GUIDELINES FOR AI ASSISTANTS' %]
+
+<!-- Include documentation CSS -->
+<link rel="stylesheet" href="/static/css/documentation.css">
+
+<div class="markdown-content">
+
+
+## FILE MODIFICATION POLICY
+
+
+
+**⚠️ WARNING: NEVER REPLACE OR MODIFY EXISTING FILES WITHOUT EXPLICIT PERMISSION ⚠️**
+
+
+
+All AI assistants working with this codebase must adhere to the following rules:
+
+
+
+1. **ALWAYS ASK FOR PERMISSION** before modifying, replacing, or deleting any existing file
+
+2. **NEVER ASSUME** that a file can be overwritten, even if it appears to have issues
+
+3. **PROPOSE CHANGES** rather than implementing them directly
+
+4. **EXPLAIN THE IMPACT** of any proposed changes before making them
+
+
+
+## Specific Guidelines for the Comserv System
+
+
+
+### File and Package Naming
+
+
+
+- Ensure that Perl module filenames match their package declarations
+
+- Example: A file named `Documentation.pm` should contain the package `Comserv::Controller::Documentation`
+
+
+
+### Known Issues
+
+
+
+- The Documentation controller has a filename/package mismatch:
+
+  - File: `Documantation.pm` (with an 'a')
+
+  - Package: `Comserv::Controller::Documentation` (with an 'o')
+
+  - This causes route failures for `/documentation` and `/Documentation`
+
+
+
+### Logging Requirements
+
+
+
+Always use the `log_with_details` method for comprehensive logging:
+
+
+
+```perl
+
+$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name',
+
+    "Detailed message with relevant information");
+
+```
+
+
+
+For more detailed guidelines, refer to `/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/AI_Guidelines.md`
+</div>

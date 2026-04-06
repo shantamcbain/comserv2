@@ -1,0 +1,71 @@
+[%
+
+# the ENCY template
+#	$Id: ResourcesView.ttml,v 1.2 2015/09/09 19:25:15 shanta Exp $	
+#file location/cgi-bin/HTMLTemplates/ENCY
+%]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Resources.']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% LastUpdate = data.last_update %]
+   [% SiteLastUpdate = data.site_last_update %]
+
+<div ALIGN="center">
+	[% IF username %]
+
+<h3 > Hello  [% firstname%]  [% lastname%]! Welcome to our Environmental  Resources!</h3>
+	  
+
+	[% ELSE %]
+
+	<h3>  Hello! Welcome to our Environmental  Resources!</h3
+
+	[% END %]
+
+</div>
+<div ALIGN="center">
+<A NAME="PageTop"></A>
+</div>
+
+
+
+     
+        <h2>Resources in our community.</h2>
+      
+      <p>Every cow produces 200 Watts of power every day.  This power is washed out of the dairy barns each day in vast quantities of water. This creates a huge problem in the ecosystem. The liquefied manure sinks rapidly into the soil contaminating the underlying aquifer.
+      
+      <p>Yet with the right digester one can produce methane gas (simplest), Bio-fuels such as diesel, alcohol even <a href="http://cleantechnica.com/2010/04/16/whod-laughing-now-scientists-make-crude-oil-from-pig-manure/" target="_blank">Crude oil</a> Research on pigs. </p>
+      
+      <p><a href="https://en.wikipedia.org/wiki/Methane" target="_blank">Methane</a> can be used directly in a Natural Gas  converted electrical generator. Methane is the primary gas in Natural Gas.  It can be compressed and used in trucks cars tractors ect. Piped into your house for use in heating or cooking. The simplest version is a plastic bag buried in the ground with a gas line attached. This system is used in Mexico. India uses a steel bell jar in a slurry pit. The weight of the bell jar compresses the gas for transport. <a href="http://www.green-trust.org/2000/biofuel/methane.htm">Indian methane production example.</a> On the other end of the scale is <a href="http://www.nytimes.com/2013/03/28/us/dairy-finds-way-to-let-cows-power-trucks.html?_r=0" target="_blank">Fair Oaks Farms</a> </p>
+      
+   <p>A short list of links</p>  
+   
+   <ul>
+    <li><a href="www.cowpowerinc.com" target="_blank">Cow Power Inc.</a></li>
+     <li>Chicken <a href="http://www.coaltecenergy.com/fuels/chicken-manure/" target="_blank">Gasification</a> Any organic material can be gasified. Manures and wood are two examples and need a high degree of cleaning. Plastics are another example of materials that can be gasified this is the cleanest source of burnable gasses.</li>
+   </ul>
+      <p>Bio-fuels like diesel and Alcohal are a bit more complex. They require special algi to create and require more processing than Methane. But systems have been installed around the world and produce vast amounts of fuel from this valuable resource. </p>
+      
+     <p> The remaining organic materials can then be added as a solid that has had the water reclaimed for use in the dairy. Solid manures work way better for soil augmentation as it dose not wash down to the water table. Staying in the upper soil for plant utilization. </p>
+      
+      
+      <div ALIGN="center">
+<a href="../CSC/helpdesk.cgi?[% session_string %]" target="_Blank" > HelpDesk</a>
+<p>Last Updated: [% SiteLastUpdate  %] 
+
+[% embed('CSCCopyRight') %]
+[% embed(data.page_bottom_view) %]
+

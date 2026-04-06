@@ -20,7 +20,6 @@
 .resource-card {
     border: 1px solid var(--border-color, #dee2e6);
     border-radius: 6px;
-    background: var(--card-bg, #fff);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -33,7 +32,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--table-header-bg, #f8f9fa);
     border-bottom: 1px solid var(--border-color, #dee2e6);
     font-size: 3em;
     cursor: pointer;
@@ -109,7 +107,7 @@
 }
 #resource-modal.open { display: flex; }
 #resource-modal-inner {
-    background: var(--card-bg, #fff);
+    background: var(--background-color, #fff);
     border-radius: 8px;
     max-width: 700px;
     width: 95%;
@@ -132,7 +130,7 @@
 
     <div class="page-header">
         <h1>📁 Workshop Resources</h1>
-        <p style="color: var(--text-muted-color);">Files and links registered for workshop use.</p>
+        <p style="color: var(--text-muted-color);">Files and links registered for workshop use. <a href="/Documentation/WorkshopResourceManagement" style="font-size:0.9em;margin-left:10px;">📖 User Guide</a></p>
     </div>
 
     [% IF c.flash.error_msg %]
@@ -142,19 +140,19 @@
         <div class="alert alert-success">[% c.flash.success_msg | html %]</div>
     [% END %]
     [% IF db_error %]
-        <div class="alert alert-warning" style="background:#fff3cd;border:1px solid #ffc107;padding:10px;border-radius:4px;margin-bottom:16px;">
+        <div class="warning">
             <strong>Database error:</strong> Could not load resource records.
             [% IF c.session.debug_mode == 1 %]<br><small>[% db_error | html %]</small>[% END %]
         </div>
     [% END %]
 
     [% IF is_admin %]
-    <div style="background:#d1ecf1;border:1px solid #bee5eb;padding:10px 14px;border-radius:4px;margin-bottom:12px;font-size:0.9em;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+    <div class="content-section" style="font-size:0.9em;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
         <span><strong>Admin:</strong> NFS at <code>[% nfs_root | html %]</code>
             [% IF nfs_available %]— <span style="color:#155724;">✓ mounted</span>[% ELSE %]— <span style="color:#721c24;">✗ not mounted</span>[% END %]
         </span>
         [% IF is_csc %]
-        <a href="/workshop/resource_sync" class="btn btn-sm" style="background:#17a2b8;color:#fff;text-decoration:none;">🔄 NFS Sync Tool</a>
+        <a href="/workshop/resource_sync" class="btn btn-sm">🔄 NFS Sync Tool</a>
         [% END %]
     </div>
     [% END %]
@@ -163,6 +161,7 @@
     <details class="upload-panel">
         <summary>⬆️ Upload File</summary>
         <form method="POST" action="/workshop/resource_upload" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
             <div class="upload-row">
                 <div class="form-group" style="flex:2; min-width:220px;">
                     <label>File</label>
@@ -270,6 +269,7 @@
                     [% IF is_csc || (r.id && r.uploaded_by == cur_uid) %]
                     <form method="POST" action="/workshop/resource_delete/[% r.id %]" style="display:inline;"
                           onsubmit="return confirm('Remove this link?');">
+                        <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                         <button type="submit" class="btn btn-sm btn-danger" title="Remove">🗑️</button>
                     </form>
                     [% END %]
@@ -279,8 +279,9 @@
                     [% IF r.file_id %]
                     <details style="display:inline-block;position:relative;">
                         <summary class="btn btn-sm" style="display:inline-block;list-style:none;background:#6c757d;color:#fff;">✏️ Edit</summary>
-                        <div style="position:absolute;right:0;top:100%;z-index:210;background:#fff;border:1px solid #ccc;border-radius:6px;padding:12px;min-width:320px;box-shadow:0 4px 12px rgba(0,0,0,0.2);">
+                        <div style="position:absolute;right:0;top:100%;z-index:210;background:var(--background-color, #fff);border:1px solid #ccc;border-radius:6px;padding:12px;min-width:320px;box-shadow:0 4px 12px rgba(0,0,0,0.2);">
                             <form method="POST" action="/workshop/file_update">
+                                <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                                 <input type="hidden" name="file_id" value="[% r.file_id %]">
                                 <div style="margin-bottom:7px;">
                                     <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:2px;">Display Name</label>
@@ -332,6 +333,7 @@
                     [% IF is_csc || r.uploaded_by == cur_uid %]
                     <form method="POST" action="/workshop/resource_delete/[% r.id %]" style="display:inline;"
                           onsubmit="return confirm('Delete [% r.file_name | html %]?');">
+                        <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                         <button type="submit" class="btn btn-sm btn-danger" title="Delete">🗑️</button>
                     </form>
                     [% END %]
@@ -369,6 +371,7 @@
             <summary>🔗 Add External Link to Resource Library</summary>
             <p style="font-size:0.85em;color:var(--text-muted-color);margin:10px 0 6px;">Add a link to an off-site resource (book, PDF, video, article) without storing a local copy.</p>
             <form method="POST" action="/workshop/resource_add_url">
+                <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                 <div class="upload-row">
                     <div class="form-group" style="flex:3;min-width:260px;">
                         <label>URL</label>
@@ -606,10 +609,10 @@
     </div>
     </details>
 
-    [% IF is_admin %]
-    <!-- Admin: lazy NFS filesystem browser -->
-    <details id="nfs-browser-section" style="margin-top:24px;">
-        <summary>🗂️ Browse NFS Filesystem Raw (Admin)
+    [% IF can_browse_nfs %]
+    <!-- NFS Filesystem Browser -->
+    <details id="nfs-browser-section" style="margin-top:24px;" [% IF open_panel == 'nfs' %]open[% END %]>
+        <summary>🗂️ Browse NFS Filesystem
             <span id="nfs-count-badge" style="font-size:0.8em;font-weight:normal;color:var(--text-muted-color);margin-left:8px;"></span>
         </summary>
         <div style="margin:12px 16px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
@@ -633,7 +636,7 @@
                         <th>Ext</th>
                         <th>Size</th>
                         <th>Path</th>
-                        <th>Download</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody id="nfs-tbody"></tbody>
@@ -643,6 +646,83 @@
     [% END %]
 
 </div>
+<!-- Attach to Workshop Modal -->
+<div id="attach-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width:500px;">
+        <button class="modal-close" onclick="closeAttachModal()">&times;</button>
+        <h3>🔗 Attach to Workshop</h3>
+        <p style="font-size:0.9em;margin-bottom:16px;">
+            Registering file: <strong id="attach-file-name"></strong>
+        </p>
+        
+        <form method="POST" action="/workshop/resource_fs_attach">
+            <input type="hidden" name="path" id="attach-path">
+            
+            <div class="form-group" style="margin-bottom:12px;">
+                <label style="display:block;font-weight:bold;font-size:0.85em;margin-bottom:4px;">Target Workshop</label>
+                <select name="workshop_id" required style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
+                    <option value="">-- Select Workshop --</option>
+                    [% FOREACH w IN workshops %]
+                    <option value="[% w.id %]">[% w.sitename | html %] — [% w.title | html %]</option>
+                    [% END %]
+                </select>
+            </div>
+            
+            <div class="form-group" style="margin-bottom:12px;">
+                <label style="display:block;font-weight:bold;font-size:0.85em;margin-bottom:4px;">Site Name</label>
+                <select name="sitename" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
+                    <option value="[% sitename | html %]">Current: [% sitename | html %]</option>
+                    <option value="CSC">CSC (System Wide)</option>
+                </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom:12px;">
+                <label style="display:block;font-weight:bold;font-size:0.85em;margin-bottom:4px;">Description (optional)</label>
+                <textarea name="description" rows="2" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;" placeholder="Briefly describe what this file is..."></textarea>
+            </div>
+
+            <div class="form-group" style="margin-bottom:20px;">
+                <label style="display:block;font-weight:bold;font-size:0.85em;margin-bottom:4px;">Access Level</label>
+                <select name="access_level" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
+                    <option value="site_only">My Site Only</option>
+                    <option value="all_leaders">All Leaders</option>
+                    <option value="workshop_specific" selected>Workshop Specific</option>
+                </select>
+            </div>
+
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button type="button" class="btn btn-secondary" onclick="closeAttachModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Attach File</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 9100;
+    align-items: center;
+    justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-content {
+    background: #fff;
+    padding: 24px;
+    border-radius: 8px;
+    position: relative;
+    width: 90%;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+}
+.modal-close {
+    position: absolute; top: 10px; right: 14px;
+    font-size: 1.6em; border: none; background: none; cursor: pointer;
+}
+</style>
+
 <!-- View/Info Modal -->
 <div id="resource-modal">
     <div id="resource-modal-inner" style="max-width:900px;">
@@ -809,17 +889,30 @@
                 ? '<img src="' + dl + '" alt="" loading="lazy" style="max-height:46px;max-width:56px;object-fit:cover;border-radius:3px;cursor:pointer;display:block;margin:auto;" onclick="openFsModal(\'' + jsEsc(f.file_name) + '\',\'' + ext + '\',\'' + enc + '\')" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:\'' + icon + '\',style:\'font-size:1.6em;cursor:pointer\'}))">'
                 : '<span style="font-size:1.6em;cursor:pointer;" onclick="openFsModal(\'' + jsEsc(f.file_name) + '\',\'' + ext + '\',\'' + enc + '\')">' + icon + '</span>';
             var searchBlob = ((f.file_name || '') + ' ' + (f.file_path || '')).toLowerCase();
+            var attachBtn = '<button class="btn btn-sm" style="background:#28a745;color:#fff;" onclick="openAttachModal(\'' + jsEsc(f.file_name) + '\', \'' + jsEsc(f.file_path) + '\')" title="Attach to Workshop">➕</button>';
+            var dbBadge = f.db_id ? '<span class="badge-access badge-site" title="Registered in Database">DB</span>' : '';
+            
             return '<tr data-name="' + escHtml(f.file_name.toLowerCase()) + '" data-search="' + escHtml(searchBlob) + '" data-ftype="' + ftype + '">' +
                 '<td style="text-align:center;white-space:nowrap;">' + previewHtml + '</td>' +
-                '<td><span style="cursor:pointer;text-decoration:underline;" onclick="openFsModal(\'' + jsEsc(f.file_name) + '\',\'' + ext + '\',\'' + enc + '\')">' + escHtml(f.file_name) + '</span></td>' +
+                '<td><span style="cursor:pointer;text-decoration:underline;" onclick="openFsModal(\'' + jsEsc(f.file_name) + '\',\'' + ext + '\',\'' + enc + '\')">' + escHtml(f.file_name) + '</span> ' + dbBadge + '</td>' +
                 '<td>' + escHtml((f.file_ext || '').toUpperCase()) + '</td>' +
                 '<td style="white-space:nowrap;">' + sizeLabel + '</td>' +
                 '<td style="font-size:0.78em;color:#666;">' + escHtml(f.file_path) + '</td>' +
-                '<td><a href="' + dl + '" class="btn btn-sm">⬇️</a></td>' +
+                '<td><div style="display:flex;gap:4px;"><a href="' + dl + '" class="btn btn-sm">⬇️</a>' + attachBtn + '</div></td>' +
                 '</tr>';
         });
         tbody.innerHTML = rows.join('');
     }
+
+    /* ---- Attach to Workshop Modal logic ---- */
+    window.openAttachModal = function(name, path) {
+        document.getElementById('attach-file-name').textContent = name;
+        document.getElementById('attach-path').value = path;
+        document.getElementById('attach-modal').classList.add('open');
+    };
+    window.closeAttachModal = function() {
+        document.getElementById('attach-modal').classList.remove('open');
+    };
 
     function filterNfsTable(q) {
         var rows = document.querySelectorAll('#nfs-tbody tr');

@@ -132,10 +132,11 @@
 
 /* Responsive layout */
 @media (max-width: 768px) {
+  /* All columns stack to full width */
   .row {
     flex-direction: column;
   }
-  
+
   .col,
   .col-25,
   .col-33,
@@ -145,5 +146,69 @@
   .col-100 {
     flex: 0 0 100%;
     max-width: 100%;
+  }
+
+  /* Header: allow content to wrap */
+  .site-header {
+    padding: var(--spacing-small) 0;
+  }
+
+  /* Sidebar goes below content on mobile */
+  .sidebar {
+    margin-top: var(--spacing-medium);
+  }
+
+  /* Left nav: full width on mobile */
+  .LeftNavTableStyle {
+    display: block;
+    width: 100%;
+  }
+}
+
+/* Generic table scroll wrapper — apply .table-responsive on a parent div
+   OR use .scrollable-table directly on the <table> element */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: var(--spacing-medium);
+}
+
+@media (max-width: 768px) {
+  .scrollable-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+}
+
+/* Ensure inputs and buttons don't overflow on mobile */
+@media (max-width: 480px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  input[type="url"],
+  textarea,
+  select {
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+
+  /* Stack form-row flex items */
+  .form-row {
+    flex-direction: column !important;
+  }
+
+  .form-field {
+    width: 100% !important;
+    flex: none !important;
+  }
+
+  /* Ensure buttons are tap-friendly */
+  button, .btn, input[type="submit"], input[type="button"] {
+    min-height: 44px;
+    padding: 10px 16px;
   }
 }

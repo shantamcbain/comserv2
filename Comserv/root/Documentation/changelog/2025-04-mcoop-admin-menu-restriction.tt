@@ -19,7 +19,7 @@ The MCoop admin menu section in the admin top menu was modified to only display 
 This was implemented by updating the conditional check in the `admintopmenu.tt` template:
 
 ```tt
-[% IF c.session.roles && c.session.roles.grep('^admin$').size && (c.session.SiteName == 'MCOOP' || c.stash.SiteName == 'MCOOP') %]
+[% IF c.session.roles && c.session.roles.grep('^admin$').size && (c.session.SiteName == 'MCOOP' || c.stash.SiteName == 'MCOOP') %][% END %]
 ```
 
 ### 2. Site-Specific Menu Logic

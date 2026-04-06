@@ -1,0 +1,115 @@
+   [% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+ <table>  
+
+[% IF SiteName == 'CSCDev' %]
+[%# embed("CSCProjectListsql") %]  
+[% FOREACH link = DBI.query("SELECT * FROM csc_todo_tb
+                                  WHERE (sitename =  'CSCDev' and 
+                                         status = '2' )
+                                  ORDER BY project_code
+                                  ")%]    
+                                  
+ <table>                                  
+                                   <tr>
+<td class="NavTableCellStyle"> [% link.sitename %]  </td>
+<td class="NavTableCellStyle"> [% link.project_code %]  </td>
+<td class="NavTableCellStyle"> [% link.subject %]  </td>
+<td class="NavTableCellStyle"> [% link.description %]  </td>
+<td class="NavTableCellStyle">        
+  <a href="/cgi-bin/ENCY/herbs.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %][% link.view_name %]" name="Contact" target="[% link.target %]" title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+  <a href="/cgi-bin/ToDo/log.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;todo_record_id=[% link.record_id %]&amp;abstract=[% link.subject %]&amp;project_code=[% link.project_code %]&amp;details=[% link.description %]&amp;priority=" "target="_Blank">Log</a>
+ </td>
+</tr><tr>
+<td class="NavTableCellStyle">  </td>
+    [% END %]
+  [% ELSIF SiteName == 'BMaster' OR
+     SiteName == 'GrindrodProject' %]
+  [% FOREACH link = DBI.query("SELECT * FROM ency_herb_tb
+                                  WHERE (apis !=  '' )
+                                  ORDER BY botanical_name
+                                  ")%]  
+<table  width="100%">
+ <tr>  
+ <td class="NavTableCellStyle" colspan = 2> <t2>[% link.botanical_name %] </t2> </td>
+</tr>
+<td class="NavTableCellStyle" rowspan=5> <IMG SRC ="[% link.image %]"  WIDTH ="300"      HEIGHT ="325"> 	         </td>
+</tr>
+<tr><td class="NavTableCellStyle">Common Name [% link.common_names %]  </td></tr>
+<tr><td class="NavTableCellStyle">Forage [% link.apis %]  </td>
+</tr><tr><td class="NavTableCellStyle">Nectar [% link.nectar %]  </td>
+</tr><tr><td class="NavTableCellStyle">Pollen [% link.pollen %]  </td>
+</tr><tr>
+<td class="NavTableCellStyle">        
+  <a href="/cgi-bin/ENCY/herbs.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=HerbDetailView&record_id=[% link.record_id %]" name="Contact" target="[% link.target %]" title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+ [% IF  group == "Apis_admin" %]  <a href="/cgi-bin/ENCY/herbs_admin.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %]" name="Contact" target="[% link.target %]" title="details "><font   class="LeftSideBarNavStyle">Admin</font></a>   [% END %]
+</td>
+   </tr>
+</table>
+  [% END %]
+  [% ELSIF SiteName == 'CSC' %]
+ [% FOREACH link = DBI.query("SELECT * FROM csc_todo_tb
+                                  WHERE (sitename =  'CSC' )
+                                  ORDER BY project_code
+                                  ")%]    
+                                  
+ <td class="NavTableCellStyle"> [% link.project_code %]  </td>
+<td class="NavTableCellStyle"> [% link.project_name %]  </td>
+<td class="NavTableCellStyle"> [% link.comments %]  </td>
+<td class="NavTableCellStyle">        
+  <a href="/cgi-bin/ENCY/herbs.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %][% link.view_name %]" name="Contact" target="[% link.target %]" title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+  <a href="/cgi-bin/ToDo/log.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;todo_record_id=[% link.record_id %]&amp;abstract=[% link.project_name %]&amp;project_code=[% link.project_code %]&amp;details=[% link.comments %]&amp;priority=" "target="_Blank">Log</a>
+  <a href="/cgi-bin/ToDo/todo.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;record_id=[% link.record_id %]&amp;subject=[% link.project_name %]&amp;project_code=[% link.project_code %]&amp;description=[% link.comments %]&amp;priority=" "target="_Blank">Todo</a>
+     </td>
+   </tr>
+  [% END %]
+   [% ELSIF SiteName == 'HE' %]
+ [% FOREACH link = DBI.query("SELECT * FROM csc_todo_tb
+                                  WHERE (sitename = 'HE' )
+                                  ORDER BY project_code
+                                  ")%]    
+<td class="NavTableCellStyle"> [% link.project_code %]  </td>
+<td class="NavTableCellStyle"> [% link.project_name %]  </td>
+<td class="NavTableCellStyle"> [% link.comments %]  </td>
+<td class="NavTableCellStyle">        
+  <a href="/cgi-bin/ENCY/herbs.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %][% link.view_name %]" name="Contact" target="[% link.target %]" title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+  <a href="/cgi-bin/ToDo/log.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;todo_record_id=[% link.record_id %]&amp;abstract=[% link.project_name %]&amp;project_code=[% link.project_code %]&amp;details=[% link.comments %]&amp;priority=" "target="_Blank">Log</a>
+  <a href="/cgi-bin/ToDo/todo.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;record_id=[% link.record_id %]&amp;subject=[% link.project_name %]&amp;project_code=[% link.project_code %]&amp;description=[% link.comments %]&amp;priority=" "target="_Blank">Todo</a>
+     </td>
+   </tr>
+   [% END %]
+  [% ELSIF SiteName == "Skye" %]
+                                  
+ [% FOREACH link = DBI.query("SELECT * FROM csc_todo_tb
+                                  WHERE (sitename =  'Skye'and 
+                                         status = '2'  )
+                                  ORDER BY project_code
+                                  ")%]    
+   [% END %]
+<td class="NavTableCellStyle"> [% link.sitename %]  </td>
+<td class="NavTableCellStyle"> [% link.project_code %]  </td>
+<td class="NavTableCellStyle"> [% link.subject %]  </td>
+<td class="NavTableCellStyle"> [% link.description %]  </td>
+<td class="NavTableCellStyle">        
+  <a href="/cgi-bin/ToDo/todo.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %][% link.view_name %]" name="Contact" target="[% link.target %]" title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+  <a href="/cgi-bin/ToDo/log.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;display_add_form=on&amp;todo_record_id=[% link.record_id %]&amp;abstract=[% link.project_name %]&amp;project_code=[% link.project_code %]&amp;details=[% link.comments %]&amp;priority=" "target="_Blank">Log</a>
+     </td>
+   </tr>
+[% ELSE %]
+                                  <tr>Botanical Name<td></td><td>Common Names</td><td>Image</td><td>link</td></tr>
+ [% FOREACH link = DBI.query("SELECT * FROM ency_herb_tb
+                                  WHERE (botanical_name != '')
+                                  ORDER BY botanical_name                                ")%]    
+                                  
+
+                                   <tr>
+<td class="NavTableCellStyle"> [% link.botanical_name %]  </td>
+<td class="NavTableCellStyle"> [% link.common_names %]  </td>
+<td class="NavTableCellStyle"><img src=" [% link.image %]" WIDTH ="300"      HEIGHT ="325" /> </td>
+<td class="NavTableCellStyle">        
+  <a href="/cgi-bin/ENCY/herbs.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %]" name="Contact" target="[% link.target %]" title="details "><font   class="LeftSideBarNavStyle">Details</font></a>
+     </td>
+   </tr> 
+
+   [% END %]
+[% END %]
+</table>

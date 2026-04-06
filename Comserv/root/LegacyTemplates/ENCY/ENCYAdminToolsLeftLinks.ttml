@@ -1,0 +1,70 @@
+[%
+
+# the ENCYAdminToolsLeftLinks.ttml template
+#	$Id: ENCYAdminToolsLeftPageView.ttml,v 0.01 2002/11/11 14:44:14 shanta Exp shanta $
+
+%]
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+
+<!--OpenENCYAdminToolsLeftPage-->
+
+<A HREF = "http://forager.com/cgi-bin/ENCY/deseases_admin.cgi?site=[% SiteName %][% session_string %]" target="_self"><font   class="LeftSideBarNavStyle"> Diseases Admin</font></a>
+  </td>
+ </tr>
+  <tr>
+  <td class="NavTableCellStyle">	<A HREF = "http://forager.com/cgi-bin/ENCY/faq_manager.cgi?site=[% SiteName %]&amp;[% session_string %]" target="_self"><font   class="LeftSideBarNavStyle"> FAQ  Admin</font></a>
+  </td>
+  <tr>
+  <td class="NavTableCellStyle">	<A HREF = "http://forager.com/cgi-bin/ENCY/formulas_admin.cgi?site=[% SiteName %]&amp;[% session_string %]" target="_self"><font   class="LeftSideBarNavStyle"> Formulas  Admin</font></a>
+  </td>
+  <tr>
+  <td class="NavTableCellStyle">	<A HREF ="http://forager.com/cgi-bin/ENCY/herbs_admin.cgi?site=[% SiteName %]&amp;[% session_string %]" target="_self"><font   class="LeftSideBarNavStyle">Herbs Admin</font></a>
+  </td>
+ </tr>
+  <tr>
+  <td class="NavTableCellStyle">	<A HREF ="http://forager.com/cgi-bin/ENCY/reference_admin.cgi?site=[% SiteName %]&amp;[% session_string %]" target="_self"><font   class="LeftSideBarNavStyle">Reference Admin</font></a>
+  </td>
+ </tr>
+ <tr>
+   <td class="NavTableCellStyle">&nbsp;</td>
+ </tr>
+
+<tr>
+  <td  class="NavtableHeaderCellStyle">
+      ADD Tools<br>
+
+      	</td>
+ </tr>
+  <tr>
+	 <td class="NavTableCellStyle" align="left">
+<a href="http://forager.com/cgi-bin/ENCY/address_book.cgi?site=[% SiteName %]&amp;display_add_form=on&amp;[% session_string %]" target='_Blank'"><font   class="LeftSideBarNavStyle">Author </font></a>
+
+&nbsp;<a href="http://forager.com/cgi-bin/ENCY/books.cgi?site=[% SiteName %]&amp;display_add_form=on&amp;[% session_string %]" target='_Blank'"><font   class="LeftSideBarNavStyle">Book </font></a>
+&nbsp;<a href="/cgi-bin/ENCY/deseases_admin.cgi?site=[% SiteName %]&amp;display_add_form=on&amp;[% session_string %]" target='_Blank'"><font   class="LeftSideBarNavStyle">Desease </font></a>
+<br>&nbsp;
+<a href="http://forager.com/cgi-bin/ENCY/formulas_admin.cgi?site=[% SiteName %]&amp;display_add_form=on&amp;[% session_string %]" target='_Blank'"><font   class="LeftSideBarNavStyle">Formula </font></a>
+&nbsp;
+<a href="http://forager.com/cgi-bin/ENCY/herbs_admin.cgi?site=[% SiteName %]&amp;display_add_form=on&amp;[% session_string %]" target='_Blank'"><font   class="LeftSideBarNavStyle">Herb </font></a>
+&nbsp;<a href="http://forager.com/cgi-bin/ENCY/address_book.cgi?site=[% SiteName %]&amp;display_add_form=on&amp;[% session_string %]" target='_Blank'"><font   class="LeftSideBarNavStyle">Publisher </font></a>
+<br>&nbsp;
+<a href="http://forager.com/cgi-bin/ENCY/refrence.cgi?site=[% SiteName %]&amp;display_add_form=on&amp;[% session_string %]" target='_Blank'"><font   class="LeftSideBarNavStyle">Reference</font></a>
+&nbsp;<a href="http://forager.com/cgi-bin/ENCY/glossary_admin.cgi?site=[% SiteName %]&amp;display_add_form=on&amp;[% session_string %]" target='_Blank'"><font   class="LeftSideBarNavStyle"> Glossary </font></a>
+      	</td>
+ </tr>
+
+ <tr>
+   <td class="NavTableCellStyle">&nbsp;</td>
+ </tr>
+<tr>
+<!--CloseENCYAdminToolsLeftPage-->

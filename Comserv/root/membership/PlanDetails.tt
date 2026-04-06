@@ -1,0 +1,156 @@
+[% META
+   title = "Plan Details"
+   description = "Full details for a membership plan"
+   roles = "guest,user,admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-04-03"
+%]
+[% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>[% plan.name | html %]</h1>
+    [% IF plan.description %]<p>[% plan.description | html %]</p>[% END %]
+    <div class="form-actions" style="margin-top:0.5rem">
+      <a href="[% c.uri_for('/membership/plans') %]" class="btn btn-secondary">← Compare All Plans</a>
+    </div>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <h2>Pricing</h2>
+        <div class="form-row">
+          <div class="form-field">
+            <strong>Monthly:</strong>
+            [% IF plan.price_monthly == 0 %]
+              Free
+            [% ELSE %]
+              [% plan.price_currency | html %] [% plan.price_monthly %] / month
+            [% END %]
+          </div>
+          [% IF plan.price_annual > 0 %]
+          <div class="form-field">
+            <strong>Annual:</strong>
+            [% plan.price_currency | html %] [% plan.price_annual %] / year
+            [% SET saving = (plan.price_monthly * 12) - plan.price_annual %]
+            [% IF saving > 0 %]
+              <span class="badge">Save [% plan.price_currency | html %][% saving %] per year</span>
+            [% END %]
+          </div>
+          [% END %]
+        </div>
+        <p style="font-size:0.85em;color:#888">
+          Prices shown in [% plan.price_currency | html %]. Geographic pricing may apply based on your location.
+        </p>
+      </div>
+
+      <div class="content-section">
+        <h2>Features Included</h2>
+        <div class="table-container">
+          <table class="data-table">
+            <tbody>
+              <tr>
+                <td><strong>AI Requests per Day</strong></td>
+                <td>[% IF plan.ai_requests_per_day > 0 %][% plan.ai_requests_per_day %] requests/day[% ELSE %]Not included[% END %]</td>
+              </tr>
+              <tr>
+                <td><strong>AI Models Available</strong></td>
+                <td>[% IF plan.max_ai_models > 0 %]Up to [% plan.max_ai_models %] models[% ELSE %]Not included[% END %]</td>
+              </tr>
+              <tr>
+                <td><strong>Email Addresses</strong></td>
+                <td>
+                  [% IF plan.has_email %]
+                    [% plan.email_addresses %] email address[% IF plan.email_addresses != 1 %]es[% END %] @[site_name]
+                  [% ELSE %]
+                    Not included
+                  [% END %]
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Hosting</strong></td>
+                <td>
+                  [% IF plan.has_hosting %]
+                    [% plan.hosting_tier || 'Shared Hosting' | html %] included
+                  [% ELSE %]
+                    Not included
+                  [% END %]
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Subdomain</strong></td>
+                <td>[% plan.has_subdomain ? 'Included' : 'Not included' %]</td>
+              </tr>
+              <tr>
+                <td><strong>Custom Domain</strong></td>
+                <td>[% plan.has_custom_domain ? 'Included' : 'Not included' %]</td>
+              </tr>
+              <tr>
+                <td><strong>Beekeeping Module</strong></td>
+                <td>[% plan.has_beekeeping ? 'Included' : 'Not included' %]</td>
+              </tr>
+              <tr>
+                <td><strong>Planning System</strong></td>
+                <td>[% plan.has_planning ? 'Included' : 'Not included' %]</td>
+              </tr>
+              <tr>
+                <td><strong>Site Currency (Coins)</strong></td>
+                <td>
+                  [% IF plan.has_currency %]
+                    Included
+                    [% IF plan.currency_bonus > 0 %]
+                      — plus <strong>[% plan.currency_bonus %] bonus coins</strong> on activation
+                    [% END %]
+                  [% ELSE %]
+                    Not included
+                  [% END %]
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Add-on Services</strong></td>
+                <td>Up to [% plan.max_services %] service[% IF plan.max_services != 1 %]s[% END %]</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="content-section">
+        <h2>Payment Options</h2>
+        <div class="form-row">
+          <div class="form-field">
+            <strong>PayPal</strong> — Pay securely with PayPal or any credit/debit card.
+          </div>
+          [% IF patreon_cfg AND patreon_cfg.active %]
+          <div class="form-field">
+            <strong>Patreon</strong> — Support via Patreon and receive membership benefits automatically.
+            [% IF patreon_cfg.url %]<br><a href="[% patreon_cfg.url | html %]" target="_blank" rel="noopener">Visit our Patreon →</a>[% END %]
+          </div>
+          [% END %]
+          <div class="form-field">
+            <strong>Site Coins</strong> <em style="font-size:0.85em;color:var(--warning-color,#e67e22)">(Promotional)</em>
+            — Pay using your internal coin balance.
+            <br><a href="[% c.uri_for('/payment/buy/coins') %]">Buy coins →</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        [% IF c.session.username %]
+          <a href="[% c.uri_for('/membership/subscribe', { plan_id => plan.id }) %]"
+             class="btn btn-primary">Subscribe to [% plan.name | html %]</a>
+        [% ELSE %]
+          <a href="[% c.uri_for('/user/login') %]" class="btn btn-primary">Log In to Subscribe</a>
+        [% END %]
+        <a href="[% c.uri_for('/membership/plans') %]" class="btn btn-secondary">Compare All Plans</a>
+      </div>
+
+    </div>
+  </div>
+</div>

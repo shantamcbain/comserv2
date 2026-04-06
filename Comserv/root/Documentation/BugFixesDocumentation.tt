@@ -162,24 +162,24 @@ $c->stash(
 <h3>Code Changes</h3>
 
 <pre><code># Updated priority_display.md template to be self-contained
-[% 
+&#91;%
     # Internal priority mapping - no controller dependency required
     priority_names = {
-        1  => 'Critical',
-        2  => 'When we have time',
-        3  => 'Urgent',
-        4  => 'High',
-        5  => 'Medium', 
-        6  => 'Medium-Low',
-        7  => 'Low',
-        8  => 'Very Low',
-        9  => 'Minimal',
-        10 => 'Optional'
+        1  =&gt; 'Critical',
+        2  =&gt; 'When we have time',
+        3  =&gt; 'Urgent',
+        4  =&gt; 'High',
+        5  =&gt; 'Medium',
+        6  =&gt; 'Medium-Low',
+        7  =&gt; 'Low',
+        8  =&gt; 'Very Low',
+        9  =&gt; 'Minimal',
+        10 =&gt; 'Optional'
     };
-%]
+%&#93;
 
 # Display priority name or fallback to number
-[% priority_names.${priority} || "Priority ${priority}" %]
+&#91;% priority_names.${priority} || "Priority ${priority}" %&#93;
 </code></pre>
 
 <h3>Files Modified</h3>

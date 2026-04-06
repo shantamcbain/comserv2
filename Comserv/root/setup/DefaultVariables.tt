@@ -8,9 +8,14 @@
 [% username = c.session.username %][%# username  %]
 [% css_view_name =  c.session.css_view_name %]
 [% welcome_message =  c.session.welcome_message %]
-[% 
-  c.stash.ScriptDisplayName = c.stash.ScriptDisplayName || c.session.site_display_name || 'Comserv';
-  site_display_name = c.stash.site_display_name || c.session.site_display_name || 'Comserv';
+[%
+  SET _sdn = c.stash.site_display_name || c.stash.SiteDisplayName
+          || c.session.site_display_name
+          || c.stash.SiteName || c.session.SiteName
+          || 'Comserv';
+  c.stash.site_display_name = _sdn;
+  c.stash.SiteDisplayName   = _sdn;
+  c.stash.ScriptDisplayName = c.stash.ScriptDisplayName || _sdn;
 %]
 
 [% firstname = c.session.fristname %]
@@ -26,9 +31,7 @@
     [% Catalyst.debug(obj) %]
     [% PageSiteName = HostName _ 'Comserv home' %]
     [%# ScriptDisplayName = 'Comserv home' %]
-[% http_header_description %]
-[% keywords %]
-[% description %]
+[%# http_header_description, keywords, description are used by Header.tt meta tags — not rendered here %]
 [% css_view_name = c.stash.css_view_name %]
 [%# css_view_name%] [%# c.stash.css_view_name %]
 [% SET c.stash.default_css = c.uri_for(c.stash.css_view_name || '/static/css/default.css') %]

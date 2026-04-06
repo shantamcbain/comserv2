@@ -32,7 +32,6 @@
 
             <div class="form-container">
                 <form method="POST" action="/user/do_create_account" class="app-form">
-                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
 
                     <div class="form-section">
                         <div class="form-row">

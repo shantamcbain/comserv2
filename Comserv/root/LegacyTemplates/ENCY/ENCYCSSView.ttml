@@ -1,0 +1,201 @@
+[%# ENCY Style Sheat
+#	$Id: CSSView.ttml,v 1.2 2001/12/02 02:08:21 shanta Exp $	
+
+# Ideally this template should be converted into a static CSS file and
+# be served as /foo/bar.css and not via CGI, since it slows things
+# down and doesn't allow browsers to cache the CSS content.
+
+# otherwise this template is stand-alone, i.e. it doesn't rely on any
+# variables from outside.
+
+%]
+
+[% data.cgi.header %]
+
+       P {
+           font-family : Verdana, Helvetica, sans-serif;
+           font-size : 15px;
+       }
+
+       TD {
+           font-family : Verdana, Helvetica, sans-serif;
+           font-size : 15px;
+           vertical-align : top;
+       }
+
+       TH {
+           font-family : Verdana, Helvetica, sans-serif;
+           font-size : 15px;
+           vertical-align : top;
+           text-align : left
+       }
+
+       BODY {
+           color: black;
+           background:  #009933;
+           font-family : Verdana, Helvetica, sans-serif;
+ 	   background-image : url("/images/forager/backgroundtile.jpg");              }
+       
+       A:link {
+           color: black;
+       }
+
+       A:visited {
+           color: #993300;
+       }
+
+       A:active {
+           color: #FFFF66;
+       }
+
+/************************************************************
+*                   SECTION HEADER STYLINGS                 *
+************************************************************/
+
+       .sectionHeaderStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                font-weight : bold;
+                color : #FFCC99;
+                background : #009933;
+        }
+
+/************************************************************
+*                   TABLE HEADER STYLINGS                 *
+************************************************************/
+
+       .tableHeaderStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                font-weight : bold;
+                color : black;
+                vertical-align : top; 
+                background : #009933;
+        }
+/************************************************************
+*                   TABLE header login CELL STYLINGS                 *
+************************************************************/
+
+       .tablePageTopLoginCellStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                color : black;
+                vertical-align : top; 
+           	text-align : right;
+        }
+/************************************************************
+*                   TABLE CELL STYLINGS                 *
+************************************************************/
+
+       .tablePageTopWelcomeCellStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                color : black;
+               background : #009933;
+                 vertical-align : top; 
+           	text-align : left;
+        }
+
+/************************************************************
+*                   TABLE CELL STYLINGS                 *
+************************************************************/
+
+       .tableCellStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                color :   black;
+                vertical-align : top; 
+        }
+
+/************************************************************
+*                   TABLE ROW HEADER STYLINGS               *
+************************************************************/
+
+       .tableRowHeaderStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                color :  black;
+                background : #009933;
+                vertical-align : top; 
+                text-align : left
+        }
+/************************************************************
+*                   TABLE ROW STYLINGS                      *
+************************************************************/
+
+       .tableRowStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                color : black;
+                background : #009933;
+                vertical-align : top; 
+        }
+/************************************************************
+*                   TABLE ADD STYLINGS                      *
+************************************************************/
+       .tableAddStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                text-align : CENTER;
+                background :#009933;
+                vertical-align : top; 
+        }
+
+/************************************************************
+*               APPLICATION SUB MENU STYLINGS               *
+************************************************************/
+
+       .applicationSubMenuStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 10px;
+                color : black;
+                background : #009933;
+        }
+
+       A.applicationSubMenuLinkStyle:link {
+           color: black;
+       }
+
+       A.applicationSubMenuLinkStyle:visited {
+           color: black;
+       }
+
+       A.applicationSubMenuLinkStyle:active {
+           color: black;
+       }
+
+/************************************************************
+*                   Warning box                             *
+************************************************************/
+
+       .warning {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 18px;
+                color : black;
+                background : #E5E5E5;
+                text-align: center; 
+                vertical-align : top;
+                border: medium green;
+                border-style: dashed;
+        }
+
+/************************************************************
+*                   Left Side Bar STYLINGS                      *
+************************************************************/
+
+       font.LeftSideBarHeaderStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 15px;
+                color : black;
+                background :;
+                vertical-align : top; 
+                text-align : right;
+        }
+
+       font.LeftSideBarNavStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 10px;
+                background : ;
+                vertical-align : top; 
+                text-align : right;
+        }

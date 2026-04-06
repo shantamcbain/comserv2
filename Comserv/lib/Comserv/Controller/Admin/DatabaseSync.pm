@@ -77,6 +77,8 @@ sub trigger_sync :Path('/admin/database-sync/trigger') :Args(0) {
         return;
     }
     
+    
+    
     my $json_data;
     try {
         my $body = $c->req->body;
@@ -181,6 +183,8 @@ sub sync_config :Path('/admin/database-sync/config') :Args(0) {
     }
     
     if ($c->req->method eq 'POST') {
+        
+        
         my $json_data;
         try {
             my $body = $c->req->body;

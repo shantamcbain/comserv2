@@ -1,0 +1,144 @@
+[% META
+   title = "Post a Job"
+   description = "Submit a new job posting"
+   roles = "any"
+   TemplateType = "Application"
+   category = "Jobs"
+   page_version = "0.01"
+   last_updated = "2026-04-04"
+%]
+[% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Post a Job</h1>
+    <a href="[% c.uri_for('/jobs') %]" class="btn btn-secondary">&larr; Back</a>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+      <div class="content-section">
+
+        <form method="post" action="[% c.uri_for('/jobs/post') %]">
+
+          [% UNLESS c.session.username && c.session.username != 'anonymous' %]
+          <div class="form-group">
+            <label for="poster_name">Your Name <span class="required">*</span></label>
+            <input type="text" id="poster_name" name="poster_name" class="form-control"
+                   value="[% form_data.poster_name | html %]" required>
+          </div>
+          <div class="form-group">
+            <label for="poster_email">Your Email <span class="required">*</span></label>
+            <input type="email" id="poster_email" name="poster_email" class="form-control"
+                   value="[% form_data.poster_email | html %]" required>
+          </div>
+          [% END %]
+
+          <div class="form-group">
+            <label for="title">Job Title <span class="required">*</span></label>
+            <input type="text" id="title" name="title" class="form-control"
+                   value="[% form_data.title | html %]" required>
+          </div>
+
+          <div class="form-group">
+            <label for="description">Job Description <span class="required">*</span></label>
+            <textarea id="description" name="description" class="form-control" rows="6" required>[% form_data.description | html %]</textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="requirements">Requirements</label>
+            <textarea id="requirements" name="requirements" class="form-control" rows="4">[% form_data.requirements | html %]</textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group" style="flex:1">
+              <label for="location">Location</label>
+              <input type="text" id="location" name="location" class="form-control"
+                     value="[% form_data.location | html %]" placeholder="City, Province">
+            </div>
+            <div class="form-group" style="margin-left:1rem">
+              <label>&nbsp;</label>
+              <div class="form-check">
+                <input type="checkbox" id="remote" name="remote" value="1"
+                       [% IF form_data.remote %]checked[% END %]>
+                <label for="remote">Remote position</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="payment_type">Payment Type</label>
+            <select id="payment_type" name="payment_type" class="form-control" onchange="togglePaymentFields(this.value)">
+              <option value="cash"   [% IF form_data.payment_type == 'cash'   || !form_data.payment_type %]selected[% END %]>Cash</option>
+              <option value="points" [% IF form_data.payment_type == 'points' %]selected[% END %]>Points (1 point = 1 CAD)</option>
+              <option value="hybrid" [% IF form_data.payment_type == 'hybrid' %]selected[% END %]>Hybrid (Cash + Points)</option>
+            </select>
+          </div>
+
+          <div id="cash_fields" class="form-row">
+            <div class="form-group" style="flex:1">
+              <label for="cash_rate">Cash Rate</label>
+              <input type="number" id="cash_rate" name="cash_rate" class="form-control"
+                     value="[% form_data.cash_rate | html %]" min="0" step="0.01">
+            </div>
+            <div class="form-group" style="margin-left:1rem">
+              <label for="currency">Currency</label>
+              <select id="currency" name="currency" class="form-control">
+                <option value="CAD" [% IF form_data.currency == 'CAD' || !form_data.currency %]selected[% END %]>CAD</option>
+                <option value="USD" [% IF form_data.currency == 'USD' %]selected[% END %]>USD</option>
+                <option value="EUR" [% IF form_data.currency == 'EUR' %]selected[% END %]>EUR</option>
+                <option value="GBP" [% IF form_data.currency == 'GBP' %]selected[% END %]>GBP</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="points_fields" class="form-group" style="display:none">
+            <label for="point_rate">Point Rate (pts/hr)</label>
+            <input type="number" id="point_rate" name="point_rate" class="form-control"
+                   value="[% form_data.point_rate | html %]" min="0" step="1">
+            <small class="form-text">1 point = 1 Canadian Dollar</small>
+          </div>
+
+          <div class="form-group">
+            <div class="form-check">
+              <input type="checkbox" id="accept_points_payment" name="accept_points_payment" value="1"
+                     [% IF form_data.accept_points_payment %]checked[% END %]>
+              <label for="accept_points_payment">I am willing to pay applicants via the points system</label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="expires_at">Posting Expires</label>
+            <input type="date" id="expires_at" name="expires_at" class="form-control"
+                   value="[% form_data.expires_at | html %]">
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Post Job</button>
+            <a href="[% c.uri_for('/jobs') %]" class="btn btn-secondary">Cancel</a>
+          </div>
+
+        </form>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function togglePaymentFields(val) {
+    var cashDiv   = document.getElementById('cash_fields');
+    var pointsDiv = document.getElementById('points_fields');
+    if (val === 'cash') {
+        cashDiv.style.display   = '';
+        pointsDiv.style.display = 'none';
+    } else if (val === 'points') {
+        cashDiv.style.display   = 'none';
+        pointsDiv.style.display = '';
+    } else {
+        cashDiv.style.display   = '';
+        pointsDiv.style.display = '';
+    }
+}
+togglePaymentFields(document.getElementById('payment_type').value);
+</script>

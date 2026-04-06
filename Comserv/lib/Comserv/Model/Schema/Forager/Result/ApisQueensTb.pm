@@ -1,0 +1,76 @@
+package Comserv::Model::Schema::Forager::Result::ApisQueensTb;
+use base 'DBIx::Class::Core';
+
+__PACKAGE__->table('apis_queens_tb');
+__PACKAGE__->add_columns(
+    box_number => {
+        data_type => 'char(1)',
+    },
+    client_name => {
+        data_type => 'varchar(50)',
+    },
+    comments => {
+        data_type => 'text',
+        is_nullable => 1,
+    },
+    current => {
+        data_type => 'varchar(20)',
+        default_value => '0',
+    },
+    date => {
+        data_type => 'varchar(50)',
+    },
+    date_time_posted => {
+        data_type => 'varchar(30)',
+    },
+    group_of_poster => {
+        data_type => 'varchar(30)',
+    },
+    location => {
+        data_type => 'varchar(15)',
+        default_value => '0',
+    },
+    pallet_code => {
+        data_type => 'varchar(20)',
+    },
+    parent => {
+        data_type => 'varchar(20)',
+    },
+    queen_code => {
+        data_type => 'varchar(50)',
+    },
+    queen_colour => {
+        data_type => 'varchar(25)',
+    },
+    queen_name => {
+        data_type => 'varchar(100)',
+    },
+    record_id => {
+        data_type => 'int(11)',
+        is_auto_increment => 1,
+    },
+    sitename => {
+        data_type => 'varchar(20)',
+    },
+    status => {
+        data_type => 'varchar(30)',
+    },
+    username_of_poster => {
+        data_type => 'varchar(30)',
+    },
+    yard_code => {
+        data_type => 'varchar(20)',
+    }
+);
+
+__PACKAGE__->set_primary_key('record_id', 'queen_code');
+
+# Add relationships here
+# Example:
+# __PACKAGE__->belongs_to(
+#     'related_table',
+#     'Comserv::Model::Schema::Forager::Result::RelatedTable',
+#     'foreign_key_column'
+# );
+
+1;

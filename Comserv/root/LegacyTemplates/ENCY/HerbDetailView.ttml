@@ -1,0 +1,63 @@
+[%# the ENCY template
+#	$Id: HerbDetailView.ttml,v 1.2 2011/09/21 19:25:15 shanta Exp $	
+#file location/cgi-bin/HTMLTemplates/ENCY
+%]
+[% PROCESS DefaultDbi.ttml %]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Bee Pasture by botanical name.']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% LastUpdate = data.last_update %]
+   [% SiteLastUpdate = data.site_last_update %]
+   [% HerbCode = data.record_id %]
+   [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+[% PROCESS DefaultDbi.ttml %]
+
+
+<!-- /HTMLTemplates/ENCY/BeePastureView.ttml -->
+
+	[% IF username %]
+
+<h3 > Hello  [% firstname %]  [% lastname %]! Welcome to     [% data.site_display_name %]
+ Plant data base!</h3>
+	  
+
+	[% ELSE %]
+
+	<h3>  Hello! Welcome to [%  data.site_display_name %]
+ Plant data base!</h3
+
+	[% END %]
+
+</div>
+<div ALIGN="center">
+<A NAME="PageTop"></A>
+</div>
+
+     
+        <h2Herb Details.</h2>
+      
+      
+ 
+ <p>Herb detail
+ [%  embed('HerbDetailListSQL') %]
+  
+  
+      
+ <a href="http://helpdesk.computersystemconsulting.ca/cgi-bin/index.cgi?site=[% SiteName %]" target="_Blank" > HelpDesk</a>
+
+[%# embed('CSCCopyRight') %]
+[% embed(data.page_bottom_view) %]
+
