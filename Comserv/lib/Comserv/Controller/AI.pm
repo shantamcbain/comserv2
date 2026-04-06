@@ -468,6 +468,13 @@ sub generate :Local :Args(0) {
     
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
         'generate', "Agent type normalization: agent_id=$agent_id -> normalized_agent_type=$normalized_agent_type");
+
+    # When agent_type is 'helpdesk', inject HelpDesk-aware system prompt unless caller already supplied one
+    if (lc($normalized_agent_type) eq 'helpdesk' && !$system) {
+        $system = $self->_build_helpdesk_system_prompt($c);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'generate', "HelpDesk agent: injected system prompt");
+    }
     
     # Require login for external AI models (Grok etc.) before entering try block
     if (lc($provider) eq 'grok' && $is_guest) {
@@ -5561,6 +5568,7 @@ This library is part of the Comserv application.
 
 =cut
 
+
 =head2 get_page_doc
 
 Fetch plain-text content from a Documentation file so the AI can advise
@@ -6423,6 +6431,52 @@ sub support_send :Local :Args(1) {
     }
 
     $c->response->body(encode_json({ success => JSON::true }));
+}
+
+=head2 _build_helpdesk_system_prompt
+
+Builds a HelpDesk-aware system prompt for the AI when agent_type is 'helpdesk'.
+
+=cut
+
+sub _build_helpdesk_system_prompt {
+    my ($self, $c) = @_;
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'our system';
+    my $username  = $c->session->{username} || 'the user';
+
+    return <<END_PROMPT;
+You are a HelpDesk support assistant for $site_name. Your role is to help users resolve issues efficiently and professionally.
+
+CAPABILITIES:
+1. Answer support questions using knowledge from our Knowledge Base categories:
+   - Getting Started (account setup, first login, dashboard overview)
+   - Website Management (content management, SEO, backups)
+   - Email Services (setup, client configuration, spam filters)
+   - Security (passwords, two-factor auth, security audits)
+   - Billing & Payments (payment methods, billing cycles, plan upgrades)
+   - Troubleshooting (loading issues, database errors, log analysis)
+   - System Administration (Linux commands, server maintenance, backup and recovery)
+
+2. TICKET CREATION: If the user's issue cannot be resolved through conversation or requires
+   action from our team, offer to create a support ticket. Tell them they can submit a ticket at:
+   /HelpDesk/ticket/new
+   Collect: subject, category (technical/billing/account/feature/other), priority (low/medium/high/critical),
+   and a description of the issue.
+
+3. LIVE AGENT ESCALATION: For critical issues, urgent matters, or when the user expresses
+   frustration, suggest connecting with a live agent through the chat system or by visiting
+   /HelpDesk/contact
+
+GUIDELINES:
+- Be concise, friendly, and professional
+- If you don't know the answer, say so clearly and suggest the ticket or live agent option
+- Always confirm you understood the user's issue before suggesting solutions
+- For technical issues, ask clarifying questions if needed (OS, error messages, steps to reproduce)
+- The current user is: $username
+
+You are integrated into the $site_name support system. Respond helpfully and guide users to resolution.
+END_PROMPT
 }
 
 __PACKAGE__->meta->make_immutable;

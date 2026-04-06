@@ -2,6 +2,8 @@ package Comserv::Controller::HelpDesk;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use POSIX qw(strftime);
+use Try::Tiny;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -293,6 +295,191 @@ sub admin :Chained('base') :PathPart('admin') :Args(0) {
         "Completed admin action");
     
     # Explicitly forward to the TT view
+    $c->forward($c->view('TT'));
+}
+
+=head2 submit_ticket
+
+Process ticket form submission and save to database
+
+=cut
+
+sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'submit_ticket',
+        "Processing ticket submission");
+
+    my $subject     = $c->req->params->{subject}     || '';
+    my $description = $c->req->params->{description} || '';
+    my $category    = $c->req->params->{category}    || 'other';
+    my $priority    = $c->req->params->{priority}    || 'medium';
+    my $email       = $c->req->params->{email}       || $c->session->{email} || '';
+
+    unless ($subject && $description) {
+        $c->stash(
+            template  => 'CSC/HelpDesk/new_ticket.tt',
+            error_msg => 'Subject and description are required.',
+            title     => 'Create New Support Ticket',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    my $user_id   = $c->session->{user_id} || undef;
+    my $username  = $c->session->{username} || 'guest';
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+
+    my $ticket_number = uc($site_name) . '-' . strftime('%Y%m%d', localtime) . '-' . sprintf('%04d', int(rand(9999)) + 1);
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $ticket = $schema->resultset('SupportTicket')->create({
+            ticket_number => $ticket_number,
+            site_name     => $site_name,
+            user_id       => $user_id,
+            username      => $username,
+            email         => $email,
+            subject       => $subject,
+            description   => $description,
+            category      => $category,
+            priority      => $priority,
+            status        => 'open',
+            created_at    => strftime('%Y-%m-%d %H:%M:%S', localtime),
+        });
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'submit_ticket',
+            "Ticket created: " . $ticket->ticket_number . " (id=" . $ticket->id . ")");
+
+        $c->stash(
+            template      => 'CSC/HelpDesk/ticket_submitted.tt',
+            ticket        => $ticket,
+            ticket_number => $ticket->ticket_number,
+            title         => 'Ticket Submitted',
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'submit_ticket',
+            "Error creating ticket: $_");
+        $c->stash(
+            template  => 'CSC/HelpDesk/new_ticket.tt',
+            error_msg => 'There was an error submitting your ticket. Please try again.',
+            title     => 'Create New Support Ticket',
+        );
+    };
+
+    $c->forward($c->view('TT'));
+}
+
+=head2 view_ticket
+
+View a single ticket by its ticket_number
+
+=cut
+
+sub view_ticket :Chained('ticket_base') :PathPart('view') :Args(1) {
+    my ($self, $c, $ticket_number) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_ticket',
+        "Viewing ticket: $ticket_number");
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $ticket = $schema->resultset('SupportTicket')->find({ ticket_number => $ticket_number });
+
+        unless ($ticket) {
+            $c->stash(
+                template  => 'CSC/HelpDesk/ticket_status.tt',
+                error_msg => "Ticket '$ticket_number' not found.",
+                tickets   => [],
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        my $user_id  = $c->session->{user_id} || 0;
+        my $is_admin = 0;
+        if ($c->session->{roles}) {
+            my $roles = $c->session->{roles};
+            $is_admin = ref($roles) eq 'ARRAY' ? grep { $_ eq 'admin' } @$roles
+                                                 : ($roles =~ /\badmin\b/i ? 1 : 0);
+        }
+
+        unless ($is_admin || ($ticket->user_id && $ticket->user_id == $user_id)) {
+            $c->stash(
+                template  => 'CSC/HelpDesk/ticket_status.tt',
+                error_msg => 'You do not have permission to view this ticket.',
+                tickets   => [],
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        $c->stash(
+            template => 'CSC/HelpDesk/ticket_status.tt',
+            ticket   => $ticket,
+            tickets  => [$ticket],
+            title    => 'Ticket: ' . $ticket_number,
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view_ticket',
+            "Error viewing ticket: $_");
+        $c->stash(
+            template  => 'CSC/HelpDesk/ticket_status.tt',
+            error_msg => 'Error retrieving ticket.',
+            tickets   => [],
+        );
+    };
+
+    $c->forward($c->view('TT'));
+}
+
+=head2 ticket_list
+
+Show the authenticated user's tickets (or all tickets for admin)
+
+=cut
+
+sub ticket_list :Chained('ticket_base') :PathPart('list') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ticket_list',
+        "Loading ticket list");
+
+    my $user_id   = $c->session->{user_id} || 0;
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+    my $is_admin  = 0;
+    if ($c->session->{roles}) {
+        my $roles = $c->session->{roles};
+        $is_admin = ref($roles) eq 'ARRAY' ? grep { $_ eq 'admin' } @$roles
+                                             : ($roles =~ /\badmin\b/i ? 1 : 0);
+    }
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my %search = $is_admin
+            ? ( site_name => $site_name )
+            : ( user_id   => $user_id, site_name => $site_name );
+
+        my @tickets = $schema->resultset('SupportTicket')->search(
+            \%search,
+            { order_by => { -desc => 'created_at' }, rows => 50 }
+        )->all;
+
+        $c->stash(
+            template => 'CSC/HelpDesk/ticket_status.tt',
+            tickets  => \@tickets,
+            title    => 'My Support Tickets',
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'ticket_list',
+            "Error loading tickets: $_");
+        $c->stash(
+            template  => 'CSC/HelpDesk/ticket_status.tt',
+            tickets   => [],
+            error_msg => 'Error loading tickets.',
+        );
+    };
+
     $c->forward($c->view('TT'));
 }
 
