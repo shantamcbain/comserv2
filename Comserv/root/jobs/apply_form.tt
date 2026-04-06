@@ -38,13 +38,13 @@
           <div class="form-group">
             <label for="applicant_name">Full Name <span class="required">*</span></label>
             <input type="text" id="applicant_name" name="applicant_name" class="form-control"
-                   value="[% form_data.applicant_name | html || user_data.applicant_name | html %]" required>
+                   value="[% form_data.applicant_name || user_data.applicant_name | html %]" required>
           </div>
 
           <div class="form-group">
             <label for="applicant_email">Email <span class="required">*</span></label>
             <input type="email" id="applicant_email" name="applicant_email" class="form-control"
-                   value="[% form_data.applicant_email | html || user_data.applicant_email | html %]" required>
+                   value="[% form_data.applicant_email || user_data.applicant_email | html %]" required>
           </div>
 
           <div class="form-group">
