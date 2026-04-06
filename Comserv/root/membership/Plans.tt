@@ -1,0 +1,165 @@
+[% META
+   title = "Compare Membership Plans"
+   description = "Detailed comparison of all membership plans for this site"
+   roles = "guest,user,admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-04-03"
+%]
+[% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Membership Plans — [% site_name | html %]</h1>
+    <p>Choose the plan that fits your needs. All plans include access to the core platform features.</p>
+    <div class="form-actions" style="margin-top:0.5rem">
+      <a href="[% c.uri_for('/membership') %]" class="btn btn-secondary">← Back to Overview</a>
+    </div>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      [% IF plans.size %]
+      <div class="content-section">
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Feature</th>
+                [% FOREACH plan IN plans %]
+                <th style="text-align:center[% IF plan.is_featured %];background:var(--primary-color,#3498db);color:#fff[% END %]">
+                  [% plan.name | html %]
+                  [% IF plan.is_featured %]<br><span style="font-size:0.75em;font-weight:normal">★ Most Popular</span>[% END %]
+                </th>
+                [% END %]
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Monthly Price</strong></td>
+                [% FOREACH plan IN plans %]
+                <td style="text-align:center">
+                  [% IF plan.price_monthly == 0 %]
+                    <strong>Free</strong>
+                  [% ELSE %]
+                    <strong>[% plan.price_currency | html %] [% plan.price_monthly %]</strong>/mo
+                  [% END %]
+                </td>
+                [% END %]
+              </tr>
+              <tr>
+                <td><strong>Annual Price</strong></td>
+                [% FOREACH plan IN plans %]
+                <td style="text-align:center">
+                  [% IF plan.price_annual == 0 %]
+                    Free
+                  [% ELSIF plan.price_annual > 0 %]
+                    [% plan.price_currency | html %] [% plan.price_annual %]/yr
+                  [% ELSE %]
+                    —
+                  [% END %]
+                </td>
+                [% END %]
+              </tr>
+              <tr>
+                <td><strong>AI Requests / Day</strong></td>
+                [% FOREACH plan IN plans %]
+                <td style="text-align:center">
+                  [% IF plan.ai_requests_per_day > 0 %][% plan.ai_requests_per_day %][% ELSE %]—[% END %]
+                </td>
+                [% END %]
+              </tr>
+              <tr>
+                <td><strong>AI Model Access</strong></td>
+                [% FOREACH plan IN plans %]
+                <td style="text-align:center">
+                  [% IF plan.max_ai_models > 0 %]Up to [% plan.max_ai_models %][% ELSE %]—[% END %]
+                </td>
+                [% END %]
+              </tr>
+              <tr>
+                <td><strong>Email Addresses</strong></td>
+                [% FOREACH plan IN plans %]
+                <td style="text-align:center">
+                  [% IF plan.has_email %][% plan.email_addresses %] @[% site_name | lower | html %][% ELSE %]—[% END %]
+                </td>
+                [% END %]
+              </tr>
+              <tr>
+                <td><strong>Hosting</strong></td>
+                [% FOREACH plan IN plans %]
+                <td style="text-align:center">
+                  [% IF plan.has_hosting %][% plan.hosting_tier || 'Included' | html %][% ELSE %]—[% END %]
+                </td>
+                [% END %]
+              </tr>
+              <tr>
+                <td><strong>Subdomain</strong></td>
+                [% FOREACH plan IN plans %]
+                <td style="text-align:center">[% plan.has_subdomain ? '✓' : '—' %]</td>
+                [% END %]
+              </tr>
+              <tr>
+                <td><strong>Custom Domain</strong></td>
+                [% FOREACH plan IN plans %]
+                <td style="text-align:center">[% plan.has_custom_domain ? '✓' : '—' %]</td>
+                [% END %]
+              </tr>
+              <tr>
+                <td><strong>Beekeeping Module</strong></td>
+                [% FOREACH plan IN plans %]
+                <td style="text-align:center">[% plan.has_beekeeping ? '✓' : '—' %]</td>
+                [% END %]
+              </tr>
+              <tr>
+                <td><strong>Planning System</strong></td>
+                [% FOREACH plan IN plans %]
+                <td style="text-align:center">[% plan.has_planning ? '✓' : '—' %]</td>
+                [% END %]
+              </tr>
+              <tr>
+                <td><strong>Site Currency</strong></td>
+                [% FOREACH plan IN plans %]
+                <td style="text-align:center">
+                  [% IF plan.has_currency %]
+                    ✓[% IF plan.currency_bonus > 0 %] <small>(+[% plan.currency_bonus %] bonus)</small>[% END %]
+                  [% ELSE %]
+                    —
+                  [% END %]
+                </td>
+                [% END %]
+              </tr>
+              <tr>
+                <td></td>
+                [% FOREACH plan IN plans %]
+                <td style="text-align:center;padding:0.75rem">
+                  [% IF c.session.username %]
+                    <a href="[% c.uri_for('/membership/subscribe', { plan_id => plan.id }) %]"
+                       class="btn btn-primary">Choose [% plan.name | html %]</a>
+                  [% ELSE %]
+                    <a href="[% c.uri_for('/user/login') %]"
+                       class="btn btn-primary">Get Started</a>
+                  [% END %]
+                  <br>
+                  <a href="[% c.uri_for('/membership/plan_details/' _ plan.id) %]"
+                     style="font-size:0.85em">Details →</a>
+                </td>
+                [% END %]
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      [% ELSE %]
+      <div class="content-section">
+        <p class="empty-state">No membership plans have been configured for this site yet.</p>
+      </div>
+      [% END %]
+
+    </div>
+  </div>
+</div>

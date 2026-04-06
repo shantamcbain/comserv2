@@ -1,0 +1,69 @@
+[% META
+   title = "Workshop Resource Management"
+   description = "Guide for workshop leaders and admins on managing files and resources"
+   roles = "admin,workshop_leader"
+   TemplateType = "Documentation"
+   category = "WorkShops"
+   page_version = "0.01"
+   last_updated = "2026-03-10"
+%]
+[% PageVersion = 'Documentation/WorkshopResourceManagement.tt,v 0.01 2026/03/10 Zencoder Exp' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>Workshop Resource Management Guide</h1>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+            <section class="content-section">
+                <h2>Overview</h2>
+                <p>Workshop leaders and administrators can manage files and external links associated with workshops. These resources can be hosted on the system's NFS drive or linked from external websites.</p>
+            </section>
+
+            <section class="content-section">
+                <h2>Searching for Resources</h2>
+                <h3>In the Database</h3>
+                <p>To search for files already registered in the system:</p>
+                <ol>
+                    <li>Navigate to the <strong>Workshop Resource Library</strong>.</li>
+                    <li>Use the search box to filter by filename, description, or site.</li>
+                    <li>Use the category buttons (Images, Office, PDF, etc.) to filter by file type.</li>
+                </ol>
+
+                <h3>On the NFS Drive</h3>
+                <p>If a file exists on the central storage but has not yet been registered to a workshop:</p>
+                <ol>
+                    <li>Open the <strong>Browse NFS Filesystem</strong> section at the bottom of the Resources page.</li>
+                    <li>Search for your file by name.</li>
+                    <li>The system will automatically scope your view to your site's directory (unless you are a system administrator).</li>
+                </ol>
+            </section>
+
+            <section class="content-section">
+                <h2>Attaching Files to Workshops</h2>
+                <p>Once you have located a file in the <strong>NFS Filesystem Browser</strong>:</p>
+                <ol>
+                    <li>Click the green <strong>➕ (Attach)</strong> button on the right side of the file row.</li>
+                    <li>Select the target workshop from your list of managed workshops.</li>
+                    <li>Set the appropriate <strong>Access Level</strong>:
+                        <ul>
+                            <li><strong>Workshop Specific</strong>: Only visible to participants of that workshop.</li>
+                            <li><strong>My Site Only</strong>: Visible to all workshop leaders at your site.</li>
+                            <li><strong>All Leaders</strong>: Shared across all sites for all workshop leaders.</li>
+                        </ul>
+                    </li>
+                    <li>Click <strong>Attach File</strong> to complete the registration.</li>
+                </ol>
+            </section>
+
+            <section class="content-section">
+                <h2>Direct Upload</h2>
+                <p>You can also upload new files directly from your computer using the <strong>⬆️ Upload File</strong> panel at the top of the Resources page.</p>
+            </section>
+        </div>
+    </div>
+</div>

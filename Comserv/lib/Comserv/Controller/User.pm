@@ -10,7 +10,7 @@ use Email::Sender::Transport::SMTP;
 use Comserv::Util::UserVerification;
 use Comserv::Util::EmailNotification;
 use Comserv::Util::AdminAuth;
-use Comserv::Util::CSRF;
+use Comserv::Util::PointSystem;
 use DateTime;
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -55,7 +55,6 @@ sub send_error_notification {
 
 sub auto :Private {
     my ($self, $c) = @_;
-    Comserv::Util::CSRF::ensure_token($c);
     return 1;
 }
 
@@ -65,15 +64,13 @@ sub login :Local {
     # Log login page access
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', 'Accessing login page');
 
-    # Store the referer URL if it hasn't been stored already
-    my $referer = $c->req->referer || $c->uri_for('/');
-    
-    # Get the return_to parameter if it exists (for explicit redirects)
-    my $return_to = $c->req->param('return_to');
-    if ($return_to) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Found return_to parameter: $return_to");
-        $referer = $return_to;
-    }
+    # Determine the page to return to after login.
+    # Priority: return_to param > destination param (used by Admin.pm) > HTTP Referer
+    my $return_to = $c->req->param('return_to')
+                 || $c->req->param('destination')
+                 || $c->req->referer
+                 || $c->uri_for('/');
+    my $referer = $return_to;
 
     # Don't store the login or registration pages as the referer
     if ($referer !~ m{/user/login} && $referer !~ m{/login} && $referer !~ m{/do_login} &&
@@ -170,9 +167,6 @@ sub do_login :Local {
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
-
-    return unless $self->_validate_csrf($c, 'do_login', '/user/login');
-
     # Get user input — password field also accepts a 6-digit verification code
     my $username   = $c->req->body_parameters->{username} || $c->req->param('username') || '';
     my $credential = $c->req->body_parameters->{password} || $c->req->param('password') || '';
@@ -193,10 +187,15 @@ sub do_login :Local {
     my $redirect_path;
     
     if ($return_to) {
-        $redirect_path = $return_to;
+        # Validate return_to is a local path (no protocol/host) to prevent open redirect
+        if ($return_to =~ m{^/} && $return_to !~ m{^//} && $return_to !~ m{[<>"'\0]}) {
+            $redirect_path = $return_to;
+        } else {
+            $redirect_path = '/';
+        }
         $self->logging->log_with_details(
             $c, 'info', __FILE__, __LINE__, 'do_login',
-            "Using return_to parameter for redirect: $return_to"
+            "Using return_to parameter for redirect: $redirect_path"
         );
     } else {
         # Fall back to session referer
@@ -274,7 +273,6 @@ sub do_login :Local {
             my $status = $user->status || '';
 
             if ($status eq 'pending_setup') {
-                # Admin-invited user — redirect to username/password setup
                 $c->session->{setup_email} = $user->email;
                 my $setup_url = (!$user->username)
                     ? $c->uri_for('/user/complete_username_setup', { email => $user->email })
@@ -285,9 +283,6 @@ sub do_login :Local {
                 return;
 
             } elsif ($status eq 'pending_verification') {
-                # Self-registered user entering verification code at login screen
-                # (e.g. session expired between steps 1 and 2)
-                # Re-establish session context and redirect to complete_profile
                 $c->session->{verification_user_id} = $user->id;
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
                     "Valid code for pending_verification user '" . ($user->email||'') . "', redirecting to complete_profile");
@@ -300,10 +295,22 @@ sub do_login :Local {
                 return;
             }
         } else {
+            my $user_status = $user->status || '';
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
-                "Invalid or expired verification code for '$username'");
-            $c->flash->{error_msg} = 'Invalid or expired verification code.';
-            $c->res->redirect($c->uri_for('/user/login'));
+                "Invalid or expired verification code for '$username' (status=$user_status)");
+
+            my $is_expired = $code_rec ? $self->user_verification->is_expired($code_rec) : 0;
+            my $err = $is_expired
+                ? 'Your verification code has expired.'
+                : 'That verification code is not valid.';
+
+            $c->stash(
+                error_msg                => "$err You can request a new code to be sent to your email.",
+                show_resend_verification => 1,
+                prefill_username         => $username,
+                template                 => 'user/login.tt',
+            );
+            $c->forward($c->view('TT'));
             return;
         }
     }
@@ -386,8 +393,65 @@ sub do_login :Local {
             "Setting roles in session: $roles_debug"
         );
         
+        # Merge site-specific roles from UserSiteRole table.
+        # A user may be a site admin without having 'admin' in the global roles column.
+        my $login_sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+        eval {
+            my $site_obj = $c->model('DBEncy')->resultset('Site')->search({ name => $login_sitename })->single;
+            if ($site_obj) {
+                my @site_role_rows = $c->model('DBEncy')->resultset('UserSiteRole')->search({
+                    user_id   => $user->id,
+                    site_id   => $site_obj->id,
+                    is_active => 1,
+                })->all;
+                if (@site_role_rows) {
+                    my %existing = map { lc($_) => 1 } @$roles;
+                    my @added;
+                    for my $sr (@site_role_rows) {
+                        my $r = lc($sr->role);
+                        unless ($existing{$r}) {
+                            push @$roles, $r;
+                            $existing{$r} = 1;
+                            push @added, $r;
+                        }
+                    }
+                    if (@added) {
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                            "Merged site roles for '$login_sitename': " . join(', ', @added));
+                    }
+                }
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                "Could not merge UserSiteRole for '$login_sitename': $@");
+        }
+
         # Assign roles to session (no hard-coded username-based tweaks)
-        $c->session->{roles} = $roles;
+        $c->session->{roles}    = $roles;
+        $c->session->{is_admin} = (grep { lc($_) eq 'admin' } @$roles) ? 1 : 0;
+
+        # NEW: Check if we need to auto-assign WorkshopLeader role based on return_to
+        if ($return_to && $return_to =~ m{/workshop/add}) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                "Detected workshop add redirect, ensuring workshop_leader role for user '" . ($user->username||'') . "'");
+            
+            my @current_roles = @$roles;
+            unless (grep { $_ eq 'workshop_leader' } @current_roles) {
+                push @current_roles, 'workshop_leader';
+                my $roles_str = join(',', @current_roles);
+                eval {
+                    $user->update({ roles => $roles_str });
+                    $c->session->{roles} = \@current_roles;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                        "Auto-assigned workshop_leader role to user '" . ($user->username||'') . "'");
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_login',
+                        "Failed to auto-assign workshop_leader role: $@");
+                }
+            }
+        }
         
         # Log the final roles
         $roles_debug = ref($roles) eq 'ARRAY' ? join(', ', @$roles) : $roles;
@@ -399,23 +463,25 @@ sub do_login :Local {
         # Authentication failed — determine the specific reason for better UX
         my $fail_ip  = $c->req->address || 'unknown';
         my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-        my $fail_msg = 'Invalid username or password.';
+
+        my %fail_stash = (prefill_username => $username, template => 'user/login.tt');
 
         if ($user) {
-            # User account exists — check specific status and site access
+            my $user_status = $user->status || '';
 
-            if ($user->status && $user->status eq 'pending_verification') {
-                $fail_msg = 'Your registration is not yet complete. Enter your 6-digit verification code (from your confirmation email) in the password field above to continue setting up your account.';
+            if ($user_status eq 'pending_verification') {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
                     "AUDIT: Login denied user_id=" . $user->id . " ip=$fail_ip reason=pending_verification");
+                $fail_stash{error_msg}                = 'Your account has not been verified yet. Your verification code may have expired — you can request a new one below.';
+                $fail_stash{show_resend_verification} = 1;
 
-            } elsif ($user->status && $user->status eq 'pending_setup') {
-                $fail_msg = 'Your account setup is incomplete. Please check your invitation email for the 6-digit code and enter it in the password field above to finish setting up your account.';
+            } elsif ($user_status eq 'pending_setup') {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
                     "AUDIT: Login denied user_id=" . $user->id . " ip=$fail_ip reason=pending_setup");
+                $fail_stash{error_msg}                = 'Your account setup is incomplete. Please check your invitation email for a 6-digit code and enter it in the password field, or request a new code below.';
+                $fail_stash{show_resend_verification} = 1;
 
             } else {
-                # Active account — check if they have access to the current SiteName
                 my $has_site_access = 0;
                 eval {
                     my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
@@ -430,11 +496,9 @@ sub do_login :Local {
                 };
 
                 if (!$has_site_access) {
-                    $fail_msg = "You do not currently have access to $sitename. Please contact the site administrator to request access.";
+                    $fail_stash{error_msg} = "You do not currently have access to $sitename. Please contact the site administrator to request access.";
                     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
                         "AUDIT: Login denied user_id=" . $user->id . " username='" . ($user->username||'') . "' ip=$fail_ip reason=no_site_access sitename=$sitename");
-
-                    # Notify the SiteName admin about this access attempt
                     eval {
                         my $site_obj = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
                         my $admin_email = ($site_obj && $site_obj->mail_to_admin)
@@ -446,38 +510,29 @@ sub do_login :Local {
                         $self->email_notification->send_error_notification($c, $admin_email,
                             "Login attempt — no $sitename access",
                             "A registered user attempted to log in to $sitename but does not have site access.\n\n"
-                            . "User: $display_name\n"
-                            . "Email: " . ($user->email || 'N/A') . "\n"
-                            . "Username: " . ($user->username || 'N/A') . "\n"
-                            . "IP Address: $fail_ip\n\n"
+                            . "User: $display_name\nEmail: " . ($user->email || 'N/A')
+                            . "\nUsername: " . ($user->username || 'N/A')
+                            . "\nIP Address: $fail_ip\n\n"
                             . "If this person should have access, grant it via the Admin User Management screen."
                         );
                     };
-                    if ($@) {
-                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
-                            "Could not send no-site-access notification to admin: $@");
-                    }
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                        "Could not send no-site-access notification: $@") if $@;
+
                 } else {
-                    # Has site access but wrong password
                     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
                         "AUDIT: Login failed user_id=" . $user->id . " ip=$fail_ip reason=wrong_password sitename=$sitename");
-                    # Generic message — don't reveal that the user exists
-                    $fail_msg = 'Invalid username or password.';
+                    $fail_stash{error_msg}              = 'Invalid password. If you have forgotten your password, you can reset it below.';
+                    $fail_stash{show_forgot_password}   = 1;
                 }
             }
         } else {
-            # User not found at all
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
                 "AUDIT: Login failed username='$username' ip=$fail_ip reason=user_not_found");
-            # Generic message — don't reveal whether the user exists
-            $fail_msg = 'Invalid username or password.';
+            $fail_stash{error_msg} = 'Invalid username or password.';
         }
 
-        $c->stash(
-            error_msg        => $fail_msg,
-            prefill_username => $username,
-            template         => 'user/login.tt',
-        );
+        $c->stash(%fail_stash);
         $c->forward($c->view('TT'));
         return;
     }
@@ -513,23 +568,6 @@ sub hash_password {
     return sha256_hex($password);
 }
 
-sub _validate_csrf {
-    my ($self, $c, $action_name, $redirect_to, $template) = @_;
-    $redirect_to //= '/user/login';
-    unless (Comserv::Util::CSRF::validate_token($c)) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $action_name // '_validate_csrf',
-            'CSRF token validation failed');
-        if ($template) {
-            $c->stash(error_msg => 'Invalid form submission. Please try again.', template => $template);
-            $c->forward($c->view('TT'));
-        } else {
-            $c->flash->{error_msg} = 'Invalid form submission. Please try again.';
-            $c->response->redirect($c->uri_for($redirect_to));
-        }
-        return 0;
-    }
-    return 1;
-}
 
 sub logout :Local {
     my ($self, $c) = @_;
@@ -786,9 +824,6 @@ sub settings :Local {
 
 sub update_settings :Local {
     my ($self, $c) = @_;
-
-    return unless $self->_validate_csrf($c, 'update_settings', '/user/settings');
-
     # Check if user is logged in
     unless ($c->session->{username}) {
         $c->flash->{error_msg} = "You must be logged in to update settings.";
@@ -891,9 +926,6 @@ sub change_password :Local {
 
 sub do_change_password :Local {
     my ($self, $c) = @_;
-
-    return unless $self->_validate_csrf($c, 'do_change_password', '/user/change_password');
-
     # Check if user is logged in
     unless ($c->session->{username}) {
         $c->flash->{error_msg} = "You must be logged in to change your password.";
@@ -1004,9 +1036,6 @@ sub create_account :Local {
 }
 sub do_create_account :Local {
     my ($self, $c) = @_;
-
-    return unless $self->_validate_csrf($c, 'do_create_account', undef, 'user/register.tt');
-
     my $username = $c->request->params->{username} // '';
     my $email    = $c->request->params->{email}    // '';
 
@@ -1086,6 +1115,21 @@ sub do_create_account :Local {
                 "Could not create UserSiteRole (table may not exist): $@");
         }
         
+        eval {
+            my $ps = Comserv::Util::PointSystem->new(c => $c);
+            $ps->apply_joining_bonus($new_user->id);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+                "Granted joining bonus to user_id=" . $new_user->id);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+                "Could not grant joining bonus: $@");
+        }
+
+        delete $c->session->{$_} for qw(
+            username user_id roles first_name last_name email
+            group_membership group_name SiteName theme_name debug_mode
+        );
         $c->session->{verification_user_id} = $new_user->id;
         $c->session->{verification_code_display} = $verification_code;
         
@@ -1158,7 +1202,6 @@ sub verify_email :Local {
     }
     
     if ($c->request->method eq 'POST') {
-        return unless $self->_validate_csrf($c, 'verify_email', undef, 'user/VerifyEmail.tt');
         my $code = $c->request->params->{code};
         my $user_id = $c->session->{verification_user_id};
         
@@ -1179,18 +1222,265 @@ sub verify_email :Local {
                 "AUDIT: Email verified user_id=$user_id ip=$verify_ip");
             
             delete $c->session->{verification_code_display};
+            delete $c->session->{verify_fail_count};
             $c->response->redirect($c->uri_for('/user/complete_profile'));
         } else {
+            my $fail_count = ($c->session->{verify_fail_count} || 0) + 1;
+            $c->session->{verify_fail_count} = $fail_count;
+
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'verify_email',
-                "Invalid or expired verification code for user ID: $user_id");
-            
+                "Invalid or expired verification code for user_id=$user_id fail_count=$fail_count ip=" . ($c->req->address || 'unknown'));
+
+            my $reason = ($code && length($code) == 6)
+                ? 'Wrong or expired code entered'
+                : 'Malformed code entered';
+
+            if ($fail_count >= 2) {
+                eval {
+                    $self->email_notification->send_admin_verification_alert($c, $user, $reason);
+                };
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'verify_email',
+                    "Admin verification alert sent for user_id=$user_id") unless $@;
+            }
+
             $c->stash(
-                error_msg => 'Invalid or expired verification code. Please try again.',
-                template => 'user/VerifyEmail.tt'
+                error_msg  => 'Invalid or expired verification code. You can request a new code below.',
+                code_failed => 1,
+                template   => 'user/VerifyEmail.tt',
             );
         }
     } else {
         $c->stash(template => 'user/VerifyEmail.tt');
+    }
+}
+
+sub resend_verification_code :Local {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{verification_user_id}) {
+        $c->flash->{error_msg} = 'No active registration found. Please register again.';
+        $c->response->redirect($c->uri_for('/user/register'));
+        return;
+    }
+
+    my $user_id = $c->session->{verification_user_id};
+    my $user    = $c->model('DBEncy::User')->find($user_id);
+
+    unless ($user) {
+        $c->flash->{error_msg} = 'User not found. Please register again.';
+        $c->response->redirect($c->uri_for('/user/register'));
+        return;
+    }
+
+    my $recent_count = eval {
+        $user->verification_codes->search({
+            created_at => { '>=' => DateTime->now->subtract(minutes => 2)->strftime('%Y-%m-%d %H:%M:%S') },
+            verified_at => undef,
+        })->count;
+    } || 0;
+
+    if ($recent_count > 0) {
+        $c->flash->{error_msg} = 'A code was sent very recently. Please wait 2 minutes before requesting another.';
+        $c->response->redirect($c->uri_for('/user/verify_email'));
+        return;
+    }
+
+    my $new_code;
+    eval {
+        $new_code = $self->user_verification->generate_verification_code();
+        $self->user_verification->create_verification_code($user, $new_code);
+        $self->email_notification->send_verification_email($c, $user, $new_code);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resend_verification_code',
+            "Failed to resend code for user_id=$user_id: $@");
+        $c->flash->{error_msg} = 'Failed to send a new code. Please try again or contact support.';
+    } else {
+        $c->session->{verification_code_display} = $new_code;
+        $c->session->{email_sent}     = 1;
+        $c->session->{verify_fail_count} = 0;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resend_verification_code',
+            "AUDIT: Verification code resent user_id=$user_id ip=" . ($c->req->address || 'unknown'));
+        $c->flash->{success_msg} = 'A new verification code has been sent to your email address.';
+    }
+
+    $c->response->redirect($c->uri_for('/user/verify_email'));
+}
+
+sub resend_code_by_username :Local {
+    my ($self, $c) = @_;
+
+    return unless $self->_validate_csrf($c, 'resend_code_by_username', '/user/login');
+
+    my $input = $c->req->param('username') // '';
+    $input =~ s/^\s+|\s+$//g;
+
+    unless ($input) {
+        $c->flash->{error_msg} = 'Please enter your username or email address.';
+        $c->res->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $user;
+    eval {
+        if ($input =~ /@/) {
+            $user = $c->model('DBEncy::User')->find({ email => $input });
+        } else {
+            $user = $c->model('DBEncy::User')->find({ username => $input });
+            $user ||= $c->model('DBEncy::User')->find({ email => $input });
+        }
+    };
+
+    my $generic_ok = 'If that account exists and is awaiting verification, a new code has been sent.';
+
+    unless ($user) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resend_code_by_username',
+            "Resend requested for unknown input='$input'");
+        $c->flash->{success_msg} = $generic_ok;
+        $c->res->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $user_status = $user->status || '';
+    unless ($user_status eq 'pending_verification' || $user_status eq 'pending_setup') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resend_code_by_username',
+            "Resend ignored for user_id=" . $user->id . " (status=$user_status)");
+        $c->flash->{success_msg} = $generic_ok;
+        $c->res->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $recent_count = eval {
+        $user->verification_codes->search({
+            created_at  => { '>=' => DateTime->now->subtract(minutes => 2)->strftime('%Y-%m-%d %H:%M:%S') },
+            verified_at => undef,
+        })->count;
+    } || 0;
+
+    if ($recent_count > 0) {
+        $c->flash->{error_msg} = 'A code was sent very recently. Please wait 2 minutes before requesting another.';
+        $c->res->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    eval {
+        my $new_code = $self->user_verification->generate_verification_code();
+        $self->user_verification->create_verification_code($user, $new_code);
+        $self->email_notification->send_verification_email($c, $user, $new_code);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resend_code_by_username',
+            "AUDIT: Verification code resent via login page user_id=" . $user->id
+            . " ip=" . ($c->req->address || 'unknown'));
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resend_code_by_username',
+            "Failed to resend code for user_id=" . $user->id . ": $@");
+        $c->flash->{error_msg} = 'Failed to send a new code. Please try again or contact support.';
+        $c->res->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    $c->flash->{success_msg} = $generic_ok;
+    $c->res->redirect($c->uri_for('/user/login'));
+}
+
+sub admin_send_password_reset :Local {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'admin_send_password_reset')) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $user_id = $c->req->param('user_id');
+    unless ($user_id && $user_id =~ /^\d+$/) {
+        $c->flash->{error_msg} = 'Invalid or missing user ID.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $user = $c->model('DBEncy::User')->find($user_id);
+    unless ($user) {
+        $c->flash->{error_msg} = "User #$user_id not found.";
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    eval {
+        my $token      = $self->user_verification->generate_reset_token();
+        $self->user_verification->create_reset_token($user, $token);
+        my $reset_link = $self->_public_reset_link($c, $token);
+        $self->email_notification->send_password_reset_email($c, $user, $reset_link);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_send_password_reset',
+            "Admin failed to send password reset for user_id=$user_id: $@");
+        $c->flash->{error_msg} = 'Failed to send password reset email to ' . $user->email . ': ' . $@;
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_send_password_reset',
+            "AUDIT: Admin " . ($c->session->{username} || '?') . " sent password reset"
+            . " to user_id=$user_id email=" . $user->email
+            . " admin_ip=" . ($c->req->address || 'unknown'));
+        $c->flash->{success_msg} = 'Password reset email sent to ' . $user->email . '.';
+    }
+
+    my $return_to = $c->req->param('return_to') || '/user/edit_user/' . $user_id;
+    if ($return_to =~ m{^https?://}) {
+        $c->response->redirect($return_to);
+    } else {
+        $c->response->redirect($c->uri_for($return_to));
+    }
+}
+
+sub admin_resend_verification :Local {
+    my ($self, $c) = @_;
+
+    my $roles = $c->session->{roles} || [];
+    my @roles_list = ref $roles eq 'ARRAY' ? @$roles : split /,/, ($roles || '');
+    unless (grep { lc($_) eq 'admin' || lc($_) eq 'site_admin' } @roles_list) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $user_id = $c->req->param('user_id');
+    unless ($user_id && $user_id =~ /^\d+$/) {
+        $c->flash->{error_msg} = 'Invalid or missing user ID.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $user = $c->model('DBEncy::User')->find($user_id);
+    unless ($user) {
+        $c->flash->{error_msg} = "User #$user_id not found.";
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $new_code;
+    eval {
+        $new_code = $self->user_verification->generate_verification_code();
+        $self->user_verification->create_verification_code($user, $new_code);
+        $self->email_notification->send_verification_email($c, $user, $new_code);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_resend_verification',
+            "Admin failed to resend code for user_id=$user_id: $@");
+        $c->flash->{error_msg} = 'Failed to send verification code to ' . $user->email . ': ' . $@;
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_resend_verification',
+            "AUDIT: Admin " . ($c->session->{username} || '?') . " resent verification code "
+            . "to user_id=$user_id email=" . $user->email
+            . " admin_ip=" . ($c->req->address || 'unknown'));
+        $c->flash->{success_msg} = 'Verification code resent to ' . $user->email . '.';
+    }
+
+    my $return_to = $c->req->param('return_to') || '/admin/users';
+    if ($return_to =~ m{^https?://}) {
+        $c->response->redirect($return_to);
+    } else {
+        $c->response->redirect($c->uri_for($return_to));
     }
 }
 
@@ -1211,7 +1501,6 @@ sub complete_profile :Local {
     }
     
     if ($c->request->method eq 'POST') {
-        return unless $self->_validate_csrf($c, 'complete_profile', undef, 'user/CompleteProfile.tt');
         my $first_name = $c->request->params->{first_name};
         my $last_name = $c->request->params->{last_name};
         my $password = $c->request->params->{password};
@@ -1244,18 +1533,27 @@ sub complete_profile :Local {
         my $hashed_password = sha256_hex($password);
         
         eval {
+            my $roles_to_assign = 'normal';
+            my $session_return_to = $c->session->{return_to};
+            
+            if ($session_return_to && $session_return_to =~ m{/workshop/add}) {
+                $roles_to_assign = 'normal,workshop_leader';
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_profile',
+                    "Auto-assigning workshop_leader role due to return_to: $session_return_to");
+            }
+
             $user->update({
                 first_name        => $first_name,
                 last_name         => $last_name,
                 password          => $hashed_password,
                 status            => 'active',
-                roles             => 'normal',
+                roles             => $roles_to_assign,
                 email_verified_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
             });
             
             my $profile_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_profile',
-                "AUDIT: Profile completed user_id=$user_id ip=$profile_ip status=active");
+                "AUDIT: Profile completed user_id=$user_id ip=$profile_ip status=active roles=$roles_to_assign");
         };
         
         if ($@) {
@@ -1282,8 +1580,11 @@ sub complete_profile :Local {
                 "Failed to send welcome email: $@");
         }
 
+        my $final_redirect = $c->session->{return_to} || $c->uri_for('/user/login');
+        delete $c->session->{return_to};
+        
         $c->flash->{success_msg} = "Registration complete! You can now log in.";
-        $c->response->redirect($c->uri_for('/user/login'));
+        $c->response->redirect($final_redirect);
     } else {
         $c->stash(template => 'user/CompleteProfile.tt');
     }
@@ -1319,7 +1620,6 @@ sub admin_create_user :Local {
     my $available_roles = $self->_load_available_roles($c, $is_csc_admin, $sitename);
 
     if ($c->req->method eq 'POST') {
-        return unless $self->_validate_csrf($c, 'admin_create_user', '/admin/users');
         my $first_name     = $c->req->params->{first_name};
         my $last_name      = $c->req->params->{last_name};
         my $email          = $c->req->params->{email};
@@ -1522,7 +1822,6 @@ sub complete_username_setup :Local {
     }
     
     if ($c->req->method eq 'POST') {
-        return unless $self->_validate_csrf($c, 'complete_username_setup', undef, 'user/complete_username_setup.tt');
         my $input_code = $c->req->params->{code};
         my $username = $c->req->params->{username};
         my $first_name = $c->req->params->{first_name};
@@ -1636,7 +1935,6 @@ sub complete_password_setup :Local {
     }
     
     if ($c->req->method eq 'POST') {
-        return unless $self->_validate_csrf($c, 'complete_password_setup', undef, 'user/complete_password_setup.tt');
         my $input_code = $c->req->params->{code};
         my $password = $c->req->params->{password};
         my $password_confirm = $c->req->params->{password_confirm};
@@ -1796,9 +2094,6 @@ sub edit_user :Local :Args(1) {
 
 sub do_edit_user :Local :Args(1) {
     my ($self, $c) = @_;
-
-    return unless $self->_validate_csrf($c, 'do_edit_user', '/admin/users');
-
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'do_edit_user')) {
         $c->flash->{error_msg} = 'Access denied. Admin access required.';
@@ -1999,9 +2294,6 @@ sub do_edit_user :Local :Args(1) {
 
 sub admin_suspend_user :Local :Args(1) {
     my ($self, $c, $user_id) = @_;
-
-    return unless $self->_validate_csrf($c, 'admin_suspend_user', '/admin/users');
-
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'admin_suspend_user')) {
         $c->flash->{error_msg} = 'Access denied. Admin access required.';
@@ -2070,9 +2362,6 @@ sub admin_suspend_user :Local :Args(1) {
 
 sub admin_activate_user :Local :Args(1) {
     my ($self, $c, $user_id) = @_;
-
-    return unless $self->_validate_csrf($c, 'admin_activate_user', '/admin/users');
-
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'admin_activate_user')) {
         $c->flash->{error_msg} = 'Access denied. Admin access required.';
@@ -2214,9 +2503,6 @@ sub admin_delete_user :Local :Args(1) {
 
 sub do_admin_delete_user :Local :Args(1) {
     my ($self, $c, $user_id) = @_;
-
-    return unless $self->_validate_csrf($c, 'do_admin_delete_user', '/admin/users');
-
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'do_admin_delete_user')) {
         $c->flash->{error_msg} = 'Access denied. Admin access required.';
@@ -2373,6 +2659,13 @@ sub register :Local {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register',
         'Displaying registration form (Step 1)');
     
+    my $return_to = $c->req->param('return_to');
+    if ($return_to) {
+        $c->session->{return_to} = $return_to;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register',
+            "Stored return_to in session: $return_to");
+    }
+    
     $c->stash(template => 'user/register.tt');
 }
 sub welcome :Local {
@@ -2392,7 +2685,6 @@ sub forgot_password :Local {
     my $prefill = $c->req->param('email') || '';
 
     if ($c->req->method eq 'POST') {
-        return unless $self->_validate_csrf($c, 'forgot_password', undef, 'user/forgot_password.tt');
         my $input = $c->req->params->{email} || '';
         $input =~ s/^\s+|\s+$//g;
 
@@ -2429,7 +2721,7 @@ sub forgot_password :Local {
                 my $token = $self->user_verification->generate_reset_token();
                 $self->user_verification->create_reset_token($user, $token);
 
-                my $reset_link = $c->uri_for('/user/reset_password', { token => $token });
+                my $reset_link = $self->_public_reset_link($c, $token);
                 my $req_ip = $c->req->address || 'unknown';
 
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'forgot_password',
@@ -2519,7 +2811,6 @@ sub reset_password :Local {
     }
 
     # ── POST ─────────────────────────────────────────────────────────────────
-    return unless $self->_validate_csrf($c, 'reset_password', undef, 'user/reset_password.tt');
     my $new_password    = $c->req->param('new_password')    || '';
     my $password_confirm = $c->req->param('password_confirm') || '';
 
@@ -2662,7 +2953,6 @@ sub admin_manage_roles :Local :Args(1) {
     }
 
     if ($c->req->method eq 'POST') {
-        return unless $self->_validate_csrf($c, 'admin_manage_roles', '/admin/users');
         my @roles_arr      = $c->req->param('roles');
         my @new_site_names = $c->req->param('sitenames');
         my $roles_str      = join(',', @roles_arr);
@@ -2786,7 +3076,6 @@ sub admin_role_list :Local :Args(0) {
     my $sitename     = $c->session->{SiteName};
 
     if ($c->req->method eq 'POST') {
-        return unless $self->_validate_csrf($c, 'admin_role_list', '/user/admin_role_list');
         my $action      = $c->req->params->{action} || 'create';
         my $role_name   = $c->req->params->{role_name};
         my $description = $c->req->params->{description} || '';
@@ -2880,9 +3169,6 @@ sub admin_role_list :Local :Args(0) {
 
 sub admin_delete_site_role :Local :Args(1) {
     my ($self, $c, $role_id) = @_;
-
-    return unless $self->_validate_csrf($c, 'admin_delete_site_role', '/user/admin_role_list');
-
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'admin_delete_site_role')) {
         $c->flash->{error_msg} = 'Access denied. Admin access required.';
@@ -2974,6 +3260,19 @@ sub _load_available_roles {
         default_roles => \@default_roles,
         site_roles    => \@site_specific,
     };
+}
+
+sub _public_reset_link {
+    my ($self, $c, $token) = @_;
+    my $hostname = $c->stash->{HostName} // '';
+    $hostname =~ s{/+$}{};
+    if ($hostname =~ m{^https?://}) {
+        return $hostname . '/user/reset_password?token=' . $token;
+    }
+    if ($hostname && $hostname =~ m{^[a-zA-Z0-9]}) {
+        return 'https://' . $hostname . '/user/reset_password?token=' . $token;
+    }
+    return $c->uri_for('/user/reset_password', { token => $token });
 }
 
 __PACKAGE__->meta->make_immutable;

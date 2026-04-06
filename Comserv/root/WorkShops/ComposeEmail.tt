@@ -4,11 +4,11 @@
    roles = "admin,workshop_leader"
    TemplateType = "Application"
    category = "WorkShops"
-   page_version = "0.03"
-   last_updated = "2026-02-16"
+   page_version = "0.05"
+   last_updated = "2026-03-22"
 %]
 
-[% PageVersion = 'WorkShops/ComposeEmail.tt,v 0.03 2026/02/16 shanta Exp shanta' %]
+[% PageVersion = 'WorkShops/ComposeEmail.tt,v 0.05 2026/03/22 shanta Exp shanta' %]
 [% IF c.session.debug_mode == 1 %]
     <div class="debug-info">PageVersion: [% PageVersion %]</div>
 [% END %]
@@ -30,10 +30,11 @@
             [% END %]
             
             <div class="content-section">
-                <p><strong>Recipients:</strong> [% recipient_count %] registered participant(s)</p>
+                <p><strong>Primary Workshop:</strong> [% workshop.title | html %]
+                   &mdash; [% recipient_count %] registered participant(s)</p>
             </div>
-            
-            [% IF recipient_count == 0 %]
+
+            [% IF recipient_count == 0 && leader_workshops.size == 0 %]
             <div class="warning">
                 <p>There are no registered participants to email.</p>
             </div>
@@ -45,23 +46,102 @@
             </div>
             [% ELSE %]
             
+            [% all_templates = workshop_templates.merge(global_templates) %]
+            [% IF all_templates.size > 0 %]
+            <div class="content-section">
+                <label for="load_template"><strong>Load from Template:</strong></label>
+                <select id="load_template" class="form-input" style="width:auto;display:inline-block;">
+                    <option value="">-- select a template --</option>
+                    [% IF workshop_templates.size > 0 %]
+                    <optgroup label="This Workshop">
+                        [% FOR tmpl IN workshop_templates %]
+                        <option value="[% tmpl.id %]"
+                                data-subject="[% tmpl.subject | html %]"
+                                data-body="[% tmpl.body_text | html %]">
+                            [% tmpl.name | html %]
+                        </option>
+                        [% END %]
+                    </optgroup>
+                    [% END %]
+                    [% IF global_templates.size > 0 %]
+                    <optgroup label="Global">
+                        [% FOR tmpl IN global_templates %]
+                        <option value="[% tmpl.id %]"
+                                data-subject="[% tmpl.subject | html %]"
+                                data-body="[% tmpl.body_text | html %]">
+                            [% tmpl.name | html %] (global)
+                        </option>
+                        [% END %]
+                    </optgroup>
+                    [% END %]
+                </select>
+                <button type="button" class="btn btn-secondary" onclick="loadTemplate()">Load</button>
+                <a href="/workshop/mail_templates/[% workshop.id %]" class="btn btn-secondary">Manage Templates</a>
+            </div>
+            [% ELSE %]
+            <div class="content-section">
+                <a href="/workshop/mail_templates/[% workshop.id %]" class="btn btn-secondary">+ Create Templates</a>
+            </div>
+            [% END %]
+
             <div class="form-container">
-                <form method="POST" action="/workshop/send_email/[% workshop.id %]" class="app-form">
-                    
+                <form method="POST" action="/workshop/send_email/[% workshop.id %]" class="app-form" id="compose-form">
+
+                    [% IF all_recipients.size > 0 %]
                     <div class="form-section">
+                        <h3>Send To</h3>
+                        <p>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="setAll(true)">Select All</button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="setAll(false)">Deselect All</button>
+                            &nbsp;&nbsp;
+                            <strong>Selected: <span id="sel-count">[% all_recipients.size %]</span> of [% all_recipients.size %]</strong>
+                        </p>
+                        <div style="max-height:300px;overflow-y:auto;border:1px solid #ddd;padding:8px;border-radius:4px;">
+                        [% FOREACH r IN all_recipients %]
+                        <label style="display:block;margin-bottom:4px;">
+                            <input type="checkbox" name="selected_recipient"
+                                   value="[% r.email | html %]"
+                                   data-name="[% r.name | html %]"
+                                   class="recip-check" checked
+                                   onchange="updateSelCount()">
+                            [% r.display | html %]
+                        </label>
+                        [% END %]
+                        </div>
+                    </div>
+                    [% END %]
+
+                    <div class="form-section">
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="reply_to_override">From / Reply-To address:</label>
+                                <input type="email" id="reply_to_override" name="reply_to_override"
+                                       class="form-input" style="width:320px;"
+                                       value="[% leader_email_default | html %]">
+                                <small>Replies go to this address. Defaults to your account email ([% leader_email_default | html %]).</small>
+                            </div>
+                        </div>
                         <div class="form-row">
                             <div class="form-field">
                                 <label for="subject">Subject:</label>
                                 <input type="text" id="subject" name="subject" class="form-input" size="80" 
-                                       value="[% form_data.subject | html OR '' %]" required>
+                                       value="[% form_data.subject || '' | html %]" required>
                             </div>
                         </div>
                         
                         <div class="form-row">
                             <div class="form-field">
-                                <label for="body">Message:</label>
-                                <textarea id="body" name="body" rows="15" cols="80" class="form-input" required>[% form_data.body OR '' %]</textarea>
-                                <small>This message will be sent to all registered participants.</small>
+                                <label for="message_body">Your Message:</label>
+                                <textarea id="message_body" name="message_body" rows="10" cols="80" class="form-input">[% form_data.message_body OR '' %]</textarea>
+                                <small>This text replaces <strong>[[message_body]]</strong> in your template. You can also write the full email here if not using a template.</small>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="body">Full Email Body (optional override):</label>
+                                <textarea id="body" name="body" rows="8" cols="80" class="form-input">[% form_data.body OR '' %]</textarea>
+                                <small>Leave blank to use a loaded template. If filled, this overrides the template body entirely.</small>
                             </div>
                         </div>
                     </div>
@@ -80,6 +160,29 @@
                     <a href="/workshop/details?id=[% workshop.id %]" class="btn btn-secondary">Back to Workshop</a>
                 </div>
             </div>
+
+            <script>
+            function loadTemplate() {
+                var sel = document.getElementById('load_template');
+                var opt = sel.options[sel.selectedIndex];
+                if (!opt.value) return;
+                document.getElementById('subject').value       = opt.getAttribute('data-subject');
+                document.getElementById('message_body').value  = opt.getAttribute('data-body');
+            }
+
+            function updateSelCount() {
+                var total = document.querySelectorAll('.recip-check:checked').length;
+                var el = document.getElementById('sel-count');
+                if (el) el.textContent = total;
+            }
+
+            function setAll(checked) {
+                document.querySelectorAll('.recip-check').forEach(function(cb) {
+                    cb.checked = checked;
+                });
+                updateSelCount();
+            }
+            </script>
             
             [% END %]
             

@@ -114,12 +114,16 @@ sub decrypt_api_key {
         -pbkdf  => 'pbkdf2',
     );
     
+    my $decrypted;
     eval {
         my $encrypted = decode_base64($self->api_key_encrypted);
-        return $cipher->decrypt($encrypted);
+        $decrypted = $cipher->decrypt($encrypted);
     };
-    
-    return undef;
+    if ($@) {
+        warn "UserApiKeys decrypt_api_key failed for id=" . ($self->id || '?') . ": $@";
+        return undef;
+    }
+    return $decrypted;
 }
 
 sub set_api_key {

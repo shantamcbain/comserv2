@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat</title>
+    <link rel="stylesheet" href="/static/css/themes/[% theme_name || 'default' %].css">
+    <link rel="stylesheet" href="/static/css/theme-overrides.css">
+    <link rel="stylesheet" href="/static/css/ai-chat.css">
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            background: var(--background-color, #fff);
+            color: var(--text-color, #000);
+            font-family: inherit;
+        }
+        /* Widget container fills entire popup window */
+        .local-chat-widget {
+            position: fixed !important;
+            top: 0 !important; left: 0 !important;
+            right: 0 !important; bottom: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            z-index: 1 !important;
+        }
+        /* Chat toggle button is not needed — panel is always open */
+        .chat-button { display: none !important; }
+        /* Panel fills the container absolutely so mouse events work correctly */
+        .chat-panel {
+            position: absolute !important;
+            top: 0 !important; left: 0 !important;
+            right: 0 !important; bottom: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+            min-width: unset !important;
+            min-height: unset !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            border: none !important;
+        }
+        /* No expand button — already a separate window */
+        #detach-chat { display: none !important; }
+        /* Drag and resize not applicable in popup */
+        .chat-header-drag { cursor: default !important; opacity: 0.2 !important; pointer-events: none !important; }
+        .chat-resize-handle { display: none !important; }
+    </style>
+</head>
+<body class="theme-[% theme_name || 'default' %]">
+    <script id="ai-widget-config" type="application/json">[% widget_config %]</script>
+    <script>
+        (function() {
+            try {
+                var cfg = JSON.parse(document.getElementById('ai-widget-config').textContent);
+                window.AI_CHAT_PAGE_MODE      = false;
+                window.AI_WIDGET_POPUP        = true;
+                window.AI_DETACHED_FROM_PATH  = cfg.from_path  || '/';
+                window.AI_DETACHED_FROM_TITLE = cfg.from_title || '';
+                if (cfg.resume_conv) window.AI_RESUME_CONVERSATION = parseInt(cfg.resume_conv, 10);
+            } catch(e) {
+                window.AI_CHAT_PAGE_MODE  = false;
+                window.AI_WIDGET_POPUP    = true;
+            }
+        })();
+    </script>
+    <script src="/static/js/local-chat.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            /* Auto-open the chat panel */
+            var btn = document.getElementById('chat-button');
+            if (btn) { btn.click(); }
+
+            /* Intercept link clicks: navigate the opener instead of this popup */
+            document.addEventListener('click', function(e) {
+                var anchor = e.target.closest('a[href]');
+                if (!anchor) return;
+                var href = anchor.getAttribute('href');
+                if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+                if (window.opener && !window.opener.closed) {
+                    e.preventDefault();
+                    window.opener.location.href = href;
+                }
+            }, true);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+[% META
+   title = "Manage Membership Plans"
+   description = "Create and manage membership plans for this site"
+   roles = "admin,site_admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-03-18"
+%]
+[% PageVersion = 'membership/admin/ManagePlans.tt,v 0.01 2026/03/18' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Manage Membership Plans</h1>
+    [% IF site %]<p>Site: <strong>[% site.name | html %]</strong></p>[% END %]
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <div class="action-bar">
+          <a href="[% c.uri_for('/membership/admin/create_plan') %]" class="btn btn-primary">+ New Plan</a>
+          <a href="[% c.uri_for('/membership/admin') %]" class="btn btn-secondary">← Back to Admin</a>
+        </div>
+
+        [% IF plans.size %]
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Plan</th>
+                <th>Slug</th>
+                <th>Monthly</th>
+                <th>Annual</th>
+                <th>AI Req/Day</th>
+                <th>Features</th>
+                <th>Order</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              [% FOREACH plan IN plans %]
+              <tr[% UNLESS plan.is_active %] class="muted-row"[% END %]>
+                <td>
+                  <strong>[% plan.name | html %]</strong>
+                  [% IF plan.is_featured %]<span class="badge">Featured</span>[% END %]
+                  [% IF plan.description %]<br><small>[% plan.description | html %]</small>[% END %]
+                </td>
+                <td><code>[% plan.slug | html %]</code></td>
+                <td>[% plan.price_currency | html %] [% plan.price_monthly %]</td>
+                <td>[% plan.price_currency | html %] [% plan.price_annual %]</td>
+                <td>[% plan.ai_requests_per_day %]</td>
+                <td>
+                  [% IF plan.has_email %]📧[% plan.email_addresses %] [% END %]
+                  [% IF plan.has_hosting %]🖥[% plan.hosting_tier | html %] [% END %]
+                  [% IF plan.has_subdomain %]🌐sub [% END %]
+                  [% IF plan.has_custom_domain %]🌐dom [% END %]
+                  [% IF plan.has_beekeeping %]🐝 [% END %]
+                  [% IF plan.has_planning %]📋 [% END %]
+                  [% IF plan.has_currency %]🪙 [% END %]
+                </td>
+                <td>[% plan.sort_order %]</td>
+                <td>[% plan.is_active ? 'Active' : 'Inactive' %]</td>
+                <td class="action-cell">
+                  <a href="[% c.uri_for('/membership/admin/edit_plan', plan.id) %]" class="btn btn-small">Edit</a>
+                  <a href="[% c.uri_for('/membership/admin/toggle_plan', plan.id) %]"
+                     class="btn btn-small [% plan.is_active ? 'btn-warning' : 'btn-success' %]"
+                     onclick="return confirm('[% plan.is_active ? 'Deactivate' : 'Activate' %] this plan?')">
+                     [% plan.is_active ? 'Deactivate' : 'Activate' %]
+                  </a>
+                  <a href="[% c.uri_for('/membership/admin/delete_plan', plan.id) %]"
+                     class="btn btn-small btn-danger"
+                     onclick="return confirm('Delete this plan? This cannot be undone.')">Delete</a>
+                </td>
+              </tr>
+              [% END %]
+            </tbody>
+          </table>
+        </div>
+        [% ELSE %]
+        <p class="empty-state">No plans configured for this site. <a href="[% c.uri_for('/membership/admin/create_plan') %]">Create the first plan.</a></p>
+        [% END %]
+      </div>
+
+    </div>
+  </div>
+</div>

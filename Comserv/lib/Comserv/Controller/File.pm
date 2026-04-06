@@ -8,11 +8,20 @@ use Time::Piece;
 use URI::Escape;
 use Digest::SHA ();
 use Comserv::Util::Logging;
+use Comserv::Util::HealthLogger;
+use Comserv::Util::NfsPath;
+use Comserv::Util::AdminAuth;
 BEGIN { extends 'Catalyst::Controller'; }
 
 has 'logging' => (
     is      => 'ro',
     default => sub { Comserv::Util::Logging->new() },
+);
+
+has 'nfs_path' => (
+    is      => 'ro',
+    lazy    => 1,
+    default => sub { Comserv::Util::NfsPath->new() },
 );
 
 my %SYNC_MIME_MAP = (
@@ -58,7 +67,7 @@ sub admin_browser :Path('/file/admin_browser') :Args(0) {
 
     unless ($is_admin) {
         $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
-        $c->response->redirect($c->uri_for('/'));
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
 
@@ -76,17 +85,30 @@ sub admin_browser :Path('/file/admin_browser') :Args(0) {
             )->all;
             $allocated_dirs = \@allocs;
         }
+        # Translate paths to container environment if needed
+        for my $alloc (@$allocated_dirs) {
+            my $tp = $self->nfs_path->to_container_path($alloc->nfs_path);
+            if ($tp && $tp ne $alloc->nfs_path) {
+                # We can't easily update the result object in memory if it's not a real column
+                # but we can set it if it is. Since it's a DBIx::Class object, we can.
+                $alloc->nfs_path($tp);
+            }
+        }
     };
     if ($@) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin_browser',
-            "nfs_directory table not available: $@");
-        $c->stash(error_msg => 'NFS directory table not yet created. Visit /admin/compare_schema to create it.');
+            "nfs_directory table not available or error: $@");
+        $c->stash(error_msg => 'NFS directory table error. Visit /admin/compare_schema.');
     }
 
     my $dir_path = $c->req->param('dir_path');
     unless (defined $dir_path && length $dir_path) {
         if ($is_csc) {
             $dir_path = $nfs_root;
+        } elsif (lc($sitename) eq 'bmaster') {
+            $dir_path = "$nfs_root/apis";
+        } elsif (lc($sitename) eq 'shanta') {
+            $dir_path = "$nfs_root/Shanta";
         } elsif (@$allocated_dirs) {
             $dir_path = $allocated_dirs->[0]->nfs_path;
         } else {
@@ -96,21 +118,28 @@ sub admin_browser :Path('/file/admin_browser') :Args(0) {
 
     my $nav_root = $nfs_root;
     unless ($is_csc) {
-        my $allowed = 0;
-        for my $alloc (@$allocated_dirs) {
-            my $apath = $alloc->nfs_path;
-            if (CORE::index($dir_path, $apath) == 0) {
-                $allowed  = 1;
-                $nav_root = $apath;
-                last;
-            }
-        }
-        unless ($allowed) {
+        my ($allowed, $nr) = $self->_is_path_allowed($c, $dir_path, $is_csc, $sitename, $nfs_root);
+        if ($allowed) {
+            $nav_root = $nr;
+        } else {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin_browser',
                 "SiteName admin '$sitename' attempted to access out-of-scope dir: $dir_path");
             $c->stash(error_msg => 'Access denied to that directory.');
-            $dir_path = @$allocated_dirs ? $allocated_dirs->[0]->nfs_path : $nfs_root;
-            $nav_root = $dir_path;
+            
+            # Reset to allowed root
+            if (lc($sitename) eq 'bmaster') {
+                $dir_path = "$nfs_root/apis";
+                $nav_root = $dir_path;
+            } elsif (lc($sitename) eq 'shanta') {
+                $dir_path = "$nfs_root/Shanta";
+                $nav_root = $dir_path;
+            } elsif (@$allocated_dirs) {
+                $dir_path = $allocated_dirs->[0]->nfs_path;
+                $nav_root = $dir_path;
+            } else {
+                $dir_path = $nfs_root;
+                $nav_root = $nfs_root;
+            }
         }
     }
 
@@ -177,19 +206,7 @@ sub fs_download :Path('/file/fs_download') :Args(0) {
     $path =~ s{\.\.}{}g;
 
     my $nfs_root = $self->_nfs_root_for_sync();
-    my $allowed  = 0;
-    if ($is_csc) {
-        $allowed = (CORE::index($path, '/') == 0 || CORE::index($path, $nfs_root) == 0) ? 1 : 0;
-        $allowed = 1 if -f $path;
-    } else {
-        my $schema = $c->model('DBEncy');
-        eval {
-            my @allocs = $schema->resultset('NfsDirectory')->search({ sitename => $sitename, is_active => 1 })->all;
-            for my $a (@allocs) {
-                if (CORE::index($path, $a->nfs_path) == 0) { $allowed = 1; last; }
-            }
-        };
-    }
+    my ($allowed, $nav_root) = $self->_is_path_allowed($c, $path, $is_csc, $sitename, $nfs_root);
 
     unless ($allowed && -f $path) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fs_download',
@@ -229,6 +246,8 @@ sub fs_rename :Path('/file/fs_rename') :Args(0) {
         return;
     }
 
+
+
     my $old_path = $c->req->param('old_path') // '';
     my $new_name = $c->req->param('new_name') // '';
     my $dir      = $c->req->param('dir')      // '';
@@ -246,6 +265,18 @@ sub fs_rename :Path('/file/fs_rename') :Args(0) {
     require File::Basename;
     my $parent   = File::Basename::dirname($old_path);
     my $new_path = "$parent/$new_name";
+
+    my $nfs_root = $self->_nfs_root_for_sync();
+    my ($allowed_src, $nr_src) = $self->_is_path_allowed($c, $old_path, $is_csc, $sitename, $nfs_root);
+    my ($allowed_dst, $nr_dst) = $self->_is_path_allowed($c, $new_path, $is_csc, $sitename, $nfs_root);
+
+    unless ($allowed_src && $allowed_dst) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fs_rename',
+            "Scope violation: '$sitename' tried to rename '$old_path' -> '$new_path'");
+        $c->flash->{error_msg} = 'Access denied: cannot rename files outside your allocated paths.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        return;
+    }
 
     unless (-e $old_path) {
         $c->flash->{error_msg} = 'Source file not found.';
@@ -299,21 +330,12 @@ sub fs_list_dirs :Path('/file/fs_list_dirs') :Args(0) {
         return;
     }
 
-    unless ($is_csc) {
-        my $schema  = $c->model('DBEncy');
-        my $allowed = 0;
-        eval {
-            my @allocs = $schema->resultset('NfsDirectory')->search(
-                { sitename => $sitename, is_active => 1 }
-            )->all;
-            for my $a (@allocs) {
-                if (CORE::index($path, $a->nfs_path) == 0) { $allowed = 1; last; }
-            }
-        };
-        unless ($allowed) {
-            $c->response->body('{"error":"Access denied"}');
-            return;
-        }
+    my $nfs_root = $self->_nfs_root_for_sync();
+    my ($allowed, $nav_root) = $self->_is_path_allowed($c, $path, $is_csc, $sitename, $nfs_root);
+
+    unless ($allowed) {
+        $c->response->body('{"error":"Access denied"}');
+        return;
     }
 
     opendir my $dh, $path or do {
@@ -326,9 +348,8 @@ sub fs_list_dirs :Path('/file/fs_list_dirs') :Args(0) {
 
     require File::Basename;
     my $parent = File::Basename::dirname($path);
-    $parent = '' if $path eq ($self->_nfs_root_for_sync()) && !$is_csc;
+    $parent = '' if $path eq $nfs_root && !$is_csc;
 
-    my $nfs_root = $self->_nfs_root_for_sync();
     my $can_go_up = $is_csc ? ($path ne '/') : ($path ne $nfs_root && length $parent);
 
     my $json_dirs = join(',', map { my $d = $_; $d =~ s/\\/\\\\/g; $d =~ s/"/\\"/g; "\"$d\"" } @dirs);
@@ -352,9 +373,12 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
         return;
     }
 
+    
+
     my $old_path = $c->req->param('old_path') // '';
     my $dest_dir = $c->req->param('dest_dir') // '';
     my $dir      = $c->req->param('dir')      // '';
+    my $back_url = $c->req->param('back_url') // '';
 
     $old_path =~ s{\.\.}{}g;
     $dest_dir =~ s{\.\.}{}g;
@@ -362,47 +386,39 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
     $dest_dir =~ s/\s+$//;
     $dest_dir =~ s{/+$}{};
 
+    my $_err_redir = sub {
+        my $msg = shift;
+        $c->flash->{error_msg} = $msg;
+        my $r = length($back_url) ? $back_url
+              : $c->uri_for('/file/admin_browser', { dir_path => $dir });
+        $c->response->redirect($r);
+    };
+
     unless (length $old_path && length $dest_dir) {
-        $c->flash->{error_msg} = 'Source path and destination directory are required.';
-        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        $_err_redir->('Source path and destination directory are required.');
         return;
     }
 
     unless (-e $old_path) {
-        $c->flash->{error_msg} = 'Source file not found.';
-        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        $_err_redir->('Source file not found.');
         return;
     }
 
-    unless ($is_csc) {
-        my $schema = $c->model('DBEncy');
-        my $allowed = 0;
-        eval {
-            my @allocs = $schema->resultset('NfsDirectory')->search(
-                { sitename => $sitename, is_active => 1 }
-            )->all;
-            for my $a (@allocs) {
-                my $apath = $a->nfs_path;
-                if (CORE::index($old_path, $apath) == 0 &&
-                    CORE::index($dest_dir, $apath) == 0) {
-                    $allowed = 1; last;
-                }
-            }
-        };
-        unless ($allowed) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fs_move',
-                "Scope violation: '$sitename' tried to move '$old_path' -> '$dest_dir'");
-            $c->flash->{error_msg} = 'Access denied: destination is outside your allocated directories.';
-            $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
-            return;
-        }
+    my $nfs_root = $self->_nfs_root_for_sync();
+    my ($allowed_src, $nr_src) = $self->_is_path_allowed($c, $old_path, $is_csc, $sitename, $nfs_root);
+    my ($allowed_dst, $nr_dst) = $self->_is_path_allowed($c, $dest_dir, $is_csc, $sitename, $nfs_root);
+
+    unless ($allowed_src && $allowed_dst) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fs_move',
+            "Scope violation: '$sitename' tried to move '$old_path' -> '$dest_dir'");
+        $_err_redir->('Access denied: destination is outside your allocated directories.');
+        return;
     }
 
     unless (-d $dest_dir) {
         eval { make_path($dest_dir) };
         if ($@ || !-d $dest_dir) {
-            $c->flash->{error_msg} = "Destination directory could not be created: $@";
-            $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+            $_err_redir->("Destination directory could not be created: $@");
             return;
         }
     }
@@ -414,14 +430,14 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
     if (-e $new_path) {
         if (-d $old_path && -d $new_path) {
             $c->response->redirect($c->uri_for('/file/dir_merge', {
-                src  => $old_path,
-                dest => $new_path,
-                back => $dir,
+                src      => $old_path,
+                dest     => $new_path,
+                back     => $dir,
+                back_url => $back_url,
             }));
             return;
         }
-        $c->flash->{error_msg} = "A file named '$filename' already exists in '$dest_dir'. Cannot overwrite a file with a file — rename one first.";
-        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        $_err_redir->("A file named '$filename' already exists in '$dest_dir'. Cannot overwrite a file with a file — rename one first.");
         return;
     }
 
@@ -432,8 +448,7 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
     } elsif ($is_dir) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fs_move',
             "Rename failed for directory '$old_path' -> '$new_path': $!");
-        $c->flash->{error_msg} = "Cannot move directory: $! (directories can only be moved within the same filesystem)";
-        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        $_err_redir->("Cannot move directory: $! (directories can only be moved within the same filesystem)");
         return;
     } else {
         require File::Copy;
@@ -441,8 +456,7 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
         unless ($move_ok) {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fs_move',
                 "Move failed: $old_path -> $new_path: $!");
-            $c->flash->{error_msg} = "Move failed: $!";
-            $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+            $_err_redir->("Move failed: $!");
             return;
         }
     }
@@ -463,7 +477,9 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
         $msg .= " <strong>Duplicate detected</strong> — check the Duplicates page." if $sync->{dup_flagged};
     }
     $c->flash->{success_msg} = $msg;
-    $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+    my $redir = length($back_url) ? $back_url
+              : $c->uri_for('/file/admin_browser', { dir_path => $dir });
+    $c->response->redirect($redir);
 }
 
 sub fs_mkdir :Path('/file/fs_mkdir') :Args(0) {
@@ -474,6 +490,8 @@ sub fs_mkdir :Path('/file/fs_mkdir') :Args(0) {
         $c->response->redirect($c->uri_for('/file/admin_browser'));
         return;
     }
+
+    
 
     my $parent_dir = $c->req->param('parent_dir') // '';
     my $dir_name   = $c->req->param('dir_name')   // '';
@@ -490,6 +508,17 @@ sub fs_mkdir :Path('/file/fs_mkdir') :Args(0) {
 
     unless (-d $parent_dir) {
         $c->flash->{error_msg} = 'Parent directory does not exist.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $parent_dir }));
+        return;
+    }
+
+    my $nfs_root = $self->_nfs_root_for_sync();
+    my ($allowed, $nr) = $self->_is_path_allowed($c, $parent_dir, $is_csc, $sitename, $nfs_root);
+
+    unless ($allowed) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fs_mkdir',
+            "Scope violation: '$sitename' tried to mkdir in '$parent_dir'");
+        $c->flash->{error_msg} = 'Access denied: cannot create directory outside your allocated paths.';
         $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $parent_dir }));
         return;
     }
@@ -774,6 +803,15 @@ sub upload_file :Path('/file/upload_file') :Args(0) {
         if ($upload_err) {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'upload_file',
                 "Upload failed nfs_dir_id=$nfs_dir_id filename=" . $upload->filename . ": $upload_err");
+            Comserv::Util::HealthLogger->log_file_upload($c,
+                success  => 0,
+                filename => $upload->filename,
+                message  => "Upload failed for '" . $upload->filename . "': $upload_err",
+                details  => "nfs_dir_id=$nfs_dir_id error=$upload_err",
+                file     => __FILE__,
+                line     => __LINE__,
+                sub      => 'upload_file',
+            );
             $c->stash(
                 allocated_dirs => $allocated_dirs,
                 is_csc         => $is_csc,
@@ -787,6 +825,15 @@ sub upload_file :Path('/file/upload_file') :Args(0) {
         my $dup_msg = $file_row->is_duplicate ? ' (detected as duplicate)' : '';
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'upload_file',
             "File uploaded id=" . $file_row->id . " name=" . $file_row->file_name . $dup_msg);
+        Comserv::Util::HealthLogger->log_file_upload($c,
+            success  => 1,
+            filename => $file_row->file_name,
+            message  => "File uploaded: '" . $file_row->file_name . "'" . $dup_msg,
+            details  => "id=" . $file_row->id . " nfs_dir_id=$nfs_dir_id" . $dup_msg,
+            file     => __FILE__,
+            line     => __LINE__,
+            sub      => 'upload_file',
+        );
         $c->flash->{success_msg} = "File '" . $file_row->file_name . "' uploaded successfully.$dup_msg";
         $c->response->redirect($c->uri_for('/file/list'));
         return;
@@ -844,7 +891,7 @@ sub edit :Path('/file/edit') :Args(1) {
 
     unless ($is_admin) {
         $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
-        $c->response->redirect($c->uri_for('/'));
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
 
@@ -987,18 +1034,11 @@ sub download :Path('/file/download') :Args(1) {
         return;
     }
 
-    my $full_path = $file->file_path // '';
-    if (!length($full_path) || !-f $full_path) {
-        my $nfs_rel = $file->nfs_path // '';
-        if (length $nfs_rel) {
-            my $nfs_root = $self->_nfs_root_for_sync();
-            $full_path = (-f $nfs_rel) ? $nfs_rel : "$nfs_root/$nfs_rel";
-        }
-    }
+    my $full_path = $self->nfs_path->resolve_path($file->nfs_path // $file->file_path // '');
 
     unless (length($full_path) && -f $full_path) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'download',
-            "File id=$id not found on filesystem: path=" . ($file->file_path // 'undef'));
+            "File id=$id not found on filesystem: path=" . ($file->file_path // 'undef') . " nfs_path=" . ($file->nfs_path // 'undef'));
         $c->flash->{error_msg} = 'File not found on the filesystem.';
         $c->response->redirect($c->uri_for('/file/view', $id));
         return;
@@ -1014,6 +1054,15 @@ sub download :Path('/file/download') :Args(1) {
         or do {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'download',
                 "Cannot open file id=$id path=$full_path: $!");
+            Comserv::Util::HealthLogger->log_file_download($c,
+                success  => 0,
+                filename => $filename,
+                message  => "File download failed: '$filename' - cannot open: $!",
+                details  => "id=$id path=$full_path error=$!",
+                file     => __FILE__,
+                line     => __LINE__,
+                sub      => 'download',
+            );
             $c->flash->{error_msg} = "Cannot read file: $!";
             $c->response->redirect($c->uri_for('/file/view', $id));
             return;
@@ -1026,6 +1075,16 @@ sub download :Path('/file/download') :Args(1) {
     local $/ = undef;
     my $content = <$fh>;
     close $fh;
+
+    Comserv::Util::HealthLogger->log_file_download($c,
+        success  => 1,
+        filename => $filename,
+        message  => "File downloaded: '$filename'",
+        details  => "id=$id size=" . length($content) . " mime=$mime",
+        file     => __FILE__,
+        line     => __LINE__,
+        sub      => 'download',
+    );
 
     $c->response->body($content);
 }
@@ -1130,28 +1189,26 @@ sub _db_mark_orphan {
 
 sub _resolve_roles {
     my ($self, $c) = @_;
-    my $sitename = $c->session->{SiteName} // '';
-    my $roles    = $c->session->{roles} || [];
-    $roles = [split /\s*,\s*/, $roles] unless ref $roles;
-    my $is_admin = grep { $_ eq 'admin' } @$roles;
-    my $is_csc   = $is_admin && lc($sitename) eq 'csc';
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $is_admin   = $admin_auth->check_admin_access($c, '_resolve_roles');
+    my $is_csc     = $admin_auth->is_csc_admin($c);
+    my $sitename   = $c->session->{SiteName} // '';
+
+    # Log details about the session and roles for debugging
+    my $session_id = $c->sessionid // 'no-session-id';
+    my $user_id    = $c->session->{user_id} // 'no-user-id';
+    my $roles      = $c->session->{roles} || [];
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_resolve_roles',
+        "RESULT: is_admin=$is_admin is_csc=$is_csc sitename=$sitename session_id=$session_id user_id=$user_id roles=" . (ref $roles ? join(',', @$roles) : $roles));
+
     return ($is_admin, $is_csc, $sitename);
 }
 
 sub _nfs_root_for_sync {
     my ($self) = @_;
-    my $configured = $ENV{WORKSHOP_RESOURCES_PATH} || '/data/nfs';
-    return $configured if -d $configured;
-
-    for my $fallback (
-        ($ENV{HOME} ? "$ENV{HOME}/nfs"                : ()),
-        '/opt/comserv/workshop_resources',
-        ($ENV{HOME} ? "$ENV{HOME}/workshop_resources" : ()),
-    ) {
-        return $fallback if -d $fallback;
-    }
-
-    return $configured;
+    return $self->nfs_path->get_nfs_root();
 }
 
 sub _file_sha256 {
@@ -1206,7 +1263,10 @@ sub _gather_nfs_files {
 sub nfs_sync :Path('/file/nfs_sync') :Args(0) {
     my ($self, $c) = @_;
 
-    unless ($c->session->{user_id}) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $is_admin   = $admin_auth->check_admin_access($c, 'nfs_sync');
+
+    unless ($c->session->{user_id} || $is_admin) {
         $c->flash->{error_msg} = 'Please log in.';
         $c->response->redirect($c->uri_for('/'));
         return;
@@ -1216,6 +1276,8 @@ sub nfs_sync :Path('/file/nfs_sync') :Args(0) {
         $c->response->redirect($c->uri_for('/workshop/resources'));
         return;
     }
+
+    
 
     my @selected_paths = $c->req->param('selected_paths');
     my $add_to_workshop_resource = $c->req->param('add_to_workshop_resource') ? 1 : 0;
@@ -1376,6 +1438,8 @@ sub nfs_sync_all :Path('/file/nfs_sync_all') :Args(0) {
         $c->response->redirect($c->uri_for('/workshop/resources'));
         return;
     }
+
+    
 
     my $return_to = $c->req->param('return_to') || '/workshop/resources';
     $return_to = '/workshop/resources' unless $return_to =~ m{^/};
@@ -1552,6 +1616,8 @@ sub resolve_duplicate :Path('/file/resolve_duplicate') :Args(1) {
         return;
     }
 
+    
+
     my $action    = $c->req->param('action')   // '';
     my $target_id = $c->req->param('target_id') // $id;
 
@@ -1696,6 +1762,8 @@ sub batch_resolve_duplicates :Path('/file/batch_resolve_duplicates') :Args(0) {
         $c->response->redirect($c->uri_for('/file/duplicates'));
         return;
     }
+
+    
 
     my $action     = $c->req->param('batch_action') // '';
     my @target_ids = $c->req->param('selected_ids');
@@ -1861,6 +1929,8 @@ sub nfs_allocation_mkdir :Path('/file/nfs_allocation_mkdir') :Args(1) {
         return;
     }
 
+    
+
     my $schema = $c->model('DBEncy');
     my $alloc;
     eval { $alloc = $schema->resultset('NfsDirectory')->find($id) };
@@ -1908,6 +1978,8 @@ sub nfs_allocation_create :Path('/file/nfs_allocation_create') :Args(0) {
         return;
     }
 
+    
+
     my $alloc_sitename = $c->req->param('sitename')    // '';
     my $nfs_path       = $c->req->param('nfs_path')    // '';
     my $description    = $c->req->param('description') // '';
@@ -1931,6 +2003,14 @@ sub nfs_allocation_create :Path('/file/nfs_allocation_create') :Args(0) {
     my $nfs_root = $self->_nfs_root_for_sync();
     unless (CORE::index($nfs_path, '/') == 0 || CORE::index($nfs_path, $nfs_root) == 0) {
         $nfs_path = "$nfs_root/$nfs_path" unless CORE::index($nfs_path, '/') == 0;
+    }
+
+    # Security check: Prevent allocation of sensitive paths
+    my ($allowed, $nr) = $self->_is_path_allowed($c, $nfs_path, $is_csc, $sitename, $nfs_root);
+    unless ($allowed) {
+        $c->flash->{error_msg} = "Access denied: cannot allocate to sensitive or unauthorized path '$nfs_path'.";
+        $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+        return;
     }
 
     my ($row, $create_err) = $c->model('File')->create_nfs_allocation($c,
@@ -1990,6 +2070,8 @@ sub nfs_allocation_edit :Path('/file/nfs_allocation_edit') :Args(1) {
         return;
     }
 
+    
+
     my $schema = $c->model('DBEncy');
     my $alloc  = $schema->resultset('NfsDirectory')->find($id);
 
@@ -1999,11 +2081,57 @@ sub nfs_allocation_edit :Path('/file/nfs_allocation_edit') :Args(1) {
         return;
     }
 
-    my $description = $c->req->param('description') // '';
-    my $is_active   = $c->req->param('is_active') ? 1 : 0;
+    my $alloc_sitename = $c->req->param('sitename')    // '';
+    my $site_id        = $c->req->param('site_id')     // undef;
+    my $nfs_path       = $c->req->param('nfs_path')    // '';
+    my $description    = $c->req->param('description') // '';
+    my $is_active      = $c->req->param('is_active') ? 1 : 0;
+
+    # Trim whitespace
+    $alloc_sitename =~ s/^\s+|\s+$//g;
+    $nfs_path       =~ s/^\s+|\s+$//g;
+    $description    =~ s/^\s+|\s+$//g;
+
+    # Validate required fields
+    unless (length $alloc_sitename) {
+        $c->flash->{error_msg} = 'SiteName is required.';
+        $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+        return;
+    }
+
+    unless (length $nfs_path) {
+        $c->flash->{error_msg} = 'NFS path is required.';
+        $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+        return;
+    }
+
+    # Ensure nfs_path is absolute
+    my $nfs_root = $self->_nfs_root_for_sync();
+    unless (CORE::index($nfs_path, '/') == 0 || CORE::index($nfs_path, $nfs_root) == 0) {
+        $nfs_path = "$nfs_root/$nfs_path";
+    }
+
+    # Security check: Prevent allocation of sensitive paths
+    my ($allowed, $nr) = $self->_is_path_allowed($c, $nfs_path, $is_csc, $alloc_sitename, $nfs_root);
+    unless ($allowed) {
+        $c->flash->{error_msg} = "Access denied: cannot allocate to sensitive or unauthorized path '$nfs_path'.";
+        $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+        return;
+    }
+
+    # Parse site_id - ensure it's either a valid integer or NULL
+    if (defined $site_id && $site_id ne '') {
+        $site_id =~ s/\D//g;  # Remove non-digits
+        $site_id = ($site_id ne '' && $site_id > 0) ? int($site_id) : undef;
+    } else {
+        $site_id = undef;
+    }
 
     eval {
         $alloc->update({
+            sitename    => $alloc_sitename,
+            site_id     => $site_id,
+            nfs_path    => $nfs_path,
             description => $description,
             is_active   => $is_active,
         });
@@ -2015,7 +2143,7 @@ sub nfs_allocation_edit :Path('/file/nfs_allocation_edit') :Args(1) {
         $c->flash->{error_msg} = "Failed to update allocation: $err";
     } else {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'nfs_allocation_edit',
-            "NFS allocation updated id=$id is_active=$is_active");
+            "NFS allocation updated id=$id sitename=$alloc_sitename nfs_path=$nfs_path is_active=$is_active");
         $c->flash->{success_msg} = "Allocation #$id updated.";
     }
 
@@ -2036,18 +2164,7 @@ sub fs_preview :Path('/file/fs_preview') :Args(0) {
     $path =~ s{\.\.}{}g;
 
     my $nfs_root = $self->_nfs_root_for_sync();
-    my $allowed  = 0;
-    if ($is_csc) {
-        $allowed = (-f $path) ? 1 : 0;
-    } else {
-        my $schema = $c->model('DBEncy');
-        eval {
-            my @allocs = $schema->resultset('NfsDirectory')->search({ sitename => $sitename, is_active => 1 })->all;
-            for my $a (@allocs) {
-                if (CORE::index($path, $a->nfs_path) == 0) { $allowed = 1; last; }
-            }
-        };
-    }
+    my ($allowed, $nr) = $self->_is_path_allowed($c, $path, $is_csc, $sitename, $nfs_root);
 
     unless ($allowed && -f $path) {
         $c->response->status(404);
@@ -2101,6 +2218,8 @@ sub fs_delete :Path('/file/fs_delete') :Args(0) {
         return;
     }
 
+    
+
     my $path     = $c->req->param('path')     // '';
     my $dir      = $c->req->param('dir')      // '';
     my $also_db  = $c->req->param('also_db')  // 0;
@@ -2108,18 +2227,7 @@ sub fs_delete :Path('/file/fs_delete') :Args(0) {
     $path =~ s{\.\.}{}g;
 
     my $nfs_root = $self->_nfs_root_for_sync();
-    my $allowed  = 0;
-    if ($is_csc) {
-        $allowed = 1 if -e $path;
-    } else {
-        my $schema = $c->model('DBEncy');
-        eval {
-            my @allocs = $schema->resultset('NfsDirectory')->search({ sitename => $sitename, is_active => 1 })->all;
-            for my $a (@allocs) {
-                if (CORE::index($path, $a->nfs_path) == 0) { $allowed = 1; last; }
-            }
-        };
-    }
+    my ($allowed, $nr) = $self->_is_path_allowed($c, $path, $is_csc, $sitename, $nfs_root);
 
     unless ($allowed && -e $path) {
         $c->flash->{error_msg} = 'File not found or access denied.';
@@ -2182,6 +2290,8 @@ sub db_import_file :Path('/file/db_import_file') :Args(0) {
         return;
     }
 
+    
+
     my $file_path    = $c->req->param('file_path')    // '';
     my $dir          = $c->req->param('dir')           // '';
     my $access_level = $c->req->param('access_level')  // 'site_only';
@@ -2197,6 +2307,15 @@ sub db_import_file :Path('/file/db_import_file') :Args(0) {
 
     unless (-f $file_path) {
         $c->flash->{error_msg} = "File not found on disk: $file_path";
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        return;
+    }
+
+    my $nfs_root = $self->_nfs_root_for_sync();
+    my ($allowed, $nr) = $self->_is_path_allowed($c, $file_path, $is_csc, $sitename, $nfs_root);
+
+    unless ($allowed) {
+        $c->flash->{error_msg} = "Access denied: cannot import file outside your allocated paths.";
         $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
         return;
     }
@@ -2222,7 +2341,6 @@ sub db_import_file :Path('/file/db_import_file') :Args(0) {
     my ($ext)   = ($name =~ /\.([^.]+)$/);
     $ext        = lc($ext // '');
     my $size    = -s $file_path;
-    my $nfs_root = $self->_nfs_root_for_sync();
     my $rel      = $file_path;
     $rel =~ s{^\Q$nfs_root\E/?}{};
 
@@ -2294,6 +2412,8 @@ sub fs_upload_tree :Path('/file/fs_upload_tree') :Args(0) {
         $c->response->body('{"error":"Access denied"}');
         return;
     }
+
+    
 
     my $target_dir = $c->req->param('target_dir') // '';
     my $rel_path   = $c->req->param('rel_path')   // '';
@@ -2380,25 +2500,14 @@ sub dir_merge :Path('/file/dir_merge') :Args(0) {
         return;
     }
 
-    unless ($is_csc) {
-        my $schema  = $c->model('DBEncy');
-        my $allowed = 0;
-        eval {
-            my @allocs = $schema->resultset('NfsDirectory')->search(
-                { sitename => $sitename, is_active => 1 }
-            )->all;
-            for my $a (@allocs) {
-                my $ap = $a->nfs_path;
-                if (CORE::index($src, $ap) == 0 && CORE::index($dest, $ap) == 0) {
-                    $allowed = 1; last;
-                }
-            }
-        };
-        unless ($allowed) {
-            $c->flash->{error_msg} = 'Access denied: directory outside your allocation.';
-            $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $back }));
-            return;
-        }
+    my $nfs_root = $self->_nfs_root_for_sync();
+    my ($allowed_src, $nr_src) = $self->_is_path_allowed($c, $src, $is_csc, $sitename, $nfs_root);
+    my ($allowed_dst, $nr_dst) = $self->_is_path_allowed($c, $dest, $is_csc, $sitename, $nfs_root);
+
+    unless ($allowed_src && $allowed_dst) {
+        $c->flash->{error_msg} = 'Access denied: directory outside your allocation.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $back }));
+        return;
     }
 
     my %dest_files;
@@ -2489,6 +2598,8 @@ sub dir_merge_submit :Path('/file/dir_merge_submit') :Args(0) {
         return;
     }
 
+    
+
     my $src  = $c->req->param('src')  // '';
     my $dest = $c->req->param('dest') // '';
     my $back = $c->req->param('back') // '';
@@ -2524,7 +2635,7 @@ sub dir_merge_submit :Path('/file/dir_merge_submit') :Args(0) {
                     $errors++; next;
                 };
             }
-            if (rename($src_path, $dst_path)) {
+            if (CORE::rename($src_path, $dst_path)) {
                 $self->_db_sync_path($c, $src_path, $dst_path);
                 $moved++;
             } else {
@@ -2546,7 +2657,7 @@ sub dir_merge_submit :Path('/file/dir_merge_submit') :Args(0) {
                 $new_dst = "$dest/${base}_conflict_$n${suffix}";
                 $n++;
             } while (-e $new_dst && $n < 100);
-            if (rename($src_path, $new_dst)) {
+            if (CORE::rename($src_path, $new_dst)) {
                 $self->_db_sync_path($c, $src_path, $new_dst);
                 $renamed++;
                 push @messages, "Renamed '$rel' to '" . basename($new_dst) . "'";
@@ -2851,6 +2962,8 @@ sub dir_sync_submit :Path('/file/dir_sync_submit') :Args(0) {
         return;
     }
 
+    
+
     my $dir_path = $c->req->param('dir_path') // '';
     $dir_path =~ s{\.\.}{}g;
 
@@ -2941,6 +3054,60 @@ sub dir_sync_submit :Path('/file/dir_sync_submit') :Args(0) {
     $c->flash->{success_msg} = $msg;
     $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir_path }));
 }
+
+sub _is_path_allowed {
+    my ($self, $c, $path, $is_csc, $sitename, $nfs_root) = @_;
+    
+    # Validation
+    return (0, undef) unless defined $path && length $path;
+    $path =~ s{\\}{/}g;
+    $path =~ s{^\s+|\s+$}{}g;
+    $path =~ s{/+$}{}; # Remove trailing slash for consistent comparison
+
+    # Security: Prohibit access to sensitive system paths regardless of admin status
+    if ($path =~ m{^/(etc|proc|sys|var|boot|root|dev|tmp/session_data)\b}i || $path eq '/') {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_is_path_allowed',
+            "SECURITY: Blocked access to sensitive path: $path");
+        return (0, undef);
+    }
+
+    # CSC Admins can access everything in the NFS root
+    if ($is_csc) {
+        if (CORE::index($path, $nfs_root) == 0) {
+            return (1, $nfs_root);
+        }
+        # If it's outside NFS root but they are CSC admin, we might allow it 
+        # but for now let's keep it scoped to NFS root for safety.
+        # return (1, $nfs_root); 
+    }
+    
+    # Normalize sitename
+    $sitename = lc($sitename // '');
+
+    # Check site-specific roots
+    if ($sitename eq 'bmaster' && CORE::index($path, "$nfs_root/apis") == 0) {
+        return (1, "$nfs_root/apis");
+    }
+    if ($sitename eq 'shanta' && CORE::index($path, "$nfs_root/Shanta") == 0) {
+        return (1, "$nfs_root/Shanta");
+    }
+    
+    # Check allocated dirs
+    my $schema = $c->model('DBEncy');
+    my @allocs = eval { 
+        $schema->resultset('NfsDirectory')->search({ sitename => $c->session->{SiteName}, is_active => 1 })->all 
+    };
+    for my $a (@allocs) {
+        my $apath = $a->nfs_path;
+        my $translated = $self->nfs_path->to_container_path($apath);
+        if (CORE::index($path, $translated) == 0) {
+            return (1, $translated);
+        }
+    }
+    
+    return (0, undef);
+}
+
 
 __PACKAGE__->meta->make_immutable;
 

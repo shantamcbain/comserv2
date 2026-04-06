@@ -19,6 +19,12 @@
 [% END %]
     [% INCLUDE 'Header.tt' %]
 <body class="theme-[% theme_name || c.stash.theme_name || c.session.theme_name || 'default' %]">
+[% IF c.stash.ai_popup_mode %]
+    [%# Popup / detached-widget mode: render bare — no nav, no footer, no back-to-top %]
+    [% content %]
+    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% USE date; date.format(date.now, '%s') %]">
+    <script src="/static/js/local-chat.js?v=[% date.format(date.now, '%s') %]"></script>
+[% ELSE %]
     [% INCLUDE 'pagetop.tt' %]
 [%# INCLUDE 'home.tt' %]
     [% content %]
@@ -32,20 +38,13 @@
     [% TRY %]
         [% INCLUDE 'footer.tt' %]
     [% CATCH %]
-        <!-- Error including footer.tt: [% error.info %] -->
-        <footer>
-            <div class="footer-content">
-                <p>&copy; [% USE date; date.format(date.now, '%Y') %] Comserv. All rights reserved.</p>
-                [% IF c.session.debug_mode == 1 %]
-                    <p>[% PageVersion %]</p>
-                    <p><a href="/reset_session">Reset Session</a></p>
-                [% END %]
-            </div>
-        </footer>
+        [% IF c.session.debug_mode == 1 %]<!-- footer.tt error: [% error.info %] -->[% END %]
     [% END %]
-    
 
-    
+    <!-- Chat widget CSS and JS — outside footer TRY/CATCH so it appears on every page -->
+    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% USE date; date.format(date.now, '%s') %]">
+    <script src="/static/js/local-chat.js?v=[% date.format(date.now, '%s') %]"></script>
+[% END %]
 
 </body>
 

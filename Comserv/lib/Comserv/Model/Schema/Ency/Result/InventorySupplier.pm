@@ -1,0 +1,94 @@
+package Comserv::Model::Schema::Ency::Result::InventorySupplier;
+use strict;
+use warnings;
+use base 'DBIx::Class::Core';
+
+__PACKAGE__->load_components('InflateColumn::DateTime', 'TimeStamp');
+__PACKAGE__->table('inventory_suppliers');
+
+__PACKAGE__->add_columns(
+    id => {
+        data_type         => 'integer',
+        is_auto_increment => 1,
+        is_nullable       => 0,
+    },
+    sitename => {
+        data_type   => 'varchar',
+        size        => 255,
+        is_nullable => 0,
+    },
+    name => {
+        data_type   => 'varchar',
+        size        => 255,
+        is_nullable => 0,
+    },
+    contact_name => {
+        data_type   => 'varchar',
+        size        => 255,
+        is_nullable => 1,
+    },
+    email => {
+        data_type   => 'varchar',
+        size        => 255,
+        is_nullable => 1,
+    },
+    phone => {
+        data_type   => 'varchar',
+        size        => 100,
+        is_nullable => 1,
+    },
+    address => {
+        data_type   => 'text',
+        is_nullable => 1,
+    },
+    website => {
+        data_type   => 'varchar',
+        size        => 255,
+        is_nullable => 1,
+    },
+    lead_time_days => {
+        data_type     => 'integer',
+        is_nullable   => 1,
+        default_value => 0,
+    },
+    status => {
+        data_type     => 'varchar',
+        size          => 50,
+        is_nullable   => 0,
+        default_value => 'active',
+    },
+    notes => {
+        data_type   => 'text',
+        is_nullable => 1,
+    },
+    created_by => {
+        data_type   => 'varchar',
+        size        => 255,
+        is_nullable => 1,
+    },
+    created_at => {
+        data_type     => 'datetime',
+        is_nullable   => 1,
+        set_on_create => 1,
+    },
+    updated_at => {
+        data_type     => 'datetime',
+        is_nullable   => 1,
+        set_on_create => 1,
+        set_on_update => 1,
+    },
+);
+
+__PACKAGE__->set_primary_key('id');
+
+__PACKAGE__->has_many(
+    'item_suppliers' => 'Comserv::Model::Schema::Ency::Result::InventoryItemSupplier',
+    { 'foreign.supplier_id' => 'self.id' },
+    { cascade_delete => 1 }
+);
+
+__PACKAGE__->many_to_many(
+    'items' => 'item_suppliers', 'item'
+);
+
+1;

@@ -1,0 +1,155 @@
+[% META
+   title = "My Membership"
+   description = "View and manage your membership account"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.02"
+   last_updated = "2026-03-19"
+%]
+[% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>My Membership</h1>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <!-- ── Points Balance ─────────────────────────── -->
+      <div class="content-section">
+        <h2>My Points</h2>
+        <p>Balance: <strong style="font-size:1.15em;color:var(--success-color,#27ae60)">[% point_balance | format('%.2f') %] points</strong></p>
+        <p style="font-size:0.85em;color:#888">1 point = 1 CAD &mdash; use points to pay for memberships and services.</p>
+        <div class="form-actions">
+          <a href="[% c.uri_for('/payment/buy/coins') %]" class="btn btn-primary">Buy Points</a>
+          <a href="[% c.uri_for('/payment/balance') %]" class="btn btn-secondary">Transaction History</a>
+        </div>
+      </div>
+
+      <!-- ── Subscriptions ──────────────────────────── -->
+      [% IF memberships.size %]
+      <div class="content-section">
+        <h2>Subscriptions</h2>
+
+        [% FOREACH m IN memberships %]
+        [%# Compute days-until-expiry and whether balance covers renewal %]
+        [% SET days_left = 9999 %]
+        [% SET renewal_cost = m.billing_cycle == 'annual' ? m.plan.price_annual : m.plan.price_monthly %]
+        [% SET coin_ok = point_balance >= renewal_cost %]
+
+        <div class="content-section" style="margin-bottom:1rem;border:1px solid var(--border-color,#ddd);border-radius:6px;padding:1rem">
+
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem">
+            <div>
+              <strong style="font-size:1.1em">[% m.plan.name | html %]</strong>
+              <span style="margin-left:0.5rem;padding:2px 8px;border-radius:10px;font-size:0.8em;
+                           background:[% m.status == 'active' ? '#d4edda' : '#fff3cd' %];
+                           color:[% m.status == 'active' ? '#155724' : '#856404' %]">
+                [% m.status | html %]
+              </span>
+            </div>
+            <div style="font-size:0.88em;color:#666;text-align:right">
+              [% m.billing_cycle | ucfirst | html %] &bull;
+              Expires: <strong>[% m.expires_at ? m.expires_at : 'Never' | html %]</strong>
+            </div>
+          </div>
+
+          [%# Low-balance warning %]
+          [% IF m.expires_at && m.status == 'active' && !coin_ok && renewal_cost > 0 %]
+          <div style="margin-top:0.75rem;padding:0.6rem 0.9rem;border:1px solid #f0ad4e;border-radius:5px;background:#fffde7;font-size:0.9em">
+            <strong>Low balance warning:</strong>
+            Your point balance ([% point_balance | format('%.2f') %] points) may not cover the
+            next renewal cost of <strong>[% m.plan.price_currency | html %] [% renewal_cost %]</strong>.
+            <a href="[% c.uri_for('/payment/buy/coins') %]">Top up points</a> or enable auto-pay below.
+          </div>
+          [% END %]
+
+          <div style="margin-top:0.6rem;font-size:0.88em;color:#555">
+            Provider: [% m.payment_provider | html %] &bull;
+            Started: [% m.started_at | html %]
+          </div>
+
+          [% IF m.plan.has_hosting %]
+          <div style="margin-top:0.6rem">
+            <a href="[% c.uri_for('/hosting/renew', { site_id => m.site_id }) %]"
+               class="btn btn-secondary" style="font-size:0.88em;padding:0.3rem 0.8rem">
+              Renew Hosting
+            </a>
+          </div>
+          [% END %]
+
+          <!-- ── Auto-pay settings ── -->
+          <div style="margin-top:1rem;padding:0.75rem;background:rgba(0,0,0,0.03);border-radius:5px;border:1px solid var(--border-color,#e0e0e0)">
+            <strong style="font-size:0.95em">Auto-Pay Settings</strong>
+            <form method="post" action="[% c.uri_for('/membership/autopay_settings') %]" style="margin-top:0.5rem">
+              <input type="hidden" name="membership_id" value="[% m.id %]">
+
+              <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;margin-bottom:0.5rem">
+                <input type="checkbox" name="autopay_enabled" value="1"
+                       [% 'checked' IF m.autopay_enabled %]
+                       onchange="this.form.querySelector('.autopay-options').style.display=this.checked?'block':'none'">
+                <span>Enable auto-pay for this subscription</span>
+              </label>
+
+              <div class="autopay-options" style="display:[% m.autopay_enabled ? 'block' : 'none' %];padding-left:1.5rem">
+
+                <div style="margin-bottom:0.5rem">
+                  <label style="font-size:0.88em"><strong>Pay using:</strong></label><br>
+                  <label style="margin-right:1rem;cursor:pointer">
+                    <input type="radio" name="autopay_method" value="coins"
+                           [% 'checked' IF !m.autopay_method || m.autopay_method == 'coins' %]>
+                    Site Coins (instant, from balance)
+                  </label>
+                  <label style="cursor:pointer">
+                    <input type="radio" name="autopay_method" value="paypal"
+                           [% 'checked' IF m.autopay_method == 'paypal' %]>
+                    PayPal (charges your PayPal account)
+                  </label>
+                </div>
+
+                <div style="margin-bottom:0.5rem;font-size:0.88em">
+                  <label for="topup_[% m.id %]"><strong>Coin top-up amount</strong> (if balance is low):</label><br>
+                  <select id="topup_[% m.id %]" name="autopay_topup_coins"
+                          style="padding:0.3rem 0.5rem;border:1px solid var(--border-color,#ccc);border-radius:4px;margin-top:0.2rem">
+                    <option value="0"  [% 'selected' IF m.autopay_topup_coins == 0  %]>Exact amount needed</option>
+                    <option value="100" [% 'selected' IF m.autopay_topup_coins == 100 %]>100 coins (~$1 CAD buffer)</option>
+                    <option value="500" [% 'selected' IF m.autopay_topup_coins == 500 %]>500 coins (~$5 CAD)</option>
+                    <option value="1000" [% 'selected' IF m.autopay_topup_coins == 1000 %]>1,000 coins (~$10 CAD)</option>
+                    <option value="2500" [% 'selected' IF m.autopay_topup_coins == 2500 %]>2,500 coins (~$25 CAD)</option>
+                  </select>
+                  <span style="color:#888;margin-left:0.4rem;font-size:0.9em">— extra coins added to your balance each renewal</span>
+                </div>
+
+                <p style="font-size:0.82em;color:#888;margin:0">
+                  You will receive an email 7 days before renewal if your balance is low.
+                  If auto-pay is enabled and coins are sufficient, renewal happens automatically.
+                  PayPal auto-charge requires your PayPal account to support reference transactions.
+                </p>
+              </div>
+
+              <div class="form-actions" style="margin-top:0.5rem">
+                <button type="submit" class="btn btn-primary" style="padding:0.35rem 0.9rem;font-size:0.9em">Save</button>
+              </div>
+            </form>
+          </div>
+
+        </div>
+        [% END %]
+      </div>
+
+      [% ELSE %]
+      <div class="content-section">
+        <p class="empty-state">You have no active memberships.</p>
+        <div class="form-actions">
+          <a href="[% c.uri_for('/membership') %]" class="btn btn-primary">View Plans</a>
+        </div>
+      </div>
+      [% END %]
+
+    </div>
+  </div>
+</div>

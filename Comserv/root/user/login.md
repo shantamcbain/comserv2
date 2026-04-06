@@ -1,0 +1,35 @@
+[% PageVersion = 'login.tt,v 0.01 2023/09/01 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+[% IF c.session.success_msg %]
+    <p class="success">[% c.session.success_msg %]</p>
+[% END %]
+[% IF c.flash.success_msg %]
+    <p class="success">[% c.flash.success_msg %]</p>
+[% END %]
+<!-- Display error message if it exists -->
+[% IF c.stash.error_msg %]
+    <p class="error">[% c.stash.error_msg %]</p>
+[% END %]
+
+<!-- root/src/login.tt2 -->
+<form method="post" action="/user/do_login">
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" required>
+
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" required>
+
+    <!-- Add a hidden field to help with debugging -->
+    <input type="hidden" name="form_source" value="login_form">
+
+    <input type="submit" value="Login">
+</form>
+
+<!-- Add a Register button that links to the register page -->
+<a href="/user/register" class="register-button">Register</a>
+
+<!-- Add a Change Password button that links to the change_password page -->
+<a href="/user/change_password_request" class="change-password-button">Change Password</a>

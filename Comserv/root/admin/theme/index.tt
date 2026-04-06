@@ -133,19 +133,35 @@
 
             <!-- Favicon -->
             <div class="app-section">
-                <h2>Browser Tab Icon (Favicon)</h2>
+                <h2>Browser Tab Icons (Favicons)</h2>
+
+                <p><strong>Port favicons</strong> are generated automatically — when the URL includes a non-standard
+                port (e.g. :3000, :3001) the browser tab shows a coloured badge with that port number.
+                Each port gets a unique colour so you can instantly tell which server you are on.</p>
+
+                <div class="favicon-port-row">
+                    [% FOREACH p IN [3000, 3001, 3002, 3003, 8080, 8443] %]
+                    <span style="display:inline-flex;flex-direction:column;align-items:center;margin:4px 8px;gap:4px;">
+                        <img src="/favicon/port/[% p %]" alt="port [% p %]"
+                             style="width:32px;height:32px;border:1px solid #ccc;border-radius:4px;">
+                        <span style="font-size:11px;color:#666;">:[% p %]</span>
+                    </span>
+                    [% END %]
+                </div>
+
+                <h3 style="margin-top:16px;">Site favicon (no port)</h3>
                 <form action="[% c.uri_for('/admin/theme/set_favicon') %]" method="POST"
                       enctype="multipart/form-data" class="app-form">
                     <div class="form-row" style="align-items:center;">
                         <div class="form-field" style="flex:0 0 auto;">
                             [% IF site_favicon %]
-                            <img src="[% site_favicon %]" alt="favicon" style="width:32px;height:32px;border:1px solid #ccc;">
+                            <img src="[% site_favicon %]" alt="site favicon" style="width:32px;height:32px;border:1px solid #ccc;">
                             [% ELSE %]
-                            <img src="/static/images/favicon.ico" alt="favicon" style="width:32px;height:32px;border:1px solid #ccc;">
+                            <img src="/static/images/favicon.ico" alt="default favicon" style="width:32px;height:32px;border:1px solid #ccc;">
                             [% END %]
                         </div>
                         <div class="form-field">
-                            <label for="favicon_file">Upload icon (.ico / .png / .svg)</label>
+                            <label for="favicon_file">Upload (.ico / .png / .svg)</label>
                             <input type="file" id="favicon_file" name="favicon_file"
                                    class="form-input" accept=".ico,.png,.svg,.gif">
                         </div>
@@ -157,6 +173,50 @@
                         </div>
                         <div class="form-field" style="flex:0 0 auto;">
                             <button type="submit" class="btn btn-primary">Set Icon</button>
+                        </div>
+                    </div>
+                </form>
+
+                <h3 style="margin-top:16px;">Domain favicon (overrides site favicon)</h3>
+                <p style="font-size:13px;color:#555;">
+                    Set a unique icon for a specific domain hostname (e.g. <em>[% req_host %]</em>).
+                    Domain icons take priority over the site icon when no port is in the URL.
+                </p>
+                [% IF domain_favicons.keys.size %]
+                <table class="app-table" style="margin-bottom:12px;">
+                    <thead><tr><th>Domain</th><th>Icon</th></tr></thead>
+                    <tbody>
+                    [% FOREACH d IN domain_favicons.keys.sort %]
+                    <tr>
+                        <td>[% d %]</td>
+                        <td><img src="[% domain_favicons.$d %]" alt="[% d %]"
+                                 style="width:28px;height:28px;border:1px solid #ccc;"></td>
+                    </tr>
+                    [% END %]
+                    </tbody>
+                </table>
+                [% END %]
+                <form action="[% c.uri_for('/admin/theme/set_domain_favicon') %]" method="POST"
+                      enctype="multipart/form-data" class="app-form">
+                    <div class="form-row" style="align-items:center;">
+                        <div class="form-field">
+                            <label for="domain">Domain hostname</label>
+                            <input type="text" id="domain" name="domain"
+                                   class="form-input" placeholder="[% req_host %]"
+                                   value="[% req_host %]">
+                        </div>
+                        <div class="form-field">
+                            <label for="domain_favicon_file">Upload (.ico / .png / .svg)</label>
+                            <input type="file" id="domain_favicon_file" name="favicon_file"
+                                   class="form-input" accept=".ico,.png,.svg,.gif">
+                        </div>
+                        <div class="form-field">
+                            <label for="domain_favicon_url">Or URL</label>
+                            <input type="text" id="domain_favicon_url" name="favicon_url"
+                                   class="form-input" placeholder="/static/images/icon.png">
+                        </div>
+                        <div class="form-field" style="flex:0 0 auto;">
+                            <button type="submit" class="btn btn-primary">Set Domain Icon</button>
                         </div>
                     </div>
                 </form>

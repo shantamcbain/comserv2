@@ -1,0 +1,81 @@
+[% #CSC SiteNaveView
+#	$Id: ENCYSiteNaveView.ttml,v 1.2 2002/05/17 21:42:33 shanta Exp shanta $	
+
+# this template generates the top of HTML,
+
+# if -PAGE_TITLE is defined, it gets used in the <title>
+
+# if -SCRIPT_DISPLAY_NAME is defined, it gets used in the <title>
+
+# if -CSS_VIEW_URL is defined, the CSS link is created.
+
+# if -APPLICATION_SUB_MENU_VIEW_NAME is defined, the corresponding
+# template gets embedded
+
+# also see various other logo values below
+
+#Set needed values
+
+%]
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+	[% session_string = "session_id=$session_id" %]
+
+[% END %]
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+[% sitename = data.session_object.getAttribute('-KEY','SiteName') %]
+
+
+
+
+<style type="text/css">
+<!--
+
+.combobox {
+background-color: #FFFFFF;
+color: #808080;
+font-size: 10pt;
+font-family: arial;
+font-weight: bold;
+}
+
+-->
+</style>
+
+
+
+
+
+
+<form>
+<td width="100%" >
+<select class="combobox" name="SiteMap" onchange="if(options[selectedIndex].value){location = options[selectedIndex].value}" size="1">
+<option selected>SiteMap  </option>
+[% IF sitename == 'VitalVic' %]
+<option value="/cgi-bin/VitalVic/vitalvic.cgi?[%session_string%]">Home</option>
+[% END %]
+
+<option value="/cgi-bin/ENCY/ency.cgi?[%session_string%]">ENCY</option>
+
+<option value="/cgi-bin/ENCY/webcal.cgi?[%session_string%]">Calendar</option>
+<option value="/cgi-bin/ENCY/herbs.cgi?[%session_string%]">Herbs</option>
+<option value="/cgi-bin/ENCY/diseases.cgi?[%session_string%]">Diseases</option>
+<option value="/cgi-bin/ENCY/faq.cgi?[%session_string%]">FAQ</option>
+<option value="/cgi-bin/ENCY/formulas.cgi?[%session_string%]">Formulas</option>
+<option value="/cgi-bin/ENCY/bbs.cgi?[%session_string%]">Forums</option>
+<option value="/cgi-bin/ENCY/glossary.cgi?[%session_string%]">Glossary</option>
+<option value="/cgi-bin/ENCY/news.cgi?[%session_string%]">News</option>
+<option value="/cgi-bin/ENCY/url.cgi?[%session_string%]">URL DB</option>
+<option value="/cgi-bin/CSC/helpdesk.cgi?[%session_string%]&site=ENCY">HelpDesk</option>
+</select>
+
+
+</form>
+
+
+
