@@ -233,7 +233,10 @@
         "text-color": "#000000",
         "primary-color": "#ccffff",
         "warning-color": "red",
-        "body-font": "Arial, sans-serif"
+        "body-font": "Arial, sans-serif",
+        "background-image": "url(/static/images/BMaster/honey2.jpg)",
+        "background-repeat": "repeat",
+        "background-attachment": "scroll"
       },
       "name": "APIS Theme",
       "description": "Beekeeping theme with honeycomb pattern",
@@ -255,7 +258,7 @@
         }
       },
       "special_styles": {
-        "body": "background-image: url(../images/BMaster/honey2.jpg);"
+        "body": "background-image: url(/static/images/BMaster/honey2.jpg);"
       }
     }
   },
