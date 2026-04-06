@@ -71,9 +71,9 @@ sub get_weather_config {
     my $config;
     eval {
         my @priorities;
-        push @priorities, { user_id => $user_id, site_id => $site_id, is_active => 1 }
+        push @priorities, { user_id => $user_id, site_id => $site_id, is_active => '1' }
             if $user_id && $site_id;
-        push @priorities, { user_id => 0, site_id => 0, is_active => 1 };
+        push @priorities, { user_id => 0, site_id => 0, is_active => '1' };
 
         for my $where (@priorities) {
             my $row = $schema->resultset('WeatherConfig')->search(
