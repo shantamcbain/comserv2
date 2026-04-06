@@ -8,16 +8,19 @@
     <header class="weather-header">
         <div class="weather-header-left">
             <h1><i class="fas fa-cloud-sun"></i>
-                [% IF current_weather && current_weather.location %]
-                    Weather — [% current_weather.location | html %]
+                [% SET loc = current_weather.location || weather_config.location_value %]
+                [% IF loc && loc != 'Unknown Location' %]
+                    Weather — [% loc | html %]
                 [% ELSE %]
                     Weather Dashboard
                 [% END %]
             </h1>
-            [% IF current_weather && current_weather.data_source %]
+            [% IF current_weather && current_weather.data_source && current_weather.data_source != 'MOCK_DATA' %]
             <small class="text-muted">
                 [% IF current_weather.data_source == 'DATABASE' || current_weather.data_source == 'CACHED_FALLBACK' %]
                     <i class="fas fa-database"></i> Updated from database cache
+                [% ELSIF current_weather.data_source == 'SESSION_CACHE' %]
+                    <i class="fas fa-clock"></i> Showing last known conditions (DB temporarily unavailable)
                 [% ELSE %]
                     <i class="fas fa-wifi"></i> Live from [% current_weather.data_source | html %]
                 [% END %]
