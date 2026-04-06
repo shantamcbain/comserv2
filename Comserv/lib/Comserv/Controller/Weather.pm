@@ -78,6 +78,19 @@ sub index :Path('/Weather') :Args(0) {
             undef;
         };
 
+        # If DB returned mock/no data, fall back to session-cached weather
+        if (!$current_weather || ($current_weather->{data_source} && $current_weather->{data_source} eq 'MOCK_DATA')) {
+            if ($c->session->{last_weather}) {
+                $current_weather = $c->session->{last_weather};
+                $current_weather->{data_source} = 'SESSION_CACHE';
+            } else {
+                $current_weather = undef;
+            }
+        } else {
+            # Cache good data in session for fallback
+            $c->session->{last_weather} = $current_weather;
+        }
+
         $weather_config = try {
             $self->weather_model->get_weather_config();
         } catch { undef };
