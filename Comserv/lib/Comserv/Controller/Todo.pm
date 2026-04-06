@@ -1808,8 +1808,9 @@ sub quick_close :Path('quick_close') :Args(0) {
             priority        => $todo->priority || 5,
             last_mod_by     => $username,
             last_mod_date   => $today,
-            group_of_poster => $c->session->{group} || '',
-            comments        => '',
+            group_of_poster  => $c->session->{group} || '',
+            comments         => '',
+            points_processed => 0,
         });
     };
     if ($@) {
