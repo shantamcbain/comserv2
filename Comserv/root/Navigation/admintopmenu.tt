@@ -28,6 +28,7 @@
                 <a href="/log"><i class="icon-log"></i>Open Log</a>
                 <a href="/Documentation/Planning"><i class="icon-planning"></i>Planning</a>
                 <a href='/ProxyManager'><i class="icon-proxy"></i>Proxy Manager</a>
+                <a href="/admin/compare_schema"><i class="icon-schema"></i>Schema Compare</a>
                 <a href='/admin/view_log'><i class="icon-view"></i>View Log</a>
             </div>
         </div>
@@ -240,11 +241,11 @@
                 <!-- System Configuration -->
                 <div class="submenu-section">
                     <span class="submenu-section-title">System Configuration</span>
-                    <a href="/css_form"><i class="icon-css"></i>CSS Settings</a>
-                    <a href="/display_schema"><i class="icon-schema"></i>Database Schema</a>
-                    <a href="/mail/add_mail_config_form"><i class="icon-mail-config"></i>Mail Configuration</a>
                     <a href="/ApiCredentials"><i class="icon-key"></i>API Credentials</a>
                     <a href="/cloudflareapi"><i class="icon-cloud"></i>Cloudflare DNS</a>
+                    <a href="/css_form"><i class="icon-css"></i>CSS Settings</a>
+                    <a href="/admin/compare_schema"><i class="icon-schema"></i>Database Schema Compare</a>
+                    <a href="/mail/add_mail_config_form"><i class="icon-mail-config"></i>Mail Configuration</a>
                 </div>
                 
                 <!-- Network Management -->
