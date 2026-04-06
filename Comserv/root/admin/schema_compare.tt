@@ -988,12 +988,12 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
                 const hasDifferences = !resultMissing && (
                     formatDataType(tableField.data_type) !== formatDataType(resultField.data_type) ||
                     formatSize(tableField.data_type, tableField.size) !== formatSize(resultField.data_type, resultField.size) ||
-                    tableField.is_nullable !== resultField.is_nullable ||
-                    tableField.is_auto_increment !== resultField.is_auto_increment ||
-                    tableField.is_primary_key !== resultField.is_primary_key ||
-                    tableField.is_foreign_key !== resultField.is_foreign_key ||
-                    tableField.default_value !== resultField.default_value ||
-                    tableField.extra !== resultField.extra
+                    !!tableField.is_nullable !== !!resultField.is_nullable ||
+                    !!tableField.is_auto_increment !== !!resultField.is_auto_increment ||
+                    !!tableField.is_primary_key !== !!resultField.is_primary_key ||
+                    !!tableField.is_foreign_key !== !!resultField.is_foreign_key ||
+                    String(tableField.default_value ?? '') !== String(resultField.default_value ?? '') ||
+                    String(tableField.extra ?? '') !== String(resultField.extra ?? '')
                 );
                 
                 html += '<tr class="table-row' + (hasDifferences ? ' has-differences' : '') + '">';
@@ -1003,12 +1003,12 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
                 // Add difference highlighting to individual cells
                 const dataTypeDiff = !resultMissing && formatDataType(tableField.data_type) !== formatDataType(resultField.data_type);
                 const sizeDiff = !resultMissing && formatSize(tableField.data_type, tableField.size) !== formatSize(resultField.data_type, resultField.size);
-                const nullableDiff = !resultMissing && tableField.is_nullable !== resultField.is_nullable;
-                const autoIncDiff = !resultMissing && tableField.is_auto_increment !== resultField.is_auto_increment;
-                const pkDiff = !resultMissing && tableField.is_primary_key !== resultField.is_primary_key;
-                const fkDiff = !resultMissing && tableField.is_foreign_key !== resultField.is_foreign_key;
-                const defaultDiff = !resultMissing && tableField.default_value !== resultField.default_value;
-                const extraDiff = !resultMissing && tableField.extra !== resultField.extra;
+                const nullableDiff = !resultMissing && !!tableField.is_nullable !== !!resultField.is_nullable;
+                const autoIncDiff = !resultMissing && !!tableField.is_auto_increment !== !!resultField.is_auto_increment;
+                const pkDiff = !resultMissing && !!tableField.is_primary_key !== !!resultField.is_primary_key;
+                const fkDiff = !resultMissing && !!tableField.is_foreign_key !== !!resultField.is_foreign_key;
+                const defaultDiff = !resultMissing && String(tableField.default_value ?? '') !== String(resultField.default_value ?? '');
+                const extraDiff = !resultMissing && String(tableField.extra ?? '') !== String(resultField.extra ?? '');
                 
                 html += '<td class="data-type-column' + (dataTypeDiff ? ' field-different' : '') + '">' + formatDataType(tableField.data_type) + '</td>';
                 html += '<td class="size-column' + (sizeDiff ? ' field-different' : '') + '">' + formatSize(tableField.data_type, tableField.size) + '</td>';
@@ -1041,12 +1041,12 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
                 const hasDifferences = tableMissing || (
                     formatDataType(tableField.data_type) !== formatDataType(resultField.data_type) ||
                     formatSize(tableField.data_type, tableField.size) !== formatSize(resultField.data_type, resultField.size) ||
-                    tableField.is_nullable !== resultField.is_nullable ||
-                    tableField.is_auto_increment !== resultField.is_auto_increment ||
-                    tableField.is_primary_key !== resultField.is_primary_key ||
-                    tableField.is_foreign_key !== resultField.is_foreign_key ||
-                    tableField.default_value !== resultField.default_value ||
-                    tableField.extra !== resultField.extra
+                    !!tableField.is_nullable !== !!resultField.is_nullable ||
+                    !!tableField.is_auto_increment !== !!resultField.is_auto_increment ||
+                    !!tableField.is_primary_key !== !!resultField.is_primary_key ||
+                    !!tableField.is_foreign_key !== !!resultField.is_foreign_key ||
+                    String(tableField.default_value ?? '') !== String(resultField.default_value ?? '') ||
+                    String(tableField.extra ?? '') !== String(resultField.extra ?? '')
                 );
                 
                 html += '<tr class="result-row' + (hasDifferences ? ' has-differences' : '') + '">';
@@ -1056,12 +1056,12 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
                 // Add difference highlighting to individual cells
                 const dataTypeDiff = !tableMissing && formatDataType(tableField.data_type) !== formatDataType(resultField.data_type);
                 const sizeDiff = !tableMissing && formatSize(tableField.data_type, tableField.size) !== formatSize(resultField.data_type, resultField.size);
-                const nullableDiff = !tableMissing && tableField.is_nullable !== resultField.is_nullable;
-                const autoIncDiff = !tableMissing && tableField.is_auto_increment !== resultField.is_auto_increment;
-                const pkDiff = !tableMissing && tableField.is_primary_key !== resultField.is_primary_key;
-                const fkDiff = !tableMissing && tableField.is_foreign_key !== resultField.is_foreign_key;
-                const defaultDiff = !tableMissing && tableField.default_value !== resultField.default_value;
-                const extraDiff = !tableMissing && tableField.extra !== resultField.extra;
+                const nullableDiff = !tableMissing && !!tableField.is_nullable !== !!resultField.is_nullable;
+                const autoIncDiff = !tableMissing && !!tableField.is_auto_increment !== !!resultField.is_auto_increment;
+                const pkDiff = !tableMissing && !!tableField.is_primary_key !== !!resultField.is_primary_key;
+                const fkDiff = !tableMissing && !!tableField.is_foreign_key !== !!resultField.is_foreign_key;
+                const defaultDiff = !tableMissing && String(tableField.default_value ?? '') !== String(resultField.default_value ?? '');
+                const extraDiff = !tableMissing && String(tableField.extra ?? '') !== String(resultField.extra ?? '');
                 
                 html += '<td class="data-type-column' + (dataTypeDiff ? ' field-different' : '') + '">' + formatDataType(resultField.data_type) + '</td>';
                 html += '<td class="size-column' + (sizeDiff ? ' field-different' : '') + '">' + formatSize(resultField.data_type, resultField.size) + '</td>';

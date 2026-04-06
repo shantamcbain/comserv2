@@ -2018,13 +2018,22 @@ sub compare_field_attributes {
 
 sub normalize_field_value {
     my ($self, $attribute, $value) = @_;
+
+    # is_* booleans: undef means "not set" = false = 0, so normalise BEFORE the undef-guard
+    if ($attribute =~ /^is_/) {
+        return (defined $value && $value) ? 1 : 0;
+    }
+
+    # extra: undef and '' are both "nothing extra" — treat as equal
+    if ($attribute eq 'extra') {
+        return '' unless defined $value;
+        return ref($value) ? '' : "$value";
+    }
+
     return undef unless defined $value;
-    
+
     if ($attribute eq 'data_type') {
         return $self->normalize_data_type($value);
-    }
-    if ($attribute =~ /^is_/) {
-        return $value ? 1 : 0;
     }
     if ($attribute eq 'size') {
         return "$value" if $value =~ /^[\d,]+$/;
