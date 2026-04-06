@@ -4,19 +4,14 @@ use warnings;
 use FindBin;
 use lib "$FindBin::Bin/../lib";
 
-# Load the Catalyst application
 use Comserv;
+use Plack::Builder;
 
-# Return the PSGI app for Starman/Plack
 my $app = Comserv->psgi_app;
 
-# Optional: enable common middleware here if needed in future
-# use Plack::Builder;
-# my $wrapped = builder {
-#     enable 'AccessLog';
-#     enable 'ContentLength';
-#     $app;
-# };
-# return $wrapped;
+my $wrapped = builder {
+    enable 'ReverseProxy';
+    $app;
+};
 
-return $app;
+return $wrapped;

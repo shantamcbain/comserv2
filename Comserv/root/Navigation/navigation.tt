@@ -17,20 +17,23 @@
         <!-- Login/Logout -->
         [% INCLUDE 'Navigation/TopDropListLogin.tt' %]
         
-        <!-- Global Menu -->
-        [% INCLUDE 'Navigation/TopDropListGlobal.tt' %]
+        [%# Global Menu discontinued — Mail/Jobs/Join moved to Main %]
+        [% IF 0 %][% INCLUDE 'Navigation/TopDropListGlobal.tt' %][% END %]
         
         <!-- Hosted Menu -->
         [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
         
         <!-- Member Menu -->
         [% INCLUDE 'Navigation/TopDropListMember.tt' %]
+
+        <!-- ENCY Encyclopedia -->
+        [% INCLUDE 'Navigation/TopDropListENCY.tt' %]
         
         <!-- Weather Menu -->
         [% INCLUDE 'Navigation/TopDropListWeather.tt' %]
         
-        <!-- IT Menu -->
-        [% INCLUDE 'Navigation/TopDropListIT.tt' %]
+        [%# IT Menu discontinued — IT content moved to HelpDesk submenu %]
+        [% IF 0 %][% INCLUDE 'Navigation/TopDropListIT.tt' %][% END %]
         
         <!-- Admin Menu (only for admin users) -->
         [% user_roles = c.controller('Navigation').get_user_roles(c) %]
@@ -38,6 +41,9 @@
             [% INCLUDE 'Navigation/admintopmenu.tt' %]
         [% END %]
         
+        <!-- Planning Menu (logged-in users with planning access only) -->
+        [% INCLUDE 'Navigation/TopDropListPlanning.tt' %]
+
         <!-- HelpDesk Menu -->
         [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
         

@@ -1,0 +1,342 @@
+[%
+   title        = "Disk Diagnose — " _ hostname _ " " _ path
+   description  = "Find and remedy disk space usage"
+   roles        = "admin"
+   TemplateType = "Application"
+   category     = "Admin"
+   page_version = "0.03"
+   last_updated = "2026-04-01"
+%]
+[% PageVersion = 'admin/HardwareMonitor/disk_diagnose.tt,v 0.03 2026/04/01 AI Exp AI ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+<style>
+.dd-crumb   { font-size:.9em; color:#555; margin-bottom:10px; }
+.dd-crumb a { color:#2196f3; text-decoration:none; }
+.dd-crumb a:hover { text-decoration:underline; }
+.dd-table   { width:100%; border-collapse:collapse; font-size:.9em; }
+.dd-table th { background:#f0f0f0; text-align:left; padding:6px 10px; border-bottom:2px solid #ccc; white-space:nowrap; }
+.dd-table td { padding:5px 10px; border-bottom:1px solid #eee; vertical-align:middle; }
+.dd-table tr:hover { background:#fafafa; }
+.dd-table td.dd-cb-col { width:28px; text-align:center; padding:0 6px; }
+.dd-table th.dd-cb-col { width:28px; text-align:center; padding:0 6px; }
+.dd-bar-wrap { width:120px; background:#e8e8e8; border-radius:3px; height:14px; display:inline-block; vertical-align:middle; position:relative; }
+.dd-bar      { height:14px; border-radius:3px; background:#2196f3; }
+.dd-bar-lbl  { position:absolute; right:4px; top:0; line-height:14px; font-size:.72em; color:#fff; font-weight:bold; mix-blend-mode:difference; white-space:nowrap; pointer-events:none; }
+.dd-table th.sortable { cursor:pointer; user-select:none; }
+.dd-table th.sortable:hover { background:#e0e0e0; }
+.dd-sort-asc::after  { content:' ▲'; font-size:.75em; }
+.dd-sort-desc::after { content:' ▼'; font-size:.75em; }
+.dd-actions  { display:flex; gap:6px; flex-wrap:wrap; }
+.dd-btn      { font-size:.78em; padding:2px 8px; border:1px solid #ccc; border-radius:3px; cursor:pointer; background:#fff; white-space:nowrap; }
+.dd-btn-del  { border-color:#f44336; color:#f44336; }
+.dd-btn-del:hover { background:#f44336; color:#fff; }
+.dd-btn-nfs  { border-color:#4caf50; color:#4caf50; }
+.dd-btn-nfs:hover { background:#4caf50; color:#fff; }
+.dd-btn-drill { border-color:#1976d2; color:#1976d2; }
+.dd-btn-drill:hover { background:#1976d2; color:#fff; }
+.dd-confirm  { display:none; background:#fff8e1; border:1px solid #ffe082; border-radius:4px; padding:8px 12px; margin-top:6px; font-size:.85em; }
+.dd-result   { padding:10px 14px; border-radius:4px; margin-bottom:12px; font-size:.9em; }
+.dd-ok       { background:#d4edda; border:1px solid #c3e6cb; color:#155724; }
+.dd-err      { background:#f8d7da; border:1px solid #f5c6cb; color:#721c24; }
+.dd-ssh-hint { font-family:monospace; background:#222; color:#eee; padding:8px; border-radius:4px; font-size:.85em; margin-top:6px; overflow-x:auto; }
+.dd-bulk-bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:7px 10px;
+               background:#fff8e1; border:1px solid #ffe082; border-radius:4px; margin-bottom:8px; font-size:.85em; }
+.dd-bulk-bar button { font-size:.82em; }
+.dd-sel-count { color:#c0720a; font-weight:bold; }
+.dd-help-toggle { font-size:.82em; color:#1976d2; cursor:pointer; text-decoration:underline; margin-left:12px; }
+.dd-help-panel { background:#e8f4ff; border:1px solid #90caf9; border-radius:4px;
+                 padding:12px 16px; margin-bottom:14px; font-size:.82em; line-height:1.6; }
+.dd-help-panel dl { margin:0; }
+.dd-help-panel dt { font-weight:bold; color:#0d47a1; margin-top:8px; }
+.dd-help-panel dd { margin-left:12px; color:#333; }
+</style>
+
+<div style="margin-bottom:10px;">
+  <a href="/admin/hardware_monitor">&larr; Hardware Monitor</a>
+</div>
+
+<h2>&#128202; Disk Diagnose: <code>[% hostname | html %]</code>
+  <span class="dd-help-toggle" id="dd-help-lbl" onclick="ddToggleHelp()">&#8743; Hide Help</span>
+</h2>
+
+<div class="dd-help-panel" id="dd-help">
+  <strong>How this page works</strong>
+  <dl>
+    <dt>&#128202; This listing</dt>
+    <dd>Shows how much disk space each item in the current directory uses, sorted largest first.
+        Click column headers to re-sort. The bar shows size relative to the largest item on screen.</dd>
+    <dt>&#128193; Manage (green)</dt>
+    <dd>Opens the <strong>File Browser</strong> for that directory or file location.
+        In the File Browser you can: rename, move, download, delete individual files,
+        and use <strong>+DB</strong> to register a file in the application database.</dd>
+    <dt>&#9658; Drill in (blue)</dt>
+    <dd>Stays in this Disk Diagnose view but navigates <em>into</em> that directory,
+        showing sizes of its contents. Use this to find what is consuming space.</dd>
+    <dt>&#128465; Delete (red)</dt>
+    <dd>Permanently removes the file or directory (and everything inside) from disk.
+        A confirmation prompt appears first. <strong>This cannot be undone.</strong></dd>
+    <dt>&#9745; Multi-select + Delete Selected</dt>
+    <dd>Check the boxes on the left of each row, then click <em>Delete Selected</em>
+        to remove multiple items in one operation. Requires confirmation.</dd>
+    <dt>+DB (in File Browser)</dt>
+    <dd>Creates a database record for an NFS file so that application users can
+        <strong>search, view, and download</strong> it through the app.
+        The file <strong>stays on the server</strong> — nothing is copied.
+        You can set visibility (public / site / private), add a description,
+        and attach it to a workshop. If the file is already in the DB,
+        you are taken to its edit page to update its attributes.
+        Files on disk that are not in the DB are invisible to regular users.</dd>
+    <dt>Duplicate detection</dt>
+    <dd>When the same file (matched by name+size or SHA-256 hash) appears in multiple
+        locations, it is flagged as a duplicate. Use the
+        <a href="/file/duplicates">Duplicates page</a> to compare and clean them up.</dd>
+  </dl>
+</div>
+
+[%# Breadcrumb %]
+<div class="dd-crumb">
+  <a href="/admin/hardware_monitor/disk_diagnose?hostname=[% hostname | uri %]&amp;path=/">/</a>
+  [% FOR crumb IN crumb_parts %]
+  / <a href="/admin/hardware_monitor/disk_diagnose?hostname=[% hostname | uri %]&amp;path=[% crumb.path | uri %]">[% crumb.label | html %]</a>
+  [% END %]
+</div>
+
+[% IF action_result %]
+[%  SET is_ok = action_result.match('^(Deleted|Moved|Compressed)') %]
+<div class="dd-result [% is_ok ? 'dd-ok' : 'dd-err' %]">
+  [% action_result | html %]
+</div>
+[% END %]
+
+[% IF error %]
+<div class="dd-result dd-err">
+  <strong>Error:</strong> [% error | html %]
+  [% IF ssh_hint %]
+  <p style="margin:6px 0 2px;">You can run this manually:</p>
+  <div class="dd-ssh-hint">[% ssh_hint | html %]</div>
+  [% END %]
+</div>
+[% ELSIF entries.size == 0 %]
+<p style="color:#888;">Directory is empty or not accessible.</p>
+[% ELSE %]
+
+[%# Compute max bytes for relative bars %]
+[% max_bytes = entries.0.bytes || 1 %]
+
+[%# ── Bulk-delete form (hidden; JS populates and submits) ── %]
+<form id="dd-bulk-form" method="post" action="/admin/hardware_monitor/disk_diagnose" style="display:none">
+  <input type="hidden" name="hostname" value="[% hostname | html %]">
+  <input type="hidden" name="path"     value="[% path | html %]">
+  <input type="hidden" name="action"   value="delete_selected">
+  <div id="dd-bulk-targets"></div>
+</form>
+
+[%# ── Top bulk toolbar ── %]
+<div class="dd-bulk-bar">
+  <input type="checkbox" id="dd-sel-all" onchange="ddSelAll(this.checked)"
+         title="Select / deselect all visible rows" style="cursor:pointer">
+  <label for="dd-sel-all" style="cursor:pointer;margin-right:4px">Select All</label>
+  <button type="button" class="btn btn-sm btn-secondary" onclick="ddSelAll(false)">Clear</button>
+  <span style="color:#888">|</span>
+  <span class="dd-sel-count" id="dd-sel-count">0 selected</span>
+  <span style="color:#888">|</span>
+  <button type="button" class="btn btn-sm btn-delete" onclick="ddBulkDelete()"
+          title="Delete all checked items from disk (cannot be undone)">
+    &#128465; Delete Selected
+  </button>
+</div>
+
+<table class="dd-table" id="dd-tbl">
+<thead>
+  <tr>
+    <th class="dd-cb-col"></th>
+    <th class="sortable dd-sort-asc" data-col="1" onclick="sortTable(1)">Name</th>
+    <th class="sortable" data-col="2" style="text-align:right;" onclick="sortTable(2)">Size</th>
+    <th style="min-width:160px;">% of largest</th>
+    <th class="sortable" data-col="4" onclick="sortTable(4)">Type</th>
+    <th>Actions</th>
+  </tr>
+</thead>
+<tbody>
+[% FOR e IN entries %]
+[%  pct = max_bytes > 0 ? e.bytes / max_bytes * 100 : 0; pct = pct.int %]
+<tr id="row-[% loop.index %]" data-bytes="[% e.bytes %]" [% IF e.is_net %]style="background:#f0f4ff;opacity:.85;"[% END %]>
+  <td class="dd-cb-col">
+    [% UNLESS e.is_net %]
+    <input type="checkbox" class="dd-sel-cb" data-path="[% e.path | html %]"
+           onchange="ddUpdateCount()" title="Select for bulk delete"
+           style="cursor:pointer">
+    [% END %]
+  </td>
+  <td>
+    [% IF e.is_net %]
+    &#127760; <a href="/admin/hardware_monitor/disk_diagnose?hostname=[% hostname | uri %]&amp;path=[% e.path | uri %]"
+                title="Network mount — click to drill into it">[% e.name | html %]</a>
+    <span style="font-size:.75em;color:#1976d2;font-weight:bold;">[network]</span>
+    [% ELSIF e.is_dir %]
+    &#128193; <a href="/admin/hardware_monitor/disk_diagnose?hostname=[% hostname | uri %]&amp;path=[% e.path | uri %]"
+                title="Click to drill in and see what is using space inside">[% e.name | html %]</a>
+    [% ELSE %]
+    &#128196; [% e.name | html %]
+    [% END %]
+    <div style="font-size:.75em;color:#aaa;">[% e.path | html %]</div>
+  </td>
+  <td style="text-align:right;font-weight:bold;white-space:nowrap;">
+    [% e.size | html %]
+    [% IF e.is_net %]<div style="font-size:.7em;color:#888;font-weight:normal;">(not counted)</div>[% END %]
+  </td>
+  <td>
+    [% IF e.is_net %]
+    <div class="dd-bar-wrap"><div class="dd-bar" style="width:0%;background:#90caf9;"></div><span class="dd-bar-lbl" style="color:#1976d2;">network</span></div>
+    [% ELSE %]
+    <div class="dd-bar-wrap">
+      <div class="dd-bar" style="width:[% pct %]%; background:[% pct >= 80 ? '#e53935' : pct >= 50 ? '#fb8c00' : '#2196f3' %];"></div>
+      <span class="dd-bar-lbl">[% pct %]%</span>
+    </div>
+    [% END %]
+  </td>
+  <td style="font-size:.8em;color:#666;white-space:nowrap;">[% e.fstype | html %]</td>
+  <td>
+    <div class="dd-actions">
+      [% IF e.is_net %]
+      <a href="/admin/hardware_monitor/disk_diagnose?hostname=[% hostname | uri %]&amp;path=[% e.path | uri %]"
+         class="dd-btn dd-btn-drill"
+         title="Navigate into this network mount to see its disk usage">&#9658; Drill in</a>
+      [% ELSIF e.is_dir %]
+      <a href="/file/admin_browser?dir_path=[% e.path | uri %]"
+         class="dd-btn dd-btn-nfs"
+         title="Open File Browser for this directory — rename, move, +DB, download, delete files">&#128193; Manage</a>
+      <a href="/admin/hardware_monitor/disk_diagnose?hostname=[% hostname | uri %]&amp;path=[% e.path | uri %]"
+         class="dd-btn dd-btn-drill"
+         title="Stay in Disk Diagnose view and navigate inside to see what is using space">&#9658; Drill in</a>
+      <button type="button" class="dd-btn dd-btn-del" onclick="showConfirm([% loop.index %])"
+              title="Permanently delete this directory and all its contents from disk">&#128465; Delete</button>
+      [% ELSE %]
+      <a href="/file/admin_browser?dir_path=[% path | uri %]"
+         class="dd-btn dd-btn-nfs"
+         title="Open File Browser in this file's directory — rename, move, +DB, download">&#128193; Manage</a>
+      <button type="button" class="dd-btn dd-btn-del" onclick="showConfirm([% loop.index %])"
+              title="Permanently delete this file from disk">&#128465; Delete</button>
+      [% END %]
+    </div>
+    <div class="dd-confirm" id="confirm-[% loop.index %]" style="display:none">
+      <form method="post" action="/admin/hardware_monitor/disk_diagnose">
+        <input type="hidden" name="hostname" value="[% hostname | html %]">
+        <input type="hidden" name="path"     value="[% path | html %]">
+        <input type="hidden" name="target"   value="[% e.path | html %]">
+        <input type="hidden" name="action"   value="delete">
+        &#9888; Delete <code style="font-size:.9em;">[% e.path | html %]</code>?
+        [% IF e.is_dir %]This will remove the directory and <strong>all its contents</strong>.[% END %]
+        This cannot be undone.
+        &nbsp;<button type="submit" class="dd-btn dd-btn-del">Confirm Delete</button>
+        <button type="button" class="dd-btn" onclick="hideConfirm([% loop.index %])">Cancel</button>
+      </form>
+    </div>
+  </td>
+</tr>
+[% END %]
+</tbody>
+</table>
+
+[%# ── Bottom bulk toolbar ── %]
+<div class="dd-bulk-bar" style="margin-top:8px;margin-bottom:0">
+  <span class="dd-sel-count" id="dd-sel-count2">0 selected</span>
+  <button type="button" class="btn btn-sm btn-delete" onclick="ddBulkDelete()"
+          title="Delete all checked items from disk (cannot be undone)">
+    &#128465; Delete Selected
+  </button>
+</div>
+
+[% END %]
+
+[% IF !is_local %]
+<p style="margin-top:16px;font-size:.85em;color:#888;">
+  &#128274; Remote host — actions require SSH key access for user
+  <code>[% ENV.HW_SSH_USER || 'root' %]</code> to <code>[% hostname | html %]</code>.
+  Set <code>HW_SSH_USER</code> in the app environment to change the SSH user.
+</p>
+[% END %]
+
+<script>
+function ddToggleHelp() {
+    var el  = document.getElementById('dd-help');
+    var lbl = document.getElementById('dd-help-lbl');
+    var hidden = el.style.display === 'none';
+    el.style.display  = hidden ? 'block' : 'none';
+    lbl.textContent   = hidden ? '\u2227 Hide Help' : '\u2228 Show Help';
+}
+
+function showConfirm(idx) {
+    var el = document.getElementById('confirm-' + idx);
+    el.style.display = el.style.display === 'none' || !el.style.display ? 'block' : 'none';
+}
+function hideConfirm(idx) {
+    document.getElementById('confirm-' + idx).style.display = 'none';
+}
+
+function ddUpdateCount() {
+    var n = document.querySelectorAll('.dd-sel-cb:checked').length;
+    var label = n + ' selected';
+    var el1 = document.getElementById('dd-sel-count');
+    var el2 = document.getElementById('dd-sel-count2');
+    if (el1) el1.textContent = label;
+    if (el2) el2.textContent = label;
+    var all = document.getElementById('dd-sel-all');
+    if (all) all.checked = (n === document.querySelectorAll('.dd-sel-cb').length) && n > 0;
+}
+
+function ddSelAll(state) {
+    document.querySelectorAll('.dd-sel-cb').forEach(function(cb) { cb.checked = state; });
+    ddUpdateCount();
+}
+
+function ddBulkDelete() {
+    var cbs = document.querySelectorAll('.dd-sel-cb:checked');
+    if (!cbs.length) { alert('No items selected. Check the boxes on the left first.'); return; }
+    var msg = 'Permanently delete ' + cbs.length + ' item(s) from disk?\n\nThis cannot be undone.';
+    if (!confirm(msg)) return;
+    var form = document.getElementById('dd-bulk-form');
+    var container = document.getElementById('dd-bulk-targets');
+    container.innerHTML = '';
+    cbs.forEach(function(cb) {
+        var inp = document.createElement('input');
+        inp.type  = 'hidden';
+        inp.name  = 'target';
+        inp.value = cb.getAttribute('data-path');
+        container.appendChild(inp);
+    });
+    form.submit();
+}
+
+var _sortCol = 1, _sortAsc = false;
+function sortTable(col) {
+    var tbl = document.getElementById('dd-tbl');
+    var tbody = tbl.querySelector('tbody');
+    var rows = Array.from(tbody.querySelectorAll('tr'));
+    if (_sortCol === col) { _sortAsc = !_sortAsc; } else { _sortCol = col; _sortAsc = true; }
+
+    rows.sort(function(a, b) {
+        var av, bv;
+        if (col === 2) {
+            av = parseFloat(a.dataset.bytes || 0);
+            bv = parseFloat(b.dataset.bytes || 0);
+        } else {
+            av = (a.cells[col] ? a.cells[col].textContent.trim().toLowerCase() : '');
+            bv = (b.cells[col] ? b.cells[col].textContent.trim().toLowerCase() : '');
+        }
+        if (av < bv) return _sortAsc ? -1 : 1;
+        if (av > bv) return _sortAsc ? 1 : -1;
+        return 0;
+    });
+
+    rows.forEach(function(r) { tbody.appendChild(r); });
+
+    tbl.querySelectorAll('th.sortable').forEach(function(th) {
+        th.classList.remove('dd-sort-asc', 'dd-sort-desc');
+    });
+    var th = tbl.querySelector('th[data-col="' + col + '"]');
+    if (th) th.classList.add(_sortAsc ? 'dd-sort-asc' : 'dd-sort-desc');
+}
+</script>

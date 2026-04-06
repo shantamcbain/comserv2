@@ -25,7 +25,33 @@ has 'logging' => (
 
 sub _get_schema {
     my $self = shift;
-    return Comserv::Model::DBEncy->new->schema;
+    require Comserv::Model::RemoteDB;
+    require Comserv::Model::Schema::Ency;
+
+    my $remote_db = Comserv::Model::RemoteDB->new();
+    my $connection_info = $remote_db->get_connection_info('ency');
+
+    die "Weather: Cannot get ency database connection from RemoteDB\n"
+        unless $connection_info;
+
+    my $conn    = $connection_info->{config};
+    my $db_type = $conn->{db_type} || 'mysql';
+
+    my $dsn;
+    my %opts = (RaiseError => 1, PrintError => 0, AutoCommit => 1);
+
+    if ($db_type eq 'sqlite') {
+        $dsn = "dbi:SQLite:dbname=" . $conn->{database_path};
+        return Comserv::Model::Schema::Ency->connect($dsn, '', '', \%opts);
+    }
+
+    my $driver = 'MariaDB';
+    eval { require DBD::MariaDB; 1 } or do { $driver = 'mysql' };
+    $dsn = "dbi:$driver:database=$conn->{database};host=$conn->{host};port=$conn->{port}";
+
+    return Comserv::Model::Schema::Ency->connect(
+        $dsn, $conn->{username}, $conn->{password}, \%opts
+    );
 }
 
 =head1 METHODS
@@ -38,9 +64,10 @@ Get the active weather configuration for a specific user and site
 
 sub get_weather_config {
     my ($self, $user_id, $site_id) = @_;
-    
-    my $schema = $self->_get_schema;
-    
+
+    my $schema = eval { $self->_get_schema };
+    return undef if $@ || !$schema;
+
     eval {
         my $config = $schema->resultset('WeatherConfig')->search(
             { 
@@ -68,8 +95,9 @@ Save or update weather configuration for a specific user and site
 
 sub save_weather_config {
     my ($self, $config, $user_id, $site_id) = @_;
-    
-    my $schema = $self->_get_schema;
+
+    my $schema = eval { $self->_get_schema };
+    return undef if $@ || !$schema;
     
     eval {
         # First, deactivate all existing configs for this user and site
@@ -109,33 +137,74 @@ Get list of available weather providers
 
 sub get_weather_providers {
     my ($self) = @_;
-    
-    my $schema = $self->_get_schema;
-    
-    eval {
+
+    my $default_providers = [
+        {
+            provider_name   => 'openweathermap',
+            api_base_url    => 'https://api.openweathermap.org/data/2.5',
+            documentation_url => 'https://openweathermap.org/api'
+        },
+        {
+            provider_name   => 'weatherapi',
+            api_base_url    => 'https://api.weatherapi.com/v1',
+            documentation_url => 'https://www.weatherapi.com/docs/'
+        }
+    ];
+
+    my $schema = eval { $self->_get_schema };
+    return $default_providers if $@ || !$schema;
+
+    my $result = eval {
         my @providers = $schema->resultset('WeatherProviders')->search(
             { is_active => 1 },
             { order_by => 'provider_name' }
         );
-        
         return [ map { $_->get_inflated_columns } @providers ];
     };
-    
-    if ($@) {
-        # Return default providers if table doesn't exist
-        return [
-            {
-                provider_name => 'openweathermap',
-                api_base_url => 'https://api.openweathermap.org/data/2.5',
-                documentation_url => 'https://openweathermap.org/api'
-            },
-            {
-                provider_name => 'weatherapi',
-                api_base_url => 'https://api.weatherapi.com/v1',
-                documentation_url => 'https://www.weatherapi.com/docs/'
-            }
-        ];
-    }
+
+    return ($@ || !$result) ? $default_providers : $result;
+}
+
+sub get_cached_weather_data {
+    my ($self, $data_type, $max_age_minutes) = @_;
+
+    my $schema = eval { $self->_get_schema };
+    return undef if $@ || !$schema;
+
+    my $result = eval {
+        my $cutoff = DateTime->now->subtract(minutes => $max_age_minutes)->epoch;
+        $schema->resultset('WeatherData')->search(
+            { data_type => $data_type, fetched_at => { '>=' => $cutoff } },
+            { order_by => { -desc => 'fetched_at' }, rows => 1 }
+        )->first;
+    };
+    return undef if $@ || !$result;
+
+    my $raw = eval { JSON->new->utf8->decode($result->data_json) };
+    return $@ ? undef : $raw;
+}
+
+sub cache_weather_data {
+    my ($self, $config_id, $data_type, $data) = @_;
+
+    my $schema = eval { $self->_get_schema };
+    return 0 if $@ || !$schema;
+
+    eval {
+        $schema->resultset('WeatherData')->create({
+            config_id  => $config_id,
+            data_type  => $data_type,
+            data_json  => JSON->new->utf8->encode($data),
+            fetched_at => time(),
+        });
+        1;
+    } or do { return 0 };
+    return 1;
+}
+
+sub track_api_usage {
+    my ($self, $config_id, $api_service) = @_;
+    return 1;
 }
 
 __PACKAGE__->meta->make_immutable;

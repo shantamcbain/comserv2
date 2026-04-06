@@ -4,6 +4,7 @@ use namespace::autoclean;
 use Data::FormValidator;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::Logging;
+use Comserv::Util::PointSystem;
 BEGIN { extends 'Catalyst::Controller'; }
 
 has 'logging' => (
@@ -988,6 +989,24 @@ sub register :Local :Args(1) {
         $participant_status = 'registered';
     }
     
+    my $registration_fee = $workshop->registration_fee || 0;
+    if ($registration_fee > 0 && $participant_status eq 'registered') {
+        my $ps = Comserv::Util::PointSystem->new(c => $c);
+        my ($ok, $err) = $ps->debit(
+            user_id          => $user_id,
+            amount           => $registration_fee,
+            transaction_type => 'spend',
+            description      => 'Workshop registration: ' . $workshop->title,
+            reference_type   => 'workshop',
+            reference_id     => $id,
+        );
+        unless ($ok) {
+            $c->flash->{error_msg} = $err || 'Insufficient points to register for this workshop.';
+            $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
+            return;
+        }
+    }
+
     my $participant;
     eval {
         $participant = $c->model('DBEncy::Participant')->create({
@@ -1113,7 +1132,24 @@ sub unregister :Local :Args(1) {
     if ($@) {
         $c->flash->{error_msg} = 'Failed to cancel registration: ' . $@;
     } else {
-        $c->flash->{success_msg} = 'Your registration has been cancelled.';
+        my $registration_fee = $workshop->registration_fee || 0;
+        if ($registration_fee > 0 && $participant->status eq 'cancelled') {
+            eval {
+                my $ps = Comserv::Util::PointSystem->new(c => $c);
+                $ps->credit(
+                    user_id          => $user_id,
+                    amount           => $registration_fee,
+                    transaction_type => 'refund',
+                    description      => 'Workshop cancellation refund: ' . $workshop->title,
+                    reference_type   => 'workshop',
+                    reference_id     => $id,
+                );
+            };
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'unregister',
+                "Refund failed: $@") if $@;
+        }
+        $c->flash->{success_msg} = 'Your registration has been cancelled.'
+            . ($registration_fee > 0 ? " $registration_fee points have been refunded." : '');
     }
     
     $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
@@ -1192,15 +1228,18 @@ sub add_participant :Local :Args(1) {
     }
     
     my $params = $c->request->body_parameters;
-    my $name = $params->{name};
-    my $email = $params->{email};
-    my $site_affiliation = $params->{site_affiliation};
-    
+    my $name              = $params->{name};
+    my $email             = $params->{email};
+    my $site_affiliation  = $params->{site_affiliation};
+    my $send_confirmation = $params->{send_confirmation} || 0;
+    my $confirm_note      = $params->{confirmation_note} || '';
+
     unless ($name && $email) {
         $c->stash->{error_msg} = 'Name and email are required.';
         $c->stash(
-            workshop => $workshop,
-            template => 'WorkShops/AddParticipant.tt',
+            workshop  => $workshop,
+            form_data => $params,
+            template  => 'WorkShops/AddParticipant.tt',
         );
         return;
     }
@@ -1208,42 +1247,39 @@ sub add_participant :Local :Args(1) {
     unless ($email =~ /\@/) {
         $c->stash->{error_msg} = 'Invalid email address.';
         $c->stash(
-            workshop => $workshop,
-            template => 'WorkShops/AddParticipant.tt',
+            workshop  => $workshop,
+            form_data => $params,
+            template  => 'WorkShops/AddParticipant.tt',
         );
         return;
     }
     
     my $existing = $c->model('DBEncy::Participant')->search({
         workshop_id => $id,
-        email => $email,
-        status => { -in => ['registered', 'waitlist'] }
+        email       => $email,
+        status      => { -in => ['registered', 'waitlist'] }
     })->first;
     
     if ($existing) {
         $c->stash->{error_msg} = 'A participant with this email address is already registered.';
         $c->stash(
-            workshop => $workshop,
-            template => 'WorkShops/AddParticipant.tt',
+            workshop  => $workshop,
+            form_data => $params,
+            template  => 'WorkShops/AddParticipant.tt',
         );
         return;
     }
     
-    my $participant_status;
-    if ($workshop->is_full) {
-        $participant_status = 'waitlist';
-    } else {
-        $participant_status = 'registered';
-    }
+    my $participant_status = $workshop->is_full ? 'waitlist' : 'registered';
     
     my $participant;
     eval {
         $participant = $c->model('DBEncy::Participant')->create({
-            workshop_id => $id,
-            name => $name,
-            email => $email,
+            workshop_id      => $id,
+            name             => $name,
+            email            => $email,
             site_affiliation => $site_affiliation,
-            status => $participant_status,
+            status           => $participant_status,
         });
     };
     my $create_err = "$@" if $@;
@@ -1252,16 +1288,88 @@ sub add_participant :Local :Args(1) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_participant',
             "Failed to create participant for workshop_id=$id email=$email: $create_err");
         $c->flash->{error_msg} = "Failed to add participant: $create_err";
-    } else {
+        $c->response->redirect($c->uri_for($self->action_for('participants'), [$id]));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_participant',
+        "Participant added: workshop_id=$id name=$name email=$email status=$participant_status");
+
+    my $success_msg = $participant_status eq 'registered'
+        ? "Participant $name added successfully."
+        : "Participant $name added to waitlist (workshop is full).";
+
+    # Send confirmation email if requested and participant has a valid email
+    if ($send_confirmation && $email =~ /\@/) {
+        my $leader_name  = '';
+        my $leader_email = '';
+        if ($workshop->created_by) {
+            my $lu = $c->model('DBEncy::User')->find($workshop->created_by);
+            if ($lu) {
+                $leader_name  = join(' ', grep { $_ } ($lu->first_name, $lu->last_name));
+                $leader_name ||= $lu->username || '';
+                $leader_email = $lu->email || '';
+            }
+        }
+        $leader_name ||= $workshop->instructor || '';
+
+        my $formatted_date = do {
+            my $d = $workshop->date;
+            $d ? (ref($d) && $d->can('strftime') ? $d->strftime('%Y-%m-%d')
+                : do { (my $s = "$d") =~ s/ .*$//; $s }) : 'TBD';
+        };
+        my $formatted_time = do {
+            my $t = $workshop->time;
+            $t ? (ref($t) && $t->can('strftime') ? $t->strftime('%H:%M') : substr("$t", 0, 5)) : 'TBD';
+        };
+
+        my $first_name = (split /\s+/, $name)[0] || $name;
+
+        my $confirm_subject = "Registration Confirmed: " . ($workshop->title || 'Workshop');
+        my $confirm_body    = "Dear $first_name,\n\n"
+            . "You have been registered for the following workshop:\n\n"
+            . "  Title:      " . ($workshop->title || '') . "\n"
+            . "  Date:       $formatted_date\n"
+            . "  Time:       $formatted_time\n"
+            . "  Location:   " . ($workshop->location || 'TBD') . "\n"
+            . "  Instructor: " . ($workshop->instructor || '') . "\n\n";
+
+        if ($confirm_note) {
+            $confirm_body .= "Note from your workshop leader:\n\n$confirm_note\n\n";
+        }
+
+        $confirm_body .= "We look forward to seeing you there!\n\n"
+            . "Warm regards,\n$leader_name\n";
+
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_participant',
-            "Participant added: workshop_id=$id name=$name email=$email status=$participant_status");
-        if ($participant_status eq 'registered') {
-            $c->flash->{success_msg} = "Participant added successfully.";
+            "Sending confirmation email to $email for workshop_id=$id");
+
+        my $mail_ok;
+        eval {
+            $mail_ok = $c->model('Mail')->send_email(
+                $c,
+                $email,
+                $confirm_subject,
+                $confirm_body,
+                undef,
+                { reply_to => $leader_email, leader_name => $leader_name },
+            );
+        };
+        my $mail_err = "$@" if $@;
+
+        if ($mail_err || !$mail_ok) {
+            my $reason = $mail_err || 'Mail model returned failure';
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_participant',
+                "Confirmation email failed to=$email workshop_id=$id: $reason");
+            $success_msg .= " (confirmation email could not be delivered)";
         } else {
-            $c->flash->{success_msg} = "Participant added to waitlist (workshop is full).";
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_participant',
+                "Confirmation email sent to $email workshop_id=$id");
+            $success_msg .= " A confirmation email has been sent to $email.";
         }
     }
-    
+
+    $c->flash->{success_msg} = $success_msg;
     $c->response->redirect($c->uri_for($self->action_for('participants'), [$id]));
 }
 
@@ -3425,7 +3533,7 @@ sub compose_email :Local :Args(1) {
     # Fetch ALL unique participants across primary + all leader workshops for the recipient checklist
     my @all_ids = ($id, map { $_->{workshop}->id } @leader_workshops);
     my @all_participants_rs = $c->model('DBEncy::Participant')->search(
-        { workshop_id => \@all_ids, 'me.status' => 'registered' },
+        { workshop_id => \@all_ids, 'me.status' => 'registered', 'me.email_opt_out' => 0 },
         { prefetch => 'user', order_by => [\'me.name', \'me.email'] }
     )->all;
 
@@ -3611,6 +3719,20 @@ sub send_email :Local :Args(1) {
         $user_name =~ s/^\s+|\s+$//g;
         my $first_name = (split /\s+/, $user_name)[0] || $user_name;
 
+        # Build per-participant unsubscribe URL
+        # Look up participant record to get ID for opt-out token
+        my $unsubscribe_url = '';
+        {
+            my $p_rec = $c->model('DBEncy::Participant')->search({
+                workshop_id => $id,
+                email       => $email,
+                status      => 'registered',
+            })->first;
+            if ($p_rec) {
+                $unsubscribe_url = $c->uri_for($self->action_for('optout'), [$p_rec->id]) . '';
+            }
+        }
+
         # Process per-participant [[placeholders]] in body
         my $processed_body = $body;
         $processed_body =~ s/\[\[message_body\]\]/$message_body/g;
@@ -3623,6 +3745,12 @@ sub send_email :Local :Args(1) {
         $processed_body =~ s/\[\[workshop\.instructor\]\]/${\($workshop->instructor || '')}/g;
         $processed_body =~ s/\[\[leader\.name\]\]/$leader_name/g;
         $processed_body =~ s/\[\[workshop\.url\]\]/$full_url/g;
+        $processed_body =~ s/\[\[unsubscribe_url\]\]/$unsubscribe_url/g;
+
+        # Append unsubscribe footer if not already in the body
+        if ($unsubscribe_url && $processed_body !~ /unsubscribe/i) {
+            $processed_body .= "\n\n---\nTo stop receiving emails about this workshop, visit:\n$unsubscribe_url\n";
+        }
 
         my $send_result;
         my $send_err;
@@ -3857,6 +3985,100 @@ sub _send_error_notification {
     }
 }
 
+
+sub optout :Local :Args(1) {
+    my ($self, $c, $participant_id) = @_;
+
+    my $participant = $c->model('DBEncy::Participant')->find($participant_id);
+
+    unless ($participant) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'optout',
+            "Opt-out request for unknown participant_id=$participant_id");
+        $c->stash(
+            message  => 'Invalid or expired opt-out link.',
+            template => 'WorkShops/OptOut.tt',
+        );
+        return;
+    }
+
+    if ($participant->email_opt_out) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'optout',
+            "Participant id=$participant_id already opted out — no change");
+        $c->stash(
+            message   => 'You are already unsubscribed from workshop emails.',
+            workshop  => $participant->workshop,
+            template  => 'WorkShops/OptOut.tt',
+        );
+        return;
+    }
+
+    eval { $participant->update({ email_opt_out => 1 }) };
+    my $err = "$@" if $@;
+
+    if ($err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'optout',
+            "Failed to set opt-out for participant_id=$participant_id: $err");
+        $c->stash(
+            message  => 'There was a problem processing your request. Please try again later.',
+            template => 'WorkShops/OptOut.tt',
+        );
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'optout',
+        "Participant id=$participant_id email=" . ($participant->email || '') . " opted out of workshop emails");
+
+    $c->stash(
+        message   => 'You have been unsubscribed from emails for this workshop. '
+                   . 'Your registration remains active.',
+        workshop  => $participant->workshop,
+        template  => 'WorkShops/OptOut.tt',
+    );
+}
+
+sub toggle_optout :Local :Args(1) {
+    my ($self, $c, $participant_id) = @_;
+
+    unless ($self->_require_login($c)) {
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    my $participant = $c->model('DBEncy::Participant')->find($participant_id);
+
+    unless ($participant) {
+        $c->flash->{error_msg} = 'Participant not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    my $workshop = $participant->workshop;
+
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for($self->action_for('participants'), [$workshop->id]));
+        return;
+    }
+
+    my $new_val = $participant->email_opt_out ? 0 : 1;
+
+    eval { $participant->update({ email_opt_out => $new_val }) };
+    my $err = "$@" if $@;
+
+    if ($err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'toggle_optout',
+            "Failed to toggle opt-out for participant_id=$participant_id: $err");
+        $c->flash->{error_msg} = "Could not update email preference: $err";
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'toggle_optout',
+            "Toggled opt-out for participant_id=$participant_id to $new_val");
+        $c->flash->{success_msg} = $new_val
+            ? 'Email opt-out enabled for this participant.'
+            : 'Email opt-out cleared — participant will receive emails.';
+    }
+
+    $c->response->redirect($c->uri_for($self->action_for('participants'), [$workshop->id]));
+}
 
 sub mail_templates :Local :Args(1) {
     my ($self, $c, $id) = @_;

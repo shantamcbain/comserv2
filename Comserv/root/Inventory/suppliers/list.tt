@@ -1,0 +1,67 @@
+[% PageVersion = 'Inventory/suppliers/list.tt,v 0.01 2026/03/30 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Suppliers</h1>
+
+[% IF c.flash.success_msg %]<p class="success">[% c.flash.success_msg %]</p>[% END %]
+[% IF c.flash.error_msg %]<p class="error">[% c.flash.error_msg %]</p>[% END %]
+
+<div class="actions">
+  <a href="/Inventory/supplier/add">Add Supplier</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory">Dashboard</a>
+</div>
+
+<form method="GET" action="/Inventory/suppliers">
+  <label>Status:
+    <select name="status">
+      <option value="active" [% IF status == 'active' %]selected[% END %]>Active</option>
+      <option value="inactive" [% IF status == 'inactive' %]selected[% END %]>Inactive</option>
+      <option value="all" [% IF status == 'all' %]selected[% END %]>All</option>
+    </select>
+  </label>
+  <input type="submit" value="Filter">
+</form>
+
+[% IF suppliers.size == 0 %]
+  <p>No suppliers found. <a href="/Inventory/supplier/add">Add one now</a>.</p>
+[% ELSE %]
+<table border="1" cellpadding="4">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Contact</th>
+      <th>Email</th>
+      <th>Phone</th>
+      <th>Lead Time (days)</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH s IN suppliers %]
+    <tr>
+      <td>[% s.name %]</td>
+      <td>[% s.contact_name || '-' %]</td>
+      <td>[% s.email ? '<a href="mailto:' _ s.email _ '">' _ s.email _ '</a>' : '-' %]</td>
+      <td>[% s.phone || '-' %]</td>
+      <td>[% s.lead_time_days %]</td>
+      <td>[% s.status %]</td>
+      <td>
+        <a href="/Inventory/supplier/edit/[% s.id %]">Edit</a>
+        [% IF c.session.roles.grep('admin').size %]
+        <form method="POST" action="/Inventory/supplier/delete/[% s.id %]" style="display:inline"
+              onsubmit="return confirm('Deactivate this supplier?')">
+          <input type="submit" value="Deactivate">
+        </form>
+        [% END %]
+      </td>
+    </tr>
+  [% END %]
+  </tbody>
+</table>
+[% END %]
+
+[% IF debug_errors && debug_errors.size > 0 %]
+<div class="debug">[% FOREACH err IN debug_errors %]<p>[% err %]</p>[% END %]</div>
+[% END %]
