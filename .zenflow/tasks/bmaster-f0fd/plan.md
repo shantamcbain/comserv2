@@ -94,6 +94,13 @@ Save to `{@artifacts_path}/plan.md`. If the feature is trivial and doesn't warra
 - Write report to `.zenflow/tasks/bmaster-f0fd/report.md`
 - Run verification: `perl -cw Comserv/script/comserv_server.pl`
 
+### [x] Step: Fix DailyPlan Tab CSS Variables and Merge Main
+- Merged latest main commit (schema compare menu fix)
+- Added `--bg-color` and `--bg-secondary` CSS variable aliases to `base/variables.css` — these were undefined, causing active tab styling to be invisible
+- Added dark theme overrides: `--bg-color: #121212`, `--bg-secondary: #2c2c2c`
+- Added apiary theme overrides: `--bg-color: #f1faee`, `--bg-secondary: #fdf6e3` (honey cream)
+- Run verification: syntax OK
+
 ### [ ] Step: Hive Inspection — Schema Updates
 Complete gap analysis documented in `spec.md` (Hive Inspection Feature section). Apply the following schema changes:
 - Fix `Inspection.inspection_type` enum: add `queen_check` value (in DB and Result class)
