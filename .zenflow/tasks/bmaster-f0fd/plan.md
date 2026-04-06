@@ -93,3 +93,40 @@ Save to `{@artifacts_path}/plan.md`. If the feature is trivial and doesn't warra
 - Update `Documentation/BMaster.tt` route list to reflect current controller state
 - Write report to `.zenflow/tasks/bmaster-f0fd/report.md`
 - Run verification: `perl -cw Comserv/script/comserv_server.pl`
+
+### [ ] Step: Hive Inspection — Schema Updates
+Complete gap analysis documented in `spec.md` (Hive Inspection Feature section). Apply the following schema changes:
+- Fix `Inspection.inspection_type` enum: add `queen_check` value (in DB and Result class)
+- Add `configuration_id` FK to `hives` table → `hive_configurations` (DB ALTER + Hive.pm update)
+- Add `frame_size` ENUM(`deep`,`dadant`,`medium`,`shallow`) to `hive_frames` table (DB ALTER + HiveFrame.pm update)
+- Add `frame_code` VARCHAR(50) to `hive_frames` table (DB ALTER + HiveFrame.pm)
+- Add feeding fields to `inspections`: `feeding_done` BOOLEAN, `feed_type` VARCHAR(50), `feed_amount` VARCHAR(50), `boosted_from_hive` INT FK (DB ALTER + Inspection.pm)
+- Create `frame_movements` table (DB CREATE + new `FrameMovement.pm` Result class)
+- Create `inspection_feedings` table (DB CREATE + new `InspectionFeeding.pm` Result class)
+- Add `treatment_id` INT FK to `inspection_details` alongside existing `treatment_applied` varchar
+- Create missing Result classes referenced by `HiveConfiguration.pm`: `ConfigurationBox.pm`, `ConfigurationInventory.pm`, `HiveConfigurationHistory.pm`, `HiveAssembly.pm`, `HiveMovement.pm`
+- Update `apiary_schema.sql` to rename `frames` table to `hive_frames` (for consistency with HiveFrame.pm)
+- Run verification: `perl -cw Comserv/script/comserv_server.pl`
+
+### [ ] Step: Hive Inspection — Controller Actions
+Implement all missing inspection CRUD actions in `Apiary.pm`:
+- `inspections` GET: list inspections for user's hives (with hive/date filter)
+- `inspections_new` GET: render `new_inspection.tt` (prefill hive from param)
+- `inspections_create` POST: save `Inspection` + `InspectionDetail` records per box/frame
+- `inspections_view` GET `/Apiary/inspections/:id`: view single inspection
+- `inspections_edit` GET `/Apiary/inspections/:id/edit`: edit form
+- `inspections_update` POST `/Apiary/inspections/:id/update`: save edits
+- `inspections_reports` GET: summary/seasonal reports
+- `inspections_calendar` GET: calendar view of scheduled inspections
+- `api_queen_search` GET `/Apiary/api/queen_search`: AJAX queen search for new_inspection form
+- `api_hive_frame_layout` GET `/Apiary/api/hive_frame_layout/:id`: JSON frame layout for diagram
+- Run verification: `perl -cw Comserv/script/comserv_server.pl`
+
+### [ ] Step: Hive Inspection — Templates and Visual Diagram
+- Fix `Apiary/new_inspection.tt`: remove `<head>` tag at line 2, add `[% META title = "New Hive Inspection" %]`
+- Create `Apiary/inspection_view.tt`: display full inspection record with visual hive diagram
+- Create `Apiary/_hive_diagram.tt`: reusable color-coded frame layout component (box rows, frame cells by type)
+- Create `Apiary/inspection_reports.tt`: seasonal summary charts
+- Create `Apiary/inspection_calendar.tt`: calendar view
+- Frame color scheme: brood=orange, honey=yellow, pollen=green, empty=white, foundation=grey, drone=blue, comb=tan
+- Run verification: `perl -cw Comserv/script/comserv_server.pl`
