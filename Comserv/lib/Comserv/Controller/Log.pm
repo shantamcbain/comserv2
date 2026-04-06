@@ -483,23 +483,24 @@ sub create_log :Path('/log/create_log') :Args() {
     );
 
     my $logEntry = $rs->create({
-        todo_record_id  => $c->request->body_parameters->{todo_record_id},
-        username        => $username,
-        sitename        => $sitename,
-        start_date      => $start_date || $current_date,
-        project_code    => $project_id, # Use project_id from project_list.tt
-        due_date        => $c->request->body_parameters->{due_date},
-        abstract        => $subject,
-        details         => $c->request->body_parameters->{details},
-        start_time      => $start_time, # Now has a default value if empty
-        end_time        => $end_time,   # Now has a default value if empty
-        time            => $time_diff,
-        group_of_poster => $group_of_poster, # Use the converted string value
-        status          => $c->request->body_parameters->{status},
-        priority        => $c->request->body_parameters->{priority},
-        last_mod_by     => $c->session->{username},
-        last_mod_date   => DateTime->now->ymd,
-        comments        => $c->request->body_parameters->{comments}
+        todo_record_id   => $c->request->body_parameters->{todo_record_id},
+        username         => $username,
+        sitename         => $sitename,
+        start_date       => $start_date || $current_date,
+        project_code     => $project_id,
+        due_date         => $c->request->body_parameters->{due_date},
+        abstract         => $subject,
+        details          => $c->request->body_parameters->{details},
+        start_time       => $start_time,
+        end_time         => $end_time,
+        time             => $time_diff,
+        group_of_poster  => $group_of_poster,
+        status           => $c->request->body_parameters->{status},
+        priority         => $c->request->body_parameters->{priority},
+        last_mod_by      => $c->session->{username},
+        last_mod_date    => DateTime->now->ymd,
+        comments         => $c->request->body_parameters->{comments},
+        points_processed => 0,
     });
 
     # Log the success event
