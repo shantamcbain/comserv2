@@ -5,6 +5,13 @@
 <!-- ===== DASHBOARD MODE — shown when weather is configured ===== -->
 <div class="weather-dashboard">
 
+    [% IF c.flash.success_msg %]
+    <div class="alert alert-success"><i class="fas fa-check-circle"></i> [% c.flash.success_msg | html %]</div>
+    [% END %]
+    [% IF c.flash.error_msg %]
+    <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> [% c.flash.error_msg | html %]</div>
+    [% END %]
+
     <header class="weather-header">
         <div class="weather-header-left">
             <h1><i class="fas fa-cloud-sun"></i>
@@ -163,23 +170,32 @@
         <a href="[% c.uri_for('/Weather/forecast') %]" class="btn btn-primary">
             <i class="fas fa-calendar-week"></i> 5-Day Forecast
         </a>
-        <a href="[% c.uri_for('/Weather/current') %]" class="btn btn-outline">
-            <i class="fas fa-code"></i> Current JSON
+        [% IF c.session.roles.grep('admin').size > 0 || c.session.roles.grep('Admin').size > 0 %]
+        <a href="[% c.uri_for('/Weather/poll') %]" class="btn btn-success">
+            <i class="fas fa-sync-alt"></i> Refresh Now
         </a>
+        [% END %]
         [% IF c.session.username %]
         <a href="[% c.uri_for('/Weather/configuration') %]" class="btn btn-outline">
             <i class="fas fa-map-marker-alt"></i> Change Location
         </a>
         [% END %]
+        <a href="[% c.uri_for('/Weather/current') %]" class="btn btn-outline">
+            <i class="fas fa-code"></i> Current JSON
+        </a>
     </div>
 
     [% ELSE %]
     <!-- Configured but no data yet -->
     <div class="weather-no-data">
-        <i class="fas fa-spinner fa-spin fa-2x"></i>
-        <p>Weather is configured. Waiting for the first data poll.</p>
-        <p><small>Run <code>perl script/weather_poll.pl</code> or wait for the cron job to execute.</small></p>
-        <a href="[% c.uri_for('/Weather/configuration') %]" class="btn btn-secondary">
+        <i class="fas fa-cloud-download-alt fa-2x" style="margin-bottom:.75rem;"></i>
+        <p>Weather is configured. No data has been collected yet.</p>
+        [% IF c.session.roles.grep('admin').size > 0 || c.session.roles.grep('Admin').size > 0 %]
+        <a href="[% c.uri_for('/Weather/poll') %]" class="btn btn-primary" style="margin:.5rem;">
+            <i class="fas fa-sync-alt"></i> Fetch Weather Now
+        </a>
+        [% END %]
+        <a href="[% c.uri_for('/Weather/configuration') %]" class="btn btn-secondary" style="margin:.5rem;">
             <i class="fas fa-cog"></i> Review Settings
         </a>
     </div>
