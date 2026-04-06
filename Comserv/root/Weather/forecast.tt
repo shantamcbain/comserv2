@@ -1,204 +1,122 @@
 [% META title = 'Weather Forecast' %]
 
-<div class="weather-container">
-    <!-- Header Section -->
+[% SET location_label = forecast_data.location_name || weather_config.location_value || 'Weather' %]
+
+<div class="weather-dashboard">
+
+    [% IF c.flash.success_msg %]
+    <div class="alert alert-success"><i class="fas fa-check-circle"></i> [% c.flash.success_msg | html %]</div>
+    [% END %]
+    [% IF c.flash.error_msg %]
+    <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> [% c.flash.error_msg | html %]</div>
+    [% END %]
+
     <header class="weather-header">
-        <h1><i class="fas fa-calendar-week"></i> Weather Forecast</h1>
-        <div class="weather-context">
-            <span class="context-item"><strong>Location:</strong> Default Location</span>
-            <span class="context-item"><strong>Updated:</strong> [% USE date; date.format(date.now, '%Y-%m-%d %H:%M') %]</span>
-            <span class="context-item"><strong>Source:</strong> [% forecast_data.data_source || 'Weather API' %]</span>
+        <div class="weather-header-left">
+            <h1><i class="fas fa-calendar-week"></i> 5-Day Forecast — [% location_label | html %]</h1>
+            <small class="text-muted">
+                [% IF forecast_data.data_source == 'DATABASE' || forecast_data.data_source == 'CACHED_FALLBACK' %]
+                    <i class="fas fa-database"></i> From database cache
+                [% ELSIF forecast_data.data_source == 'NO_DATA' %]
+                    <i class="fas fa-exclamation-circle"></i> No forecast data yet — run the weather poller
+                [% ELSE %]
+                    <i class="fas fa-wifi"></i> [% forecast_data.data_source | html %]
+                [% END %]
+            </small>
+        </div>
+        <div class="weather-header-right">
+            <a href="[% c.uri_for('/Weather') %]" class="btn btn-sm btn-secondary">
+                <i class="fas fa-home"></i> Dashboard
+            </a>
         </div>
     </header>
 
-    <div class="feature-grid">
-        
-        <!-- 5-Day Forecast -->
-        <div class="feature-card forecast-card">
-            <div class="feature-header">
-                <h3><i class="fas fa-calendar-alt feature-icon"></i>5-Day Weather Forecast</h3>
+    [% IF forecast_data.forecast && forecast_data.forecast.size > 0 %]
+
+    <!-- Daily forecast cards -->
+    <div class="forecast-strip">
+        [% FOREACH day IN forecast_data.forecast %]
+        <div class="forecast-day-card">
+            <div class="forecast-day-name">[% day.date %]</div>
+            <div class="forecast-icon-wrap">
+                <img src="https://openweathermap.org/img/wn/[% day.icon %]@2x.png"
+                     alt="[% day.condition | html %]" width="60" height="60">
             </div>
-            <div class="feature-content">
-                <div class="forecast-grid">
-                    [% FOREACH day IN forecast_data.forecast %]
-                    <div class="forecast-day">
-                        <div class="forecast-date">
-                            [% USE date; date.format(day.date, '%a, %b %d') %]
-                        </div>
-                        <div class="forecast-icon">
-                            <i class="fas fa-[% 
-                                day.icon == 'sunny' ? 'sun' :
-                                day.icon == 'partly-cloudy' ? 'cloud-sun' :
-                                day.icon == 'cloudy' ? 'cloud' :
-                                day.icon == 'light-rain' ? 'cloud-rain' :
-                                'cloud'
-                            %]"></i>
-                        </div>
-                        <div class="forecast-condition">[% day.condition %]</div>
-                        <div class="forecast-temps">
-                            <span class="temp-high">[% day.high_temp %]°</span>
-                            <span class="temp-low">[% day.low_temp %]°</span>
-                        </div>
-                        <div class="forecast-precipitation">
-                            <i class="fas fa-tint"></i> [% day.precipitation %]%
-                        </div>
-                    </div>
-                    [% END %]
-                </div>
-                [% IF forecast_data.data_source == 'MOCK_DATA' %]
-                <div class="forecast-note">
-                    <small><i class="fas fa-info-circle"></i> This is sample forecast data. Configure weather service for real forecasts.</small>
-                </div>
-                [% END %]
+            <div class="forecast-condition">[% day.condition | html %]</div>
+            <div class="forecast-temps">
+                <span class="temp-high" title="High">[% day.high_temp | format('%.0f') %]°</span>
+                <span class="temp-sep">/</span>
+                <span class="temp-low" title="Low">[% day.low_temp | format('%.0f') %]°</span>
+            </div>
+            <div class="forecast-precip" title="Precipitation (mm)">
+                <i class="fas fa-tint"></i> [% day.precipitation %] mm
             </div>
         </div>
-
-        <!-- Current Conditions -->
-        <div class="feature-card">
-            <div class="feature-header">
-                <h3><i class="fas fa-thermometer-half feature-icon"></i>Current Conditions</h3>
-            </div>
-            <div class="feature-content">
-                <div id="current-weather-display">
-                    <div class="loading-weather">
-                        <i class="fas fa-spinner fa-spin"></i> Loading current conditions...
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Weather Alerts -->
-        <div class="feature-card">
-            <div class="feature-header">
-                <h3><i class="fas fa-exclamation-triangle feature-icon"></i>Weather Alerts</h3>
-            </div>
-            <div class="feature-content">
-                <div class="weather-alerts">
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i>
-                        No weather alerts at this time.
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Weather Details -->
-        <div class="feature-card">
-            <div class="feature-header">
-                <h3><i class="fas fa-list feature-icon"></i>Detailed Information</h3>
-            </div>
-            <div class="feature-content">
-                <div class="weather-details-grid">
-                    <div class="detail-item">
-                        <div class="detail-label">
-                            <i class="fas fa-eye"></i> Visibility
-                        </div>
-                        <div class="detail-value">10 km</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">
-                            <i class="fas fa-compress-arrows-alt"></i> Pressure
-                        </div>
-                        <div class="detail-value">1013 hPa</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">
-                            <i class="fas fa-sun"></i> UV Index
-                        </div>
-                        <div class="detail-value">5 (Moderate)</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">
-                            <i class="fas fa-cloud"></i> Cloud Cover
-                        </div>
-                        <div class="detail-value">40%</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
+        [% END %]
     </div>
 
-    <!-- Action Buttons -->
-    <div class="feature-actions">
-        <button class="btn btn-primary" onclick="location.reload()">
-            <i class="fas fa-sync-alt"></i> Refresh Forecast
-        </button>
-        <a href="[% c.uri_for('/Weather') %]" class="btn btn-secondary">
-            <i class="fas fa-home"></i> Weather Home
+    <!-- Hourly detail table (optional — shows raw data) -->
+    [% ELSE %]
+    <div class="weather-no-data">
+        <i class="fas fa-cloud-download-alt fa-2x" style="margin-bottom:.75rem;"></i>
+        <p>No forecast data available.</p>
+        [% IF c.session.roles.grep('admin').size > 0 || c.session.roles.grep('Admin').size > 0 %]
+        <a href="[% c.uri_for('/Weather/poll') %]" class="btn btn-primary">
+            <i class="fas fa-sync-alt"></i> Fetch Forecast Now
         </a>
-        <button class="btn btn-info" onclick="window.history.back()">
-            <i class="fas fa-arrow-left"></i> Back
-        </button>
+        [% END %]
+    </div>
+    [% END %]
+
+    <div class="weather-quick-links" style="margin-top:1.5rem;">
+        [% IF c.session.roles.grep('admin').size > 0 || c.session.roles.grep('Admin').size > 0 %]
+        <a href="[% c.uri_for('/Weather/poll') %]" class="btn btn-success">
+            <i class="fas fa-sync-alt"></i> Refresh Forecast
+        </a>
+        [% END %]
+        <a href="[% c.uri_for('/Weather') %]" class="btn btn-outline">
+            <i class="fas fa-home"></i> Weather Dashboard
+        </a>
+        <a href="[% c.uri_for('/Weather/configuration') %]" class="btn btn-outline">
+            <i class="fas fa-cog"></i> Settings
+        </a>
     </div>
 </div>
 
-<!-- JavaScript for current weather loading -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    loadCurrentWeather();
-    
-    function loadCurrentWeather() {
-        const currentWeatherDiv = document.getElementById('current-weather-display');
-        
-        fetch('[% c.uri_for("/Weather/current") %]')
-            .then(response => response.json())
-            .then(data => {
-                const weatherIcon = getWeatherIcon(data.icon);
-                const mockIndicator = data.data_source === 'MOCK_DATA' ? 
-                    ' <small style="opacity: 0.6;">(Mock)</small>' : '';
-                
-                currentWeatherDiv.innerHTML = `
-                    <div class="current-weather-display">
-                        <div class="current-weather-main">
-                            <div class="current-icon">
-                                <i class="${weatherIcon}"></i>
-                            </div>
-                            <div class="current-info">
-                                <div class="current-temp">${data.temperature}&deg;C${mockIndicator}</div>
-                                <div class="current-condition">${data.condition}</div>
-                                <div class="current-description">${data.description}</div>
-                            </div>
-                        </div>
-                        <div class="current-weather-details">
-                            <div class="detail-row">
-                                <span><i class="fas fa-tint"></i> Humidity:</span>
-                                <span>${data.humidity}%</span>
-                            </div>
-                            <div class="detail-row">
-                                <span><i class="fas fa-wind"></i> Wind:</span>
-                                <span>${data.wind_speed} km/h ${data.wind_direction}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span><i class="fas fa-clock"></i> Updated:</span>
-                                <span>${new Date(data.timestamp * 1000).toLocaleTimeString()}</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            })
-            .catch(error => {
-                currentWeatherDiv.innerHTML = `
-                    <div class="alert alert-warning">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        Unable to load current weather conditions.
-                    </div>
-                `;
-            });
-    }
-    
-    function getWeatherIcon(iconCode) {
-        const iconMap = {
-            'sunny': 'fas fa-sun',
-            'partly-cloudy': 'fas fa-cloud-sun',
-            'cloudy': 'fas fa-cloud',
-            'light-rain': 'fas fa-cloud-rain',
-            'heavy-rain': 'fas fa-cloud-showers-heavy',
-            'windy': 'fas fa-wind',
-            'cold': 'fas fa-snowflake',
-            'hot': 'fas fa-thermometer-full'
-        };
-        return iconMap[iconCode] || 'fas fa-cloud';
-    }
-});
-</script>
+<style>
+.forecast-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: center;
+    margin: 1.5rem 0;
+}
+.forecast-day-card {
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border-color, #dee2e6);
+    border-radius: .75rem;
+    padding: 1.25rem 1rem;
+    text-align: center;
+    min-width: 130px;
+    flex: 1 1 130px;
+    max-width: 160px;
+}
+.forecast-day-name {
+    font-size: .85rem;
+    font-weight: 600;
+    color: var(--text-muted, #6c757d);
+    margin-bottom: .5rem;
+}
+.forecast-icon-wrap { margin: .25rem 0; }
+.forecast-condition {
+    font-size: .8rem;
+    color: var(--text-muted, #6c757d);
+    margin-bottom: .5rem;
+    min-height: 2.4rem;
+}
+.forecast-temps { font-size: 1.1rem; font-weight: 700; margin-bottom: .4rem; }
+.temp-high { color: var(--danger, #dc3545); }
+.temp-sep  { color: var(--text-muted, #6c757d); margin: 0 .2rem; }
+.temp-low  { color: var(--info, #0dcaf0); }
+.forecast-precip { font-size: .8rem; color: var(--info, #0dcaf0); }
+</style>
