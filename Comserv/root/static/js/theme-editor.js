@@ -88,21 +88,13 @@ class ThemeEditor {
             border-radius: 4px;
             cursor: pointer;
         `;
-        this.toggleBtn.addEventListener('click', (e) => {
+        const _closeHandler = (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('Close button clicked');
-            // Force close the inspector
-            this.forceCloseInspector();
-        });
-        
-        // Add backup onclick handler for compatibility
-        this.toggleBtn.onclick = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('Backup close handler triggered');
             this.forceCloseInspector();
         };
+        this.toggleBtn.addEventListener('click', _closeHandler, true);
+        this.toggleBtn.addEventListener('click', _closeHandler);
         
         header.appendChild(title);
         header.appendChild(this.toggleBtn);
@@ -560,56 +552,48 @@ class ThemeEditor {
     }
 
     closeInspector() {
-        console.log('closeInspector called, container exists:', !!this.inspectorContainer);
-        if (!this.inspectorContainer) return;
-        
         this.isInspectorActive = false;
-        this.inspectorContainer.style.display = 'none';
-        console.log('Inspector display set to none');
-        if (this.toggleBtn) this.toggleBtn.textContent = 'Close';
         document.body.style.cursor = '';
-        
-        // Sync the pagetop toggle button
+        document.body.classList.remove('css-edit-mode');
+
+        if (this.inspectorContainer) {
+            this.inspectorContainer.style.display = 'none';
+        } else {
+            const el = document.getElementById('theme-inspector');
+            if (el) el.style.display = 'none';
+        }
+
+        if (this.toggleBtn) this.toggleBtn.textContent = 'Open';
+
         this._syncPagetopToggle(false);
 
-        // Remove highlights
         if (this.highlightedElement) {
             this.highlightedElement.classList.remove('highlighted');
             this.highlightedElement = null;
         }
-        // Remove event listeners for inspector functionality
         this.removeInspectorEventListeners();
-        console.log('Inspector closed successfully');
     }
     
     forceCloseInspector() {
-        console.log('Force closing inspector');
+        this.isInspectorActive = false;
+        document.body.style.cursor = '';
+        document.body.classList.remove('css-edit-mode');
+
         const inspector = document.getElementById('theme-inspector');
         if (inspector) {
             inspector.style.display = 'none';
-            inspector.style.visibility = 'hidden';
+            inspector.style.removeProperty('visibility');
         }
-        
-        this.isInspectorActive = false;
-        document.body.style.cursor = '';
+        if (this.inspectorContainer) {
+            this.inspectorContainer.style.display = 'none';
+        }
 
-        // Sync the pagetop toggle button
         this._syncPagetopToggle(false);
-        
-        // Remove all highlights
-        document.querySelectorAll('.highlighted').forEach(el => {
-            el.classList.remove('highlighted');
-        });
+
+        document.querySelectorAll('.highlighted').forEach(el => el.classList.remove('highlighted'));
         this.highlightedElement = null;
-        
-        // Clean up event listeners
-        try {
-            this.removeInspectorEventListeners();
-        } catch (e) {
-            console.log('Error removing event listeners:', e);
-        }
-        
-        console.log('Inspector force closed');
+
+        try { this.removeInspectorEventListeners(); } catch (e) {}
     }
     
     openInspector() {
@@ -671,14 +655,15 @@ class ThemeEditor {
         const element = e.target;
 
         // Never intercept the inspector panel itself or its children
-        if (this.inspectorContainer && (element === this.inspectorContainer || this.inspectorContainer.contains(element))) {
-            return;
-        }
+        try {
+            if (element.closest('#theme-inspector')) return;
+            if (this.inspectorContainer && this.inspectorContainer.contains(element)) return;
+        } catch (ex) { return; }
 
         // Never intercept the pagetop toggle or the floating button
-        if (element.closest('#css-edit-toggle') || element.closest('#theme-inspector-toggle')) {
-            return;
-        }
+        try {
+            if (element.closest('#css-edit-toggle') || element.closest('#theme-inspector-toggle')) return;
+        } catch (ex) { return; }
 
         // Only now prevent the click from activating links/buttons on the page
         e.preventDefault();

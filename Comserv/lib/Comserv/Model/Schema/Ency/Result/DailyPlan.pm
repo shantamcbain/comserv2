@@ -56,14 +56,10 @@ __PACKAGE__->add_columns(
         default_value => \'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
         is_nullable => 0,
     },
-    allowed_roles => {
-        data_type => 'json',
-        is_nullable => 1,
-    },
 );
 
 __PACKAGE__->set_primary_key('id');
-__PACKAGE__->add_unique_constraint(['sitename', 'plan_name']);
+__PACKAGE__->add_unique_constraint('dailyplan_sitename_plan_name' => ['sitename', 'plan_name']);
 
 __PACKAGE__->has_many(
     'dailyplan_projects' => 'Comserv::Model::Schema::Ency::Result::DailyPlanProject',

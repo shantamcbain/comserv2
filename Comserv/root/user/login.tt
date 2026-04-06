@@ -38,8 +38,8 @@
 
             <div class="form-container">
                 <form method="POST" action="/user/do_login" class="app-form" id="login-form">
-                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                     <input type="hidden" name="form_source" value="login_form">
+                    <input type="hidden" name="return_to" value="[% return_to | html %]">
 
                     <div class="form-section">
                         <div class="form-row">
@@ -67,12 +67,54 @@
                         <a href="/user/register" class="btn btn-secondary">Create Account</a>
                     </div>
 
+                    [% UNLESS show_resend_verification OR show_forgot_password %]
                     <div style="margin-top: 12px; text-align: center;">
-                        <a href="#" id="forgot-pw-link">Forgot your password?</a>
+                        <a href="/user/forgot_password" id="forgot-pw-link">Forgot your password?</a>
                     </div>
+                    [% END %]
 
                 </form>
             </div>
+
+            [% IF show_resend_verification %]
+            <div class="action-panel action-panel-warning" style="margin-top:1.5rem;">
+                <h3>Request a New Verification Code</h3>
+                <p>Enter your username or email address and we will send a fresh 6-digit code to your registered email.</p>
+                <form method="POST" action="[% c.uri_for('/user/resend_code_by_username') %]" class="app-form inline-action-form">
+                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
+                    <div class="form-row">
+                        <div class="form-field" style="flex:1;">
+                            <input type="text" name="username" class="form-input"
+                                   value="[% prefill_username | html %]"
+                                   placeholder="Username or email" required autocomplete="username">
+                        </div>
+                        <div class="form-field" style="flex:0;">
+                            <button type="submit" class="btn btn-warning">Send New Code</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            [% END %]
+
+            [% IF show_forgot_password %]
+            <div class="action-panel action-panel-info" style="margin-top:1.5rem;">
+                <h3>Reset Your Password</h3>
+                <p>Enter your username or email address and we will send a password reset link to your registered email.</p>
+                <form method="POST" action="[% c.uri_for('/user/forgot_password') %]" class="app-form inline-action-form">
+                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
+                    <div class="form-row">
+                        <div class="form-field" style="flex:1;">
+                            <input type="text" name="email" class="form-input"
+                                   value="[% prefill_username | html %]"
+                                   placeholder="Username or email" required autocomplete="email">
+                        </div>
+                        <div class="form-field" style="flex:0;">
+                            <button type="submit" class="btn btn-primary">Send Reset Email</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            [% END %]
 
         </div>
 
@@ -80,14 +122,51 @@
 
 </div>
 
+<style>
+.action-panel {
+    padding: 1rem 1.25rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+.action-panel h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+}
+.action-panel-warning {
+    background: #fff8e1;
+    border-color: #f0c040;
+}
+.action-panel-info {
+    background: #e8f4fd;
+    border-color: #90caf9;
+}
+.inline-action-form .form-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    margin: 0;
+}
+.btn-warning {
+    background: #f0a020;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.btn-warning:hover { background: #d08800; }
+</style>
+
 <script>
-document.getElementById('forgot-pw-link').addEventListener('click', function(e) {
-    e.preventDefault();
-    var val = document.getElementById('username').value.trim();
-    var url = '/user/forgot_password';
-    if (val) {
-        url += '?email=' + encodeURIComponent(val);
-    }
-    window.location.href = url;
-});
+var forgotLink = document.getElementById('forgot-pw-link');
+if (forgotLink) {
+    forgotLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        var val = document.getElementById('username').value.trim();
+        var url = '/user/forgot_password';
+        if (val) { url += '?email=' + encodeURIComponent(val); }
+        window.location.href = url;
+    });
+}
 </script>

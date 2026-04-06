@@ -1,0 +1,231 @@
+[%
+
+# the ENCY template
+#	$Id: FormulaView.ttml,v 1.2 2011/09/21 19:25:15 shanta Exp $	
+#file location/cgi-bin/HTMLTemplates/ENCY
+%]
+[% PROCESS DefaultDbi.ttml %]
+[% embed(data.page_top_view,['-PAGE_TITLE','Formulas.']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% LastUpdate = data.last_update %]
+   [% SiteLastUpdate = data.site_last_update %]
+  [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+
+	[% IF username %]
+
+<h3 > Hello  [% firstname%]  [% lastname%]! Welcome to The Encyclopaedia of Biological life!</h3>
+	  
+
+	[% ELSE %]
+
+	<h3>  Hello! Welcome to The Encyclopaedia of Biological life!</h3
+
+	[% END %]
+
+</div>
+<div ALIGN="center">
+<A NAME="PageTop"></A>
+</div>
+
+
+
+     
+        <h2>Formulas.</h2>
+      
+      
+      <form action="/cgi-bin/ENCY/formulas.cgi?site=[% SiteName %]&[% session_string %]" METHOD =" POST"> 
+<font FACE =" " SIZE =" 2"> 
+Search our forumulas Database 
+        <input TYPE="TEXT"   NAME="simple_search_string"
+               VALUE=""> 
+<input TYPE="HIDDEN" NAME="display_simple_search_results"
+               VALUE =" on"> 
+<input TYPE="SUBMIT" NAME="display_simple_search_results"
+               VALUE ="       Go        "> 
+<input TYPE="HIDDEN" NAME="site"
+               VALUE ="[% SiteName %]"> 
+<input TYPE="HIDDEN" NAME="session_id"
+               VALUE ="[%  session_id %]"> 
+</font> 
+
+ 
+</form> 
+[% SiteName %]
+     <a href="ency/usbmformula.htm"> Formulas.</a> <br> 
+    <OL> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf1.htm"> Formula #1 For cheek Swelling (jaw infection).</A> 
+              <LI> <img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf2.htm"> Formula #2 Herb fomentation. .</A> 
+              <LI> <img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf3.htm"> 
+                Formula #3 FOR KIDNEY, BLADDER AND LUMBAGO .</A> 
+              <LI> <img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf4.htm"> MOHAWK HERBS.</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf5.htm"> USBM's Formula #5 Bronchitis,Rheumatism</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf6.htm"> Formula #6 Glandular swellings.</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf7.htm"> Formula #7 Glandular swelling (to be given 
+                in combination with the fomentation #6).</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf8.htm"> Formula #8 Asthma</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbm9.htm"> Formula #9 Colds</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf10.htm"> Formula #:10 Diphtheria (fomentation).</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf11.htm"> 
+                Formula #11 Diphtheria (decoction).</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf12htm"> 
+                Formula #12 Potter's emollient .</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="http://web.archive.org/web/20030120044714///old%20root/index.html">F13 
+                Formula #13 Mumps (Poultice).</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf14.htm"> 
+                Formula #14 Piles and haemorrhoids.</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf15.htm"> 
+                Formula #15 Arthritis Poultice (swollen joints ). </A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf16.htm"> 
+                Formula #16 chBronchitisURL: healing and soothing </A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf17.htm"> Formula #17 Bronchitis.</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf22.htm"> 
+                Formula #22 Tonsillitis.</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf23.htm"> Formula #23 Hair Wash.</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf24.htm"> 
+                Formula #24 Reducing tea .</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf25.htm"> 
+                Formula #25 Cancer Denmark and Northern Europe.</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf26.htm"> 
+                Formula #26 Anemia. </A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf27.htm"> 
+                Formula #27 Anemia .</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf28.htm"> 
+                Formula #28 Appetite, For lack of.</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf29.htm"> 
+                Formula #29 Blood Cleaner (2).</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf30.htm"> 
+                Formula #30 Blood Cleander (2).</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf31.htm"> 
+                Formula #31 Blood Cleaner.</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf32.htm"> 
+                Formula #32 Blood cleaner.</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf33.htm"> 
+                Formula #33 Blood sugar to lower.</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf34.htm"> 
+                Formula #34 Bronchitis, Healing and soothing.</A> 
+              <li><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf35.htm"> 
+                Formula #35 Chest and Lung Problems (relieve congestion and inflammation).</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf36.htm"> 
+                Formula #36 Chest and Lung Releave congestion and Infamation.</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf37.htm"> 
+                Formula #37 Woopingcough.</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf38.htm"> 
+                Formula #38 Diabetes improve sugar tolerance.</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf39.htm"> 
+                Formula #39 Dropsy.</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf40.htm"> 
+                Formula #40 Gout and </a><A HREF="/ency/diseases.htm#Rheumatism"> Rheumatism.</A> 
+                . 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf48.htm"> 
+                Formula #48 Hair wash (dark hair).</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf70.htm"> 
+                Formula #70 Scrupulous and other blood troubles .</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf71.htm"> 
+                Formula #71 Malignat ulcers. scrofula, indolient Sors Burns, whoopingcough.</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf84.htm"> 
+                Formula #84 Lung formula .</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf85.htm"> 
+                Formula #85 Bolus for female problems.</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf97.htm"> 
+                Formula #97 Pancreas (NM).</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf100.htm"> 
+                Formula #100Cancer tea (Blood) NM.</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf101.htm"> 
+                Formula #101 Standard Kidney (NM).</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf105.htm"> 
+                Formula #105 Cancer (enema) NM Liver 6.</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0><A HREF="/ency/usbmf00.htm"> 
+                Formula # ? Dropsy; Kidney; bladder; SEE PIPSISSEWA </A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf01.htm"> Formula # ? kidney problems; SEE PIPSISSEWA 
+                </A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbm9.htm"> Formula #119 Cucumber oil sunburn; cooling</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf120.htm"> Formula #120 Night cream</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf127.htm"> Formula #127 Heaart and Circulation Formula</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf133.htm"> Formula #133 Pregnancy formula</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf136.htm"> Formula #136 Weight loss formula</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf143.htm"> Dirarea; Sumusr complaints of children</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf144.htm"> Formula #144 Cucumber oil </A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf155.htm"> Formula #155 Imune formula</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf156.htm"> Formula #156 Essiac Cancer; Diabetis</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf157.htm"> Formula #157 Fistulas</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf158.htm"> Formula #158 Female problems</A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf161.htm"> Formula #161 Poultis for, absesses, Fresh 
+                wounds, Infammation, congestion, Eruptions, Enlarged prostate, 
+                </A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf162.htm"> Formula #162 Blood Cleaner </A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf163.htm"> Formula #163 Laxative </A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf174.htm"> Formula #174 Joint Stiffness </A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf175.htm"> Formula #175 Worms Cancer </A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf176.htm"> Formula #176 Acne </A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf177.htm"> Formula #177 Blood Purifier </A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf178.htm"> Formula #178 Boils (poultice) </A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf179.htm"> Formula #179 Skin problems, Eczema, Etc. 
+                (wash) </A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf180.htm"> Formula #180 Skin problems, Eczema, Etc. 
+                (wash) </A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf181.htm"> Formula #181 Itch ointment </A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf182.htm"> Formula #182 Rheumatism </A> 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf183.htm"> Formula #183 </a><A HREF="/ency/diseases.htm#Sciatica">Sciatica.</A> 
+                , Rheumatism 
+              <LI><img src=/images/forager/plant.gif alt="Herbs on the web." BORDER=0> 
+                <A HREF="/ency/usbmf184.htm"> Formula #184 Spring tonic; </A> 
+            </OL> 
+
+  
+      
+ <a href="http://helpdesk.computersystemconsulting.ca" target="_Blank" > HelpDesk</a>
+
+[%# embed('CSCCopyRight') %]
+[% embed(data.page_bottom_view) %]
+

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- USBM green — matching the usbm theme primary color -->
+  <rect width="32" height="32" rx="4" fill="#009933"/>
+  <!-- Small maple leaf outline (Canadian .ca) in white -->
+  <path d="M16 4 L17.5 8 L21 7 L19 10 L23 10.5 L20 13 L21 17 L16 15 L11 17 L12 13 L9 10.5 L13 10 L11 7 L14.5 8 Z"
+        fill="white" opacity="0.25"/>
+  <!-- U text -->
+  <text x="16" y="27" text-anchor="middle" font-family="Arial,sans-serif" font-weight="bold" font-size="16" fill="white">U</text>
+</svg>

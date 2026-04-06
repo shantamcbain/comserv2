@@ -1,0 +1,204 @@
+[%
+
+# the ENCY template
+#	$Id: BotanicalNameView.ttml,v 1.2 2011/09/21 19:25:15 shanta Exp $	
+#file location/cgi-bin/HTMLTemplates/ENCY
+%]
+[% PROCESS DefaultDbi.ttml %]
+
+[% embed(data.page_top_view,['-PAGE_TITLE','Herbs by botanical name.']) %]
+
+[% embed('ErrorDisplayView') %]
+
+
+[% IF data.session_object %]
+
+	[% session_id = data.session_object.getId() %]
+        [% session_string = "session_id=$session_id" %]
+
+[% END %] 
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%] 
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+   [% LastUpdate = data.last_update %]
+   [% SiteLastUpdate = data.site_last_update %]
+  [% SiteName = data.session_object.getAttribute('-KEY','SiteName') %]
+
+	[% IF username %]
+
+<h3 > Hello  [% firstname%]  [% lastname%]! Welcome to The Encyclopaedia of Biological life!</h3>
+	  
+
+	[% ELSE %]
+
+	<h3>  Hello! Welcome to The Encyclopaedia of Biological life!</h3
+
+	[% END %]
+
+</div>
+<div ALIGN="center">
+<A NAME="PageTop"></A>
+</div>
+
+
+
+     
+        <h2>Herbs by Botanical name.</h2>
+      test
+      
+      <form action="/cgi-bin/ENCY/herbs.cgi?site=[% SiteName%]&[% session_string %]" METHOD =" POST"> 
+<font FACE =" " SIZE =" 2"> 
+Search our herbal Database 
+        <input TYPE="TEXT"   NAME="simple_search_string"
+               VALUE=""> 
+<input TYPE="HIDDEN" NAME="display_simple_search_results"
+               VALUE =" on"> 
+<input TYPE="SUBMIT" NAME="display_simple_search_results"
+               VALUE ="       Go        "> 
+</font> 
+
+ 
+</form> 
+
+<p>     <a href="/cgi-bin/index.cgi?site=[% SiteName %]&[% session_string %]&view=ForumulaView"> Formulas.</a> 
+ 
+ <p> These Herbs are in the data base.
+ [%  embed('PlantListSQL') %]
+ <p>These are in the old site and have yet to be placed in the database. Please join the site if you would lilke to be on out data entry and varification crew.
+ 
+ 
+ 
+ [%  #<a href="/cgi-bin/ENCY/herbs.cgi?site=[% SiteName %]&[% session_string %]&sort_field1=fname&sort_field2=lname&first_record_to_display=0&records_per_page=5&record_id=5&columns_to_view=fname&columns_to_view=key_name&display_details_view.x=2&display_details_view.y=6">Agrimonia eupatoria.</a> <br> 
+ 
+ 
+<a href="/cgi-bin/ENCY/herbs.cgi?site=[% SiteName %]&[% session_string %]&sort_field1=fname&sort_field2=lname&first_record_to_display=0&records_per_page=&record_id=12&columns_to_view=fname&columns_to_view=key_name&display_details_view.x=13&display_details_view.y=10"> Althaea officinalis.</a>  <br> 
+ 
+<a href="/cgi-bin/ENCY/herbs.cgi?site=[% SiteName %]&[% session_string %]&sort_field1=fname&sort_field2=lname&first_record_to_display=0&records_per_page=&record_id=7&columns_to_view=fname&columns_to_view=key_name&columns_to_view=medical_uses&display_details_view.x=15&display_details_view.y=15"> Altremisia absinthium.</a> <br> 
+ 
+  
+<a href="/cgi-bin/ENCY/herbs.cgi?site=[% SiteName %]&[% session_string %]&sort_field1=fname&sort_field2=lname&first_record_to_display=0&records_per_page=&record_id=8&columns_to_view=fname&columns_to_view=key_name&display_details_view.x=12&display_details_view.y=11">  Anthemis nobalis.</a><br> 
+ 
+ 
+<a href="/cgi-bin/ENCY/herbs.cgi?site=[% SiteName %]&[% session_string %]&sort_field1=fname&sort_field2=lname&first_record_to_display=0&records_per_page=25&record_id=13&columns_to_view=fname&columns_to_view=key_name&display_details_view.x=9&display_details_view.y=12"> Arctium lappa.</a>  <br> 
+ 
+ %]
+<a href="/ency/usbmarm.htm"> Arnica montana.</a>  <br> 
+ 
+ 
+<a href="/ency/usbmco.htm"> Calendula officinalis</a>  <br> 
+ 
+ <a href="/ency/usbmcannabis.htm"> Cannabis setiva</a>  <br> 
+ 
+ <a href="/ency/usbmcap.htm">Capsicum minimum.</a> <br> 
+ 
+ 
+<a href="/cgi-bin/ENCY/herb.cgi?site=[% SiteName %]&[% session_string %]&sort_field1=fname&sort_field2=lname&first_record_to_display=0&records_per_page=&record_id=11&columns_to_view=fname&columns_to_view=key_name&display_details_view.x=8&display_details_view.y=11"> Castanea vesca.</a>  <br> 
+ 
+ <a href="/ency/usbmcucumber.htm">Cucumis sativus.</a> <br> 
+ 
+ 
+<a href="/cgi-bin/ENCY/herbs.cgi?site=[% SiteName %]&[% session_string %]&view=DetailsRecordView&submit_power_search=on&simple_search_string=Eupatorim%20perfoliatum">  Eupatorium perfoliatum</a> <br> 
+ 
+<a href="/ency/usbmgg.htm">Glycyrrhiza glabra.</a> <br> 
+ 
+<a href="/ency/ac.html">  Hemlock spruce.</a> <br> 
+ 
+ <a href="/ency/usbmhl.htm">Humulus lupulus.</a> <br> 
+ 
+<a href="/ency/usbmhya.htm">Hydrangea aborescens.</a> <br> 
+ 
+ 
+<a href="/ency/usbmstjohn.htm"> Hypericum perforatum.</a>  <br> 
+ 
+<a href="/ency/usbmwalnut.htm"> 
+ Juglans nigia</a>  <br> 
+ 
+<a href="/ency/usbmsaxifrax.htm"> Laurus sassafras.</a><br> 
+ 
+ 
+<a href="/ency/usbmlobelia.htm"> Lobelia inflata.</a>  <br> 
+ 
+ 
+<a href="/ency/usbmmalvas.htm">  Malva sylvestris or m rotundifolia (high and low mallow ) </a><br> 
+ 
+<a href="/cgi-bin/ENCY/herbs.cgi?site=[% SiteName %]&[% session_string %]&sort_field1=fname&sort_field2=lname&first_record_to_display=0&records_per_page=&columns_to_view=fname&columns_to_view=key_name&display_details_view.x=11&display_details_view.y=9">Medicago sativa</a><br> 
+ 
+ 
+ 
+<a href="/ency/usbmpenyroyal.htm"> usntha pulegium.</a>  <br> 
+ 
+<a href="/ency/usbmsm.htm">  Milk-thistle .</a> <br> 
+ 
+ <a href="/ency/usbmm.htm">  Monarda fistulosa.</a> <br> 
+ 
+<a href="/ency/usbmag.htm">  Musk seed.</a> <br> 
+ 
+<a href="/ency/usbmnc.htm"> Nepta cataria.</a>  <br> 
+ 
+<a href="/ency/okra.html">  Okra.</a> <br> 
+ 
+<a href="/ency/usbmpanax.htm">  Panax pseudoginseng.</a> <br> 
+ 
+ <a href="/ency/usbmpeach.htm">Peach.</a> <br> 
+ 
+<a href="/ency/usbmpantagol.htm">  Plantago lanceolata.</a> <br> 
+ 
+<a href="/ENCY/herbs.cgi?site=[% SiteName %]&[% session_string %]&sort_field1=fname&sort_field2=lname&first_record_to_display=0&records_per_page=&session_id=d240861ffc5b47ca4290d5419abc6d1445fd8655&record_id=10&columns_to_view=fname&columns_to_view=key_name&display_details_view.x=0&display_details_view.y=10">  Prunus dulcis.</a> <br> 
+ 
+<a href="/ency/usbmpm.htm"> Plantago majora.</a>  <br> 
+ 
+<a href="/ency/usbmpd.html">  Poke root.</a> <br> 
+ 
+<a href="/ency/usbmlungwort.htm">  Pulmonaria officinalis.</a> <br> 
+ 
+ <a href="/ency/usbmraspberry.htm"> Rubus indaeus.</a><br> 
+ 
+<a href="/ency/usbmyellowdock.htm">  Rumex crispus.</a> 
+<br> 
+ 
+<a href="/ency/usbmsage.htm"> Salvia officinalis. </a>  <br> 
+ 
+ 
+<a href="/ency/usbmsc.htm"> Sambucus canadensis.</a>  <br> 
+ 
+ 
+<a href="/ency/usbmsanicula.htm"> Sanicula eupapa </a>  <br> 
+ 
+<a href="/ency/usbmsm.htm">Silybum marianum</a> <br> 
+ 
+ 
+<a href="/ency/usbmsarsaparilla.htm"> Similax ornata, smilax officinale.</a> <br> 
+ 
+ 
+<a href="/ency/usbmcomfrey.htm"> Syphytum officinal.</a>  <br> 
+ 
+<a href="/ency/usbmtansy.htm"> Tanacetum vulgare.</a>  <br> 
+ 
+ 
+<a href="/ency/usbmredclover.htm"> Trifolium pratense.</a>  <br> 
+ 
+ <a href="/ency/usbmcoltsfoot.htm">Tussilago farfara .</a>. <br> 
+ 
+<a href="/ency/usbmslipelm.htm">  Ulmus flava .</a> <br> 
+ 
+ 
+ 
+<a href="/ency/usbmnettle.htm"> Urtica lyollii-lyons, urtica dioca.</a>  <br> 
+ 
+ 
+<a href="/ency/usbmmullein.htm"> Verbascum thapsus. </a>  <br> 
+ 
+
+
+<a href="/ency/violet.html"> 
+  Violet leaf and flower .</a> <br> 
+ 
+<center> 
+  
+      
+ <a href="http://helpdesk.computersystemconsulting.ca" target="_Blank" > HelpDesk</a>
+
+[%# embed('CSCCopyRight') %]
+[% embed(data.page_bottom_view) %]
+

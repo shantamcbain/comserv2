@@ -1,0 +1,168 @@
+[% META title = 'File Locations Reference' %]
+[% PageVersion = 'Documentation/developer/file-locations.tt,v 0.01 2025/01/28 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="documentation-container">
+    <header class="documentation-header">
+        <h1><i class="fas fa-folder-open"></i>File Locations Reference</h1>
+        <div class="user-context">
+            <span class="context-item"><strong>For:</strong> Developers & AI Assistants</span>
+            <span class="context-item"><strong>Status:</strong> <span class="status-active">Reference Guide</span></span>
+        </div>
+    </header>
+
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        <div>
+            <h3>Quick Reference</h3>
+            <p>Essential file locations for development and AI assistance.</p>
+        </div>
+    </div>
+
+    <section class="doc-section">
+        <h2 class="section-toggle">Navigation System Files</h2>
+        <div class="section-content">
+            <div class="file-category">
+                <h3>Controllers</h3>
+                <ul class="file-list">
+                    <li><strong>Primary Navigation Controller:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Navigation.pm</code></li>
+                </ul>
+            </div>
+            
+            <div class="file-category">
+                <h3>Templates</h3>
+                <ul class="file-list">
+                    <li><strong>Main Navigation:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Navigation/navigation.tt</code></li>
+                    <li><strong>Admin Top Menu:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Navigation/admintopmenu.tt</code></li>
+                </ul>
+            </div>
+            
+            <div class="file-category">
+                <h3>Models</h3>
+                <ul class="file-list">
+                    <li><strong>Result Classes:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result/</code></li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section class="doc-section">
+        <h2 class="section-toggle">Documentation</h2>
+        <div class="section-content">
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                <div>
+                    <h4>Directory Normalization</h4>
+                    <p>We are normalizing to single <code>Documentation</code> directory (capitalized) to reduce confusion. 
+                    Legacy references to lowercase <code>documentation</code> should be updated.</p>
+                </div>
+            </div>
+            
+            <div class="file-category">
+                <h3>Main Documentation</h3>
+                <ul class="file-list">
+                    <li><strong>Documentation Root:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/</code></li>
+                    <li><strong>Developer Docs:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/developer/</code></li>
+                    <li><strong>AI Guidelines:</strong> <code>/home/shanta/PycharmProjects/comserv2/AI_DEVELOPMENT_GUIDELINES.TT</code></li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section class="doc-section">
+        <h2 class="section-toggle">Configuration Files</h2>
+        <div class="section-content">
+            <div class="file-category">
+                <h3>Application Configuration</h3>
+                <ul class="file-list">
+                    <li><strong>Main Config:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/comserv.conf</code></li>
+                    <li><strong>Database Config:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/config/database.yml</code></li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section class="doc-section">
+        <h2 class="section-toggle">Log Files</h2>
+        <div class="section-content">
+            <div class="file-category">
+                <h3>Application Logs</h3>
+                <ul class="file-list">
+                    <li><strong>Primary:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log</code></li>
+                    <li><strong>Secondary:</strong> <code>/home/shanta/PycharmProjects/comserv2/logs/application.log</code></li>
+                </ul>
+            </div>
+            
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                <div>
+                    <h4>Always Check Logs</h4>
+                    <p>Check application logs for errors during development using the logging locations above.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="doc-section">
+        <h2 class="section-toggle">AI Development Notes</h2>
+        <div class="section-content">
+            <div class="guideline-section">
+                <h3>File Management Rules</h3>
+                <ul>
+                    <li><strong>Search First:</strong> Always search for existing files before creating new ones</li>
+                    <li><strong>Use Existing Directories:</strong> Don't create new directories - use established structure</li>
+                    <li><strong>Consolidate Duplicates:</strong> If similar files exist, consolidate into the established standard</li>
+                    <li><strong>Update Existing:</strong> Improve existing files rather than creating new ones</li>
+                </ul>
+            </div>
+            
+            <div class="guideline-section">
+                <h3>Common Issues to Avoid</h3>
+                <ul>
+                    <li><strong>Duplicate Directories:</strong> We have both <code>navigation</code> and <code>Navigation</code> directories - use the established one</li>
+                    <li><strong>Scattered Content:</strong> Don't create multiple files for the same topic</li>
+                    <li><strong>Case Sensitivity:</strong> Be consistent with directory naming conventions</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+</div>
+
+<style>
+.file-list {
+    list-style: none;
+    padding-left: 0;
+}
+
+.file-list li {
+    margin: 0.5rem 0;
+    padding: 0.5rem;
+    background: var(--background-secondary);
+    border-radius: 4px;
+    font-family: monospace;
+}
+
+.file-category {
+    margin: 1rem 0;
+}
+
+.file-category h3 {
+    color: var(--primary-color);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+
+.guideline-section {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: var(--background-secondary);
+    border-radius: 8px;
+}
+
+.guideline-section h3 {
+    color: var(--primary-color);
+    margin-top: 0;
+}
+</style>

@@ -1,0 +1,106 @@
+[% PageVersion = 'membership/application_success.tt,v 1.0 2025/01/17 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <header class="header">
+        <h1>Application Submitted - [% site_domain || site_name %]</h1>
+        <div class="context">
+            <span class="context-item"><strong>Site:</strong> [% site_domain || site_name %]</span>
+        </div>
+    </header>
+    
+    <section class="section success-section">
+        <div class="success-icon">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" stroke="#28a745" stroke-width="2" fill="#d4edda"/>
+                <path d="m9 12 2 2 4-4" stroke="#28a745" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        
+        <h2>Thank You, [% applicant_name %]!</h2>
+        <p class="success-message">Your membership application has been successfully submitted and is now under review.</p>
+        
+        <div class="next-steps">
+            <h3>What Happens Next?</h3>
+            <div class="steps-list">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>Application Review</h4>
+                        <p>Our team will review your application within 1-2 business days.</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>Email Confirmation</h4>
+                        <p>You'll receive an email confirmation with your application status and next steps.</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>Account Setup</h4>
+                        <p>Once approved, we'll help you set up your member account and access.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="contact-info">
+            <h3>Questions?</h3>
+            <p>If you have any questions about your application or our membership program, please don't hesitate to contact us:</p>
+            <div class="contact-methods">
+                <div class="contact-method">
+                    <strong>Email:</strong> <a href="mailto:membership@[% site_domain || site_name.lower %]">membership@[% site_domain || site_name.lower %]</a>
+                </div>
+                <div class="contact-method">
+                    <strong>Phone:</strong> <a href="tel:+1-555-0123">+1 (555) 012-3456</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="action-buttons">
+            <a href="/membership" class="btn btn-primary">Back to Membership</a>
+            <a href="/" class="btn btn-secondary">Return to Home</a>
+        </div>
+    </section>
+    
+    <!-- Additional Resources -->
+    <section class="section resources-section">
+        <h2 class="section-header">While You Wait</h2>
+        <p>Explore these resources to get familiar with our community:</p>
+        
+        <div class="resources-grid">
+            <div class="resource-card">
+                <h3>Community Guidelines</h3>
+                <p>Learn about our community standards and expectations for members.</p>
+                <a href="/community-guidelines" class="resource-link">Read Guidelines</a>
+            </div>
+            
+            <div class="resource-card">
+                <h3>Getting Started Guide</h3>
+                <p>A comprehensive guide to help you make the most of your membership.</p>
+                <a href="/getting-started" class="resource-link">View Guide</a>
+            </div>
+            
+            <div class="resource-card">
+                <h3>FAQ</h3>
+                <p>Find answers to commonly asked questions about membership and services.</p>
+                <a href="/faq" class="resource-link">Browse FAQ</a>
+            </div>
+            
+            <div class="resource-card">
+                <h3>Contact Support</h3>
+                <p>Need help or have questions? Our support team is here to assist you.</p>
+                <a href="/contact" class="resource-link">Get Support</a>
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- CSS moved to /static/css/themes/hosted-membership.css for theme consistency -->

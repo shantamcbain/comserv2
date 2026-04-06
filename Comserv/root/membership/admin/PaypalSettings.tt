@@ -1,0 +1,163 @@
+[% META
+   title = "PayPal Settings"
+   description = "Configure PayPal payment integration"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Admin"
+   page_version = "0.01"
+   last_updated = "2026-03-19"
+%]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>PayPal Settings</h1>
+    <p>Configure how the site connects to PayPal for coin and membership payments.</p>
+  </div>
+
+  <div class="content-container">
+
+    <!-- ── Settings Form ─────────────────────────────── -->
+    <div class="content-primary">
+
+      <div class="content-section">
+        <h2>Connection Settings</h2>
+        <form method="post" action="[% c.uri_for('/membership/admin/paypal_settings') %]">
+
+          <div class="form-field" style="margin-bottom:1.2rem">
+            <label style="display:flex;align-items:center;gap:0.6rem;cursor:pointer">
+              <input type="checkbox" name="paypal_sandbox" value="1"
+                     [% 'checked' IF current.paypal_sandbox %]
+                     style="width:1.1rem;height:1.1rem">
+              <span><strong>Sandbox / Test Mode</strong></span>
+            </label>
+            <p class="form-hint" style="margin:0.25rem 0 0 1.7rem;font-size:0.88em;color:#666">
+              Check this while testing. Uncheck when you are ready to accept real payments.
+            </p>
+          </div>
+
+          <div class="form-field" style="margin-bottom:1.2rem">
+            <label for="paypal_business"><strong>PayPal Business Email</strong></label>
+            <input type="email" id="paypal_business" name="paypal_business"
+                   value="[% current.paypal_business | html %]"
+                   placeholder="yourname@example.com"
+                   style="width:100%;max-width:420px;padding:0.5rem;border:1px solid var(--border-color,#ccc);border-radius:4px">
+            <p class="form-hint" style="font-size:0.88em;color:#666;margin:0.2rem 0 0">
+              The email address of your PayPal Business account. Payments go here.
+            </p>
+          </div>
+
+          <div class="form-field" style="margin-bottom:1.2rem">
+            <label for="paypal_currency"><strong>Currency Code</strong></label>
+            <select id="paypal_currency" name="paypal_currency"
+                    style="padding:0.5rem;border:1px solid var(--border-color,#ccc);border-radius:4px">
+              [% SET cur = current.paypal_currency || 'CAD' %]
+              [% FOR code IN ['CAD','USD','AUD','GBP','EUR'] %]
+              <option value="[% code %]" [% 'selected' IF cur == code %]>[% code %]</option>
+              [% END %]
+            </select>
+          </div>
+
+          <hr style="margin:1.5rem 0;border:none;border-top:1px solid var(--border-color,#ddd)">
+          <h3 style="margin:0 0 0.5rem">REST API Credentials <span style="font-weight:normal;font-size:0.85em">(optional — for future subscription billing)</span></h3>
+
+          <div class="form-field" style="margin-bottom:1.2rem">
+            <label for="paypal_client_id"><strong>Client ID</strong></label>
+            <input type="text" id="paypal_client_id" name="paypal_client_id"
+                   value="[% current.paypal_client_id | html %]"
+                   placeholder="AaBbCcDd…"
+                   style="width:100%;max-width:520px;padding:0.5rem;border:1px solid var(--border-color,#ccc);border-radius:4px;font-family:monospace">
+          </div>
+
+          <div class="form-field" style="margin-bottom:1.5rem">
+            <label for="paypal_secret"><strong>Secret</strong></label>
+            <input type="password" id="paypal_secret" name="paypal_secret"
+                   value="[% current.paypal_secret | html %]"
+                   placeholder="EeFfGgHh…"
+                   style="width:100%;max-width:520px;padding:0.5rem;border:1px solid var(--border-color,#ccc);border-radius:4px;font-family:monospace">
+            <p class="form-hint" style="font-size:0.88em;color:#666;margin:0.2rem 0 0">
+              Stored encrypted in the database. Leave blank to keep the existing value unchanged.
+            </p>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+            <a href="[% c.uri_for('/membership/admin') %]" class="btn btn-secondary">← Back</a>
+          </div>
+        </form>
+      </div>
+
+    </div>
+
+    <!-- ── Instructions Sidebar ──────────────────────── -->
+    <div class="content-secondary">
+
+      <div class="content-section">
+        <h2>How to Set Up PayPal</h2>
+
+        <div style="background:#e8f5e9;border:1px solid #66bb6a;border-radius:6px;padding:0.6rem 0.9rem;margin-bottom:1rem;font-size:0.9em">
+          <strong>Good news:</strong> You do <em>not</em> need to create a developer app or know anything technical.
+          All you need is a free PayPal Business account and its email address.
+        </div>
+
+        <h3 style="font-size:1em;margin:1rem 0 0.25rem">Step 1 — Get a PayPal Business Account</h3>
+        <p style="font-size:0.88em;margin:0 0 0.4rem">
+          If you already accept PayPal payments anywhere, you already have this — just use that email address.
+          If not:
+        </p>
+        <ol style="padding-left:1.2rem;margin:0 0 0.75rem;font-size:0.9em">
+          <li>Go to <a href="https://www.paypal.com/bizsignup" target="_blank" rel="noopener">paypal.com/bizsignup</a></li>
+          <li>Sign up for a <strong>Business account</strong> (it is free)</li>
+          <li>Verify your email address when PayPal sends you a confirmation</li>
+          <li>That verified email is your <strong>PayPal Business Email</strong> — enter it in the form on the left</li>
+        </ol>
+
+        <h3 style="font-size:1em;margin:1rem 0 0.25rem">Step 2 — Go Live</h3>
+        <ol style="padding-left:1.2rem;margin:0 0 0.75rem;font-size:0.9em">
+          <li>Enter your PayPal Business email in the <strong>PayPal Business Email</strong> field</li>
+          <li>Set <strong>Currency</strong> to match your PayPal account currency</li>
+          <li>Make sure <strong>Sandbox Mode is unchecked</strong></li>
+          <li>Click <strong>Save Settings</strong></li>
+          <li>Members can now pay with real money via PayPal</li>
+        </ol>
+
+        <h3 style="font-size:1em;margin:1rem 0 0.25rem">Optional — Test Before Going Live</h3>
+        <p style="font-size:0.88em;margin:0 0 0.4rem">
+          PayPal provides a free test environment called <em>Sandbox</em>. To use it:
+        </p>
+        <ol style="padding-left:1.2rem;margin:0 0 0.75rem;font-size:0.9em">
+          <li>Go to <a href="https://developer.paypal.com/dashboard/accounts" target="_blank" rel="noopener">developer.paypal.com/dashboard/accounts</a> and log in with your normal PayPal account</li>
+          <li>You will see two pre-made test accounts — one labelled <strong>Business</strong> and one <strong>Personal</strong></li>
+          <li>Click the <strong>Business</strong> account → <em>View/Edit Account</em> → copy the email shown</li>
+          <li>Paste that test email into <strong>PayPal Business Email</strong> on this form</li>
+          <li>Leave <strong>Sandbox Mode checked</strong> and save</li>
+          <li>To simulate a purchase, use the <strong>Personal</strong> test account email and password shown on the same page</li>
+          <li>When you are happy with testing, switch back to your real email and uncheck Sandbox</li>
+        </ol>
+
+        <div style="background:#fff8e1;border:1px solid #ffcc02;border-radius:6px;padding:0.6rem 0.9rem;font-size:0.88em">
+          <strong>Client ID / Secret fields</strong> — you can ignore these completely.
+          They are only needed for a future feature (automatic recurring subscriptions).
+          Leave them blank for now.
+        </div>
+      </div>
+
+      <div class="content-section" style="background:rgba(255,253,231,0.95);border-color:#f0ad4e">
+        <h2 style="color:#7a5700">Technical Note</h2>
+        <p style="font-size:0.88em">
+          When a member pays, PayPal automatically notifies this site at:
+        </p>
+        <code style="word-break:break-all;font-size:0.82em;display:block;padding:0.4rem;background:#fff;border:1px solid #ddd;border-radius:4px">
+          [% c.uri_for('/payment/paypal/ipn') %]
+        </code>
+        <p style="font-size:0.88em;margin-top:0.5rem">
+          Nothing extra needs to be set up in PayPal for this — it happens automatically.
+          For live payments, this address must be reachable from the internet (not just your local network).
+        </p>
+      </div>
+
+    </div>
+
+  </div>
+</div>

@@ -1,0 +1,118 @@
+[% META
+   title = "Subscribe"
+   description = "Choose billing cycle and payment method to activate your membership"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.02"
+   last_updated = "2026-03-18"
+%]
+[% PageVersion = 'membership/Subscribe.tt,v 0.02 2026/03/18' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Subscribe[% IF plan %]: [% plan.name | html %][% END %]</h1>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      [% IF plan %]
+
+      <div class="content-section">
+        <h2>Plan Summary</h2>
+        <div class="form-row">
+          <div class="form-field"><strong>Plan:</strong> [% plan.name | html %]</div>
+          <div class="form-field"><strong>Monthly:</strong> [% plan.price_currency | html %] [% plan.price_monthly %]/mo</div>
+          [% IF plan.price_annual > 0 %]
+          <div class="form-field">
+            <strong>Annual:</strong> [% plan.price_currency | html %] [% plan.price_annual %]/yr
+            [% SET annual_saving = (plan.price_monthly * 12) - plan.price_annual %]
+            [% IF annual_saving > 0 %]<span class="badge">Save [% plan.price_currency | html %][% annual_saving %]</span>[% END %]
+          </div>
+          [% END %]
+        </div>
+        [% IF plan.description %]<p>[% plan.description | html %]</p>[% END %]
+      </div>
+
+      <div class="content-section">
+        <h2>Complete Your Sign-Up</h2>
+
+        <form id="subscribe-form" method="get" action="[% c.uri_for('/payment/internal/checkout') %]">
+          <input type="hidden" name="plan_id" value="[% plan.id %]">
+
+          <h3>1. Billing Cycle</h3>
+          <div class="form-row">
+            <label style="cursor:pointer;padding:0.5em 1em;border:1px solid #ccc;border-radius:4px;margin-right:0.5em">
+              <input type="radio" name="billing_cycle" value="monthly" checked>
+              Monthly — [% plan.price_currency | html %] [% plan.price_monthly %]/mo
+            </label>
+            [% IF plan.price_annual > 0 %]
+            <label style="cursor:pointer;padding:0.5em 1em;border:1px solid #ccc;border-radius:4px">
+              <input type="radio" name="billing_cycle" value="annual">
+              Annual — [% plan.price_currency | html %] [% plan.price_annual %]/yr
+              [% IF annual_saving > 0 %](saves [% plan.price_currency | html %][% annual_saving %])[% END %]
+            </label>
+            [% END %]
+          </div>
+
+          <h3>2. Promo Code (optional)</h3>
+          <div class="form-row">
+            <div class="form-field">
+              <input type="text" name="promo_code" placeholder="Enter promo code"
+                     value="[% c.req.param('promo_code') | html %]"
+                     style="text-transform:uppercase" autocomplete="off">
+              <small>Promo codes give discounts or free trial months.</small>
+            </div>
+          </div>
+
+          <h3>3. Choose Payment Method</h3>
+          <div class="form-row">
+
+            <div class="form-field" style="text-align:center;padding:1em;border:1px solid #ddd;border-radius:8px">
+              <strong>Site Coins</strong>
+              <em style="font-size:0.8em;display:block;color:var(--warning-color,#e67e22)">Promotional Offer</em>
+              <small>Pay using your coin balance. Coins can also be used for services offered by participating members.</small><br><br>
+              <button type="submit" formaction="[% c.uri_for('/payment/internal/checkout') %]"
+                      class="btn btn-primary">Pay with Coins</button>
+              <br><small><a href="[% c.uri_for('/payment/buy/coins') %]">Need coins?</a></small>
+            </div>
+
+            <div class="form-field" style="text-align:center;padding:1em;border:1px solid #ddd;border-radius:8px">
+              <strong>PayPal</strong><br>
+              <small>Pay securely with PayPal or any credit/debit card. No PayPal account required.</small><br><br>
+              <button type="submit" formaction="[% c.uri_for('/payment/paypal/checkout') %]"
+                      class="btn btn-primary">Pay with PayPal</button>
+            </div>
+
+            [% IF patreon_cfg AND patreon_cfg.active %]
+            <div class="form-field" style="text-align:center;padding:1em;border:2px solid #f96854;border-radius:8px">
+              <strong style="color:#f96854">Patreon</strong><br>
+              <small>Become a patron to support this site and receive membership benefits.</small><br><br>
+              <button type="submit" formaction="[% c.uri_for('/payment/patreon/checkout') %]"
+                      class="btn" style="background:#f96854;color:#fff;border:none">Support on Patreon</button>
+            </div>
+            [% END %]
+
+          </div>
+        </form>
+      </div>
+
+      [% ELSE %]
+      <div class="content-section">
+        <p class="empty-state">No plan selected. <a href="[% c.uri_for('/membership') %]">View available plans</a>.</p>
+      </div>
+      [% END %]
+
+      <div class="form-actions">
+        <a href="[% c.uri_for('/membership') %]" class="btn btn-secondary">← Back to Plans</a>
+      </div>
+
+    </div>
+  </div>
+</div>
