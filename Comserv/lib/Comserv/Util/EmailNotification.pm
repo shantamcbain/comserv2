@@ -495,6 +495,67 @@ This is an automated notification.
     return $self->send_email($c, $email, $smtp_config);
 }
 
+sub send_admin_profile_completion_notification {
+    my ($self, $c, $user) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_admin_profile_completion_notification',
+        "Sending Step 3 completion notification for user: " . $user->username);
+
+    my $sitename    = $c->stash->{SiteName} || 'CSC';
+    my $smtp_config = $self->get_smtp_config($c, $sitename);
+
+    unless ($smtp_config->{smtp_host}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_admin_profile_completion_notification',
+            "No SMTP configuration — notification not sent");
+        return 0;
+    }
+
+    my $site        = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
+    my $admin_email = ($site && $site->mail_to_admin)
+        ? $site->mail_to_admin
+        : 'helpdesk@computersystemconsulting.ca';
+
+    my $timestamp   = scalar localtime;
+    my $admin_link  = $c->uri_for('/user/admin_user_list')->as_string;
+
+    my $full_name   = join(' ', grep { $_ } ($user->first_name, $user->last_name)) || $user->username;
+
+    my $body = qq{
+Registration Complete (Step 3 of 3) — $sitename
+Time: $timestamp
+
+A user has completed full account setup and is now active:
+
+  Username  : } . $user->username . qq{
+  Full Name : $full_name
+  Email     : } . $user->email . qq{
+  User ID   : } . $user->id . qq{
+  Status    : } . ($user->status || 'active') . qq{
+  Roles     : } . ($user->roles || 'normal') . qq{
+
+The account is fully activated and the user can now log in.
+
+View user list: $admin_link
+
+This is an automated notification.
+};
+
+    my $email = Email::MIME->create(
+        header_str => [
+            From    => $smtp_config->{smtp_from} || 'noreply@' . $smtp_config->{smtp_host},
+            To      => $admin_email,
+            Subject => "[$sitename] Registration complete: " . $user->username,
+        ],
+        attributes => {
+            encoding => 'quoted-printable',
+            charset  => 'UTF-8',
+        },
+        body_str => $body,
+    );
+
+    return $self->send_email($c, $email, $smtp_config);
+}
+
 sub get_smtp_config {
     my ($self, $c, $sitename) = @_;
     

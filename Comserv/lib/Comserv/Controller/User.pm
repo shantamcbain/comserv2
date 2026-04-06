@@ -1036,6 +1036,28 @@ sub create_account :Local {
 }
 sub do_create_account :Local {
     my ($self, $c) = @_;
+
+    my $submitted_token = $c->request->params->{csrf_token} // '';
+    my $session_token   = $c->session->{csrf_token}         // '';
+    my $honeypot        = $c->request->params->{website}    // '';
+    my $reg_ip          = $c->req->address || 'unknown';
+
+    if ($honeypot ne '') {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+            "Bot detected (honeypot filled) from ip=$reg_ip");
+        $c->stash(error_msg => 'Registration failed. Please try again.', template => 'user/register.tt');
+        return;
+    }
+
+    if (!$submitted_token || !$session_token || $submitted_token ne $session_token) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+            "CSRF token mismatch from ip=$reg_ip");
+        $c->stash(error_msg => 'Your session has expired. Please try again.', template => 'user/register.tt');
+        return;
+    }
+
+    delete $c->session->{csrf_token};
+
     my $username = $c->request->params->{username} // '';
     my $email    = $c->request->params->{email}    // '';
 
@@ -1578,6 +1600,16 @@ sub complete_profile :Local {
         if ($@) {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'complete_profile',
                 "Failed to send welcome email: $@");
+        }
+
+        eval {
+            $self->email_notification->send_admin_profile_completion_notification($c, $user);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_profile',
+                "Admin Step 3 notification sent for user: " . $user->username);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'complete_profile',
+                "Failed to send admin Step 3 notification: $@");
         }
 
         my $final_redirect = $c->session->{return_to} || $c->uri_for('/user/login');
@@ -2665,8 +2697,10 @@ sub register :Local {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register',
             "Stored return_to in session: $return_to");
     }
-    
-    $c->stash(template => 'user/register.tt');
+
+    my $csrf_token = sha256_hex(time() . rand() . ($c->sessionid || ''));
+    $c->session->{csrf_token} = $csrf_token;
+    $c->stash(csrf_token => $csrf_token, template => 'user/register.tt');
 }
 sub welcome :Local {
     my ($self, $c) = @_;
