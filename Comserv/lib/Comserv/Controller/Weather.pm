@@ -66,21 +66,24 @@ sub index :Path('/Weather') :Args(0) {
 
     # Check weather configuration status
     my $config_status = $self->_check_weather_config($c);
-    
-    # Get sample weather data to show functionality
-    my $sample_weather = $self->_get_sample_weather_data($c);
-    
-    # Add debug info about configuration if debug mode is enabled
-    if ($c->session->{debug_mode}) {
-        push @{$c->stash->{debug_msg}}, "Configuration status checked";
-        push @{$c->stash->{debug_msg}}, "Sample weather data prepared";
+
+    # If configured, get real current weather data
+    my $current_weather;
+    if ($config_status->{api_configured}) {
+        $current_weather = try {
+            $self->_get_current_weather($c);
+        } catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+                "Error getting current weather for index: $_");
+            undef;
+        };
     }
 
     # Stash data for template
     $c->stash(
-        config_status => $config_status,
-        sample_weather => $sample_weather,
-        template => 'Weather/index.tt'
+        config_status   => $config_status,
+        current_weather => $current_weather,
+        template        => 'Weather/index.tt'
     );
 }
 

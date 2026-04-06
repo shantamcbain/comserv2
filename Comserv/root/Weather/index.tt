@@ -43,33 +43,75 @@
             </div>
         </div>
 
-        <!-- Sample Weather Display -->
+        <!-- Current Weather Display -->
         <div class="feature-card">
             <div class="feature-header">
-                <h3><i class="fas fa-thermometer-half feature-icon"></i>Weather Display Preview</h3>
+                <h3><i class="fas fa-thermometer-half feature-icon"></i>
+                    [% IF current_weather && current_weather.data_source != 'MOCK_DATA' %]
+                        Current Conditions — [% current_weather.location || config_status.api_service %]
+                    [% ELSE %]
+                        Weather Display Preview
+                    [% END %]
+                </h3>
             </div>
             <div class="feature-content">
-                <p>Here's how weather information will appear throughout your application:</p>
+                [% IF current_weather && current_weather.temperature.defined && current_weather.data_source != 'MOCK_DATA' %]
                 <div class="weather-preview">
                     <div class="weather-display-sample">
                         <div class="weather-current">
                             <div class="weather-icon">
-                                <i class="fas fa-[% sample_weather.icon == 'sunny' ? 'sun' : sample_weather.icon == 'partly-cloudy' ? 'cloud-sun' : 'cloud' %]"></i>
+                                [% IF current_weather.icon %]
+                                <img src="https://openweathermap.org/img/wn/[% current_weather.icon %]@2x.png"
+                                     alt="[% current_weather.condition | html %]" style="width:64px;height:64px;">
+                                [% ELSE %]
+                                <i class="fas fa-cloud-sun" style="font-size:3rem;"></i>
+                                [% END %]
                             </div>
                             <div class="weather-info">
-                                <div class="weather-temp">[% sample_weather.temperature %]&deg;C</div>
-                                <div class="weather-condition">[% sample_weather.condition %]</div>
+                                <div class="weather-temp">[% current_weather.temperature | format('%.1f') %]&deg;C</div>
+                                <div class="weather-condition">[% current_weather.description || current_weather.condition | html %]</div>
                                 <div class="weather-details">
-                                    Humidity: [% sample_weather.humidity %]% | 
-                                    Wind: [% sample_weather.wind_speed %]km/h [% sample_weather.wind_direction %]
+                                    Humidity: [% current_weather.humidity %]% |
+                                    Wind: [% current_weather.wind_speed | format('%.1f') %] m/s
                                 </div>
+                                [% IF current_weather.data_source %]
+                                <div class="weather-source">
+                                    <small class="text-muted"><i class="fas fa-database"></i>
+                                        [% IF current_weather.data_source == 'CACHED_FALLBACK' %]Cached (may be stale)
+                                        [% ELSIF current_weather.data_source == 'DATABASE' %]From database cache
+                                        [% ELSE %]Live from [% current_weather.data_source | html %]
+                                        [% END %]
+                                    </small>
+                                </div>
+                                [% END %]
                             </div>
-                        </div>
-                        <div class="weather-note">
-                            <small><i class="fas fa-info-circle"></i> This is sample data. Real weather will appear once configured.</small>
                         </div>
                     </div>
                 </div>
+                [% ELSE %]
+                <p>Here's how weather information will appear throughout your application:</p>
+                <div class="weather-preview">
+                    <div class="weather-display-sample">
+                        <div class="weather-current">
+                            <div class="weather-icon"><i class="fas fa-cloud-sun" style="font-size:3rem;"></i></div>
+                            <div class="weather-info">
+                                <div class="weather-temp">18&deg;C</div>
+                                <div class="weather-condition">Clear Sky</div>
+                                <div class="weather-details">Humidity: 45% | Wind: 3.3 m/s NW</div>
+                            </div>
+                        </div>
+                        <div class="weather-note">
+                            <small><i class="fas fa-info-circle"></i>
+                                [% IF config_status.api_configured %]
+                                    Weather data is being fetched. Check back shortly or run the weather poller.
+                                [% ELSE %]
+                                    Sample data. Real weather will appear once configured.
+                                [% END %]
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                [% END %]
             </div>
         </div>
 
