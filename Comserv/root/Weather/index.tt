@@ -47,7 +47,7 @@
         <div class="feature-card">
             <div class="feature-header">
                 <h3><i class="fas fa-thermometer-half feature-icon"></i>
-                    [% IF current_weather && current_weather.data_source != 'MOCK_DATA' %]
+                    [% IF current_weather && current_weather.data_source.defined && current_weather.data_source ne 'MOCK_DATA' %]
                         Current Conditions — [% current_weather.location || config_status.api_service %]
                     [% ELSE %]
                         Weather Display Preview
@@ -55,7 +55,7 @@
                 </h3>
             </div>
             <div class="feature-content">
-                [% IF current_weather && current_weather.temperature.defined && current_weather.data_source != 'MOCK_DATA' %]
+                [% IF current_weather && current_weather.temperature.defined && current_weather.data_source ne 'MOCK_DATA' %]
                 <div class="weather-preview">
                     <div class="weather-display-sample">
                         <div class="weather-current">
