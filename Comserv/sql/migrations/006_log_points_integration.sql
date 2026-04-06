@@ -21,6 +21,11 @@ ALTER TABLE `log`
     ADD COLUMN IF NOT EXISTS `point_rate` DECIMAL(10,4) NULL
         COMMENT 'Override pts/hr for this session. NULL = inherit from todo or system default';
 
+-- If the column already exists without DEFAULT 0, fix it:
+ALTER TABLE `log`
+    MODIFY COLUMN `points_processed` TINYINT(1) NOT NULL DEFAULT 0
+        COMMENT '1 once billing/earning has been applied for this closed session';
+
 -- -----------------------------------------------------------------------------
 -- todo: billing settings per task
 -- billable: 0 = internal/non-billable, 1 = charge customer when log is closed
