@@ -430,6 +430,52 @@ sub _check_weather_config {
     };
 }
 
+sub poll_now :Path('/Weather/poll') :Args(0) {
+    my ($self, $c) = @_;
+
+    my @roles = @{$c->session->{roles} || []};
+    unless (grep { /^admin$/i } @roles) {
+        $c->flash->{error_msg} = 'Admin access required to run weather poll.';
+        $c->response->redirect($c->uri_for('/Weather'));
+        return;
+    }
+
+    my $config = try {
+        $self->weather_model->get_weather_config();
+    } catch { undef };
+
+    unless ($config && $config->{api_key}) {
+        $c->flash->{error_msg} = 'Weather is not configured. Please set up the API key first.';
+        $c->response->redirect($c->uri_for('/Weather/configuration'));
+        return;
+    }
+
+    my $result = try {
+        $self->weather_api->api_key($config->{api_key});
+        $self->weather_api->api_service($config->{api_service} || 'openweathermap');
+        my $data = $self->weather_api->get_current_weather($config);
+        $self->weather_model->cache_weather_data($config->{id}, 'current', $data);
+        $self->weather_model->record_weather_history($config->{id}, $data);
+        $c->session->{last_weather} = $self->_format_weather_response($data);
+        return $data;
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'poll_now',
+            "Manual poll failed: $_");
+        return undef;
+    };
+
+    if ($result) {
+        $c->flash->{success_msg} = 'Weather data updated: '
+            . sprintf('%.1f', $result->{temperature} // 0) . '°C, '
+            . ($result->{condition_description} || $result->{condition_main} || 'n/a')
+            . ' at ' . ($result->{location_name} || $config->{location_value} || '?');
+    } else {
+        $c->flash->{error_msg} = 'Weather poll failed. Check API key and location settings.';
+    }
+
+    $c->response->redirect($c->uri_for('/Weather'));
+}
+
 sub _get_sample_weather_data {
     my ( $self, $c ) = @_;
     
