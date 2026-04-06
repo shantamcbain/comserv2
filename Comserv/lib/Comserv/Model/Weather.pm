@@ -217,6 +217,7 @@ sub record_weather_history {
             pressure              => $data->{pressure},
             wind_speed            => $data->{wind_speed},
             cloudiness            => $data->{cloudiness},
+            precipitation         => $data->{precipitation},
             condition_main        => $data->{condition_main},
             condition_description => $data->{condition_description},
             weather_icon          => $data->{weather_icon},
