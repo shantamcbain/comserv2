@@ -193,7 +193,7 @@
                     </div>
                     [% END %]
                     <div style="margin-top:5px;text-align:right;">
-                        <a href="/project/dependency_form" style="font-size:0.85em;color:#6f42c1;">Manage dependencies →</a>
+                        <a href="/project/dependency_form" style="font-size:0.85em;color:#6f42c1;">+ Manage Dependencies</a>
                     </div>
                 </div>
             </details>
