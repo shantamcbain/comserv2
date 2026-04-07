@@ -481,6 +481,12 @@ sub generate :Local :Args(0) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
             'generate', "ENCY agent: injected system prompt");
     }
+
+    if (lc($normalized_agent_type) =~ /^bmaster$/ && !$system) {
+        $system = $self->_build_bmaster_system_prompt($c);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'generate', "BMaster agent: injected system prompt");
+    }
     
     # Require login for external AI models (Grok etc.) before entering try block
     if (lc($provider) eq 'grok' && $is_guest) {
@@ -1682,6 +1688,9 @@ sub chat :Local :Args(0) {
     }
     if (lc($chat_agent_id) eq 'ency' && !$chat_agent_system) {
         $chat_agent_system = $self->_build_ency_system_prompt($c);
+    }
+    if (lc($chat_agent_id) =~ /^bmaster$/ && !$chat_agent_system) {
+        $chat_agent_system = $self->_build_bmaster_system_prompt($c);
     }
 
     # Build combined system prompt: agent-specific prompt + role prompt + live module data + shared KB
@@ -3552,6 +3561,67 @@ sub _get_module_data {
             '_get_module_data', "ENCY herb fetch error: $@") if $@;
     }
 
+    # --- BMaster / Apiary live data ---
+    # Always inject for bmaster agent; also inject on hive/bee/apiary keyword match
+    my $is_bmaster_agent = lc($agent_id) =~ /^bmaster$/;
+    if ($is_bmaster_agent || $prompt =~ /hive|apiary|yard|queen|varroa|swarm|inspect|honey|harvest|brood|beekeeper|bee\s*keep/i) {
+        eval {
+            my $schema = $c->model('DBEncy')->schema;
+            if ($schema) {
+                # Fetch yards for this site
+                my @yards = $schema->resultset('Yard')->search(
+                    { sitename => $site_name },
+                    { order_by => 'yard_name' }
+                )->all;
+
+                if (@yards) {
+                    my @yard_lines;
+                    for my $y (@yards) {
+                        my $hive_count = $schema->resultset('Hive')->search({
+                            yard_id => $y->id,
+                            status  => 'active',
+                        })->count;
+                        push @yard_lines, sprintf("  Yard: %s (%s) — %d active hive(s) of %d capacity | Status: %s%s",
+                            $y->yard_name // $y->yard_code,
+                            $y->yard_code,
+                            $hive_count,
+                            $y->yard_size // 0,
+                            $y->status // 'unknown',
+                            ($y->notes ? " | Notes: " . substr($y->notes, 0, 80) : '')
+                        );
+
+                        # Show hives if bmaster agent or hive keywords
+                        if ($is_bmaster_agent || $prompt =~ /hive|queen|inspect|brood/i) {
+                            my @hives = $schema->resultset('Hive')->search(
+                                { yard_id => $y->id },
+                                { order_by => 'hive_number', rows => 10 }
+                            )->all;
+                            for my $h (@hives) {
+                                my $last_insp = $schema->resultset('Inspection')->search(
+                                    { hive_id => $h->id },
+                                    { order_by => { -desc => 'inspection_date' }, rows => 1 }
+                                )->first;
+                                push @yard_lines, sprintf("    Hive #%s [ID=%d] — Status: %s%s%s",
+                                    $h->hive_number,
+                                    $h->id,
+                                    $h->status,
+                                    ($h->queen_code ? " | Queen: ${\$h->queen_code}" : ''),
+                                    ($last_insp ? " | Last inspection: ${\$last_insp->inspection_date} (${\$last_insp->overall_status})" : ' | No inspections recorded')
+                                );
+                            }
+                        }
+                    }
+                    push @sections,
+                        "LIVE APIARY DATA for site '$site_name':\n"
+                        . join("\n", @yard_lines)
+                        . "\nManage apiary at /Apiary | Hive management at /Apiary/HiveManagement";
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_get_module_data', "BMaster apiary fetch error: $@") if $@;
+    }
+
     return join("\n\n", @sections);
 }
 
@@ -4174,7 +4244,7 @@ sub _select_model_for_context {
         chat        => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral'],
         helpdesk    => ['llama3.1', 'llama3', 'mistral'],
         ency        => ['phi4', 'llama3.1', 'llama3', 'mistral'],
-        bmaster     => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral'],
+        bmaster     => ['phi4', 'llama3.1', 'llama3', 'mistral'],
         csc         => ['llama3.1', 'llama3', 'mistral'],
         general     => ['llama3.1', 'llama3', 'mistral'],
         navigation  => ['llama3.1', 'llama3'],
@@ -6454,6 +6524,127 @@ sub support_send :Local :Args(1) {
     }
 
     $c->response->body(encode_json({ success => JSON::true }));
+}
+
+=head2 _build_bmaster_system_prompt
+
+Builds a BMaster beekeeping-aware system prompt for the AI when agent_id is 'bmaster'.
+Bee-welfare philosophy: not agribiz-driven, always answers with the bees' best interests first.
+Includes full apiary schema, seasonal calendar, editor workflow, and cross-context awareness.
+
+=cut
+
+sub _build_bmaster_system_prompt {
+    my ($self, $c) = @_;
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'BMaster';
+    my $username  = $c->session->{username} || 'the user';
+    my $is_admin  = do {
+        my $roles = $c->session->{roles} || [];
+        $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
+        grep { /^(admin|developer|editor|site_admin)$/i } @$roles;
+    };
+
+    my $editor_section = $is_admin ? <<'EDITOR' : '';
+EDITOR / ADMIN WORKFLOW:
+- Add/edit a yard (apiary location): /Apiary/add_yard | /Apiary/edit_yard?id=ID
+- Add/edit a hive: /Apiary/add_hive | /Apiary/edit_hive?id=ID
+- Record a hive inspection: /Apiary/add_inspection?hive_id=ID
+- Record a treatment: /Apiary/add_treatment?hive_id=ID
+- Record a honey harvest: /Apiary/add_harvest?hive_id=ID
+- Manage queens: /Apiary/QueenRearing
+- View hive management: /Apiary/HiveManagement
+- View bee health: /Apiary/BeeHealth
+- When the user asks to "add", "record", "log", "edit", or "update" apiary data,
+  provide the direct URL for that action — do not just describe the steps.
+EDITOR
+
+    return <<END_PROMPT;
+You are the expert BMaster beekeeping assistant for $site_name.
+
+PHILOSOPHY — This system is NOT driven by agribusiness profits. It is designed around
+what is best for the bees and healthy, sustainable apiculture:
+- Prioritize bee colony health and longevity over maximum honey extraction
+- Prefer integrated pest management (IPM) and natural treatments before chemical options
+- Respect the natural colony cycle — swarming is natural reproduction, not just a loss
+- Minimal intervention: inspect only when necessary, disturb colonies as little as possible
+- Forage diversity and habitat health are as important as hive management
+- Share knowledge freely — hobbyist and commercial beekeepers both matter
+
+CROSS-CONTEXT AWARENESS:
+When asked about insects, answer with bees in mind — how does this insect interact with
+bee colonies? Is it a predator, competitor, or neutral? (e.g., yellow jackets compete for
+forage and rob weak colonies; hover flies are harmless pollinators; small hive beetle is
+a significant pest in warm climates)
+When asked about herbs or plants, think: Is this a bee forage plant? Does it offer nectar,
+pollen, or both? What season? Is it safe near hives?
+When asked about health/medicine, consider whether any treatments affect bees or honey safety.
+
+DATABASE SCHEMA — BMaster / Apiary tables:
+- Yard: id, yard_code, yard_name, yard_size, current (hive count), total_yard_size,
+        sitename, status, comments, notes
+- Hive: id, hive_number, yard_id, pallet_code, queen_code,
+        status (active/inactive/dead/split/combined), owner, sitename, notes
+- Inspection: id, hive_id, inspection_date, start/end_time, weather_conditions, temperature,
+              inspector, inspection_type (routine/disease_check/harvest/treatment/emergency),
+              overall_status (excellent/good/fair/poor/critical),
+              queen_seen, queen_marked, eggs_seen, larvae_seen, capped_brood_seen,
+              supersedure_cells, swarm_cells, queen_cells,
+              population_estimate (very_strong/strong/moderate/weak/very_weak),
+              temperament (calm/moderate/aggressive/very_aggressive),
+              general_notes, action_required, next_inspection_date
+- Queen: id, tag_number, birth_date, breed, origin, mating_status,
+         introduction_date, removal_date, performance_rating, health_status, comments
+- Treatment: id, hive_id, treatment_date,
+             treatment_type (varroa/nosema/foulbrood/tracheal_mite/small_hive_beetle/wax_moth/other),
+             product_name, dosage, application_method (strip/drench/dust/spray/fumigation/feeding),
+             duration_days, withdrawal_period_days, effectiveness, applied_by, notes
+- HoneyHarvest: id, hive_id, harvest_date, honey_type (spring/summer/fall/wildflower/clover/basswood/other),
+                weight_kg, weight_lbs, moisture_content, quality_grade (grade_a/b/c/comb_honey),
+                harvested_by, processing_notes, storage_location
+- Box: hive_id, box_position, box_type, status — supers and brood boxes
+- HiveFrame: box_id, frame_position, frame_type, status — individual frames
+- HiveConfiguration: hive setup templates
+- HiveFrame: linked to Box (frame-level detail)
+
+NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
+- BMaster dashboard: /BMaster
+- Apiary overview: /Apiary
+- Hive management: /Apiary/HiveManagement
+- Queen rearing: /Apiary/QueenRearing
+- Bee health: /Apiary/BeeHealth
+- Bee pasture / forage plants: /BMaster/bee_pasture  (→ /ENCY/BeePastureView)
+- Honey production: /BMaster/honey
+- Environment / habitat: /BMaster/environment
+- Education: /BMaster/education
+- ENCY herb/plant search: /ENCY/search?q=TERM
+- ENCY bee forage view: /ENCY/BeePastureView
+- Workshops (local beekeeping events): /workshop
+- Membership: /membership
+$editor_section
+DATA ALREADY INJECTED:
+The server automatically injects LIVE APIARY DATA (yards, hive counts) below when available.
+ALWAYS use this live data — do not ask the user to describe their apiary setup.
+
+SEASONAL BEEKEEPING CALENDAR (Northern Hemisphere — adapt for local climate):
+- Late Winter / Early Spring: Feed if stores low; watch for first cleansing flights; plan splits
+- Spring (buildup): Add supers ahead of nectar flow; monitor for swarm cells; requeen if needed
+- Early Summer (nectar flow): Minimal disturbance; check supers filling; watch for supercedure
+- Mid Summer (dearth): Robbing risk increases; reduce entrances; treat for varroa after flow
+- Late Summer / Fall: Final varroa treatment; ensure winter stores (≥30 kg / 60 lbs); reduce entrance
+- Winter: No inspections unless emergency; heft hives monthly to check stores; ventilation essential
+
+COMMON ISSUES AND IPM APPROACH:
+- Varroa destructor: Count mites before treating (sugar roll / alcohol wash / sticky board).
+  Prefer oxalic acid (OA) vaporization during broodless period. Apivar/Apistan as backup.
+- Nosema: Promote good nutrition and forage diversity; restock with young bees if heavy infection
+- American Foulbrood (AFB): Notifiable disease — contact provincial/state apiarist immediately
+- Small Hive Beetle: Maintain strong colonies; beetle traps; good ventilation
+- Wax Moth: Not a problem in strong colonies; keep colony populous
+- Swarming: Natural — manage with splits, adding space, or supering promptly
+
+The current user is: $username
+END_PROMPT
 }
 
 =head2 _build_ency_system_prompt
