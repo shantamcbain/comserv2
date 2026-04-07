@@ -1287,11 +1287,18 @@ sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
         }
 
         my ($ok, $new_id) = $c->model('ENCYModel')->add_constituent($c, $data);
-        if ($ok && $new_id && $data->{found_in_herbs}) {
-            $c->model('ENCYModel')->auto_link_herb_constituent($c, $new_id, $data->{found_in_herbs});
+        if ($ok && $new_id) {
+            if ($data->{found_in_herbs}) {
+                $c->model('ENCYModel')->auto_link_herb_constituent($c, $new_id, $data->{found_in_herbs});
+            }
+            my $resolve = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'constituent', $new_id, $data);
+            my $n_linked = scalar @{ $resolve->{linked} || [] };
+            my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
+            $c->flash->{success_msg} = "Constituent added. Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
+        } else {
+            $c->flash->{success_msg} = 'Constituent added successfully.';
         }
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_constituent', "Constituent added: $data->{name}");
-        $c->flash->{success_msg} = 'Constituent added successfully.';
         $c->response->redirect($c->uri_for('/ENCY/Constituent'));
         return;
     }
@@ -1377,9 +1384,12 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
             if ($data->{found_in_herbs}) {
                 $c->model('ENCYModel')->auto_link_herb_constituent($c, $record_id, $data->{found_in_herbs});
             }
+            my $resolve = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'constituent', $record_id, $data);
+            my $n_linked = scalar @{ $resolve->{linked} || [] };
+            my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_constituent',
                 "Constituent updated successfully for record_id: $record_id");
-            $c->flash->{success_msg} = "Constituent details updated successfully.";
+            $c->flash->{success_msg} = "Constituent updated. Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
             $c->response->redirect($c->uri_for('/ENCY/Constituent', $record_id));
             return;
         } else {
@@ -1888,7 +1898,14 @@ sub add_drug : Path('/ENCY/Drug/add') : Args(0) {
             );
             return;
         }
-        $c->flash->{success_msg} = 'Drug added successfully.';
+        if ($new_id) {
+            my $resolve = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'drug', $new_id, $data);
+            my $n_linked = scalar @{ $resolve->{linked} || [] };
+            my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
+            $c->flash->{success_msg} = "Drug added. Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
+        } else {
+            $c->flash->{success_msg} = 'Drug added successfully.';
+        }
         $c->response->redirect($c->uri_for('/ENCY/Drug', $new_id ? ($new_id) : ()));
         return;
     }
@@ -1987,9 +2004,12 @@ sub edit_drug : Path('/ENCY/Drug/edit') : Args(0) {
         my ($status, $msg) = $c->model('ENCYModel')->update_drug($c, $record_id, $data);
 
         if ($status) {
+            my $resolve = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'drug', $record_id, $data);
+            my $n_linked = scalar @{ $resolve->{linked} || [] };
+            my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_drug',
                 "Drug updated successfully for record_id: $record_id");
-            $c->flash->{success_msg} = "Drug details updated successfully.";
+            $c->flash->{success_msg} = "Drug updated. Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
             $c->response->redirect($c->uri_for('/ENCY/Drug', $record_id));
             return;
         } else {
