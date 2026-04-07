@@ -37,7 +37,7 @@
     <div class="forecast-strip">
         [% FOREACH day IN forecast_data.forecast %]
         <div class="forecast-day-card">
-            <div class="forecast-day-name">[% day.date %]</div>
+            <div class="forecast-day-name">[% day.date_label || day.date | html %]</div>
             <div class="forecast-icon-wrap">
                 <img src="https://openweathermap.org/img/wn/[% day.icon %]@2x.png"
                      alt="[% day.condition | html %]" width="60" height="60">
