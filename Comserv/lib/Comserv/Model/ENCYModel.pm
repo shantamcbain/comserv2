@@ -1413,5 +1413,136 @@ sub find_herb_by_name {
     return $herb;
 }
 
+sub _create_ency_todo {
+    my ($self, $c, $subject, $description) = @_;
+    eval {
+        my $now = DateTime->now->strftime('%Y-%m-%d');
+        $c->model('DBEncy')->resultset('Todo')->create({
+            sitename          => $c->stash->{SiteName} || 'ENCY',
+            subject           => substr($subject, 0, 254),
+            description       => $description,
+            status            => 'New',
+            priority          => 3,
+            share             => 0,
+            project_code      => 'ENCY',
+            project_id        => 1,
+            username_of_poster => $c->session->{username} || 'system',
+            group_of_poster   => $c->session->{group}    || 'admin',
+            last_mod_by       => 'system',
+            start_date        => $now,
+            due_date          => $now,
+            last_mod_date     => $now,
+            date_time_posted  => $now,
+        });
+        1;
+    } or do {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_create_ency_todo', "Failed to create todo: $@");
+    };
+}
+
+my %FIELD_MAPPINGS = (
+    found_in_herbs        => { schema => 'forager', resultset => 'Herb',        fields => ['common_names','botanical_name'] },
+    herbal_alternatives   => { schema => 'forager', resultset => 'Herb',        fields => ['common_names','botanical_name'] },
+    herb_drug_interactions=> { schema => 'forager', resultset => 'Herb',        fields => ['common_names','botanical_name'] },
+    found_in_foods        => { schema => 'forager', resultset => 'Herb',        fields => ['common_names','botanical_name'] },
+    found_in_drugs        => { schema => 'ency',    resultset => 'Drug',        fields => ['generic_name','brand_name'] },
+    active_ingredients    => { schema => 'ency',    resultset => 'Constituent', fields => ['name','common_name'] },
+    constituents          => { schema => 'ency',    resultset => 'Constituent', fields => ['name','common_name'] },
+    therapeutic_action    => { schema => 'ency',    resultset => 'Glossary',    fields => ['term'] },
+    pharmacological_effects=> { schema => 'ency',   resultset => 'Glossary',    fields => ['term'] },
+    indications           => { schema => 'ency',    resultset => 'Disease',     fields => ['common_name','scientific_name'] },
+    contraindications     => { schema => 'ency',    resultset => 'Disease',     fields => ['common_name','scientific_name'] },
+    side_effects          => { schema => 'ency',    resultset => 'Symptom',     fields => ['name','common_name'] },
+    symptoms_description  => { schema => 'ency',    resultset => 'Symptom',     fields => ['name','common_name'] },
+);
+
+my @STOP_WORDS = qw(and or the a an of in on at to with for by from as is are was were be been being
+                    have has had do does did will would could should may might shall can shall
+                    not no nor but if then than also both either neither);
+
+sub auto_resolve_text_fields {
+    my ($self, $c, $entity_type, $entity_id, $data) = @_;
+    my %result = ( linked => [], unresolved => [], errors => [] );
+
+    my %stop = map { lc($_) => 1 } @STOP_WORDS;
+
+    while (my ($field, $mapping) = each %FIELD_MAPPINGS) {
+        my $text = $data->{$field};
+        next unless defined $text && length($text) > 2;
+
+        my $schema_obj = $mapping->{schema} eq 'ency'
+            ? $self->ency_schema
+            : $self->forager_schema;
+
+        my @terms = grep { length($_) > 2 && !$stop{lc($_)} }
+                    map  { s/^\s+|\s+$//gr }
+                    split /[,;\n\r|]+/, $text;
+
+        for my $term (@terms) {
+            next if $term =~ /^\d+(\.\d+)?$/;
+
+            my $found;
+            eval {
+                for my $col (@{ $mapping->{fields} }) {
+                    $found = $schema_obj->resultset($mapping->{resultset})->search(
+                        { $col => { like => "%$term%" } },
+                        { rows => 1 }
+                    )->first;
+                    last if $found;
+                }
+                1;
+            } or do {
+                push @{ $result{errors} }, "$field/$term: $@";
+                next;
+            };
+
+            if ($found) {
+                my $linked_id = $found->record_id;
+                my $link_key = lc($entity_type) . '_' . lc($mapping->{resultset});
+                my $link_method = "link_${link_key}";
+                if ($self->can($link_method)) {
+                    eval {
+                        $self->$link_method($c, $entity_id, $linked_id);
+                        push @{ $result{linked} }, {
+                            field   => $field,
+                            term    => $term,
+                            matched => ($found->can('common_name') ? $found->common_name : '') || ($found->can('name') ? $found->name : '') || $linked_id,
+                        };
+                        1;
+                    } or do {
+                        push @{ $result{errors} }, "link $entity_type#$entity_id → $mapping->{resultset}#$linked_id: $@";
+                    };
+                } else {
+                    push @{ $result{linked} }, {
+                        field   => $field,
+                        term    => $term,
+                        matched => $linked_id,
+                        note    => "no link method '$link_method' — record exists but not linked",
+                    };
+                }
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto_resolve_text_fields',
+                    "Resolved '$term' in $field → $mapping->{resultset}#$linked_id");
+            } else {
+                push @{ $result{unresolved} }, { field => $field, term => $term };
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto_resolve_text_fields',
+                    "Unresolved term '$term' in $entity_type#$entity_id field '$field'");
+                $self->_create_ency_todo($c,
+                    "ENCY: Unresolved term in $entity_type#$entity_id",
+                    "Field: $field\nTerm: $term\nEntity: $entity_type #$entity_id\n\n" .
+                    "This term was found in the '$field' field but does not match any existing ENCY record. " .
+                    "Please verify and add it as a new $mapping->{resultset} entry if valid."
+                );
+            }
+        }
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto_resolve_text_fields',
+        sprintf("Resolve complete for %s#%s: %d linked, %d unresolved, %d errors",
+            $entity_type, $entity_id,
+            scalar @{ $result{linked} }, scalar @{ $result{unresolved} }, scalar @{ $result{errors} }));
+
+    return \%result;
+}
+
 __PACKAGE__->meta->make_immutable;
 1;
