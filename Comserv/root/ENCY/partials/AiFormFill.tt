@@ -1,4 +1,4 @@
-[% IF is_admin %]
+[% IF is_editor %]
 <div id="ency-ai-fill-panel" style="margin:1em 0;padding:1em;border:1px solid #acd;background:#f0f7ff;border-radius:6px;">
   <strong>Ask AI to Fill Form</strong>
   <span id="ency-ai-prompt-data" data-prompt="[% ency_ai_prompt | html %]" style="display:none;"></span>
@@ -6,9 +6,7 @@
     <input type="text" id="ency-ai-entity-name" placeholder="Enter name to look up…" size="38" />
     <select id="ency-ai-model-sel" title="AI model to use" style="font-size:0.9em;">
       <option value="grok-3-mini|grok">Grok 3 Mini (fast)</option>
-      <option value="grok-3|grok" selected>Grok 3 (recommended)</option>
-      <option value="claude-3-5-sonnet-20241022|anthropic">Claude 3.5 Sonnet</option>
-      <option value="gemini-1.5-flash|gemini">Gemini 1.5 Flash</option>
+      <option value="grok-3|grok" selected>Grok 3 (best holistic responses)</option>
     </select>
     <button type="button" id="ency-ai-ask-btn" onclick="encyAiFill()">Ask AI</button>
     <span id="ency-ai-status" style="color:#555;font-style:italic;font-size:0.9em;"></span>
@@ -20,7 +18,7 @@
     </label>
     <span style="margin-left:1em;color:#888;">
       Note: The <em>Reference</em> field is always appended, never replaced.
-      Grok 4 has been removed — it refuses to present holistic/integrative health perspectives.
+      Grok 4 removed (refuses integrative framing). Claude/Gemini not yet wired as providers.
     </span>
   </div>
   <div id="ency-ai-raw" style="display:none;margin-top:0.8em;">

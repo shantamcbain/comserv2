@@ -27,7 +27,7 @@
 [% IF edit_mode == 0 %]
     <div>
         <a href="[% c.uri_for('/ENCY/BotanicalNameView') %]">Back to Botanical Name View</a>
-        [% IF is_admin %]
+        [% IF is_editor %]
             <a href="/ENCY/edit_herb">Edit Herb</a>
         [% END %]
     </div>
