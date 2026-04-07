@@ -80,8 +80,8 @@ sub index :Path('/ENCY') :Args(0) {
     );
 }
 
-sub plants             : Path('/ENCY/plants')              : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/botanical_name_view')) }
-sub herbs_alias        : Path('/ENCY/herbs')               : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/botanical_name_view')) }
+sub plants             : Path('/ENCY/plants')              : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/BotanicalNameView')) }
+sub herbs_alias        : Path('/ENCY/herbs')               : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/BotanicalNameView')) }
 sub animals_alias      : Path('/ENCY/animals')             : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Animal')) }
 sub insects_alias      : Path('/ENCY/insects')             : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Insect')) }
 sub constituents_alias : Path('/ENCY/constituents')        : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Constituent')) }
@@ -230,9 +230,10 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
 
     $self->_stash_image_files($c);
     $c->stash(
-        herb => $herb,
-        mode => 'view',
-        template => 'ENCY/HerbView.tt');
+        herb      => $herb,
+        edit_mode => 0,
+        template  => 'ENCY/HerbView.tt',
+    );
 }
 sub get_reference_by_id :Local {
     my ( $self, $c, $id ) = @_;
