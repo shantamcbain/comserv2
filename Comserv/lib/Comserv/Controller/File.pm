@@ -1907,6 +1907,7 @@ sub nfs_allocations :Path('/file/nfs_allocations') :Args(0) {
         {
             id          => $alloc->id,
             sitename    => $alloc->sitename,
+            site_id     => $alloc->site_id,
             nfs_path    => $alloc->nfs_path,
             description => $alloc->description,
             is_active   => $alloc->is_active,
@@ -2145,14 +2146,13 @@ sub nfs_allocation_edit :Path('/file/nfs_allocation_edit') :Args(1) {
 
     # Ensure nfs_path is absolute
     my $nfs_root = $self->_nfs_root_for_sync();
-    unless (CORE::index($nfs_path, '/') == 0 || CORE::index($nfs_path, $nfs_root) == 0) {
+    unless (CORE::index($nfs_path, '/') == 0) {
         $nfs_path = "$nfs_root/$nfs_path";
     }
 
-    # Security check: Prevent allocation of sensitive paths
-    my ($allowed, $nr) = $self->_is_path_allowed($c, $nfs_path, $is_csc, $alloc_sitename, $nfs_root);
-    unless ($allowed) {
-        $c->flash->{error_msg} = "Access denied: cannot allocate to sensitive or unauthorized path '$nfs_path'.";
+    # Block only obviously dangerous system paths
+    if ($nfs_path =~ m{^/(etc|proc|sys|boot|dev)\b} || $nfs_path eq '/') {
+        $c->flash->{error_msg} = "Cannot allocate a system path: '$nfs_path'.";
         $c->response->redirect($c->uri_for('/file/nfs_allocations'));
         return;
     }
