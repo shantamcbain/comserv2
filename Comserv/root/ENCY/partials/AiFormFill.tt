@@ -210,8 +210,10 @@
                         if (!matched) skipped.push(key + '=' + val);
                     } else {
                         // TEXT / TEXTAREA: skip if already has content and not overriding
+                        // Exception: if this field was explicitly targeted, always override
                         var currentVal = (el.value || '').trim();
-                        if (currentVal && !overrideAll) {
+                        var isTargeted = targetFields.length && targetFields.indexOf(key.toLowerCase()) !== -1;
+                        if (currentVal && !overrideAll && !isTargeted) {
                             skipped.push(key);
                             return;
                         }
