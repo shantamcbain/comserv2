@@ -141,6 +141,11 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
     # Handle POST request for herb updates (if applicable)
     if ($c->request->method eq 'POST') {
         my $p = $c->request->params;
+        my $_clean_url = sub {
+            my $u = shift // '';
+            return '' if $u =~ m{workstation\.local|bmast\.local|localhost|127\.0\.0\.1|/ENCY/entry/}i;
+            return $u;
+        };
         my $form_data = {
             botanical_name     => $p->{botanical_name}     // '',
             common_names       => $p->{common_names}       // '',
@@ -157,7 +162,7 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
             odour              => $p->{odour}              // '',
             root               => $p->{root}               // '',
             image              => $p->{image}              // '',
-            url                => $p->{url}                // '',
+            url                => $_clean_url->($p->{url}),
             distribution       => $p->{distribution}       // '',
             cultivation        => $p->{cultivation}        // '',
             harvest            => $p->{harvest}            // '',
@@ -192,9 +197,12 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
         if ($status) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_herb',
                 "Herb updated successfully for record_id: $record_id.");
+            my ($auto_linked, $unresolved) = $c->model('ENCYModel')->auto_link_herb_data($c, $record_id, $form_data);
             my $updated_herb = $c->model('DBForager')->get_herb_by_id($record_id) || $herb;
+            my $link_msg = $auto_linked ? " Auto-linked $auto_linked record(s)." : '';
+            my $todo_msg = $unresolved   ? " $unresolved unresolved term(s) logged as todos." : '';
             $c->stash(
-                success_msg => "Herb details updated successfully.",
+                success_msg => "Herb updated successfully.$link_msg$todo_msg",
                 herb        => $updated_herb,
                 edit_mode   => 0,
                 template    => 'ENCY/HerbView.tt',
@@ -228,6 +236,9 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
                          . 'therapeutic_action, medical_uses, constituents, solvents, dosage, administration, '
                          . 'formulas, contra_indications, preparation, chinese, vetrinary, homiopathic, '
                          . 'pollinator, pollennotes, nectarnotes, non_med, culinary, history, reference. '
+                         . 'IMPORTANT for url field: use a real external URL (Wikipedia, Plants.USDA.gov, '
+                         . 'Botanical.com, etc.) — NEVER generate internal application URLs like '
+                         . 'workstation.local, localhost, or /ENCY/entry/... — leave url blank if unknown. '
                          . 'For integrative fields (therapeutic_action, medical_uses, preparation) include '
                          . 'conventional, herbal, TCM, Ayurvedic, and naturopathic perspectives where known.',
         template        => 'ENCY/HerbView.tt',
@@ -529,6 +540,11 @@ sub edit_animal : Path('/ENCY/Animal/edit') : Args(0) {
 
     if ($c->request->method eq 'POST') {
         my $p = $c->request->body_parameters;
+        my $_clean_url = sub {
+            my $u = shift // '';
+            return '' if $u =~ m{workstation\.local|bmast\.local|localhost|127\.0\.0\.1|/ENCY/entry/}i;
+            return $u;
+        };
         my $data = {
             common_name          => $p->{common_name}          // '',
             scientific_name      => $p->{scientific_name}      // '',
@@ -549,7 +565,7 @@ sub edit_animal : Path('/ENCY/Animal/edit') : Args(0) {
             conservation_status  => $p->{conservation_status}  // '',
             constituents         => $p->{constituents}         // '',
             image                => $p->{image}                // '',
-            url                  => $p->{url}                  // '',
+            url                  => $_clean_url->($p->{url}),
             history              => $p->{history}              // '',
             reference            => $p->{reference}            // '',
         };
@@ -557,9 +573,12 @@ sub edit_animal : Path('/ENCY/Animal/edit') : Args(0) {
         my ($status, $msg) = $c->model('ENCYModel')->update_animal($c, $record_id, $data);
 
         if ($status) {
+            my $resolve  = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'animal', $record_id, $data);
+            my $n_linked = scalar @{ $resolve->{linked}     || [] };
+            my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_animal',
                 "Animal updated successfully for record_id: $record_id");
-            $c->flash->{success_msg} = "Animal details updated successfully.";
+            $c->flash->{success_msg} = "Animal updated. Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
             $c->response->redirect($c->uri_for('/ENCY/Animal', $record_id));
             return;
         } else {
@@ -753,6 +772,11 @@ sub edit_insect : Path('/ENCY/Insect/edit') : Args(0) {
 
     if ($c->request->method eq 'POST') {
         my $p = $c->request->body_parameters;
+        my $_clean_url = sub {
+            my $u = shift // '';
+            return '' if $u =~ m{workstation\.local|bmast\.local|localhost|127\.0\.0\.1|/ENCY/entry/}i;
+            return $u;
+        };
         my $data = {
             common_name       => $p->{common_name}       // '',
             scientific_name   => $p->{scientific_name}   // '',
@@ -772,7 +796,7 @@ sub edit_insect : Path('/ENCY/Insect/edit') : Args(0) {
             pest_notes        => $p->{pest_notes}        // '',
             beneficial_notes  => $p->{beneficial_notes}  // '',
             image             => $p->{image}             // '',
-            url               => $p->{url}               // '',
+            url               => $_clean_url->($p->{url}),
             history           => $p->{history}           // '',
             reference         => $p->{reference}         // '',
         };
@@ -780,9 +804,12 @@ sub edit_insect : Path('/ENCY/Insect/edit') : Args(0) {
         my ($status, $msg) = $c->model('ENCYModel')->update_insect($c, $record_id, $data);
 
         if ($status) {
+            my $resolve  = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'insect', $record_id, $data);
+            my $n_linked = scalar @{ $resolve->{linked}     || [] };
+            my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_insect',
                 "Insect updated successfully for record_id: $record_id");
-            $c->flash->{success_msg} = "Insect details updated successfully.";
+            $c->flash->{success_msg} = "Insect updated. Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
             $c->response->redirect($c->uri_for('/ENCY/Insect', $record_id));
             return;
         } else {
@@ -973,6 +1000,11 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
 
     if ($c->request->method eq 'POST') {
         my $p = $c->request->body_parameters;
+        my $_clean_url = sub {
+            my $u = shift // '';
+            return '' if $u =~ m{workstation\.local|bmast\.local|localhost|127\.0\.0\.1|/ENCY/entry/}i;
+            return $u;
+        };
         my $data = {
             common_name              => $p->{common_name}              // '',
             scientific_name          => $p->{scientific_name}          // '',
@@ -989,7 +1021,7 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
             icd_code                 => $p->{icd_code}                 // '',
             distribution             => $p->{distribution}             // '',
             image                    => $p->{image}                    // '',
-            url                      => $p->{url}                      // '',
+            url                      => $_clean_url->($p->{url}),
             history                  => $p->{history}                  // '',
             reference                => $p->{reference}                // '',
         };
@@ -997,9 +1029,12 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
         my ($status, $msg) = $c->model('ENCYModel')->update_disease($c, $record_id, $data);
 
         if ($status) {
+            my $resolve  = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'disease', $record_id, $data);
+            my $n_linked = scalar @{ $resolve->{linked}     || [] };
+            my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_disease',
                 "Disease updated successfully for record_id: $record_id");
-            $c->flash->{success_msg} = "Disease details updated successfully.";
+            $c->flash->{success_msg} = "Disease updated. Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
             $c->response->redirect($c->uri_for('/ENCY/Disease', $record_id));
             return;
         } else {
@@ -1186,6 +1221,11 @@ sub edit_symptom : Path('/ENCY/Symptom/edit') : Args(0) {
 
     if ($c->request->method eq 'POST') {
         my $p = $c->request->body_parameters;
+        my $_clean_url = sub {
+            my $u = shift // '';
+            return '' if $u =~ m{workstation\.local|bmast\.local|localhost|127\.0\.0\.1|/ENCY/entry/}i;
+            return $u;
+        };
         my $data = {
             name          => $p->{name}          // '',
             common_name   => $p->{common_name}   // '',
@@ -1195,16 +1235,19 @@ sub edit_symptom : Path('/ENCY/Symptom/edit') : Args(0) {
             acute_chronic => $p->{acute_chronic} // '',
             host_type     => $p->{host_type}     // '',
             image         => $p->{image}         // '',
-            url           => $p->{url}           // '',
+            url           => $_clean_url->($p->{url}),
             reference     => $p->{reference}     // '',
         };
 
         my ($status, $msg) = $c->model('ENCYModel')->update_symptom($c, $record_id, $data);
 
         if ($status) {
+            my $resolve  = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'symptom', $record_id, $data);
+            my $n_linked = scalar @{ $resolve->{linked}     || [] };
+            my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_symptom',
                 "Symptom updated successfully for record_id: $record_id");
-            $c->flash->{success_msg} = "Symptom details updated successfully.";
+            $c->flash->{success_msg} = "Symptom updated. Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
             $c->response->redirect($c->uri_for('/ENCY/Symptom', $record_id));
             return;
         } else {
