@@ -475,6 +475,12 @@ sub generate :Local :Args(0) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
             'generate', "HelpDesk agent: injected system prompt");
     }
+
+    if (lc($normalized_agent_type) eq 'ency' && !$system) {
+        $system = $self->_build_ency_system_prompt($c);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'generate', "ENCY agent: injected system prompt");
+    }
     
     # Require login for external AI models (Grok etc.) before entering try block
     if (lc($provider) eq 'grok' && $is_guest) {
@@ -1669,6 +1675,14 @@ sub chat :Local :Args(0) {
 
     # Role-based capability injection into messages (insert as system message)
     my $role_prompt_chat = $self->_build_role_system_prompt($c, $user_roles_chat, $is_grok_model ? 'grok' : 'ollama', $chat_page_path, $chat_page_title);
+
+    # Inject agent-specific system prompts
+    if (lc($chat_agent_id) eq 'helpdesk' && !$chat_agent_system) {
+        $chat_agent_system = $self->_build_helpdesk_system_prompt($c);
+    }
+    if (lc($chat_agent_id) eq 'ency' && !$chat_agent_system) {
+        $chat_agent_system = $self->_build_ency_system_prompt($c);
+    }
 
     # Build combined system prompt: agent-specific prompt + role prompt + live module data + shared KB
     my @system_parts;
@@ -3490,14 +3504,23 @@ sub _get_module_data {
     }
 
     # --- ENCY / Herb / Plant / Bee forage data ---
-    if ($prompt =~ /plant|herb|flower|forage|pasture|nectar|pollen|bee\s*food|pollinator|garden|grow/i) {
+    # Always inject for ency agent; otherwise inject on keyword match
+    my $is_ency_agent = lc($agent_id) eq 'ency';
+    if ($is_ency_agent || $prompt =~ /plant|herb|flower|forage|pasture|nectar|pollen|bee\s*food|pollinator|garden|grow/i) {
         eval {
             my $forager = $c->model('DBForager');
             if ($forager) {
                 # Extract key search terms from the prompt
                 my @keywords = ($prompt =~ /(\w{4,})/g);
-                my $search   = join(' ', grep { /plant|herb|flower|forage|nectar|pollen|bee|grow|garden/i } @keywords);
-                $search ||= 'bee';
+                my $search;
+                if ($is_ency_agent) {
+                    # For ency agent: use all meaningful words from prompt as search
+                    $search = join(' ', grep { length($_) >= 4 && !/^(what|where|when|which|that|this|with|from|have|help|show|list|find|tell|about|does|should|would|could|please|give)$/i } @keywords);
+                    $search ||= 'herb';
+                } else {
+                    $search = join(' ', grep { /plant|herb|flower|forage|nectar|pollen|bee|grow|garden/i } @keywords);
+                    $search ||= 'bee';
+                }
 
                 my $results = $forager->searchHerbs($c, $search);
                 if ($results && @$results) {
@@ -4150,7 +4173,7 @@ sub _select_model_for_context {
     my %context_prefs = (
         chat        => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral'],
         helpdesk    => ['llama3.1', 'llama3', 'mistral'],
-        ency        => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral'],
+        ency        => ['phi4', 'llama3.1', 'llama3', 'mistral'],
         bmaster     => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral'],
         csc         => ['llama3.1', 'llama3', 'mistral'],
         general     => ['llama3.1', 'llama3', 'mistral'],
@@ -6431,6 +6454,82 @@ sub support_send :Local :Args(1) {
     }
 
     $c->response->body(encode_json({ success => JSON::true }));
+}
+
+=head2 _build_ency_system_prompt
+
+Builds an ENCY-aware system prompt for the AI when agent_id is 'ency'.
+Includes full schema knowledge and editor workflow for herbal encyclopedia editing.
+
+=cut
+
+sub _build_ency_system_prompt {
+    my ($self, $c) = @_;
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $username  = $c->session->{username} || 'the user';
+    my $is_admin  = do {
+        my $roles = $c->session->{roles} || [];
+        $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
+        grep { /^(admin|developer|editor)$/i } @$roles;
+    };
+
+    my $editor_section = $is_admin ? <<'EDITOR' : '';
+EDITOR WORKFLOW (you have admin/editor access):
+- To add or edit a herb entry, navigate to /ENCY/edit_herb?record_id=ID or /ENCY/add_herb
+- To link constituents: /ENCY/herb_constituents?herb_id=ID
+- To link diseases/symptoms: /ENCY/herb_diseases?herb_id=ID | /ENCY/herb_symptoms?herb_id=ID
+- To manage formulas: /ENCY/formula | /ENCY/add_formula
+- To link drug-herb interactions: /ENCY/drug_herb_interactions
+- When the user asks to "add", "edit", "update", or "create" an ENCY entry, provide the direct
+  admin URL for that action — do not just describe what to do.
+EDITOR
+
+    return <<END_PROMPT;
+You are an expert Encyclopedia (ENCY) assistant for $site_name. You have deep knowledge of the
+ENCY herbal and botanical database and help users find, understand, and edit encyclopedia entries.
+
+DATABASE SCHEMA — ENCY tables you can reference:
+- Herb: record_id, botanical_name, common_names, apis, nectar, pollen, constituents,
+        key_name, ident_character, stem, leaves, flowers, fruit, taste, odour, root,
+        distribution, dosage, administration, formulas, contra_indications, chinese, non_med, harvest
+- HerbCategory: links herbs to categories (e.g., Adaptogen, Nervine, Vulnerary)
+- HerbConstituent: links herbs to specific chemical constituents
+- HerbDisease: links herbs to diseases/conditions they address
+- HerbSymptom: links herbs to symptoms they help with
+- Constituent: name, description, therapeutic actions
+- Disease: name, description, icd_code
+- Symptom: name, description, body_system
+- Formula: name, description, instructions, FormulaHerb (herb_id, amount, unit)
+- DrugHerbInteraction: herb_id, drug_name, interaction_type, severity, description
+- Insect / InsectHerb: insect species and which herbs they are associated with
+- Animal / AnimalHerb: animal species and herb associations
+
+NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
+- ENCY home: /ENCY
+- Search herbs: /ENCY/search?q=TERM  or  /ENCY/BotanicalNameView
+- Bee pasture / forage plants: /ENCY/BeePastureView
+- View herb detail: /ENCY/herb_detail?record_id=ID
+- Plants section: /ENCY/plants
+- Pollinators: /ENCY/pollinators
+- Insects: /ENCY/insects
+- Medicinal constituents: /ENCY/constituents
+- Therapeutic actions: /ENCY/therapeutic_actions
+- Drug-herb interactions: /ENCY/drug_herb_interactions
+- Formulas: /ENCY/formula
+- Recipes: /ENCY/recipes
+$editor_section
+DATA ALREADY INJECTED:
+The server automatically injects LIVE ENCY HERB/PLANT DATA below when relevant herb records
+are found. ALWAYS use this live data to answer questions — do not ask the user to paste records.
+
+GUIDELINES:
+- For health questions, always note: "This is educational information only — consult a healthcare provider."
+- Include traditional uses, constituents, and safety notes when available.
+- When suggesting herb searches, always provide the search URL: /ENCY/search?q=TERM
+- The current user is: $username
+- For unknown terms, say so and suggest searching via /ENCY/search?q=TERM
+END_PROMPT
 }
 
 =head2 _build_helpdesk_system_prompt
