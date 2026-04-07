@@ -775,9 +775,10 @@ sub resolve_names_to_herbs {
             || $rs->search({ -or => [ botanical_name => { like => "%$name%" }, common_names => { like => "%$name%" } ] }, { rows => 1, order_by => 'record_id' })->first;
         };
         push @results, {
-            name => $name,
-            herb => $herb,
-            url  => $herb ? '/ENCY/Herb/' . $herb->record_id : undef,
+            name     => $name,
+            herb     => $herb,
+            url      => $herb ? '/ENCY/herb_detail/' . $herb->record_id : undef,
+            herb_url => $herb ? ($herb->url || undef) : undef,
         };
     }
     return \@results;
