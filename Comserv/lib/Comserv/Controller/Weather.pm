@@ -166,13 +166,13 @@ sub forecast :Path('/Weather/forecast') :Args(0) {
         push @{$c->stash->{debug_msg}}, "Weather Forecast - Loading";
     }
 
-    # Get forecast data
-    my $forecast_data = $self->_get_forecast_data($c);
+    my $forecast_data  = $self->_get_forecast_data($c);
+    my $weather_config = try { $self->weather_model->get_weather_config($c) } catch { undef };
 
-    # Stash data for template
     $c->stash(
-        forecast_data => $forecast_data,
-        template => 'Weather/forecast.tt'
+        forecast_data  => $forecast_data,
+        weather_config => $weather_config,
+        template       => 'Weather/forecast.tt'
     );
 }
 
