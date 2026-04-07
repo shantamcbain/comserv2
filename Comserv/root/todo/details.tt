@@ -2,9 +2,8 @@
 [% PageVersion  = 'todo/details.tt,v 0.06 2026/04/07 Shanta Exp Shanta'; %]
 [% IF debug_mode == 1 %][% PageVersion %][% END %]
 
-[% SET roles     = c.session.roles || [] %]
-[% SET is_admin  = roles.grep('admin').size  || roles.grep('developer').size %]
-[% SET is_editor = is_admin || roles.grep('editor').size %]
+[% SET _grp      = c.session.group || '' %]
+[% SET is_editor = is_admin || _grp == 'editor' || _grp == 'developer' %]
 [% SET edit_mode = c.request.params.edit && is_editor %]
 
 <h1>Todo: [% record.get_column('subject') | html %]</h1>
