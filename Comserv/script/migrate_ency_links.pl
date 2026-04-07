@@ -251,7 +251,9 @@ if (@unresolved_log) {
             $u->{rs};
     }
 
-    printf "\n%d unique unresolved terms need new records.\n", scalar keys %{{ map { "$_->{rs}:$_->{term}" => 1 } @unresolved_log }};
+    my %_uniq;
+    $_uniq{"$_->{rs}:$_->{term}"} = 1 for @unresolved_log;
+    printf "\n%d unique unresolved terms need new records.\n", scalar keys %_uniq;
     printf "Next step: run  perl script/ai_draft_unresolved.pl --report=%s\n", $REPORT;
     printf "to have AI create draft records for each unresolved term.\n";
 }
