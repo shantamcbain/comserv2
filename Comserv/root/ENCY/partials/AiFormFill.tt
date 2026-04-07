@@ -305,8 +305,36 @@
         }
     }
 
+    function encyAutoDetectName() {
+        var nameEl = document.getElementById('ency-ai-entity-name');
+        if (!nameEl || nameEl.value.trim()) return; // already filled
+        // Try common name fields in priority order
+        var candidates = ['botanical_name','common_name','name','generic_name','brand_name','term'];
+        for (var i = 0; i < candidates.length; i++) {
+            var f = document.querySelector('[name="' + candidates[i] + '"]');
+            if (f && f.value && f.value.trim()) {
+                nameEl.value = f.value.trim();
+                nameEl.title = 'Auto-detected from form field: ' + candidates[i];
+                break;
+            }
+        }
+    }
+
+    // Auto-detect on load and whenever a name field changes
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', encyAutoDetectName);
+    } else {
+        encyAutoDetectName();
+    }
+    var nameFields = ['botanical_name','common_name','name','generic_name','brand_name','term'];
+    nameFields.forEach(function(fn) {
+        var f = document.querySelector('[name="' + fn + '"]');
+        if (f) f.addEventListener('change', encyAutoDetectName);
+    });
+
     window.encyAiFill          = encyAiFill;
     window.encyAiMarkReference = encyAiMarkReference;
+    window.encyAutoDetectName  = encyAutoDetectName;
 })();
 </script>
 [% END %]
