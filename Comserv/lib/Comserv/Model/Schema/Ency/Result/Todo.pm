@@ -139,34 +139,6 @@ __PACKAGE__->add_columns(
         data_type => 'time',
         is_nullable => 1,
     },
-    "date_time_posted",
-    { data_type => "varchar", default_value => "", is_nullable => 1, size => 30 },
-    plan_id => {
-        data_type => 'integer',
-        is_nullable => 1,
-    },
-    blocked_by_todo_id => {
-        data_type => 'integer',
-        is_nullable => 1,
-    },
-    parent_id => {
-        data_type => 'integer',
-        is_nullable => 1,
-    },
-    sort_order => {
-        data_type => 'integer',
-        default_value => 0,
-        is_nullable => 0,
-    },
-    is_blocking => {
-        data_type => 'boolean',
-        default_value => 0,
-        is_nullable => 0,
-    },
-    scheduled_date => {
-        data_type => 'date',
-        is_nullable => 1,
-    },
 );
 
 __PACKAGE__->set_primary_key('record_id');
