@@ -111,7 +111,7 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
     }
 
     # Fetch the record_id from the session
-    my $record_id = $c->session->{record_id};
+    my $record_id = $c->request->param("record_id") || $c->session->{record_id};
 
     # Validate the record_id; if invalid, show error (stay on the HerbView page)
     unless (defined $record_id && $record_id =~ /^\d+$/) {
@@ -460,7 +460,7 @@ sub edit_animal : Path('/ENCY/Animal/edit') : Args(0) {
         return;
     }
 
-    my $record_id = $c->session->{record_id};
+    my $record_id = $c->request->param("record_id") || $c->session->{record_id};
 
     unless (defined $record_id && $record_id =~ /^\d+$/) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_animal',
@@ -684,7 +684,7 @@ sub edit_insect : Path('/ENCY/Insect/edit') : Args(0) {
         return;
     }
 
-    my $record_id = $c->session->{record_id};
+    my $record_id = $c->request->param("record_id") || $c->session->{record_id};
 
     unless (defined $record_id && $record_id =~ /^\d+$/) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_insect',
@@ -904,7 +904,7 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
         return;
     }
 
-    my $record_id = $c->session->{record_id};
+    my $record_id = $c->request->param("record_id") || $c->session->{record_id};
 
     unless (defined $record_id && $record_id =~ /^\d+$/) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_disease',
@@ -1117,7 +1117,7 @@ sub edit_symptom : Path('/ENCY/Symptom/edit') : Args(0) {
         return;
     }
 
-    my $record_id = $c->session->{record_id};
+    my $record_id = $c->request->param("record_id") || $c->session->{record_id};
 
     unless (defined $record_id && $record_id =~ /^\d+$/) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_symptom',
@@ -1567,7 +1567,7 @@ sub edit_glossary : Path('/ENCY/Glossary/edit') : Args(0) {
         return;
     }
 
-    my $record_id = $c->session->{record_id};
+    my $record_id = $c->request->param("record_id") || $c->session->{record_id};
 
     unless (defined $record_id && $record_id =~ /^\d+$/) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_glossary',
