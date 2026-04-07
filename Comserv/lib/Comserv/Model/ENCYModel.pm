@@ -850,6 +850,74 @@ sub auto_link_herb_constituent {
     return $linked;
 }
 
+sub auto_link_herb_data {
+    my ($self, $c, $herb_id, $form_data) = @_;
+    return unless $herb_id;
+    my ($linked, @todos) = (0);
+
+    my $parse_terms = sub {
+        my ($text) = @_;
+        return () unless $text;
+        return grep { length($_) > 2 }
+               map  { (my $t = $_) =~ s/^\s+|\s+$//g; $t }
+               split /[,;\n]+/, $text;
+    };
+
+    # --- constituents text → HerbConstituent junctions ---
+    for my $term ($parse_terms->($form_data->{constituents})) {
+        my $clean = $term;
+        $clean =~ s/\s*\(.*//;
+        $clean =~ s/\s+$//;
+        my $rec = eval {
+            $self->ency_schema->resultset('Constituent')->search(
+                { -or => [ name => { like => "%$clean%" }, common_name => { like => "%$clean%" } ] },
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        if ($rec) {
+            eval {
+                $self->ency_schema->resultset('HerbConstituent')->find_or_create({
+                    herb_id        => $herb_id,
+                    constituent_id => $rec->record_id,
+                    plant_part     => '',
+                });
+                $linked++;
+            };
+        } else {
+            push @todos, { field => 'constituents', term => $term };
+        }
+    }
+
+    # --- therapeutic_action terms → Glossary lookup; create todo if missing ---
+    for my $term ($parse_terms->($form_data->{therapeutic_action})) {
+        next if $term =~ /\s{2,}|^\d+$/;
+        my $rec = eval {
+            $self->ency_schema->resultset('Glossary')->search(
+                { -or => [ term => { like => "%$term%" }, alternate_terms => { like => "%$term%" } ] },
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        unless ($rec) {
+            push @todos, { field => 'therapeutic_action', term => $term };
+        }
+    }
+
+    # --- create todos for unresolved terms ---
+    my %seen;
+    for my $item (@todos) {
+        my $key = "$item->{field}:$item->{term}";
+        next if $seen{$key}++;
+        $self->_create_ency_todo($c,
+            "ENCY: Unresolved term in herb#$herb_id",
+            "Field: $item->{field}\nTerm: $item->{term}\nEntity: herb #$herb_id\n\n"
+          . "This term was found in the '$item->{field}' field but does not match any existing ENCY record. "
+          . "Please verify and add it as a new entry if valid."
+        );
+    }
+
+    return ($linked, scalar @todos);
+}
+
 sub get_constituent_related {
     my ($self, $c, $id) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_constituent_related', "Fetching related data for constituent ID: $id");
