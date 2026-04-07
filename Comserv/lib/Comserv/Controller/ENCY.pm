@@ -292,13 +292,136 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
 }
 sub get_reference_by_id :Local {
     my ( $self, $c, $id ) = @_;
-    # Implement the logic to display the form for getting a reference by its id
-    # Fetch the reference using the ENCY model
-    my $reference = $c->model('ENCY')->get_reference_by_id($id);
-    $c->stash(reference => $reference);
-    $c->stash(template => 'ency/get_reference_form.tt');
-    my $herb = $c->model('DBForager')->get_herb_by_id($id);
-    $c->stash(herb => $herb, record_id => $id, template => 'ENCY/HerbView.tt');
+    $c->response->redirect($c->uri_for('/ENCY/Reference', $id));
+}
+
+sub Reference :Path('/ENCY/Reference') :Args(0) {
+    my ($self, $c) = @_;
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @role_list;
+    my $is_editor = $is_admin || grep { $_ eq 'editor' } @role_list;
+
+    my @refs = eval {
+        $c->model('ENCYModel')->ency_schema->resultset('Reference')->search(
+            {},
+            { order_by => 'reference_id', rows => 100 }
+        )->all;
+    };
+    $c->stash(
+        references => \@refs,
+        is_admin   => $is_admin,
+        is_editor  => $is_editor,
+        template   => 'ENCY/ReferenceList.tt',
+    );
+}
+
+sub Reference_id :Path('/ENCY/Reference') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @role_list;
+    my $is_editor = $is_admin || grep { $_ eq 'editor' } @role_list;
+
+    my $edit_mode = $c->request->param('edit') && $is_editor ? 1 : 0;
+
+    unless ($id && $id =~ /^\d+$/) {
+        $c->stash(error_msg => "Invalid reference ID.", template => 'ENCY/ReferenceList.tt');
+        return;
+    }
+
+    my $ref = eval {
+        $c->model('ENCYModel')->ency_schema->resultset('Reference')->find($id);
+    };
+    unless ($ref) {
+        $c->stash(error_msg => "Reference #$id not found.", template => 'ENCY/ReferenceList.tt');
+        return;
+    }
+
+    if ($c->request->method eq 'POST' && $is_editor) {
+        my $p = $c->request->body_parameters;
+        eval {
+            $ref->update({
+                title            => $p->{title}            // '',
+                author           => $p->{author}           // '',
+                publisher        => $p->{publisher}        // '',
+                publication_date => $p->{publication_date} || undef,
+                isbn             => $p->{isbn}             // '',
+                url              => $p->{url}              // '',
+                reference_system => $p->{reference_system} // '',
+                notes            => $p->{notes}            // '',
+            });
+        };
+        if ($@) {
+            $c->stash(error_msg => "Failed to update reference: $@");
+        } else {
+            $c->flash->{success_msg} = "Reference #$id updated.";
+            $c->response->redirect($c->uri_for('/ENCY/Reference', $id));
+            return;
+        }
+    }
+
+    $c->stash(
+        reference => $ref,
+        edit_mode => $edit_mode,
+        is_admin  => $is_admin,
+        is_editor => $is_editor,
+        ency_ai_prompt => 'title, author, publisher, publication_date (YYYY-MM-DD), isbn, url (archive.org or publisher), reference_system (book/journal/website/thesis), notes (page numbers and excerpt where the herb/treatment was mentioned)',
+        template  => 'ENCY/ReferenceDetail.tt',
+    );
+}
+
+sub Reference_add :Path('/ENCY/Reference/add') :Args(0) {
+    my ($self, $c) = @_;
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @role_list;
+    my $is_editor = $is_admin || grep { $_ eq 'editor' } @role_list;
+
+    unless ($is_editor) {
+        $c->stash(error_msg => "You do not have permission to add references.",
+                  template  => 'ENCY/ReferenceList.tt');
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $new_ref;
+        eval {
+            $new_ref = $c->model('ENCYModel')->ency_schema->resultset('Reference')->create({
+                title            => $p->{title}            // '',
+                author           => $p->{author}           // '',
+                publisher        => $p->{publisher}        // '',
+                publication_date => $p->{publication_date} || undef,
+                isbn             => $p->{isbn}             // '',
+                url              => $p->{url}              // '',
+                reference_system => $p->{reference_system} // 'book',
+                notes            => $p->{notes}            // '',
+                sitename         => $c->session->{site_name} // 'ENCY',
+                username_of_poster => $c->session->{username} // '',
+                date_time_posted => substr("${\scalar localtime}", 0, 30),
+            });
+        };
+        if ($@ || !$new_ref) {
+            $c->stash(error_msg => "Failed to create reference: $@",
+                      edit_mode => 1, is_editor => $is_editor,
+                      ency_ai_prompt => 'title, author, publisher, publication_date, isbn, url, reference_system, notes',
+                      template  => 'ENCY/ReferenceDetail.tt');
+            return;
+        }
+        $c->flash->{success_msg} = "Reference #" . $new_ref->reference_id . " created.";
+        $c->response->redirect($c->uri_for('/ENCY/Reference', $new_ref->reference_id));
+        return;
+    }
+
+    $c->stash(
+        reference => {},
+        edit_mode => 1,
+        is_admin  => $is_admin,
+        is_editor => $is_editor,
+        ency_ai_prompt => 'title, author, publisher, publication_date (YYYY-MM-DD), isbn, url (archive.org or publisher URL), reference_system (book/journal/website/thesis), notes (include page numbers and a short excerpt of the passage that mentions the herb or treatment)',
+        template  => 'ENCY/ReferenceDetail.tt',
+    );
 }
 sub add_herb :Path('/ENCY/add_herb') :Args(0) {
     my ( $self, $c ) = @_;

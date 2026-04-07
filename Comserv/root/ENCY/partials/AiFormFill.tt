@@ -9,6 +9,9 @@
       <option value="grok-3|grok" selected>Grok 3 (best holistic responses)</option>
     </select>
     <button type="button" id="ency-ai-ask-btn" onclick="encyAiFill()">Ask AI</button>
+    <button type="button" id="ency-ai-review-btn" onclick="encyAiReview()"
+            title="Send current field values to AI and ask it to identify errors or inconsistencies"
+            style="background:#fff3cd;border:1px solid #ffc107;padding:0.3em 0.7em;cursor:pointer;">Review &amp; Correct</button>
     <span id="ency-ai-status" style="color:#555;font-style:italic;font-size:0.9em;"></span>
   </div>
   <div style="margin-top:0.5em;font-size:0.85em;color:#444;">
@@ -40,6 +43,10 @@
   <div id="ency-resolve-panel" style="display:none;margin-top:0.8em;border-top:1px solid #acd;padding-top:0.6em;">
     <strong>ENCY Links Found:</strong>
     <div id="ency-resolve-results" style="margin-top:0.4em;"></div>
+  </div>
+  <div id="ency-review-panel" style="display:none;margin-top:0.8em;border-top:2px solid #ffc107;padding-top:0.6em;">
+    <strong style="color:#856404;">AI Review Suggestions:</strong>
+    <div id="ency-review-results" style="margin-top:0.4em;"></div>
   </div>
 </div>
 
@@ -305,6 +312,121 @@
         }
     }
 
+    function encyAiReview() {
+        var name = document.getElementById('ency-ai-entity-name').value.trim();
+        if (!name) { alert('Please enter the entity name first so AI knows what it is reviewing.'); return; }
+        var statusEl = document.getElementById('ency-ai-status');
+        var btn      = document.getElementById('ency-ai-review-btn');
+        var panel    = document.getElementById('ency-review-panel');
+        var results  = document.getElementById('ency-review-results');
+        btn.disabled = true;
+        panel.style.display = 'none';
+        results.innerHTML   = '';
+        statusEl.textContent = 'Reviewing current field values\u2026';
+
+        // Collect current field values from the form
+        var currentValues = {};
+        var inputs = document.querySelectorAll('input[name], textarea[name], select[name]');
+        inputs.forEach(function(el) {
+            var n = el.name;
+            if (!n || n === 'record_id') return;
+            var v = (el.value || '').trim();
+            if (v) currentValues[n] = v;
+        });
+
+        var mp        = getModelAndProvider();
+        var timeoutMs = 60000;
+        var controller = new AbortController();
+        setTimeout(function() { controller.abort(); }, timeoutMs);
+
+        var prompt = 'You are reviewing an ENCY encyclopedia record for "' + name + '". '
+            + 'Below are the CURRENT field values from the form. '
+            + 'Identify fields that appear INCORRECT, inconsistent with the entity, or obviously wrong (e.g. a disease name in the wrong record, wrong species data, mismatched content). '
+            + 'ONLY flag fields you are confident are wrong. Do NOT suggest changes to fields that are merely incomplete. '
+            + 'Return ONLY a raw JSON object with this structure: '
+            + '{"corrections": [{"field": "field_name", "current": "current value", "suggested": "corrected value", "reason": "why this is wrong"}]}. '
+            + 'If nothing appears wrong, return {"corrections": []}. '
+            + 'Current field values: ' + JSON.stringify(currentValues);
+
+        fetch('/ai/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            signal: controller.signal,
+            body: JSON.stringify({
+                prompt:     prompt,
+                system:     INTEGRATIVE_SYSTEM,
+                provider:   mp.provider,
+                model:      mp.model,
+                page_path:  window.location.pathname,
+                page_title: document.title
+            })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            if (!data.success) {
+                statusEl.textContent = 'Review failed: ' + (data.error || 'unknown error');
+                return;
+            }
+            var raw = (data.response || '').trim();
+            var jsonStart = raw.indexOf('{'), jsonEnd = raw.lastIndexOf('}');
+            if (jsonStart === -1) {
+                statusEl.textContent = 'AI returned no JSON. See raw response.';
+                document.getElementById('ency-ai-raw-text').textContent = raw;
+                document.getElementById('ency-ai-raw').style.display = '';
+                return;
+            }
+            var parsed = JSON.parse(raw.substring(jsonStart, jsonEnd + 1));
+            var corrections = parsed.corrections || [];
+            if (!corrections.length) {
+                statusEl.textContent = 'Review complete \u2014 no obvious errors found.';
+                return;
+            }
+            statusEl.textContent = 'Review found ' + corrections.length + ' potential issue(s). Review below:';
+            panel.style.display = '';
+            corrections.forEach(function(c) {
+                var el = document.querySelector('[name="' + c.field + '"]');
+                var div = document.createElement('div');
+                div.style.cssText = 'margin:0.5em 0;padding:0.5em;background:#fffbe6;border:1px solid #ffc107;border-radius:4px;';
+                div.innerHTML = '<strong>' + c.field + '</strong>: '
+                    + '<span style="color:#c00;text-decoration:line-through;">' + (c.current || '').substring(0,120).replace(/</g,'&lt;') + '</span> '
+                    + '&rarr; <span style="color:#155724;">' + (c.suggested || '').substring(0,200).replace(/</g,'&lt;') + '</span>'
+                    + '<br><em style="font-size:0.85em;color:#666;">' + (c.reason || '').replace(/</g,'&lt;') + '</em>';
+                if (el) {
+                    var applyBtn = document.createElement('button');
+                    applyBtn.type = 'button';
+                    applyBtn.textContent = 'Apply correction';
+                    applyBtn.style.cssText = 'margin-left:1em;font-size:0.85em;padding:0.15em 0.6em;cursor:pointer;';
+                    applyBtn.onclick = (function(field, suggested) {
+                        return function() {
+                            var formEl = document.querySelector('[name="' + field + '"]');
+                            if (formEl) {
+                                if (field === 'reference') {
+                                    formEl.value = (formEl.value || '').trim()
+                                        ? formEl.value + '\n[AI correction]: ' + suggested
+                                        : suggested;
+                                } else {
+                                    formEl.value = suggested;
+                                }
+                                applyBtn.textContent = '\u2713 Applied';
+                                applyBtn.disabled = true;
+                            }
+                        };
+                    })(c.field, c.suggested);
+                    div.appendChild(applyBtn);
+                }
+                results.appendChild(div);
+            });
+        })
+        .catch(function(err) {
+            btn.disabled = false;
+            statusEl.textContent = err.name === 'AbortError'
+                ? 'Review timed out \u2014 try a faster model.'
+                : 'Review failed: ' + err.message;
+        });
+    }
+
     function encyAutoDetectName() {
         var nameEl = document.getElementById('ency-ai-entity-name');
         if (!nameEl || nameEl.value.trim()) return; // already filled
@@ -333,6 +455,7 @@
     });
 
     window.encyAiFill          = encyAiFill;
+    window.encyAiReview        = encyAiReview;
     window.encyAiMarkReference = encyAiMarkReference;
     window.encyAutoDetectName  = encyAutoDetectName;
 })();
