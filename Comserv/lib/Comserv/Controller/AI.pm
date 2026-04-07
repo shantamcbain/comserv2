@@ -97,6 +97,29 @@ sub index :Path :Args(0) {
     # Get or set the current Ollama configuration
     my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
 
+    # Filter installed Ollama models by membership-allowed models for non-privileged users
+    unless ($can_select_model) {
+        my $user_id = $c->session->{user_id};
+        my $site_id = $c->session->{SiteID};
+        if ($user_id && $site_id && $installed_models && @$installed_models) {
+            eval {
+                my $allowed = $c->model('Membership')->get_allowed_ai_models($c, $user_id, $site_id);
+                if ($allowed && @$allowed) {
+                    my %allowed_set = map { $_ => 1 } @$allowed;
+                    my @filtered = grep {
+                        my $name = ref($_) ? ($_->{name} || '') : ($_ || '');
+                        $allowed_set{$name};
+                    } @$installed_models;
+                    $installed_models = \@filtered if @filtered;
+                }
+            };
+            if (my $err = $@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'index', "Could not filter AI models by membership: $err");
+            }
+        }
+    }
+
     # Check if user has external API keys configured (grok, openai, etc.)
     # Admins can use any active key, other users only their own key
     my @external_models;
@@ -445,6 +468,13 @@ sub generate :Local :Args(0) {
     
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
         'generate', "Agent type normalization: agent_id=$agent_id -> normalized_agent_type=$normalized_agent_type");
+
+    # When agent_type is 'helpdesk', inject HelpDesk-aware system prompt unless caller already supplied one
+    if (lc($normalized_agent_type) eq 'helpdesk' && !$system) {
+        $system = $self->_build_helpdesk_system_prompt($c);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'generate', "HelpDesk agent: injected system prompt");
+    }
     
     # Require login for external AI models (Grok etc.) before entering try block
     if (lc($provider) eq 'grok' && $is_guest) {
@@ -665,24 +695,23 @@ sub generate :Local :Args(0) {
                     } else {
                         push @trace, "💾 '$use_model' already in memory — no cold-start needed";
                     }
-                    # Renew keep_alive — no prompt so Ollama just refreshes timer without generating
-                    eval {
-                        my $ping_ua  = LWP::UserAgent->new(timeout => 10);
-                        my $ping_url = "http://$current_host:" . ($current_port || 11434) . "/api/generate";
-                        my $ping_payload = encode_json({
-                            model      => $use_model,
-                            keep_alive => '2h',
-                        });
-                        $ping_ua->post($ping_url, 'Content-Type' => 'application/json', Content => $ping_payload);
-                        push @trace, "🔁 keep_alive renewed for '$use_model'";
-                    };
+                    # Renew keep_alive asynchronously — fork so it never delays the chat request
+                    my $ping_url = "http://$current_host:" . ($current_port || 11434) . "/api/generate";
+                    my $ping_payload = encode_json({ model => $use_model, keep_alive => '2h' });
+                    my $ping_pid = fork();
+                    if (defined $ping_pid && $ping_pid == 0) {
+                        my $child_ua = LWP::UserAgent->new(timeout => 15);
+                        $child_ua->post($ping_url, 'Content-Type' => 'application/json', Content => $ping_payload);
+                        exit 0;
+                    }
+                    push @trace, "🔁 keep_alive renewal dispatched async for '$use_model'";
                 }
             }
 
             # Use a longer timeout when model is NOT in memory (cold start: load + generate)
             my $is_cold_start = !grep { ($_ && ref $_ ? $_->{name} : $_) eq $use_model }
                                       @{ $fast_check->get_running_models() || [] };
-            my $timeout_secs = $is_cold_start ? 600 : 300;
+            my $timeout_secs = $is_cold_start ? 600 : 480;
             push @trace, $is_cold_start
                 ? "🧊 Cold start detected — timeout extended to ${timeout_secs}s"
                 : "🔥 Model warm — timeout ${timeout_secs}s";
@@ -772,8 +801,8 @@ sub generate :Local :Args(0) {
             # CPU Ollama prefill at ~46 tok/s: 3 000 tokens = ~65s — safe under 300s timeout.
             # Pass 1: trim history messages.  Pass 1.5: drop oldest history pairs.
             # Pass 2: strip page_content from system.  Pass 3: hard-cap system prompt.
-            my $BUDGET_CHARS  = 12_000;
-            my $SYS_MAX_CHARS =  8_000;  # system prompt hard cap (nav guide can be 30K+)
+            my $BUDGET_CHARS  =  8_000;
+            my $SYS_MAX_CHARS =  4_000;  # system prompt hard cap (nav guide can be 30K+)
             my $raw_total_gen = 0;
             $raw_total_gen += length($_->{content} || '') for @ollama_msgs;
             if ($raw_total_gen > $BUDGET_CHARS) {
@@ -873,7 +902,8 @@ sub generate :Local :Args(0) {
                 'generate', "Tier-1 SUCCESS elapsed=${query_elapsed}s model=$model_used");
 
             # ── Tier 2: escalate to large model if quality is poor ────────────
-            if (!$manual_model && $tier_large ne $use_model
+            # Guests are locked to tier_small — never escalate (saves resources).
+            if (!$manual_model && !$is_guest && $tier_large ne $use_model
                 && $self->_assess_response_quality($r_text, $prompt) eq 'poor')
             {
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
@@ -1658,9 +1688,10 @@ sub chat :Local :Args(0) {
     # This is the single most important context source — the AI can see exactly what
     # the user sees (buttons, tables, links, labels) without any keyword matching.
     if ($chat_page_content && length($chat_page_content) > 20) {
+        (my $clean_page = $chat_page_content) =~ s{(https?://[^:/\s]+):\d{4,5}(/[^\s]*)?}{$1$2}g;
         my $page_snippet = "--- Current Page Content (what the user sees on screen) ---\n"
                          . "URL: $chat_page_path\n\n"
-                         . $chat_page_content
+                         . $clean_page
                          . "\n--- End of Page Content ---";
         push @system_parts, $page_snippet;
     }
@@ -1832,24 +1863,23 @@ sub chat :Local :Args(0) {
                     } else {
                         push @chat_trace, "💾 '$chat_use_model' already in memory — no cold-start needed";
                     }
-                    # Renew keep_alive — no prompt so Ollama just refreshes timer without generating
-                    eval {
-                        my $ping_ua  = LWP::UserAgent->new(timeout => 10);
-                        my $ping_url = "http://$current_host:" . ($current_port || 11434) . "/api/generate";
-                        my $ping_payload = encode_json({
-                            model      => $chat_use_model,
-                            keep_alive => '2h',
-                        });
-                        $ping_ua->post($ping_url, 'Content-Type' => 'application/json', Content => $ping_payload);
-                        push @chat_trace, "🔁 keep_alive renewed for '$chat_use_model'";
-                    };
+                    # Renew keep_alive asynchronously — fork so it never delays the chat request
+                    my $chat_ping_url = "http://$current_host:" . ($current_port || 11434) . "/api/generate";
+                    my $chat_ping_payload = encode_json({ model => $chat_use_model, keep_alive => '2h' });
+                    my $chat_ping_pid = fork();
+                    if (defined $chat_ping_pid && $chat_ping_pid == 0) {
+                        my $child_ua = LWP::UserAgent->new(timeout => 15);
+                        $child_ua->post($chat_ping_url, 'Content-Type' => 'application/json', Content => $chat_ping_payload);
+                        exit 0;
+                    }
+                    push @chat_trace, "🔁 keep_alive renewal dispatched async for '$chat_use_model'";
                 }
             }
 
             # Use a longer timeout for cold starts (model not in memory)
             my $chat_running = eval { $avail_check->get_running_models() } || [];
             my $chat_cold = !grep { ($_ && ref $_ ? $_->{name} : $_) eq $chat_use_model } @$chat_running;
-            my $chat_timeout = $chat_cold ? 600 : 300;
+            my $chat_timeout = $chat_cold ? 600 : 480;
             push @chat_trace, $chat_cold
                 ? "🧊 Cold start — timeout extended to ${chat_timeout}s"
                 : "🔥 Model warm — timeout ${chat_timeout}s";
@@ -1866,8 +1896,8 @@ sub chat :Local :Args(0) {
             # 300s timeout even with generation.  Over-budget → trim history content first.
             # Pass 1: trim messages.  Pass 1.5: drop oldest history pairs.
             # Pass 2: strip page_content.  Pass 3: hard-cap system prompt.
-            my $BUDGET_CHARS  = 12_000;
-            my $SYS_MAX_CHARS_CHAT = 8_000;
+            my $BUDGET_CHARS  =  8_000;
+            my $SYS_MAX_CHARS_CHAT = 4_000;
             my $raw_total = 0;
             $raw_total += length($_->{content} || '') for @ollama_messages;
             if ($raw_total > $BUDGET_CHARS) {
@@ -1967,7 +1997,8 @@ sub chat :Local :Args(0) {
                     : $ai_response);
 
             # ── Tier 2: Escalate to large model if quality is poor ────────────
-            if (!$manual_model && $tier_large ne $tier_small
+            # Guests are locked to tier_small — never escalate (saves resources).
+            if (!$manual_model && !$is_guest && $tier_large ne $tier_small
                 && $self->_assess_response_quality($ai_response, $prompt) eq 'poor')
             {
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
@@ -3712,7 +3743,20 @@ sub _build_role_system_prompt {
     $page_title //= '';
 
     my $base_url = '';
-    eval { $base_url = $c->uri_for('/') . ''; $base_url =~ s{/$}{}; };
+    eval {
+        my $req       = $c->request;
+        my $fwd_host  = $req->header('X-Forwarded-Host')  || $req->header('HTTP_X_FORWARDED_HOST');
+        my $fwd_proto = $req->header('X-Forwarded-Proto') || $req->header('HTTP_X_FORWARDED_PROTO') || '';
+        if ($fwd_host) {
+            my $scheme = $fwd_proto || ($req->secure ? 'https' : 'http');
+            $base_url = "$scheme://$fwd_host";
+        } else {
+            $base_url = $c->uri_for('/') . '';
+            $base_url =~ s{/$}{};
+            $base_url =~ s{^(https?://[^:/]+):\d+}{$1}
+                unless $base_url =~ m{://[^:/]+:(80|443)(?:/|$)};
+        }
+    };
 
     my @role_list = ref($roles) eq 'ARRAY' ? @$roles : split(/\s*,\s*/, $roles || '');
     my $is_admin = grep { /^(admin|developer|editor)$/i } @role_list;
@@ -3735,6 +3779,7 @@ Supported actions:
 - Add a comment:         [ACTION: {"action": "add_todo_comment",   "params": {"todo_id": N, "comment": "text"}}]
 - Create a log entry:    [ACTION: {"action": "create_log_entry",   "params": {"todo_id": N, "abstract": "title", "details": "description"}}]
 - Create a new todo:     [ACTION: {"action": "create_todo", "params": {"subject": "title", "description": "details", "project_id": N, "due_date": "YYYY-MM-DD", "priority": 3}}]
+- Create a HelpDesk support ticket: [ACTION: {"action": "create_helpdesk_ticket", "params": {"subject": "issue title", "description": "details", "page_url": "/current/page"}}]
 
 Rules:
 - ONLY emit an [ACTION: ...] block when the user explicitly asks you to perform a write operation.
@@ -3760,6 +3805,7 @@ ACTION
              . "  - Project todos: $base_url/todo/list?project_id=N (use real ID from live data, never literal 'ID')\n"
              . "Do NOT refuse to answer general knowledge questions. "
              . "Do NOT invent live application data — direct the user to the relevant URL instead. "
+             . "Do NOT dump or list all navigation links/URLs in your response — only include the one or two most relevant links for the user's actual question. "
              . $web_search_note . "\n"
              . "NAVIGATION: When the user says 'take me to', 'open', 'go to', or 'show me' a page, "
              . "reply with the exact URL from the navigation guide below.\n"
@@ -3797,6 +3843,7 @@ ACTION
     return "You are a helpful assistant for logged-in users of this application. "
          . "Answer ALL questions to the best of your ability — application help, general technical questions, software how-tos, etc. "
          . "Do not invent live application data; if you don't know something specific to this app, say so and link to the relevant section. "
+         . "Do NOT dump or list all navigation links/URLs in your response — only include the one or two most relevant links for the user's actual question. "
          . "NAVIGATION: When the user says 'take me to', 'open', 'go to', 'navigate to', or 'show me' a page, "
          . "respond with the URL from the navigation guide so the application can automatically navigate there. "
          . "Use the exact URL from the list — the application will redirect the browser for you. "
@@ -5521,6 +5568,7 @@ This library is part of the Comserv application.
 
 =cut
 
+
 =head2 get_page_doc
 
 Fetch plain-text content from a Documentation file so the AI can advise
@@ -6116,9 +6164,319 @@ sub action :Local :Args(0) {
         return;
     }
 
+    # ── create_helpdesk_ticket ────────────────────────────────────────────────
+    if ($action_name eq 'create_helpdesk_ticket') {
+        my $subject = $params->{subject};
+        unless ($subject) {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'subject required' }));
+            return;
+        }
+        my $description = $params->{description} || '';
+        my $page_url    = $params->{page_url}    || $c->request->referer || '';
+        my $priority    = $params->{priority}    // 2;
+        my $sitename    = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+        my $user_id     = $c->session->{user_id} || 1;
+        my $roles       = $c->session->{roles}   || [];
+        my $group       = ref $roles eq 'ARRAY' && @$roles ? $roles->[0] : 'user';
+
+        my $new_ticket;
+        eval {
+            $new_ticket = $schema->resultset('AiSupportSession')->create({
+                user_id          => $user_id,
+                sitename         => $sitename,
+                status           => 'pending',
+                subject          => $subject,
+                user_description => $description,
+                page_url         => $page_url,
+                conversation_id  => do { my $cid = $params->{conversation_id} || $c->session->{current_conversation_id}; ($cid && $cid =~ /^\d+$/) ? $cid : undef },
+            });
+        };
+        if ($@ || !$new_ticket) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'action',
+                "create_helpdesk_ticket failed: $@");
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Ticket creation failed' }));
+            return;
+        }
+        my $ticket_id = $new_ticket->id // '?';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
+            "AI action create_helpdesk_ticket: id=$ticket_id sitename=$sitename by=$current_user subject='$subject'");
+        $c->response->body(encode_json({
+            success    => JSON::true,
+            message    => "Support ticket #$ticket_id created: \"$subject\". An admin will be notified.",
+            ticket_id  => $ticket_id + 0,
+            ticket_url => "/ai/support/$ticket_id",
+        }));
+        return;
+    }
+
     # Unknown action
     $c->response->status(400);
     $c->response->body(encode_json({ success => JSON::false, error => "Unknown action: $action_name" }));
+}
+
+# ── Admin presence heartbeat ──────────────────────────────────────────────────
+sub admin_heartbeat :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $user_id  = $c->session->{user_id};
+    my $roles    = $c->session->{roles} || [];
+    my $is_admin = grep { /^(admin|developer)$/i } (ref $roles eq 'ARRAY' ? @$roles : ());
+
+    unless ($user_id && $is_admin) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
+        return;
+    }
+
+    my $username = $c->session->{username} || 'admin';
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $status   = $c->request->body_parameters->{status} || 'available';
+    $status = 'available' unless $status =~ /^(available|busy|away|offline)$/;
+
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        $schema->resultset('AdminPresence')->update_or_create(
+            {
+                user_id    => $user_id,
+                username   => $username,
+                sitename   => $sitename,
+                status     => $status,
+                session_id => $c->sessionid,
+                last_seen  => \'NOW()',
+            },
+            { key => 'admin_presence_user_id' }
+        );
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_heartbeat', "Heartbeat failed: $@");
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Heartbeat failed' }));
+        return;
+    }
+
+    $c->response->body(encode_json({ success => JSON::true }));
+}
+
+# ── List pending support requests (admin) ─────────────────────────────────────
+sub support_requests :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $user_id  = $c->session->{user_id};
+    my $roles    = $c->session->{roles} || [];
+    my $is_admin = grep { /^(admin|developer)$/i } (ref $roles eq 'ARRAY' ? @$roles : ());
+
+    unless ($user_id && $is_admin) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
+        return;
+    }
+
+    my @requests;
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my @sessions = $schema->resultset('AiSupportSession')->search(
+            { status => { -in => ['pending', 'accepted'] } },
+            { order_by => { -asc => 'created_at' }, rows => 20 }
+        );
+        for my $s (@sessions) {
+            push @requests, {
+                id          => $s->id,
+                user_id     => $s->user_id,
+                sitename    => $s->sitename,
+                status      => $s->status,
+                subject     => $s->subject || '',
+                page_url    => $s->page_url || '',
+                created_at  => $s->created_at . '',
+            };
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'support_requests', "Query failed: $@");
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Query failed' }));
+        return;
+    }
+
+    $c->response->body(encode_json({ success => JSON::true, requests => \@requests }));
+}
+
+# ── Accept a support session (admin) ─────────────────────────────────────────
+sub accept_support :Local :Args(1) {
+    my ($self, $c, $session_id) = @_;
+    $c->response->content_type('application/json');
+
+    my $user_id  = $c->session->{user_id};
+    my $roles    = $c->session->{roles} || [];
+    my $is_admin = grep { /^(admin|developer)$/i } (ref $roles eq 'ARRAY' ? @$roles : ());
+
+    unless ($user_id && $is_admin) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
+        return;
+    }
+
+    eval {
+        my $schema   = $c->model('DBEncy')->schema;
+        my $session  = $schema->resultset('AiSupportSession')->find($session_id);
+        unless ($session) {
+            $c->response->status(404);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Session not found' }));
+            return;
+        }
+        $session->update({ status => 'active', admin_user_id => $user_id });
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'accept_support', "Update failed: $@");
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Update failed' }));
+        return;
+    }
+
+    $c->response->body(encode_json({ success => JSON::true, session_id => $session_id + 0 }));
+}
+
+# ── Get messages for a support session ────────────────────────────────────────
+sub support_messages :Local :Args(1) {
+    my ($self, $c, $session_id) = @_;
+    $c->response->content_type('application/json');
+
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required' }));
+        return;
+    }
+
+    my @msgs;
+    eval {
+        my $schema  = $c->model('DBEncy')->schema;
+        my $session = $schema->resultset('AiSupportSession')->find($session_id);
+        unless ($session && ($session->user_id == $user_id || do {
+            my $roles = $c->session->{roles} || [];
+            grep { /^(admin|developer)$/i } (ref $roles eq 'ARRAY' ? @$roles : ())
+        })) {
+            $c->response->status(403);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Access denied' }));
+            return;
+        }
+        my @rows = $schema->resultset('AiSupportMessage')->search(
+            { session_id => $session_id },
+            { order_by => { -asc => 'created_at' } }
+        );
+        for my $m (@rows) {
+            push @msgs, {
+                id          => $m->id,
+                sender_role => $m->sender_role,
+                content     => $m->content,
+                created_at  => $m->created_at . '',
+            };
+        }
+    };
+    if ($@) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Query failed' }));
+        return;
+    }
+
+    $c->response->body(encode_json({ success => JSON::true, messages => \@msgs }));
+}
+
+# ── Send a message in a support session ───────────────────────────────────────
+sub support_send :Local :Args(1) {
+    my ($self, $c, $session_id) = @_;
+    $c->response->content_type('application/json');
+
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required' }));
+        return;
+    }
+
+    my $content = eval { decode_json($c->request->body || '{}') }->{content} || '';
+    unless ($content) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'content required' }));
+        return;
+    }
+
+    eval {
+        my $schema  = $c->model('DBEncy')->schema;
+        my $session = $schema->resultset('AiSupportSession')->find($session_id);
+        my $roles   = $c->session->{roles} || [];
+        my $is_admin = grep { /^(admin|developer)$/i } (ref $roles eq 'ARRAY' ? @$roles : ());
+        unless ($session && ($session->user_id == $user_id || $is_admin)) {
+            $c->response->status(403);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Access denied' }));
+            return;
+        }
+        my $sender_role = $is_admin ? 'admin' : 'user';
+        $schema->resultset('AiSupportMessage')->create({
+            session_id     => $session_id,
+            sender_user_id => $user_id,
+            sender_role    => $sender_role,
+            content        => $content,
+        });
+        $session->update({ updated_at => \'NOW()' });
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'support_send', "Create failed: $@");
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Message send failed' }));
+        return;
+    }
+
+    $c->response->body(encode_json({ success => JSON::true }));
+}
+
+=head2 _build_helpdesk_system_prompt
+
+Builds a HelpDesk-aware system prompt for the AI when agent_type is 'helpdesk'.
+
+=cut
+
+sub _build_helpdesk_system_prompt {
+    my ($self, $c) = @_;
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'our system';
+    my $username  = $c->session->{username} || 'the user';
+
+    return <<END_PROMPT;
+You are a HelpDesk support assistant for $site_name. Your role is to help users resolve issues efficiently and professionally.
+
+CAPABILITIES:
+1. Answer support questions using knowledge from our Knowledge Base categories:
+   - Getting Started (account setup, first login, dashboard overview)
+   - Website Management (content management, SEO, backups)
+   - Email Services (setup, client configuration, spam filters)
+   - Security (passwords, two-factor auth, security audits)
+   - Billing & Payments (payment methods, billing cycles, plan upgrades)
+   - Troubleshooting (loading issues, database errors, log analysis)
+   - System Administration (Linux commands, server maintenance, backup and recovery)
+
+2. TICKET CREATION: If the user's issue cannot be resolved through conversation or requires
+   action from our team, offer to create a support ticket. Tell them they can submit a ticket at:
+   /HelpDesk/ticket/new
+   Collect: subject, category (technical/billing/account/feature/other), priority (low/medium/high/critical),
+   and a description of the issue.
+
+3. LIVE AGENT ESCALATION: For critical issues, urgent matters, or when the user expresses
+   frustration, suggest connecting with a live agent through the chat system or by visiting
+   /HelpDesk/contact
+
+GUIDELINES:
+- Be concise, friendly, and professional
+- If you don't know the answer, say so clearly and suggest the ticket or live agent option
+- Always confirm you understood the user's issue before suggesting solutions
+- For technical issues, ask clarifying questions if needed (OS, error messages, steps to reproduce)
+- The current user is: $username
+
+You are integrated into the $site_name support system. Respond helpfully and guide users to resolution.
+END_PROMPT
 }
 
 __PACKAGE__->meta->make_immutable;

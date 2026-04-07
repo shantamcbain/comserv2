@@ -1,0 +1,54 @@
+User-agent: *
+
+# ── Admin and developer tools ─────────────────────────────────────────────────
+Disallow: /admin
+Disallow: /ai/admin
+Disallow: /ai/planning
+Disallow: /themeadmin
+Disallow: /themetest
+Disallow: /setup
+Disallow: /site
+Disallow: /navigation
+Disallow: /page
+
+# ── Infrastructure management ─────────────────────────────────────────────────
+Disallow: /proxmox
+Disallow: /proxymanager
+Disallow: /npm
+Disallow: /cloudflare
+Disallow: /networkmap
+Disallow: /remotedb
+Disallow: /database_mode
+Disallow: /resourcetracking
+Disallow: /log
+
+# ── Member / logged-in only areas ─────────────────────────────────────────────
+Disallow: /Weather
+Disallow: /chat
+Disallow: /todo
+Disallow: /project
+Disallow: /file
+Disallow: /Mail
+Disallow: /payment
+Disallow: /hosting
+Disallow: /CSC
+Disallow: /Shanta
+Disallow: /IT
+Disallow: /MCoop
+Disallow: /SB
+Disallow: /api/
+
+# ── User account pages ────────────────────────────────────────────────────────
+Disallow: /user/profile
+Disallow: /user/create_account
+Disallow: /user/login
+Disallow: /user/logout
+Disallow: /user/change_password
+Disallow: /user/edit
+
+# ── Debug / internal ──────────────────────────────────────────────────────────
+Disallow: /health
+Disallow: /status
+
+# ── Sitemap ───────────────────────────────────────────────────────────────────
+Sitemap: https://beemaster.ca/sitemap.xml

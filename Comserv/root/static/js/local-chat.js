@@ -1934,6 +1934,32 @@
         { label: 'ency',                       url: '/ENCY' },
         { label: 'admin',                      url: '/admin' },
         { label: 'admin dashboard',            url: '/admin' },
+        { label: 'schema compare',             url: '/admin/schema_compare' },
+        { label: 'schema comparison',          url: '/admin/schema_compare' },
+        { label: 'schema_compare',             url: '/admin/schema_compare' },
+        { label: 'compare schema',             url: '/admin/schema_compare' },
+        { label: 'admin users',                url: '/admin/users' },
+        { label: 'users',                      url: '/admin/users' },
+        { label: 'admin logs',                 url: '/admin/logs' },
+        { label: 'logs',                       url: '/admin/logs' },
+        { label: 'system info',                url: '/admin/system_info' },
+        { label: 'admin settings',             url: '/admin/settings' },
+        { label: 'settings',                   url: '/admin/settings' },
+        { label: 'docker containers',          url: '/admin/docker-containers' },
+        { label: 'docker',                     url: '/admin/docker-containers' },
+        { label: 'security scan',              url: '/admin/security-scan' },
+        { label: 'link crawler',               url: '/admin/security-scan' },
+        { label: 'crawler',                    url: '/admin/security-scan' },
+        { label: 'link checker',               url: '/admin/security-scan' },
+        { label: 'check links',                url: '/admin/security-scan' },
+        { label: 'broken links',               url: '/admin/security-scan' },
+        { label: 'git pull',                   url: '/admin/git_pull' },
+        { label: 'planning admin',             url: '/admin/planning' },
+        { label: 'workshops',                  url: '/workshop' },
+        { label: 'membership',                 url: '/membership' },
+        { label: 'navigation',                 url: '/navigation/manage_links' },
+        { label: 'manage navigation',          url: '/navigation/manage_links' },
+        { label: 'manage links',               url: '/navigation/manage_links' },
         { label: 'home',                       url: '/' },
         { label: 'main menu',                  url: '/' },
     ];
@@ -1968,7 +1994,7 @@
     // Try to resolve a navigation intent query to a list of {label,url} matches
     function resolveNavIntent(rawQuery) {
         const q = rawQuery
-            .replace(/^(open|go to|take me to|navigate to|visit|switch to|switch|bring me to|load)\s+/i, '')
+            .replace(/^(goto|go to|open|take me to|navigate to|visit|switch to|switch|bring me to|load)\s*/i, '')
             .replace(/^(the|a|an)\s+/i, '')
             .replace(/[^\w\s]/g, ' ')
             .replace(/\s+/g, ' ')

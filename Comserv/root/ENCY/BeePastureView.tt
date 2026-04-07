@@ -1,8 +1,22 @@
 [% META
    title = "Bee Pasture - Forage Plant Encyclopedia"
    description = "Discover bee forage plants: nectar and pollen sources to support healthy bees year-round"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.02"
+   last_updated = "2026-04-02"
 %]
+[% PageVersion = 'ENCY/BeePastureView.tt,v 0.02 2026/04/02' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 [% PROCESS 'ENCY/ImageHelper.tt' %]
+
+[% IF c.flash.success_msg %]
+<div class="alert alert-success">[% c.flash.success_msg | html %]</div>
+[% END %]
+[% IF c.flash.error_msg %]
+<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
+[% END %]
 
 <div class="app-container">
 
