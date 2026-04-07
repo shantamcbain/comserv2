@@ -1186,29 +1186,36 @@ sub list_available_models {
     # NOTE: Ollama has no public registry API — this list must be updated manually.
     #       See https://ollama.com/library for current models.
     my @available_models = (
-        # ── Gemma 4 (Google, April 2026) — multimodal, 128k-256k context ──────
+        # ── Gemma 3 (Google) ────────────────────────────────────────────────────
         {
-            name        => 'gemma4:4b',
-            description => 'Google Gemma 4 4B — multimodal (text+image+audio), 128k context, fast on CPU',
+            name        => 'gemma3:1b',
+            description => 'Google Gemma 3 1B — tiny, very fast, 128k context',
+            size        => '0.8GB',
+            params      => '1B',
+            tags        => ['general', 'chat', 'fast', 'cpu-friendly'],
+        },
+        {
+            name        => 'gemma3:4b',
+            description => 'Google Gemma 3 4B — fast, capable, 128k context, great on CPU',
             size        => '3.3GB',
             params      => '4B',
-            tags        => ['general', 'chat', 'vision', 'multimodal', 'cpu-friendly', 'new'],
+            tags        => ['general', 'chat', 'fast', 'cpu-friendly'],
             recommended => 1,
         },
         {
-            name        => 'gemma4:12b',
-            description => 'Google Gemma 4 12B — multimodal, 128k context, strong reasoning',
+            name        => 'gemma3:12b',
+            description => 'Google Gemma 3 12B — strong reasoning, 128k context',
             size        => '7.7GB',
             params      => '12B',
-            tags        => ['general', 'chat', 'vision', 'multimodal', 'new'],
+            tags        => ['general', 'chat', 'reasoning'],
             recommended => 1,
         },
         {
-            name        => 'gemma4:27b',
-            description => 'Google Gemma 4 27B — top open model, 256k context, needs 16+ GB RAM',
+            name        => 'gemma3:27b',
+            description => 'Google Gemma 3 27B — top open model, needs 16+ GB RAM',
             size        => '17GB',
             params      => '27B',
-            tags        => ['general', 'chat', 'vision', 'multimodal', 'large', 'new'],
+            tags        => ['general', 'chat', 'advanced'],
         },
         # ── Llama (Meta) ───────────────────────────────────────────────────────
         {
