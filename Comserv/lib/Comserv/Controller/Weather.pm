@@ -708,11 +708,20 @@ sub _format_forecast_response {
         }
     }
 
+    my @day_names = qw(Sun Mon Tue Wed Thu Fri Sat);
+    my @mon_names = qw(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec);
+
     my @daily;
     for my $date (sort keys %days) {
         my @temps = @{$days{$date}{temps}};
+        my ($y, $m, $d) = split /-/, $date;
+        my $dt_obj = eval { DateTime->new(year => $y, month => $m, day => $d, time_zone => 'UTC') };
+        my $label  = $dt_obj
+            ? $day_names[$dt_obj->day_of_week % 7] . ', ' . $mon_names[$m - 1] . ' ' . int($d)
+            : $date;
         push @daily, {
             date          => $date,
+            date_label    => $label,
             dt            => $days{$date}{dt},
             high_temp     => (sort { $b <=> $a } @temps)[0],
             low_temp      => (sort { $a <=> $b } @temps)[0],
