@@ -454,6 +454,82 @@
         if (f) f.addEventListener('change', encyAutoDetectName);
     });
 
+    // --- Field tooltip definitions ---
+    var FIELD_TIPS = {
+        icd_code:              'ICD Code — International Classification of Diseases code (WHO standard). e.g. L70 for Acne vulgaris. Used for clinical documentation and insurance billing.',
+        causative_agent:       'The organism, substance, or factor that directly causes the disease. e.g. bacteria (Staphylococcus), virus (influenza A), fungus (Candida), toxin, or nutritional deficiency.',
+        host_type:             'The organism that the disease affects: Human, Animal, Plant, or Insect.',
+        transmission:          'How the disease spreads — person to person, vector-borne (mosquito, tick), airborne, foodborne, contact, etc.',
+        prognosis:             'Expected outcome of the disease with and without treatment. Includes recovery time, likelihood of complications, and long-term impact.',
+        symptoms_description:  'Observable signs and subjective symptoms experienced by the host. Be specific to this disease — do not copy symptoms from another entity.',
+        diagnosis:             'How the condition is identified: clinical signs, lab tests, imaging, differential diagnosis criteria.',
+        treatment_conventional:'Evidence-based pharmaceutical or surgical treatments used in conventional allopathic medicine.',
+        treatment_herbal:      'Herbal, botanical, naturopathic, TCM, and Ayurvedic treatments used for this condition across healing traditions.',
+        prevention:            'Measures to prevent the disease: vaccination, hygiene, diet, lifestyle, or herbal prophylaxis.',
+        disease_type:          'Classification of the disease: infectious, autoimmune, degenerative, nutritional, metabolic, hereditary, environmental, psychosomatic, etc.',
+        botanical_name:        'Latin binomial scientific name — Genus species. e.g. Taraxacum officinale.',
+        key_name:              'Short identifier used internally for indexing. Usually the genus name or a standardised abbreviation.',
+        parts_used:            'Which parts of the plant are used medicinally. e.g. root, leaf, flower, seed, bark, resin.',
+        therapeutic_action:    'Categories of medicinal action. e.g. Antioxidant, Anti-inflammatory, Adaptogen, Diuretic, Carminative.',
+        constituents:          'Chemical constituents present in the herb. e.g. alkaloids, flavonoids, terpenes, essential oils.',
+        solvents:              'Solvents used in preparation. e.g. water (infusion/decoction), alcohol (tincture), oil (infused oil), DMSO (topical carrier).',
+        contra_indications:    'Conditions or circumstances where this herb should NOT be used. e.g. pregnancy, specific drug interactions, liver disease.',
+        apis:                  'Honeybee (Apis mellifera) interaction: does this plant attract or repel bees?',
+        pollinator:            'Detailed notes on pollinator relationships — which insects visit, what they collect (nectar, pollen, resin), any known effects on pollinators.',
+        cas_number:            'CAS Registry Number — unique numerical identifier assigned by Chemical Abstracts Service for chemical substances. e.g. 117-39-5 for Quercetin.',
+        iupac_name:            'IUPAC systematic chemical name following International Union of Pure and Applied Chemistry nomenclature.',
+        molecular_weight:      'Molecular weight in g/mol (Daltons).',
+        chemical_class:        'Chemical classification of the compound. e.g. Flavonoid, Alkaloid, Terpenoid, Polyphenol, Glycoside.',
+        pharmacological_effects:'How the substance acts on body systems at a physiological level.',
+        found_in_herbs:        'Herbs that contain this constituent or are relevant to this topic. Enter as comma-separated names — these will be auto-linked to herb records.',
+        found_in_foods:        'Foods that contain this constituent. Enter as comma-separated names.',
+        found_in_drugs:        'Pharmaceutical drugs that contain this constituent or interact with it.',
+        reference_system:      'Type of source: book, journal, website, thesis, monograph, pharmacopoeia, traditional_text, personal_communication.',
+        publication_date:      'Date of publication. Format: YYYY-MM-DD or YYYY.',
+        isbn:                  'International Standard Book Number — 10 or 13 digit identifier. Click the ISBN on the detail page to look up on Open Library.',
+        ecological_role:       'The role this organism plays in its ecosystem. e.g. pollinator, decomposer, predator, prey, keystone species.',
+        conservation_status:   'IUCN or national conservation status. e.g. Least Concern, Vulnerable, Endangered, Critically Endangered.',
+        prescription_status:   'Rx = prescription required. OTC = over the counter. Schedule = scheduled/controlled substance. Controlled = controlled drug with special restrictions.',
+        din_number:            'Drug Identification Number — Health Canada identifier for approved drugs sold in Canada.',
+        ndc_code:              'National Drug Code — US FDA identifier for approved drugs.',
+        atc_code:              'Anatomical Therapeutic Chemical code — WHO classification system for drugs by organ system and therapeutic use.',
+        herb_drug_interactions:'Known interactions between this drug and herbal medicines. Important for integrative practitioners managing patients using both.',
+        naturopathic_notes:    'Naturopathic and integrative medicine perspective on this drug — context, alternatives, harm reduction, or complementary approaches.',
+        notes:                 'For references: include page numbers, edition, chapter, and a short excerpt of the passage where the herb/treatment is mentioned.',
+        acute_chronic:         'Is the symptom typically acute (sudden onset, short duration) or chronic (long-term, persistent)?',
+        body_system:           'Body system primarily affected. e.g. Respiratory, Digestive, Neurological, Cardiovascular, Integumentary (skin), Endocrine.',
+        severity:              'Typical severity: mild, moderate, severe, life-threatening.',
+        alternate_terms:       'Other names or spellings for this glossary term.',
+        etymology:             'Origin of the word — Greek, Latin, or other language roots.',
+        distribution:          'Geographic regions where this organism is naturally found or where this disease occurs.',
+    };
+
+    function encyAddFieldTooltips() {
+        var tipIcon = '\u24d8'; // ⓘ
+        document.querySelectorAll('td strong, th').forEach(function(el) {
+            var text  = el.textContent.trim();
+            // Derive field name from label text: lowercase, replace spaces/special chars with _
+            var field = text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+            // Also try removing common suffixes
+            var tip   = FIELD_TIPS[field] || FIELD_TIPS[field.replace(/_code$/, '_code')]
+                     || FIELD_TIPS[field.replace(/_s$/, '')];
+            if (tip && !el.querySelector('.ency-tip')) {
+                var span = document.createElement('span');
+                span.className = 'ency-tip';
+                span.textContent = ' ' + tipIcon;
+                span.title = tip;
+                span.style.cssText = 'color:#6c9;cursor:help;font-size:0.9em;font-style:normal;';
+                el.appendChild(span);
+            }
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', encyAddFieldTooltips);
+    } else {
+        encyAddFieldTooltips();
+    }
+
     window.encyAiFill          = encyAiFill;
     window.encyAiReview        = encyAiReview;
     window.encyAiMarkReference = encyAiMarkReference;
