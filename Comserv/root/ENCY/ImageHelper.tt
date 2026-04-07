@@ -1,3 +1,12 @@
+[% META
+   title = "ENCY Image Helper"
+   description = "Macro library for ENCY herb image display and picker widget"
+   roles = "public"
+   TemplateType = "Macro"
+   category = "ENCY"
+   page_version = "0.02"
+   last_updated = "2026-04-02"
+%]
 [%#
   ENCY/ImageHelper.tt - smart image URL resolution macro + file picker widget.
 

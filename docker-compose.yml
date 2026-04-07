@@ -40,11 +40,12 @@ services:
       context: ./Comserv
       dockerfile: Dockerfile
     container_name: comserv-web-dev
-    restart: always
+    restart: unless-stopped
     labels:
       - "description=Development web server (port 3000) with live code reload and debugging"
     environment:
       CATALYST_ENV: development
+      PLACK_ENV: development
       CATALYST_DEBUG: 1
       CATALYST_HOME: /opt/comserv
       WEB_PORT: 3000
@@ -77,7 +78,7 @@ services:
       - ${APP_MOUNT:-.}/Comserv/t:/opt/comserv/t:delegated
       # - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro  # Disabled - using secrets instead
       - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
-      - workshop_files_nfs:/data/nfs:rw
+      - ${WORKSHOP_LOCAL_DIR:-/home/shanta/comserv-workshop}:/data/nfs:rw
       - comserv-logs:/opt/comserv/root/log:rw
       - ./Comserv/docker-entrypoint.sh:/opt/comserv/docker-entrypoint.sh:ro
       - ./Comserv/startup-wrapper.sh:/opt/comserv/startup-wrapper.sh:ro
@@ -105,7 +106,7 @@ services:
       context: ./Comserv
       dockerfile: Dockerfile
     container_name: comserv-web-prod
-    restart: always
+    restart: unless-stopped
     labels:
       - "description=Production web server (port 5000) with Starman workers via Supervisor"
     environment:
@@ -143,7 +144,7 @@ services:
       - ${APP_MOUNT:-.}/Comserv/t:/opt/comserv/t:delegated
       # - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro  # Disabled - using secrets instead
       - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
-      - workshop_files_nfs:/data/nfs:rw
+      - ${WORKSHOP_LOCAL_DIR:-/home/shanta/comserv-workshop}:/data/nfs:rw
       - comserv-logs:/opt/comserv/root/log:rw
       - comserv-sessions:/tmp/comserv/session:rw
       - ./Comserv/docker-entrypoint.sh:/opt/comserv/docker-entrypoint.sh:ro
@@ -173,12 +174,6 @@ volumes:
     driver: local
   comserv-sessions:
     driver: local
-  workshop_files_nfs:
-    driver: local
-    driver_opts:
-      type: nfs
-      o: "addr=${NFS_SERVER:-192.168.1.175},rw,noatime,nfsvers=3,soft"
-      device: ":${NFS_WORKSHOP_PATH:-/mnt/data/comserv}"
 
 # Shared bridge network for all services
 networks:

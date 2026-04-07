@@ -1808,8 +1808,9 @@ sub quick_close :Path('quick_close') :Args(0) {
             priority        => $todo->priority || 5,
             last_mod_by     => $username,
             last_mod_date   => $today,
-            group_of_poster => $c->session->{group} || '',
-            comments        => '',
+            group_of_poster  => $c->session->{group} || '',
+            comments         => '',
+            points_processed => 0,
         });
     };
     if ($@) {
@@ -1970,6 +1971,235 @@ sub reschedule :Path('reschedule') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reschedule',
         "Reschedule by $username: $count todos updated ($date_count due-dates extended)");
     $c->response->body('{"ok":1,"count":' . $count . ',"date_count":' . $date_count . ',"errors":' . (JSON::encode_json(\@errors)) . '}');
+}
+
+sub open_log :Path('open_log') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $username = $c->session->{username} // '';
+    my $roles    = $c->session->{roles} || [];
+    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
+    unless ($username && $username ne 'anonymous' && grep { /^(admin|developer|editor|devops)$/i } @rl) {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Admin role required"}');
+        return;
+    }
+
+    my $body_fh = $c->req->body;
+    my $body    = $body_fh ? do { local $/; <$body_fh> } : '';
+    my $data;
+    eval { require JSON; $data = JSON::decode_json($body) if $body; };
+    my $record_id = $data->{record_id} if $data;
+    unless ($record_id) {
+        $c->response->status(400);
+        $c->response->body('{"ok":0,"error":"Missing record_id"}');
+        return;
+    }
+
+    my $now   = DateTime->now;
+    my $today = $now->ymd;
+    my $time  = $now->hms;
+
+    eval {
+        my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
+        die "Todo not found\n" unless $todo;
+
+        my $existing_open = $c->model('DBEncy')->resultset('Log')->search({
+            todo_record_id => $record_id,
+            end_time       => '00:00:00',
+            status         => { '!=' => 3 },
+        })->first;
+        die "Log already open for this todo\n" if $existing_open;
+
+        my $proj_code = '';
+        if ($todo->project_id) {
+            my $proj = eval { $c->model('DBEncy')->resultset('Project')->find($todo->project_id) };
+            $proj_code = $proj ? ($proj->project_code || '') : '';
+        }
+
+        my $log = $c->model('DBEncy')->resultset('Log')->create({
+            todo_record_id  => $record_id,
+            username        => $username,
+            sitename        => $todo->sitename || $c->session->{SiteName},
+            project_code    => $proj_code,
+            abstract        => 'Started: ' . $todo->subject,
+            details         => 'Work begun on this step by ' . $username,
+            start_date      => $today,
+            due_date        => $todo->due_date || $today,
+            start_time      => $time,
+            end_time        => '00:00:00',
+            time            => '00:00:00',
+            status          => 2,
+            priority        => $todo->priority || 5,
+            last_mod_by     => $username,
+            last_mod_date   => $today,
+            group_of_poster => $c->session->{group} || '',
+            comments        => $todo->comments || '',
+        });
+
+        $todo->update({
+            status        => 2,
+            last_mod_by   => $username,
+            last_mod_date => $today,
+        });
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'open_log',
+            "Log opened for todo $record_id by $username (log_id=" . $log->record_id . ")");
+        $c->response->body('{"ok":1,"log_id":' . $log->record_id . '}');
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'open_log',
+            "Failed open_log for todo $record_id: $@");
+        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+    }
+}
+
+sub next_step :Path('next_step') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $username = $c->session->{username} // '';
+    my $roles    = $c->session->{roles} || [];
+    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
+    unless ($username && $username ne 'anonymous' && grep { /^(admin|developer|editor|devops)$/i } @rl) {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Admin role required"}');
+        return;
+    }
+
+    my $body_fh = $c->req->body;
+    my $body    = $body_fh ? do { local $/; <$body_fh> } : '';
+    my $data;
+    eval { require JSON; $data = JSON::decode_json($body) if $body; };
+    my $record_id = $data->{record_id} if $data;
+    unless ($record_id) {
+        $c->response->status(400);
+        $c->response->body('{"ok":0,"error":"Missing record_id"}');
+        return;
+    }
+
+    my $now   = DateTime->now;
+    my $today = $now->ymd;
+    my $time  = $now->hms;
+    my $next_todo_id;
+
+    eval {
+        my $schema = $c->model('DBEncy');
+        my $todo   = $schema->resultset('Todo')->find($record_id);
+        die "Todo not found\n" unless $todo;
+
+        my $open_log = $schema->resultset('Log')->search({
+            todo_record_id => $record_id,
+            end_time       => '00:00:00',
+        }, { order_by => { -desc => 'record_id' } })->first;
+
+        if ($open_log) {
+            my $start = $open_log->start_time || '00:00:00';
+            my ($sh, $sm, $ss) = split(':', $start);
+            $sh = int($sh // 0); $sm = int($sm // 0); $ss = int($ss // 0);
+            my ($eh, $em, $es) = split(':', $time);
+            $eh = int($eh // 0); $em = int($em // 0); $es = int($es // 0);
+            my $elapsed_secs = ($eh * 3600 + $em * 60 + $es) - ($sh * 3600 + $sm * 60 + $ss);
+            $elapsed_secs = 0 if $elapsed_secs < 0;
+            my $elapsed = sprintf('%02d:%02d:%02d',
+                int($elapsed_secs / 3600),
+                int(($elapsed_secs % 3600) / 60),
+                $elapsed_secs % 60);
+
+            $open_log->update({
+                end_time      => $time,
+                time          => $elapsed,
+                status        => 3,
+                last_mod_by   => $username,
+                last_mod_date => $today,
+                details       => ($open_log->details || '') . "\nCompleted by $username at $today $time.",
+            });
+
+            my $existing_accum = $todo->accumulative_time || '00:00:00';
+            my ($ah, $am, $as_) = split(':', $existing_accum);
+            $ah = int($ah // 0); $am = int($am // 0); $as_ = int($as_ // 0);
+            my $total_secs = ($ah * 3600 + $am * 60 + $as_) + $elapsed_secs;
+            my $new_accum  = sprintf('%02d:%02d:%02d',
+                int($total_secs / 3600),
+                int(($total_secs % 3600) / 60),
+                $total_secs % 60);
+            $todo->update({
+                status            => 3,
+                accumulative_time => $new_accum,
+                last_mod_by       => $username,
+                last_mod_date     => $today,
+            });
+        } else {
+            $todo->update({
+                status        => 3,
+                last_mod_by   => $username,
+                last_mod_date => $today,
+            });
+        }
+
+        if ($todo->parent_id) {
+            my $next = $schema->resultset('Todo')->search({
+                parent_id  => $todo->parent_id,
+                sort_order => { '>' => ($todo->sort_order || 0) },
+                status     => { '!=' => 3 },
+            }, {
+                order_by => { -asc => 'sort_order' },
+                rows     => 1,
+            })->first;
+
+            if ($next) {
+                $next_todo_id = $next->record_id;
+
+                my $proj_code = '';
+                if ($next->project_id) {
+                    my $proj = eval { $schema->resultset('Project')->find($next->project_id) };
+                    $proj_code = $proj ? ($proj->project_code || '') : '';
+                }
+
+                $schema->resultset('Log')->create({
+                    todo_record_id  => $next->record_id,
+                    username        => $username,
+                    sitename        => $next->sitename || $c->session->{SiteName},
+                    project_code    => $proj_code,
+                    abstract        => 'Started: ' . $next->subject,
+                    details         => 'Work begun automatically via Next Step by ' . $username,
+                    start_date      => $today,
+                    due_date        => $next->due_date || $today,
+                    start_time      => $time,
+                    end_time        => '00:00:00',
+                    time            => '00:00:00',
+                    status          => 2,
+                    priority        => $next->priority || 5,
+                    last_mod_by     => $username,
+                    last_mod_date   => $today,
+                    group_of_poster => $c->session->{group} || '',
+                    comments        => $next->comments || '',
+                });
+
+                $next->update({
+                    status        => 2,
+                    last_mod_by   => $username,
+                    last_mod_date => $today,
+                });
+            }
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'next_step',
+            "Failed next_step for todo $record_id: $@");
+        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'next_step',
+        "next_step by $username: todo $record_id done" .
+        ($next_todo_id ? ", advanced to $next_todo_id" : ", no next step found"));
+
+    my $body_out = '{"ok":1,"closed_todo_id":' . $record_id;
+    $body_out .= ',"next_todo_id":' . $next_todo_id if $next_todo_id;
+    $body_out .= '}';
+    $c->response->body($body_out);
 }
 
 1;

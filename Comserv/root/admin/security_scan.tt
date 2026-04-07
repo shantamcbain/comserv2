@@ -42,9 +42,15 @@
     .badge-CONNECT_FAIL      { background-color: #343a40; color: #adb5bd; }
     #scan-progress { display: none; }
     #scan-results  { display: none; }
-    .stat-card { text-align: center; padding: 0.75rem; border-radius: 4px; color: #fff; }
+    .stat-card { text-align: center; padding: 0.75rem; border-radius: 4px; color: #fff; flex: 1 1 120px; min-width: 100px; }
     .stat-card h3 { margin: 0; font-size: 2rem; }
     .stat-card small { font-size: 0.8rem; }
+    .stat-card.bg-danger  { background-color: #dc3545; }
+    .stat-card.bg-warning { background-color: #ffc107; color: #212529; }
+    .stat-card.bg-success { background-color: #28a745; }
+    .stat-card.bg-secondary { background-color: #6c757d; }
+    .stat-card.bg-dark    { background-color: #343a40; }
+    #stat-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 </style>
 
 <div class="container">
@@ -77,6 +83,13 @@
                     <label><strong>Max Pages</strong></label>
                     <input type="number" class="form-control" id="max_pages" value="100" min="10" max="500">
                 </div>
+            </div>
+            <div class="form-check mb-3">
+                <input type="checkbox" class="form-check-input" id="use_auth">
+                <label class="form-check-label" for="use_auth">
+                    <strong>Scan as logged-in user</strong>
+                    <small class="text-muted d-block">Forwards your session cookie to the scanner — shows what your role can access vs an anonymous visitor.</small>
+                </label>
             </div>
             <button class="btn btn-warning" id="start-btn" onclick="startScan()">Run Security Scan</button>
             <button class="btn btn-danger" id="stop-btn" style="display:none" onclick="stopScan()">Stop</button>
@@ -115,22 +128,42 @@
                 <div class="row mb-3" id="stat-row"></div>
                 <div class="mb-2" id="filter-bar">
                     <strong>Filter:</strong>
-                    <button class="btn btn-sm btn-danger   ml-1" onclick="filterTable('EXPOSED')">Exposed</button>
-                    <button class="btn btn-sm btn-danger   ml-1" onclick="filterTable('LEAK_STACK_TRACE')">Stack Trace</button>
-                    <button class="btn btn-sm btn-warning  ml-1" onclick="filterTable('LINK_LEAK')">Link Leak</button>
-                    <button class="btn btn-sm btn-warning  ml-1" onclick="filterTable('SERVER_ERROR')">Server Error</button>
-                    <button class="btn btn-sm btn-success  ml-1" onclick="filterTable('PROTECTED')">Protected</button>
-                    <button class="btn btn-sm btn-secondary ml-1" onclick="filterTable('OK_PUBLIC')">Scanned OK</button>
-                    <button class="btn btn-sm btn-light    ml-1" onclick="filterTable('NOT_FOUND')">404</button>
-                    <button class="btn btn-sm btn-dark     ml-1" onclick="filterTable('')">All</button>
+                    <button class="btn btn-sm btn-danger   ml-1" onclick="showTab('security'); filterTable('EXPOSED')">Exposed</button>
+                    <button class="btn btn-sm btn-danger   ml-1" onclick="showTab('security'); filterTable('LEAK_STACK_TRACE')">Stack Trace</button>
+                    <button class="btn btn-sm btn-warning  ml-1" onclick="showTab('security'); filterTable('LINK_LEAK')">Link Leak</button>
+                    <button class="btn btn-sm btn-warning  ml-1" onclick="showTab('security'); filterTable('SERVER_ERROR')">Server Error</button>
+                    <button class="btn btn-sm btn-success  ml-1" onclick="showTab('security'); filterTable('PROTECTED')">Protected</button>
+                    <button class="btn btn-sm btn-secondary ml-1" onclick="showTab('security'); filterTable('OK_PUBLIC')">Scanned OK</button>
+                    <button class="btn btn-sm btn-light    ml-1" onclick="showTab('security'); filterTable('NOT_FOUND')">404</button>
+                    <button class="btn btn-sm btn-dark     ml-1" onclick="showTab('security'); filterTable('')">All</button>
+                    <button class="btn btn-sm btn-info     ml-1" onclick="showTab('broken')">&#x1F517; Broken Links</button>
+                    <button class="btn btn-sm btn-primary  ml-1" id="create-todos-btn" onclick="createTodos()" style="display:none">&#x2705; Create Todos from Findings</button>
                 </div>
-                <div class="table-responsive">
+                <div id="create-todos-result" class="alert mt-2" style="display:none"></div>
+
+                <!-- Security findings tab -->
+                <div id="tab-security" class="table-responsive">
                     <table class="table table-sm table-bordered" id="findings-table">
                         <thead class="thead-dark">
                             <tr><th>Phase</th><th>Result</th><th>Status</th><th>URL</th><th>Detail</th></tr>
                         </thead>
                         <tbody id="findings-body"></tbody>
                     </table>
+                </div>
+
+                <!-- Broken links tab -->
+                <div id="tab-broken" style="display:none">
+                    <p class="text-muted small mb-2">Links found on public pages that returned 404. <strong>Source Page</strong> is the page that contained the dead link.</p>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered" id="broken-links-table">
+                            <thead class="thead-dark">
+                                <tr><th>Source Page (contains the link)</th><th>Dead Link (404)</th></tr>
+                            </thead>
+                            <tbody id="broken-links-body">
+                                <tr><td colspan="2" class="text-muted">Run a scan to see broken links.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -155,6 +188,7 @@ function startScan() {
     var targetUrl = document.getElementById('target_url').value.trim();
     var siteName  = document.getElementById('site_name').value.trim() || 'none';
     var maxPages  = document.getElementById('max_pages').value || 100;
+    var useAuth   = document.getElementById('use_auth').checked ? 1 : 0;
 
     if (!targetUrl.match(/^https?:\/\/[\w.\-]+(:\d+)?(\/.*)?$/)) {
         alert('Please enter a valid http:// or https:// URL');
@@ -165,15 +199,17 @@ function startScan() {
     document.getElementById('stop-btn').style.display  = '';
     document.getElementById('scan-progress').style.display = 'block';
     document.getElementById('scan-results').style.display  = 'none';
+    document.getElementById('create-todos-btn').style.display = 'none';
     document.getElementById('live-output').textContent = '';
     document.getElementById('scan-status').textContent = 'Starting scan...';
-    document.getElementById('results-target').textContent = targetUrl + '  site=' + siteName;
+    document.getElementById('results-target').textContent = targetUrl + '  site=' + siteName
+        + (useAuth ? '  [AUTHENTICATED]' : '  [UNAUTHENTICATED]');
     pollOffset = 0;
 
     fetch('/admin/security-scan-start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ target_url: targetUrl, site_name: siteName, max_pages: maxPages })
+        body: new URLSearchParams({ target_url: targetUrl, site_name: siteName, max_pages: maxPages, use_auth: useAuth })
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -207,6 +243,8 @@ function doPoll() {
             scanDone();
             if (data.results && data.results.findings) {
                 renderResults(data.results.findings);
+                window._lastScanFile = data.archive_file || '';
+                document.getElementById('create-todos-btn').style.display = '';
             }
             loadHistory();
         }
@@ -229,6 +267,11 @@ function appendLine(text) {
     var el = document.getElementById('live-output');
     el.textContent += text + '\n';
     el.scrollTop = el.scrollHeight;
+}
+
+function showTab(tab) {
+    document.getElementById('tab-security').style.display = (tab === 'security') ? '' : 'none';
+    document.getElementById('tab-broken').style.display   = (tab === 'broken')   ? '' : 'none';
 }
 
 function renderResults(findings) {
@@ -262,6 +305,7 @@ function renderResults(findings) {
         if (f.final_url && f.final_url !== url) detail += '<small class="text-muted">→ ' + esc(f.final_url) + '</small>';
         if (f.leaked_link) detail += '<small class="text-muted d-block">leaked: ' + esc(f.leaked_link) + '</small>';
         if (f.detail)    detail += '<small class="text-muted d-block">' + esc(f.detail) + '</small>';
+        if (f.from_url)  detail += '<small class="text-muted d-block">from: ' + esc(f.from_url) + '</small>';
         var tr = '<tr class="finding-' + esc(r) + '" data-result="' + esc(r) + '">' +
             '<td><small>' + esc(f.phase||'') + '</small></td>' +
             '<td><span class="badge-result badge-' + esc(r) + '">' + esc(r) + '</span></td>' +
@@ -272,11 +316,30 @@ function renderResults(findings) {
         tbody.insertAdjacentHTML('beforeend', tr);
     });
 
+    // Populate broken links tab (Phase 1 crawl 404s with a known source page)
+    var brokenFindings = findings.filter(function(f) {
+        return f.phase === 'crawl' && f.result === 'NOT_FOUND' && f.from_url;
+    });
+    var btbody = document.getElementById('broken-links-body');
+    if (brokenFindings.length === 0) {
+        btbody.innerHTML = '<tr><td colspan="2" class="text-success">No broken links found.</td></tr>';
+    } else {
+        btbody.innerHTML = '';
+        brokenFindings.forEach(function(f) {
+            var tr = '<tr>' +
+                '<td><code style="font-size:0.75em;word-break:break-all">' + esc(f.from_url) + '</code></td>' +
+                '<td><code style="font-size:0.75em;word-break:break-all;color:#c0392b">' + esc(f.url) + '</code></td>' +
+                '</tr>';
+            btbody.insertAdjacentHTML('beforeend', tr);
+        });
+    }
+
     document.getElementById('scan-results').style.display = 'block';
+    showTab('security');
 }
 
 function statCard(cls, n, label) {
-    return '<div class="col-6 col-md-3 mb-2"><div class="stat-card ' + cls + '"><h3>' + n + '</h3><small>' + label + '</small></div></div>';
+    return '<div class="stat-card ' + cls + '"><h3>' + n + '</h3><small>' + label + '</small></div>';
 }
 
 function esc(s) {
@@ -303,7 +366,7 @@ function loadHistory() {
                 '<td><code style="font-size:0.8em">' + esc(s.base_url||'') + '</code> <small class="text-muted">' + esc(s.sitename||'') + '</small></td>' +
                 '<td>' + tot + ' URLs</td>' +
                 '<td>' + badge + '</td>' +
-                '<td><button class="btn btn-xs btn-outline-primary" onclick="loadArchive(' + JSON.stringify(s.file) + ')">View</button></td>' +
+                '<td><button class="btn btn-sm btn-outline-primary" onclick="loadArchive(\'' + s.file + '\')">View</button></td>' +
                 '</tr>';
         }).join('');
         el.innerHTML = '<table class="table table-sm table-bordered mb-0"><thead class="thead-light"><tr><th>Time</th><th>Target</th><th>URLs</th><th>Status</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
@@ -321,9 +384,49 @@ function loadArchive(filename) {
         document.getElementById('results-target').textContent =
             (data.base_url||'') + '  site=' + (data.sitename||'') + '  [' + (data.scan_time||'') + ']';
         renderResults(data.findings || []);
+        window._lastScanFile = filename;
+        document.getElementById('create-todos-btn').style.display = '';
+        document.getElementById('create-todos-result').style.display = 'none';
         document.getElementById('scan-results').scrollIntoView({ behavior: 'smooth' });
     })
     .catch(function(e) { alert('Error loading report: ' + e); });
+}
+
+function createTodos() {
+    var btn = document.getElementById('create-todos-btn');
+    var resDiv = document.getElementById('create-todos-result');
+    btn.disabled = true;
+    btn.textContent = 'Creating todos...';
+    resDiv.style.display = 'none';
+
+    var body = new URLSearchParams();
+    if (window._lastScanFile) body.append('file', window._lastScanFile.replace(/.*\//, ''));
+
+    fetch('/admin/security-scan-create-todos', { method: 'POST', body: body })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        btn.disabled = false;
+        btn.textContent = '\u2705 Create Todos from Findings';
+        if (data.error) {
+            resDiv.className = 'alert alert-danger mt-2';
+            resDiv.textContent = 'Error: ' + data.error;
+        } else {
+            resDiv.className = 'alert alert-success mt-2';
+            resDiv.innerHTML = '<strong>' + data.created + ' todos created</strong>'
+                + (data.skipped ? ', ' + data.skipped + ' already existed.' : '.')
+                + (data.created > 0
+                    ? ' <a href="/log" target="_blank">View in Log/Todos</a>'
+                    : '');
+        }
+        resDiv.style.display = '';
+    })
+    .catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = '\u2705 Create Todos from Findings';
+        resDiv.className = 'alert alert-danger mt-2';
+        resDiv.textContent = 'Request failed: ' + e;
+        resDiv.style.display = '';
+    });
 }
 
 function filterTable(result) {

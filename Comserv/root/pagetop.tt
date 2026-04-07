@@ -99,6 +99,45 @@
     cursor: crosshair;
 }
 
+.membership-status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+}
+
+.membership-tier-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-weight: bold;
+    font-size: 11px;
+    text-decoration: none;
+    background-color: var(--accent-color, #4a90d9);
+    color: white;
+}
+
+.membership-tier-free {
+    background-color: var(--border-color, #ccc);
+    color: var(--text-color, #555);
+}
+
+.coin-balance {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: bold;
+    background-color: var(--secondary-color, #f0f0f0);
+    color: var(--text-color, #333);
+    text-decoration: none;
+}
+
+@media (max-width: 768px) {
+    .membership-status-bar { font-size: 11px; padding: 2px 8px; }
+}
+
 /* Sticky/Floating Main Navigation Menu - Only the nav, not the header */
 header {
     position: relative !important;
@@ -275,8 +314,26 @@ document.addEventListener('DOMContentLoaded', function() {
 [% END %] to [% site_display_name || SiteDisplayName || c.stash.site_display_name || c.stash.SiteDisplayName || c.session.site_display_name || SiteName || c.session.SiteName || 'this site' %]!
     </h1>
 
-
-
+[% IF c.session.user_id %]
+[% TRY %]
+[% SET _uid = c.session.user_id %]
+[% SET _sid = c.session.SiteID %]
+[% SET _mem_rs = c.model('DBEncy').resultset('UserMembership') %]
+[% SET _active_mem = _mem_rs.search({'me.user_id' => _uid, 'me.site_id' => _sid, 'me.status' => 'active'}, {prefetch => 'plan', rows => 1, order_by => {'me.started_at' => 'DESC'}}).first %]
+[% IF NOT _active_mem %][% SET _active_mem = _mem_rs.search({'me.user_id' => _uid, 'me.site_id' => _sid, 'me.status' => 'grace'}, {prefetch => 'plan', rows => 1, order_by => {'me.started_at' => 'DESC'}}).first %][% END %]
+[% SET _coin_acct = c.model('DBEncy').resultset('InternalCurrencyAccount').find({user_id => _uid}) %]
+<div class="membership-status-bar">
+    [% IF _active_mem AND _active_mem.plan %]
+        <a href="/membership/account" class="membership-tier-badge membership-tier-[% _active_mem.plan.slug | html %]" title="Your membership plan">[% _active_mem.plan.name | html %]</a>
+    [% ELSE %]
+        <a href="/membership/plans" class="membership-tier-badge membership-tier-free" title="Upgrade your membership for more features">Free &mdash; Upgrade</a>
+    [% END %]
+    [% IF _coin_acct AND _coin_acct.balance > 0 %]
+        <a href="/currency/balance" class="coin-balance" title="Your coin balance">&#9679; [% _coin_acct.balance | format('%.2f') %]</a>
+    [% END %]
+</div>
+[% CATCH %][% END %]
+[% END %]
 
 
 
@@ -289,12 +346,15 @@ document.addEventListener('DOMContentLoaded', function() {
             </li>
         [% INCLUDE 'Navigation/TopDropListMain.tt' %]
         [% INCLUDE 'Navigation/TopDropListLogin.tt' %]
-        [% INCLUDE 'Navigation/TopDropListGlobal.tt' %]
+        [%# Global discontinued — Mail/Jobs/Join moved to Main %]
+        [% IF 0 %][% INCLUDE 'Navigation/TopDropListGlobal.tt' %][% END %]
         [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
         [% INCLUDE 'Navigation/TopDropListMember.tt' %]
-        [% INCLUDE 'Navigation/TopDropListIT.tt' %]
         [% INCLUDE 'Navigation/TopDropListENCY.tt' %]
-        <!-- TopDropListCoop.tt has been removed and merged into admintopmenu.tt -->
+        [% INCLUDE 'Navigation/TopDropListWeather.tt' %]
+        [%# IT discontinued — IT content moved to HelpDesk submenu %]
+        [% IF 0 %][% INCLUDE 'Navigation/TopDropListIT.tt' %][% END %]
+        [%# Coop removed and merged into admintopmenu.tt %]
 
         [% IF is_admin %]
             [% INCLUDE 'Navigation/admintopmenu.tt' %]

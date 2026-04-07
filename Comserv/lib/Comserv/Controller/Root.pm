@@ -13,7 +13,7 @@ use Comserv::Util::SystemInfo;
 # Configure static file serving
 __PACKAGE__->config(
     'Plugin::Static::Simple' => {
-        dirs => ['static'],
+        dirs => ['static', 'LegacyStaticPages'],
         include_path => [qw( root )],
     });
 
@@ -1719,10 +1719,15 @@ sub site_setup {
 
 sub debug :Path('/debug') {
     my ($self, $c) = @_;
+    unless ($c->stash->{is_admin}) {
+        $c->response->status(403);
+        $c->stash(template => 'error.tt', error_msg => 'Access denied.');
+        return;
+    }
     my $site_name = $c->stash->{SiteName};
     $c->stash(template => 'debug.tt');
     $c->forward($c->view('TT'));
-   $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Completed site_setup action");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'debug', "Admin debug page accessed");
 }
 
 sub accounts :Path('/accounts') :Args(0) {

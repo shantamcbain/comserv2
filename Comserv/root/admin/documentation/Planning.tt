@@ -270,10 +270,9 @@ last_updated = '2026/02/08'
                 📦 All Projects from Database (Reference - Future State Preview)
             </summary>
             <div style="margin-top: 10px;">
-                <p><em>This shows all projects with their hierarchy. Eventually, all planning will be driven from the project database structure shown here.</em></p>
-                [% SET all_db_projects = c.model('DBEncy').resultset('Project').search({}, { order_by => 'id' }) %]
-                [% IF all_db_projects.count > 0 %]
-                    [% FOREACH proj IN all_db_projects.all %]
+                <p><em>Projects scoped to your site ([% planning_sitename || 'CSC' %][% planning_is_csc ? ' — all sites visible' : ' — own site only' %]). Eventually, all planning will be driven from the project database structure shown here.</em></p>
+                [% IF all_db_projects.size > 0 %]
+                    [% FOREACH proj IN all_db_projects %]
                         [% UNLESS proj.parent_id %]
                         <details style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
                             <summary style="cursor: pointer; font-weight: bold;">
@@ -284,7 +283,7 @@ last_updated = '2026/02/08'
                                 <p><a href="/project/details?project_id=[% proj.id %]" target="_blank">View Full Details</a></p>
 
                                 [% SET proj_subs = [] %]
-                                [% FOREACH check_sub IN all_db_projects.all %]
+                                [% FOREACH check_sub IN all_db_projects %]
                                     [% IF check_sub.parent_id == proj.id %]
                                         [% proj_subs.push(check_sub) %]
                                     [% END %]

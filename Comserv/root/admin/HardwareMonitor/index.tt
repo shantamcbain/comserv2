@@ -304,6 +304,7 @@
             options: {
                 responsive: true, maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
+                onClick: onClickCb || null,
                 plugins: {
                     legend: {
                         position: 'bottom',
@@ -338,6 +339,7 @@
         box.className = 'hw-chart-box';
         var h4 = document.createElement('h4');
         h4.innerHTML = title + '<span>drag bottom edge to resize</span>';
+        if (onClickCb) { box.style.cursor = 'pointer'; }
         box.appendChild(h4);
         if (onClickCb) { box.style.cursor = 'pointer'; }
         var wrap = document.createElement('div');
@@ -407,7 +409,6 @@
         if (metric === 'ipmi_ps1_current' || metric === 'ipmi_ps2_current') return;
         if (metric.match(/_temp$/)) return;
 
-        if (metric.match(/^disk_used_pct/)) return;
         if (metric.match(/^disk_/)) return;
 
         var unit = METRIC_UNITS[metric] || '';
@@ -415,6 +416,7 @@
         rendered++;
     });
 
+    // Build one combined Disk Usage % chart: series label = "host — /mount"
     var diskCombined = {};
     rawData.forEach(function(entry) {
         if (!entry.metric.match(/^disk_used_pct/) || !entry.hosts) return;
@@ -430,6 +432,7 @@
             if (!items || !items.length) return;
             var dsIdx = items[0].datasetIndex;
             var label = Object.keys(diskCombined).sort()[dsIdx] || '';
+            // label format: "hostname — /mount"
             var parts = label.split(' \u2014 ');
             var host  = parts[0] ? parts[0].trim() : 'workstation';
             var mount = parts[1] ? parts[1].trim() : '/';

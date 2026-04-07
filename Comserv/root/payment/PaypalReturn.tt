@@ -1,0 +1,33 @@
+[% META
+   title = "PayPal Return"
+   description = "PayPal payment return confirmation"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "Payment"
+   page_version = "0.01"
+   last_updated = "2026-04-03"
+%]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>PayPal Payment Return</h1>
+  </div>
+  <div class="content-container">
+    <div class="content-primary">
+      <div class="content-section">
+        [% IF message %]
+        <p>[% message | html %]</p>
+        [% ELSE %]
+        <p>Thank you for your payment. Your membership is being processed.</p>
+        <p>If your membership does not appear active within a few minutes, please contact support with your PayPal transaction reference.</p>
+        [% END %]
+        <div class="form-actions">
+          <a href="[% c.uri_for('/membership/account') %]" class="btn btn-primary">View My Membership</a>
+          <a href="[% c.uri_for('/membership') %]" class="btn btn-secondary">← Back to Plans</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

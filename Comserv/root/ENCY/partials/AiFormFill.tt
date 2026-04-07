@@ -1,0 +1,232 @@
+[% IF is_admin %]
+<div id="ency-ai-fill-panel" style="margin:1em 0;padding:1em;border:1px solid #acd;background:#f0f7ff;border-radius:4px;">
+  <strong>Ask AI to Fill Form</strong>
+  <span id="ency-ai-prompt-data" data-prompt="[% ency_ai_prompt | html %]" style="display:none;"></span>
+  <div style="margin-top:0.5em;display:flex;flex-wrap:wrap;gap:0.5em;align-items:center;">
+    <input type="text" id="ency-ai-entity-name" placeholder="Enter name to look up (e.g. Betaderm cream)..." size="40" />
+    <select id="ency-ai-model-sel" title="AI model to use" style="font-size:0.9em;">
+      <option value="grok-3-mini|grok"  >Grok 3 Mini (fast)</option>
+      <option value="grok-3|grok" selected>Grok 3 (recommended)</option>
+      <option value="grok-4-0709|grok"  >Grok 4 (best)</option>
+    </select>
+    <button type="button" id="ency-ai-ask-btn" onclick="encyAiFill()">Ask AI</button>
+    <span id="ency-ai-status" style="color:#555;font-style:italic;"></span>
+  </div>
+  <div id="ency-ai-raw" style="display:none;margin-top:0.8em;">
+    <strong>AI Raw Response:</strong>
+    <pre id="ency-ai-raw-text" style="background:#eee;padding:0.5em;max-height:180px;overflow:auto;font-size:0.85em;"></pre>
+    <button type="button" onclick="encyAiMarkReference()">Mark Reference as AI-generated</button>
+    <span style="color:#888;font-size:0.85em;margin-left:0.5em;">Appends attribution to the Reference field.</span>
+  </div>
+  <div id="ency-resolve-panel" style="display:none;margin-top:0.8em;border-top:1px solid #acd;padding-top:0.6em;">
+    <strong>ENCY Links Found:</strong>
+    <div id="ency-resolve-results" style="margin-top:0.4em;"></div>
+  </div>
+</div>
+<script>
+(function() {
+    function getModelAndProvider() {
+        var sel = document.getElementById('ency-ai-model-sel');
+        if (sel && sel.value) {
+            var parts = sel.value.split('|');
+            return { model: parts[0], provider: parts[1] || 'grok' };
+        }
+        var widgetSel = document.getElementById('model-select');
+        if (widgetSel && widgetSel.selectedIndex >= 0) {
+            var opt = widgetSel.options[widgetSel.selectedIndex];
+            return {
+                model:    opt.value || 'grok-3',
+                provider: opt.getAttribute('data-provider') || 'grok'
+            };
+        }
+        return { model: 'grok-3', provider: 'grok' };
+    }
+
+    function encyAiFill() {
+        var name = document.getElementById('ency-ai-entity-name').value.trim();
+        if (!name) { alert('Please enter a name to look up.'); return; }
+        var promptEl  = document.getElementById('ency-ai-prompt-data');
+        var systemPrompt = promptEl ? promptEl.getAttribute('data-prompt') : '';
+        var statusEl  = document.getElementById('ency-ai-status');
+        var btn       = document.getElementById('ency-ai-ask-btn');
+        btn.disabled  = true;
+        document.getElementById('ency-ai-raw').style.display = 'none';
+        document.getElementById('ency-resolve-panel').style.display = 'none';
+
+        var mp = getModelAndProvider();
+        var isGrok = (mp.provider === 'grok');
+        statusEl.textContent = 'Asking ' + mp.model + '\u2026';
+
+        var controller = new AbortController();
+        var timeoutMs  = isGrok ? 45000 : 120000;
+        var timeoutId  = setTimeout(function() { controller.abort(); }, timeoutMs);
+
+        var payload = {
+            prompt:     'Return ONLY a raw JSON object (no markdown, no code blocks, no explanation) with encyclopedia fields for: ' + name + '. Required fields: ' + systemPrompt,
+            system:     'You are an encyclopedia data assistant. Return ONLY a raw JSON object with the requested fields filled in for the named entity. No markdown, no code fences, no prose \u2014 pure JSON only.',
+            provider:   mp.provider,
+            model:      mp.model,
+            page_path:  window.location.pathname,
+            page_title: document.title
+        };
+
+        fetch('/ai/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            signal: controller.signal,
+            body: JSON.stringify(payload)
+        })
+        .then(function(r) {
+            return r.text().then(function(text) {
+                try { return JSON.parse(text); }
+                catch(e) { throw new Error('Server returned non-JSON (HTTP ' + r.status + ')'); }
+            });
+        })
+        .then(function(data) {
+            clearTimeout(timeoutId);
+            btn.disabled = false;
+            var modelUsed = data.model || mp.model;
+            if (!data.success) {
+                statusEl.textContent = 'AI error (' + modelUsed + '): ' + (data.error || 'unknown error');
+                document.getElementById('ency-ai-raw-text').textContent = JSON.stringify(data, null, 2);
+                document.getElementById('ency-ai-raw').style.display = '';
+                return;
+            }
+            var raw = (data.response || '').trim();
+            document.getElementById('ency-ai-raw-text').textContent = raw;
+            document.getElementById('ency-ai-raw').style.display = '';
+            var jsonStart = raw.indexOf('{');
+            var jsonEnd   = raw.lastIndexOf('}');
+            if (jsonStart === -1 || jsonEnd === -1) {
+                statusEl.textContent = '[' + modelUsed + '] AI did not return JSON. See raw response above.';
+                return;
+            }
+            try {
+                var fields = JSON.parse(raw.substring(jsonStart, jsonEnd + 1));
+                var filled = 0, skipped = [];
+                Object.keys(fields).forEach(function(key) {
+                    var el = document.querySelector('[name="' + key + '"]');
+                    if (!el || fields[key] === null || fields[key] === undefined || fields[key] === '') return;
+                    var raw = fields[key];
+                    var val;
+                    if (Array.isArray(raw)) {
+                        val = raw.join('\n');
+                    } else if (typeof raw === 'object') {
+                        val = Object.entries(raw).map(function(e){ return e[0] + ': ' + e[1]; }).join('\n');
+                    } else {
+                        val = String(raw);
+                    }
+                    if (el.tagName === 'SELECT') {
+                        var matched = false;
+                        for (var i = 0; i < el.options.length; i++) {
+                            var optVal  = el.options[i].value.toLowerCase();
+                            var optText = el.options[i].text.toLowerCase();
+                            var aiVal   = val.toLowerCase();
+                            if (optVal === aiVal || optText === aiVal ||
+                                optVal === aiVal.replace(/\s*(only|required|status)\s*/gi,'').trim() ||
+                                aiVal.indexOf(optVal) !== -1 || optVal.indexOf(aiVal) !== -1) {
+                                el.selectedIndex = i;
+                                matched = true; filled++;
+                                break;
+                            }
+                        }
+                        if (!matched) skipped.push(key + '=' + val);
+                    } else {
+                        el.value = val;
+                        filled++;
+                    }
+                });
+                var msg = 'Model: ' + modelUsed + ' \u2014 Filled ' + filled + ' field(s). Review carefully \u2014 AI data may be approximate.';
+                if (skipped.length) { msg += ' (Skipped selects: ' + skipped.join(', ') + ')'; }
+                statusEl.textContent = msg;
+                encyResolveLinks(fields);
+            } catch(e) {
+                statusEl.textContent = 'Could not parse JSON. See raw response above.';
+            }
+        })
+        .catch(function(err) {
+            clearTimeout(timeoutId);
+            btn.disabled = false;
+            if (err.name === 'AbortError') {
+                statusEl.textContent = 'Request timed out (' + Math.round(timeoutMs/1000) + 's) using ' + mp.model + '. Try a faster model or try again.';
+            } else {
+                statusEl.textContent = 'Request failed: ' + err.message;
+            }
+        });
+    }
+
+    function encyResolveLinks(fields) {
+        var panel   = document.getElementById('ency-resolve-panel');
+        var results = document.getElementById('ency-resolve-results');
+        results.innerHTML = '';
+        panel.style.display = 'none';
+
+        var tasks = [];
+
+        function addTask(label, fieldText, type) {
+            if (!fieldText) return;
+            var text = Array.isArray(fieldText) ? fieldText.join(', ') : String(fieldText);
+            var terms = text.split(/[,;\n]+/).map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 2; });
+            terms.forEach(function(term) {
+                tasks.push({ label: label, term: term, type: type });
+            });
+        }
+
+        addTask('Herb',        fields.herbal_alternatives, 'herb');
+        addTask('Herb',        fields.herb_drug_interactions, 'herb');
+        addTask('Disease',     fields.indications,    'disease');
+        addTask('Disease',     fields.contraindications, 'disease');
+        addTask('Symptom',     fields.side_effects,   'symptom');
+        addTask('Constituent', fields.active_ingredients, 'constituent');
+
+        if (!tasks.length) return;
+
+        var found = 0;
+        var pending = tasks.length;
+
+        tasks.forEach(function(task) {
+            fetch('/ENCY/api/resolve?type=' + encodeURIComponent(task.type) + '&q=' + encodeURIComponent(task.term), { credentials: 'include' })
+            .then(function(r){ return r.json(); })
+            .then(function(data) {
+                if (data.results && data.results.length) {
+                    data.results.forEach(function(rec) {
+                        found++;
+                        var chip = document.createElement('span');
+                        chip.style.cssText = 'display:inline-block;margin:2px 4px;padding:2px 8px;background:#dff0d8;border:1px solid #a3c77e;border-radius:10px;font-size:0.85em;';
+                        var link = document.createElement('a');
+                        link.href   = rec.url;
+                        link.target = '_blank';
+                        link.textContent = task.label + ': ' + rec.name + (rec.secondary ? ' (' + rec.secondary + ')' : '');
+                        chip.appendChild(link);
+                        results.appendChild(chip);
+                    });
+                }
+            })
+            .catch(function(){})
+            .finally(function() {
+                pending--;
+                if (pending === 0 && found > 0) {
+                    panel.style.display = '';
+                }
+            });
+        });
+    }
+
+    function encyAiMarkReference() {
+        var refEl = document.querySelector('[name="reference"]');
+        if (!refEl) return;
+        var mp   = getModelAndProvider();
+        var note = 'AI-generated (' + mp.model + '), reviewed by [% c.session.username | html %]';
+        if (refEl.value && refEl.value.indexOf('AI-generated') === -1) {
+            refEl.value = refEl.value + '\n' + note;
+        } else if (!refEl.value) {
+            refEl.value = note;
+        }
+    }
+
+    window.encyAiFill          = encyAiFill;
+    window.encyAiMarkReference = encyAiMarkReference;
+})();
+</script>
+[% END %]

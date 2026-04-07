@@ -97,6 +97,17 @@
             </div>
         </div>
     </div>
+
+    <div class="admin-section">
+        <h2>Project Planning</h2>
+        <div class="admin-cards">
+            <div class="admin-card">
+                <h3>View All Projects</h3>
+                <p>Navigate to the ProjectPlanning system to view all registered projects.</p>
+                <a href="[% c.uri_for('/project/project') %]" class="btn btn-primary">View Projects</a>
+            </div>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -146,6 +157,11 @@
     .btn-primary {
         background-color: #007bff;
         color: white;
+    }
+
+    .btn-warning {
+        background-color: #ffc107;
+        color: #212529;
     }
     
     .error-message {
