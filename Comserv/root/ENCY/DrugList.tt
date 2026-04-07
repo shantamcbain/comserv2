@@ -24,7 +24,7 @@
 
 <p><a href="[% c.uri_for('/ENCY') %]">&larr; Back to Encyclopedia</a></p>
 
-[% IF is_admin %]
+[% IF is_editor %]
 <a href="[% c.uri_for('/ENCY/Drug/add') %]" class="btn btn-primary">Add Drug</a>
 [% END %]
 
@@ -61,7 +61,7 @@
 </table>
 [% ELSE %]
 <p>No drugs found in the database.</p>
-[% IF is_admin %]
+[% IF is_editor %]
 <p>Be the first to add a drug: <a href="[% c.uri_for('/ENCY/Drug/add') %]">Add Drug</a></p>
 [% END %]
 [% END %]

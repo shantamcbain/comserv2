@@ -32,7 +32,7 @@
 [% END %]
 
 <p><a href="[% c.uri_for('/ENCY/Disease') %]">&larr; Back to Diseases</a>
-[% IF is_admin && !edit_mode && disease.record_id %]
+[% IF is_editor && !edit_mode && disease.record_id %]
   | <a href="[% c.uri_for('/ENCY/Disease/edit') %]" onclick="document.cookie='record_id=[% disease.record_id %]'">Edit</a>
 [% END %]
 </p>

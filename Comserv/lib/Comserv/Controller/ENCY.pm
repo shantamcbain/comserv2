@@ -55,15 +55,17 @@ sub index :Path('/ENCY') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Entered index method');
     $c->session->{MailServer} = "http://webmail.usbm.ca";
 
-    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'ENCY';
-    my $roles    = $c->session->{roles} || [];
-    my $is_admin = (ref $roles ? grep { $_ eq 'admin' } @$roles
-                               : grep { $_ eq 'admin' } split(/\s*,\s*/, $roles)) ? 1 : 0;
+    my $sitename   = $c->stash->{SiteName} || $c->session->{SiteName} || 'ENCY';
+    my $roles      = $c->session->{roles} || [];
+    my @role_list  = ref $roles ? @$roles : split(/\s*,\s*/, $roles);
+    my $is_admin   = (grep { $_ eq 'admin'                                          } @role_list) ? 1 : 0;
+    my $is_editor  = (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer'  } @role_list) ? 1 : 0;
 
     $c->stash(
-        SiteName  => $sitename,
-        is_admin  => $is_admin,
-        template  => 'ENCY/index.tt',
+        SiteName   => $sitename,
+        is_admin   => $is_admin,
+        is_editor  => $is_editor,
+        template   => 'ENCY/index.tt',
     );
 }
 
@@ -364,7 +366,7 @@ sub add_animal : Path('/ENCY/Animal/add') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to add animals.",
             template  => 'ENCY/AnimalList.tt',
@@ -438,7 +440,7 @@ sub edit_animal : Path('/ENCY/Animal/edit') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to edit animals.",
             template  => 'ENCY/AnimalList.tt',
@@ -589,7 +591,7 @@ sub add_insect : Path('/ENCY/Insect/add') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to add insects.",
             template  => 'ENCY/InsectList.tt',
@@ -662,7 +664,7 @@ sub edit_insect : Path('/ENCY/Insect/edit') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to edit insects.",
             template  => 'ENCY/InsectList.tt',
@@ -812,7 +814,7 @@ sub add_disease : Path('/ENCY/Disease/add') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to add diseases.",
             template  => 'ENCY/DiseaseList.tt',
@@ -882,7 +884,7 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to edit diseases.",
             template  => 'ENCY/DiseaseList.tt',
@@ -1033,7 +1035,7 @@ sub add_symptom : Path('/ENCY/Symptom/add') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to add symptoms.",
             template  => 'ENCY/SymptomList.tt',
@@ -1095,7 +1097,7 @@ sub edit_symptom : Path('/ENCY/Symptom/edit') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to edit symptoms.",
             template  => 'ENCY/SymptomList.tt',
@@ -1236,7 +1238,7 @@ sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to add constituents.",
             template  => 'ENCY/ConstituentList.tt',
@@ -1312,7 +1314,7 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to edit constituents.",
             template  => 'ENCY/ConstituentList.tt',
@@ -1465,7 +1467,7 @@ sub add_glossary : Path('/ENCY/Glossary/add') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to add glossary terms.",
             template  => 'ENCY/GlossaryList.tt',
@@ -1535,7 +1537,7 @@ sub edit_glossary : Path('/ENCY/Glossary/edit') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to edit glossary terms.",
             template  => 'ENCY/GlossaryList.tt',
@@ -1760,6 +1762,7 @@ sub drug_list : Path('/ENCY/Drug') : Args(0) {
         drugs     => $drugs,
         db_error  => $db_error,
         is_admin  => (grep { $_ eq 'admin' } @role_list) ? 1 : 0,
+        is_editor => (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) ? 1 : 0,
         template  => 'ENCY/DrugList.tt',
     );
 }
@@ -1808,7 +1811,7 @@ sub add_drug : Path('/ENCY/Drug/add') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to add drugs.",
             template  => 'ENCY/DrugList.tt',
@@ -1908,7 +1911,7 @@ sub edit_drug : Path('/ENCY/Drug/edit') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to edit drugs.",
             template  => 'ENCY/DrugList.tt',
@@ -2015,7 +2018,8 @@ sub formula_list : Path('/ENCY/Formula') : Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'formula_list', 'Formula list');
     my $roles    = $c->session->{roles} || [];
-    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    my $is_admin  = grep { $_ eq 'admin'                                         } (ref $roles ? @$roles : split(/s*,s*/, $roles));
+    my $is_editor = grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } (ref $roles ? @$roles : split(/s*,s*/, $roles));
     my $q = $c->request->param('q') || '';
     my $formulas;
     eval {
@@ -2035,6 +2039,7 @@ sub formula_list : Path('/ENCY/Formula') : Args(0) {
         formulas      => $formulas,
         search_query  => $q,
         is_admin      => $is_admin,
+        is_editor     => $is_editor,
         ai_fallback   => $ai_fallback,
         ai_query      => $q,
         template      => 'ENCY/FormulaList.tt',
@@ -2045,13 +2050,14 @@ sub formula_detail : Path('/ENCY/Formula') : Args(1) {
     my ($self, $c, $id) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'formula_detail', "Formula detail id=$id");
     my $roles    = $c->session->{roles} || [];
-    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    my $is_admin  = grep { $_ eq 'admin'                                         } (ref $roles ? @$roles : split(/s*,s*/, $roles));
+    my $is_editor = grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } (ref $roles ? @$roles : split(/s*,s*/, $roles));
     my ($formula, $herb_links, $disease_links) = $c->model('ENCYModel')->get_formula_with_herbs($c, $id);
     unless ($formula) {
         $c->stash(error_msg => "Formula $id not found.", template => 'ENCY/FormulaList.tt');
         return;
     }
-    if ($is_admin && $c->request->method eq 'POST' && $c->request->param('set_edit')) {
+    if ($is_editor && $c->request->method eq 'POST' && $c->request->param('set_edit')) {
         $c->session->{formula_record_id} = $id;
         $c->response->redirect($c->uri_for('/ENCY/Formula/edit'));
         return;
@@ -2061,6 +2067,7 @@ sub formula_detail : Path('/ENCY/Formula') : Args(1) {
         herb_links    => $herb_links,
         disease_links => $disease_links,
         is_admin      => $is_admin,
+        is_editor     => $is_editor,
         edit_mode     => 0,
         template      => 'ENCY/FormulaDetail.tt',
     );
@@ -2069,9 +2076,10 @@ sub formula_detail : Path('/ENCY/Formula') : Args(1) {
 sub add_formula : Path('/ENCY/Formula/add') : Args(0) {
     my ($self, $c) = @_;
     my $roles    = $c->session->{roles} || [];
-    my $is_admin = grep { $_ eq 'admin' } @$roles;
-    unless ($is_admin) {
-        $c->stash(error_msg => 'Admin access required.', template => 'ENCY/FormulaList.tt');
+    my $is_admin  = grep { $_ eq 'admin'                                         } (ref $roles ? @$roles : split(/s*,s*/, $roles));
+    my $is_editor = grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } (ref $roles ? @$roles : split(/s*,s*/, $roles));
+    unless ($is_editor) {
+        $c->stash(error_msg => 'Editor access required.', template => 'ENCY/FormulaList.tt');
         return;
     }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_formula', 'Add formula');
@@ -2097,7 +2105,7 @@ sub add_formula : Path('/ENCY/Formula/add') : Args(0) {
             share              => 0,
         };
         unless ($data->{name}) {
-            $c->stash(error_msg => 'Formula name is required.', formula => bless($data, 'HASH'), edit_mode => 1, is_admin => $is_admin, template => 'ENCY/FormulaDetail.tt');
+            $c->stash(error_msg => 'Formula name is required.', formula => bless($data, 'HASH'), edit_mode => 1, is_admin => $is_admin, is_editor => $is_editor, template => 'ENCY/FormulaDetail.tt');
             return;
         }
         my ($ok, $msg, $new_id) = $c->model('ENCYModel')->add_formula($c, $data);
@@ -2105,7 +2113,7 @@ sub add_formula : Path('/ENCY/Formula/add') : Args(0) {
             $c->flash->{success_msg} = "Formula added successfully.";
             $c->response->redirect($c->uri_for('/ENCY/Formula/' . $new_id));
         } else {
-            $c->stash(error_msg => "Could not save formula: $msg", formula => bless($data, 'HASH'), edit_mode => 1, is_admin => $is_admin, template => 'ENCY/FormulaDetail.tt');
+            $c->stash(error_msg => "Could not save formula: $msg", formula => bless($data, 'HASH'), edit_mode => 1, is_admin => $is_admin, is_editor => $is_editor, template => 'ENCY/FormulaDetail.tt');
         }
         return;
     }
@@ -2121,9 +2129,10 @@ sub add_formula : Path('/ENCY/Formula/add') : Args(0) {
 sub edit_formula : Path('/ENCY/Formula/edit') : Args(0) {
     my ($self, $c) = @_;
     my $roles    = $c->session->{roles} || [];
-    my $is_admin = grep { $_ eq 'admin' } @$roles;
-    unless ($is_admin) {
-        $c->stash(error_msg => 'Admin access required.', template => 'ENCY/FormulaList.tt');
+    my $is_admin  = grep { $_ eq 'admin'                                         } (ref $roles ? @$roles : split(/s*,s*/, $roles));
+    my $is_editor = grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } (ref $roles ? @$roles : split(/s*,s*/, $roles));
+    unless ($is_editor) {
+        $c->stash(error_msg => 'Editor access required.', template => 'ENCY/FormulaList.tt');
         return;
     }
     my $id = $c->session->{formula_record_id} || $c->request->param('record_id');
@@ -2155,7 +2164,7 @@ sub edit_formula : Path('/ENCY/Formula/edit') : Args(0) {
             $c->response->redirect($c->uri_for('/ENCY/Formula/' . $id));
         } else {
             my ($formula, $herb_links, $disease_links) = $c->model('ENCYModel')->get_formula_with_herbs($c, $id);
-            $c->stash(error_msg => "Could not update formula: $msg", formula => $formula, herb_links => $herb_links, disease_links => $disease_links, edit_mode => 1, is_admin => $is_admin, template => 'ENCY/FormulaDetail.tt');
+            $c->stash(error_msg => "Could not update formula: $msg", formula => $formula, herb_links => $herb_links, disease_links => $disease_links, edit_mode => 1, is_admin => $is_admin, is_editor => $is_editor, template => 'ENCY/FormulaDetail.tt');
         }
         return;
     }

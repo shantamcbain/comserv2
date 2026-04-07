@@ -22,7 +22,7 @@
 <p>[% entity_desc | html %]</p>
 [% END %]
 
-[% IF is_admin && add_url %]
+[% IF is_editor && add_url %]
 <p>
   <a href="[% add_url | html %]" class="btn btn-primary">Add [% entity_name | html %]</a>
 </p>
