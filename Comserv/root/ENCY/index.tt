@@ -146,7 +146,7 @@ document.getElementById('ency-ai-query').addEventListener('keypress', function(e
 </script>
 
 [%# ── ADMIN QUICK-ADD BAR ─────────────────────────────────────── %]
-[% IF is_admin %]
+[% IF is_editor %]
 <div class="ency-admin-bar">
   <strong>Admin:</strong>
   <a href="[% c.uri_for('/ENCY/Herb/add') %]">+ Herb</a> |

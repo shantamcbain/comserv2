@@ -27,7 +27,7 @@
      IF r == 'admin'; is_admin = 1; END;
    END;
 %]
-[% IF is_admin %]
+[% IF is_editor %]
 <a href="[% c.uri_for('/ENCY/Glossary/add') %]" class="btn btn-primary">Add Glossary Term</a>
 [% END %]
 

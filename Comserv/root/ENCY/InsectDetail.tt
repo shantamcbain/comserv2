@@ -32,7 +32,7 @@
 [% END %]
 
 <p><a href="[% c.uri_for('/ENCY/Insect') %]">&larr; Back to Insects</a>
-[% IF is_admin && !edit_mode && insect.record_id %]
+[% IF is_editor && !edit_mode && insect.record_id %]
   | <a href="[% c.uri_for('/ENCY/Insect/edit') %]" onclick="document.cookie='record_id=[% insect.record_id %]'">Edit</a>
 [% END %]
 </p>
