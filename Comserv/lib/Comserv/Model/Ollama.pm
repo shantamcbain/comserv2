@@ -1183,7 +1183,34 @@ sub list_available_models {
     
     # Current recommended Ollama models (updated 2026-04)
     # CPU-friendly picks marked recommended => 1 (run well on 8-16 GB RAM)
+    # NOTE: Ollama has no public registry API — this list must be updated manually.
+    #       See https://ollama.com/library for current models.
     my @available_models = (
+        # ── Gemma 4 (Google, April 2026) — multimodal, 128k-256k context ──────
+        {
+            name        => 'gemma4:4b',
+            description => 'Google Gemma 4 4B — multimodal (text+image+audio), 128k context, fast on CPU',
+            size        => '3.3GB',
+            params      => '4B',
+            tags        => ['general', 'chat', 'vision', 'multimodal', 'cpu-friendly', 'new'],
+            recommended => 1,
+        },
+        {
+            name        => 'gemma4:12b',
+            description => 'Google Gemma 4 12B — multimodal, 128k context, strong reasoning',
+            size        => '7.7GB',
+            params      => '12B',
+            tags        => ['general', 'chat', 'vision', 'multimodal', 'new'],
+            recommended => 1,
+        },
+        {
+            name        => 'gemma4:27b',
+            description => 'Google Gemma 4 27B — top open model, 256k context, needs 16+ GB RAM',
+            size        => '17GB',
+            params      => '27B',
+            tags        => ['general', 'chat', 'vision', 'multimodal', 'large', 'new'],
+        },
+        # ── Llama (Meta) ───────────────────────────────────────────────────────
         {
             name        => 'llama3.2:3b',
             description => 'Meta Llama 3.2 — fast 3B model, great for quick chat responses',
