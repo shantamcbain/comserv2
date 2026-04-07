@@ -34,12 +34,9 @@
 [% END %]
 Record ID:[% herb.record_id %]
 [% IF edit_mode %]
-    <form action="[% c.uri_for('/ENCY/edit_herb') %]" method="post">
-        [% IF edit_mode %]
-            <input type="hidden" name="record_id" value="[% herb.record_id %]" />
-        [% END %]
-        <input type="submit" value="Update Herb" />
-    </form>
+<form action="[% c.uri_for('/ENCY/edit_herb') %]" method="post">
+<input type="hidden" name="record_id" value="[% herb.record_id %]" />
+[% INCLUDE 'ENCY/partials/AiFormFill.tt' %]
 [% END %]
 
 <table>

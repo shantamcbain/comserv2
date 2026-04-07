@@ -140,19 +140,50 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
 
     # Handle POST request for herb updates (if applicable)
     if ($c->request->method eq 'POST') {
+        my $p = $c->request->params;
         my $form_data = {
-            botanical_name      => $c->request->params->{botanical_name} // '',
-            common_names        => $c->request->params->{common_names} // '',
-            homiopathic         => $c->request->params->{homiopathic} // '',
-            culinary            => $c->request->params->{culinary} // '',
-            comments            => $c->request->params->{comments} // '',
-            preparation         => $c->request->params->{preparation} // '',
-            chinese             => $c->request->params->{chinese} // '',
-            history             => $c->request->params->{history} // '',
-            contra_indications  => $c->request->params->{contra_indications} // '',
-            reference           => $c->request->params->{reference} // '',
-            parts_used          => $c->request->params->{parts_used} // '',
-            key_name            => $c->request->params->{key_name} // '',
+            botanical_name     => $p->{botanical_name}     // '',
+            common_names       => $p->{common_names}       // '',
+            key_name           => $p->{key_name}           // '',
+            parts_used         => $p->{parts_used}         // '',
+            sister_plants      => $p->{sister_plants}      // '',
+            comments           => $p->{comments}           // '',
+            ident_character    => $p->{ident_character}    // '',
+            stem               => $p->{stem}               // '',
+            leaves             => $p->{leaves}             // '',
+            flowers            => $p->{flowers}            // '',
+            fruit              => $p->{fruit}              // '',
+            taste              => $p->{taste}              // '',
+            odour              => $p->{odour}              // '',
+            root               => $p->{root}               // '',
+            image              => $p->{image}              // '',
+            url                => $p->{url}                // '',
+            distribution       => $p->{distribution}       // '',
+            cultivation        => $p->{cultivation}        // '',
+            harvest            => $p->{harvest}            // '',
+            therapeutic_action => $p->{therapeutic_action} // '',
+            medical_uses       => $p->{medical_uses}       // '',
+            constituents       => $p->{constituents}       // '',
+            solvents           => $p->{solvents}           // '',
+            dosage             => $p->{dosage}             // '',
+            administration     => $p->{administration}     // '',
+            formulas           => $p->{formulas}           // '',
+            contra_indications => $p->{contra_indications} // '',
+            preparation        => $p->{preparation}        // '',
+            chinese            => $p->{chinese}            // '',
+            vetrinary          => $p->{vetrinary}          // '',
+            homiopathic        => $p->{homiopathic}        // '',
+            apis               => $p->{apis}               // 0,
+            pollinator         => $p->{pollinator}         // '',
+            pollen             => $p->{pollen}             // 0,
+            pollennotes        => $p->{pollennotes}        // '',
+            nectar             => $p->{nectar}             // 0,
+            nectarnotes        => $p->{nectarnotes}        // '',
+            non_med            => $p->{non_med}            // '',
+            culinary           => $p->{culinary}           // '',
+            history            => $p->{history}            // '',
+            reference          => $p->{reference}          // '',
+            share              => $p->{share}              // 0,
         };
 
         # Attempt to update the herb record and handle success or failure
@@ -183,10 +214,22 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
 
     # Render the herb in edit mode when Edit Herb button is clicked
     $self->_stash_image_files($c);
+    my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @{$c->session->{roles} || []};
+    my $is_editor = $is_admin || grep { $_ eq 'editor' } @{$c->session->{roles} || []};
     $c->stash(
-        herb      => $herb,
-        edit_mode => 1, # Enable edit mode
-        template  => 'ENCY/HerbView.tt',
+        herb            => $herb,
+        edit_mode       => 1,
+        is_admin        => $is_admin,
+        is_editor       => $is_editor,
+        ency_ai_prompt  => 'botanical_name, common_names, key_name, parts_used, sister_plants, comments, '
+                         . 'ident_character, stem, leaves, flowers, fruit, taste, odour, root, image, url, '
+                         . 'distribution, cultivation, harvest, '
+                         . 'therapeutic_action, medical_uses, constituents, solvents, dosage, administration, '
+                         . 'formulas, contra_indications, preparation, chinese, vetrinary, homiopathic, '
+                         . 'pollinator, pollennotes, nectarnotes, non_med, culinary, history, reference. '
+                         . 'For integrative fields (therapeutic_action, medical_uses, preparation) include '
+                         . 'conventional, herbal, TCM, Ayurvedic, and naturopathic perspectives where known.',
+        template        => 'ENCY/HerbView.tt',
     );
 
     return;
