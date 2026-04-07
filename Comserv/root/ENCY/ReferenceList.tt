@@ -1,0 +1,53 @@
+[% META
+   title = "References - ENCY Encyclopedia"
+   description = "List of all references cited in the ENCY encyclopedia"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-07"
+%]
+[% PageVersion = 'ENCY/ReferenceList.tt,v 0.01 2026/04/07' %]
+
+[% IF success_msg || c.flash.success_msg %]
+<div class="alert alert-success">[% success_msg || c.flash.success_msg | html %]</div>
+[% END %]
+[% IF error_msg || c.flash.error_msg %]
+<div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
+[% END %]
+
+<h1>References</h1>
+
+<p>
+  <a href="[% c.uri_for('/ENCY') %]">&larr; ENCY Home</a>
+  [% IF is_editor %]
+  | <a href="[% c.uri_for('/ENCY/Reference/add') %]">+ Add Reference</a>
+  [% END %]
+</p>
+
+[% IF references && references.size %]
+<table border="1" cellpadding="5" cellspacing="0" style="width:100%;border-collapse:collapse;">
+  <tr style="background:#e8f4f8;">
+    <th>#</th>
+    <th>Title</th>
+    <th>Author</th>
+    <th>Publisher</th>
+    <th>Year</th>
+    <th>Type</th>
+    <th>ISBN</th>
+  </tr>
+  [% FOR ref IN references %]
+  <tr>
+    <td><a href="[% c.uri_for('/ENCY/Reference', ref.reference_id) %]">[% ref.reference_id %]</a></td>
+    <td><a href="[% c.uri_for('/ENCY/Reference', ref.reference_id) %]">[% ref.title | html %]</a></td>
+    <td>[% ref.author | html %]</td>
+    <td>[% ref.publisher | html %]</td>
+    <td>[% ref.publication_date ? ref.publication_date.substr(0,4) : '' %]</td>
+    <td>[% ref.reference_system | html %]</td>
+    <td>[% ref.isbn | html %]</td>
+  </tr>
+  [% END %]
+</table>
+[% ELSE %]
+<p><em>No references found. <a href="[% c.uri_for('/ENCY/Reference/add') %]">Add the first reference.</a></em></p>
+[% END %]
