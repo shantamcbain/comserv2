@@ -125,8 +125,8 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
         return; # Do not redirect; just render the view with an error message
     }
 
-    # Retrieve the herb record
-    my $herb = $c->model('ENCYModel')->get_herb_by_id($record_id);
+    # Retrieve the herb record (use DBForager directly, same as herb_detail)
+    my $herb = $c->model('DBForager')->get_herb_by_id($record_id);
     unless ($herb) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_herb',
             "Herb record not found in the database for record_id: $record_id.");
@@ -192,13 +192,14 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
         if ($status) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_herb',
                 "Herb updated successfully for record_id: $record_id.");
+            my $updated_herb = $c->model('DBForager')->get_herb_by_id($record_id) || $herb;
             $c->stash(
                 success_msg => "Herb details updated successfully.",
-                herb        => $herb,
-                edit_mode   => 0, # Switch back to view mode after successful update
+                herb        => $updated_herb,
+                edit_mode   => 0,
                 template    => 'ENCY/HerbView.tt',
             );
-            return; # Render the updated herb view
+            return;
         } else {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_herb',
                 "Failed to update herb: $error_message.");
