@@ -17,7 +17,7 @@
         <div class="submenu-item">
             <span class="submenu-header"><i class="icon-biology"></i>Biological</span>
             <div class="submenu">
-                <a href="/ENCY/botanical_name_view"><i class="icon-plant"></i>Plants &amp; Herbs</a>
+                <a href="/ENCY/BotanicalNameView"><i class="icon-plant"></i>Plants &amp; Herbs</a>
                 <a href="/ENCY/Animal"><i class="icon-animal"></i>Animals</a>
                 <a href="/ENCY/Insect"><i class="icon-insect"></i>Insects</a>
                 <a href="/ENCY/bee_pasture_view"><i class="icon-pollinator"></i>Bee Pasture / Pollinators</a>
