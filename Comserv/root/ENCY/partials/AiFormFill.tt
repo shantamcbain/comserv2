@@ -11,6 +11,16 @@
     <button type="button" id="ency-ai-ask-btn" onclick="encyAiFill()">Ask AI</button>
     <span id="ency-ai-status" style="color:#555;font-style:italic;font-size:0.9em;"></span>
   </div>
+  <div style="margin-top:0.5em;font-size:0.85em;color:#444;">
+    <label style="font-weight:bold;" title="Leave blank to ask AI about all fields. Enter field names to ONLY update those fields and leave everything else untouched.">
+      Limit to specific fields (leave blank for all):
+    </label>
+    <input type="text" id="ency-ai-target-fields"
+           placeholder="e.g. harvest, preparation, dosage"
+           style="width:28em;font-size:0.95em;margin-left:0.4em;"
+           title="Only these fields will be filled by AI. All other fields are untouched regardless of what AI returns." />
+    <span style="color:#888;margin-left:0.4em;">⚠ Always fill specific fields when correcting a single field.</span>
+  </div>
   <div style="margin-top:0.4em;font-size:0.82em;color:#666;">
     <label style="cursor:pointer;">
       <input type="checkbox" id="ency-ai-override" style="vertical-align:middle;">
@@ -71,10 +81,19 @@
         var name = document.getElementById('ency-ai-entity-name').value.trim();
         if (!name) { alert('Please enter a name to look up.'); return; }
         var promptEl     = document.getElementById('ency-ai-prompt-data');
-        var fieldList    = promptEl ? promptEl.getAttribute('data-prompt') : '';
+        var allFieldList = promptEl ? promptEl.getAttribute('data-prompt') : '';
         var statusEl     = document.getElementById('ency-ai-status');
         var btn          = document.getElementById('ency-ai-ask-btn');
         var overrideAll  = document.getElementById('ency-ai-override').checked;
+
+        // Parse target fields — if set, ONLY these fields will be requested and applied
+        var targetInput = document.getElementById('ency-ai-target-fields');
+        var targetRaw   = targetInput ? targetInput.value.trim() : '';
+        var targetFields = targetRaw
+            ? targetRaw.split(/[\s,;]+/).map(function(f){ return f.trim().toLowerCase(); }).filter(Boolean)
+            : [];
+        var fieldList = targetFields.length ? targetFields.join(', ') : allFieldList;
+
         btn.disabled     = true;
         document.getElementById('ency-ai-raw').style.display = 'none';
         document.getElementById('ency-resolve-panel').style.display = 'none';
@@ -87,8 +106,12 @@
         var controller = new AbortController();
         var timeoutId  = setTimeout(function() { controller.abort(); }, timeoutMs);
 
+        var fieldInstruction = targetFields.length
+            ? 'Return ONLY a raw JSON object containing ONLY these specific fields (no other fields): ' + fieldList + '. Do NOT include any other fields in the response even if you know them.'
+            : 'Return ONLY a raw JSON object (no markdown, no code blocks, no explanation) with encyclopedia fields. Fields to include: ' + fieldList;
+
         var payload = {
-            prompt:     'Return ONLY a raw JSON object (no markdown, no code blocks, no explanation) with encyclopedia fields for: ' + name + '. Fields to include: ' + fieldList,
+            prompt:     fieldInstruction + ' The subject is: ' + name,
             system:     INTEGRATIVE_SYSTEM,
             provider:   mp.provider,
             model:      mp.model,
@@ -132,9 +155,14 @@
 
             try {
                 var fields = JSON.parse(raw.substring(jsonStart, jsonEnd + 1));
-                var filled = 0, skipped = [];
+                var filled = 0, skipped = [], blocked = [];
 
                 Object.keys(fields).forEach(function(key) {
+                    // If target fields specified, skip any field not in the list
+                    if (targetFields.length && targetFields.indexOf(key.toLowerCase()) === -1) {
+                        blocked.push(key);
+                        return;
+                    }
                     var el = document.querySelector('[name="' + key + '"]');
                     if (!el) return;
                     var aiValue = fields[key];
@@ -194,7 +222,8 @@
 
                 var mode = overrideAll ? 'override mode' : 'empty-fields-only mode';
                 var msg  = '[' + modelUsed + '] Filled ' + filled + ' field(s) (' + mode + '). Review carefully.';
-                if (skipped.length) { msg += ' Skipped (had content): ' + skipped.join(', '); }
+                if (skipped.length)  { msg += ' Skipped (had content): ' + skipped.join(', '); }
+                if (blocked.length)  { msg += ' Blocked (not in target list): ' + blocked.join(', '); }
                 statusEl.textContent = msg;
                 encyResolveLinks(fields);
             } catch(e) {
