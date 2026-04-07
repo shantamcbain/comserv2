@@ -292,21 +292,59 @@ sub fs_rename :Path('/file/fs_rename') :Args(0) {
         return;
     }
 
-    my $sync = $self->_db_sync_path($c, $old_path, $new_path);
-    eval {
-        my $schema = $c->model('DBEncy');
-        my $rec = $schema->resultset('File')->search(
-            [ { file_path => $new_path }, { nfs_path => $new_path } ]
-        )->first;
-        $rec->update({ file_name => $new_name }) if $rec;
-    };
+    my $is_dir = -d $new_path;
+    my $db_updated = 0;
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fs_rename',
-        "Renamed $old_path -> $new_path db_updated=$sync->{updated} dup=$sync->{dup_flagged}");
-    my $msg = "Renamed to '$new_name'.";
-    $msg .= " Database record updated." if $sync->{updated};
-    $msg .= " <strong>Duplicate detected</strong> — check the Duplicates page." if $sync->{dup_flagged};
-    $c->flash->{success_msg} = $msg;
+    if ($is_dir) {
+        eval {
+            my $schema    = $c->model('DBEncy');
+            my $old_prefix = $old_path;
+            my $new_prefix = $new_path;
+            my @recs = $schema->resultset('File')->search([
+                { file_path => { 'like', "$old_prefix/%" } },
+                { nfs_path  => { 'like', "$old_prefix/%" } },
+            ])->all;
+            for my $rec (@recs) {
+                my %upd;
+                if (length($rec->file_path // '') && ($rec->file_path // '') =~ m{^\Q$old_prefix\E(/|$)}) {
+                    (my $np = $rec->file_path) =~ s{^\Q$old_prefix\E}{$new_prefix};
+                    $upd{file_path} = $np;
+                }
+                if (length($rec->nfs_path // '') && ($rec->nfs_path // '') =~ m{^\Q$old_prefix\E(/|$)}) {
+                    (my $np = $rec->nfs_path) =~ s{^\Q$old_prefix\E}{$new_prefix};
+                    $upd{nfs_path} = $np;
+                }
+                $rec->update(\%upd) if %upd;
+                $db_updated++;
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fs_rename',
+                "Directory DB path update failed: $@");
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fs_rename',
+            "Renamed directory $old_path -> $new_path db_records_updated=$db_updated");
+        my $msg = "Directory renamed to '$new_name'.";
+        $msg .= " $db_updated database record(s) path updated." if $db_updated;
+        $msg .= " No database records found for files in this directory." unless $db_updated;
+        $c->flash->{success_msg} = $msg;
+    } else {
+        my $sync = $self->_db_sync_path($c, $old_path, $new_path);
+        eval {
+            my $schema = $c->model('DBEncy');
+            my $rec = $schema->resultset('File')->search(
+                [ { file_path => $new_path }, { nfs_path => $new_path } ]
+            )->first;
+            $rec->update({ file_name => $new_name }) if $rec;
+        };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fs_rename',
+            "Renamed $old_path -> $new_path db_updated=$sync->{updated} dup=$sync->{dup_flagged}");
+        my $msg = "Renamed to '$new_name'.";
+        $msg .= " Database record updated." if $sync->{updated};
+        $msg .= " <strong>Duplicate detected</strong> — check the Duplicates page." if $sync->{dup_flagged};
+        $c->flash->{success_msg} = $msg;
+    }
+
     $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
 }
 
