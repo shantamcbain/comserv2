@@ -1416,7 +1416,7 @@ sub find_herb_by_name {
 sub _create_ency_todo {
     my ($self, $c, $subject, $description) = @_;
     eval {
-        my $now = DateTime->now->strftime('%Y-%m-%d');
+        my $now = do { use POSIX qw(strftime); strftime('%Y-%m-%d', localtime) };
         $c->model('DBEncy')->resultset('Todo')->create({
             sitename          => $c->stash->{SiteName} || 'ENCY',
             subject           => substr($subject, 0, 254),
