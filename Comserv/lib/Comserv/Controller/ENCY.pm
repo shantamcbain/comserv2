@@ -50,6 +50,17 @@ sub _resolve_image_value {
     return $image_val;
 }
 
+sub auto : Private {
+    my ($self, $c) = @_;
+    my $roles     = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split(/\s*,\s*/, $roles);
+    $c->stash(
+        is_admin  => (grep { $_ eq 'admin'                                         } @role_list) ? 1 : 0,
+        is_editor => (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) ? 1 : 0,
+    );
+    return 1;
+}
+
 sub index :Path('/ENCY') :Args(0) {
     my ( $self, $c ) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Entered index method');
