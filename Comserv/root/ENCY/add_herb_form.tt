@@ -22,6 +22,7 @@
 
 
 <form method="POST" action="/ENCY/add_herb">
+[% PROCESS 'ENCY/partials/AiFormFill.tt' %]
     <label for="botanical_name">Botanical Name:</label><br>
     <input type="text" id="botanical_name" name="botanical_name" required><br>
 
