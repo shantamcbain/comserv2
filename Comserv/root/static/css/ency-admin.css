@@ -159,6 +159,24 @@ table.ency-admin-table td.sm     { font-size: 0.82em; }
     text-decoration: none;
 }
 
+/* ── Reference verification colour coding ───────────────── */
+/* Inline spans for the reference number */
+span.ref-verified {
+    color: var(--success-color);
+    font-weight: bold;
+}
+span.ref-partial {
+    color: var(--warning-color);
+    font-weight: bold;
+}
+span.ref-empty {
+    color: var(--text-muted-color);
+}
+/* Row-level tinting */
+tr.ref-row-verified td { border-left: 3px solid var(--success-color); }
+tr.ref-row-partial  td { border-left: 3px solid var(--warning-color); }
+tr.ref-row-empty    td { border-left: 3px solid var(--text-muted-color); }
+
 /* ── Muted helper text ──────────────────────────────────── */
 .ency-admin-note {
     font-size: 0.88em;
