@@ -28,9 +28,10 @@ __PACKAGE__->add_columns(reference_id => {
         is_nullable => 1,
     },
     publication_date => {
-        data_type        => 'date',
-        is_nullable      => 1,
-        inflate_datetime => 0,
+        data_type                => 'date',
+        is_nullable              => 1,
+        inflate_datetime         => 0,
+        datetime_undef_if_invalid => 1,
     },
     isbn => {
         data_type   => 'varchar',

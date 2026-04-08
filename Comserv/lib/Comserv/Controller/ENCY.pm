@@ -367,11 +367,73 @@ sub Reference_id :Path('/ENCY/Reference') :Args(1) {
         }
     }
 
+    # Load formal entity links (junction rows) for this reference
+    my @entity_links;
+    eval {
+        my @links = $c->model('ENCYModel')->ency_schema->resultset('EntityReference')->search(
+            { reference_id => $id },
+            { order_by => ['entity_type', 'entity_id'] }
+        )->all;
+        for my $link (@links) {
+            my $label = $link->entity_type . ' #' . $link->entity_id;
+            my $name  = '';
+            my $url   = '';
+            eval {
+                if ($link->entity_type eq 'herb') {
+                    my $e = $c->model('ENCYModel')->forager_schema->resultset('Herb')->find($link->entity_id);
+                    $name = $e ? ($e->common_names || 'Herb #' . $link->entity_id) : '';
+                    $url  = '/ENCY/herb_detail/' . $link->entity_id;
+                } elsif ($link->entity_type eq 'disease') {
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Disease')->find($link->entity_id);
+                    $name = $e ? ($e->common_name || $e->scientific_name || '') : '';
+                    $url  = '/ENCY/Disease/' . $link->entity_id;
+                } elsif ($link->entity_type eq 'constituent') {
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Constituent')->find($link->entity_id);
+                    $name = $e ? ($e->name || '') : '';
+                    $url  = '/ENCY/Constituent/' . $link->entity_id;
+                } elsif ($link->entity_type eq 'animal') {
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Animal')->find($link->entity_id);
+                    $name = $e ? ($e->common_name || '') : '';
+                    $url  = '/ENCY/Animal/' . $link->entity_id;
+                } elsif ($link->entity_type eq 'insect') {
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Insect')->find($link->entity_id);
+                    $name = $e ? ($e->common_name || '') : '';
+                    $url  = '/ENCY/Insect/' . $link->entity_id;
+                } elsif ($link->entity_type eq 'drug') {
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Drug')->find($link->entity_id);
+                    $name = $e ? ($e->drug_name || '') : '';
+                    $url  = '/ENCY/Drug/' . $link->entity_id;
+                } elsif ($link->entity_type eq 'formula') {
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Formula')->find($link->entity_id);
+                    $name = $e ? ($e->formula_name || '') : '';
+                    $url  = '/ENCY/Formula/' . $link->entity_id;
+                }
+            };
+            push @entity_links, {
+                entity_type => $link->entity_type,
+                entity_id   => $link->entity_id,
+                name        => $name || $label,
+                url         => $url,
+            };
+        }
+    };
+
+    # Load linked authors for this reference
+    my @ref_authors;
+    eval {
+        @ref_authors = $c->model('ENCYModel')->ency_schema->resultset('ReferenceAuthor')->search(
+            { reference_id => $id },
+            { order_by => 'author_id' }
+        )->all;
+    };
+
     $c->stash(
-        reference => $ref,
-        edit_mode => $edit_mode,
-        is_admin  => $is_admin,
-        is_editor => $is_editor,
+        reference    => $ref,
+        entity_links => \@entity_links,
+        ref_authors  => \@ref_authors,
+        edit_mode    => $edit_mode,
+        is_admin     => $is_admin,
+        is_editor    => $is_editor,
         ency_ai_prompt => 'title, author, publisher, publication_date (YYYY-MM-DD), isbn, url (archive.org or publisher), reference_system (book/journal/website/thesis), notes (page numbers and excerpt where the herb/treatment was mentioned)',
         template  => 'ENCY/ReferenceDetail.tt',
     );
