@@ -2442,6 +2442,120 @@ sub practitioner_type_detail : Path('/ENCY/PractitionerType') : Args(1) {
     $c->response->redirect($c->uri_for('/ENCY/PractitionerType'), 302);
 }
 
+sub ency_admin : Path('/ENCY/admin') : Args(0) {
+    my ($self, $c) = @_;
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    my $is_admin = grep { $_ eq 'admin' || $_ eq 'developer' } @role_list;
+
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'ENCY Admin requires admin or developer role.';
+        $c->response->redirect($c->uri_for('/ENCY'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ency_admin', 'Entered ENCY admin dashboard');
+
+    my $model  = $c->model('ENCYModel');
+    my $ency   = $model->ency_schema;
+    my $forager = $model->forager_schema;
+
+    my %counts;
+    my %ai_drafts;
+
+    # ── Entity record counts ────────────────────────────────────────────────
+    my @ency_entities = qw(Animal Insect Disease Symptom Constituent Glossary Drug Formula Reference);
+    for my $rs (@ency_entities) {
+        eval { $counts{ lc($rs) } = $ency->resultset($rs)->count };
+        $counts{ lc($rs) } //= 0;
+    }
+
+    # Herb lives in Forager schema
+    eval { $counts{herb} = $forager->resultset('Herb')->count };
+    $counts{herb} //= 0;
+
+    # ── AI draft counts ─────────────────────────────────────────────────────
+    my @ai_ency = qw(Animal Insect Disease Symptom Constituent Glossary Drug);
+    for my $rs (@ai_ency) {
+        eval {
+            $ai_drafts{ lc($rs) } = $ency->resultset($rs)->count({
+                username_of_poster => 'ai-draft',
+                share              => 0,
+            });
+        };
+        $ai_drafts{ lc($rs) } //= 0;
+    }
+    eval {
+        $ai_drafts{herb} = $forager->resultset('Herb')->count({
+            username_of_poster => 'ai-draft',
+            share              => 0,
+        });
+    };
+    $ai_drafts{herb} //= 0;
+    my $total_ai_drafts = 0;
+    $total_ai_drafts += $_ for values %ai_drafts;
+
+    # ── Junction table counts ───────────────────────────────────────────────
+    my %junctions;
+    my @ency_junctions = qw(
+        HerbConstituent HerbDisease HerbSymptom HerbCategory
+        DiseaseSymptom DiseaseAnimal DiseaseInsect DiseaseHerb
+        InsectHerb AnimalHerb ConstituentDisease ConstituentSymptom
+        DrugDisease DrugConstituent DrugSymptom DrugHerbInteraction
+        FormulaHerb FormulaDisease EntityReference
+    );
+    for my $rs (@ency_junctions) {
+        eval { $junctions{$rs} = $ency->resultset($rs)->count };
+        $junctions{$rs} //= 'N/A';
+    }
+
+    # ── Reference quality ───────────────────────────────────────────────────
+    my $refs_missing_title = 0;
+    my $refs_missing_author = 0;
+    my $refs_missing_isbn = 0;
+    eval {
+        $refs_missing_title  = $ency->resultset('Reference')->count({ -or => [ title  => undef, title  => '' ] });
+        $refs_missing_author = $ency->resultset('Reference')->count({ -or => [ author => undef, author => '' ] });
+        $refs_missing_isbn   = $ency->resultset('Reference')->count({ -or => [ isbn   => undef, isbn   => '' ] });
+    };
+
+    # ── Unresolved ENCY todos ────────────────────────────────────────────────
+    my $open_todos = 0;
+    eval {
+        $open_todos = $ency->resultset('Todo')->count({
+            project_code => 'ENCY',
+            status       => { 'not in' => ['done', 'completed', 'cancelled'] },
+        });
+    };
+
+    # ── Recent errors in ENCY routes (from Log table) ───────────────────────
+    my @recent_errors;
+    eval {
+        @recent_errors = $ency->resultset('Log')->search(
+            {
+                log_level => { like => '%error%' },
+                file_path => { like => '%ENCY%' },
+            },
+            { order_by => { -desc => 'id' }, rows => 10 }
+        )->all;
+    };
+
+    $c->stash(
+        counts          => \%counts,
+        ai_drafts       => \%ai_drafts,
+        total_ai_drafts => $total_ai_drafts,
+        junctions       => \%junctions,
+        refs_missing_title  => $refs_missing_title,
+        refs_missing_author => $refs_missing_author,
+        refs_missing_isbn   => $refs_missing_isbn,
+        open_todos      => $open_todos,
+        recent_errors   => \@recent_errors,
+        is_admin        => $is_admin,
+        template        => 'ENCY/AdminDashboard.tt',
+    );
+}
+
 sub api_references : Path('/ENCY/api/references') : Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json; charset=utf-8');
