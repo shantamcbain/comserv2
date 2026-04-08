@@ -134,7 +134,7 @@ sub index :Path :Args(0) {
                         push @external_models, { name => $id, provider => 'grok', label => $label };
                     }
                 } else {
-                    push @external_models, { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' };
+                    push @external_models, { name => 'grok-mini',                  provider => 'grok', label => 'Grok Mini (xAI)' };
                     push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
                     push @external_models, { name => 'grok-4-0709',               provider => 'grok', label => 'Grok 4 (xAI)' };
                     push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
@@ -580,11 +580,11 @@ sub generate :Local :Args(0) {
             
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
-                # Auto-fallback: if model is deprecated (410/404), retry with grok-3-mini
-                if ($error =~ /410|404|no longer available|not found/ && $grok->model ne 'grok-3-mini') {
+                # Auto-fallback: if model is deprecated (410/404), retry with grok-mini
+                if ($error =~ /410|404|no longer available|not found/ && $grok->model ne 'grok-mini') {
                     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                        'generate', "Model " . $grok->model . " unavailable, retrying with grok-3-mini");
-                    $grok->model('grok-3-mini');
+                        'generate', "Model " . $grok->model . " unavailable, retrying with grok-mini");
+                    $grok->model('grok-mini');
                     $response = $grok->chat(
                         messages   => \@grok_messages,
                         use_search => $use_search,
