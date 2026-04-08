@@ -64,10 +64,10 @@ while (<$CSV>) {
     next if /^entity_type/; # header
     my ($entity_type, $entity_id, $entity_name, $field, $term, $status, $junction) = split /,/, $_, 7;
     next unless $status && $status =~ /unresolved/;
-    # Derive target table from field name
     my $target_rs = _field_to_rs($field) or next;
     next if $ONLY && lc($target_rs) ne lc($ONLY);
     $term =~ s/^"|"$//g;
+    $term = _clean_term($target_rs, $term);
     $to_create{$target_rs}{$term} = 1 if $term && length($term) > 2;
 }
 close $CSV;
@@ -120,6 +120,61 @@ printf "  /ENCY/Constituent?filter=ai_draft\n";
 printf "  /ENCY/Glossary?filter=ai_draft\n";
 printf "  /ENCY/Symptom?filter=ai_draft\n";
 printf "Set share=1 and username_of_poster to your name to publish.\n";
+
+sub _clean_term {
+    my ($rs, $term) = @_;
+    $term =~ s/^\s+|\s+$//g;
+    $term =~ s/^['"\[\(]+|['"\]\)]+$//g; # strip surrounding quotes/brackets
+    $term =~ s/[.,;]+$//g;               # strip trailing punctuation
+    $term =~ s/\s+/ /g;
+    $term =~ s/^\s+|\s+$//g;
+
+    # For Glossary: strip "prefix: " labels added by AI (e.g. "conventional_medicine: Antioxidant")
+    if ($rs eq 'Glossary' && $term =~ /^[\w_]+:\s*(.+)/) {
+        $term = $1;
+        $term =~ s/^\s+|\s+$//g;
+    }
+
+    # Sentence verb patterns — these indicate prose fragments, not entity names
+    my @PROSE_VERBS = (
+        qr/\b(is|are|was|were|can|could|will|would|have|has|had|be|been|being)\b/i,
+        qr/\b(used|eaten|made|found|known|called|contains|include|cause|causes)\b/i,
+        qr/\b(influences|promotes|stimulates|reduces|increases|decreases|improves)\b/i,
+        qr/\b(beneficially|effectively|primarily|mainly|generally|typically)\b/i,
+        qr/\b(to make|to eat|to use|to treat|to reduce|to support|to help)\b/i,
+        qr/\b(historically|traditionally|commonly)\b/i,
+    );
+
+    # Count words
+    my @words = split /\s+/, $term;
+    my $wc = scalar @words;
+
+    my %max_words = (
+        Constituent => 4,
+        Glossary    => 5,
+        Disease     => 8,   # historical names can be multi-word: "Running of the reins"
+        Symptom     => 5,
+        Herb        => 5,
+    );
+
+    return '' if $wc > ($max_words{$rs} // 5);
+
+    # Reject prose fragments — terms containing sentence verbs
+    for my $pat (@PROSE_VERBS) {
+        return '' if $term =~ $pat;
+    }
+
+    # Reject obvious non-names
+    return '' if $term =~ /^\d+$/;             # pure numbers
+    return '' if $term =~ /[<>{}]/;            # HTML fragments
+    return '' if length($term) > 120;          # too long
+    return '' if $term =~ /^\W+$/;             # only punctuation
+    return '' if $term =~ /^\W/;               # starts with punctuation (parse artifacts)
+    return '' if $term =~ /\band\b.*\band\b/i; # "A and B and C" — list fragments
+    return '' if $term =~ /\d{2,}/;            # contains multi-digit numbers (not entity names)
+
+    return $term;
+}
 
 sub _field_to_rs {
     my ($field) = @_;
