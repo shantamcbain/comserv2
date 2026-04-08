@@ -345,17 +345,21 @@ sub Reference_id :Path('/ENCY/Reference') :Args(1) {
     if ($c->request->method eq 'POST' && $is_editor) {
         my $p = $c->request->body_parameters;
         my $pub_date = $p->{publication_date};
-        $pub_date = undef unless $pub_date && $pub_date =~ /^\d{4}-\d{2}-\d{2}$/ && $pub_date !~ /^0000/;
+        my $pd_clean = $pub_date; if ($pd_clean) { if ($pd_clean =~ /^\d{4}$/) { $pd_clean = "${pd_clean}-01-01"; } elsif ($pd_clean !~ /^\d{4}-\d{2}-\d{2}$/ || $pd_clean =~ /^0000/) { $pd_clean = undef; } } $pub_date = $pd_clean;
         eval {
             $ref->update({
-                title            => $p->{title}            // '',
-                author           => $p->{author}           // '',
-                publisher        => $p->{publisher}        // '',
-                publication_date => $pub_date,
-                isbn             => $p->{isbn}             // '',
-                url              => $p->{url}              // '',
-                reference_system => $p->{reference_system} // '',
-                notes            => $p->{notes}            // '',
+                title             => $p->{title}             // '',
+                author            => $p->{author}            // '',
+                publisher         => $p->{publisher}         // '',
+                publication_date  => $pub_date,
+                isbn              => $p->{isbn}              // '',
+                url               => $p->{url}              // '',
+                reference_system  => $p->{reference_system}  // '',
+                notes             => $p->{notes}             // '',
+                edition           => $p->{edition}           // '',
+                format            => $p->{format}            // '',
+                physical_location => $p->{physical_location} // '',
+                digital_path      => $p->{digital_path}      // '',
             });
         };
         if ($@) {
@@ -434,7 +438,7 @@ sub Reference_id :Path('/ENCY/Reference') :Args(1) {
         edit_mode    => $edit_mode,
         is_admin     => $is_admin,
         is_editor    => $is_editor,
-        ency_ai_prompt => 'title, author, publisher, publication_date (YYYY-MM-DD), isbn, url (archive.org or publisher), reference_system (book/journal/website/thesis), notes (page numbers and excerpt where the herb/treatment was mentioned)',
+        ency_ai_prompt => 'title, author, publisher, publication_date (YYYY or YYYY-MM-DD), isbn, url (archive.org or publisher — verify the URL is real), reference_system (book/journal/magazine/course/personal/website/thesis), edition (e.g. "2nd Edition, 1985"), format (hardcover/paperback/pdf/digital/online), notes (page numbers and excerpt where the herb/treatment is mentioned)',
         template  => 'ENCY/ReferenceDetail.tt',
     );
 }
@@ -455,27 +459,31 @@ sub Reference_add :Path('/ENCY/Reference/add') :Args(0) {
     if ($c->request->method eq 'POST') {
         my $p = $c->request->body_parameters;
         my $pub_date = $p->{publication_date};
-        $pub_date = undef unless $pub_date && $pub_date =~ /^\d{4}-\d{2}-\d{2}$/ && $pub_date !~ /^0000/;
+        my $pd_clean = $pub_date; if ($pd_clean) { if ($pd_clean =~ /^\d{4}$/) { $pd_clean = "${pd_clean}-01-01"; } elsif ($pd_clean !~ /^\d{4}-\d{2}-\d{2}$/ || $pd_clean =~ /^0000/) { $pd_clean = undef; } } $pub_date = $pd_clean;
         my $new_ref;
         eval {
             $new_ref = $c->model('ENCYModel')->ency_schema->resultset('Reference')->create({
-                title            => $p->{title}            // '',
-                author           => $p->{author}           // '',
-                publisher        => $p->{publisher}        // '',
-                publication_date => $pub_date,
-                isbn             => $p->{isbn}             // '',
-                url              => $p->{url}              // '',
-                reference_system => $p->{reference_system} // 'book',
-                notes            => $p->{notes}            // '',
-                sitename         => $c->session->{site_name} // 'ENCY',
+                title             => $p->{title}             // '',
+                author            => $p->{author}            // '',
+                publisher         => $p->{publisher}         // '',
+                publication_date  => $pub_date,
+                isbn              => $p->{isbn}              // '',
+                url               => $p->{url}               // '',
+                reference_system  => $p->{reference_system}  // 'book',
+                notes             => $p->{notes}             // '',
+                edition           => $p->{edition}           // '',
+                format            => $p->{format}            // '',
+                physical_location => $p->{physical_location} // '',
+                digital_path      => $p->{digital_path}      // '',
+                sitename          => $c->session->{site_name} // 'ENCY',
                 username_of_poster => $c->session->{username} // '',
-                date_time_posted => substr("${\scalar localtime}", 0, 30),
+                date_time_posted  => substr("${\scalar localtime}", 0, 30),
             });
         };
         if ($@ || !$new_ref) {
             $c->stash(error_msg => "Failed to create reference: $@",
                       edit_mode => 1, is_editor => $is_editor,
-                      ency_ai_prompt => 'title, author, publisher, publication_date, isbn, url, reference_system, notes',
+                      ency_ai_prompt => 'title, author, publisher, publication_date, isbn, url, reference_system, edition, format, notes',
                       template  => 'ENCY/ReferenceDetail.tt');
             return;
         }
@@ -489,7 +497,7 @@ sub Reference_add :Path('/ENCY/Reference/add') :Args(0) {
         edit_mode => 1,
         is_admin  => $is_admin,
         is_editor => $is_editor,
-        ency_ai_prompt => 'title, author, publisher, publication_date (YYYY-MM-DD), isbn, url (archive.org or publisher URL), reference_system (book/journal/website/thesis), notes (include page numbers and a short excerpt of the passage that mentions the herb or treatment)',
+        ency_ai_prompt => 'title, author, publisher, publication_date (YYYY or YYYY-MM-DD), isbn, url (archive.org or publisher URL for public domain — verify it is a real URL), reference_system (book/journal/magazine/course/personal/website/thesis), edition (e.g. "2nd Edition"), format (hardcover/paperback/pdf/digital/online), notes (include page numbers and a short excerpt of the passage that mentions the herb or treatment)',
         template  => 'ENCY/ReferenceDetail.tt',
     );
 }

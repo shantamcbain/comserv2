@@ -98,16 +98,71 @@
     </td>
   </tr>
   <tr>
+    <td><strong>Edition</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <input type="text" name="edition" value="[% reference.edition | html %]" size="20"
+             placeholder="e.g. 2nd Edition, Rev. 1985" />
+      [% ELSE %]
+      [% reference.edition | html %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
     <td><strong>Type</strong></td>
     <td>
       [% IF edit_mode %]
       <select name="reference_system">
-        [% FOR t IN ['book','journal','website','thesis','monograph','pharmacopoeia','traditional_text','personal_communication'] %]
+        [% FOR t IN ['book','journal','magazine','course','personal','website','thesis','monograph','pharmacopoeia','traditional_text','personal_communication'] %]
         <option value="[% t %]"[% reference.reference_system == t ? ' selected' : '' %]>[% t %]</option>
         [% END %]
       </select>
       [% ELSE %]
       [% reference.reference_system | html %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Format</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <select name="format">
+        [% FOR f IN ['', 'hardcover', 'paperback', 'pdf', 'digital', 'online', 'microfilm', 'audio'] %]
+        <option value="[% f %]"[% reference.format == f ? ' selected' : '' %]>[% f || '— select —' %]</option>
+        [% END %]
+      </select>
+      [% ELSE %]
+      [% reference.format | html %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Physical Location</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <input type="text" name="physical_location" value="[% reference.physical_location | html %]" style="width:98%;"
+             placeholder="e.g. Library shelf B-3, Office bookcase, NFS storage box 4" />
+      <div style="font-size:0.82em;color:#666;margin-top:2px;">Where is the physical copy held?</div>
+      [% ELSE %]
+      [% reference.physical_location | html %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Digital Path / URL</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <input type="text" name="digital_path" value="[% reference.digital_path | html %]" style="width:98%;"
+             placeholder="e.g. /mnt/nfs/library/herbs.pdf or https://archive.org/..." />
+      <div style="font-size:0.82em;color:#666;margin-top:2px;">NFS path, local file path, or public URL to digital copy.</div>
+      [% ELSE %]
+      [% IF reference.digital_path %]
+        [% IF reference.digital_path.match('^https?://') %]
+        <a href="[% reference.digital_path | html %]" target="_blank">[% reference.digital_path | html %]</a>
+        [% ELSE %]
+        <code>[% reference.digital_path | html %]</code>
+        [% END %]
+      [% END %]
       [% END %]
     </td>
   </tr>
