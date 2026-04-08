@@ -42,6 +42,7 @@
             <div class="submenu">
                 <a href="/ENCY/Glossary"><i class="icon-glossary"></i>Glossary</a>
                 <a href="/ENCY/Reference"><i class="icon-book"></i>Reference Library</a>
+                <a href="/ENCY/Author"><i class="icon-author"></i>Authors</a>
                 <a href="/ENCY/search?q=cultivation"><i class="icon-grow"></i>Cultivation</a>
                 <a href="/ENCY/search?q=conservation"><i class="icon-conservation"></i>Conservation</a>
                 <a href="/ENCY/search?q=ecology"><i class="icon-ecology"></i>Ecology</a>
@@ -63,6 +64,8 @@
                 <a href="/ENCY/Drug/add"><i class="icon-add"></i>Add Drug</a>
                 <a href="/ENCY/Formula/add"><i class="icon-add"></i>Add Formula</a>
                 <a href="/ENCY/Glossary/add"><i class="icon-add"></i>Add Glossary Term</a>
+                <a href="/ENCY/Reference/add"><i class="icon-add"></i>Add Reference</a>
+                <a href="/ENCY/Author/add"><i class="icon-add"></i>Add Author</a>
             </div>
         </div>
         [% END %]

@@ -431,6 +431,136 @@ sub Reference_add :Path('/ENCY/Reference/add') :Args(0) {
         template  => 'ENCY/ReferenceDetail.tt',
     );
 }
+sub Author_list :Path('/ENCY/Author') :Args(0) {
+    my ($self, $c) = @_;
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @role_list;
+    my $is_editor = $is_admin || grep { $_ eq 'editor' } @role_list;
+
+    my @authors;
+    eval {
+        @authors = $c->model('ENCYModel')->ency_schema->resultset('Author')->search(
+            {}, { order_by => { -asc => 'full_name' } }
+        )->all;
+    };
+    $c->stash(
+        authors   => \@authors,
+        is_admin  => $is_admin,
+        is_editor => $is_editor,
+        template  => 'ENCY/AuthorList.tt',
+    );
+}
+
+sub Author_id :Path('/ENCY/Author') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @role_list;
+    my $is_editor = $is_admin || grep { $_ eq 'editor' } @role_list;
+
+    my $edit_mode = $c->request->param('edit') && $is_editor ? 1 : 0;
+
+    unless ($id && $id =~ /^\d+$/) {
+        $c->stash(error_msg => "Invalid author ID.", template => 'ENCY/AuthorList.tt');
+        return;
+    }
+
+    my $author = eval { $c->model('ENCYModel')->ency_schema->resultset('Author')->find($id) };
+    unless ($author) {
+        $c->stash(error_msg => "Author #$id not found.", template => 'ENCY/AuthorList.tt');
+        return;
+    }
+
+    if ($c->request->method eq 'POST' && $is_editor) {
+        my $p = $c->request->body_parameters;
+        eval {
+            $author->update({
+                full_name          => $p->{full_name}          || $author->full_name,
+                credentials        => $p->{credentials}        // '',
+                affiliation        => $p->{affiliation}        // '',
+                specialty          => $p->{specialty}          // '',
+                born_year          => ($p->{born_year}  && $p->{born_year}  =~ /^\d{4}$/) ? $p->{born_year}  : undef,
+                died_year          => ($p->{died_year}  && $p->{died_year}  =~ /^\d{4}$/) ? $p->{died_year}  : undef,
+                nationality        => $p->{nationality}        // '',
+                bio                => $p->{bio}                // '',
+                notes              => $p->{notes}              // '',
+                url                => $p->{url}                // '',
+            });
+        };
+        if ($@) {
+            $c->stash(error_msg => "Failed to update author: $@");
+        } else {
+            $c->flash->{success_msg} = "Author updated.";
+            $c->response->redirect($c->uri_for('/ENCY/Author', $id));
+            return;
+        }
+    }
+
+    my @works = eval { $author->reference_authors->search_related('reference', {}, { order_by => 'reference_id' })->all };
+    $c->stash(
+        author    => $author,
+        works     => \@works,
+        edit_mode => $edit_mode,
+        is_admin  => $is_admin,
+        is_editor => $is_editor,
+        template  => 'ENCY/AuthorDetail.tt',
+    );
+}
+
+sub Author_add :Path('/ENCY/Author/add') :Args(0) {
+    my ($self, $c) = @_;
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @role_list;
+    my $is_editor = $is_admin || grep { $_ eq 'editor' } @role_list;
+
+    unless ($is_editor) {
+        $c->stash(error_msg => "You do not have permission to add authors.",
+                  template  => 'ENCY/AuthorList.tt');
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $new_author;
+        eval {
+            $new_author = $c->model('ENCYModel')->ency_schema->resultset('Author')->create({
+                full_name          => $p->{full_name}          || 'Unknown',
+                credentials        => $p->{credentials}        // '',
+                affiliation        => $p->{affiliation}        // '',
+                specialty          => $p->{specialty}          // '',
+                born_year          => ($p->{born_year}  && $p->{born_year}  =~ /^\d{4}$/) ? $p->{born_year}  : undef,
+                died_year          => ($p->{died_year}  && $p->{died_year}  =~ /^\d{4}$/) ? $p->{died_year}  : undef,
+                nationality        => $p->{nationality}        // '',
+                bio                => $p->{bio}                // '',
+                notes              => $p->{notes}              // '',
+                url                => $p->{url}                // '',
+                sitename           => $c->session->{site_name} // 'ENCY',
+                username_of_poster => $c->session->{username}  // '',
+                date_time_posted   => substr("${\scalar localtime}", 0, 30),
+            });
+        };
+        if ($@ || !$new_author) {
+            $c->stash(error_msg => "Failed to create author: $@",
+                      author => {}, edit_mode => 1, is_editor => $is_editor,
+                      template => 'ENCY/AuthorDetail.tt');
+            return;
+        }
+        $c->flash->{success_msg} = "Author '" . $new_author->full_name . "' created.";
+        $c->response->redirect($c->uri_for('/ENCY/Author', $new_author->author_id));
+        return;
+    }
+
+    $c->stash(
+        author    => {},
+        edit_mode => 1,
+        is_admin  => $is_admin,
+        is_editor => $is_editor,
+        template  => 'ENCY/AuthorDetail.tt',
+    );
+}
+
 sub add_herb :Path('/ENCY/add_herb') :Args(0) {
     my ( $self, $c ) = @_;
 
