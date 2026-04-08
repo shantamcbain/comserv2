@@ -5,7 +5,7 @@
   <div style="margin-top:0.6em;display:flex;flex-wrap:wrap;gap:0.5em;align-items:center;">
     <input type="text" id="ency-ai-entity-name" placeholder="Enter name to look up…" size="38" />
     <select id="ency-ai-model-sel" title="AI model to use" style="font-size:0.9em;">
-      <option value="grok-3-mini|grok">Grok 3 Mini (fast)</option>
+      <option value="grok-mini|grok">Grok Mini (fast)</option>
       <option value="grok-3|grok" selected>Grok 3 (best holistic responses)</option>
     </select>
     <button type="button" id="ency-ai-ask-btn" onclick="encyAiFill()">Ask AI</button>
@@ -29,9 +29,14 @@
       <input type="checkbox" id="ency-ai-override" style="vertical-align:middle;">
       Override existing values (default: only fills empty fields)
     </label>
+    &nbsp;&nbsp;
+    <label style="cursor:pointer;" title="Enables Grok live web search for current data (may be unavailable on some plans)">
+      <input type="checkbox" id="ency-ai-web-search" style="vertical-align:middle;">
+      Use live web search (Grok only — richer current data)
+    </label>
     <span style="margin-left:1em;color:#888;">
       Note: The <em>Reference</em> field is always appended, never replaced.
-      Grok 4 removed (refuses integrative framing). Claude/Gemini not yet wired as providers.
+      Grok 4 removed (refuses integrative framing).
     </span>
   </div>
   <div id="ency-ai-raw" style="display:none;margin-top:0.8em;">
@@ -144,7 +149,7 @@
             model:      mp.model,
             page_path:  window.location.pathname,
             page_title: document.title,
-            use_search: (mp.provider === 'grok')
+            use_search: (mp.provider === 'grok') && document.getElementById('ency-ai-web-search') && document.getElementById('ency-ai-web-search').checked
         };
 
         fetch('/ai/generate', {
@@ -487,7 +492,7 @@
                 model:      mp.model,
                 page_path:  window.location.pathname,
                 page_title: document.title,
-                use_search: (mp.provider === 'grok')
+                use_search: (mp.provider === 'grok') && document.getElementById('ency-ai-web-search') && document.getElementById('ency-ai-web-search').checked
             })
         })
         .then(function(r) { return r.json(); })

@@ -306,7 +306,7 @@ sub Reference :Path('/ENCY/Reference') :Args(0) {
     eval {
         @refs = $c->model('ENCYModel')->ency_schema->resultset('Reference')->search(
             {},
-            { order_by => { -asc => 'reference_id' } }
+            { order_by => { -asc => 'reference_id' }, prefetch => 'publisher_record' }
         )->all;
     };
     if ($@) {
