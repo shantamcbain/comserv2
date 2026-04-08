@@ -1682,6 +1682,12 @@ sub _draft_clean_term {
 sub _create_ai_draft_record {
     my ($self, $c, $rs, $term, $schema_obj) = @_;
 
+    # Never write to the Forager schema — it is a legacy read-only source.
+    # Herb records from found_in_foods/found_in_herbs are searched in Forager
+    # but cannot be auto-created there (different column set, no sitename).
+    my $is_ency = ($schema_obj == $self->ency_schema);
+    return undef unless $is_ency;
+
     my $name_col = do {
         my %nc = ( Glossary=>'term', Constituent=>'name', Disease=>'common_name',
                    Symptom=>'name', Herb=>'botanical_name', Drug=>'generic_name' );
