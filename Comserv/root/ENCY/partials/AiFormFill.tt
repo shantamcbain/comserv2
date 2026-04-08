@@ -154,7 +154,7 @@
             var parts = sel.value.split('|');
             return { model: parts[0], provider: parts[1] || 'grok' };
         }
-        return { model: 'grok-3', provider: 'grok' };
+        return { model: 'grok-4-0709', provider: 'grok' };
     }
 
     function encyAiFill() {
