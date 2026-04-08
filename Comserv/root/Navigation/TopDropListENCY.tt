@@ -41,6 +41,7 @@
             <span class="submenu-header"><i class="icon-docs"></i>Reference</span>
             <div class="submenu">
                 <a href="/ENCY/Glossary"><i class="icon-glossary"></i>Glossary</a>
+                <a href="/ENCY/Reference"><i class="icon-book"></i>Reference Library</a>
                 <a href="/ENCY/search?q=cultivation"><i class="icon-grow"></i>Cultivation</a>
                 <a href="/ENCY/search?q=conservation"><i class="icon-conservation"></i>Conservation</a>
                 <a href="/ENCY/search?q=ecology"><i class="icon-ecology"></i>Ecology</a>
@@ -66,10 +67,10 @@
         </div>
         [% END %]
 
-        [%# Admin: link to admin desktop ENCY section %]
+        [%# Admin: link to ENCY admin dashboard %]
         [% IF c.session.roles && c.session.roles.grep('admin').size %]
         <div class="dropdown-divider"></div>
-        <a href="/admin/ency"><i class="icon-admin"></i>ENCY Administration</a>
+        <a href="/ENCY/admin"><i class="icon-admin"></i>ENCY Administration</a>
         [% END %]
     </div>
 </li>
