@@ -134,8 +134,6 @@ sub index :Path :Args(0) {
                         push @external_models, { name => $id, provider => 'grok', label => $label };
                     }
                 } else {
-                    push @external_models, { name => 'grok-mini',                  provider => 'grok', label => 'Grok Mini (xAI)' };
-                    push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
                     push @external_models, { name => 'grok-4-0709',               provider => 'grok', label => 'Grok 4 (xAI)' };
                     push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
                     push @external_models, { name => 'grok-code-fast-1',          provider => 'grok', label => 'Grok Code Fast (xAI)' };
@@ -561,7 +559,23 @@ sub generate :Local :Args(0) {
                 die "Failed to load Grok model";
             }
             $grok->api_key($grok_api_key);
-            $grok->model($model) if $model;
+            if ($model) {
+                $grok->model($model);
+            } else {
+                # No model specified — use first available synced model from API key metadata
+                eval {
+                    my $schema  = $c->model('DBEncy')->schema;
+                    my $key_obj = $schema->resultset('UserApiKeys')->search(
+                        { service => 'grok', is_active => '1' }
+                    )->first;
+                    if ($key_obj) {
+                        my $meta   = $key_obj->get_metadata() || {};
+                        my $synced = $meta->{available_models} || [];
+                        my ($first) = grep { $_->{id} && $_->{id} !~ /imagine|video/i } @$synced;
+                        $grok->model($first->{id}) if $first && $first->{id};
+                    }
+                };
+            }
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'generate', "Querying Grok API (model: " . $grok->model . ")");
@@ -580,15 +594,31 @@ sub generate :Local :Args(0) {
             
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
-                # Auto-fallback: if model is deprecated (410/404), retry with grok-3
-                if ($error =~ /410|404|no longer available|not found/ && $grok->model ne 'grok-3') {
-                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                        'generate', "Model " . $grok->model . " unavailable, retrying with grok-3");
-                    $grok->model('grok-3');
-                    $response = $grok->chat(
-                        messages   => \@grok_messages,
-                        use_search => $use_search,
-                    );
+                # Auto-fallback: if model is deprecated (410/404), try next synced model or grok-4-0709
+                if ($error =~ /410|404|no longer available|not found/) {
+                    my $fallback = 'grok-4-0709';
+                    eval {
+                        my $schema  = $c->model('DBEncy')->schema;
+                        my $key_obj = $schema->resultset('UserApiKeys')->search(
+                            { service => 'grok', is_active => '1' }
+                        )->first;
+                        if ($key_obj) {
+                            my $meta   = $key_obj->get_metadata() || {};
+                            my $synced = $meta->{available_models} || [];
+                            my $cur    = $grok->model;
+                            my ($next) = grep { $_->{id} && $_->{id} ne $cur && $_->{id} !~ /imagine|video/i } @$synced;
+                            $fallback = $next->{id} if $next && $next->{id};
+                        }
+                    };
+                    if ($fallback ne $grok->model) {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                            'generate', "Model " . $grok->model . " unavailable, retrying with $fallback");
+                        $grok->model($fallback);
+                        $response = $grok->chat(
+                            messages   => \@grok_messages,
+                            use_search => $use_search,
+                        );
+                    }
                 }
                 unless ($response) {
                     $error = $grok->last_error || $error;
@@ -5307,7 +5337,6 @@ sub get_user_providers :Local :Args(0) {
                 # Fallback to hardcoded Grok models if none stored in metadata
                 if (!@$models && $key->service eq 'grok') {
                     $models = [
-                        { id => 'grok-3' },
                         { id => 'grok-4-0709' },
                         { id => 'grok-4-fast-non-reasoning' },
                         { id => 'grok-code-fast-1' },
