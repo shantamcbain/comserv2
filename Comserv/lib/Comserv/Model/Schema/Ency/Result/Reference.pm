@@ -73,7 +73,7 @@ __PACKAGE__->add_columns(reference_id => {
 __PACKAGE__->set_primary_key('reference_id');
 
 __PACKAGE__->belongs_to(
-    publisher => 'Comserv::Model::Schema::Ency::Result::Publisher',
+    publisher_record => 'Comserv::Model::Schema::Ency::Result::Publisher',
     'publisher_id',
 );
 
