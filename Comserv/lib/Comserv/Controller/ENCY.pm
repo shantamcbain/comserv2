@@ -2442,6 +2442,113 @@ sub practitioner_type_detail : Path('/ENCY/PractitionerType') : Args(1) {
     $c->response->redirect($c->uri_for('/ENCY/PractitionerType'), 302);
 }
 
+sub api_references : Path('/ENCY/api/references') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    my $q = $c->request->param('q') || '';
+    unless (length($q) >= 2) {
+        $c->response->body('{"results":[]}');
+        return;
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_references', "Searching references q=$q");
+    my @results;
+    eval {
+        my @refs = $c->model('ENCYModel')->ency_schema->resultset('Reference')->search(
+            { -or => [
+                title  => { like => "%$q%" },
+                author => { like => "%$q%" },
+                isbn   => { like => "%$q%" },
+            ]},
+            { order_by => 'reference_id', rows => 12 }
+        )->all;
+        @results = map { {
+            reference_id => $_->reference_id,
+            title        => $_->title        // '',
+            author       => $_->author       // '',
+            publisher    => $_->publisher    // '',
+            year         => ($_->publication_date ? substr($_->publication_date, 0, 4) : ''),
+            isbn         => $_->isbn         // '',
+        } } @refs;
+    } or do {
+        my $err = $@ || 'unknown';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_references', "Error: $err");
+    };
+    require JSON;
+    $c->response->body(JSON::encode_json({ results => \@results }));
+}
+
+sub api_link_reference : Path('/ENCY/api/link_reference') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    my $is_editor = grep { $_ eq 'admin' || $_ eq 'developer' || $_ eq 'editor' } @role_list;
+    unless ($is_editor) {
+        $c->response->body('{"ok":0,"error":"Permission denied"}');
+        return;
+    }
+    my $entity_type  = $c->request->param('entity_type')  || '';
+    my $entity_id    = $c->request->param('entity_id')    || 0;
+    my $reference_id = $c->request->param('reference_id') || 0;
+    unless ($entity_type && $entity_id && $reference_id) {
+        $c->response->body('{"ok":0,"error":"Missing parameters"}');
+        return;
+    }
+    my ($ok, $msg) = $c->model('ENCYModel')->link_entity_reference($c, $entity_type, $entity_id, $reference_id);
+    require JSON;
+    $c->response->body(JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
+}
+
+sub api_unlink_reference : Path('/ENCY/api/unlink_reference') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    my $is_editor = grep { $_ eq 'admin' || $_ eq 'developer' || $_ eq 'editor' } @role_list;
+    unless ($is_editor) {
+        $c->response->body('{"ok":0,"error":"Permission denied"}');
+        return;
+    }
+    my $entity_type  = $c->request->param('entity_type')  || '';
+    my $entity_id    = $c->request->param('entity_id')    || 0;
+    my $reference_id = $c->request->param('reference_id') || 0;
+    unless ($entity_type && $entity_id && $reference_id) {
+        $c->response->body('{"ok":0,"error":"Missing parameters"}');
+        return;
+    }
+    my ($ok, $msg) = $c->model('ENCYModel')->unlink_entity_reference($c, $entity_type, $entity_id, $reference_id);
+    require JSON;
+    $c->response->body(JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
+}
+
+sub api_entity_references : Path('/ENCY/api/entity_references') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    my $entity_type = $c->request->param('entity_type') || '';
+    my $entity_id   = $c->request->param('entity_id')   || 0;
+    unless ($entity_type && $entity_id =~ /^\d+$/) {
+        $c->response->body('{"references":[]}');
+        return;
+    }
+    my @refs = eval {
+        $c->model('ENCYModel')->get_references_for($c, $entity_type, $entity_id);
+    };
+    if ($@) {
+        $c->response->body('{"references":[]}');
+        return;
+    }
+    my @data = map { {
+        reference_id => $_->reference_id,
+        title        => $_->title        // '',
+        author       => $_->author       // '',
+        publisher    => $_->publisher    // '',
+        year         => ($_->publication_date ? substr($_->publication_date, 0, 4) : ''),
+        isbn         => $_->isbn         // '',
+    } } @refs;
+    require JSON;
+    $c->response->body(JSON::encode_json({ references => \@data }));
+}
+
 sub api_resolve : Path('/ENCY/api/resolve') : Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json; charset=utf-8');

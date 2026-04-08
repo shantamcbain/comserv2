@@ -1731,5 +1731,62 @@ sub _create_ai_draft_record {
     return $rec;
 }
 
+sub link_entity_reference {
+    my ($self, $c, $entity_type, $entity_id, $reference_id) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'link_entity_reference',
+        "Linking $entity_type #$entity_id to reference #$reference_id");
+    my $result;
+    eval {
+        $result = $self->ency_schema->resultset('EntityReference')->find_or_create({
+            entity_type  => $entity_type,
+            entity_id    => $entity_id,
+            reference_id => $reference_id,
+        });
+    } or do {
+        my $err = $@ || 'Unknown error';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'link_entity_reference',
+            "Error: $err");
+        return (0, "Error: $err");
+    };
+    return (1, "Linked.", $result);
+}
+
+sub unlink_entity_reference {
+    my ($self, $c, $entity_type, $entity_id, $reference_id) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'unlink_entity_reference',
+        "Unlinking $entity_type #$entity_id from reference #$reference_id");
+    eval {
+        $self->ency_schema->resultset('EntityReference')->search({
+            entity_type  => $entity_type,
+            entity_id    => $entity_id,
+            reference_id => $reference_id,
+        })->delete;
+    } or do {
+        my $err = $@ || 'Unknown error';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'unlink_entity_reference',
+            "Error: $err");
+        return (0, "Error: $err");
+    };
+    return (1, "Unlinked.");
+}
+
+sub get_references_for {
+    my ($self, $c, $entity_type, $entity_id) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_references_for',
+        "Getting references for $entity_type #$entity_id");
+    my @refs = eval {
+        $self->ency_schema->resultset('EntityReference')->search(
+            { entity_type => $entity_type, entity_id => $entity_id },
+            { prefetch => 'reference', order_by => 'reference_id' }
+        )->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_references_for',
+            "Error: $@");
+        return ();
+    }
+    return map { $_->reference } @refs;
+}
+
 __PACKAGE__->meta->make_immutable;
 1;
