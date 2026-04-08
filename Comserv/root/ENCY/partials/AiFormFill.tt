@@ -9,7 +9,7 @@
     <input type="text" id="ency-ai-entity-name" placeholder="Enter name to look up…" size="38"
            value="[% ency_ai_entity_name | html %]" />
     <select id="ency-ai-model-sel" title="AI model to use" style="font-size:0.9em;">
-      <option value="grok-3|grok" selected>Grok 3 (loading…)</option>
+      <option value="grok-4-0709|grok" selected>Grok 4 (loading…)</option>
     </select>
     <button type="button" id="ency-ai-ask-btn" onclick="encyAiFill()">Ask AI</button>
     <button type="button" id="ency-ai-review-btn" onclick="encyAiReview()"
@@ -92,7 +92,6 @@
                 data.providers.forEach(function(p) { if (p.service === 'grok') grokProvider = p; });
                 if (!grokProvider) return;
                 var FALLBACK = [
-                    { val: 'grok-3|grok',                    label: 'Grok 3 (best holistic responses)' },
                     { val: 'grok-4-0709|grok',               label: 'Grok 4' },
                     { val: 'grok-4-fast-non-reasoning|grok', label: 'Grok 4 Fast' },
                     { val: 'grok-code-fast-1|grok',          label: 'Grok Code Fast' }
