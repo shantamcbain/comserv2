@@ -16,8 +16,11 @@
 <div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
 [% END %]
 
+<link rel="stylesheet" href="/static/css/ency-index.css">
+<link rel="stylesheet" href="/static/css/ency-admin.css">
+
 <h1>ENCY Administration Dashboard</h1>
-<p style="color:#666;">
+<p class="ency-admin-breadcrumb">
   <a href="[% c.uri_for('/ENCY') %]">&larr; ENCY Home</a>
   &nbsp;|&nbsp;
   <a href="[% c.uri_for('/admin/schema_compare', { database => 'ency' }) %]">Schema Compare (Ency DB)</a>
@@ -28,50 +31,6 @@
   &nbsp;|&nbsp;
   <a href="[% c.uri_for('/todo') %]">Todo List</a>
 </p>
-
-<style>
-.ency-admin-grid { display:flex; flex-wrap:wrap; gap:1.2em; margin:1em 0; }
-.ency-admin-card {
-    background:#fff;
-    border:1px solid #d0e8f5;
-    border-radius:6px;
-    padding:1em 1.2em;
-    min-width:200px;
-    flex:1 1 220px;
-    box-shadow:0 1px 3px rgba(0,0,0,0.06);
-}
-.ency-admin-card h3 {
-    margin:0 0 0.6em;
-    font-size:1em;
-    color:#1a4a7a;
-    border-bottom:1px solid #d0e8f5;
-    padding-bottom:0.4em;
-}
-.ency-admin-stat {
-    display:flex;
-    justify-content:space-between;
-    align-items:baseline;
-    padding:0.2em 0;
-    font-size:0.92em;
-    border-bottom:1px dotted #eee;
-}
-.ency-admin-stat:last-child { border-bottom:none; }
-.ency-admin-stat a { color:#1a4a7a; text-decoration:none; }
-.ency-admin-stat a:hover { text-decoration:underline; }
-.ency-count { font-weight:bold; font-size:1.05em; color:#333; }
-.ency-count.warn { color:#c56200; }
-.ency-count.ok   { color:#2e7d32; }
-.ency-count.zero { color:#aaa; }
-.ency-admin-section { margin:1.5em 0; }
-.ency-admin-section h2 { font-size:1.1em; color:#1a4a7a; border-bottom:2px solid #d0e8f5; padding-bottom:0.3em; margin-bottom:0.8em; }
-table.ency-admin-table { width:100%; border-collapse:collapse; font-size:0.9em; }
-table.ency-admin-table th { background:#e8f4f8; text-align:left; padding:0.4em 0.6em; font-weight:bold; color:#1a4a7a; }
-table.ency-admin-table td { padding:0.35em 0.6em; border-bottom:1px solid #eee; }
-table.ency-admin-table tr:hover td { background:#f8fcff; }
-.badge-warn  { display:inline-block; background:#fff3cd; color:#856404; border:1px solid #ffc107; border-radius:10px; padding:0.1em 0.5em; font-size:0.82em; }
-.badge-ok    { display:inline-block; background:#d4edda; color:#155724; border:1px solid #c3e6cb; border-radius:10px; padding:0.1em 0.5em; font-size:0.82em; }
-.badge-error { display:inline-block; background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; border-radius:10px; padding:0.1em 0.5em; font-size:0.82em; }
-</style>
 
 <!-- ════════════════════════════════════════════════════════
      SECTION 1: Entity Record Counts
@@ -146,9 +105,9 @@ table.ency-admin-table tr:hover td { background:#f8fcff; }
       <span title="References missing ISBN">Missing ISBN</span>
       <span class="ency-count [% refs_missing_isbn > 0 ? 'warn' : 'ok' %]">[% refs_missing_isbn %]</span>
     </div>
-    <div class="ency-admin-stat" style="margin-top:0.4em;">
+    <div class="ency-admin-stat mt">
       <a href="[% c.uri_for('/ENCY/Reference/add') %]">+ Add Reference</a>
-      <a href="[% c.uri_for('/ENCY/Reference') %]" style="font-size:0.85em;">View All &rarr;</a>
+      <a href="[% c.uri_for('/ENCY/Reference') %]">View All &rarr;</a>
     </div>
   </div>
 
@@ -167,7 +126,7 @@ table.ency-admin-table tr:hover td { background:#f8fcff; }
   [% END %]
 </h2>
 [% IF total_ai_drafts > 0 %]
-<p style="font-size:0.9em;color:#666;">Records with <code>username_of_poster = 'ai-draft'</code> and <code>share = 0</code> (not yet public). Review and edit before making public.</p>
+<p class="ency-admin-note">Records with <code>username_of_poster = 'ai-draft'</code> and <code>share = 0</code> (not yet public). Review and edit before making public.</p>
 <table class="ency-admin-table">
   <tr><th>Entity</th><th>AI Drafts</th><th>Action</th></tr>
   [% FOR entity IN ['herb','animal','insect','disease','symptom','constituent','drug'] %]
@@ -198,7 +157,7 @@ table.ency-admin-table tr:hover td { background:#f8fcff; }
   [% END %]
 </table>
 [% ELSE %]
-<p style="color:#666;font-size:0.9em;">No AI draft records pending verification.</p>
+<p class="ency-admin-note">No AI draft records pending verification.</p>
 [% END %]
 </div>
 
@@ -253,7 +212,7 @@ table.ency-admin-table tr:hover td { background:#f8fcff; }
     </div>
     [% END %]
 
-    <h3 style="margin-top:0.8em;">Constituent Links</h3>
+    <h3 class="mt">Constituent Links</h3>
     [% FOR pair IN [
         ['ConstituentDisease', 'Constituent ↔ Disease'],
         ['ConstituentSymptom', 'Constituent ↔ Symptom'],
@@ -279,12 +238,12 @@ table.ency-admin-table tr:hover td { background:#f8fcff; }
     </div>
     [% END %]
 
-    <h3 style="margin-top:0.8em;">Reference Links</h3>
+    <h3 class="mt">Reference Links</h3>
     <div class="ency-admin-stat">
       <span>Entity ↔ Reference (formal)</span>
       <span class="ency-count [% junctions.EntityReference > 0 ? 'ok' : 'zero' %]">[% junctions.EntityReference %]</span>
     </div>
-    <div class="ency-admin-stat" style="margin-top:0.3em;font-size:0.82em;">
+    <div class="ency-admin-stat sm">
       <a href="[% c.uri_for('/ENCY/admin') %]?run_seed_refs=1">Run Reference Link Seeder (dry run)</a>
     </div>
   </div>
@@ -295,16 +254,14 @@ table.ency-admin-table tr:hover td { background:#f8fcff; }
 <!-- ════════════════════════════════════════════════════════
      SECTION 4: Open Todos & System Health
      ═══════════════════════════════════════════════════════ -->
-<div class="ency-admin-grid" style="margin-top:0;">
+<div class="ency-admin-grid">
 
   <div class="ency-admin-card">
     <h3>Open ENCY Todos
       [% IF open_todos > 0 %]<span class="badge-warn">[% open_todos %]</span>[% ELSE %]<span class="badge-ok">0</span>[% END %]
     </h3>
     [% IF open_todos > 0 %]
-    <p style="font-size:0.88em;color:#666;margin:0.3em 0 0.6em;">
-      [% open_todos %] open task(s) in ENCY project.
-    </p>
+    <p class="ency-admin-note">[% open_todos %] open task(s) in ENCY project.</p>
     [% END %]
     <div class="ency-admin-stat">
       <a href="[% c.uri_for('/todo', { project_code => 'ENCY' }) %]">View ENCY Todos</a>
@@ -326,31 +283,31 @@ table.ency-admin-table tr:hover td { background:#f8fcff; }
     <div class="ency-admin-stat">
       <a href="[% c.uri_for('/admin') %]">Main Admin Panel</a>
     </div>
-    <p style="font-size:0.8em;color:#888;margin-top:0.5em;">
+    <p class="ency-admin-note">
       New tables requiring schema compare: <code>ency_entity_reference</code>
       (EntityReference.pm added 2026-04-08).
     </p>
   </div>
 
   [% IF recent_errors && recent_errors.size %]
-  <div class="ency-admin-card" style="flex:2 1 400px;">
+  <div class="ency-admin-card wide">
     <h3>Recent ENCY Errors <span class="badge-error">[% recent_errors.size %]</span></h3>
     <table class="ency-admin-table">
       <tr><th>Line</th><th>Method</th><th>Message</th></tr>
       [% FOR e IN recent_errors %]
       <tr>
-        <td style="white-space:nowrap;">[% e.line_number %]</td>
-        <td style="white-space:nowrap;">[% e.sub_name | html %]</td>
-        <td style="font-size:0.82em;">[% e.message.substr(0,120) | html %]</td>
+        <td class="nowrap">[% e.line_number %]</td>
+        <td class="nowrap">[% e.sub_name | html %]</td>
+        <td class="sm">[% e.message.substr(0,120) | html %]</td>
       </tr>
       [% END %]
     </table>
-    <p style="margin-top:0.5em;"><a href="[% c.uri_for('/admin/logs') %]">View full logs &rarr;</a></p>
+    <div class="ency-admin-stat mt"><a href="[% c.uri_for('/admin/logs') %]">View full logs &rarr;</a></div>
   </div>
   [% ELSE %]
   <div class="ency-admin-card">
     <h3>Recent ENCY Errors</h3>
-    <p style="color:#2e7d32;font-size:0.9em;">No recent errors found. <span class="badge-ok">clean</span></p>
+    <p class="ency-admin-note">No recent errors found. <span class="badge-ok">clean</span></p>
     <div class="ency-admin-stat"><a href="[% c.uri_for('/admin/logs') %]">View logs</a></div>
   </div>
   [% END %]
@@ -362,7 +319,7 @@ table.ency-admin-table tr:hover td { background:#f8fcff; }
      ═══════════════════════════════════════════════════════ -->
 <div class="ency-admin-section">
 <h2>Quick Add</h2>
-<div style="display:flex;flex-wrap:wrap;gap:0.5em;">
+<div class="ency-quick-add">
   [% FOR item IN [
       ['/ENCY/add_herb',        'Herb'],
       ['/ENCY/Animal/add',      'Animal'],
@@ -375,10 +332,7 @@ table.ency-admin-table tr:hover td { background:#f8fcff; }
       ['/ENCY/Glossary/add',    'Glossary Term'],
       ['/ENCY/Reference/add',   'Reference'],
   ] %]
-  <a href="[% c.uri_for(item.0) %]"
-     style="display:inline-block;padding:0.4em 0.9em;background:#e8f4f8;border:1px solid #4a90d9;border-radius:4px;text-decoration:none;color:#1a4a7a;font-size:0.9em;">
-    + [% item.1 %]
-  </a>
+  <a href="[% c.uri_for(item.0) %]">+ [% item.1 %]</a>
   [% END %]
 </div>
 </div>
