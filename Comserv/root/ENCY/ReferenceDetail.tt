@@ -160,10 +160,52 @@
 [% END %]
 
 [% IF !edit_mode && ref_id %]
-<h2 style="margin-top:1.5em;">Where this reference is cited</h2>
-<p style="color:#666;font-size:0.9em;">
-  Search for <code>[% ref_id %]</code> in herb, disease, constituent, and drug records to find
-  all places this reference (#[% ref_id %]) is cited.
-  <a href="[% c.uri_for('/ENCY/search', { search_string => ref_id }) %]">Search ENCY for citations of #[% ref_id %]</a>
+
+[%# ── Linked Authors ──────────────────────────────────────── %]
+[% IF ref_authors && ref_authors.size %]
+<h2 style="margin-top:1.5em;">Authors</h2>
+<ul style="margin:0.5em 0 1em;">
+  [% FOR ra IN ref_authors %]
+  [% SET aobj = ra.author %]
+  <li>
+    [% IF aobj %]
+    <a href="[% c.uri_for('/ENCY/Author', aobj.author_id) %]"><strong>[% aobj.full_name | html %]</strong></a>
+    [% IF aobj.credentials %] <em>[% aobj.credentials | html %]</em>[% END %]
+    [% IF aobj.affiliation %] — [% aobj.affiliation | html %][% END %]
+    [% ELSE %]
+    Author #[% ra.author_id %]
+    [% END %]
+  </li>
+  [% END %]
+</ul>
+[% END %]
+
+[%# ── Entities citing this reference ─────────────────────── %]
+<h2 style="margin-top:1.5em;">Where Reference #[% ref_id %] is Cited</h2>
+[% IF entity_links && entity_links.size %]
+<p style="color:#666;font-size:0.9em;">[% entity_links.size %] formally linked record(s):</p>
+<table style="border-collapse:collapse;width:100%;font-size:0.95em;">
+  <thead>
+  <tr style="background:#e8f0f8;">
+    <th style="padding:0.35em 0.6em;text-align:left;">Type</th>
+    <th style="padding:0.35em 0.6em;text-align:left;">Record</th>
+  </tr>
+  </thead>
+  <tbody>
+  [% FOR link IN entity_links %]
+  <tr style="border-bottom:1px solid #dde;">
+    <td style="padding:0.3em 0.6em;text-transform:capitalize;white-space:nowrap;">[% link.entity_type | html %]</td>
+    <td style="padding:0.3em 0.6em;">
+      <a href="[% link.url | html %]">[% link.name | html %]</a>
+      <span style="color:#888;font-size:0.85em;">(#[% link.entity_id %])</span>
+    </td>
+  </tr>
+  [% END %]
+  </tbody>
+</table>
+[% ELSE %]
+<p style="color:#666;font-size:0.9em;">No formally linked records yet.
+  <a href="[% c.uri_for('/ENCY/search', { search_string => ref_id }) %]">Search ENCY for text citations of #[% ref_id %]</a>
 </p>
+[% END %]
 [% END %]
