@@ -503,8 +503,6 @@
                                         return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                                     })
                                 : [
-                                    { val: 'grok|grok-mini',                 label: 'Grok Mini (fast)' },
-                                    { val: 'grok|grok-3',                    label: 'Grok 3' },
                                     { val: 'grok|grok-4-0709',               label: 'Grok 4' },
                                     { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
                                     { val: 'grok|grok-code-fast-1',          label: 'Grok Code Fast' }
@@ -517,7 +515,7 @@
                             sel.appendChild(grp);
                             // Cheapest Grok for complex queries (non-guest)
                             if (!state.isGuest) {
-                                state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-mini';
+                                state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-4-0709';
                             }
                             // Show web search toggle for any user who has Grok access
                             // (toggle applies to Grok requests whether selected manually or via auto-routing)
@@ -1013,8 +1011,6 @@
                                 return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                             })
                         : [
-                            { val: 'grok|grok-mini',                 label: 'Grok Mini (fast)' },
-                            { val: 'grok|grok-3',                    label: 'Grok 3' },
                             { val: 'grok|grok-4-0709',               label: 'Grok 4' },
                             { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
                             { val: 'grok|grok-code-fast-1',          label: 'Grok Code Fast' }
