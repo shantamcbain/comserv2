@@ -48,6 +48,15 @@
     <strong style="color:#856404;">AI Review Suggestions:</strong>
     <div id="ency-review-results" style="margin-top:0.4em;"></div>
   </div>
+  <div id="ency-ai-staged-panel" style="display:none;margin-top:0.8em;border-top:2px solid #4a90d9;padding-top:0.6em;">
+    <div style="display:flex;align-items:center;gap:0.8em;margin-bottom:0.6em;flex-wrap:wrap;">
+      <strong style="color:#1a4a7a;">AI Suggestions — Fields With Existing Content:</strong>
+      <button type="button" id="ency-ai-stage-all-btn" onclick="encyStageAll()" style="padding:0.25em 0.7em;cursor:pointer;background:#d4edda;border:1px solid #28a745;border-radius:3px;">Append All</button>
+      <button type="button" id="ency-ai-skip-all-btn" onclick="encySkipAll()" style="padding:0.25em 0.7em;cursor:pointer;background:#f8f9fa;border:1px solid #aaa;border-radius:3px;">Skip All</button>
+      <span style="font-size:0.82em;color:#666;">Choose action per field, or use buttons above for bulk action.</span>
+    </div>
+    <div id="ency-ai-staged-items"></div>
+  </div>
 </div>
 
 <script>
@@ -162,7 +171,7 @@
 
             try {
                 var fields = JSON.parse(raw.substring(jsonStart, jsonEnd + 1));
-                var filled = 0, skipped = [], blocked = [];
+                var filled = 0, blocked = [], staged = [];
 
                 Object.keys(fields).forEach(function(key) {
                     // If target fields specified, skip any field not in the list
@@ -216,24 +225,29 @@
                         }
                         if (!matched) skipped.push(key + '=' + val);
                     } else {
-                        // TEXT / TEXTAREA: skip if already has content and not overriding
-                        // Exception: if this field was explicitly targeted, always override
                         var currentVal = (el.value || '').trim();
-                        var isTargeted = targetFields.length && targetFields.indexOf(key.toLowerCase()) !== -1;
-                        if (currentVal && !overrideAll && !isTargeted) {
-                            skipped.push(key);
+                        if (!currentVal) {
+                            el.value = val;
+                            filled++;
                             return;
                         }
-                        el.value = val;
-                        filled++;
+                        if (overrideAll) {
+                            el.value = val;
+                            filled++;
+                            return;
+                        }
+                        if (currentVal.indexOf(val) !== -1) {
+                            return;
+                        }
+                        staged.push({ key: key, el: el, currentVal: currentVal, aiVal: val });
                     }
                 });
 
-                var mode = overrideAll ? 'override mode' : 'empty-fields-only mode';
-                var msg  = '[' + modelUsed + '] Filled ' + filled + ' field(s) (' + mode + '). Review carefully.';
-                if (skipped.length)  { msg += ' Skipped (had content): ' + skipped.join(', '); }
-                if (blocked.length)  { msg += ' Blocked (not in target list): ' + blocked.join(', '); }
+                var msg = '[' + modelUsed + '] Filled ' + filled + ' field(s) directly.';
+                if (staged.length)  { msg += ' ' + staged.length + ' field(s) staged for review — see diff panel below.'; }
+                if (blocked.length) { msg += ' Blocked (not in target list): ' + blocked.join(', '); }
                 statusEl.textContent = msg;
+                encyRenderStagedDiff(staged);
                 encyResolveLinks(fields);
             } catch(e) {
                 statusEl.textContent = 'Could not parse JSON: ' + e.message + '. See raw response.';
@@ -296,6 +310,106 @@
                 pending--;
                 if (pending === 0 && found > 0) panel.style.display = '';
             });
+        });
+    }
+
+    function encyRenderStagedDiff(staged) {
+        var panel     = document.getElementById('ency-ai-staged-panel');
+        var container = document.getElementById('ency-ai-staged-items');
+        container.innerHTML = '';
+        panel.style.display = 'none';
+        if (!staged || !staged.length) return;
+        panel.style.display = '';
+
+        staged.forEach(function(item) {
+            var div = document.createElement('div');
+            div.className = 'ency-staged-item';
+            div.style.cssText = 'margin:0.5em 0;padding:0.6em;background:#f0f7ff;border:1px solid #4a90d9;border-radius:4px;';
+            div.setAttribute('data-key', item.key);
+
+            var label = document.createElement('div');
+            label.style.cssText = 'font-weight:bold;margin-bottom:0.3em;';
+            label.textContent = item.key;
+            div.appendChild(label);
+
+            var diffWrap = document.createElement('div');
+            diffWrap.style.cssText = 'display:flex;gap:0.5em;margin-bottom:0.4em;flex-wrap:wrap;';
+
+            var existingBox = document.createElement('div');
+            existingBox.style.cssText = 'flex:1;min-width:200px;padding:0.4em;background:#fff8f8;border:1px solid #f5c6cb;border-radius:3px;font-size:0.85em;white-space:pre-wrap;max-height:120px;overflow:auto;';
+            existingBox.innerHTML = '<em style="color:#856404;display:block;margin-bottom:0.2em;">Existing</em>' + item.currentVal.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+            var aiBox = document.createElement('div');
+            aiBox.style.cssText = 'flex:1;min-width:200px;padding:0.4em;background:#f0fff4;border:1px solid #a3d9a5;border-radius:3px;font-size:0.85em;white-space:pre-wrap;max-height:120px;overflow:auto;';
+            aiBox.innerHTML = '<em style="color:#155724;display:block;margin-bottom:0.2em;">AI suggestion</em>' + item.aiVal.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+            diffWrap.appendChild(existingBox);
+            diffWrap.appendChild(aiBox);
+            div.appendChild(diffWrap);
+
+            var btnWrap = document.createElement('div');
+            btnWrap.style.cssText = 'display:flex;gap:0.5em;';
+
+            function makeActionBtn(label, style, handler) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = label;
+                b.style.cssText = style;
+                b.onclick = function() { handler(b); };
+                return b;
+            }
+
+            var appendBtn = makeActionBtn('Append',
+                'padding:0.25em 0.7em;cursor:pointer;font-size:0.9em;background:#d4edda;border:1px solid #28a745;border-radius:3px;',
+                function(btn) {
+                    item.el.value = item.currentVal + '\n' + item.aiVal;
+                    div.style.background = '#e8f5e9';
+                    div.style.borderColor = '#4caf50';
+                    btnWrap.querySelectorAll('button').forEach(function(b){ b.disabled = true; });
+                    btn.disabled = false;
+                    btn.textContent = '\u2713 Appended';
+                });
+
+            var replaceBtn = makeActionBtn('Replace',
+                'padding:0.25em 0.7em;cursor:pointer;font-size:0.9em;background:#fff3cd;border:1px solid #ffc107;border-radius:3px;',
+                function(btn) {
+                    item.el.value = item.aiVal;
+                    div.style.background = '#fff3cd';
+                    div.style.borderColor = '#ffc107';
+                    btnWrap.querySelectorAll('button').forEach(function(b){ b.disabled = true; });
+                    btn.disabled = false;
+                    btn.textContent = '\u2713 Replaced';
+                });
+
+            var skipBtn = makeActionBtn('Skip',
+                'padding:0.25em 0.7em;cursor:pointer;font-size:0.9em;background:#f8f9fa;border:1px solid #aaa;border-radius:3px;',
+                function(btn) {
+                    div.style.background = '#f8f9fa';
+                    div.style.borderColor = '#aaa';
+                    btnWrap.querySelectorAll('button').forEach(function(b){ b.disabled = true; });
+                    btn.disabled = false;
+                    btn.textContent = '\u2713 Skipped';
+                });
+
+            btnWrap.appendChild(appendBtn);
+            btnWrap.appendChild(replaceBtn);
+            btnWrap.appendChild(skipBtn);
+            div.appendChild(btnWrap);
+            container.appendChild(div);
+        });
+    }
+
+    function encyStageAll() {
+        document.querySelectorAll('#ency-ai-staged-items .ency-staged-item').forEach(function(div) {
+            var btns = div.querySelectorAll('button');
+            if (btns[0] && !btns[0].disabled) btns[0].click();
+        });
+    }
+
+    function encySkipAll() {
+        document.querySelectorAll('#ency-ai-staged-items .ency-staged-item').forEach(function(div) {
+            var btns = div.querySelectorAll('button');
+            if (btns[2] && !btns[2].disabled) btns[2].click();
         });
     }
 
@@ -530,10 +644,13 @@
         encyAddFieldTooltips();
     }
 
-    window.encyAiFill          = encyAiFill;
-    window.encyAiReview        = encyAiReview;
-    window.encyAiMarkReference = encyAiMarkReference;
-    window.encyAutoDetectName  = encyAutoDetectName;
+    window.encyAiFill           = encyAiFill;
+    window.encyAiReview         = encyAiReview;
+    window.encyAiMarkReference  = encyAiMarkReference;
+    window.encyAutoDetectName   = encyAutoDetectName;
+    window.encyRenderStagedDiff = encyRenderStagedDiff;
+    window.encyStageAll         = encyStageAll;
+    window.encySkipAll          = encySkipAll;
 })();
 </script>
 [% END %]
