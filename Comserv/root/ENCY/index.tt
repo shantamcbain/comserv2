@@ -27,7 +27,7 @@
 [%# ── HERO — adapts per site ──────────────────────────────────── %]
 <div class="ency-hero">
 [% IF c.session.username %]
-  <h2>Welcome back, [% c.session.firstname | html %]!</h2>
+  <h2>Welcome back, [% c.session.first_name || c.session.username | html %]!</h2>
 [% ELSE %]
   <h2>Welcome to
     [% IF site_lc == 'bmaster' %]
