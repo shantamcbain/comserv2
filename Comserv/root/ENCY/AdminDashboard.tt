@@ -346,6 +346,7 @@
       ['/ENCY/Formula/add',     'Formula'],
       ['/ENCY/Glossary/add',    'Glossary Term'],
       ['/ENCY/Reference/add',   'Reference'],
+      ['/ENCY/Author/add',      'Author'],
   ] %]
   <a href="[% c.uri_for(item.0) %]">+ [% item.1 %]</a>
   [% END %]

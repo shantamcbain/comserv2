@@ -182,7 +182,7 @@
 
             try {
                 var fields = JSON.parse(raw.substring(jsonStart, jsonEnd + 1));
-                var filled = 0, blocked = [], staged = [];
+                var filled = 0, blocked = [], staged = [], skipped = [];
 
                 Object.keys(fields).forEach(function(key) {
                     // If target fields specified, skip any field not in the list
@@ -255,8 +255,9 @@
                 });
 
                 var msg = '[' + modelUsed + '] Filled ' + filled + ' field(s) directly.';
-                if (staged.length)  { msg += ' ' + staged.length + ' field(s) staged for review — see diff panel below.'; }
-                if (blocked.length) { msg += ' Blocked (not in target list): ' + blocked.join(', '); }
+                if (staged.length)   { msg += ' ' + staged.length + ' field(s) staged for review — see diff panel below.'; }
+                if (blocked.length)  { msg += ' Blocked (not in target list): ' + blocked.join(', '); }
+                if (skipped.length)  { msg += ' Skipped (SELECT already set): ' + skipped.join(', '); }
                 statusEl.textContent = msg;
                 encyRenderStagedDiff(staged);
                 encyResolveLinks(fields);

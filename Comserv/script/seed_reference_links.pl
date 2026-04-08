@@ -55,19 +55,36 @@ if ($@) {
 my $ref_count = scalar keys %known_refs;
 print "Found $ref_count known reference IDs in reference table.\n\n";
 
-# Extract all [N] and standalone numeric patterns from a reference text
+# Extract all reference IDs from a free-text reference field.
+# Strategies:
+#   [N]        — bracket notation
+#   reference N — explicit keyword
+#   \bN\b       — bare 1-2 digit numbers; all our ref IDs are ≤ 38 so page numbers
+#                 (100+) are automatically excluded. Two-digit numbers ≥ 39 are skipped.
 sub extract_ref_ids {
     my ($text) = @_;
     return () unless defined $text && length $text;
     my %seen;
-    # Match [N] notation
+
+    # [N] notation
     while ($text =~ /\[(\d+)\]/g) {
-        $seen{$1} = 1;
+        my $n = $1 + 0;
+        $seen{$n} = 1 if $n >= 1 && $n <= 38;
     }
-    # Match standalone numbers at word boundary (e.g. "See reference 27")
-    while ($text =~ /\breference[s]?\s+(\d+)/gi) {
-        $seen{$1} = 1;
+
+    # "reference N" or "references N" keyword
+    while ($text =~ /\breferences?\s+(\d+)/gi) {
+        my $n = $1 + 0;
+        $seen{$n} = 1 if $n >= 1 && $n <= 38;
     }
+
+    # Bare 1-or-2-digit numbers at word boundaries (covers "1, 2, 5" lists and "1. Title")
+    # Exclude numbers that are part of larger numbers (word boundary handles this)
+    while ($text =~ /\b(\d{1,2})\b/g) {
+        my $n = $1 + 0;
+        $seen{$n} = 1 if $n >= 1 && $n <= 38;
+    }
+
     return keys %seen;
 }
 
