@@ -2520,6 +2520,14 @@ sub ency_admin : Path('/ENCY/admin') : Args(0) {
         $refs_missing_isbn   = $ency->resultset('Reference')->count({ -or => [ isbn   => undef, isbn   => '' ] });
     };
 
+    # ── Publisher / Author / ReferenceAuthor counts ──────────────────────────
+    eval { $counts{publisher}        = $ency->resultset('Publisher')->count };
+    $counts{publisher} //= 0;
+    eval { $counts{author}           = $ency->resultset('Author')->count };
+    $counts{author} //= 0;
+    eval { $counts{reference_author} = $ency->resultset('ReferenceAuthor')->count };
+    $counts{reference_author} //= 0;
+
     # ── Unresolved ENCY todos ────────────────────────────────────────────────
     my $open_todos = 0;
     eval {
