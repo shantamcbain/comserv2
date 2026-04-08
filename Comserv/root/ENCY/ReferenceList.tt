@@ -69,7 +69,7 @@
     </td>
     <td>
       <a href="[% c.uri_for('/ENCY/Reference', ref.reference_id) %]">
-        [% ref.title ? ref.title | html : '<em>No title</em>' %]
+        [% IF ref.title %][% ref.title | html %][% ELSE %]<em>No title</em>[% END %]
       </a>
     </td>
     <td>[% ref.author | html %]</td>
