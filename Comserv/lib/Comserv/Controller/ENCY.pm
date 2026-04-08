@@ -344,12 +344,14 @@ sub Reference_id :Path('/ENCY/Reference') :Args(1) {
 
     if ($c->request->method eq 'POST' && $is_editor) {
         my $p = $c->request->body_parameters;
+        my $pub_date = $p->{publication_date};
+        $pub_date = undef unless $pub_date && $pub_date =~ /^\d{4}-\d{2}-\d{2}$/ && $pub_date !~ /^0000/;
         eval {
             $ref->update({
                 title            => $p->{title}            // '',
                 author           => $p->{author}           // '',
                 publisher        => $p->{publisher}        // '',
-                publication_date => $p->{publication_date} || undef,
+                publication_date => $pub_date,
                 isbn             => $p->{isbn}             // '',
                 url              => $p->{url}              // '',
                 reference_system => $p->{reference_system} // '',
@@ -390,13 +392,15 @@ sub Reference_add :Path('/ENCY/Reference/add') :Args(0) {
 
     if ($c->request->method eq 'POST') {
         my $p = $c->request->body_parameters;
+        my $pub_date = $p->{publication_date};
+        $pub_date = undef unless $pub_date && $pub_date =~ /^\d{4}-\d{2}-\d{2}$/ && $pub_date !~ /^0000/;
         my $new_ref;
         eval {
             $new_ref = $c->model('ENCYModel')->ency_schema->resultset('Reference')->create({
                 title            => $p->{title}            // '',
                 author           => $p->{author}           // '',
                 publisher        => $p->{publisher}        // '',
-                publication_date => $p->{publication_date} || undef,
+                publication_date => $pub_date,
                 isbn             => $p->{isbn}             // '',
                 url              => $p->{url}              // '',
                 reference_system => $p->{reference_system} // 'book',
