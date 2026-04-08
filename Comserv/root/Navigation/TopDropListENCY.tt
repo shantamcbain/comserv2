@@ -67,8 +67,8 @@
         </div>
         [% END %]
 
-        [%# Admin: link to ENCY admin dashboard %]
-        [% IF c.session.roles && c.session.roles.grep('admin').size %]
+        [%# Admin/Developer: link to ENCY admin dashboard %]
+        [% IF c.session.roles && (c.session.roles.grep('admin').size || c.session.roles.grep('developer').size) %]
         <div class="dropdown-divider"></div>
         <a href="/ENCY/admin"><i class="icon-admin"></i>ENCY Administration</a>
         [% END %]
