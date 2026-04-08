@@ -36,6 +36,7 @@
 
 [% IF edit_mode %]
 <form action="[% author.author_id ? c.uri_for('/ENCY/Author', author.author_id) : c.uri_for('/ENCY/Author/add') %]" method="post">
+[% PROCESS 'ENCY/partials/AiFormFill.tt' %]
 [% END %]
 
 <table class="ency-admin-table" style="width:100%;">
