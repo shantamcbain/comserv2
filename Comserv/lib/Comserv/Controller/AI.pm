@@ -600,6 +600,7 @@ sub generate :Local :Args(0) {
                 if ($error =~ /410|404|no longer available|not found/) {
                     my $failed_model = $grok->model;
                     my $fallback;
+                    my $discovery_err = '';
                     eval {
                         require LWP::UserAgent;
                         require HTTP::Request;
@@ -614,11 +615,9 @@ sub generate :Local :Args(0) {
                                 $_->{id} && $_->{id} ne $failed_model
                                          && $_->{id} !~ /imagine|video/i
                             } @{ $mdata->{data} || [] };
-                            # Prefer non-reasoning fast models for speed
                             my ($best) = sort { $a->{id} cmp $b->{id} } @live;
                             if ($best) {
                                 $fallback = $best->{id};
-                                # Update DB metadata so future calls use the live list
                                 my $schema  = $c->model('DBEncy')->schema;
                                 my $key_obj = $schema->resultset('UserApiKeys')->search(
                                     { service => 'grok', is_active => '1' }
@@ -630,9 +629,18 @@ sub generate :Local :Args(0) {
                                     $key_obj->set_metadata($meta);
                                     eval { $key_obj->update };
                                 }
+                            } else {
+                                $discovery_err = "xAI returned model list but no usable models found";
                             }
+                        } else {
+                            $discovery_err = "xAI models endpoint returned: " . $resp->status_line;
                         }
                     };
+                    if ($@) { $discovery_err = "live model discovery exception: $@"; }
+                    if ($discovery_err) {
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                            'generate', "410 fallback failed — $discovery_err");
+                    }
                     if ($fallback) {
                         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                             'generate', "Model $failed_model unavailable; live-discovered $fallback");
@@ -645,7 +653,7 @@ sub generate :Local :Args(0) {
                 }
                 unless ($response) {
                     $error = $grok->last_error || $error;
-                    die "Grok query failed: $error";
+                    die "Grok query failed: $error — Admin: please go to /ai/models and Sync to update available models";
                 }
             }
             
@@ -1822,6 +1830,7 @@ sub chat :Local :Args(0) {
                 if ($error =~ /410|404|no longer available|not found/) {
                     my $failed_model = $grok->model;
                     my $fallback;
+                    my $discovery_err = '';
                     eval {
                         require LWP::UserAgent;
                         require HTTP::Request;
@@ -1850,9 +1859,18 @@ sub chat :Local :Args(0) {
                                     $key_obj->set_metadata($meta);
                                     eval { $key_obj->update };
                                 }
+                            } else {
+                                $discovery_err = "xAI returned model list but no usable models found";
                             }
+                        } else {
+                            $discovery_err = "xAI models endpoint returned: " . $resp->status_line;
                         }
                     };
+                    if ($@) { $discovery_err = "live model discovery exception: $@"; }
+                    if ($discovery_err) {
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                            'chat', "410 fallback failed — $discovery_err");
+                    }
                     if ($fallback) {
                         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                             'chat', "Model $failed_model unavailable; live-discovered $fallback");
@@ -1863,7 +1881,7 @@ sub chat :Local :Args(0) {
                 }
                 unless ($response) {
                     $error = $grok->last_error || $error;
-                    die "Grok chat failed: $error";
+                    die "Grok chat failed: $error — Admin: please go to /ai/models and Sync to update available models";
                 }
             }
 

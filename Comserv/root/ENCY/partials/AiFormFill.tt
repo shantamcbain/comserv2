@@ -15,6 +15,11 @@
     <button type="button" id="ency-ai-review-btn" onclick="encyAiReview()"
             title="Send current field values to AI and ask it to identify errors or inconsistencies"
             style="background:#fff3cd;border:1px solid #ffc107;padding:0.3em 0.7em;cursor:pointer;">Review &amp; Correct</button>
+    [% IF is_admin %]
+    <button type="button" id="ency-ai-sync-btn" onclick="encyAiSyncModels()"
+            title="Sync available xAI model list from the API — run this if AI returns 410/deprecated errors"
+            style="background:#e8f4e8;border:1px solid #5a9;padding:0.3em 0.7em;cursor:pointer;font-size:0.85em;">&#8635; Sync Models</button>
+    [% END %]
     <span id="ency-ai-status" style="color:#555;font-style:italic;font-size:0.9em;"></span>
   </div>
   <div style="margin-top:0.5em;font-size:0.85em;color:#444;">
@@ -81,7 +86,7 @@
 <script>
 (function() {
     // ── Dynamic model loader ── same endpoint as local-chat.js ──────────────
-    (function loadEncyModelOptions() {
+    function loadEncyModelOptions() {
         var sel = document.getElementById('ency-ai-model-sel');
         if (!sel) return;
         fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include' })
@@ -114,7 +119,8 @@
                 });
             })
             .catch(function() { /* keep default option on failure */ });
-    })();
+    }
+    loadEncyModelOptions();
     // Auto-check web-search for entity types that need it (e.g. authors/people)
     (function() {
         var pd = document.getElementById('ency-ai-prompt-data');
@@ -811,6 +817,29 @@
         .catch(function(){});
     }
 
+    function encyAiSyncModels() {
+        var btn = document.getElementById('ency-ai-sync-btn');
+        var statusEl = document.getElementById('ency-ai-status');
+        if (btn) btn.disabled = true;
+        statusEl.textContent = 'Syncing xAI model list\u2026';
+        fetch('/ai/sync_models?service=grok', { method: 'POST', credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (btn) btn.disabled = false;
+                if (d.success) {
+                    var count = d.count || (d.models && d.models.length) || '?';
+                    statusEl.textContent = '\u2713 Synced ' + count + ' models. Reloading dropdown\u2026';
+                    loadEncyModelOptions();
+                } else {
+                    statusEl.textContent = 'Sync failed: ' + (d.error || 'unknown error');
+                }
+            })
+            .catch(function(e) {
+                if (btn) btn.disabled = false;
+                statusEl.textContent = 'Sync request failed: ' + e.message;
+            });
+    }
+
     window.encyAiFill           = encyAiFill;
     window.encyAiReview         = encyAiReview;
     window.encyAiMarkReference  = encyAiMarkReference;
@@ -820,6 +849,7 @@
     window.encySkipAll          = encySkipAll;
     window.encyRefSearch        = encyRefSearch;
     window.encyLinkReference    = encyLinkReference;
+    window.encyAiSyncModels     = encyAiSyncModels;
 })();
 </script>
 [% END %]
