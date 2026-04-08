@@ -5,8 +5,7 @@
   <div style="margin-top:0.6em;display:flex;flex-wrap:wrap;gap:0.5em;align-items:center;">
     <input type="text" id="ency-ai-entity-name" placeholder="Enter name to look up…" size="38" />
     <select id="ency-ai-model-sel" title="AI model to use" style="font-size:0.9em;">
-      <option value="grok-mini|grok">Grok Mini (fast)</option>
-      <option value="grok-3|grok" selected>Grok 3 (best holistic responses)</option>
+      <option value="grok-3|grok" selected>Grok 3 (loading…)</option>
     </select>
     <button type="button" id="ency-ai-ask-btn" onclick="encyAiFill()">Ask AI</button>
     <button type="button" id="ency-ai-review-btn" onclick="encyAiReview()"
@@ -77,6 +76,44 @@
 
 <script>
 (function() {
+    // ── Dynamic model loader ── same endpoint as local-chat.js ──────────────
+    (function loadEncyModelOptions() {
+        var sel = document.getElementById('ency-ai-model-sel');
+        if (!sel) return;
+        fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.success || !data.providers) return;
+                var grokProvider = null;
+                data.providers.forEach(function(p) { if (p.service === 'grok') grokProvider = p; });
+                if (!grokProvider) return;
+                var FALLBACK = [
+                    { val: 'grok-3|grok',                    label: 'Grok 3 (best holistic responses)' },
+                    { val: 'grok-4-0709|grok',               label: 'Grok 4' },
+                    { val: 'grok-4-fast-non-reasoning|grok', label: 'Grok 4 Fast' },
+                    { val: 'grok-code-fast-1|grok',          label: 'Grok Code Fast' }
+                ];
+                var models = (grokProvider.models && grokProvider.models.length > 0)
+                    ? grokProvider.models
+                        .filter(function(m) { return m.id && !m.id.match(/imagine|video/i); })
+                        .map(function(m) {
+                            var lbl = m.id.replace(/-/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+                            return { val: m.id + '|grok', label: lbl + ' (xAI)' };
+                        })
+                    : FALLBACK;
+                sel.innerHTML = '';
+                models.forEach(function(m, i) {
+                    var opt = document.createElement('option');
+                    opt.value = m.val;
+                    opt.textContent = m.label;
+                    if (i === 0) opt.selected = true;
+                    sel.appendChild(opt);
+                });
+            })
+            .catch(function() { /* keep default option on failure */ });
+    })();
+    // ────────────────────────────────────────────────────────────────────────
+
     var INTEGRATIVE_SYSTEM = [
         'You are an integrative health encyclopedia assistant serving a multi-disciplinary practitioner team:',
         'MDs, naturopathic doctors (NDs), herbalists, TCM practitioners, Ayurvedic practitioners,',

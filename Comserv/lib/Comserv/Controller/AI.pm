@@ -580,11 +580,11 @@ sub generate :Local :Args(0) {
             
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
-                # Auto-fallback: if model is deprecated (410/404), retry with grok-mini
-                if ($error =~ /410|404|no longer available|not found/ && $grok->model ne 'grok-mini') {
+                # Auto-fallback: if model is deprecated (410/404), retry with grok-3
+                if ($error =~ /410|404|no longer available|not found/ && $grok->model ne 'grok-3') {
                     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                        'generate', "Model " . $grok->model . " unavailable, retrying with grok-mini");
-                    $grok->model('grok-mini');
+                        'generate', "Model " . $grok->model . " unavailable, retrying with grok-3");
+                    $grok->model('grok-3');
                     $response = $grok->chat(
                         messages   => \@grok_messages,
                         use_search => $use_search,
@@ -5307,7 +5307,6 @@ sub get_user_providers :Local :Args(0) {
                 # Fallback to hardcoded Grok models if none stored in metadata
                 if (!@$models && $key->service eq 'grok') {
                     $models = [
-                        { id => 'grok-3-mini' },
                         { id => 'grok-3' },
                         { id => 'grok-4-0709' },
                         { id => 'grok-4-fast-non-reasoning' },

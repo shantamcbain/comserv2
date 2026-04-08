@@ -431,7 +431,7 @@ sub _send_request {
             $error = "Grok API authentication failed. Check your API key.";
         } elsif ($status =~ /410/) {
             $error = "Grok model '" . ($payload->{model} || 'unknown') . "' is no longer available (410 Gone). "
-                   . "Please select a different model such as grok-mini or grok-3.";
+                   . "Please sync your model list at /ai/models and select an available model.";
         } elsif ($status =~ /404/) {
             $error = "Grok model '" . ($payload->{model} || 'unknown') . "' not found (404). "
                    . "Please sync models and select an available one.";
