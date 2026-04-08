@@ -1581,7 +1581,7 @@
                         // Re-send with Grok web search
                         const grokModel = (state.modelTiers && state.modelTiers.grok)
                                           ? state.modelTiers.grok
-                                          : 'grok|grok-mini';
+                                          : 'grok|grok-4-0709';
                         state.userModelOverride = grokModel;
                         const webEl = document.getElementById('enable-web-search');
                         if (webEl) webEl.checked = true;

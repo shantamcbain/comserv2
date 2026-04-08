@@ -1818,7 +1818,53 @@ sub chat :Local :Args(0) {
 
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
-                die "Grok chat failed: $error";
+                # Auto-fallback: if model is deprecated (410/404), live-query xAI for available models
+                if ($error =~ /410|404|no longer available|not found/) {
+                    my $failed_model = $grok->model;
+                    my $fallback;
+                    eval {
+                        require LWP::UserAgent;
+                        require HTTP::Request;
+                        my $ua  = LWP::UserAgent->new(timeout => 10);
+                        my $req = HTTP::Request->new(GET => 'https://api.x.ai/v1/models');
+                        $req->header('Authorization' => "Bearer $grok_api_key");
+                        $req->header('Content-Type'  => 'application/json');
+                        my $resp = $ua->request($req);
+                        if ($resp->is_success) {
+                            my $mdata = eval { decode_json($resp->content) } || {};
+                            my @live  = grep {
+                                $_->{id} && $_->{id} ne $failed_model
+                                         && $_->{id} !~ /imagine|video/i
+                            } @{ $mdata->{data} || [] };
+                            my ($best) = sort { $a->{id} cmp $b->{id} } @live;
+                            if ($best) {
+                                $fallback = $best->{id};
+                                my $schema  = $c->model('DBEncy')->schema;
+                                my $key_obj = $schema->resultset('UserApiKeys')->search(
+                                    { service => 'grok', is_active => '1' }
+                                )->first;
+                                if ($key_obj) {
+                                    my $meta = $key_obj->get_metadata() || {};
+                                    $meta->{available_models} = [ map { { id => $_->{id} } } @live ];
+                                    $meta->{models_synced_at} = time();
+                                    $key_obj->set_metadata($meta);
+                                    eval { $key_obj->update };
+                                }
+                            }
+                        }
+                    };
+                    if ($fallback) {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                            'chat', "Model $failed_model unavailable; live-discovered $fallback");
+                        push @chat_trace, "⚠️ Model $failed_model unavailable (410); auto-switched to $fallback";
+                        $grok->model($fallback);
+                        $response = $grok->chat(messages => \@final_messages, use_search => $use_search_chat);
+                    }
+                }
+                unless ($response) {
+                    $error = $grok->last_error || $error;
+                    die "Grok chat failed: $error";
+                }
             }
 
             if ($response->{choices} && ref($response->{choices}) eq 'ARRAY' && @{$response->{choices}}) {
