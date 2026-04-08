@@ -94,16 +94,29 @@
       <span class="ency-count [% counts.reference > 0 ? 'ok' : 'zero' %]">[% counts.reference || 0 %]</span>
     </div>
     <div class="ency-admin-stat">
-      <span title="References missing title field">Missing Title</span>
+      <span title="References missing title field">&#9675; Missing Title</span>
       <span class="ency-count [% refs_missing_title > 0 ? 'warn' : 'ok' %]">[% refs_missing_title %]</span>
     </div>
     <div class="ency-admin-stat">
-      <span title="References missing author field">Missing Author</span>
+      <span title="References missing author field">&#9675; Missing Author</span>
       <span class="ency-count [% refs_missing_author > 0 ? 'warn' : 'ok' %]">[% refs_missing_author %]</span>
     </div>
     <div class="ency-admin-stat">
-      <span title="References missing ISBN">Missing ISBN</span>
+      <span title="References missing ISBN">&#9675; Missing ISBN</span>
       <span class="ency-count [% refs_missing_isbn > 0 ? 'warn' : 'ok' %]">[% refs_missing_isbn %]</span>
+    </div>
+    <h3 class="mt">Publishers &amp; Authors</h3>
+    <div class="ency-admin-stat">
+      <span>Publishers</span>
+      <span class="ency-count [% counts.publisher > 0 ? 'ok' : 'zero' %]">[% counts.publisher || 0 %]</span>
+    </div>
+    <div class="ency-admin-stat">
+      <span>Authors</span>
+      <span class="ency-count [% counts.author > 0 ? 'ok' : 'zero' %]">[% counts.author || 0 %]</span>
+    </div>
+    <div class="ency-admin-stat">
+      <span>Ref ↔ Author links</span>
+      <span class="ency-count [% counts.reference_author > 0 ? 'ok' : 'zero' %]">[% counts.reference_author || 0 %]</span>
     </div>
     <div class="ency-admin-stat mt">
       <a href="[% c.uri_for('/ENCY/Reference/add') %]">+ Add Reference</a>
