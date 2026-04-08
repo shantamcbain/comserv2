@@ -302,12 +302,16 @@ sub Reference :Path('/ENCY/Reference') :Args(0) {
     my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @role_list;
     my $is_editor = $is_admin || grep { $_ eq 'editor' } @role_list;
 
-    my @refs = eval {
-        $c->model('ENCYModel')->ency_schema->resultset('Reference')->search(
+    my @refs;
+    eval {
+        @refs = $c->model('ENCYModel')->ency_schema->resultset('Reference')->search(
             {},
-            { order_by => 'reference_id', rows => 100 }
+            { order_by => { -asc => 'reference_id' } }
         )->all;
     };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'Reference', "Failed to load references: $@");
+    }
     $c->stash(
         references => \@refs,
         is_admin   => $is_admin,
