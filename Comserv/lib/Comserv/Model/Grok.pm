@@ -79,8 +79,8 @@ has 'endpoint' => (
 has 'model' => (
     is => 'rw',
     isa => 'Str',
-    default => 'grok-3-mini',
-    documentation => 'Grok model to use (default: grok-3-mini)'
+    default => 'grok-3',
+    documentation => 'Grok model to use (default: grok-3)'
 );
 
 has 'timeout' => (
@@ -431,7 +431,7 @@ sub _send_request {
             $error = "Grok API authentication failed. Check your API key.";
         } elsif ($status =~ /410/) {
             $error = "Grok model '" . ($payload->{model} || 'unknown') . "' is no longer available (410 Gone). "
-                   . "Please select a different model such as grok-3-mini or grok-3.";
+                   . "Please select a different model such as grok-mini or grok-3.";
         } elsif ($status =~ /404/) {
             $error = "Grok model '" . ($payload->{model} || 'unknown') . "' not found (404). "
                    . "Please sync models and select an available one.";
