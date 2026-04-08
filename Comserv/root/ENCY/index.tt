@@ -9,7 +9,7 @@
 %]
 [% PageVersion = 'ENCY/index.tt,v 0.04 2026/04/04' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
-<link rel="stylesheet" href="/static/css/ency-index.css">
+
 
 [% IF c.flash.success_msg %]
 <div class="alert alert-success">[% c.flash.success_msg | html %]</div>

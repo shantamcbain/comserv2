@@ -4,7 +4,6 @@ use strict;
 use warnings;
 use base 'DBIx::Class::Core';
 
-__PACKAGE__->load_components('InflateColumn::DateTime', 'TimeStamp');
 __PACKAGE__->table('reference');
 __PACKAGE__->add_columns(reference_id => {
         data_type         => 'int',
@@ -23,15 +22,14 @@ __PACKAGE__->add_columns(reference_id => {
         is_nullable => 1,
     },
     publisher_id => {
-        data_type => 'int(11)',
-        size => 11,
+        data_type   => 'int',
+        size        => 11,
         is_nullable => 1,
     },
     publication_date => {
-        data_type                => 'date',
-        is_nullable              => 1,
-        inflate_datetime         => 0,
-        datetime_undef_if_invalid => 1,
+        data_type   => 'varchar',
+        size        => 30,
+        is_nullable => 1,
     },
     isbn => {
         data_type   => 'varchar',
@@ -62,15 +60,41 @@ __PACKAGE__->add_columns(reference_id => {
         is_nullable => 1,
     },
     author => {
-        data_type => 'varchar(500)',
-        size => 500,
+        data_type   => 'varchar',
+        size        => 500,
         is_nullable => 1,
     },
     publisher => {
-        data_type => 'varchar(255)',
-        size => 255,
+        data_type   => 'varchar',
+        size        => 255,
         is_nullable => 1,
-    }
+    },
+    edition => {
+        data_type   => 'varchar',
+        size        => 50,
+        is_nullable => 1,
+    },
+    format => {
+        data_type   => 'varchar',
+        size        => 50,
+        is_nullable => 1,
+    },
+    physical_location => {
+        data_type   => 'varchar',
+        size        => 500,
+        is_nullable => 1,
+    },
+    digital_path => {
+        data_type   => 'varchar',
+        size        => 500,
+        is_nullable => 1,
+    },
+    share => {
+        data_type     => 'tinyint',
+        size          => 1,
+        is_nullable   => 0,
+        default_value => 1,
+    },
 );
 __PACKAGE__->set_primary_key('reference_id');
 

@@ -16,8 +16,6 @@
 <div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
 [% END %]
 
-<link rel="stylesheet" href="/static/css/ency-admin.css">
-
 <h1>Reference Library</h1>
 
 <p class="ency-admin-breadcrumb">
