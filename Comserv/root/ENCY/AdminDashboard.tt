@@ -16,9 +16,6 @@
 <div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
 [% END %]
 
-<link rel="stylesheet" href="/static/css/ency-index.css">
-<link rel="stylesheet" href="/static/css/ency-admin.css">
-
 <h1>ENCY Administration Dashboard</h1>
 <p class="ency-admin-breadcrumb">
   <a href="[% c.uri_for('/ENCY') %]">&larr; ENCY Home</a>

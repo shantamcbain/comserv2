@@ -143,7 +143,8 @@
             provider:   mp.provider,
             model:      mp.model,
             page_path:  window.location.pathname,
-            page_title: document.title
+            page_title: document.title,
+            use_search: (mp.provider === 'grok')
         };
 
         fetch('/ai/generate', {
@@ -485,7 +486,8 @@
                 provider:   mp.provider,
                 model:      mp.model,
                 page_path:  window.location.pathname,
-                page_title: document.title
+                page_title: document.title,
+                use_search: (mp.provider === 'grok')
             })
         })
         .then(function(r) { return r.json(); })
