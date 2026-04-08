@@ -504,6 +504,7 @@ sub Author_id :Path('/ENCY/Author') :Args(1) {
         edit_mode => $edit_mode,
         is_admin  => $is_admin,
         is_editor => $is_editor,
+        ency_ai_prompt => 'full_name (Last, First format), credentials (e.g. ND, PhD, Master Herbalist), specialty (e.g. Naturopathic Oncology, Indigenous Herbalism), born_year (YYYY), died_year (YYYY or omit if living), nationality, affiliation (institution or college), url (author website or Wikipedia), bio (full biography — include background, healing tradition, teaching philosophy, published works, legacy), notes (relationship to this reference system or other relevant notes)',
         template  => 'ENCY/AuthorDetail.tt',
     );
 }
@@ -557,6 +558,7 @@ sub Author_add :Path('/ENCY/Author/add') :Args(0) {
         edit_mode => 1,
         is_admin  => $is_admin,
         is_editor => $is_editor,
+        ency_ai_prompt => 'full_name (Last, First format), credentials (e.g. ND, PhD, Master Herbalist), specialty (e.g. Naturopathic Oncology, Indigenous Herbalism), born_year (YYYY), died_year (YYYY or omit if living), nationality, affiliation (institution or college), url (author website or Wikipedia), bio (full biography — include background, healing tradition, teaching philosophy, published works, legacy), notes (relationship to this reference system or other relevant notes)',
         template  => 'ENCY/AuthorDetail.tt',
     );
 }
@@ -631,8 +633,9 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
         # Display the form
         $self->_stash_image_files($c);
         $c->stash(
-            template => 'ENCY/add_herb_form.tt',
-            user_role => $c->session->{roles}  # Pass user role to the template
+            template       => 'ENCY/add_herb_form.tt',
+            user_role      => $c->session->{roles},
+            ency_ai_prompt => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator',
         );
     }
 }
