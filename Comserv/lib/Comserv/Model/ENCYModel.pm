@@ -1599,15 +1599,32 @@ sub auto_resolve_text_fields {
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto_resolve_text_fields',
                     "Resolved '$term' in $field → $mapping->{resultset}#$linked_id");
             } else {
-                push @{ $result{unresolved} }, { field => $field, term => $term };
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto_resolve_text_fields',
-                    "Unresolved term '$term' in $entity_type#$entity_id field '$field'");
-                $self->_create_ency_todo($c,
-                    "ENCY: Unresolved term in $entity_type#$entity_id",
-                    "Field: $field\nTerm: $term\nEntity: $entity_type #$entity_id\n\n" .
-                    "This term was found in the '$field' field but does not match any existing ENCY record. " .
-                    "Please verify and add it as a new $mapping->{resultset} entry if valid."
-                );
+                my $clean = $self->_draft_clean_term($mapping->{resultset}, $term);
+                if ($clean) {
+                    my $new_rec = $self->_create_ai_draft_record($c, $mapping->{resultset}, $clean, $schema_obj);
+                    if ($new_rec) {
+                        my $new_id = $new_rec->get_column('record_id');
+                        my $link_key = lc($entity_type) . '_' . lc($mapping->{resultset});
+                        my $link_method = "link_${link_key}";
+                        if ($self->can($link_method)) {
+                            eval { $self->$link_method($c, $entity_id, $new_id) };
+                        }
+                        push @{ $result{linked} }, {
+                            field   => $field,
+                            term    => $clean,
+                            matched => $clean,
+                            note    => "ai-draft #$new_id created — awaiting human verification",
+                        };
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto_resolve_text_fields',
+                            "AI draft created for '$clean' → $mapping->{resultset}#$new_id");
+                    } else {
+                        push @{ $result{unresolved} }, { field => $field, term => $term };
+                    }
+                } else {
+                    push @{ $result{unresolved} }, { field => $field, term => $term };
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto_resolve_text_fields',
+                        "Skipped prose fragment '$term' in $entity_type#$entity_id field '$field'");
+                }
             }
         }
     }
@@ -1618,6 +1635,94 @@ sub auto_resolve_text_fields {
             scalar @{ $result{linked} }, scalar @{ $result{unresolved} }, scalar @{ $result{errors} }));
 
     return \%result;
+}
+
+my %_DRAFT_MAX_WORDS = (
+    Constituent => 4,
+    Glossary    => 5,
+    Disease     => 8,
+    Symptom     => 5,
+    Herb        => 6,
+    Drug        => 5,
+);
+
+my @_PROSE_VERB_PATS = (
+    qr/\b(is|are|was|were|can|could|will|would|have|has|had|be|been|being)\b/i,
+    qr/\b(used|eaten|made|found|known|called|contains|include|cause|causes)\b/i,
+    qr/\b(influences|promotes|stimulates|reduces|increases|decreases|improves)\b/i,
+    qr/\b(beneficially|effectively|primarily|mainly|generally|typically)\b/i,
+    qr/\b(historically|traditionally|commonly)\b/i,
+);
+
+sub _draft_clean_term {
+    my ($self, $rs, $term) = @_;
+    $term =~ s/^\s+|\s+$//g;
+    $term =~ s/^['"*\[\(]+|['"*\]\)]+$//g;
+    $term =~ s/[.,;]+$//g;
+    $term =~ s/\s+/ /g;
+    $term =~ s/^\s+|\s+$//g;
+
+    if ($rs eq 'Glossary' && $term =~ /^[\w_]+:\s*(.+)/) {
+        $term = $1;
+        $term =~ s/^\s+|\s+$//g;
+    }
+
+    my @words = split /\s+/, $term;
+    return '' if scalar(@words) > ($_DRAFT_MAX_WORDS{$rs} // 5);
+    return '' if $term =~ /^\d+$/ || $term =~ /[<>{}]/ || $term =~ /^\W/ || length($term) < 3;
+    return '' if $term =~ /\d{2,}/;
+    return '' if $term =~ /\band\b.*\band\b/i;
+
+    for my $pat (@_PROSE_VERB_PATS) {
+        return '' if $term =~ $pat;
+    }
+    return $term;
+}
+
+sub _create_ai_draft_record {
+    my ($self, $c, $rs, $term, $schema_obj) = @_;
+
+    my $name_col = do {
+        my %nc = ( Glossary=>'term', Constituent=>'name', Disease=>'common_name',
+                   Symptom=>'name', Herb=>'botanical_name', Drug=>'generic_name' );
+        $nc{$rs} || 'name';
+    };
+
+    my $existing = eval {
+        $schema_obj->resultset($rs)->search(
+            { $name_col => { like => "%$term%" } }, { rows => 1 }
+        )->first;
+    };
+    return $existing if $existing;
+
+    my $now  = do { use POSIX qw(strftime); strftime('%Y-%m-%d', localtime) };
+    my $site = ($c && $c->stash) ? ($c->stash->{SiteName} || 'ENCY') : 'ENCY';
+    my $user = ($c && $c->session) ? ($c->session->{username} || 'ai-draft') : 'ai-draft';
+
+    my %base = (
+        sitename           => $site,
+        username_of_poster => 'ai-draft',
+        group_of_poster    => 'admin',
+        date_time_posted   => $now,
+        share              => 0,
+    );
+
+    my $data;
+    if    ($rs eq 'Glossary')    { $data = { %base, term => $term, definition => "AI DRAFT: '$term' — awaiting human verification." } }
+    elsif ($rs eq 'Constituent') { $data = { %base, name => $term, common_name => $term } }
+    elsif ($rs eq 'Disease')     { $data = { %base, common_name => $term } }
+    elsif ($rs eq 'Symptom')     { $data = { %base, name => $term, common_name => $term } }
+    elsif ($rs eq 'Herb')        { $data = { %base, botanical_name => $term, common_names => $term } }
+    elsif ($rs eq 'Drug')        { $data = { %base, generic_name => $term } }
+    else                         { $data = { %base, name => $term } }
+
+    my $rec = eval { $schema_obj->resultset($rs)->create($data) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_create_ai_draft_record',
+            "Failed to create AI draft $rs '$term': $@");
+        return undef;
+    }
+    return $rec;
 }
 
 __PACKAGE__->meta->make_immutable;
