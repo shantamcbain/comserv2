@@ -68,7 +68,7 @@
       [% IF edit_mode %]
       <input type="text" name="publisher" value="[% reference.publisher | html %]" style="width:98%;" />
       [% ELSE %]
-      [% reference.publisher | html %]
+      [% IF reference.publisher_record %][% reference.publisher_record.name | html %][% ELSE %][% reference.publisher | html %][% END %]
       [% END %]
     </td>
   </tr>
@@ -79,7 +79,7 @@
       <input type="text" name="publication_date" value="[% reference.publication_date | html %]"
              placeholder="YYYY-MM-DD or YYYY" size="15" />
       [% ELSE %]
-      [% reference.publication_date | html %]
+      [% IF reference.publication_date %][% reference.publication_date.substr(0,4) %][% END %]
       [% END %]
     </td>
   </tr>

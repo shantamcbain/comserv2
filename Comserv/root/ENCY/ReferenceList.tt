@@ -73,7 +73,7 @@
       </a>
     </td>
     <td>[% ref.author | html %]</td>
-    <td>[% ref.publisher | html %]</td>
+    <td>[% IF ref.publisher_record %][% ref.publisher_record.name | html %][% ELSE %][% ref.publisher | html %][% END %]</td>
     <td>[% ref.publication_date ? ref.publication_date.substr(0,4) : '' %]</td>
     <td>[% ref.reference_system | html %]</td>
     <td>[% ref.isbn | html %]</td>

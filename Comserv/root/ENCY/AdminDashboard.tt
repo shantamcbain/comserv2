@@ -111,7 +111,7 @@
       <span class="ency-count [% counts.publisher > 0 ? 'ok' : 'zero' %]">[% counts.publisher || 0 %]</span>
     </div>
     <div class="ency-admin-stat">
-      <span>Authors</span>
+      <a href="[% c.uri_for('/ENCY/Author') %]">Authors</a>
       <span class="ency-count [% counts.author > 0 ? 'ok' : 'zero' %]">[% counts.author || 0 %]</span>
     </div>
     <div class="ency-admin-stat">
@@ -120,7 +120,9 @@
     </div>
     <div class="ency-admin-stat mt">
       <a href="[% c.uri_for('/ENCY/Reference/add') %]">+ Add Reference</a>
-      <a href="[% c.uri_for('/ENCY/Reference') %]">View All &rarr;</a>
+      <a href="[% c.uri_for('/ENCY/Author/add') %]">+ Add Author</a>
+      <a href="[% c.uri_for('/ENCY/Reference') %]">References &rarr;</a>
+      <a href="[% c.uri_for('/ENCY/Author') %]">Authors &rarr;</a>
     </div>
   </div>
 
