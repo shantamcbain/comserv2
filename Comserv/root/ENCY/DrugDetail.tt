@@ -277,6 +277,9 @@
 </table>
 [% END %]
 
+[% IF !edit_mode %]
+[% PROCESS 'ENCY/partials/FormalRefs.tt' %]
+[% END %]
 [% IF edit_mode %]
 [% PROCESS 'ENCY/partials/AiFormFill.tt' %]
 <br/>
