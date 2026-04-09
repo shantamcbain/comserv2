@@ -46,7 +46,7 @@
      
         <h2>Herbs by Botanical name.</h2>
  <!-- Display the Add Herb button only for admin users -->
-[% IF is_admin %]
+[% IF is_editor %]
     <a href="/ENCY/add_herb" class="btn btn-primary">Add Herb</a>
 [% END %]
 
@@ -59,7 +59,7 @@
 <p>     <a href="ForumulaView"> Formulas.</a>
 
  <p> These Herbs are in the data base.
-[% IF is_admin %]
+[% IF is_editor %]
     <a href="/ENCY/add_herb" class="btn btn-primary">Add new Herb</a>
 [% END %]
 

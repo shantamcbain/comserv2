@@ -25,13 +25,8 @@
 
 <p><a href="[% c.uri_for('/ENCY') %]">&larr; Back to Encyclopedia</a></p>
 
-[% roles = c.session.roles;
-   is_admin = 0;
-   FOREACH r IN roles;
-     IF r == 'admin'; is_admin = 1; END;
-   END;
-%]
-[% IF is_admin %]
+[% is_editor = is_editor || 0; is_admin = is_admin || 0 %]
+[% IF is_editor %]
 <a href="[% c.uri_for('/ENCY/Formula/add') %]" class="btn btn-primary">Add Formula</a>
 [% END %]
 
@@ -74,7 +69,7 @@
 </table>
 [% ELSE %]
 <p>No formulas found in the database.</p>
-[% IF is_admin %]
+[% IF is_editor %]
 <p>Run the seeder to import legacy formulas: <code>perl Comserv/script/seed_formulas.pl --dry-run</code></p>
 [% END %]
 [% END %]
