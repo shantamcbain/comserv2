@@ -603,7 +603,49 @@ sub generate :Local :Args(0) {
                 die "Failed to load Grok model";
             }
             $grok->api_key($grok_api_key);
-            $grok->model($model) if $model;
+            if ($model) {
+                # Pre-flight: if the requested model is known deprecated, use last_working_model instead
+                eval {
+                    my $schema  = $c->model('DBEncy')->schema;
+                    my $key_obj = $schema->resultset('UserApiKeys')->search(
+                        { service => 'grok', is_active => '1' }
+                    )->first;
+                    if ($key_obj) {
+                        my $meta       = $key_obj->get_metadata() || {};
+                        my $deprecated = $meta->{deprecated_models} || {};
+                        if ($deprecated->{$model}) {
+                            my $replacement = $meta->{last_working_model} || '';
+                            if ($replacement && $replacement ne $model) {
+                                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                                    'generate', "Requested model '$model' is deprecated; using '$replacement' instead");
+                                $model = $replacement;
+                            }
+                        }
+                    }
+                };
+                $grok->model($model);
+            } else {
+                # No model specified — prefer last_working_model, then synced list (skip deprecated)
+                eval {
+                    my $schema  = $c->model('DBEncy')->schema;
+                    my $key_obj = $schema->resultset('UserApiKeys')->search(
+                        { service => 'grok', is_active => '1' }
+                    )->first;
+                    if ($key_obj) {
+                        my $meta       = $key_obj->get_metadata() || {};
+                        my $deprecated = $meta->{deprecated_models} || {};
+                        if ($meta->{last_working_model} && !$deprecated->{ $meta->{last_working_model} }) {
+                            $grok->model($meta->{last_working_model});
+                        } else {
+                            my $synced = $meta->{available_models} || [];
+                            my ($first) = grep {
+                                $_->{id} && $_->{id} !~ /imagine|video/i && !$deprecated->{ $_->{id} }
+                            } @$synced;
+                            $grok->model($first->{id}) if $first && $first->{id};
+                        }
+                    }
+                };
+            }
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'generate', "Querying Grok API (model: " . $grok->model . ")");
@@ -622,19 +664,71 @@ sub generate :Local :Args(0) {
             
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
-                # Auto-fallback: if model is deprecated (410/404), retry with grok-3-mini
-                if ($error =~ /410|404|no longer available|not found/ && $grok->model ne 'grok-3-mini') {
-                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                        'generate', "Model " . $grok->model . " unavailable, retrying with grok-3-mini");
-                    $grok->model('grok-3-mini');
-                    $response = $grok->chat(
-                        messages   => \@grok_messages,
-                        use_search => $use_search,
-                    );
+                # Auto-fallback: if model is deprecated (410/404), live-query xAI for available models
+                if ($error =~ /410|404|no longer available|not found/) {
+                    my $failed_model = $grok->model;
+                    my $fallback;
+                    eval {
+                        require LWP::UserAgent;
+                        require HTTP::Request;
+                        my $ua  = LWP::UserAgent->new(timeout => 10);
+                        my $req = HTTP::Request->new(GET => 'https://api.x.ai/v1/models');
+                        $req->header('Authorization' => "Bearer $grok_api_key");
+                        $req->header('Content-Type'  => 'application/json');
+                        my $resp = $ua->request($req);
+                        if ($resp->is_success) {
+                            my $mdata = eval { decode_json($resp->content) } || {};
+                            my @live  = grep {
+                                $_->{id} && $_->{id} ne $failed_model && $_->{id} !~ /imagine|video/i
+                            } @{ $mdata->{data} || [] };
+                            # Prefer newer models: reverse-alphabetical sort (grok-3-mini > grok-2-mini > grok-2)
+                            my ($best) = sort { $b->{id} cmp $a->{id} } @live;
+                            if ($best) {
+                                $fallback = $best->{id};
+                                my $schema  = $c->model('DBEncy')->schema;
+                                my $key_obj = $schema->resultset('UserApiKeys')->search(
+                                    { service => 'grok', is_active => '1' }
+                                )->first;
+                                if ($key_obj) {
+                                    my $meta       = $key_obj->get_metadata() || {};
+                                    my $deprecated = $meta->{deprecated_models} || {};
+                                    $deprecated->{$failed_model} = time();
+                                    $meta->{deprecated_models} = $deprecated;
+                                    $meta->{available_models}   = [ map { { id => $_->{id} } } @live ];
+                                    $meta->{models_synced_at}   = time();
+                                    $key_obj->set_metadata($meta);
+                                    eval { $key_obj->update };
+                                }
+                            }
+                        }
+                    };
+                    if ($fallback) {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                            'generate', "Model $failed_model unavailable; live-discovered $fallback");
+                        $grok->model($fallback);
+                        $response = $grok->chat(
+                            messages   => \@grok_messages,
+                            use_search => $use_search,
+                        );
+                        if ($response) {
+                            eval {
+                                my $schema  = $c->model('DBEncy')->schema;
+                                my $key_obj = $schema->resultset('UserApiKeys')->search(
+                                    { service => 'grok', is_active => '1' }
+                                )->first;
+                                if ($key_obj) {
+                                    my $meta = $key_obj->get_metadata() || {};
+                                    $meta->{last_working_model} = $fallback;
+                                    $key_obj->set_metadata($meta);
+                                    eval { $key_obj->update };
+                                }
+                            };
+                        }
+                    }
                 }
                 unless ($response) {
                     $error = $grok->last_error || $error;
-                    die "Grok query failed: $error";
+                    die "Grok query failed: $error — Admin: please go to /ai/models and Sync to update available models";
                 }
             }
             
