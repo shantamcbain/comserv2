@@ -170,6 +170,45 @@ sub apply :Chained('base') :PathPart('apply') :Args(1) {
             $user_id = $user->id if $user;
         }
 
+        my $resume_path;
+        my $upload = $c->request->upload('resume_file');
+        if ($upload && $upload->size > 0) {
+            my $filename = $upload->filename;
+            my ($ext) = $filename =~ /(\.[^.]+)$/;
+            $ext = lc($ext // '');
+
+            my @allowed = ('.pdf', '.doc', '.docx');
+            my $max_size = 5 * 1024 * 1024;
+
+            if (!grep { $_ eq $ext } @allowed) {
+                $c->stash(
+                    error_msg => 'Invalid file type. Please upload a PDF, DOC, or DOCX file.',
+                    job       => $job,
+                    form_data => $params,
+                    template  => 'jobs/apply_form.tt',
+                );
+                return;
+            }
+
+            if ($upload->size > $max_size) {
+                $c->stash(
+                    error_msg => 'Resume file is too large. Maximum size is 5 MB.',
+                    job       => $job,
+                    form_data => $params,
+                    template  => 'jobs/apply_form.tt',
+                );
+                return;
+            }
+
+            my $upload_dir = $c->path_to('root', 'uploads', 'resumes');
+            $upload_dir->mkpath unless -d $upload_dir;
+
+            my $safe_name = time() . '_' . $job_id . '_' . ($user_id // 'guest') . $ext;
+            my $dest = $upload_dir->file($safe_name);
+            $upload->copy_to("$dest");
+            $resume_path = "uploads/resumes/$safe_name";
+        }
+
         my $use_pts = ($params->{use_points_payment} // '0') ? 1 : 0;
 
         $schema->resultset('JobApplication')->create({
@@ -178,6 +217,7 @@ sub apply :Chained('base') :PathPart('apply') :Args(1) {
             applicant_name     => $name,
             applicant_email    => $email,
             cover_letter       => $params->{cover_letter} // undef,
+            resume_file        => $resume_path,
             use_points_payment => $use_pts,
             status             => 'pending',
         });
