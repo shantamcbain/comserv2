@@ -1,0 +1,66 @@
+[% PageVersion = 'ai/conversation.tt,v 0.1 2026/04/09 Exp' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+<div style="max-width:900px; margin:20px auto; padding:20px;">
+    <h1>[% page_title || 'AI Conversation' %]</h1>
+
+    [% IF error_msg %]
+    <div style="background:#ffebee; border-left:4px solid #f44336; padding:12px; margin-bottom:20px; border-radius:4px;">
+        [% error_msg %]
+    </div>
+    [% END %]
+
+    [% IF conversation %]
+    <div style="margin-bottom:15px; padding:12px; background:#f5f5f5; border-radius:4px; font-size:0.9em; color:#555;">
+        <strong>Model:</strong> [% conversation.model || 'Unknown' %]
+        &nbsp;|&nbsp;
+        <strong>Status:</strong> [% conversation.status %]
+        &nbsp;|&nbsp;
+        <strong>Created:</strong> [% conversation.created_at %]
+        [% IF conversation.project %]
+        &nbsp;|&nbsp;
+        <strong>Project:</strong> <a href="/project/details?project_id=[% conversation.project.id %]">[% conversation.project.name %]</a>
+        [% END %]
+        [% IF conversation.task %]
+        &nbsp;|&nbsp;
+        <strong>Task:</strong> [% conversation.task.subject %]
+        [% END %]
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:16px;">
+        [% FOREACH msg IN messages %]
+        <div style="display:flex; [% IF msg.role == 'user' %]justify-content:flex-end[% ELSE %]justify-content:flex-start[% END %];">
+            <div style="max-width:75%; padding:12px 16px; border-radius:12px;
+                [% IF msg.role == 'user' %]
+                    background:#0064c8; color:#fff; border-bottom-right-radius:4px;
+                [% ELSE %]
+                    background:#f0f0f0; color:#222; border-bottom-left-radius:4px;
+                [% END %]">
+                <div style="font-size:0.75em; margin-bottom:6px; opacity:0.7;">
+                    [% IF msg.role == 'user' %]You[% ELSE %]AI Assistant[% END %]
+                    &mdash; [% msg.created_at %]
+                </div>
+                <div style="white-space:pre-wrap; word-break:break-word;">[% msg.content | html %]</div>
+            </div>
+        </div>
+        [% END %]
+    </div>
+
+    [% IF !messages || messages.size == 0 %]
+    <p style="color:#888; text-align:center; margin:40px 0;">No messages in this conversation.</p>
+    [% END %]
+    [% END %]
+
+    <div style="margin-top:30px;">
+        <a href="/ai/conversations">&larr; Back to All Conversations</a>
+        [% IF conversation && conversation.project_id %]
+        &nbsp;|&nbsp;
+        <a href="/project/details?project_id=[% conversation.project_id %]">View Project</a>
+        &nbsp;|&nbsp;
+        <a href="/ai?project_id=[% conversation.project_id %]&amp;conversation_id=[% conversation.id %]">Continue Chat</a>
+        [% ELSIF conversation %]
+        &nbsp;|&nbsp;
+        <a href="/ai?conversation_id=[% conversation.id %]">Continue Chat</a>
+        [% END %]
+    </div>
+</div>

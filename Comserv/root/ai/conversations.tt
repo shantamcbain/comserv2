@@ -22,9 +22,24 @@
             ID: [% single_conv.id %] &nbsp;|&nbsp;
             Status: [% single_conv.status | html %] &nbsp;|&nbsp;
             Created: [% single_conv.created_at %]
+            [% IF single_conv.model %]
+            &nbsp;|&nbsp; Model: [% single_conv.model | html %]
+            [% END %]
+            [% IF single_conv.project %]
+            &nbsp;|&nbsp; Project: <a href="/project/details?project_id=[% single_conv.project.id %]">[% single_conv.project.name | html %]</a>
+            [% END %]
+            [% IF single_conv.task %]
+            &nbsp;|&nbsp; Task: [% single_conv.task.subject | html %]
+            [% END %]
         </p>
         <a href="/ai/conversations" class="button button-secondary">← Back to Conversations</a>
+        [% IF single_conv.project_id %]
+        <a href="/ai?project_id=[% single_conv.project_id %]&amp;conversation_id=[% single_conv.id %]" class="button button-primary">Continue Chat</a>
+        [% ELSIF single_conv.id %]
+        <a href="/ai?conversation_id=[% single_conv.id %]" class="button button-primary">Continue Chat</a>
+        [% ELSE %]
         <a href="/ai" class="button button-primary">New Chat</a>
+        [% END %]
     </div>
 
     <div class="ai-conversations-messages-section">
