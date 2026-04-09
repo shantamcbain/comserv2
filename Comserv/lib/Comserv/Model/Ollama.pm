@@ -493,6 +493,86 @@ sub chat {
     return $result;
 }
 
+=head2 chain_query
+
+Execute a chain of sequential prompts where each step's response is passed as
+context to the next step. Useful for multi-stage reasoning, refinement loops,
+and complex analysis pipelines.
+
+    my $result = $ollama->chain_query(
+        steps => [
+            { prompt => "Summarize the following text: ...", system => "You are a summarizer." },
+            { prompt => "Extract the key action items from the summary above." },
+            { prompt => "Prioritize these action items by urgency, highest first." },
+        ],
+        return_all => 0,   # 0 = final step only (default); 1 = all step results
+    );
+
+    # return_all => 0 (default): returns hashref { step, prompt, response, model }
+    # return_all => 1: returns arrayref of the same hashref per step
+
+Returns undef on failure; check $ollama->last_error.
+
+=cut
+
+sub chain_query {
+    my ($self, %args) = @_;
+
+    my $steps = $args{steps};
+    unless (ref($steps) eq 'ARRAY' && @$steps > 0) {
+        $self->last_error("chain_query: 'steps' must be a non-empty arrayref");
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'chain_query',
+            "steps must be a non-empty arrayref");
+        return undef;
+    }
+
+    my $return_all = $args{return_all} || 0;
+    my @results;
+    my $context = '';
+
+    for my $i (0 .. $#$steps) {
+        my $step   = $steps->[$i];
+        my $prompt = $step->{prompt} or do {
+            $self->last_error("chain_query: step " . ($i + 1) . " has no prompt");
+            $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'chain_query',
+                "Step " . ($i + 1) . " missing prompt");
+            return undef;
+        };
+        my $system = $step->{system} || '';
+
+        my @messages;
+        push @messages, { role => 'system',    content => $system  } if $system;
+        push @messages, { role => 'assistant', content => $context } if $context;
+        push @messages, { role => 'user',      content => $prompt  };
+
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'chain_query',
+            "Step " . ($i + 1) . "/" . scalar(@$steps) . " — model=" . $self->model
+            . " msgs=" . scalar(@messages));
+
+        my $resp = $self->chat(messages => \@messages);
+        unless ($resp && $resp->{response}) {
+            my $err = $self->last_error || 'empty response';
+            $self->last_error("chain_query: step " . ($i + 1) . " failed: $err");
+            $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'chain_query',
+                "Step " . ($i + 1) . " failed: $err");
+            return undef;
+        }
+
+        $context = $resp->{response};
+        push @results, {
+            step     => $i + 1,
+            prompt   => $prompt,
+            response => $resp->{response},
+            model    => $resp->{model} || $self->model,
+        };
+    }
+
+    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'chain_query',
+        "Chain complete — " . scalar(@results) . " steps");
+
+    return $return_all ? \@results : $results[-1];
+}
+
 =head2 _parse_streaming_chat_response
 
 Parse a streaming response from Ollama Chat API.
