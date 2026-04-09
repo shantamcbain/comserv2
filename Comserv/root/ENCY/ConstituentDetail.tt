@@ -18,12 +18,7 @@
 <div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
 [% END %]
 
-[% roles = c.session.roles;
-   is_admin = 0;
-   FOREACH r IN roles;
-     IF r == 'admin'; is_admin = 1; END;
-   END;
-%]
+[% is_editor = is_editor || 0; is_admin = is_admin || 0 %]
 
 [% IF edit_mode %]
 <h1>Editing Constituent: [% constituent.name | html %]</h1>
@@ -32,7 +27,7 @@
 [% END %]
 
 <p><a href="[% c.uri_for('/ENCY/Constituent') %]">&larr; Back to Constituents</a>
-[% IF is_admin && !edit_mode && constituent.record_id %]
+[% IF is_editor && !edit_mode && constituent.record_id %]
   | <a href="[% c.uri_for('/ENCY/Constituent/edit', { record_id => constituent.record_id }) %]">Edit</a>
 [% END %]
 </p>
@@ -174,9 +169,9 @@
             [% IF linked_herbs && linked_herbs.size %]
                 [% FOREACH lh IN linked_herbs %]
                     [% IF lh.url %]
-                        <a href="[% lh.url | html %]">[% lh.name | html %]</a>
+                        <a href="[% lh.url | html %]">[% lh.name | html %]</a>[% IF lh.herb_url %]&nbsp;<a href="[% lh.herb_url | html %]" target="_blank" title="External source" style="font-size:0.75em;">[&#x2197;]</a>[% END %]
                     [% ELSE %]
-                        [% lh.name | html %] <a href="[% c.uri_for('/ENCY/Herb/add', { common_names => lh.name }) %]" title="Add this herb to ENCY" style="font-size:0.8em;">[+]</a>
+                        [% lh.name | html %]
                     [% END %]
                     [% UNLESS loop.last %], [% END %]
                 [% END %]

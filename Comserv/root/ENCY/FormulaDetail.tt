@@ -17,12 +17,7 @@
 <div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
 [% END %]
 
-[% roles = c.session.roles;
-   is_admin = 0;
-   FOREACH r IN roles;
-     IF r == 'admin'; is_admin = 1; END;
-   END;
-%]
+[% is_editor = is_editor || 0; is_admin = is_admin || 0 %]
 
 [% IF edit_mode %]
 <h1>Editing Formula [% formula.formula_number | html %]: [% formula.name | html %]</h1>
@@ -32,7 +27,7 @@
 
 <p>
     <a href="[% c.uri_for('/ENCY/Formula') %]">&larr; Back to Formulas</a>
-    [% IF is_admin && !edit_mode && formula.record_id %]
+    [% IF is_editor && !edit_mode && formula.record_id %]
     | <a href="[% c.uri_for('/ENCY/Formula/edit', { record_id => formula.record_id }) %]">Edit</a>
     [% END %]
 </p>

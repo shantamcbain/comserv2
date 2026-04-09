@@ -41,6 +41,11 @@ __PACKAGE__->add_columns(
         data_type   => 'int',
         is_nullable => 1,
     },
+    precipitation => {
+        data_type   => 'decimal',
+        size        => [6, 2],
+        is_nullable => 1,
+    },
     condition_main => {
         data_type   => 'varchar',
         size        => 50,

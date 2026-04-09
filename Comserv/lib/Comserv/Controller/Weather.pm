@@ -166,13 +166,13 @@ sub forecast :Path('/Weather/forecast') :Args(0) {
         push @{$c->stash->{debug_msg}}, "Weather Forecast - Loading";
     }
 
-    # Get forecast data
-    my $forecast_data = $self->_get_forecast_data($c);
+    my $forecast_data  = $self->_get_forecast_data($c);
+    my $weather_config = try { $self->weather_model->get_weather_config($c) } catch { undef };
 
-    # Stash data for template
     $c->stash(
-        forecast_data => $forecast_data,
-        template => 'Weather/forecast.tt'
+        forecast_data  => $forecast_data,
+        weather_config => $weather_config,
+        template       => 'Weather/forecast.tt'
     );
 }
 
@@ -548,69 +548,22 @@ sub _get_forecast_data {
     };
     
     if ($cached_data) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_get_forecast_data', 
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_get_forecast_data',
             'Using cached forecast data');
         return $self->_format_forecast_response($cached_data);
     }
-    
-    # Get fresh data from API
-    my $config = try {
-        return $self->weather_model->get_weather_config($c);
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_get_forecast_data', 
-            "Error getting weather config: $_");
-        return undef;
-    };
-    
-    unless ($config && $config->{api_key}) {
-        # Return mock data if not configured
-        my @forecast = ();
-        my @conditions = ('Sunny', 'Partly Cloudy', 'Cloudy', 'Light Rain');
-        my @icons = ('sunny', 'partly-cloudy', 'cloudy', 'light-rain');
-        
-        for my $day (1..5) {
-            push @forecast, {
-                date => DateTime->now->add(days => $day)->epoch,
-                high_temp => 20 + int(rand(10)),
-                low_temp => 10 + int(rand(8)),
-                condition => $conditions[int(rand(4))],
-                icon => $icons[int(rand(4))],
-                precipitation => int(rand(30)),
-            };
-        }
-        
-        return {
-            forecast => \@forecast,
-            data_source => 'MOCK_DATA'
-        };
+
+    # Cache is stale — fall back to older data (cron poller refreshes the cache)
+    my $stale_data = try {
+        $self->weather_model->get_cached_weather_data($c, 'forecast', 1440);
+    } catch { undef };
+
+    if ($stale_data) {
+        $stale_data->{data_source} = 'CACHED_FALLBACK';
+        return $self->_format_forecast_response($stale_data);
     }
-    
-    my $forecast_data = try {
-        my $data = $self->weather_api->get_forecast_weather($config);
-        
-        # Cache the data
-        $self->weather_model->cache_weather_data($c, $config->{id}, 'forecast', $data);
-        
-        # Track API usage
-        $self->weather_model->track_api_usage($c, $config->{id}, $config->{api_service});
-        
-        return $data;
-    } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_get_forecast_data', 
-            "Error getting forecast data: $error");
-        
-        # Try to return the most recent cached data even if expired
-        my $fallback_data = $self->weather_model->get_cached_weather_data($c, 'forecast', 1440); # 24 hours
-        if ($fallback_data) {
-            $fallback_data->{data_source} = 'CACHED_FALLBACK';
-            return $self->_format_forecast_response($fallback_data);
-        }
-        
-        die $error;
-    };
-    
-    return $forecast_data;
+
+    return { forecast => [], data_source => 'NO_DATA' };
 }
 
 sub _get_weather_configuration {
@@ -732,11 +685,57 @@ sub _format_weather_response {
 }
 
 sub _format_forecast_response {
-    my ( $self, $data ) = @_;
-    
-    # This would need to be implemented based on how forecast data is stored
-    # For now, return the raw data
-    return $data;
+    my ($self, $db_row) = @_;
+
+    my $raw_json = $db_row->{raw_data} or return { forecast => [], data_source => 'NO_DATA' };
+
+    my $owm;
+    eval { $owm = JSON->new->utf8->decode($raw_json) };
+    return { forecast => [], data_source => 'PARSE_ERROR' } if $@ || !$owm;
+
+    my $items = $owm->{list} or return { forecast => [], data_source => 'NO_LIST' };
+
+    my %days;
+    for my $item (@$items) {
+        my $dt   = DateTime->from_epoch(epoch => $item->{dt}, time_zone => 'UTC');
+        my $date = $dt->ymd;
+        $days{$date} ||= { temps => [], precip => 0, icon => undef, condition => undef, dt => $item->{dt} };
+        push @{$days{$date}{temps}}, $item->{main}{temp};
+        $days{$date}{precip} += ($item->{rain}{'3h'} || $item->{snow}{'3h'} || 0);
+        if ($dt->hour == 12 || !$days{$date}{icon}) {
+            $days{$date}{icon}      = $item->{weather}[0]{icon};
+            $days{$date}{condition} = $item->{weather}[0]{description};
+        }
+    }
+
+    my @day_names = qw(Sun Mon Tue Wed Thu Fri Sat);
+    my @mon_names = qw(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec);
+
+    my @daily;
+    for my $date (sort keys %days) {
+        my @temps = @{$days{$date}{temps}};
+        my ($y, $m, $d) = split /-/, $date;
+        my $dt_obj = eval { DateTime->new(year => $y, month => $m, day => $d, time_zone => 'UTC') };
+        my $label  = $dt_obj
+            ? $day_names[$dt_obj->day_of_week % 7] . ', ' . $mon_names[$m - 1] . ' ' . int($d)
+            : $date;
+        push @daily, {
+            date          => $date,
+            date_label    => $label,
+            dt            => $days{$date}{dt},
+            high_temp     => (sort { $b <=> $a } @temps)[0],
+            low_temp      => (sort { $a <=> $b } @temps)[0],
+            condition     => ucfirst($days{$date}{condition} || 'Unknown'),
+            icon          => $days{$date}{icon} || '01d',
+            precipitation => sprintf('%.1f', $days{$date}{precip}),
+        };
+    }
+
+    return {
+        forecast      => \@daily,
+        location_name => $owm->{city}{name} || $db_row->{location_name},
+        data_source   => $db_row->{data_source} || 'DATABASE',
+    };
 }
 
 sub _ensure_weather_tables {
