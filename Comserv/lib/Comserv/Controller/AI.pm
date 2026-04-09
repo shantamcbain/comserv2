@@ -520,6 +520,12 @@ sub generate :Local :Args(0) {
         $use_search = 0;
     }
 
+    # Inject schema_compare context when on that page
+    if ($page_path && $page_path =~ m{/admin/(?:compare_schema|schema_compare)}) {
+        my $schema_ctx = $self->_build_schema_compare_context();
+        $system .= "\n\n" . $schema_ctx;
+    }
+
     # --- Live DB data injection (same as /ai/chat) ---
     my $site_name_gen = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
     my $module_data_gen = $self->_get_module_data($c, $prompt, $agent_id);
@@ -1748,6 +1754,12 @@ sub chat :Local :Args(0) {
         if ($ctx) {
             $chat_agent_system = ($chat_agent_system ? $chat_agent_system . "\n\n" : '') . $ctx;
         }
+    }
+
+    # Inject schema_compare page-specific context when on that page
+    if ($chat_page_path && $chat_page_path =~ m{/admin/(?:compare_schema|schema_compare)}) {
+        my $schema_ctx = $self->_build_schema_compare_context();
+        $chat_agent_system = ($chat_agent_system ? $chat_agent_system . "\n\n" : '') . $schema_ctx;
     }
 
     # Build messages array for chat API
@@ -4048,6 +4060,10 @@ Supported actions:
 - Create a log entry:    [ACTION: {"action": "create_log_entry",   "params": {"todo_id": N, "abstract": "title", "details": "description"}}]
 - Create a new todo:     [ACTION: {"action": "create_todo", "params": {"subject": "title", "description": "details", "project_id": N, "due_date": "YYYY-MM-DD", "priority": 3}}]
 - Create a HelpDesk support ticket: [ACTION: {"action": "create_helpdesk_ticket", "params": {"subject": "issue title", "description": "details", "page_url": "/current/page"}}]
+- Sync a schema field (admin/compare_schema page only):
+    Update Result file to match DB:  [ACTION: {"action": "sync_schema_field", "params": {"table": "table_name", "field": "field_name", "direction": "to_result", "database": "ency"}}]
+    ALTER TABLE to match Result file: [ACTION: {"action": "sync_schema_field", "params": {"table": "table_name", "field": "field_name", "direction": "to_table", "database": "ency"}}]
+    (Omit "field" to sync all fields in the table. Use "database": "forager" for the forager DB.)
 
 Rules:
 - ONLY emit an [ACTION: ...] block when the user explicitly asks you to perform a write operation.
@@ -5978,6 +5994,38 @@ sub _persist_chat {
     return $conv->id;
 }
 
+=head2 _build_schema_compare_context
+
+Private method: build a system prompt addendum for the schema comparison page.
+Instructs the AI to guide the user toward the correct fix direction and emit
+a sync_schema_field ACTION when asked.
+
+=cut
+
+sub _build_schema_compare_context {
+    my ($self) = @_;
+    return <<'SCHEMA_CTX';
+
+## Schema Compare Assistant Mode
+
+You are helping the admin resolve differences between the live database and the DBIx::Class Result files on the /admin/compare_schema page.
+
+For each difference you explain, follow this structure:
+1. **What the difference is**: describe the field, what the DB has vs what the Result file has.
+2. **Which direction to fix**:
+   - **Update Result file to match DB** ("to_result"): safe — changes only the Perl file, no DB alteration. Use when the DB schema is correct and the Result file is out of date.
+   - **ALTER TABLE to match Result file** ("to_table"): changes the live database. Use with caution — only when the Result file intentionally defines a stricter or different schema.
+3. **Ask the user which direction** they prefer before emitting an ACTION.
+4. **Once the user chooses**, emit the appropriate ACTION:
+   - To update the Result file: [ACTION: {"action": "sync_schema_field", "params": {"table": "TABLE_NAME", "field": "FIELD_NAME", "direction": "to_result", "database": "ency"}}]
+   - To alter the database:     [ACTION: {"action": "sync_schema_field", "params": {"table": "TABLE_NAME", "field": "FIELD_NAME", "direction": "to_table", "database": "ency"}}]
+   - Omit "field" to sync all differences in the table at once.
+   - Use "database": "forager" for the forager database.
+
+**Do NOT emit a sync ACTION unless the user has explicitly confirmed which direction they want.**
+SCHEMA_CTX
+}
+
 =head2 _build_project_context
 
 Private method: build a system prompt context block from project/todo data.
@@ -6690,6 +6738,63 @@ sub action :Local :Args(0) {
             message    => "Support ticket #$ticket_id created: \"$subject\". An admin will be notified.",
             ticket_id  => $ticket_id + 0,
             ticket_url => "/ai/support/$ticket_id",
+        }));
+        return;
+    }
+
+    # ── sync_schema_field ─────────────────────────────────────────────────────
+    # direction: "to_result" = update Result file to match DB
+    #            "to_table"  = ALTER TABLE to match Result file
+    if ($action_name eq 'sync_schema_field') {
+        my $table     = $params->{table}     || '';
+        my $field     = $params->{field}     || '';
+        my $direction = $params->{direction} || '';
+        my $database  = $params->{database}  || 'ency';
+
+        unless ($table && $direction && $direction =~ /^(to_result|to_table)$/) {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false,
+                error => "sync_schema_field requires table, field (optional), direction (to_result|to_table)" }));
+            return;
+        }
+
+        my $endpoint = ($direction eq 'to_result')
+            ? '/admin/sync_table_to_result'
+            : '/admin/sync_result_to_table';
+
+        my $payload = encode_json({
+            table    => $table,
+            field    => $field || undef,
+            database => $database,
+        });
+
+        my $result;
+        eval {
+            require LWP::UserAgent;
+            require HTTP::Request;
+            my $ua = LWP::UserAgent->new(timeout => 30);
+            my $req = HTTP::Request->new(POST => $c->uri_for($endpoint));
+            $req->content_type('application/json');
+            $req->content($payload);
+            # Forward session cookie
+            my $cookie = $c->request->header('Cookie') || '';
+            $req->header('Cookie' => $cookie) if $cookie;
+            my $resp = $ua->request($req);
+            $result = eval { decode_json($resp->content) } || { success => 0, error => $resp->status_line };
+        };
+        if ($@) { $result = { success => 0, error => "Internal error: $@" }; }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
+            "sync_schema_field: table=$table field=" . ($field||'ALL') . " direction=$direction result=" . ($result->{success} ? 'ok' : $result->{error}));
+
+        $c->response->body(encode_json({
+            success   => $result->{success} ? JSON::true : JSON::false,
+            message   => $result->{success}
+                ? "Schema sync ($direction) applied for table '$table'" . ($field ? ", field '$field'" : " (all fields)")
+                : "Schema sync failed: " . ($result->{error} || 'unknown error'),
+            direction => $direction,
+            table     => $table,
+            field     => $field || undef,
         }));
         return;
     }
