@@ -75,7 +75,11 @@
               [% FOREACH m IN memberships %]
               <tr>
                 <td><strong>[% m.site.name | html %]</strong></td>
-                <td>[% m.user.username | html %]<br><small>[% m.user.email | html %]</small></td>
+                <td>
+                  <a href="[% c.uri_for('/membership/admin/subscriber_details', m.id) %]">
+                    [% m.user.username | html %]
+                  </a><br><small>[% m.user.email | html %]</small>
+                </td>
                 <td>[% m.plan.name | html %]</td>
                 <td>[% m.billing_cycle | html %]</td>
                 <td>

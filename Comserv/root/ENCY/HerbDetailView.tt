@@ -1,10 +1,26 @@
+[% META
+   title = "Herb Detail - Encyclopedia of Biological Life"
+   description = "Full herb profile including medicinal uses, constituents, and growing information"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.02"
+   last_updated = "2026-04-02"
+%]
+[% PageVersion = 'ENCY/HerbDetailView.tt,v 0.02 2026/04/02' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[% PROCESS 'ENCY/ImageHelper.tt' %]
 
-
-[% IF is_admin %]
-    <a href="/ENCY/edit_herb">Edit Herb</a>
+[% IF success_msg || c.flash.success_msg %]
+<div class="alert alert-success">[% success_msg || c.flash.success_msg | html %]</div>
+[% END %]
+[% IF error_msg || c.flash.error_msg %]
+<div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
 [% END %]
 
-[% PROCESS 'ENCY/ImageHelper.tt' %]
+[% IF is_editor %]
+    <a href="/ENCY/edit_herb">Edit Herb</a>
+[% END %]
 <h1>[% herb.botanical_name %]</h1>
 <p>Common Names: [% herb.common_names %]</p>
 [% ency_img_tag(herb.image, 300, 325) %]
@@ -36,7 +52,7 @@
 <p>History [% herb.history %] </p>
 <p>Reference [% herb.reference %]</p>
 <!-- Display the Add Herb button only for admin users -->
-[% IF is_admin %]
+[% IF is_editor %]
     <a href="/ENCY/add_herb" class="btn btn-primary">Add Herb</a>
 [% END %]
 <table>

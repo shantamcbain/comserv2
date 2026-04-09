@@ -178,6 +178,31 @@
                 <td style="white-space:nowrap">
                   <a href="[% c.uri_for('/file/edit', file.id) %]" class="btn btn-sm btn-edit">Edit</a>
                   <a href="[% c.uri_for('/file/download', file.id) %]" class="btn btn-sm" title="Download">&#8595;</a>
+                  [% SET fp = file.nfs_path || file.file_path %]
+                  [% IF fp %]
+                  <button type="button" class="btn btn-sm btn-secondary"
+                          onclick="flToggleMove('[% loop.index %]')"
+                          title="Move this file to a different directory on disk and update the database">
+                    &#8594; Move
+                  </button>
+                  <div id="fl-move-[% loop.index %]" style="display:none;margin-top:6px;background:#f8f8f8;border:1px solid #ddd;border-radius:4px;padding:8px 10px;min-width:320px;">
+                    <form method="post" action="[% c.uri_for('/file/fs_move') %]">
+                      <input type="hidden" name="old_path" value="[% fp | html %]">
+                      <input type="hidden" name="dir"      value="">
+                      <input type="hidden" name="back_url" value="[% c.uri_for('/file/list', { sitename => filter_params.sitename, file_status => filter_params.file_status, file_type => filter_params.file_type, is_duplicate => filter_params.is_duplicate }) %]">
+                      <div style="font-size:.8rem;color:#555;margin-bottom:5px;">
+                        Moving: <code style="font-size:.78rem">[% fp | html %]</code>
+                      </div>
+                      <label style="font-size:.82rem;font-weight:600">Destination directory:</label>
+                      <input type="text" name="dest_dir" placeholder="/data/nfs/SiteName/subdir"
+                             style="width:100%;margin:4px 0 6px;padding:4px 6px;font-size:.82rem;border:1px solid #ccc;border-radius:3px;"
+                             required>
+                      <button type="submit" class="btn btn-sm btn-primary">Move</button>
+                      <button type="button" class="btn btn-sm btn-secondary"
+                              onclick="flToggleMove('[% loop.index %]')">Cancel</button>
+                    </form>
+                  </div>
+                  [% END %]
                 </td>
               </tr>
               [% END %]
@@ -192,3 +217,9 @@
     </div>
   </div>
 </div>
+<script>
+function flToggleMove(idx) {
+    var el = document.getElementById('fl-move-' + idx);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+</script>

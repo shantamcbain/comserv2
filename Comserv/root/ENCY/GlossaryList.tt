@@ -1,0 +1,62 @@
+[% META
+   title = "Glossary - Encyclopedia of Biological Life"
+   description = "Browse glossary terms in the ENCY encyclopedia"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-02"
+%]
+[% PageVersion = 'ENCY/GlossaryList.tt,v 0.01 2026/04/02' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.success_msg %]
+<div class="alert alert-success">[% c.flash.success_msg | html %]</div>
+[% END %]
+[% IF c.flash.error_msg %]
+<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
+[% END %]
+
+<h1>Glossary</h1>
+
+<p><a href="[% c.uri_for('/ENCY') %]">&larr; Back to Encyclopedia</a></p>
+
+[% is_editor = is_editor || 0; is_admin = is_admin || 0 %]
+[% IF is_editor %]
+<a href="[% c.uri_for('/ENCY/Glossary/add') %]" class="btn btn-primary">Add Glossary Term</a>
+[% END %]
+
+<div class="glossary-alpha-nav">
+[% FOREACH letter IN ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'] %]
+  <a href="#letter-[% letter %]">[% letter %]</a>
+[% END %]
+</div>
+
+[% IF glossary_by_letter.keys.size %]
+[% FOREACH letter IN glossary_by_letter.keys.sort %]
+<h2 id="letter-[% letter | html %]">[% letter | html %]</h2>
+<dl>
+    [% FOREACH entry IN glossary_by_letter.$letter %]
+    <dt>
+        <strong><a href="[% c.uri_for('/ENCY/Glossary', entry.record_id) %]">[% entry.term | html %]</a></strong>
+        [% IF entry.category %]
+        <span class="badge">[% entry.category | html %]</span>
+        [% END %]
+    </dt>
+    <dd>
+        [% SET def = entry.definition | html %]
+        [% IF def.length > 200 %][% def.substr(0, 200) %]&hellip;[% ELSE %][% def %][% END %]
+    </dd>
+    [% END %]
+</dl>
+[% END %]
+[% ELSE %]
+<p>No glossary terms found in the database.</p>
+[% END %]
+
+[% IF ai_fallback %]
+<div class="alert alert-info" style="margin-top:1em;">
+  No local results for &ldquo;[% ai_query | html %]&rdquo;.
+  <a href="/ai?prompt=Tell+me+about+[% ai_query | uri %]+in+the+context+of+the+encyclopedia">Ask AI</a>
+</div>
+[% END %]
