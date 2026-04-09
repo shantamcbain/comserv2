@@ -603,6 +603,42 @@
     </div>
 </details>
 
+[% IF ai_daily_conversations && ai_daily_conversations.size > 0 %]
+<div style="margin-top:30px; padding:15px; background:rgba(0,100,200,0.05); border-left:3px solid #0064c8; border-radius:4px; max-width:100%;">
+    <h3 style="margin-top:0; color:#0064c8;">AI Activity for [% date %]</h3>
+    <table style="width:100%; border-collapse:collapse;">
+        <thead>
+            <tr style="background:#f2f2f2;">
+                <th style="padding:8px; border:1px solid #ddd; text-align:left;">Conversation</th>
+                <th style="padding:8px; border:1px solid #ddd; text-align:left;">Project</th>
+                <th style="padding:8px; border:1px solid #ddd; text-align:left;">Model</th>
+                <th style="padding:8px; border:1px solid #ddd; text-align:left;">Updated</th>
+                <th style="padding:8px; border:1px solid #ddd; text-align:left;">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% FOREACH conv IN ai_daily_conversations %]
+            <tr>
+                <td style="padding:8px; border:1px solid #ddd;">
+                    <a href="/ai/conversation/[% conv.id %]">[% conv.get_display_title | html %]</a>
+                </td>
+                <td style="padding:8px; border:1px solid #ddd;">
+                    [% IF conv.project %]
+                        <a href="/project/details?project_id=[% conv.project.id %]">[% conv.project.name | html %]</a>
+                    [% ELSE %]—[% END %]
+                </td>
+                <td style="padding:8px; border:1px solid #ddd;">[% conv.model | html %]</td>
+                <td style="padding:8px; border:1px solid #ddd;">[% conv.updated_at %]</td>
+                <td style="padding:8px; border:1px solid #ddd;">
+                    <a href="/ai?conversation_id=[% conv.id %]" style="font-size:0.85em;">Continue</a>
+                </td>
+            </tr>
+            [% END %]
+        </tbody>
+    </table>
+</div>
+[% END %]
+
 [% UNLESS is_daily_plan OR include_mode %]
 <div class="day-navigation view-navigation">
     <a href="/todo/day/[% previous_date %][% url_hash %]" title="Previous Day">←</a>

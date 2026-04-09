@@ -372,12 +372,24 @@ sub details :Path('/todo/details') :Args {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'details',
             "Interval fetch error: $@") if $@;
 
+        # Fetch AI conversations linked to this task
+        my @ai_conversations;
+        eval {
+            @ai_conversations = $schema->resultset('AiConversation')->search(
+                { task_id => $record_id },
+                { order_by => { -desc => 'updated_at' }, rows => 10 }
+            );
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'details',
+            "AI conv fetch error: $@") if $@;
+
         # Add the todo, accumulative_time, projects, and interval history to the stash
         $c->stash(
             record            => $todo,
             accumulative_time => $accumulative_time,
             projects          => $projects,
             todo_intervals    => \@intervals,
+            ai_conversations  => \@ai_conversations,
             return_to         => $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo')),
         );
 
@@ -1282,16 +1294,37 @@ sub day :Path('/todo/day') :Args {
         %proj_name_map = map { $_->id => $_->name } @prows;
     };
 
+    # Fetch AI conversations active on this date (admin/developer/editor only)
+    my @ai_daily_conversations;
+    my $user_roles_day = $c->session->{roles} || [];
+    $user_roles_day = [split(/\s*,\s*/, $user_roles_day)] if !ref($user_roles_day) && $user_roles_day;
+    my $can_see_ai_day = ref($user_roles_day) eq 'ARRAY'
+        ? (grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_day) ? 1 : 0
+        : 0;
+    if ($can_see_ai_day) {
+        eval {
+            my $day_start = $date . ' 00:00:00';
+            my $day_end   = $date . ' 23:59:59';
+            @ai_daily_conversations = $c->model('DBEncy')->resultset('AiConversation')->search(
+                { updated_at => { '>=' => $day_start, '<=' => $day_end } },
+                { order_by => { -desc => 'updated_at' }, prefetch => 'project' }
+            );
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'day',
+            "AI daily conv fetch error: $@") if $@;
+    }
+
     # Add the todos to the stash
     $c->stash(
-        todos => \@today_todos,
-        overdue_todos => \@overdue_todos,
-        sitename => $c->session->{SiteName},
-        date => $date,
-        previous_date => $previous_date,
-        next_date => $next_date,
-        proj_name_map => \%proj_name_map,
-        template => 'todo/day.tt',
+        todos                  => \@today_todos,
+        overdue_todos          => \@overdue_todos,
+        sitename               => $c->session->{SiteName},
+        date                   => $date,
+        previous_date          => $previous_date,
+        next_date              => $next_date,
+        proj_name_map          => \%proj_name_map,
+        ai_daily_conversations => \@ai_daily_conversations,
+        template               => 'todo/day.tt',
     );
 
     $c->forward($c->view('TT'));
