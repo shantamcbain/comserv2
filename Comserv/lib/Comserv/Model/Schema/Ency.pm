@@ -54,6 +54,9 @@ __PACKAGE__->register_class('PaymentTransaction', 'Comserv::Model::Schema::Ency:
 __PACKAGE__->register_class('InternalCurrencyAccount', 'Comserv::Model::Schema::Ency::Result::InternalCurrencyAccount');
 __PACKAGE__->register_class('InternalCurrencyTransaction', 'Comserv::Model::Schema::Ency::Result::InternalCurrencyTransaction');
 
+# Register Beekeeping hive component tracking
+__PACKAGE__->register_class('HiveComponent', 'Comserv::Model::Schema::Ency::Result::HiveComponent');
+
 # Register Inventory system classes
 __PACKAGE__->register_class('InventoryItem', 'Comserv::Model::Schema::Ency::Result::InventoryItem');
 __PACKAGE__->register_class('InventorySupplier', 'Comserv::Model::Schema::Ency::Result::InventorySupplier');

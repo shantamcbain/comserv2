@@ -18,6 +18,10 @@
     --border-color: #e9c46a;        /* Golden yellow */
     --table-header-bg: #f8f9fa;     /* Light gray */
     
+    /* Layout/background aliases */
+    --bg-color: #f1faee;
+    --bg-secondary: #fdf6e3;
+
     /* Bee-themed accent colors (for special elements) */
     --bee-yellow: #ffd60a;
     --bee-black: #003566;

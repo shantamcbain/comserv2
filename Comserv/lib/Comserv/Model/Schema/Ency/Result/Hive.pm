@@ -108,6 +108,13 @@ __PACKAGE__->has_many(
     { cascade_delete => 1 }
 );
 
+__PACKAGE__->has_many(
+    'hive_components',
+    'Comserv::Model::Schema::Ency::Result::HiveComponent',
+    { 'foreign.hive_id' => 'self.id' },
+    { cascade_delete => 0 }
+);
+
 # Custom methods
 sub active_boxes {
     my $self = shift;
