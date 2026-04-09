@@ -157,8 +157,6 @@ sub index :Path :Args(0) {
                         push @external_models, { name => $id, provider => 'grok', label => $label };
                     }
                 } else {
-                    push @external_models, { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' };
-                    push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
                     push @external_models, { name => 'grok-4-0709',               provider => 'grok', label => 'Grok 4 (xAI)' };
                     push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
                     push @external_models, { name => 'grok-code-fast-1',          provider => 'grok', label => 'Grok Code Fast (xAI)' };
@@ -468,6 +466,25 @@ sub generate :Local :Args(0) {
     
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
         'generate', "Agent type normalization: agent_id=$agent_id -> normalized_agent_type=$normalized_agent_type");
+
+    # When agent_type is 'helpdesk', inject HelpDesk-aware system prompt unless caller already supplied one
+    if (lc($normalized_agent_type) eq 'helpdesk' && !$system) {
+        $system = $self->_build_helpdesk_system_prompt($c);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'generate', "HelpDesk agent: injected system prompt");
+    }
+
+    if (lc($normalized_agent_type) eq 'ency' && !$system) {
+        $system = $self->_build_ency_system_prompt($c);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'generate', "ENCY agent: injected system prompt");
+    }
+
+    if (lc($normalized_agent_type) =~ /^bmaster$/ && !$system) {
+        $system = $self->_build_bmaster_system_prompt($c);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'generate', "BMaster agent: injected system prompt");
+    }
     
     # Require login for external AI models (Grok etc.) before entering try block
     if (lc($provider) eq 'grok' && $is_guest) {
@@ -584,7 +601,51 @@ sub generate :Local :Args(0) {
                 die "Failed to load Grok model";
             }
             $grok->api_key($grok_api_key);
-            $grok->model($model) if $model;
+            if ($model) {
+                # Pre-flight: if the requested model is known deprecated, use last_working_model instead
+                eval {
+                    my $schema  = $c->model('DBEncy')->schema;
+                    my $key_obj = $schema->resultset('UserApiKeys')->search(
+                        { service => 'grok', is_active => '1' }
+                    )->first;
+                    if ($key_obj) {
+                        my $meta       = $key_obj->get_metadata() || {};
+                        my $deprecated = $meta->{deprecated_models} || {};
+                        if ($deprecated->{$model}) {
+                            my $replacement = $meta->{last_working_model} || '';
+                            if ($replacement && $replacement ne $model) {
+                                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                                    'generate', "Requested model '$model' is deprecated; using '$replacement' instead");
+                                $model = $replacement;
+                            }
+                        }
+                    }
+                };
+                $grok->model($model);
+            } else {
+                # No model specified — prefer last_working_model, then synced list (skip deprecated)
+                eval {
+                    my $schema  = $c->model('DBEncy')->schema;
+                    my $key_obj = $schema->resultset('UserApiKeys')->search(
+                        { service => 'grok', is_active => '1' }
+                    )->first;
+                    if ($key_obj) {
+                        my $meta       = $key_obj->get_metadata() || {};
+                        my $deprecated = $meta->{deprecated_models} || {};
+                        if ($meta->{last_working_model} && !$deprecated->{ $meta->{last_working_model} }) {
+                            $grok->model($meta->{last_working_model});
+                        } else {
+                            my $synced = $meta->{available_models} || [];
+                            my ($first) = grep {
+                                $_->{id} && $_->{id} !~ /imagine|video/i && !$deprecated->{ $_->{id} }
+                            } @$synced;
+                            $grok->model($first->{id}) if $first && $first->{id};
+                        }
+                    }
+                };
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                    'generate', "No model specified; using " . $grok->model . " from synced list or default");
+            }
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'generate', "Querying Grok API (model: " . $grok->model . ")");
@@ -603,19 +664,83 @@ sub generate :Local :Args(0) {
             
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
-                # Auto-fallback: if model is deprecated (410/404), retry with grok-3-mini
-                if ($error =~ /410|404|no longer available|not found/ && $grok->model ne 'grok-3-mini') {
-                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                        'generate', "Model " . $grok->model . " unavailable, retrying with grok-3-mini");
-                    $grok->model('grok-3-mini');
-                    $response = $grok->chat(
-                        messages   => \@grok_messages,
-                        use_search => $use_search,
-                    );
+                # Auto-fallback: if model is deprecated (410/404), live-query xAI for available models
+                if ($error =~ /410|404|no longer available|not found/) {
+                    my $failed_model = $grok->model;
+                    my $fallback;
+                    my $discovery_err = '';
+                    eval {
+                        require LWP::UserAgent;
+                        require HTTP::Request;
+                        my $ua  = LWP::UserAgent->new(timeout => 10);
+                        my $req = HTTP::Request->new(GET => 'https://api.x.ai/v1/models');
+                        $req->header('Authorization' => "Bearer $grok_api_key");
+                        $req->header('Content-Type'  => 'application/json');
+                        my $resp = $ua->request($req);
+                        if ($resp->is_success) {
+                            my $mdata = eval { decode_json($resp->content) } || {};
+                            my @live  = grep {
+                                $_->{id} && $_->{id} ne $failed_model
+                                         && $_->{id} !~ /imagine|video/i
+                            } @{ $mdata->{data} || [] };
+                            # Prefer newer models: use reverse-alphabetical sort as heuristic
+                            # (grok-3-mini > grok-2-mini > grok-2 etc.)
+                            my ($best) = sort { $b->{id} cmp $a->{id} } @live;
+                            if ($best) {
+                                $fallback = $best->{id};
+                                my $schema  = $c->model('DBEncy')->schema;
+                                my $key_obj = $schema->resultset('UserApiKeys')->search(
+                                    { service => 'grok', is_active => '1' }
+                                )->first;
+                                if ($key_obj) {
+                                    my $meta       = $key_obj->get_metadata() || {};
+                                    my $deprecated = $meta->{deprecated_models} || {};
+                                    $deprecated->{$failed_model} = time();
+                                    $meta->{deprecated_models} = $deprecated;
+                                    $meta->{available_models}   = [ map { { id => $_->{id} } } @live ];
+                                    $meta->{models_synced_at}   = time();
+                                    $key_obj->set_metadata($meta);
+                                    eval { $key_obj->update };
+                                }
+                            } else {
+                                $discovery_err = "xAI returned model list but no usable models found";
+                            }
+                        } else {
+                            $discovery_err = "xAI models endpoint returned: " . $resp->status_line;
+                        }
+                    };
+                    if ($@) { $discovery_err = "live model discovery exception: $@"; }
+                    if ($discovery_err) {
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                            'generate', "410 fallback failed — $discovery_err");
+                    }
+                    if ($fallback) {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                            'generate', "Model $failed_model unavailable; live-discovered $fallback");
+                        $grok->model($fallback);
+                        $response = $grok->chat(
+                            messages   => \@grok_messages,
+                            use_search => $use_search,
+                        );
+                        if ($response) {
+                            eval {
+                                my $schema  = $c->model('DBEncy')->schema;
+                                my $key_obj = $schema->resultset('UserApiKeys')->search(
+                                    { service => 'grok', is_active => '1' }
+                                )->first;
+                                if ($key_obj) {
+                                    my $meta = $key_obj->get_metadata() || {};
+                                    $meta->{last_working_model} = $fallback;
+                                    $key_obj->set_metadata($meta);
+                                    eval { $key_obj->update };
+                                }
+                            };
+                        }
+                    }
                 }
                 unless ($response) {
                     $error = $grok->last_error || $error;
-                    die "Grok query failed: $error";
+                    die "Grok query failed: $error — Admin: please go to /ai/models and Sync to update available models";
                 }
             }
             
@@ -1663,6 +1788,17 @@ sub chat :Local :Args(0) {
     # Role-based capability injection into messages (insert as system message)
     my $role_prompt_chat = $self->_build_role_system_prompt($c, $user_roles_chat, $is_grok_model ? 'grok' : 'ollama', $chat_page_path, $chat_page_title);
 
+    # Inject agent-specific system prompts
+    if (lc($chat_agent_id) eq 'helpdesk' && !$chat_agent_system) {
+        $chat_agent_system = $self->_build_helpdesk_system_prompt($c);
+    }
+    if (lc($chat_agent_id) eq 'ency' && !$chat_agent_system) {
+        $chat_agent_system = $self->_build_ency_system_prompt($c);
+    }
+    if (lc($chat_agent_id) =~ /^bmaster$/ && !$chat_agent_system) {
+        $chat_agent_system = $self->_build_bmaster_system_prompt($c);
+    }
+
     # Build combined system prompt: agent-specific prompt + role prompt + live module data + shared KB
     my @system_parts;
     push @system_parts, $chat_agent_system if $chat_agent_system;
@@ -1790,7 +1926,63 @@ sub chat :Local :Args(0) {
 
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
-                die "Grok chat failed: $error";
+                # Auto-fallback: if model is deprecated (410/404), live-query xAI for available models
+                if ($error =~ /410|404|no longer available|not found/) {
+                    my $failed_model = $grok->model;
+                    my $fallback;
+                    my $discovery_err = '';
+                    eval {
+                        require LWP::UserAgent;
+                        require HTTP::Request;
+                        my $ua  = LWP::UserAgent->new(timeout => 10);
+                        my $req = HTTP::Request->new(GET => 'https://api.x.ai/v1/models');
+                        $req->header('Authorization' => "Bearer $grok_api_key");
+                        $req->header('Content-Type'  => 'application/json');
+                        my $resp = $ua->request($req);
+                        if ($resp->is_success) {
+                            my $mdata = eval { decode_json($resp->content) } || {};
+                            my @live  = grep {
+                                $_->{id} && $_->{id} ne $failed_model
+                                         && $_->{id} !~ /imagine|video/i
+                            } @{ $mdata->{data} || [] };
+                            my ($best) = sort { $a->{id} cmp $b->{id} } @live;
+                            if ($best) {
+                                $fallback = $best->{id};
+                                my $schema  = $c->model('DBEncy')->schema;
+                                my $key_obj = $schema->resultset('UserApiKeys')->search(
+                                    { service => 'grok', is_active => '1' }
+                                )->first;
+                                if ($key_obj) {
+                                    my $meta = $key_obj->get_metadata() || {};
+                                    $meta->{available_models} = [ map { { id => $_->{id} } } @live ];
+                                    $meta->{models_synced_at} = time();
+                                    $key_obj->set_metadata($meta);
+                                    eval { $key_obj->update };
+                                }
+                            } else {
+                                $discovery_err = "xAI returned model list but no usable models found";
+                            }
+                        } else {
+                            $discovery_err = "xAI models endpoint returned: " . $resp->status_line;
+                        }
+                    };
+                    if ($@) { $discovery_err = "live model discovery exception: $@"; }
+                    if ($discovery_err) {
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                            'chat', "410 fallback failed — $discovery_err");
+                    }
+                    if ($fallback) {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                            'chat', "Model $failed_model unavailable; live-discovered $fallback");
+                        push @chat_trace, "⚠️ Model $failed_model unavailable (410); auto-switched to $fallback";
+                        $grok->model($fallback);
+                        $response = $grok->chat(messages => \@final_messages, use_search => $use_search_chat);
+                    }
+                }
+                unless ($response) {
+                    $error = $grok->last_error || $error;
+                    die "Grok chat failed: $error — Admin: please go to /ai/models and Sync to update available models";
+                }
             }
 
             if ($response->{choices} && ref($response->{choices}) eq 'ARRAY' && @{$response->{choices}}) {
@@ -3483,14 +3675,23 @@ sub _get_module_data {
     }
 
     # --- ENCY / Herb / Plant / Bee forage data ---
-    if ($prompt =~ /plant|herb|flower|forage|pasture|nectar|pollen|bee\s*food|pollinator|garden|grow/i) {
+    # Always inject for ency agent; otherwise inject on keyword match
+    my $is_ency_agent = lc($agent_id) eq 'ency';
+    if ($is_ency_agent || $prompt =~ /plant|herb|flower|forage|pasture|nectar|pollen|bee\s*food|pollinator|garden|grow/i) {
         eval {
             my $forager = $c->model('DBForager');
             if ($forager) {
                 # Extract key search terms from the prompt
                 my @keywords = ($prompt =~ /(\w{4,})/g);
-                my $search   = join(' ', grep { /plant|herb|flower|forage|nectar|pollen|bee|grow|garden/i } @keywords);
-                $search ||= 'bee';
+                my $search;
+                if ($is_ency_agent) {
+                    # For ency agent: use all meaningful words from prompt as search
+                    $search = join(' ', grep { length($_) >= 4 && !/^(what|where|when|which|that|this|with|from|have|help|show|list|find|tell|about|does|should|would|could|please|give)$/i } @keywords);
+                    $search ||= 'herb';
+                } else {
+                    $search = join(' ', grep { /plant|herb|flower|forage|nectar|pollen|bee|grow|garden/i } @keywords);
+                    $search ||= 'bee';
+                }
 
                 my $results = $forager->searchHerbs($c, $search);
                 if ($results && @$results) {
@@ -3520,6 +3721,67 @@ sub _get_module_data {
         };
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
             '_get_module_data', "ENCY herb fetch error: $@") if $@;
+    }
+
+    # --- BMaster / Apiary live data ---
+    # Always inject for bmaster agent; also inject on hive/bee/apiary keyword match
+    my $is_bmaster_agent = lc($agent_id) =~ /^bmaster$/;
+    if ($is_bmaster_agent || $prompt =~ /hive|apiary|yard|queen|varroa|swarm|inspect|honey|harvest|brood|beekeeper|bee\s*keep/i) {
+        eval {
+            my $schema = $c->model('DBEncy')->schema;
+            if ($schema) {
+                # Fetch yards for this site
+                my @yards = $schema->resultset('Yard')->search(
+                    { sitename => $site_name },
+                    { order_by => 'yard_name' }
+                )->all;
+
+                if (@yards) {
+                    my @yard_lines;
+                    for my $y (@yards) {
+                        my $hive_count = $schema->resultset('Hive')->search({
+                            yard_id => $y->id,
+                            status  => 'active',
+                        })->count;
+                        push @yard_lines, sprintf("  Yard: %s (%s) — %d active hive(s) of %d capacity | Status: %s%s",
+                            $y->yard_name // $y->yard_code,
+                            $y->yard_code,
+                            $hive_count,
+                            $y->yard_size // 0,
+                            $y->status // 'unknown',
+                            ($y->notes ? " | Notes: " . substr($y->notes, 0, 80) : '')
+                        );
+
+                        # Show hives if bmaster agent or hive keywords
+                        if ($is_bmaster_agent || $prompt =~ /hive|queen|inspect|brood/i) {
+                            my @hives = $schema->resultset('Hive')->search(
+                                { yard_id => $y->id },
+                                { order_by => 'hive_number', rows => 10 }
+                            )->all;
+                            for my $h (@hives) {
+                                my $last_insp = $schema->resultset('Inspection')->search(
+                                    { hive_id => $h->id },
+                                    { order_by => { -desc => 'inspection_date' }, rows => 1 }
+                                )->first;
+                                push @yard_lines, sprintf("    Hive #%s [ID=%d] — Status: %s%s%s",
+                                    $h->hive_number,
+                                    $h->id,
+                                    $h->status,
+                                    ($h->queen_code ? " | Queen: ${\$h->queen_code}" : ''),
+                                    ($last_insp ? " | Last inspection: ${\$last_insp->inspection_date} (${\$last_insp->overall_status})" : ' | No inspections recorded')
+                                );
+                            }
+                        }
+                    }
+                    push @sections,
+                        "LIVE APIARY DATA for site '$site_name':\n"
+                        . join("\n", @yard_lines)
+                        . "\nManage apiary at /Apiary | Hive management at /Apiary/HiveManagement";
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_get_module_data', "BMaster apiary fetch error: $@") if $@;
     }
 
     return join("\n\n", @sections);
@@ -4143,8 +4405,8 @@ sub _select_model_for_context {
     my %context_prefs = (
         chat        => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral'],
         helpdesk    => ['llama3.1', 'llama3', 'mistral'],
-        ency        => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral'],
-        bmaster     => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral'],
+        ency        => ['phi4', 'llama3.1', 'llama3', 'mistral'],
+        bmaster     => ['phi4', 'llama3.1', 'llama3', 'mistral'],
         csc         => ['llama3.1', 'llama3', 'mistral'],
         general     => ['llama3.1', 'llama3', 'mistral'],
         navigation  => ['llama3.1', 'llama3'],
@@ -5335,8 +5597,6 @@ sub get_user_providers :Local :Args(0) {
                 # Fallback to hardcoded Grok models if none stored in metadata
                 if (!@$models && $key->service eq 'grok') {
                     $models = [
-                        { id => 'grok-3-mini' },
-                        { id => 'grok-3' },
                         { id => 'grok-4-0709' },
                         { id => 'grok-4-fast-non-reasoning' },
                         { id => 'grok-code-fast-1' },
@@ -5560,6 +5820,7 @@ AI Assistant
 This library is part of the Comserv application.
 
 =cut
+
 
 =head2 get_page_doc
 
@@ -6423,6 +6684,249 @@ sub support_send :Local :Args(1) {
     }
 
     $c->response->body(encode_json({ success => JSON::true }));
+}
+
+=head2 _build_bmaster_system_prompt
+
+Builds a BMaster beekeeping-aware system prompt for the AI when agent_id is 'bmaster'.
+Bee-welfare philosophy: not agribiz-driven, always answers with the bees' best interests first.
+Includes full apiary schema, seasonal calendar, editor workflow, and cross-context awareness.
+
+=cut
+
+sub _build_bmaster_system_prompt {
+    my ($self, $c) = @_;
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'BMaster';
+    my $username  = $c->session->{username} || 'the user';
+    my $is_admin  = do {
+        my $roles = $c->session->{roles} || [];
+        $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
+        grep { /^(admin|developer|editor|site_admin)$/i } @$roles;
+    };
+
+    my $editor_section = $is_admin ? <<'EDITOR' : '';
+EDITOR / ADMIN WORKFLOW:
+- Add/edit a yard (apiary location): /Apiary/add_yard | /Apiary/edit_yard?id=ID
+- Add/edit a hive: /Apiary/add_hive | /Apiary/edit_hive?id=ID
+- Record a hive inspection: /Apiary/add_inspection?hive_id=ID
+- Record a treatment: /Apiary/add_treatment?hive_id=ID
+- Record a honey harvest: /Apiary/add_harvest?hive_id=ID
+- Manage queens: /Apiary/QueenRearing
+- View hive management: /Apiary/HiveManagement
+- View bee health: /Apiary/BeeHealth
+- When the user asks to "add", "record", "log", "edit", or "update" apiary data,
+  provide the direct URL for that action — do not just describe the steps.
+EDITOR
+
+    return <<END_PROMPT;
+You are the expert BMaster beekeeping assistant for $site_name.
+
+PHILOSOPHY — This system is NOT driven by agribusiness profits. It is designed around
+what is best for the bees and healthy, sustainable apiculture:
+- Prioritize bee colony health and longevity over maximum honey extraction
+- Prefer integrated pest management (IPM) and natural treatments before chemical options
+- Respect the natural colony cycle — swarming is natural reproduction, not just a loss
+- Minimal intervention: inspect only when necessary, disturb colonies as little as possible
+- Forage diversity and habitat health are as important as hive management
+- Share knowledge freely — hobbyist and commercial beekeepers both matter
+
+CROSS-CONTEXT AWARENESS:
+When asked about insects, answer with bees in mind — how does this insect interact with
+bee colonies? Is it a predator, competitor, or neutral? (e.g., yellow jackets compete for
+forage and rob weak colonies; hover flies are harmless pollinators; small hive beetle is
+a significant pest in warm climates)
+When asked about herbs or plants, think: Is this a bee forage plant? Does it offer nectar,
+pollen, or both? What season? Is it safe near hives?
+When asked about health/medicine, consider whether any treatments affect bees or honey safety.
+
+DATABASE SCHEMA — BMaster / Apiary tables:
+- Yard: id, yard_code, yard_name, yard_size, current (hive count), total_yard_size,
+        sitename, status, comments, notes
+- Hive: id, hive_number, yard_id, pallet_code, queen_code,
+        status (active/inactive/dead/split/combined), owner, sitename, notes
+- Inspection: id, hive_id, inspection_date, start/end_time, weather_conditions, temperature,
+              inspector, inspection_type (routine/disease_check/harvest/treatment/emergency),
+              overall_status (excellent/good/fair/poor/critical),
+              queen_seen, queen_marked, eggs_seen, larvae_seen, capped_brood_seen,
+              supersedure_cells, swarm_cells, queen_cells,
+              population_estimate (very_strong/strong/moderate/weak/very_weak),
+              temperament (calm/moderate/aggressive/very_aggressive),
+              general_notes, action_required, next_inspection_date
+- Queen: id, tag_number, birth_date, breed, origin, mating_status,
+         introduction_date, removal_date, performance_rating, health_status, comments
+- Treatment: id, hive_id, treatment_date,
+             treatment_type (varroa/nosema/foulbrood/tracheal_mite/small_hive_beetle/wax_moth/other),
+             product_name, dosage, application_method (strip/drench/dust/spray/fumigation/feeding),
+             duration_days, withdrawal_period_days, effectiveness, applied_by, notes
+- HoneyHarvest: id, hive_id, harvest_date, honey_type (spring/summer/fall/wildflower/clover/basswood/other),
+                weight_kg, weight_lbs, moisture_content, quality_grade (grade_a/b/c/comb_honey),
+                harvested_by, processing_notes, storage_location
+- Box: hive_id, box_position, box_type, status — supers and brood boxes
+- HiveFrame: box_id, frame_position, frame_type, status — individual frames
+- HiveConfiguration: hive setup templates
+- HiveFrame: linked to Box (frame-level detail)
+
+NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
+- BMaster dashboard: /BMaster
+- Apiary overview: /Apiary
+- Hive management: /Apiary/HiveManagement
+- Queen rearing: /Apiary/QueenRearing
+- Bee health: /Apiary/BeeHealth
+- Bee pasture / forage plants: /BMaster/bee_pasture  (→ /ENCY/BeePastureView)
+- Honey production: /BMaster/honey
+- Environment / habitat: /BMaster/environment
+- Education: /BMaster/education
+- ENCY herb/plant search: /ENCY/search?q=TERM
+- ENCY bee forage view: /ENCY/BeePastureView
+- Workshops (local beekeeping events): /workshop
+- Membership: /membership
+$editor_section
+DATA ALREADY INJECTED:
+The server automatically injects LIVE APIARY DATA (yards, hive counts) below when available.
+ALWAYS use this live data — do not ask the user to describe their apiary setup.
+
+SEASONAL BEEKEEPING CALENDAR (Northern Hemisphere — adapt for local climate):
+- Late Winter / Early Spring: Feed if stores low; watch for first cleansing flights; plan splits
+- Spring (buildup): Add supers ahead of nectar flow; monitor for swarm cells; requeen if needed
+- Early Summer (nectar flow): Minimal disturbance; check supers filling; watch for supercedure
+- Mid Summer (dearth): Robbing risk increases; reduce entrances; treat for varroa after flow
+- Late Summer / Fall: Final varroa treatment; ensure winter stores (≥30 kg / 60 lbs); reduce entrance
+- Winter: No inspections unless emergency; heft hives monthly to check stores; ventilation essential
+
+COMMON ISSUES AND IPM APPROACH:
+- Varroa destructor: Count mites before treating (sugar roll / alcohol wash / sticky board).
+  Prefer oxalic acid (OA) vaporization during broodless period. Apivar/Apistan as backup.
+- Nosema: Promote good nutrition and forage diversity; restock with young bees if heavy infection
+- American Foulbrood (AFB): Notifiable disease — contact provincial/state apiarist immediately
+- Small Hive Beetle: Maintain strong colonies; beetle traps; good ventilation
+- Wax Moth: Not a problem in strong colonies; keep colony populous
+- Swarming: Natural — manage with splits, adding space, or supering promptly
+
+The current user is: $username
+END_PROMPT
+}
+
+=head2 _build_ency_system_prompt
+
+Builds an ENCY-aware system prompt for the AI when agent_id is 'ency'.
+Includes full schema knowledge and editor workflow for herbal encyclopedia editing.
+
+=cut
+
+sub _build_ency_system_prompt {
+    my ($self, $c) = @_;
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $username  = $c->session->{username} || 'the user';
+    my $is_admin  = do {
+        my $roles = $c->session->{roles} || [];
+        $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
+        grep { /^(admin|developer|editor)$/i } @$roles;
+    };
+
+    my $editor_section = $is_admin ? <<'EDITOR' : '';
+EDITOR WORKFLOW (you have admin/editor access):
+- To add or edit a herb entry, navigate to /ENCY/edit_herb?record_id=ID or /ENCY/add_herb
+- To link constituents: /ENCY/herb_constituents?herb_id=ID
+- To link diseases/symptoms: /ENCY/herb_diseases?herb_id=ID | /ENCY/herb_symptoms?herb_id=ID
+- To manage formulas: /ENCY/formula | /ENCY/add_formula
+- To link drug-herb interactions: /ENCY/drug_herb_interactions
+- When the user asks to "add", "edit", "update", or "create" an ENCY entry, provide the direct
+  admin URL for that action — do not just describe what to do.
+EDITOR
+
+    return <<END_PROMPT;
+You are an expert Encyclopedia (ENCY) assistant for $site_name. You have deep knowledge of the
+ENCY herbal and botanical database and help users find, understand, and edit encyclopedia entries.
+
+DATABASE SCHEMA — ENCY tables you can reference:
+- Herb: record_id, botanical_name, common_names, apis, nectar, pollen, constituents,
+        key_name, ident_character, stem, leaves, flowers, fruit, taste, odour, root,
+        distribution, dosage, administration, formulas, contra_indications, chinese, non_med, harvest
+- HerbCategory: links herbs to categories (e.g., Adaptogen, Nervine, Vulnerary)
+- HerbConstituent: links herbs to specific chemical constituents
+- HerbDisease: links herbs to diseases/conditions they address
+- HerbSymptom: links herbs to symptoms they help with
+- Constituent: name, description, therapeutic actions
+- Disease: name, description, icd_code
+- Symptom: name, description, body_system
+- Formula: name, description, instructions, FormulaHerb (herb_id, amount, unit)
+- DrugHerbInteraction: herb_id, drug_name, interaction_type, severity, description
+- Insect / InsectHerb: insect species and which herbs they are associated with
+- Animal / AnimalHerb: animal species and herb associations
+
+NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
+- ENCY home: /ENCY
+- Search herbs: /ENCY/search?q=TERM  or  /ENCY/BotanicalNameView
+- Bee pasture / forage plants: /ENCY/BeePastureView
+- View herb detail: /ENCY/herb_detail?record_id=ID
+- Plants section: /ENCY/plants
+- Pollinators: /ENCY/pollinators
+- Insects: /ENCY/insects
+- Medicinal constituents: /ENCY/constituents
+- Therapeutic actions: /ENCY/therapeutic_actions
+- Drug-herb interactions: /ENCY/drug_herb_interactions
+- Formulas: /ENCY/formula
+- Recipes: /ENCY/recipes
+$editor_section
+DATA ALREADY INJECTED:
+The server automatically injects LIVE ENCY HERB/PLANT DATA below when relevant herb records
+are found. ALWAYS use this live data to answer questions — do not ask the user to paste records.
+
+GUIDELINES:
+- For health questions, always note: "This is educational information only — consult a healthcare provider."
+- Include traditional uses, constituents, and safety notes when available.
+- When suggesting herb searches, always provide the search URL: /ENCY/search?q=TERM
+- The current user is: $username
+- For unknown terms, say so and suggest searching via /ENCY/search?q=TERM
+END_PROMPT
+}
+
+=head2 _build_helpdesk_system_prompt
+
+Builds a HelpDesk-aware system prompt for the AI when agent_type is 'helpdesk'.
+
+=cut
+
+sub _build_helpdesk_system_prompt {
+    my ($self, $c) = @_;
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'our system';
+    my $username  = $c->session->{username} || 'the user';
+
+    return <<END_PROMPT;
+You are a HelpDesk support assistant for $site_name. Your role is to help users resolve issues efficiently and professionally.
+
+CAPABILITIES:
+1. Answer support questions using knowledge from our Knowledge Base categories:
+   - Getting Started (account setup, first login, dashboard overview)
+   - Website Management (content management, SEO, backups)
+   - Email Services (setup, client configuration, spam filters)
+   - Security (passwords, two-factor auth, security audits)
+   - Billing & Payments (payment methods, billing cycles, plan upgrades)
+   - Troubleshooting (loading issues, database errors, log analysis)
+   - System Administration (Linux commands, server maintenance, backup and recovery)
+
+2. TICKET CREATION: If the user's issue cannot be resolved through conversation or requires
+   action from our team, offer to create a support ticket. Tell them they can submit a ticket at:
+   /HelpDesk/ticket/new
+   Collect: subject, category (technical/billing/account/feature/other), priority (low/medium/high/critical),
+   and a description of the issue.
+
+3. LIVE AGENT ESCALATION: For critical issues, urgent matters, or when the user expresses
+   frustration, suggest connecting with a live agent through the chat system or by visiting
+   /HelpDesk/contact
+
+GUIDELINES:
+- Be concise, friendly, and professional
+- If you don't know the answer, say so clearly and suggest the ticket or live agent option
+- Always confirm you understood the user's issue before suggesting solutions
+- For technical issues, ask clarifying questions if needed (OS, error messages, steps to reproduce)
+- The current user is: $username
+
+You are integrated into the $site_name support system. Respond helpfully and guide users to resolution.
+END_PROMPT
 }
 
 __PACKAGE__->meta->make_immutable;

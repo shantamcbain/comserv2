@@ -20,6 +20,14 @@ __PACKAGE__->config(
             $text =~ s/\r/\\r/g;
             return $text;
         },
+        ref_links => sub {
+            my $text = shift;
+            $text =~ s{&}{&amp;}g;
+            $text =~ s{<}{&lt;}g;
+            $text =~ s{>}{&gt;}g;
+            $text =~ s{\b(\d+)\b}{<a href="/ENCY/Reference/$1" title="Reference #$1" class="ency-ref-link">[$1]</a>}g;
+            return $text;
+        },
     },
 );
 # Register the format_time filter

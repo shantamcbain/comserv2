@@ -503,8 +503,6 @@
                                         return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                                     })
                                 : [
-                                    { val: 'grok|grok-3-mini',               label: 'Grok 3 Mini (fast)' },
-                                    { val: 'grok|grok-3',                    label: 'Grok 3' },
                                     { val: 'grok|grok-4-0709',               label: 'Grok 4' },
                                     { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
                                     { val: 'grok|grok-code-fast-1',          label: 'Grok Code Fast' }
@@ -517,7 +515,7 @@
                             sel.appendChild(grp);
                             // Cheapest Grok for complex queries (non-guest)
                             if (!state.isGuest) {
-                                state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-3-mini';
+                                state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-4-0709';
                             }
                             // Show web search toggle for any user who has Grok access
                             // (toggle applies to Grok requests whether selected manually or via auto-routing)
@@ -1013,8 +1011,6 @@
                                 return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                             })
                         : [
-                            { val: 'grok|grok-3-mini',               label: 'Grok 3 Mini (fast)' },
-                            { val: 'grok|grok-3',                    label: 'Grok 3' },
                             { val: 'grok|grok-4-0709',               label: 'Grok 4' },
                             { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
                             { val: 'grok|grok-code-fast-1',          label: 'Grok Code Fast' }
@@ -1283,7 +1279,7 @@
             }
         }
 
-        // Parse provider|model format (e.g. "grok|grok-3-mini" or "ollama|llama3.1:latest")
+        // Parse provider|model format (e.g. "grok|grok-mini" or "ollama|llama3.1:latest")
         const providerParts = effectiveProvider.split('|');
         const providerName = providerParts[0];
         // Only pass a model name for Grok (client-chosen) or explicit user overrides.
@@ -1585,7 +1581,7 @@
                         // Re-send with Grok web search
                         const grokModel = (state.modelTiers && state.modelTiers.grok)
                                           ? state.modelTiers.grok
-                                          : 'grok|grok-3-mini';
+                                          : 'grok|grok-4-0709';
                         state.userModelOverride = grokModel;
                         const webEl = document.getElementById('enable-web-search');
                         if (webEl) webEl.checked = true;
