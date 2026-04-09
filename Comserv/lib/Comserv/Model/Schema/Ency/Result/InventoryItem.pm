@@ -35,6 +35,20 @@ __PACKAGE__->add_columns(
         data_type   => 'varchar',
         size        => 100,
         is_nullable => 1,
+        comment     => 'Free-text: Apiary, Garden, Hardware, 3D Print, Craft, etc.',
+    },
+    item_origin => {
+        data_type     => 'varchar',
+        size          => 50,
+        is_nullable   => 0,
+        default_value => 'purchased',
+        comment       => 'purchased | grown | foraged | manufactured | 3d_printed | harvested | crafted | other',
+    },
+    is_assemblable => {
+        data_type     => 'tinyint',
+        is_nullable   => 0,
+        default_value => 0,
+        comment       => '1 if this item has a BOM (made from other items)',
     },
     unit_of_measure => {
         data_type     => 'varchar',
@@ -114,6 +128,18 @@ __PACKAGE__->has_many(
 
 __PACKAGE__->many_to_many(
     'suppliers' => 'item_suppliers', 'supplier'
+);
+
+__PACKAGE__->has_many(
+    'bom_components' => 'Comserv::Model::Schema::Ency::Result::InventoryItemBOM',
+    { 'foreign.parent_item_id' => 'self.id' },
+    { cascade_delete => 1 }
+);
+
+__PACKAGE__->has_many(
+    'bom_used_in' => 'Comserv::Model::Schema::Ency::Result::InventoryItemBOM',
+    { 'foreign.component_item_id' => 'self.id' },
+    { cascade_delete => 0 }
 );
 
 1;

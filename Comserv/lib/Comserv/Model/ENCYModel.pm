@@ -1777,7 +1777,7 @@ sub get_references_for {
     my @refs = eval {
         $self->ency_schema->resultset('EntityReference')->search(
             { entity_type => $entity_type, entity_id => $entity_id },
-            { prefetch => 'reference', order_by => 'reference_id' }
+            { prefetch => 'reference', order_by => 'me.reference_id' }
         )->all;
     };
     if ($@) {
