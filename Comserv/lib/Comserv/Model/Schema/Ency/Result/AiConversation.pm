@@ -18,6 +18,19 @@ __PACKAGE__->add_columns(
         size => 255,
         is_nullable => 1,
     },
+    project_id => {
+        data_type => 'integer',
+        is_nullable => 1,
+    },
+    task_id => {
+        data_type => 'integer',
+        is_nullable => 1,
+    },
+    model => {
+        data_type => 'varchar',
+        size => 255,
+        is_nullable => 1,
+    },
     created_at => {
         data_type => 'timestamp',
         default_value => \'CURRENT_TIMESTAMP',
@@ -46,6 +59,18 @@ __PACKAGE__->set_primary_key('id');
 __PACKAGE__->belongs_to(
     'user' => 'Comserv::Model::Schema::Ency::Result::User',
     { 'foreign.id' => 'self.user_id' }
+);
+
+__PACKAGE__->belongs_to(
+    'project' => 'Comserv::Model::Schema::Ency::Result::Project',
+    { 'foreign.id' => 'self.project_id' },
+    { join_type => 'LEFT', is_foreign_key_constraint => 0 }
+);
+
+__PACKAGE__->belongs_to(
+    'task' => 'Comserv::Model::Schema::Ency::Result::Todo',
+    { 'foreign.record_id' => 'self.task_id' },
+    { join_type => 'LEFT', is_foreign_key_constraint => 0 }
 );
 
 __PACKAGE__->has_many(

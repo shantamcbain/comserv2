@@ -148,6 +148,44 @@
 </div>
 [% END %]
 
+[% SET task_id = record.get_column('record_id') %]
+<div class="ai-chat-activity-panel" style="margin-top:20px; border:1px solid #ddd; border-radius:4px; padding:16px; background:#fafafa;">
+    <h3 style="margin-top:0;">AI Chat Activity</h3>
+    <div id="ai-task-conversations" data-task-id="[% task_id %]">
+        <p style="color:#888; font-size:0.9em;">Loading conversations&hellip;</p>
+    </div>
+    <div style="margin-top:10px;">
+        <a href="/ai?task_id=[% task_id %]" class="button button-primary" style="font-size:0.9em;">Chat about this task</a>
+        <a href="/ai/conversations?task_id=[% task_id %]" class="button button-secondary" style="font-size:0.9em; margin-left:8px;">View all task conversations</a>
+    </div>
+</div>
+
+<script>
+(function() {
+    var el = document.getElementById('ai-task-conversations');
+    var taskId = el ? el.getAttribute('data-task-id') : null;
+    if (!taskId) return;
+    fetch('/ai/project_conversations?task_id=' + encodeURIComponent(taskId))
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (!d.success || !d.conversations || !d.conversations.length) {
+                el.innerHTML = '<p style="color:#888;font-size:0.9em;">No AI conversations for this task yet.</p>';
+                return;
+            }
+            var html = '<ul style="margin:0;padding-left:18px;">';
+            d.conversations.forEach(function(c) {
+                html += '<li><a href="/ai/conversation/' + c.id + '">' + (c.title || 'Untitled') + '</a>'
+                      + ' <span style="color:#888;font-size:0.85em;">(' + (c.model || 'unknown') + ' &mdash; ' + c.updated_at + ')</span></li>';
+            });
+            html += '</ul>';
+            el.innerHTML = html;
+        })
+        .catch(function() {
+            el.innerHTML = '<p style="color:#888;font-size:0.9em;">Could not load conversations.</p>';
+        });
+})();
+</script>
+
 <div class="return-nav" style="margin-top:16px">
     <a href="/todo" class="return-button">Return to List View</a>
     <a href="/todo/day" class="return-button">Return to Day View</a>
