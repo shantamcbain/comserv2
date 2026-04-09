@@ -3,6 +3,8 @@ use Moose;
 use namespace::autoclean;
 use DateTime;
 use Data::Dumper;
+use Try::Tiny;
+use POSIX qw(strftime);
 use JSON ();
 use Comserv::Util::Logging;
 use Comserv::Controller::Site;
@@ -13,7 +15,7 @@ sub _require_login {
     my $username = $c->session->{username} // '';
     if (!$username || $username eq 'anonymous') {
         $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
-        return 0;
+        $c->detach();
     }
     return 1;
 }
@@ -89,6 +91,13 @@ sub add_project :Path('addproject') :Args(0) {
 
 sub  create_project :Local :Args(0) {
     my ($self, $c) = @_;
+
+    unless ($c->request->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body('Method Not Allowed');
+        return;
+    }
+
     return unless $self->_require_login($c);
 
     my $form_data = $c->request->body_parameters;
@@ -126,6 +135,18 @@ sub  create_project :Local :Args(0) {
 
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_project',
         "Parent ID: " . (defined $parent_id ? $parent_id : 'undef') . ", Group of poster: $group_of_poster");
+
+    unless ($form_data->{name} && $form_data->{client_name}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_project',
+            "Rejected incomplete project submission (missing required fields)");
+        $c->response->status(400);
+        $c->stash(
+            error_message => 'Required fields (name, client name) are missing.',
+            template      => 'todo/add_project.tt',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
 
     my $project = eval {
         $project_rs->create({
@@ -175,10 +196,59 @@ sub  create_project :Local :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_project',
         "Project created with ID: " . $project->id);
 
+    $self->_create_governance_ticket($c, $project);
+
     $c->flash->{success_message} = 'Project added successfully';
     $c->res->redirect($c->uri_for($self->action_for('project')));
 }
 
+
+sub _create_governance_ticket {
+    my ($self, $c, $project) = @_;
+
+    my $site_name    = $project->sitename || 'unknown';
+    my $project_name = $project->name     || '(unnamed)';
+    my $project_id   = $project->id;
+    my $project_code = $project->project_code || '';
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_create_governance_ticket',
+        "Creating governance HelpDesk ticket for project id=$project_id on site=$site_name");
+
+    try {
+        my $schema  = $c->model('DBEncy')->schema;
+        my $ticket_rs = $schema->resultset('SupportTicket');
+
+        my $ticket_number = 'CSC-GOV-' . strftime('%Y%m%d', localtime) . '-' . sprintf('%04d', $project_id);
+
+        $ticket_rs->create({
+            ticket_number => $ticket_number,
+            site_name     => 'CSC',
+            user_id       => undef,
+            username      => $c->session->{username} || 'system',
+            email         => '',
+            subject       => "New project created: $project_name (site: $site_name)",
+            description   => "A new project has been created and requires CSC awareness.\n\n"
+                           . "Project ID    : $project_id\n"
+                           . "Project Name  : $project_name\n"
+                           . "Project Code  : $project_code\n"
+                           . "Site          : $site_name\n"
+                           . "Created by    : " . ($c->session->{username} || 'system') . "\n"
+                           . "Created at    : " . strftime('%Y-%m-%d %H:%M:%S', localtime) . "\n\n"
+                           . "Please review and ensure proper governance procedures are followed.",
+            category      => 'project_governance',
+            priority      => 'medium',
+            status        => 'open',
+            created_at    => strftime('%Y-%m-%d %H:%M:%S', localtime),
+        });
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_create_governance_ticket',
+            "Governance ticket $ticket_number created for project id=$project_id");
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_create_governance_ticket',
+            "Could not create governance ticket for project id=$project_id: $_"
+            . " (run schema_compare to create support_tickets table if missing)");
+    };
+}
 
 sub project :Path('project') :Args(0) {
     my ( $self, $c ) = @_;
@@ -613,10 +683,18 @@ sub build_project_tree :Private {
     # Create an array of todo hashrefs with only the needed attributes
     my @todo_hashrefs = ();
     foreach my $todo (@todos) {
-        # Safely get accumulated_time (may not exist in all schemas)
         my $accumulated_time = 0;
-        eval { $accumulated_time = $todo->accumulated_time || 0; };
-        
+        eval {
+            my $t = $todo->accumulative_time;
+            if ($t) {
+                if ($t =~ /^(\d+):(\d+):(\d+)$/) {
+                    $accumulated_time = $1 * 3600 + $2 * 60 + $3;
+                } elsif ($t =~ /^\d+$/) {
+                    $accumulated_time = $t + 0;
+                }
+            }
+        };
+
         push @todo_hashrefs, {
             id => $todo->id,
             record_id => $todo->record_id,

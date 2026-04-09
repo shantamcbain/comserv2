@@ -1,0 +1,74 @@
+[% META
+   title = "Animals - Encyclopedia of Biological Life"
+   description = "Browse all animals in the ENCY encyclopedia"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-02"
+%]
+[% PageVersion = 'ENCY/AnimalList.tt,v 0.01 2026/04/02' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.success_msg %]
+<div class="alert alert-success">[% c.flash.success_msg | html %]</div>
+[% END %]
+[% IF c.flash.error_msg %]
+<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
+[% END %]
+
+<h1>Animals</h1>
+
+<p><a href="[% c.uri_for('/ENCY') %]">&larr; Back to Encyclopedia</a></p>
+
+[% is_editor = is_editor || 0; is_admin = is_admin || 0 %]
+[% IF is_editor %]
+<a href="[% c.uri_for('/ENCY/Animal/add') %]" class="btn btn-primary">Add Animal</a>
+[% END %]
+
+<form method="get" action="[% c.uri_for('/ENCY/Animal') %]">
+    <label>Kingdom:
+        <input type="text" name="kingdom" value="[% kingdom | html %]" size="20" />
+    </label>
+    <label>Ecological Role:
+        <input type="text" name="ecological_role" value="[% ecological_role | html %]" size="20" />
+    </label>
+    <input type="submit" value="Filter" class="btn btn-default" />
+    <a href="[% c.uri_for('/ENCY/Animal') %]">Clear</a>
+</form>
+
+[% IF animals && animals.size %]
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <th>Common Name</th>
+        <th>Scientific Name</th>
+        <th>Ecological Role</th>
+        <th>Distribution</th>
+        <th>Image</th>
+        <th></th>
+    </tr>
+    [% FOREACH animal IN animals %]
+    <tr>
+        <td>[% animal.common_name | html %]</td>
+        <td><em>[% animal.scientific_name | html %]</em></td>
+        <td>[% animal.ecological_role | html %]</td>
+        <td>[% animal.distribution | html %]</td>
+        <td>
+            [% IF animal.image %]
+            <img src="[% animal.image | html %]" alt="[% animal.common_name | html %]" width="60" height="60" style="object-fit:cover" />
+            [% END %]
+        </td>
+        <td><a href="[% c.uri_for('/ENCY/Animal', animal.record_id) %]">Details</a></td>
+    </tr>
+    [% END %]
+</table>
+[% ELSE %]
+<p>No animals found in the database.</p>
+[% END %]
+
+[% IF ai_fallback %]
+<div class="alert alert-info" style="margin-top:1em;">
+  No local results for &ldquo;[% ai_query | html %]&rdquo;.
+  <a href="/ai?prompt=Tell+me+about+[% ai_query | uri %]+in+the+context+of+the+encyclopedia">Ask AI</a>
+</div>
+[% END %]

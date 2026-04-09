@@ -7,6 +7,7 @@ use DateTime::Format::Strptime;
 use Data::Dumper;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::PointSystem;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -45,7 +46,7 @@ sub index :Path('/log') :Args(0) {
     unless ($admin_auth->check_admin_access($c, 'log_index')) {
         $c->flash->{error_msg} = 'You must be an administrator to view logs.';
         $c->response->redirect($c->uri_for('/user/login'));
-        return;
+        $c->detach();
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Accessed log index");
@@ -86,7 +87,7 @@ sub details :Path('/log/details') :Args(0) {
     unless ($admin_auth->check_admin_access($c, 'log_details')) {
         $c->flash->{error_msg} = 'You must be an administrator to view log details.';
         $c->response->redirect($c->uri_for('/user/login'));
-        return;
+        $c->detach();
     }
 
     my $record_id = $c->request->body_parameters->{record_id};
@@ -116,7 +117,7 @@ sub update :Path('/log/update') :Args(0) {
     unless ($admin_auth->check_admin_access($c, 'log_update')) {
         $c->flash->{error_msg} = 'You must be an administrator to update log entries.';
         $c->response->redirect($c->uri_for('/user/login'));
-        return;
+        $c->detach();
     }
 
     # Get the record_id from the form data
@@ -232,6 +233,34 @@ sub update :Path('/log/update') :Args(0) {
     # Call the modify method on the Log model instance
     $log_model->modify($c, $record_id, $new_values);
 
+    # When a log entry is closed (status=3/DONE), apply points billing/earning
+    if ($status == 3) {
+        eval {
+            my $updated_log = $c->model('DBEncy')->resultset('Log')->find($record_id);
+            if ($updated_log && !$updated_log->points_processed) {
+                my $ps = Comserv::Util::PointSystem->new(c => $c);
+                my ($ok, $err) = $ps->bill_time_log($updated_log);
+                if ($ok) {
+                    $self->logging->log_with_details(
+                        $c, 'info', __FILE__, __LINE__, 'update',
+                        "Points processed for log #$record_id"
+                    );
+                } elsif ($err && $err ne 'already processed' && $err ne 'zero duration — nothing to bill') {
+                    $self->logging->log_with_details(
+                        $c, 'warn', __FILE__, __LINE__, 'update',
+                        "Points processing skipped for log #$record_id: $err"
+                    );
+                }
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details(
+                $c, 'error', __FILE__, __LINE__, 'update',
+                "Points billing error for log #$record_id: $@"
+            );
+        }
+    }
+
     # Redirect to the log details page after successful update
     $c->response->redirect($c->uri_for("/log", { record_id => $record_id }));
 }
@@ -242,7 +271,7 @@ sub log_form :Path('/log/log_form') :Args() {
 
     unless ($c->session->{username} && $c->session->{username} ne 'anonymous') {
         $c->response->redirect($c->uri_for('/user/login'));
-        return;
+        $c->detach();
     }
 
     my $schema = $c->model('DBEncy');
@@ -454,23 +483,24 @@ sub create_log :Path('/log/create_log') :Args() {
     );
 
     my $logEntry = $rs->create({
-        todo_record_id  => $c->request->body_parameters->{todo_record_id},
-        username        => $username,
-        sitename        => $sitename,
-        start_date      => $start_date || $current_date,
-        project_code    => $project_id, # Use project_id from project_list.tt
-        due_date        => $c->request->body_parameters->{due_date},
-        abstract        => $subject,
-        details         => $c->request->body_parameters->{details},
-        start_time      => $start_time, # Now has a default value if empty
-        end_time        => $end_time,   # Now has a default value if empty
-        time            => $time_diff,
-        group_of_poster => $group_of_poster, # Use the converted string value
-        status          => $c->request->body_parameters->{status},
-        priority        => $c->request->body_parameters->{priority},
-        last_mod_by     => $c->session->{username},
-        last_mod_date   => DateTime->now->ymd,
-        comments        => $c->request->body_parameters->{comments}
+        todo_record_id   => $c->request->body_parameters->{todo_record_id},
+        username         => $username,
+        sitename         => $sitename,
+        start_date       => $start_date || $current_date,
+        project_code     => $project_id,
+        due_date         => $c->request->body_parameters->{due_date},
+        abstract         => $subject,
+        details          => $c->request->body_parameters->{details},
+        start_time       => $start_time,
+        end_time         => $end_time,
+        time             => $time_diff,
+        group_of_poster  => $group_of_poster,
+        status           => $c->request->body_parameters->{status},
+        priority         => $c->request->body_parameters->{priority},
+        last_mod_by      => $c->session->{username},
+        last_mod_date    => DateTime->now->ymd,
+        comments         => $c->request->body_parameters->{comments},
+        points_processed => 0,
     });
 
     # Log the success event

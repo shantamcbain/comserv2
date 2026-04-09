@@ -246,7 +246,7 @@ sub fs_rename :Path('/file/fs_rename') :Args(0) {
         return;
     }
 
-    
+
 
     my $old_path = $c->req->param('old_path') // '';
     my $new_name = $c->req->param('new_name') // '';
@@ -292,21 +292,59 @@ sub fs_rename :Path('/file/fs_rename') :Args(0) {
         return;
     }
 
-    my $sync = $self->_db_sync_path($c, $old_path, $new_path);
-    eval {
-        my $schema = $c->model('DBEncy');
-        my $rec = $schema->resultset('File')->search(
-            [ { file_path => $new_path }, { nfs_path => $new_path } ]
-        )->first;
-        $rec->update({ file_name => $new_name }) if $rec;
-    };
+    my $is_dir = -d $new_path;
+    my $db_updated = 0;
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fs_rename',
-        "Renamed $old_path -> $new_path db_updated=$sync->{updated} dup=$sync->{dup_flagged}");
-    my $msg = "Renamed to '$new_name'.";
-    $msg .= " Database record updated." if $sync->{updated};
-    $msg .= " <strong>Duplicate detected</strong> — check the Duplicates page." if $sync->{dup_flagged};
-    $c->flash->{success_msg} = $msg;
+    if ($is_dir) {
+        eval {
+            my $schema    = $c->model('DBEncy');
+            my $old_prefix = $old_path;
+            my $new_prefix = $new_path;
+            my @recs = $schema->resultset('File')->search([
+                { file_path => { 'like', "$old_prefix/%" } },
+                { nfs_path  => { 'like', "$old_prefix/%" } },
+            ])->all;
+            for my $rec (@recs) {
+                my %upd;
+                if (length($rec->file_path // '') && ($rec->file_path // '') =~ m{^\Q$old_prefix\E(/|$)}) {
+                    (my $np = $rec->file_path) =~ s{^\Q$old_prefix\E}{$new_prefix};
+                    $upd{file_path} = $np;
+                }
+                if (length($rec->nfs_path // '') && ($rec->nfs_path // '') =~ m{^\Q$old_prefix\E(/|$)}) {
+                    (my $np = $rec->nfs_path) =~ s{^\Q$old_prefix\E}{$new_prefix};
+                    $upd{nfs_path} = $np;
+                }
+                $rec->update(\%upd) if %upd;
+                $db_updated++;
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fs_rename',
+                "Directory DB path update failed: $@");
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fs_rename',
+            "Renamed directory $old_path -> $new_path db_records_updated=$db_updated");
+        my $msg = "Directory renamed to '$new_name'.";
+        $msg .= " $db_updated database record(s) path updated." if $db_updated;
+        $msg .= " No database records found for files in this directory." unless $db_updated;
+        $c->flash->{success_msg} = $msg;
+    } else {
+        my $sync = $self->_db_sync_path($c, $old_path, $new_path);
+        eval {
+            my $schema = $c->model('DBEncy');
+            my $rec = $schema->resultset('File')->search(
+                [ { file_path => $new_path }, { nfs_path => $new_path } ]
+            )->first;
+            $rec->update({ file_name => $new_name }) if $rec;
+        };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fs_rename',
+            "Renamed $old_path -> $new_path db_updated=$sync->{updated} dup=$sync->{dup_flagged}");
+        my $msg = "Renamed to '$new_name'.";
+        $msg .= " Database record updated." if $sync->{updated};
+        $msg .= " <strong>Duplicate detected</strong> — check the Duplicates page." if $sync->{dup_flagged};
+        $c->flash->{success_msg} = $msg;
+    }
+
     $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
 }
 
@@ -378,6 +416,7 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
     my $old_path = $c->req->param('old_path') // '';
     my $dest_dir = $c->req->param('dest_dir') // '';
     my $dir      = $c->req->param('dir')      // '';
+    my $back_url = $c->req->param('back_url') // '';
 
     $old_path =~ s{\.\.}{}g;
     $dest_dir =~ s{\.\.}{}g;
@@ -385,15 +424,21 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
     $dest_dir =~ s/\s+$//;
     $dest_dir =~ s{/+$}{};
 
+    my $_err_redir = sub {
+        my $msg = shift;
+        $c->flash->{error_msg} = $msg;
+        my $r = length($back_url) ? $back_url
+              : $c->uri_for('/file/admin_browser', { dir_path => $dir });
+        $c->response->redirect($r);
+    };
+
     unless (length $old_path && length $dest_dir) {
-        $c->flash->{error_msg} = 'Source path and destination directory are required.';
-        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        $_err_redir->('Source path and destination directory are required.');
         return;
     }
 
     unless (-e $old_path) {
-        $c->flash->{error_msg} = 'Source file not found.';
-        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        $_err_redir->('Source file not found.');
         return;
     }
 
@@ -404,16 +449,14 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
     unless ($allowed_src && $allowed_dst) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fs_move',
             "Scope violation: '$sitename' tried to move '$old_path' -> '$dest_dir'");
-        $c->flash->{error_msg} = 'Access denied: destination is outside your allocated directories.';
-        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        $_err_redir->('Access denied: destination is outside your allocated directories.');
         return;
     }
 
     unless (-d $dest_dir) {
         eval { make_path($dest_dir) };
         if ($@ || !-d $dest_dir) {
-            $c->flash->{error_msg} = "Destination directory could not be created: $@";
-            $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+            $_err_redir->("Destination directory could not be created: $@");
             return;
         }
     }
@@ -425,14 +468,14 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
     if (-e $new_path) {
         if (-d $old_path && -d $new_path) {
             $c->response->redirect($c->uri_for('/file/dir_merge', {
-                src  => $old_path,
-                dest => $new_path,
-                back => $dir,
+                src      => $old_path,
+                dest     => $new_path,
+                back     => $dir,
+                back_url => $back_url,
             }));
             return;
         }
-        $c->flash->{error_msg} = "A file named '$filename' already exists in '$dest_dir'. Cannot overwrite a file with a file — rename one first.";
-        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        $_err_redir->("A file named '$filename' already exists in '$dest_dir'. Cannot overwrite a file with a file — rename one first.");
         return;
     }
 
@@ -443,8 +486,7 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
     } elsif ($is_dir) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fs_move',
             "Rename failed for directory '$old_path' -> '$new_path': $!");
-        $c->flash->{error_msg} = "Cannot move directory: $! (directories can only be moved within the same filesystem)";
-        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        $_err_redir->("Cannot move directory: $! (directories can only be moved within the same filesystem)");
         return;
     } else {
         require File::Copy;
@@ -452,8 +494,7 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
         unless ($move_ok) {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fs_move',
                 "Move failed: $old_path -> $new_path: $!");
-            $c->flash->{error_msg} = "Move failed: $!";
-            $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+            $_err_redir->("Move failed: $!");
             return;
         }
     }
@@ -474,7 +515,9 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
         $msg .= " <strong>Duplicate detected</strong> — check the Duplicates page." if $sync->{dup_flagged};
     }
     $c->flash->{success_msg} = $msg;
-    $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+    my $redir = length($back_url) ? $back_url
+              : $c->uri_for('/file/admin_browser', { dir_path => $dir });
+    $c->response->redirect($redir);
 }
 
 sub fs_mkdir :Path('/file/fs_mkdir') :Args(0) {
@@ -1864,6 +1907,7 @@ sub nfs_allocations :Path('/file/nfs_allocations') :Args(0) {
         {
             id          => $alloc->id,
             sitename    => $alloc->sitename,
+            site_id     => $alloc->site_id,
             nfs_path    => $alloc->nfs_path,
             description => $alloc->description,
             is_active   => $alloc->is_active,
@@ -2102,14 +2146,13 @@ sub nfs_allocation_edit :Path('/file/nfs_allocation_edit') :Args(1) {
 
     # Ensure nfs_path is absolute
     my $nfs_root = $self->_nfs_root_for_sync();
-    unless (CORE::index($nfs_path, '/') == 0 || CORE::index($nfs_path, $nfs_root) == 0) {
+    unless (CORE::index($nfs_path, '/') == 0) {
         $nfs_path = "$nfs_root/$nfs_path";
     }
 
-    # Security check: Prevent allocation of sensitive paths
-    my ($allowed, $nr) = $self->_is_path_allowed($c, $nfs_path, $is_csc, $alloc_sitename, $nfs_root);
-    unless ($allowed) {
-        $c->flash->{error_msg} = "Access denied: cannot allocate to sensitive or unauthorized path '$nfs_path'.";
+    # Block only obviously dangerous system paths
+    if ($nfs_path =~ m{^/(etc|proc|sys|boot|dev)\b} || $nfs_path eq '/') {
+        $c->flash->{error_msg} = "Cannot allocate a system path: '$nfs_path'.";
         $c->response->redirect($c->uri_for('/file/nfs_allocations'));
         return;
     }

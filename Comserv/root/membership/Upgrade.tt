@@ -1,0 +1,162 @@
+[% META
+   title = "Upgrade Membership"
+   description = "Upgrade or change your current membership plan"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-04-03"
+%]
+[% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Upgrade Your Membership</h1>
+    <p>Select a new plan below. Your current plan access remains active until the new plan is activated.</p>
+    <div class="form-actions" style="margin-top:0.5rem">
+      <a href="[% c.uri_for('/membership/account') %]" class="btn btn-secondary">← My Account</a>
+    </div>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      [% IF current_membership %]
+      <div class="content-section">
+        <h2>Current Plan</h2>
+        <div class="table-container">
+          <table class="data-table">
+            <tbody>
+              <tr>
+                <td><strong>Plan</strong></td>
+                <td>[% current_membership.plan.name | html %]</td>
+              </tr>
+              <tr>
+                <td><strong>Status</strong></td>
+                <td>
+                  <span style="padding:2px 8px;border-radius:10px;font-size:0.85em;
+                               background:[% current_membership.status == 'active' ? '#d4edda' : '#fff3cd' %];
+                               color:[% current_membership.status == 'active' ? '#155724' : '#856404' %]">
+                    [% current_membership.status | html %]
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Expires</strong></td>
+                <td>[% current_membership.expires_at ? current_membership.expires_at : 'Never' | html %]</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      [% END %]
+
+      [% IF plans.size %]
+      <div class="content-section">
+        <h2>Available Plans</h2>
+        <div class="form-row">
+          [% FOREACH plan IN plans %]
+          [% SET is_current = current_membership AND current_membership.plan.id == plan.id %]
+          <div class="form-field" style="flex:1;min-width:200px;border:2px solid [% is_current ? 'var(--primary-color,#3498db)' : 'var(--border-color,#ddd)' %];
+                                         border-radius:8px;padding:1.25rem;text-align:center;
+                                         [% IF plan.is_featured %]box-shadow:0 4px 12px rgba(52,152,219,0.2)[% END %]">
+
+            [% IF plan.is_featured %]
+            <div style="font-size:0.8em;font-weight:bold;color:var(--primary-color,#3498db);margin-bottom:0.4rem">
+              ★ Most Popular
+            </div>
+            [% END %]
+
+            <h3 style="margin:0 0 0.5rem">[% plan.name | html %]</h3>
+
+            [% IF plan.description %]
+            <p style="font-size:0.85em;color:#666;margin:0 0 0.75rem">[% plan.description | html %]</p>
+            [% END %]
+
+            <div style="font-size:1.4em;font-weight:bold;margin-bottom:0.25rem">
+              [% IF plan.price_monthly == 0 %]
+                Free
+              [% ELSE %]
+                [% plan.price_currency | html %] [% plan.price_monthly %]<span style="font-size:0.6em;font-weight:normal">/mo</span>
+              [% END %]
+            </div>
+            [% IF plan.price_annual > 0 %]
+            <div style="font-size:0.8em;color:#888;margin-bottom:0.75rem">
+              or [% plan.price_currency | html %] [% plan.price_annual %]/yr
+            </div>
+            [% END %]
+
+            <ul style="text-align:left;font-size:0.85em;list-style:none;padding:0;margin:0 0 1rem">
+              [% IF plan.ai_requests_per_day > 0 %]
+              <li>✓ [% plan.ai_requests_per_day %] AI requests/day</li>
+              [% END %]
+              [% IF plan.has_email %]
+              <li>✓ [% plan.email_addresses %] email address[% IF plan.email_addresses != 1 %]es[% END %]</li>
+              [% END %]
+              [% IF plan.has_hosting %]
+              <li>✓ [% plan.hosting_tier || 'Hosting' | html %]</li>
+              [% END %]
+              [% IF plan.has_beekeeping %]<li>✓ Beekeeping module</li>[% END %]
+              [% IF plan.has_planning %]<li>✓ Planning system</li>[% END %]
+              [% IF plan.has_currency %]
+              <li>✓ Site coins[% IF plan.currency_bonus > 0 %] (+[% plan.currency_bonus %] bonus)[% END %]</li>
+              [% END %]
+            </ul>
+
+            [% IF is_current %]
+            <span class="btn btn-secondary" style="display:block;pointer-events:none;opacity:0.65">
+              Current Plan
+            </span>
+            [% ELSE %]
+            <a href="[% c.uri_for('/membership/subscribe', { plan_id => plan.id }) %]"
+               class="btn btn-primary" style="display:block">
+              [% IF current_membership AND plan.price_monthly > current_membership.plan.price_monthly %]
+                Upgrade to [% plan.name | html %]
+              [% ELSE %]
+                Switch to [% plan.name | html %]
+              [% END %]
+            </a>
+            [% END %]
+
+            <a href="[% c.uri_for('/membership/plan_details/' _ plan.id) %]"
+               style="display:block;margin-top:0.5rem;font-size:0.82em">Full details →</a>
+          </div>
+          [% END %]
+        </div>
+      </div>
+
+      <div class="content-section" style="font-size:0.87em;color:#666">
+        <p>
+          <strong>Note:</strong> Upgrading takes effect immediately.
+          Downgrading takes effect at the end of your current billing cycle.
+          All plan changes are logged for your records.
+        </p>
+        [% IF patreon_cfg AND patreon_cfg.active %]
+        <p>
+          <strong>Patreon supporters:</strong> Your Patreon pledge level determines your membership tier automatically.
+          <a href="[% patreon_cfg.url | html %]" target="_blank" rel="noopener">Manage your Patreon pledge →</a>
+        </p>
+        [% END %]
+      </div>
+
+      [% ELSE %]
+      <div class="content-section">
+        <p class="empty-state">No plans are currently available for this site.</p>
+      </div>
+      [% END %]
+
+      [% IF current_membership %]
+      <div class="content-section">
+        <p>
+          Want to cancel instead?
+          <a href="[% c.uri_for('/membership/cancel', { membership_id => current_membership.id }) %]"
+             style="color:#e74c3c">Cancel my membership</a>
+        </p>
+      </div>
+      [% END %]
+
+    </div>
+  </div>
+</div>

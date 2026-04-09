@@ -1,0 +1,297 @@
+[% META
+   title = "Constituent Detail - Encyclopedia of Biological Life"
+   description = "View and edit chemical constituent details in the ENCY encyclopedia"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-02"
+%]
+[% PageVersion = 'ENCY/ConstituentDetail.tt,v 0.01 2026/04/02' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[% PROCESS 'ENCY/ImageHelper.tt' %]
+
+[% IF success_msg || c.flash.success_msg %]
+<div class="alert alert-success">[% success_msg || c.flash.success_msg | html %]</div>
+[% END %]
+[% IF error_msg || c.flash.error_msg %]
+<div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
+[% END %]
+
+[% is_editor = is_editor || 0; is_admin = is_admin || 0 %]
+
+[% IF edit_mode %]
+<h1>Editing Constituent: [% constituent.name | html %]</h1>
+[% ELSE %]
+<h1>[% constituent.name | html %]</h1>
+[% END %]
+
+<p><a href="[% c.uri_for('/ENCY/Constituent') %]">&larr; Back to Constituents</a>
+[% IF is_editor && !edit_mode && constituent.record_id %]
+  | <a href="[% c.uri_for('/ENCY/Constituent/edit', { record_id => constituent.record_id }) %]">Edit</a>
+[% END %]
+</p>
+
+[% IF edit_mode %]
+<form action="[% IF constituent.record_id %][% c.uri_for('/ENCY/Constituent/edit') %][% ELSE %][% c.uri_for('/ENCY/Constituent/add') %][% END %]" method="post">
+[% IF constituent.record_id %]
+<input type="hidden" name="record_id" value="[% constituent.record_id %]" />
+[% END %]
+[% END %]
+
+<h2>Chemical Properties</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Name</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="name" value="[% constituent.name | html %]" size="50" />
+            [% ELSE %]
+            [% constituent.name | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Common Name</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="common_name" value="[% constituent.common_name | html %]" size="50" />
+            [% ELSE %]
+            [% constituent.common_name | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Chemical Formula</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="chemical_formula" value="[% constituent.chemical_formula | html %]" size="30" />
+            [% ELSE %]
+            [% constituent.chemical_formula | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Chemical Class</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="chemical_class" value="[% constituent.chemical_class | html %]" size="50" />
+            [% ELSE %]
+            [% constituent.chemical_class | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>IUPAC Name</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="iupac_name" value="[% constituent.iupac_name | html %]" size="60" />
+            [% ELSE %]
+            [% constituent.iupac_name | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>CAS Number</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="cas_number" value="[% constituent.cas_number | html %]" size="20" />
+            [% ELSE %]
+            [% constituent.cas_number | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Molecular Weight</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="molecular_weight" value="[% constituent.molecular_weight | html %]" size="15" />
+            <span style="font-size:0.85em;color:#666;"> g/mol (numbers only — units stripped automatically)</span>
+            [% ELSE %]
+            [% IF constituent.molecular_weight %][% constituent.molecular_weight | html %] g/mol[% END %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+<h2>Pharmacology</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Therapeutic Action</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="therapeutic_action" rows="4" cols="60">[% constituent.therapeutic_action | html %]</textarea>
+            [% ELSE %]
+            [% constituent.therapeutic_action | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Toxicity</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="toxicity" rows="3" cols="60">[% constituent.toxicity | html %]</textarea>
+            [% ELSE %]
+            [% constituent.toxicity | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Solubility</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="solubility" value="[% constituent.solubility | html %]" size="50" />
+            [% ELSE %]
+            [% constituent.solubility | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Pharmacological Effects</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="pharmacological_effects" rows="4" cols="60">[% constituent.pharmacological_effects | html %]</textarea>
+            [% ELSE %]
+            [% constituent.pharmacological_effects | html %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+<h2>Found In</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Found in Herbs</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="found_in_herbs" rows="3" cols="60">[% constituent.found_in_herbs | html %]</textarea>
+            [% ELSE %]
+            [% IF linked_herbs && linked_herbs.size %]
+                [% FOREACH lh IN linked_herbs %]
+                    [% IF lh.url %]
+                        <a href="[% lh.url | html %]">[% lh.name | html %]</a>[% IF lh.herb_url %]&nbsp;<a href="[% lh.herb_url | html %]" target="_blank" title="External source" style="font-size:0.75em;">[&#x2197;]</a>[% END %]
+                    [% ELSE %]
+                        [% lh.name | html %]
+                    [% END %]
+                    [% UNLESS loop.last %], [% END %]
+                [% END %]
+            [% ELSIF constituent.found_in_herbs %]
+                [% constituent.found_in_herbs | html %]
+            [% END %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Found in Foods</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="found_in_foods" rows="3" cols="60">[% constituent.found_in_foods | html %]</textarea>
+            [% ELSE %]
+            [% constituent.found_in_foods | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Found in Drugs</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="found_in_drugs" rows="3" cols="60">[% constituent.found_in_drugs | html %]</textarea>
+            [% ELSE %]
+            [% IF linked_drugs && linked_drugs.size %]
+                [% FOREACH ld IN linked_drugs %]
+                    [% IF ld.url %]
+                        <a href="[% ld.url | html %]">[% ld.name | html %]</a>
+                    [% ELSE %]
+                        [% ld.name | html %]
+                    [% END %]
+                    [% UNLESS loop.last %], [% END %]
+                [% END %]
+            [% ELSIF constituent.found_in_drugs %]
+                [% constituent.found_in_drugs | html %]
+            [% END %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+<h2>Research Notes</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Research Notes</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="research_notes" rows="5" cols="60">[% constituent.research_notes | html %]</textarea>
+            [% ELSE %]
+            [% constituent.research_notes | html %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+[% IF related_diseases && related_diseases.size %]
+<h2>Related Diseases</h2>
+<ul>
+    [% FOREACH disease IN related_diseases %]
+    <li><a href="[% c.uri_for('/ENCY/Disease', disease.record_id) %]">[% disease.common_name | html %]</a></li>
+    [% END %]
+</ul>
+[% END %]
+
+[% IF related_symptoms && related_symptoms.size %]
+<h2>Related Symptoms</h2>
+<ul>
+    [% FOREACH symptom IN related_symptoms %]
+    <li><a href="[% c.uri_for('/ENCY/Symptom', symptom.record_id) %]">[% symptom.name | html %][% IF symptom.common_name %] ([% symptom.common_name | html %])[% END %]</a></li>
+    [% END %]
+</ul>
+[% END %]
+
+<h2>Additional Information</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Reference</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="reference" rows="3" cols="60">[% constituent.reference | html %]</textarea>
+            [% ELSE %]
+            [% constituent.reference | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>URL</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="url" value="[% constituent.url | html %]" size="60" />
+            [% ELSE %]
+            [% IF constituent.url %]<a href="[% constituent.url | html %]" target="_blank">[% constituent.url | html %]</a>[% END %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Image</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="image" value="[% constituent.image | html %]" size="60" />
+            <span style="font-size:0.85em;color:#666;"> (paste a Wikipedia or PubChem image URL; AI can suggest one)</span>
+            [% ELSE %]
+            [% IF constituent.image %]
+            [% ency_img_tag(constituent.image, 300, 300) %]
+            [% ELSE %]
+            <span style="color:#999;font-style:italic;">No image — edit to add one (AI can suggest a PubChem image URL)</span>
+            [% END %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+[% IF !edit_mode %]
+[% PROCESS 'ENCY/partials/FormalRefs.tt' %]
+[% END %]
+[% IF edit_mode %]
+[% PROCESS 'ENCY/partials/AiFormFill.tt' %]
+<br/>
+<input type="submit" value="[% IF constituent.record_id %]Update Constituent[% ELSE %]Add Constituent[% END %]" class="btn btn-primary" />
+<a href="[% c.uri_for('/ENCY/Constituent') %]" class="btn btn-default">Cancel</a>
+</form>
+[% END %]
