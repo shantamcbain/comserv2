@@ -33,6 +33,19 @@ __PACKAGE__->add_columns(
         default_value => 'active',
         is_nullable => 0,
     },
+    project_id => {
+        data_type => 'integer',
+        is_nullable => 1,
+    },
+    task_id => {
+        data_type => 'integer',
+        is_nullable => 1,
+    },
+    model => {
+        data_type => 'varchar',
+        size => 255,
+        is_nullable => 1,
+    },
 );
 
 __PACKAGE__->set_primary_key('id');

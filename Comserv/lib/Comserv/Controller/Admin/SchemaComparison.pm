@@ -1492,6 +1492,10 @@ sub create_table_from_result :Chained('base') :PathPart('create-table-from-resul
 }
 
 # AJAX endpoint: Create result file from database table
+# WARNING: This is the NON-PREFERRED direction. The preferred workflow is:
+#   1. Create the Result file first (it is the authoritative schema definition)
+#   2. Then run create_table_from_result to create the DB table from the Result file
+# Creating a Result file from an existing table is a recovery/catch-up operation only.
 sub create_result_from_table :Chained('base') :PathPart('create-result-from-table') :Args(0) {
     my ($self, $c) = @_;
     
@@ -1504,6 +1508,10 @@ sub create_result_from_table :Chained('base') :PathPart('create-result-from-tabl
         $c->response->body(encode_json({ error => 'Missing required parameters' }));
         return;
     }
+    
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_result_from_table',
+        "NON-PREFERRED DIRECTION: Creating Result file FROM table '$table_name'. "
+        . "Preferred workflow: create Result file first, then use create_table_from_result.");
     
     try {
         my $schema = $database eq 'Ency' ? $c->model('DBEncy') : $c->model('DBForager');
@@ -1534,7 +1542,11 @@ sub create_result_from_table :Chained('base') :PathPart('create-result-from-tabl
             success => 1,
             message => "Successfully created result file for $table_name",
             file_path => $result_file_path,
-            fields_exported => scalar(@$table_fields)
+            fields_exported => scalar(@$table_fields),
+            workflow_warning => "NON-PREFERRED DIRECTION: Result file was generated from the database table. "
+                . "Review and correct the generated file — do not treat it as authoritative. "
+                . "Going forward, create the Result file first, then use 'Create Table from Result'.",
+            preferred_direction => "Result file first \x{2192} Create Table from Result",
         }));
         
     } catch {
