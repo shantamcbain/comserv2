@@ -15,6 +15,7 @@
         <a href="/" onclick="activateSite('Home')"><i class="icon-home"></i>Home</a>
         <a href="[% c.session.return_url %]"><i class="icon-back"></i>Go Back</a>
         <a href="/workshop" onclick="activateSite('Workshops')" target="_blank"><i class="icon-workshop"></i>Workshops</a>
+        <a href="/jobs"><i class="icon-briefcase"></i>Jobs &amp; Employment</a>
         
         [% IF c.session.username %]
         <div class="dropdown-divider"></div>

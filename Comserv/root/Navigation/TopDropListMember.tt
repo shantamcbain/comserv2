@@ -111,6 +111,7 @@
             <div class="submenu">
                 <!-- Link to the list of herbs -->
                 <a href="/ENCY/BotanicalNameView" class="submenu-link"><i class="icon-herb"></i>List of Herbs</a>
+                <a href="/jobs" class="submenu-link"><i class="icon-briefcase"></i>Jobs &amp; Employment</a>
             </div>
         </div>
         
