@@ -2,6 +2,7 @@ package Comserv::Controller::Jobs;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Try::Tiny;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -183,6 +184,16 @@ sub apply :Chained('base') :PathPart('apply') :Args(1) {
 
         $c->flash->{success_msg} = 'Your application has been submitted.';
         $c->response->redirect($c->uri_for($self->action_for('view'), [$job_id]));
+        $self->_notify_poster($c, $job, $name, $email);
+
+        my $is_guest = (!$username || $username eq 'anonymous') ? 1 : 0;
+        $c->stash(
+            job      => $job,
+            name     => $name,
+            email    => $email,
+            is_guest => $is_guest,
+            template => 'jobs/apply_success.tt',
+        );
         return;
     }
 
@@ -202,6 +213,36 @@ sub apply :Chained('base') :PathPart('apply') :Args(1) {
         user_data => $user_data,
         template  => 'jobs/apply_form.tt',
     );
+}
+
+sub _notify_poster {
+    my ($self, $c, $job, $applicant_name, $applicant_email) = @_;
+
+    my $poster_email = $job->poster_email;
+    if (!$poster_email && $job->posted_by_user_id) {
+        my $user = eval { $job->posted_by };
+        $poster_email = $user->email if $user;
+    }
+
+    return unless $poster_email;
+
+    my $site_id  = $c->session->{site_id};
+    my $job_url  = $c->uri_for($self->action_for('view'), [$job->id]);
+    my $subject  = 'New application for: ' . $job->title;
+    my $body     = "Hello,\n\n"
+                 . "$applicant_name ($applicant_email) has applied for your job posting:\n"
+                 . $job->title . "\n\n"
+                 . "View the application at: $job_url\n\n"
+                 . "-- The Jobs System";
+
+    try {
+        $c->model('Mail')->send_email($c, $poster_email, $subject, $body, $site_id);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_notify_poster',
+            "Notification sent to $poster_email for job " . $job->id);
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_notify_poster',
+            "Failed to send notification: $_");
+    };
 }
 
 sub close_job :Chained('base') :PathPart('close') :Args(1) {
@@ -252,6 +293,98 @@ sub update_application :Chained('base') :PathPart('application/update') :Args(1)
 
     $c->flash->{error_msg} = 'Application not found.';
     $c->response->redirect($c->uri_for($self->action_for('index')));
+}
+
+sub admin :Chained('base') :PathPart('admin') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $roles = $c->session->{roles} || [];
+    unless (grep { $_ eq 'admin' || $_ eq 'developer' } @$roles) {
+        $c->flash->{error_msg} = 'You must be an administrator to access this area.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    my $sitename = $c->session->{SiteName} // 'CSC';
+    my $schema   = $c->model('DBEncy');
+
+    my @jobs = eval {
+        $schema->resultset('Job')->search(
+            { sitename => $sitename },
+            { order_by => { -desc => 'created_at' } }
+        );
+    };
+
+    my @all_applications = eval {
+        $schema->resultset('JobApplication')->search(
+            {},
+            {
+                join     => 'job',
+                where    => { 'job.sitename' => $sitename },
+                order_by => { -desc => 'me.created_at' },
+            }
+        );
+    };
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin',
+        'Admin accessed jobs admin for site: ' . $sitename);
+
+    $c->stash(
+        jobs             => \@jobs,
+        all_applications => \@all_applications,
+        template         => 'jobs/admin.tt',
+    );
+}
+
+sub admin_update_job :Chained('base') :PathPart('admin/update') :Args(1) {
+    my ($self, $c, $job_id) = @_;
+
+    my $roles = $c->session->{roles} || [];
+    unless (grep { $_ eq 'admin' || $_ eq 'developer' } @$roles) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my $job    = $schema->resultset('Job')->find($job_id);
+
+    if ($job) {
+        my $new_status = $c->request->body_parameters->{status} // $job->status;
+        $job->update({ status => $new_status });
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_update_job',
+            "Job $job_id status updated to $new_status");
+        $c->flash->{success_msg} = 'Job status updated.';
+    } else {
+        $c->flash->{error_msg} = 'Job not found.';
+    }
+
+    $c->response->redirect($c->uri_for($self->action_for('admin')));
+}
+
+sub admin_delete_job :Chained('base') :PathPart('admin/delete') :Args(1) {
+    my ($self, $c, $job_id) = @_;
+
+    my $roles = $c->session->{roles} || [];
+    unless (grep { $_ eq 'admin' || $_ eq 'developer' } @$roles) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my $job    = $schema->resultset('Job')->find($job_id);
+
+    if ($job) {
+        $job->delete;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_delete_job',
+            "Job $job_id deleted by admin");
+        $c->flash->{success_msg} = 'Job deleted.';
+    } else {
+        $c->flash->{error_msg} = 'Job not found.';
+    }
+
+    $c->response->redirect($c->uri_for($self->action_for('admin')));
 }
 
 __PACKAGE__->meta->make_immutable;
