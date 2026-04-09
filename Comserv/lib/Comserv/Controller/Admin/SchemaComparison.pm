@@ -2158,6 +2158,260 @@ sub parse_result_file_columns {
 
 Recursively clean scalar references from data structures for JSON serialization
 
+# AJAX endpoint: Create result file from database table
+# WARNING: This is the NON-PREFERRED direction. The preferred workflow is:
+#   1. Create the Result file first (it is the authoritative schema definition)
+#   2. Then run create_table_from_result to create the DB table from the Result file
+# Creating a Result file from an existing table is a recovery/catch-up operation only.
+sub create_result_from_table :Chained('base') :PathPart('create-result-from-table') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json; charset=utf-8');
+    
+    my $table_name = $c->req->param('table_name');
+    my $database = $c->req->param('database');
+    
+    unless ($table_name && $database) {
+        $c->response->body(encode_json({ error => 'Missing required parameters' }));
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_result_from_table',
+        "NON-PREFERRED DIRECTION: Creating Result file FROM table '$table_name'. "
+        . "Preferred workflow: create Result file first, then use create_table_from_result.");
+    
+    try {
+        my $schema = $database eq 'Ency' ? $c->model('DBEncy') : $c->model('DBForager');
+        
+        # Get table structure using internal DBI system
+        my $table_fields = $self->get_table_structure_via_model($c, $database, $table_name);
+        
+        unless (@$table_fields) {
+            $c->response->body(encode_json({ error => 'Table not found or has no fields' }));
+            return;
+        }
+        
+        # Create result file
+        my $result_file_content = $self->generate_result_file_content($table_name, $table_fields, $database);
+        my $result_file_path = $self->determine_result_file_path($c, $table_name, $database);
+        
+        # Ensure directory exists
+        my $result_dir = dirname($result_file_path);
+        make_path($result_dir) unless -d $result_dir;
+        
+        # Write result file
+        write_file($result_file_path, $result_file_content);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_result_from_table', 
+            "Successfully created result file $result_file_path for table $table_name");
+        
+        $c->response->body(encode_json({
+            success => 1,
+            message => "Successfully created result file for $table_name",
+            file_path => $result_file_path,
+            fields_exported => scalar(@$table_fields),
+            workflow_warning => "NON-PREFERRED DIRECTION: Result file was generated from the database table. "
+                . "Review and correct the generated file — do not treat it as authoritative. "
+                . "Going forward, create the Result file first, then use 'Create Table from Result'.",
+            preferred_direction => "Result file first \x{2192} Create Table from Result",
+        }));
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_result_from_table', 
+            "Result file creation failed: $_");
+        $c->response->body(encode_json({ error => "Result file creation failed: $_" }));
+    };
+}
+
+# AJAX endpoint: Sync table schema to result file
+sub sync_table_to_result :Chained('base') :PathPart('sync-table-to-result') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json; charset=utf-8');
+    
+    my $table_name = $c->req->param('table_name');
+    my $database = $c->req->param('database');
+    
+    unless ($table_name && $database) {
+        $c->response->body(encode_json({ error => 'Missing required parameters' }));
+        return;
+    }
+    
+    try {
+        my $result = $self->sync_table_to_result_file($c, $table_name, $database);
+        $c->response->body(encode_json($result));
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'sync_table_to_result', 
+            "Table to result sync failed: $_");
+        $c->response->body(encode_json({ error => "Sync failed: $_" }));
+    };
+}
+
+# AJAX endpoint: Sync result file to table schema
+sub sync_result_to_table :Chained('base') :PathPart('sync-result-to-table') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json; charset=utf-8');
+    
+    my $table_name = $c->req->param('table_name');
+    my $database = $c->req->param('database');
+    
+    unless ($table_name && $database) {
+        $c->response->body(encode_json({ error => 'Missing required parameters' }));
+        return;
+    }
+    
+    try {
+        my $result = $self->sync_result_to_table_schema($c, $table_name, $database);
+        $c->response->body(encode_json($result));
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'sync_result_to_table', 
+            "Result to table sync failed: $_");
+        $c->response->body(encode_json({ error => "Sync failed: $_" }));
+    };
+}
+
+# Helper method: Sync table schema to result file
+sub sync_table_to_result_file {
+    my ($self, $c, $table_name, $database) = @_;
+    
+    my $schema = $database eq 'Ency' ? $c->model('DBEncy') : $c->model('DBForager');
+    
+    # Get current table structure using internal DBI system
+    my $table_fields = $self->get_table_structure_via_model($c, $database, $table_name);
+    
+    # Find or determine result file path
+    my $result_file_path = $self->find_result_file_for_table($c, $table_name);
+    $result_file_path ||= $self->determine_result_file_path($c, $table_name, $database);
+    
+    # Generate updated result file content
+    my $result_content = $self->generate_result_file_content($table_name, $table_fields, $database);
+    
+    # Backup existing file if it exists
+    if (-f $result_file_path) {
+        my $backup_path = $result_file_path . '.backup.' . time();
+        copy($result_file_path, $backup_path);
+    }
+    
+    # Ensure directory exists
+    my $result_dir = dirname($result_file_path);
+    make_path($result_dir) unless -d $result_dir;
+    
+    # Write updated result file
+    write_file($result_file_path, $result_content);
+    
+    return {
+        success => 1,
+        message => "Successfully synchronized table $table_name to result file",
+        file_path => $result_file_path,
+        fields_synchronized => scalar(@$table_fields)
+    };
+}
+
+# Helper method: Sync result file to table schema
+sub sync_result_to_table_schema {
+    my ($self, $c, $table_name, $database) = @_;
+    
+    # Find result file
+    my $result_file_path = $self->find_result_file_for_table($c, $table_name);
+    
+    unless ($result_file_path && -f $result_file_path) {
+        return { error => "Result file not found for table $table_name" };
+    }
+    
+    # Parse result file fields
+    my $result_fields = $self->parse_result_file_fields($result_file_path);
+    
+    unless (@$result_fields) {
+        return { error => "No fields found in result file" };
+    }
+    
+    # Use DBSchemaManager to modify the table
+    my $db_manager = $c->model('DBSchemaManager');
+    my $schema_model = $database eq 'Ency' ? 'DBEncy' : 'DBForager';
+    
+    my $alter_result = $db_manager->sync_table_with_result_fields($table_name, $result_fields, $schema_model);
+    
+    return $alter_result;
+}
+
+# Helper method: Generate result file content from table structure
+sub generate_result_file_content {
+    my ($self, $table_name, $fields, $database) = @_;
+    
+    # Convert table name to class name
+    my $class_name = join('', map { ucfirst(lc($_)) } split(/_/, $table_name));
+    my $namespace = $database eq 'Ency' ? 'Comserv::Model::DBEncy::Result' : 'Comserv::Model::DBForager::Result';
+    
+    my $content = qq{package ${namespace}::${class_name};
+
+use strict;
+use warnings;
+use base 'DBIx::Class::Core';
+
+__PACKAGE__->table('${table_name}');
+
+__PACKAGE__->add_columns(
+};
+
+    foreach my $field (@$fields) {
+        my $field_name = $field->{name};
+        my $data_type = $self->convert_mysql_to_dbic_type($field->{type});
+        
+        $content .= qq{    "${field_name}" => {
+        data_type => "${data_type}",
+        is_nullable => } . ($field->{null} eq 'YES' ? '1' : '0') . qq{,
+};
+        
+        # Add size if applicable
+        if ($field->{type} =~ /\((\d+)\)/) {
+            $content .= qq{        size => $1,
+};
+        }
+        
+        # Add default value if present
+        if (defined $field->{default} && $field->{default} ne '') {
+            $content .= qq{        default_value => '$field->{default}',
+};
+        }
+        
+        # Add auto_increment if present
+        if ($field->{extra} && $field->{extra} =~ /auto_increment/i) {
+            $content .= qq{        is_auto_increment => 1,
+};
+        }
+        
+        $content .= qq{    },
+};
+    }
+    
+    $content .= qq{);
+
+# Set primary key
+};
+    
+    # Find primary key fields
+    my @pk_fields = grep { $_->{key} eq 'PRI' } @$fields;
+    if (@pk_fields) {
+        my $pk_list = join(', ', map { qq{"$_->{name}"} } @pk_fields);
+        $content .= qq{__PACKAGE__->set_primary_key($pk_list);
+
+};
+    }
+    
+    $content .= qq{1;
+
+=head1 NAME
+
+${namespace}::${class_name} - Result class for '${table_name}' table
+
+=head1 DESCRIPTION
+
+Auto-generated DBIx::Class result class for the '${table_name}' table.
+Generated from database schema on } . strftime('%Y-%m-%d %H:%M:%S', localtime()) . qq{
+
 =cut
 
 sub clean_scalar_refs {
