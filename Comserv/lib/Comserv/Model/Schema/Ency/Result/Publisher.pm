@@ -30,7 +30,7 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key('publisher_id');
 
 __PACKAGE__->has_many(
-    references => 'Comserv::Model::Schema::Ency::Result::Reference',
+    reference_records => 'Comserv::Model::Schema::Ency::Result::Reference',
     'publisher_id',
 );
 

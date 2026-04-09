@@ -1,0 +1,94 @@
+[% META
+   title = "Reference Library - ENCY Encyclopedia"
+   description = "All references cited in the ENCY encyclopedia"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.02"
+   last_updated = "2026-04-08"
+%]
+[% PageVersion = 'ENCY/ReferenceList.tt,v 0.02 2026/04/08' %]
+
+[% IF success_msg || c.flash.success_msg %]
+<div class="alert alert-success">[% success_msg || c.flash.success_msg | html %]</div>
+[% END %]
+[% IF error_msg || c.flash.error_msg %]
+<div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
+[% END %]
+
+<h1>Reference Library</h1>
+
+<p class="ency-admin-breadcrumb">
+  <a href="[% c.uri_for('/ENCY') %]">&larr; ENCY Home</a>
+  [% IF is_editor %]
+  &nbsp;|&nbsp; <a href="[% c.uri_for('/ENCY/Reference/add') %]">+ Add Reference</a>
+  [% END %]
+  [% IF is_admin %]
+  &nbsp;|&nbsp; <a href="[% c.uri_for('/ENCY/admin') %]">ENCY Admin</a>
+  [% END %]
+</p>
+
+[% IF references && references.size %]
+<p class="ency-admin-note">
+  [% references.size %] reference(s).
+  Colour key:
+  <span class="ref-verified">&#10003; Verified</span> —
+  <span class="ref-partial">&#9679; Partial</span> —
+  <span class="ref-empty">&#9675; Empty</span>
+</p>
+
+<table class="ency-admin-table" style="width:100%;">
+  <thead>
+  <tr>
+    <th style="width:3em;">#</th>
+    <th>Title</th>
+    <th>Author(s)</th>
+    <th>Publisher</th>
+    <th style="width:4em;">Year</th>
+    <th style="width:4em;">Type</th>
+    <th style="width:6em;">ISBN</th>
+    <th style="width:8em;">Actions</th>
+  </tr>
+  </thead>
+  <tbody>
+  [% FOR ref IN references %]
+  [%  SET verified = (ref.title && ref.title != '' && ref.author && ref.author != '' && ref.isbn && ref.isbn != '') ? 1 : 0 %]
+  [%  SET partial  = (!verified && (ref.title && ref.title != '')) ? 1 : 0 %]
+  [%  SET cls = verified ? 'ref-row-verified' : partial ? 'ref-row-partial' : 'ref-row-empty' %]
+  <tr class="[% cls %]">
+    <td>
+      <a href="[% c.uri_for('/ENCY/Reference', ref.reference_id) %]"
+         title="[% verified ? 'Verified' : partial ? 'Partial data' : 'No data' %]">
+        [% IF verified %]<span class="ref-verified">[% ref.reference_id %]</span>
+        [% ELSIF partial %]<span class="ref-partial">[% ref.reference_id %]</span>
+        [% ELSE %]<span class="ref-empty">[% ref.reference_id %]</span>
+        [% END %]
+      </a>
+    </td>
+    <td>
+      <a href="[% c.uri_for('/ENCY/Reference', ref.reference_id) %]">
+        [% IF ref.title %][% ref.title | html %][% ELSE %]<em>No title</em>[% END %]
+      </a>
+    </td>
+    <td>[% ref.author | html %]</td>
+    <td>[% IF ref.publisher_record %][% ref.publisher_record.name | html %][% ELSE %][% ref.publisher | html %][% END %]</td>
+    <td>[% ref.publication_date ? ref.publication_date.substr(0,4) : '' %]</td>
+    <td>[% ref.reference_system | html %]</td>
+    <td>[% ref.isbn | html %]</td>
+    <td class="nowrap">
+      <a href="[% c.uri_for('/ENCY/Reference', ref.reference_id) %]">Detail</a>
+      [% IF is_editor %]
+      &nbsp;<a href="[% c.uri_for('/ENCY/Reference', ref.reference_id, { edit => 1 }) %]">Edit</a>
+      [% END %]
+    </td>
+  </tr>
+  [% END %]
+  </tbody>
+</table>
+
+[% ELSE %]
+<p class="ency-admin-note">
+  No references found.
+  [% IF is_editor %]<a href="[% c.uri_for('/ENCY/Reference/add') %]">Add the first reference.</a>[% END %]
+</p>
+[% END %]

@@ -9,7 +9,7 @@
 %]
 [% PageVersion = 'ENCY/index.tt,v 0.04 2026/04/04' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
-<link rel="stylesheet" href="/static/css/ency-index.css">
+
 
 [% IF c.flash.success_msg %]
 <div class="alert alert-success">[% c.flash.success_msg | html %]</div>
@@ -27,7 +27,7 @@
 [%# ── HERO — adapts per site ──────────────────────────────────── %]
 <div class="ency-hero">
 [% IF c.session.username %]
-  <h2>Welcome back, [% c.session.firstname | html %]!</h2>
+  <h2>Welcome back, [% (c.session.first_name || c.session.username) | html %]!</h2>
 [% ELSE %]
   <h2>Welcome to
     [% IF site_lc == 'bmaster' %]
@@ -72,6 +72,8 @@
   <a href="[% c.uri_for('/ENCY/Constituent') %]" class="ency-nav-card"><span class="ency-card-icon">⚗</span> Constituents</a>
   <a href="[% c.uri_for('/ENCY/Drug') %]" class="ency-nav-card"><span class="ency-card-icon">💊</span> Drugs &amp; Treatments</a>
   <a href="[% c.uri_for('/ENCY/Glossary') %]" class="ency-nav-card"><span class="ency-card-icon">📖</span> Glossary</a>
+  <a href="[% c.uri_for('/ENCY/Reference') %]" class="ency-nav-card"><span class="ency-card-icon">📚</span> Reference Library</a>
+  <a href="[% c.uri_for('/ENCY/Author') %]" class="ency-nav-card"><span class="ency-card-icon">✍</span> Authors</a>
 
 [% ELSIF site_lc == 'forager' %]
   <a href="[% c.uri_for('/ENCY/Herb') %]" class="ency-nav-card"><span class="ency-card-icon">🌿</span> Herbs &amp; Plants</a>
@@ -81,6 +83,8 @@
   <a href="[% c.uri_for('/ENCY/Insect') %]" class="ency-nav-card"><span class="ency-card-icon">🐛</span> Insects</a>
   <a href="[% c.uri_for('/ENCY/Constituent') %]" class="ency-nav-card"><span class="ency-card-icon">⚗</span> Constituents</a>
   <a href="[% c.uri_for('/ENCY/Glossary') %]" class="ency-nav-card"><span class="ency-card-icon">📖</span> Glossary</a>
+  <a href="[% c.uri_for('/ENCY/Reference') %]" class="ency-nav-card"><span class="ency-card-icon">📚</span> Reference Library</a>
+  <a href="[% c.uri_for('/ENCY/Author') %]" class="ency-nav-card"><span class="ency-card-icon">✍</span> Authors</a>
 
 [% ELSIF site_lc == 'usbm' %]
   <a href="[% c.uri_for('/ENCY/Herb') %]" class="ency-nav-card"><span class="ency-card-icon">🌿</span> Herbs</a>
@@ -93,6 +97,8 @@
   <a href="[% c.uri_for('/ENCY/Insect') %]" class="ency-nav-card"><span class="ency-card-icon">🐛</span> Insects</a>
   <a href="[% c.uri_for('/ENCY/Glossary') %]" class="ency-nav-card"><span class="ency-card-icon">📖</span> Glossary</a>
   <a href="[% c.uri_for('/ENCY/PractitionerType') %]" class="ency-nav-card"><span class="ency-card-icon">👩‍⚕️</span> Practitioner Types</a>
+  <a href="[% c.uri_for('/ENCY/Reference') %]" class="ency-nav-card"><span class="ency-card-icon">📚</span> Reference Library</a>
+  <a href="[% c.uri_for('/ENCY/Author') %]" class="ency-nav-card"><span class="ency-card-icon">✍</span> Authors</a>
 
 [% ELSE %]
   <a href="[% c.uri_for('/ENCY/Herb') %]" class="ency-nav-card"><span class="ency-card-icon">🌿</span> Herbs</a>
@@ -106,6 +112,8 @@
   <a href="[% c.uri_for('/ENCY/Glossary') %]" class="ency-nav-card"><span class="ency-card-icon">📖</span> Glossary</a>
   <a href="[% c.uri_for('/ENCY/BotanicalNameView') %]" class="ency-nav-card"><span class="ency-card-icon">🔤</span> Botanical Names</a>
   <a href="[% c.uri_for('/ENCY/BeePastureView') %]" class="ency-nav-card"><span class="ency-card-icon">🌼</span> Bee Forage</a>
+  <a href="[% c.uri_for('/ENCY/Reference') %]" class="ency-nav-card"><span class="ency-card-icon">📚</span> Reference Library</a>
+  <a href="[% c.uri_for('/ENCY/Author') %]" class="ency-nav-card"><span class="ency-card-icon">✍</span> Authors</a>
 [% END %]
 
 </nav>
@@ -157,7 +165,9 @@ document.getElementById('ency-ai-query').addEventListener('keypress', function(e
   <a href="[% c.uri_for('/ENCY/Constituent/add') %]">+ Constituent</a> |
   <a href="[% c.uri_for('/ENCY/Formula/add') %]">+ Formula</a> |
   <a href="[% c.uri_for('/ENCY/Drug/add') %]">+ Drug</a> |
-  <a href="[% c.uri_for('/ENCY/Glossary/add') %]">+ Glossary Term</a>
+  <a href="[% c.uri_for('/ENCY/Glossary/add') %]">+ Glossary Term</a> |
+  <a href="[% c.uri_for('/ENCY/Reference/add') %]">+ Reference</a> |
+  <a href="[% c.uri_for('/ENCY/Author/add') %]">+ Author</a>
 </div>
 [% END %]
 
