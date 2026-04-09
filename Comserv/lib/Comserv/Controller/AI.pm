@@ -602,19 +602,45 @@ sub generate :Local :Args(0) {
             }
             $grok->api_key($grok_api_key);
             if ($model) {
-                $grok->model($model);
-            } else {
-                # No model specified — use first available synced model from API key metadata
+                # Pre-flight: if the requested model is known deprecated, use last_working_model instead
                 eval {
                     my $schema  = $c->model('DBEncy')->schema;
                     my $key_obj = $schema->resultset('UserApiKeys')->search(
                         { service => 'grok', is_active => '1' }
                     )->first;
                     if ($key_obj) {
-                        my $meta   = $key_obj->get_metadata() || {};
-                        my $synced = $meta->{available_models} || [];
-                        my ($first) = grep { $_->{id} && $_->{id} !~ /imagine|video/i } @$synced;
-                        $grok->model($first->{id}) if $first && $first->{id};
+                        my $meta       = $key_obj->get_metadata() || {};
+                        my $deprecated = $meta->{deprecated_models} || {};
+                        if ($deprecated->{$model}) {
+                            my $replacement = $meta->{last_working_model} || '';
+                            if ($replacement && $replacement ne $model) {
+                                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                                    'generate', "Requested model '$model' is deprecated; using '$replacement' instead");
+                                $model = $replacement;
+                            }
+                        }
+                    }
+                };
+                $grok->model($model);
+            } else {
+                # No model specified — prefer last_working_model, then synced list (skip deprecated)
+                eval {
+                    my $schema  = $c->model('DBEncy')->schema;
+                    my $key_obj = $schema->resultset('UserApiKeys')->search(
+                        { service => 'grok', is_active => '1' }
+                    )->first;
+                    if ($key_obj) {
+                        my $meta       = $key_obj->get_metadata() || {};
+                        my $deprecated = $meta->{deprecated_models} || {};
+                        if ($meta->{last_working_model} && !$deprecated->{ $meta->{last_working_model} }) {
+                            $grok->model($meta->{last_working_model});
+                        } else {
+                            my $synced = $meta->{available_models} || [];
+                            my ($first) = grep {
+                                $_->{id} && $_->{id} !~ /imagine|video/i && !$deprecated->{ $_->{id} }
+                            } @$synced;
+                            $grok->model($first->{id}) if $first && $first->{id};
+                        }
                     }
                 };
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
@@ -657,7 +683,9 @@ sub generate :Local :Args(0) {
                                 $_->{id} && $_->{id} ne $failed_model
                                          && $_->{id} !~ /imagine|video/i
                             } @{ $mdata->{data} || [] };
-                            my ($best) = sort { $a->{id} cmp $b->{id} } @live;
+                            # Prefer newer models: use reverse-alphabetical sort as heuristic
+                            # (grok-3-mini > grok-2-mini > grok-2 etc.)
+                            my ($best) = sort { $b->{id} cmp $a->{id} } @live;
                             if ($best) {
                                 $fallback = $best->{id};
                                 my $schema  = $c->model('DBEncy')->schema;
@@ -665,9 +693,12 @@ sub generate :Local :Args(0) {
                                     { service => 'grok', is_active => '1' }
                                 )->first;
                                 if ($key_obj) {
-                                    my $meta = $key_obj->get_metadata() || {};
-                                    $meta->{available_models}  = [ map { { id => $_->{id} } } @live ];
-                                    $meta->{models_synced_at}  = time();
+                                    my $meta       = $key_obj->get_metadata() || {};
+                                    my $deprecated = $meta->{deprecated_models} || {};
+                                    $deprecated->{$failed_model} = time();
+                                    $meta->{deprecated_models} = $deprecated;
+                                    $meta->{available_models}   = [ map { { id => $_->{id} } } @live ];
+                                    $meta->{models_synced_at}   = time();
                                     $key_obj->set_metadata($meta);
                                     eval { $key_obj->update };
                                 }
@@ -691,6 +722,20 @@ sub generate :Local :Args(0) {
                             messages   => \@grok_messages,
                             use_search => $use_search,
                         );
+                        if ($response) {
+                            eval {
+                                my $schema  = $c->model('DBEncy')->schema;
+                                my $key_obj = $schema->resultset('UserApiKeys')->search(
+                                    { service => 'grok', is_active => '1' }
+                                )->first;
+                                if ($key_obj) {
+                                    my $meta = $key_obj->get_metadata() || {};
+                                    $meta->{last_working_model} = $fallback;
+                                    $key_obj->set_metadata($meta);
+                                    eval { $key_obj->update };
+                                }
+                            };
+                        }
                     }
                 }
                 unless ($response) {
