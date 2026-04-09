@@ -1814,18 +1814,21 @@ sub search :Path('/documentation/search') :Args(0) {
     $self->_ensure_scanned($c);
     
     # Get user role (same logic as index method)
-    my $user_role = 'normal';
+    my $user_role = 'guest';
     my $is_admin = 0;
-    
-    if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
+
+    my $session_username_s = $c->session->{username} // '';
+    my $is_authenticated = ($session_username_s && $session_username_s ne 'anonymous');
+
+    if ($is_authenticated && $c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
         if (grep { lc($_) eq 'admin' } @{$c->session->{roles}}) {
             $user_role = 'admin';
             $is_admin = 1;
         } else {
             $user_role = $c->session->{roles}->[0];
         }
-    } elsif ($c->controller('Root')->user_exists($c)) {
-        $user_role = $c->session->{roles} || 'normal';
+    } elsif ($is_authenticated && $c->controller('Root')->user_exists($c)) {
+        $user_role = $c->session->{roles} || 'user';
         $is_admin = 1 if lc($user_role) eq 'admin';
     }
     
@@ -1869,7 +1872,7 @@ sub search :Path('/documentation/search') :Args(0) {
                             $has_role = 1;
                             last;
                         }
-                    } elsif ($role eq 'normal' && $user_role) {
+                    } elsif ($role eq 'normal' && $is_authenticated) {
                         $has_role = 1;
                         last;
                     }
@@ -2468,18 +2471,39 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         $ap_cond{user_id}  = $user_id  unless $can_see_all;
 
         # ── Load projects that are blocking other projects ────────────────────
-        # A project is a "cross-project blocker" if it appears as depends_on_id
-        # in an active project_dependency row. Todos in these projects get a
-        # priority boost so they float to the top of active priorities.
-        my %cross_blocker_projects;  # project_id => [names of projects it is blocking]
+        # project_dependencies table:
+        #   project_id    = the BLOCKED project (cannot proceed yet)
+        #   depends_on_id = the BLOCKER project (must deliver first)
+        # Todos in "depends_on_id" projects get a priority boost.
+        my %cross_blocker_projects;  # depends_on_id => [project_ids that are blocked]
+        my %cross_blocker_names;     # depends_on_id => [names of blocked projects]
         my @dep_rows_ap = eval {
             $c->model('DBEncy')->resultset('ProjectDependency')->search(
                 { status => 'active', dependency_type => 'blocks' },
                 { columns => [qw(depends_on_id project_id)] }
             )->all;
         };
-        for my $dr (@dep_rows_ap) {
-            push @{ $cross_blocker_projects{$dr->depends_on_id} }, $dr->project_id;
+        if (@dep_rows_ap) {
+            my %ids_needed;
+            for my $dr (@dep_rows_ap) {
+                push @{ $cross_blocker_projects{$dr->depends_on_id} }, $dr->project_id;
+                $ids_needed{$dr->project_id}    = 1;
+                $ids_needed{$dr->depends_on_id} = 1;
+            }
+            my %pid2name;
+            eval {
+                my @prows = $c->model('DBEncy')->resultset('Project')->search(
+                    { id => { -in => [keys %ids_needed] } },
+                    { columns => [qw(id name)] }
+                )->all;
+                %pid2name = map { $_->id => $_->name } @prows;
+            };
+            for my $dep_id (keys %cross_blocker_projects) {
+                $cross_blocker_names{$dep_id} = [
+                    map { $pid2name{$_} || "Project #$_" }
+                        @{ $cross_blocker_projects{$dep_id} }
+                ];
+            }
         }
 
         my @rows = $c->model('DBEncy')->resultset('Todo')->search(
@@ -2523,12 +2547,16 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
             my $priority    = ($h{priority} || 5);
             my $block_bonus = $h{is_blocking} ? -0.4 : 0;
 
-            # Cross-project blocker bonus: this todo's project is blocking other projects
+            # Cross-project blocker bonus: this todo's project must complete first
+            # (it appears as depends_on_id — other projects are waiting on it)
+            # -3 means a P5 blocker (score 102) beats any P3+ non-blocker (score 103+)
+            # Status-tier × 100 ensures IN-PROGRESS always beats NEW regardless of bonus
             my $cross_block_bonus = 0;
             if ($h{project_id} && $cross_blocker_projects{$h{project_id}}) {
-                $cross_block_bonus = -1.5;   # pull it higher than a same-priority non-blocker
+                $cross_block_bonus = -3;   # boosts ~3 priority levels above equivalent non-blocker
                 $h{is_cross_blocker} = 1;
                 $h{blocking_count}   = scalar @{ $cross_blocker_projects{$h{project_id}} };
+                $h{blocking_names}   = join(', ', @{ $cross_blocker_names{$h{project_id}} || [] });
             }
 
             $h{ap_score} = ($status_tier * 100) + ($priority + $block_bonus + $cross_block_bonus) + $stale_penalty;
@@ -2567,15 +2595,81 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
 
     # ── Project dependencies (cross-project blocking) ─────────────────────────
     my @project_deps;
+    my $auto_resolved_count = 0;
+    my $auto_detected_count = 0;
+    my @done_statuses_dep   = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+
     eval {
+        my $prs  = $c->model('DBEncy')->resultset('Project');
+        my $tdrs = $c->model('DBEncy')->resultset('Todo');
+
+        # ── Step 1: Auto-detect cross-project todo-level blocks ────────────────
+        # Find todos with blocked_by_todo_id pointing to a todo in a DIFFERENT project
+        my @blocked_todos = $tdrs->search(
+            {
+                'me.blocked_by_todo_id' => { '!=' => undef },
+                'me.status'             => { -not_in => \@done_statuses_dep },
+                'me.project_id'         => { '!=' => undef },
+            }
+        )->all;
+
+        for my $blocked (@blocked_todos) {
+            my $blocker_todo_id = $blocked->blocked_by_todo_id // next;
+            my $blocker = eval { $tdrs->find($blocker_todo_id) };
+            next unless $blocker && $blocker->project_id;
+            next if $blocker->project_id == $blocked->project_id;
+
+            my $bs = $blocker->status // 0;
+            next if ($bs == 3 || $bs == 4 || $bs =~ /^(done|completed|closed)$/i);
+
+            my $existing = eval {
+                $c->model('DBEncy')->resultset('ProjectDependency')->find({
+                    project_id    => $blocked->project_id,
+                    depends_on_id => $blocker->project_id,
+                })
+            };
+            unless ($existing) {
+                eval {
+                    $c->model('DBEncy')->resultset('ProjectDependency')->create({
+                        project_id      => $blocked->project_id,
+                        depends_on_id   => $blocker->project_id,
+                        dependency_type => 'blocks',
+                        status          => 'active',
+                        sitename        => $sitename,
+                        created_by      => 'auto-detect',
+                        description     => "Auto-detected: '"
+                            . ($blocked->subject // '?') . "' blocked by '"
+                            . ($blocker->subject // '?') . "'",
+                    });
+                    $auto_detected_count++;
+                };
+            }
+        }
+
+        # ── Step 2: Fetch active deps and auto-resolve completed ones ──────────
         my @dep_rows = $c->model('DBEncy')->resultset('ProjectDependency')->search(
             { status => 'active' },
             { order_by => { -asc => 'project_id' } }
         )->all;
 
         my %proj_name_cache;
-        my $prs = $c->model('DBEncy')->resultset('Project');
         for my $dep (@dep_rows) {
+            # Check if the blocking project still has open todos
+            my $open_count = eval {
+                $tdrs->search({
+                    project_id => $dep->depends_on_id,
+                    status     => { -not_in => \@done_statuses_dep },
+                })->count
+            } // 1;
+
+            if (defined $open_count && $open_count == 0) {
+                eval {
+                    $dep->update({ status => 'resolved', resolved_at => \'NOW()' });
+                };
+                $auto_resolved_count++;
+                next;
+            }
+
             my %d = $dep->get_columns;
             for my $fid ($d{project_id}, $d{depends_on_id}) {
                 unless (exists $proj_name_cache{$fid}) {
@@ -2590,7 +2684,7 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     };
     if ($@) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
-            "Could not fetch project dependencies: $@");
+            "Could not fetch/process project dependencies: $@");
     }
 
     # Pass all date information and todos to template
@@ -2635,8 +2729,10 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         todos           => $all_todos_calendar,    # For week.tt
         todos_for_today => $todos_for_today,       # For day view
         active_priorities    => \@active_priorities,    # DB-driven priority list for TODAY'S FOCUS
-        project_deps         => \@project_deps,         # Cross-project blocking dependencies
-        active_blockers      => [ grep { $_->{dependency_type} eq 'blocks' && $_->{status} eq 'active' } @project_deps ],
+        project_deps          => \@project_deps,
+        active_blockers       => [ grep { $_->{dependency_type} eq 'blocks' && $_->{status} eq 'active' } @project_deps ],
+        dep_auto_resolved     => $auto_resolved_count,
+        dep_auto_detected     => $auto_detected_count,
 
         template => 'admin/documentation/DailyPlan.tt'
     );

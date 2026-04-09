@@ -274,6 +274,23 @@ __PACKAGE__->_initialize_ai_chat_schema();
 # as the application uses db_config.json for database connections instead.
 # Comserv::Util::ConfigDatabaseInit->initialize();
 
+# Context helper: delegate to Root controller's check_user_roles
+# Allows controllers to call $c->check_user_roles('admin') directly
+sub check_user_roles {
+    my ($c, @roles) = @_;
+    my $root = $c->controller('Root');
+    return 0 unless $root;
+    return $root->check_user_roles($c, @roles);
+}
+
+# Context helper: delegate to Root controller's user_exists
+sub user_exists {
+    my ($c) = @_;
+    my $root = $c->controller('Root');
+    return 0 unless $root;
+    return $root->user_exists($c);
+}
+
 1;
 
 =head1 INTERNAL METHODS

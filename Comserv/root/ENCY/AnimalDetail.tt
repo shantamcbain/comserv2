@@ -1,0 +1,310 @@
+[% META
+   title = "Animal Detail - Encyclopedia of Biological Life"
+   description = "View and edit animal details in the ENCY encyclopedia"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-02"
+%]
+[% PageVersion = 'ENCY/AnimalDetail.tt,v 0.01 2026/04/02' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[% PROCESS 'ENCY/ImageHelper.tt' %]
+
+[% IF success_msg || c.flash.success_msg %]
+<div class="alert alert-success">[% success_msg || c.flash.success_msg | html %]</div>
+[% END %]
+[% IF error_msg || c.flash.error_msg %]
+<div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
+[% END %]
+
+[% is_editor = is_editor || 0; is_admin = is_admin || 0 %]
+
+[% IF edit_mode %]
+<h1>Editing Animal: [% animal.common_name | html %]</h1>
+[% ELSE %]
+<h1>[% animal.common_name | html %]</h1>
+[% END %]
+
+<p><a href="[% c.uri_for('/ENCY/Animal') %]">&larr; Back to Animals</a>
+[% IF is_editor && !edit_mode && animal.record_id %]
+  | <a href="[% c.uri_for('/ENCY/Animal/edit', { record_id => animal.record_id }) %]">Edit</a>
+[% END %]
+</p>
+
+[% IF edit_mode %]
+<form action="[% IF animal.record_id %][% c.uri_for('/ENCY/Animal/edit') %][% ELSE %][% c.uri_for('/ENCY/Animal/add') %][% END %]" method="post">
+[% IF animal.record_id %]
+<input type="hidden" name="record_id" value="[% animal.record_id %]" />
+[% END %]
+[% END %]
+
+<h2>Taxonomy</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Common Name</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="common_name" value="[% animal.common_name | html %]" size="50" />
+            [% ELSE %]
+            [% animal.common_name | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Scientific Name</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="scientific_name" value="[% animal.scientific_name | html %]" size="50" />
+            [% ELSE %]
+            <em>[% animal.scientific_name | html %]</em>
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Kingdom</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="kingdom" value="[% animal.kingdom | html %]" size="30" />
+            [% ELSE %]
+            [% animal.kingdom | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Phylum</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="phylum" value="[% animal.phylum | html %]" size="30" />
+            [% ELSE %]
+            [% animal.phylum | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Class</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="class_name" value="[% animal.class_name | html %]" size="30" />
+            [% ELSE %]
+            [% animal.class_name | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Order</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="order_name" value="[% animal.order_name | html %]" size="30" />
+            [% ELSE %]
+            [% animal.order_name | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Family</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="family_name" value="[% animal.family_name | html %]" size="30" />
+            [% ELSE %]
+            [% animal.family_name | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Genus</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="genus" value="[% animal.genus | html %]" size="30" />
+            [% ELSE %]
+            [% animal.genus | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Species</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="species" value="[% animal.species | html %]" size="30" />
+            [% ELSE %]
+            [% animal.species | html %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+<h2>Ecology</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Habitat</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="habitat" rows="3" cols="60">[% animal.habitat | html %]</textarea>
+            [% ELSE %]
+            [% animal.habitat | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Diet</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="diet" rows="3" cols="60">[% animal.diet | html %]</textarea>
+            [% ELSE %]
+            [% animal.diet | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Behavior</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="behavior" rows="3" cols="60">[% animal.behavior | html %]</textarea>
+            [% ELSE %]
+            [% animal.behavior | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Ecological Role</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="ecological_role" rows="3" cols="60">[% animal.ecological_role | html %]</textarea>
+            [% ELSE %]
+            [% animal.ecological_role | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Distribution</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="distribution" rows="3" cols="60">[% animal.distribution | html %]</textarea>
+            [% ELSE %]
+            [% animal.distribution | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Conservation Status</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="conservation_status" value="[% animal.conservation_status | html %]" size="30" />
+            [% ELSE %]
+            [% animal.conservation_status | html %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+<h2>Medical</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Therapeutic Uses</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="therapeutic_uses" rows="4" cols="60">[% animal.therapeutic_uses | html %]</textarea>
+            [% ELSE %]
+            [% animal.therapeutic_uses | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Veterinary Uses</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="veterinary_uses" rows="4" cols="60">[% animal.veterinary_uses | html %]</textarea>
+            [% ELSE %]
+            [% animal.veterinary_uses | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Constituents</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="constituents" rows="3" cols="60">[% animal.constituents | html %]</textarea>
+            [% ELSE %]
+            [% animal.constituents | html %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+<h2>Metadata</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>History</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="history" rows="4" cols="60">[% animal.history | html %]</textarea>
+            [% ELSE %]
+            [% animal.history | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Reference</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="reference" rows="3" cols="60">[% animal.reference | html %]</textarea>
+            [% ELSE %]
+            [% animal.reference | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>URL</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="url" value="[% animal.url | html %]" size="60" />
+            [% ELSE %]
+            [% IF animal.url %]<a href="[% animal.url | html %]" target="_blank">[% animal.url | html %]</a>[% END %]
+            [% END %]
+        </td>
+    </tr>
+    [% IF edit_mode %]
+    <tr>
+        <td><strong>Image</strong></td>
+        <td>
+            <input type="text" name="image" value="[% animal.image | html %]" size="60" />
+        </td>
+    </tr>
+    [% ELSE %]
+    [% IF animal.image %]
+    <tr>
+        <td><strong>Image</strong></td>
+        <td>[% ency_img_tag(animal.image, 300, 300) %]</td>
+    </tr>
+    [% END %]
+    [% END %]
+</table>
+
+[% IF related_herbs && related_herbs.size %]
+<h2>Related Herbs</h2>
+<ul>
+    [% FOREACH herb IN related_herbs %]
+    <li><a href="[% c.uri_for('/ENCY/herb_detail', herb.record_id) %]">[% herb.botanical_name | html %] ([% herb.common_names | html %])</a></li>
+    [% END %]
+</ul>
+[% END %]
+
+[% IF related_diseases && related_diseases.size %]
+<h2>Related Diseases</h2>
+<ul>
+    [% FOREACH disease IN related_diseases %]
+    <li><a href="[% c.uri_for('/ENCY/Disease', disease.record_id) %]">[% disease.common_name | html %]</a></li>
+    [% END %]
+</ul>
+[% END %]
+
+[% IF !edit_mode %]
+[% PROCESS 'ENCY/partials/FormalRefs.tt' %]
+[% END %]
+[% IF edit_mode %]
+[% PROCESS 'ENCY/partials/AiFormFill.tt' %]
+<br/>
+<input type="submit" value="[% IF animal.record_id %]Update Animal[% ELSE %]Add Animal[% END %]" class="btn btn-primary" />
+<a href="[% c.uri_for('/ENCY/Animal') %]" class="btn btn-default">Cancel</a>
+</form>
+[% END %]

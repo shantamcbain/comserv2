@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "id": "185f3e40-9d71-4222-b1f0-1be0f3a677b9",
+      "name": "Phase 1 & 2: DB Planning Core + Access Control",
+      "description": "COMPLETED in planningsystem-59ae. DailyPlan as universal hub, plan CRUD, SiteName/role gates, active priorities, Gantt, drag-drop reorder, Planning top-nav dropdown, CSC-only text gate, UserSiteRole detection.",
+      "status": "Completed",
+      "sort_order": 0,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-30T05:39:57.970610251Z",
+      "updated_at": "2026-03-30T05:40:09.155772425Z"
+    },
+    {
+      "id": "e9a6e1af-ee5c-4815-ba7f-6f3346e5ebdc",
+      "name": "Phase 3: DailyPlan UI Migration (ongoing)",
+      "description": "IN PROGRESS — planningsystem-59ae. Migrate remaining text-based sections in DailyPlan.tt to DB todos/projects. Remove text as work is migrated. Smart scoring, quick-close, triage-stale, reschedule, Good Morning log, module access tables done. Todo 564.",
+      "status": "InProgress",
+      "sort_order": 1,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-30T05:39:57.970610251Z",
+      "updated_at": "2026-03-30T05:40:09.158630667Z"
+    },
+    {
+      "id": "ae3a0429-fcda-40e0-a07f-15cb789b545f",
+      "name": "api-bc05: Resolve API credentials BLOCKER (todo 568)",
+      "description": "BLOCKER — api-bc05 branch. Missing credentials file blocks all API-driven plan/todo creation from external tools. Must be resolved before API System Phases 1-6 can start. Project id=157. Priority P1.",
+      "status": "Pending",
+      "sort_order": 2,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-30T05:39:57.970610251Z",
+      "updated_at": "2026-03-30T05:39:57.970610251Z"
+    },
+    {
+      "id": "b7a33a2b-1342-456d-9a5c-f91a4921f3c4",
+      "name": "aichatsystem: Merge remaining fixes to main (todo 567)",
+      "description": "ACTIVE — aichatsystem-ef4e branch. Chat button border already merged. Remaining: guest model tiers in local-chat.js + AI.pm context budget Pass 1.5. DB driver fix committed. Project id=115.",
+      "status": "InProgress",
+      "sort_order": 3,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-30T05:39:57.970610251Z",
+      "updated_at": "2026-03-30T05:40:09.201379994Z"
+    },
+    {
+      "id": "86473699-bab9-4be6-bb69-cd9a0d22a0a7",
+      "name": "schema-mgmt: Verify all planning tables in production DB (todo 569)",
+      "description": "Pending — schema-management-system-7eb3 branch. Use /admin/compare_schema to verify site_modules, user_module_access, plan_audit, dailyplan, dailyplan_project, plan_system_mapping all present in 192.168.1.198.",
+      "status": "Pending",
+      "sort_order": 4,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-30T05:39:57.970610251Z",
+      "updated_at": "2026-03-30T05:39:57.970610251Z"
+    },
+    {
+      "id": "74c03f02-0253-4dda-962f-89f010a40814",
+      "name": "planningsystem: Module Access Control in Root.pm (todo 565)",
+      "description": "Pending — planningsystem-59ae + membership-1304. Tables created. Root.pm::auto must load enabled_modules per SiteName. TopDropListPlanning.tt gate on c.stash.enabled_modules.planning. Admin UI at /admin/site_modules.",
+      "status": "Pending",
+      "sort_order": 5,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-30T05:39:57.970610251Z",
+      "updated_at": "2026-03-30T05:39:57.970610251Z"
+    },
+    {
+      "id": "da38b561-7591-461a-8635-260847057bd4",
+      "name": "pointsystem: Create payment tables + PointsLedger utility (todo 566)",
+      "description": "Pending — pointsystem-3230 branch. Create developer_time_log, point_rules, developer_points_ledger, payment_records tables. DBIC Result classes. Hook into Todo.pm and PlanManagement.pm. Project id=193.",
+      "status": "Pending",
+      "sort_order": 6,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-30T05:39:57.970610251Z",
+      "updated_at": "2026-03-30T05:39:57.970610251Z"
+    },
+    {
+      "id": "9d5ec147-5685-4cc0-a84d-03097361eb33",
+      "name": "workshops: Phase 3 Registration & Participant Management (todo 570)",
+      "description": "Pending — workshops-7d21 branch. Phases 0-2 complete. Phase 3: attendee registration form, DB table, confirmation email via unified-mail-system. Projects id=177 (CSC) / id=168 (BMaster).",
+      "status": "Pending",
+      "sort_order": 7,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-30T05:39:57.970610251Z",
+      "updated_at": "2026-03-30T05:39:57.970610251Z"
+    },
+    {
+      "id": "dbb087f6-2606-4327-87e8-74caa5e18a28",
+      "name": "documentation: SiteName-filter all branch docs (todo 571)",
+      "description": "Pending — documentation-9122 branch. 49 CSC pages done. Check BMaster/Shanta/MCOOP. Add Planning System user guide, Module Access Control, Points System documentation pages. Project id=47.",
+      "status": "Pending",
+      "sort_order": 8,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-30T05:39:57.970610251Z",
+      "updated_at": "2026-03-30T05:39:57.970610251Z"
+    },
+    {
+      "id": "6b8bcb87-30f2-455b-a072-768d015b521e",
+      "name": "Phase 5: Full Manual Test Checklist (todo 572)",
+      "description": "Pending — all branches. Test all sites, all roles: CSC admin sees text+DB, non-CSC DB-only, Planning nav correct, plan create works, normal role access, quick-close/triage/reschedule, log button pre-fill, chat widget on Shanta.",
+      "status": "Pending",
+      "sort_order": 9,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-30T05:39:57.970610251Z",
+      "updated_at": "2026-03-30T05:39:57.970610251Z"
+    }
+  ]
+}

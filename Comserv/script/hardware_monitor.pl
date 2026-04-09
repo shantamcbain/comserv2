@@ -162,18 +162,27 @@ sub _uptime {
 
 sub _disk {
     my @out;
-    open my $fh, '-|', 'df -Pl --output=source,pcent,target 2>/dev/null' or return ();
+    my $cmd = $^O eq 'freebsd'
+        ? 'df -k 2>/dev/null'
+        : 'df -Pk 2>/dev/null';
+    open my $fh, '-|', $cmd or return ();
     while (<$fh>) {
         next if /^Filesystem/;
         chomp;
-        my ($dev, $pct_str, $mount) = split /\s+/, $_, 3;
+        my ($dev, $total_k, $used_k, $avail_k, $pct_str, $mount) = split /\s+/, $_, 6;
         next unless defined $mount;
-        next if $dev =~ /^(tmpfs|devtmpfs|udev|overlay|shm)/;
+        next if $dev  =~ /^(tmpfs|devtmpfs|udev|overlay|shm|squashfs|none|loop)/;
+        next if $mount =~ m{^(/sys|/proc|/dev/pts|/run/|/snap/)};
         (my $pct = $pct_str) =~ s/%//;
         next unless looks_like_number($pct);
         (my $safe = $mount) =~ s{/}{_}g;
         $safe = 'root' unless $safe;
-        push @out, { name => "disk_used_pct$safe", value => $pct+0, unit => '%', text => $dev };
+        my $total_mb = $total_k > 0 ? int($total_k / 1024) : undef;
+        my $free_mb  = $avail_k > 0 ? int($avail_k / 1024) : 0;
+        push @out,
+            { name => "disk_used_pct$safe",  value => $pct+0,     unit => '%',  text => $dev },
+            { name => "disk_total_mb$safe",   value => $total_mb,  unit => 'MB', text => $dev },
+            { name => "disk_free_mb$safe",    value => $free_mb,   unit => 'MB', text => $dev };
     }
     close $fh;
     return @out;

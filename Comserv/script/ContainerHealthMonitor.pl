@@ -138,7 +138,12 @@ sub check_health {
     # --- 2. Disk space ---
     check_disk_space('/');
     for my $mount (qw(/data/nfs /opt/comserv/logs)) {
-        check_disk_space($mount) if -d $mount;
+        next unless -d $mount;
+        # Skip if same device as / (bind mount reflects host disk, already checked above)
+        my $root_dev = (stat('/'))[0];
+        my $mnt_dev  = (stat($mount))[0];
+        next if defined $root_dev && defined $mnt_dev && $root_dev == $mnt_dev;
+        check_disk_space($mount);
     }
 
     # --- 3. Memory ---

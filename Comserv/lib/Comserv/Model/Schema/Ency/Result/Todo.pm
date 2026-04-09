@@ -167,6 +167,17 @@ __PACKAGE__->add_columns(
         data_type => 'date',
         is_nullable => 1,
     },
+    billable => {
+        data_type     => 'tinyint',
+        size          => 1,
+        is_nullable   => 0,
+        default_value => 1,
+    },
+    point_rate => {
+        data_type   => 'decimal',
+        size        => [10, 4],
+        is_nullable => 1,
+    },
 );
 
 __PACKAGE__->set_primary_key('record_id');

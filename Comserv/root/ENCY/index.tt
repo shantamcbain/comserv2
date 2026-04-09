@@ -1,36 +1,183 @@
-<!-- File: /home/shanta/PycharmProjects/comserv/Comserv/root/ENCY/index.tt -->
-[% PageVersion = 'ENCY/index.tt,v 0.02 2024/05/22 Shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
+[% META
+   title = "Encyclopedia of Biological Life"
+   description = "ENCY: A comprehensive reference for herbs, animals, insects, diseases, symptoms, constituents, and formulas"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.04"
+   last_updated = "2026-04-04"
+%]
+[% PageVersion = 'ENCY/index.tt,v 0.04 2026/04/04' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+
+[% IF c.flash.success_msg %]
+<div class="alert alert-success">[% c.flash.success_msg | html %]</div>
 [% END %]
-<div align="center">
-    [% IF username %]
-        <h3>Hello [% firstname %] [% lastname %]! Welcome to The Encyclopedia of Biological Life!</h3>
+[% IF c.flash.error_msg %]
+<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
+[% END %]
+
+[%# ── Resolve site context ────────────────────────────────────── %]
+[% SET site = SiteName || c.stash.SiteName || c.session.SiteName || 'ENCY' %]
+[% SET site_lc = site.lower %]
+
+<div class="ency-site-[% site_lc | html %]">
+
+[%# ── HERO — adapts per site ──────────────────────────────────── %]
+<div class="ency-hero">
+[% IF c.session.username %]
+  <h2>Welcome back, [% (c.session.first_name || c.session.username) | html %]!</h2>
+[% ELSE %]
+  <h2>Welcome to
+    [% IF site_lc == 'bmaster' %]
+      Bee Health &amp; Forage Reference
+    [% ELSIF site_lc == 'forager' %]
+      The Forager's Plant Encyclopedia
+    [% ELSIF site_lc == 'usbm' %]
+      The Universal System of Biological Medicine
     [% ELSE %]
-        <h3>Hello! Welcome to The Encyclopedia of Biological Life!</h3>
+      The Encyclopedia of Biological Life
     [% END %]
+  </h2>
+[% END %]
+
+[% IF site_lc == 'bmaster' %]
+  <p>A specialist reference for beekeepers: bee forage plants, pollinator health, hive diseases, and the ecology of bees and the plants they depend on.</p>
+[% ELSIF site_lc == 'forager' %]
+  <p>Your guide to wild edible and medicinal plants — identification, harvesting seasons, preparation, and safe foraging practice.</p>
+[% ELSIF site_lc == 'usbm' %]
+  <p>ENCY is the encyclopedic reference library of the USBM system — covering herbs, formulas, constituents, diseases, symptoms, and the full multi-practitioner treatment perspective.</p>
+[% ELSE %]
+  <p>A comprehensive, evolving reference to biological life — herbs, animals, insects, diseases, symptoms, chemical constituents, herbal formulas, and the connections between them. Drawn from herbals, medical texts, scientific journals, growers, foragers, and herbalists.</p>
+[% END %]
 </div>
-<div align="center">
-    <a name="PageTop"></a>
+
+[%# ── UNIFIED SEARCH ──────────────────────────────────────────── %]
+<form method="post" action="[% c.uri_for('/ENCY/search') %]" class="ency-search-form">
+  <input type="text" name="search_string"
+    placeholder="[% IF site_lc == 'bmaster' %]Search bee forage, bee diseases, pollinator plants...[% ELSIF site_lc == 'forager' %]Search plants, herbs, edibles, preparation...[% ELSE %]Search herbs, animals, insects, diseases, symptoms, constituents, formulas...[% END %]" />
+  <button type="submit">Search</button>
+</form>
+
+[%# ── NAVIGATION CARDS — site-filtered ──────────────────────── %]
+<nav class="ency-nav-grid" aria-label="Encyclopedia sections">
+
+[% IF site_lc == 'bmaster' %]
+  <a href="[% c.uri_for('/ENCY/BeePastureView') %]" class="ency-nav-card"><span class="ency-card-icon">🌼</span> Bee Forage Plants</a>
+  <a href="[% c.uri_for('/ENCY/Herb') %]" class="ency-nav-card"><span class="ency-card-icon">🌿</span> Herbs &amp; Plants</a>
+  <a href="[% c.uri_for('/ENCY/Insect') %]" class="ency-nav-card"><span class="ency-card-icon">🐝</span> Insects</a>
+  <a href="[% c.uri_for('/ENCY/Disease') %]" class="ency-nav-card"><span class="ency-card-icon">🔬</span> Bee &amp; Plant Diseases</a>
+  <a href="[% c.uri_for('/ENCY/Animal') %]" class="ency-nav-card"><span class="ency-card-icon">🦎</span> Animals</a>
+  <a href="[% c.uri_for('/ENCY/Constituent') %]" class="ency-nav-card"><span class="ency-card-icon">⚗</span> Constituents</a>
+  <a href="[% c.uri_for('/ENCY/Drug') %]" class="ency-nav-card"><span class="ency-card-icon">💊</span> Drugs &amp; Treatments</a>
+  <a href="[% c.uri_for('/ENCY/Glossary') %]" class="ency-nav-card"><span class="ency-card-icon">📖</span> Glossary</a>
+  <a href="[% c.uri_for('/ENCY/Reference') %]" class="ency-nav-card"><span class="ency-card-icon">📚</span> Reference Library</a>
+  <a href="[% c.uri_for('/ENCY/Author') %]" class="ency-nav-card"><span class="ency-card-icon">✍</span> Authors</a>
+
+[% ELSIF site_lc == 'forager' %]
+  <a href="[% c.uri_for('/ENCY/Herb') %]" class="ency-nav-card"><span class="ency-card-icon">🌿</span> Herbs &amp; Plants</a>
+  <a href="[% c.uri_for('/ENCY/BotanicalNameView') %]" class="ency-nav-card"><span class="ency-card-icon">🔤</span> Botanical Names</a>
+  <a href="[% c.uri_for('/ENCY/BeePastureView') %]" class="ency-nav-card"><span class="ency-card-icon">🌼</span> Bee Forage</a>
+  <a href="[% c.uri_for('/ENCY/Animal') %]" class="ency-nav-card"><span class="ency-card-icon">🦎</span> Animals</a>
+  <a href="[% c.uri_for('/ENCY/Insect') %]" class="ency-nav-card"><span class="ency-card-icon">🐛</span> Insects</a>
+  <a href="[% c.uri_for('/ENCY/Constituent') %]" class="ency-nav-card"><span class="ency-card-icon">⚗</span> Constituents</a>
+  <a href="[% c.uri_for('/ENCY/Glossary') %]" class="ency-nav-card"><span class="ency-card-icon">📖</span> Glossary</a>
+  <a href="[% c.uri_for('/ENCY/Reference') %]" class="ency-nav-card"><span class="ency-card-icon">📚</span> Reference Library</a>
+  <a href="[% c.uri_for('/ENCY/Author') %]" class="ency-nav-card"><span class="ency-card-icon">✍</span> Authors</a>
+
+[% ELSIF site_lc == 'usbm' %]
+  <a href="[% c.uri_for('/ENCY/Herb') %]" class="ency-nav-card"><span class="ency-card-icon">🌿</span> Herbs</a>
+  <a href="[% c.uri_for('/ENCY/Formula') %]" class="ency-nav-card"><span class="ency-card-icon">🧪</span> Formulas</a>
+  <a href="[% c.uri_for('/ENCY/Disease') %]" class="ency-nav-card"><span class="ency-card-icon">🔬</span> Diseases</a>
+  <a href="[% c.uri_for('/ENCY/Symptom') %]" class="ency-nav-card"><span class="ency-card-icon">📋</span> Symptoms</a>
+  <a href="[% c.uri_for('/ENCY/Constituent') %]" class="ency-nav-card"><span class="ency-card-icon">⚗</span> Constituents</a>
+  <a href="[% c.uri_for('/ENCY/Drug') %]" class="ency-nav-card"><span class="ency-card-icon">💊</span> Drugs</a>
+  <a href="[% c.uri_for('/ENCY/Animal') %]" class="ency-nav-card"><span class="ency-card-icon">🦎</span> Animals</a>
+  <a href="[% c.uri_for('/ENCY/Insect') %]" class="ency-nav-card"><span class="ency-card-icon">🐛</span> Insects</a>
+  <a href="[% c.uri_for('/ENCY/Glossary') %]" class="ency-nav-card"><span class="ency-card-icon">📖</span> Glossary</a>
+  <a href="[% c.uri_for('/ENCY/PractitionerType') %]" class="ency-nav-card"><span class="ency-card-icon">👩‍⚕️</span> Practitioner Types</a>
+  <a href="[% c.uri_for('/ENCY/Reference') %]" class="ency-nav-card"><span class="ency-card-icon">📚</span> Reference Library</a>
+  <a href="[% c.uri_for('/ENCY/Author') %]" class="ency-nav-card"><span class="ency-card-icon">✍</span> Authors</a>
+
+[% ELSE %]
+  <a href="[% c.uri_for('/ENCY/Herb') %]" class="ency-nav-card"><span class="ency-card-icon">🌿</span> Herbs</a>
+  <a href="[% c.uri_for('/ENCY/Animal') %]" class="ency-nav-card"><span class="ency-card-icon">🦎</span> Animals</a>
+  <a href="[% c.uri_for('/ENCY/Insect') %]" class="ency-nav-card"><span class="ency-card-icon">🐛</span> Insects</a>
+  <a href="[% c.uri_for('/ENCY/Disease') %]" class="ency-nav-card"><span class="ency-card-icon">🔬</span> Diseases</a>
+  <a href="[% c.uri_for('/ENCY/Symptom') %]" class="ency-nav-card"><span class="ency-card-icon">📋</span> Symptoms</a>
+  <a href="[% c.uri_for('/ENCY/Constituent') %]" class="ency-nav-card"><span class="ency-card-icon">⚗</span> Constituents</a>
+  <a href="[% c.uri_for('/ENCY/Formula') %]" class="ency-nav-card"><span class="ency-card-icon">🧪</span> Formulas</a>
+  <a href="[% c.uri_for('/ENCY/Drug') %]" class="ency-nav-card"><span class="ency-card-icon">💊</span> Drugs</a>
+  <a href="[% c.uri_for('/ENCY/Glossary') %]" class="ency-nav-card"><span class="ency-card-icon">📖</span> Glossary</a>
+  <a href="[% c.uri_for('/ENCY/BotanicalNameView') %]" class="ency-nav-card"><span class="ency-card-icon">🔤</span> Botanical Names</a>
+  <a href="[% c.uri_for('/ENCY/BeePastureView') %]" class="ency-nav-card"><span class="ency-card-icon">🌼</span> Bee Forage</a>
+  <a href="[% c.uri_for('/ENCY/Reference') %]" class="ency-nav-card"><span class="ency-card-icon">📚</span> Reference Library</a>
+  <a href="[% c.uri_for('/ENCY/Author') %]" class="ency-nav-card"><span class="ency-card-icon">✍</span> Authors</a>
+[% END %]
+
+</nav>
+
+[%# ── AI SEARCH PANEL ────────────────────────────────────────── %]
+<div class="ency-ai-panel">
+  <strong>Ask AI</strong> — Can't find what you need in the database?
+  <div class="ency-ai-search">
+    <input type="text" id="ency-ai-query" placeholder="Ask about any herb, condition, ingredient, formula..." />
+    <button class="btn-ai" type="button" onclick="encyAskAI()">Ask AI</button>
+  </div>
+</div>
+<script>
+function encyAskAI() {
+    var q = document.getElementById('ency-ai-query').value.trim();
+    if (!q) return;
+    var ctx = '[% IF site_lc == "bmaster" %]bee health, bee forage plants, and apiary management[% ELSIF site_lc == "forager" %]wild plant foraging, edible and medicinal plants[% ELSIF site_lc == "usbm" %]the Universal System of Biological Medicine, herbal formulas, and multi-practitioner healthcare[% ELSE %]the Encyclopedia of Biological Life covering herbs, animals, diseases, constituents, and natural health[% END %]';
+    var fullQuery = 'In the context of ' + ctx + ', tell me about: ' + q;
+
+    var chatBtn  = document.getElementById('chat-button');
+    var msgInput = document.getElementById('message-input');
+    var sendBtn  = document.getElementById('send-message');
+
+    if (chatBtn && msgInput) {
+        if (chatBtn.style.display !== 'none') { chatBtn.click(); }
+        setTimeout(function() {
+            msgInput.value = fullQuery;
+            msgInput.dispatchEvent(new Event('input'));
+            msgInput.focus();
+        }, 150);
+    } else {
+        window.open('/ai?prompt=' + encodeURIComponent(fullQuery), '_blank');
+    }
+}
+document.getElementById('ency-ai-query').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') encyAskAI();
+});
+</script>
+
+[%# ── ADMIN QUICK-ADD BAR ─────────────────────────────────────── %]
+[% IF is_editor %]
+<div class="ency-admin-bar">
+  <strong>Admin:</strong>
+  <a href="[% c.uri_for('/ENCY/Herb/add') %]">+ Herb</a> |
+  <a href="[% c.uri_for('/ENCY/Animal/add') %]">+ Animal</a> |
+  <a href="[% c.uri_for('/ENCY/Insect/add') %]">+ Insect</a> |
+  <a href="[% c.uri_for('/ENCY/Disease/add') %]">+ Disease</a> |
+  <a href="[% c.uri_for('/ENCY/Symptom/add') %]">+ Symptom</a> |
+  <a href="[% c.uri_for('/ENCY/Constituent/add') %]">+ Constituent</a> |
+  <a href="[% c.uri_for('/ENCY/Formula/add') %]">+ Formula</a> |
+  <a href="[% c.uri_for('/ENCY/Drug/add') %]">+ Drug</a> |
+  <a href="[% c.uri_for('/ENCY/Glossary/add') %]">+ Glossary Term</a> |
+  <a href="[% c.uri_for('/ENCY/Reference/add') %]">+ Reference</a> |
+  <a href="[% c.uri_for('/ENCY/Author/add') %]">+ Author</a>
+</div>
+[% END %]
+
+[%# ── DISCLAIMER ──────────────────────────────────────────────── %]
+<div class="ency-disclaimer">
+  <p>All references to uses are for informational purposes only. Consult your healthcare practitioner team before using any products for your health. This applies to all treatments and therapies you may be considering.</p>
+  <p>Last Updated: [% SiteLastUpdate | html %]</p>
 </div>
 
-<h2>Your Dynamic Link to Alternative Health Information</h2>
-
-<p>ENCY provides a comprehensive reference to natural health that evolves with your needs. We continuously update the information in this reference, drawing from herbals, medical texts and journals, growers, foragers, herbalists, and even our users. We strive to verify all information to the best of our ability.</p>
-
-<p>
-    <a href="/ENCY/BotanicalNameView">Botanical Name View</a>
-</p>
-<p>
-    <a href="/workshop">Workshops</a>
-</p>
-
-<p>All references to uses are for informational purposes only. You should consult your healthcare practitioner team before using any products for your health. This applies to all treatments and therapies that you may be considering in your personal health program.</p>
-
-<div align="center">
-    <a href="../CSC/helpdesk.cgi?[% session_string %]" target="_blank">HelpDesk</a>
-    <p>Last Updated: [% SiteLastUpdate %]</p>
-</div>
+</div>[%# end .ency-site-* %]
 
 [% embed('CSCCopyRight') %]
 [% embed(data.page_bottom_view) %]

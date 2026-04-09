@@ -4,7 +4,7 @@
     <h1>Edit Theme CSS: [% theme_name %]</h1>
 
     <div class="alert alert-info">
-        <strong>Tip:</strong> To add a background image, include <code>background-image: url('../images/BMaster/honey2.jpg');</code> in the body section.
+        <strong>Tip:</strong> To add a background image, include <code>background-image: url('/static/images/BMaster/honey2.jpg');</code> in the body section.
         <a href="[% c.uri_for('/admin/theme/help') %]" class="btn btn-sm btn-info float-end">View Help</a>
     </div>
 
@@ -140,13 +140,13 @@
                 <div class="mb-3">
                     <h6>Body Background Image</h6>
                     <pre class="bg-light p-2">body {
-  background-image: url('../images/BMaster/background.jpg');
+  background-image: url('/static/images/BMaster/honey2.jpg');
   background-size: cover;
   background-repeat: no-repeat;
   background-attachment: fixed;
 }</pre>
                     <button type="button" class="btn btn-sm btn-primary copy-code" data-code="body {
-  background-image: url('../images/BMaster/background.jpg');
+  background-image: url('/static/images/BMaster/honey2.jpg');
   background-size: cover;
   background-repeat: no-repeat;
   background-attachment: fixed;
@@ -156,12 +156,12 @@
                 <div class="mb-3">
                     <h6>Header Background Image</h6>
                     <pre class="bg-light p-2">header, .header {
-  background-image: url('../images/BMaster/header-bg.jpg');
+  background-image: url('/static/images/BMaster/honey2.jpg');
   background-size: cover;
   background-position: center;
 }</pre>
                     <button type="button" class="btn btn-sm btn-primary copy-code" data-code="header, .header {
-  background-image: url('../images/BMaster/header-bg.jpg');
+  background-image: url('/static/images/BMaster/honey2.jpg');
   background-size: cover;
   background-position: center;
 }">Copy to Editor</button>

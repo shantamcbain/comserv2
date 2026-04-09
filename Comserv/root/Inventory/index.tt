@@ -1,0 +1,59 @@
+[% PageVersion = 'Inventory/index.tt,v 0.01 2026/03/30 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Inventory Management</h1>
+<p>Site: <strong>[% sitename %]</strong></p>
+
+[% IF c.flash.success_msg %]
+<p class="success">[% c.flash.success_msg %]</p>
+[% END %]
+[% IF error_msg %]
+<p class="error">[% error_msg %]</p>
+[% END %]
+
+<div class="inventory-dashboard">
+  <div class="stat-card">
+    <h3>Active Items</h3>
+    <span class="stat-number">[% item_count %]</span>
+    <a href="/Inventory/items">View Items</a>
+  </div>
+  <div class="stat-card">
+    <h3>Suppliers</h3>
+    <span class="stat-number">[% supplier_count %]</span>
+    <a href="/Inventory/suppliers">View Suppliers</a>
+  </div>
+  <div class="stat-card">
+    <h3>Locations</h3>
+    <span class="stat-number">[% location_count %]</span>
+    <a href="/Inventory/locations">View Locations</a>
+  </div>
+  <div class="stat-card [% IF low_stock > 0 %]stat-alert[% END %]">
+    <h3>Low Stock Items</h3>
+    <span class="stat-number">[% low_stock %]</span>
+    <a href="/Inventory/items">Review Stock</a>
+  </div>
+</div>
+
+<div class="inventory-actions">
+  <h2>Quick Actions</h2>
+  <ul>
+    <li><a href="/Inventory/item/add">Add New Item</a></li>
+    <li><a href="/Inventory/supplier/add">Add Supplier</a></li>
+    <li><a href="/Inventory/location/add">Add Location</a></li>
+    <li><a href="/Inventory/stock/adjust">Adjust Stock</a></li>
+  </ul>
+</div>
+
+<div class="inventory-api-info">
+  <h2>API Endpoints</h2>
+  <ul>
+    <li><code>GET /Inventory/api/items?sitename=[% sitename %]</code> - List items (JSON)</li>
+    <li><code>GET /Inventory/api/stock?sitename=[% sitename %]</code> - Stock levels (JSON)</li>
+  </ul>
+</div>
+
+[% IF debug_errors && debug_errors.size > 0 %]
+<div class="debug">
+  [% FOREACH err IN debug_errors %]<p>[% err %]</p>[% END %]
+</div>
+[% END %]
