@@ -50,25 +50,38 @@ sub _resolve_image_value {
     return $image_val;
 }
 
+sub auto : Private {
+    my ($self, $c) = @_;
+    my $roles     = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split(/\s*,\s*/, $roles);
+    $c->stash(
+        is_admin  => (grep { $_ eq 'admin'                                         } @role_list) ? 1 : 0,
+        is_editor => (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) ? 1 : 0,
+    );
+    return 1;
+}
+
 sub index :Path('/ENCY') :Args(0) {
     my ( $self, $c ) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Entered index method');
     $c->session->{MailServer} = "http://webmail.usbm.ca";
 
-    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'ENCY';
-    my $roles    = $c->session->{roles} || [];
-    my $is_admin = (ref $roles ? grep { $_ eq 'admin' } @$roles
-                               : grep { $_ eq 'admin' } split(/\s*,\s*/, $roles)) ? 1 : 0;
+    my $sitename   = $c->stash->{SiteName} || $c->session->{SiteName} || 'ENCY';
+    my $roles      = $c->session->{roles} || [];
+    my @role_list  = ref $roles ? @$roles : split(/\s*,\s*/, $roles);
+    my $is_admin   = (grep { $_ eq 'admin'                                          } @role_list) ? 1 : 0;
+    my $is_editor  = (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer'  } @role_list) ? 1 : 0;
 
     $c->stash(
-        SiteName  => $sitename,
-        is_admin  => $is_admin,
-        template  => 'ENCY/index.tt',
+        SiteName   => $sitename,
+        is_admin   => $is_admin,
+        is_editor  => $is_editor,
+        template   => 'ENCY/index.tt',
     );
 }
 
-sub plants             : Path('/ENCY/plants')              : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/botanical_name_view')) }
-sub herbs_alias        : Path('/ENCY/herbs')               : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/botanical_name_view')) }
+sub plants             : Path('/ENCY/plants')              : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/BotanicalNameView')) }
+sub herbs_alias        : Path('/ENCY/herbs')               : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/BotanicalNameView')) }
 sub animals_alias      : Path('/ENCY/animals')             : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Animal')) }
 sub insects_alias      : Path('/ENCY/insects')             : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Insect')) }
 sub constituents_alias : Path('/ENCY/constituents')        : Args(0) { $_[1]->response->redirect($_[1]->uri_for('/ENCY/Constituent')) }
@@ -98,7 +111,7 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
     }
 
     # Fetch the record_id from the session
-    my $record_id = $c->session->{record_id};
+    my $record_id = $c->request->param("record_id") || $c->session->{record_id};
 
     # Validate the record_id; if invalid, show error (stay on the HerbView page)
     unless (defined $record_id && $record_id =~ /^\d+$/) {
@@ -112,8 +125,8 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
         return; # Do not redirect; just render the view with an error message
     }
 
-    # Retrieve the herb record
-    my $herb = $c->model('ENCYModel')->get_herb_by_id($record_id);
+    # Retrieve the herb record (use DBForager directly, same as herb_detail)
+    my $herb = $c->model('DBForager')->get_herb_by_id($record_id);
     unless ($herb) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_herb',
             "Herb record not found in the database for record_id: $record_id.");
@@ -127,19 +140,55 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
 
     # Handle POST request for herb updates (if applicable)
     if ($c->request->method eq 'POST') {
+        my $p = $c->request->params;
+        my $_clean_url = sub {
+            my $u = shift // '';
+            return '' if $u =~ m{workstation\.local|bmast\.local|localhost|127\.0\.0\.1|/ENCY/entry/}i;
+            return $u;
+        };
         my $form_data = {
-            botanical_name      => $c->request->params->{botanical_name} // '',
-            common_names        => $c->request->params->{common_names} // '',
-            homiopathic         => $c->request->params->{homiopathic} // '',
-            culinary            => $c->request->params->{culinary} // '',
-            comments            => $c->request->params->{comments} // '',
-            preparation         => $c->request->params->{preparation} // '',
-            chinese             => $c->request->params->{chinese} // '',
-            history             => $c->request->params->{history} // '',
-            contra_indications  => $c->request->params->{contra_indications} // '',
-            reference           => $c->request->params->{reference} // '',
-            parts_used          => $c->request->params->{parts_used} // '',
-            key_name            => $c->request->params->{key_name} // '',
+            botanical_name     => $p->{botanical_name}     // '',
+            common_names       => $p->{common_names}       // '',
+            key_name           => $p->{key_name}           // '',
+            parts_used         => $p->{parts_used}         // '',
+            sister_plants      => $p->{sister_plants}      // '',
+            comments           => $p->{comments}           // '',
+            ident_character    => $p->{ident_character}    // '',
+            stem               => $p->{stem}               // '',
+            leaves             => $p->{leaves}             // '',
+            flowers            => $p->{flowers}            // '',
+            fruit              => $p->{fruit}              // '',
+            taste              => $p->{taste}              // '',
+            odour              => $p->{odour}              // '',
+            root               => $p->{root}               // '',
+            image              => $p->{image}              // '',
+            url                => $_clean_url->($p->{url}),
+            distribution       => $p->{distribution}       // '',
+            cultivation        => $p->{cultivation}        // '',
+            harvest            => $p->{harvest}            // '',
+            therapeutic_action => $p->{therapeutic_action} // '',
+            medical_uses       => $p->{medical_uses}       // '',
+            constituents       => $p->{constituents}       // '',
+            solvents           => $p->{solvents}           // '',
+            dosage             => $p->{dosage}             // '',
+            administration     => $p->{administration}     // '',
+            formulas           => $p->{formulas}           // '',
+            contra_indications => $p->{contra_indications} // '',
+            preparation        => $p->{preparation}        // '',
+            chinese            => $p->{chinese}            // '',
+            vetrinary          => $p->{vetrinary}          // '',
+            homiopathic        => $p->{homiopathic}        // '',
+            apis               => $p->{apis}               // 0,
+            pollinator         => $p->{pollinator}         // '',
+            pollen             => $p->{pollen}             // 0,
+            pollennotes        => $p->{pollennotes}        // '',
+            nectar             => $p->{nectar}             // 0,
+            nectarnotes        => $p->{nectarnotes}        // '',
+            non_med            => $p->{non_med}            // '',
+            culinary           => $p->{culinary}           // '',
+            history            => $p->{history}            // '',
+            reference          => $p->{reference}          // '',
+            share              => $p->{share}              // 0,
         };
 
         # Attempt to update the herb record and handle success or failure
@@ -148,13 +197,17 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
         if ($status) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_herb',
                 "Herb updated successfully for record_id: $record_id.");
+            my ($auto_linked, $unresolved) = $c->model('ENCYModel')->auto_link_herb_data($c, $record_id, $form_data);
+            my $updated_herb = $c->model('DBForager')->get_herb_by_id($record_id) || $herb;
+            my $link_msg = $auto_linked ? " Auto-linked $auto_linked record(s)." : '';
+            my $todo_msg = $unresolved   ? " $unresolved unresolved term(s) logged as todos." : '';
             $c->stash(
-                success_msg => "Herb details updated successfully.",
-                herb        => $herb,
-                edit_mode   => 0, # Switch back to view mode after successful update
+                success_msg => "Herb updated successfully.$link_msg$todo_msg",
+                herb        => $updated_herb,
+                edit_mode   => 0,
                 template    => 'ENCY/HerbView.tt',
             );
-            return; # Render the updated herb view
+            return;
         } else {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_herb',
                 "Failed to update herb: $error_message.");
@@ -170,10 +223,25 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
 
     # Render the herb in edit mode when Edit Herb button is clicked
     $self->_stash_image_files($c);
+    my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @{$c->session->{roles} || []};
+    my $is_editor = $is_admin || grep { $_ eq 'editor' } @{$c->session->{roles} || []};
     $c->stash(
-        herb      => $herb,
-        edit_mode => 1, # Enable edit mode
-        template  => 'ENCY/HerbView.tt',
+        herb            => $herb,
+        edit_mode       => 1,
+        is_admin        => $is_admin,
+        is_editor       => $is_editor,
+        ency_ai_prompt  => 'botanical_name, common_names, key_name, parts_used, sister_plants, comments, '
+                         . 'ident_character, stem, leaves, flowers, fruit, taste, odour, root, image, url, '
+                         . 'distribution, cultivation, harvest, '
+                         . 'therapeutic_action, medical_uses, constituents, solvents, dosage, administration, '
+                         . 'formulas, contra_indications, preparation, chinese, vetrinary, homiopathic, '
+                         . 'pollinator, pollennotes, nectarnotes, non_med, culinary, history, reference. '
+                         . 'IMPORTANT for url field: use a real external URL (Wikipedia, Plants.USDA.gov, '
+                         . 'Botanical.com, etc.) — NEVER generate internal application URLs like '
+                         . 'workstation.local, localhost, or /ENCY/entry/... — leave url blank if unknown. '
+                         . 'For integrative fields (therapeutic_action, medical_uses, preparation) include '
+                         . 'conventional, herbal, TCM, Ayurvedic, and naturopathic perspectives where known.',
+        template        => 'ENCY/HerbView.tt',
     );
 
     return;
@@ -217,20 +285,358 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
 
     $self->_stash_image_files($c);
     $c->stash(
-        herb => $herb,
-        mode => 'view',
-        template => 'ENCY/HerbView.tt');
+        herb      => $herb,
+        edit_mode => 0,
+        template  => 'ENCY/HerbView.tt',
+    );
 }
 sub get_reference_by_id :Local {
     my ( $self, $c, $id ) = @_;
-    # Implement the logic to display the form for getting a reference by its id
-    # Fetch the reference using the ENCY model
-    my $reference = $c->model('ENCY')->get_reference_by_id($id);
-    $c->stash(reference => $reference);
-    $c->stash(template => 'ency/get_reference_form.tt');
-    my $herb = $c->model('DBForager')->get_herb_by_id($id);
-    $c->stash(herb => $herb, record_id => $id, template => 'ENCY/HerbView.tt');
+    $c->response->redirect($c->uri_for('/ENCY/Reference', $id));
 }
+
+sub Reference :Path('/ENCY/Reference') :Args(0) {
+    my ($self, $c) = @_;
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @role_list;
+    my $is_editor = $is_admin || grep { $_ eq 'editor' } @role_list;
+
+    my @refs;
+    eval {
+        @refs = $c->model('ENCYModel')->ency_schema->resultset('Reference')->search(
+            {},
+            { order_by => { -asc => 'reference_id' }, prefetch => 'publisher_record' }
+        )->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'Reference', "Failed to load references: $@");
+    }
+    $c->stash(
+        references => \@refs,
+        is_admin   => $is_admin,
+        is_editor  => $is_editor,
+        template   => 'ENCY/ReferenceList.tt',
+    );
+}
+
+sub Reference_id :Path('/ENCY/Reference') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @role_list;
+    my $is_editor = $is_admin || grep { $_ eq 'editor' } @role_list;
+
+    my $edit_mode = $c->request->param('edit') && $is_editor ? 1 : 0;
+
+    unless ($id && $id =~ /^\d+$/) {
+        $c->stash(error_msg => "Invalid reference ID.", template => 'ENCY/ReferenceList.tt');
+        return;
+    }
+
+    my $ref = eval {
+        $c->model('ENCYModel')->ency_schema->resultset('Reference')->find($id);
+    };
+    unless ($ref) {
+        $c->stash(error_msg => "Reference #$id not found.", template => 'ENCY/ReferenceList.tt');
+        return;
+    }
+
+    if ($c->request->method eq 'POST' && $is_editor) {
+        my $p = $c->request->body_parameters;
+        my $pub_date = $p->{publication_date};
+        my $pd_clean = $pub_date; if ($pd_clean) { if ($pd_clean =~ /^\d{4}$/) { $pd_clean = "${pd_clean}-01-01"; } elsif ($pd_clean !~ /^\d{4}-\d{2}-\d{2}$/ || $pd_clean =~ /^0000/) { $pd_clean = undef; } } $pub_date = $pd_clean;
+        eval {
+            $ref->update({
+                title             => $p->{title}             // '',
+                author            => $p->{author}            // '',
+                publisher         => $p->{publisher}         // '',
+                publication_date  => $pub_date,
+                isbn              => $p->{isbn}              // '',
+                url               => $p->{url}              // '',
+                reference_system  => $p->{reference_system}  // '',
+                notes             => $p->{notes}             // '',
+                edition           => $p->{edition}           // '',
+                format            => $p->{format}            // '',
+                physical_location => $p->{physical_location} // '',
+                digital_path      => $p->{digital_path}      // '',
+            });
+        };
+        if ($@) {
+            $c->stash(error_msg => "Failed to update reference: $@");
+        } else {
+            $c->flash->{success_msg} = "Reference #$id updated.";
+            $c->response->redirect($c->uri_for('/ENCY/Reference', $id));
+            return;
+        }
+    }
+
+    # Load formal entity links (junction rows) for this reference
+    my @entity_links;
+    eval {
+        my @links = $c->model('ENCYModel')->ency_schema->resultset('EntityReference')->search(
+            { reference_id => $id },
+            { order_by => ['entity_type', 'entity_id'] }
+        )->all;
+        for my $link (@links) {
+            my $label = $link->entity_type . ' #' . $link->entity_id;
+            my $name  = '';
+            my $url   = '';
+            eval {
+                if ($link->entity_type eq 'herb') {
+                    my $e = $c->model('ENCYModel')->forager_schema->resultset('Herb')->find($link->entity_id);
+                    $name = $e ? ($e->common_names || 'Herb #' . $link->entity_id) : '';
+                    $url  = '/ENCY/herb_detail/' . $link->entity_id;
+                } elsif ($link->entity_type eq 'disease') {
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Disease')->find($link->entity_id);
+                    $name = $e ? ($e->common_name || $e->scientific_name || '') : '';
+                    $url  = '/ENCY/Disease/' . $link->entity_id;
+                } elsif ($link->entity_type eq 'constituent') {
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Constituent')->find($link->entity_id);
+                    $name = $e ? ($e->name || '') : '';
+                    $url  = '/ENCY/Constituent/' . $link->entity_id;
+                } elsif ($link->entity_type eq 'animal') {
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Animal')->find($link->entity_id);
+                    $name = $e ? ($e->common_name || '') : '';
+                    $url  = '/ENCY/Animal/' . $link->entity_id;
+                } elsif ($link->entity_type eq 'insect') {
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Insect')->find($link->entity_id);
+                    $name = $e ? ($e->common_name || '') : '';
+                    $url  = '/ENCY/Insect/' . $link->entity_id;
+                } elsif ($link->entity_type eq 'drug') {
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Drug')->find($link->entity_id);
+                    $name = $e ? ($e->drug_name || '') : '';
+                    $url  = '/ENCY/Drug/' . $link->entity_id;
+                } elsif ($link->entity_type eq 'formula') {
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Formula')->find($link->entity_id);
+                    $name = $e ? ($e->formula_name || '') : '';
+                    $url  = '/ENCY/Formula/' . $link->entity_id;
+                }
+            };
+            push @entity_links, {
+                entity_type => $link->entity_type,
+                entity_id   => $link->entity_id,
+                name        => $name || $label,
+                url         => $url,
+            };
+        }
+    };
+
+    # Load linked authors for this reference
+    my @ref_authors;
+    eval {
+        @ref_authors = $c->model('ENCYModel')->ency_schema->resultset('ReferenceAuthor')->search(
+            { reference_id => $id },
+            { order_by => 'author_id' }
+        )->all;
+    };
+
+    $c->stash(
+        reference    => $ref,
+        entity_links => \@entity_links,
+        ref_authors  => \@ref_authors,
+        edit_mode    => $edit_mode,
+        is_admin     => $is_admin,
+        is_editor    => $is_editor,
+        ency_ai_prompt => 'title, author, publisher, publication_date (YYYY or YYYY-MM-DD), isbn, url (archive.org or publisher — verify the URL is real), reference_system (book/journal/magazine/course/personal/website/thesis), edition (e.g. "2nd Edition, 1985"), format (hardcover/paperback/pdf/digital/online), notes (page numbers and excerpt where the herb/treatment is mentioned)',
+        template  => 'ENCY/ReferenceDetail.tt',
+    );
+}
+
+sub Reference_add :Path('/ENCY/Reference/add') :Args(0) {
+    my ($self, $c) = @_;
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @role_list;
+    my $is_editor = $is_admin || grep { $_ eq 'editor' } @role_list;
+
+    unless ($is_editor) {
+        $c->stash(error_msg => "You do not have permission to add references.",
+                  template  => 'ENCY/ReferenceList.tt');
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $pub_date = $p->{publication_date};
+        my $pd_clean = $pub_date; if ($pd_clean) { if ($pd_clean =~ /^\d{4}$/) { $pd_clean = "${pd_clean}-01-01"; } elsif ($pd_clean !~ /^\d{4}-\d{2}-\d{2}$/ || $pd_clean =~ /^0000/) { $pd_clean = undef; } } $pub_date = $pd_clean;
+        my $new_ref;
+        eval {
+            $new_ref = $c->model('ENCYModel')->ency_schema->resultset('Reference')->create({
+                title             => $p->{title}             // '',
+                author            => $p->{author}            // '',
+                publisher         => $p->{publisher}         // '',
+                publication_date  => $pub_date,
+                isbn              => $p->{isbn}              // '',
+                url               => $p->{url}               // '',
+                reference_system  => $p->{reference_system}  // 'book',
+                notes             => $p->{notes}             // '',
+                edition           => $p->{edition}           // '',
+                format            => $p->{format}            // '',
+                physical_location => $p->{physical_location} // '',
+                digital_path      => $p->{digital_path}      // '',
+                sitename          => $c->session->{site_name} // 'ENCY',
+                username_of_poster => $c->session->{username} // '',
+                date_time_posted  => substr("${\scalar localtime}", 0, 30),
+            });
+        };
+        if ($@ || !$new_ref) {
+            $c->stash(error_msg => "Failed to create reference: $@",
+                      edit_mode => 1, is_editor => $is_editor,
+                      ency_ai_prompt => 'title, author, publisher, publication_date, isbn, url, reference_system, edition, format, notes',
+                      template  => 'ENCY/ReferenceDetail.tt');
+            return;
+        }
+        $c->flash->{success_msg} = "Reference #" . $new_ref->reference_id . " created.";
+        $c->response->redirect($c->uri_for('/ENCY/Reference', $new_ref->reference_id));
+        return;
+    }
+
+    $c->stash(
+        reference => {},
+        edit_mode => 1,
+        is_admin  => $is_admin,
+        is_editor => $is_editor,
+        ency_ai_prompt => 'title, author, publisher, publication_date (YYYY or YYYY-MM-DD), isbn, url (archive.org or publisher URL for public domain — verify it is a real URL), reference_system (book/journal/magazine/course/personal/website/thesis), edition (e.g. "2nd Edition"), format (hardcover/paperback/pdf/digital/online), notes (include page numbers and a short excerpt of the passage that mentions the herb or treatment)',
+        template  => 'ENCY/ReferenceDetail.tt',
+    );
+}
+sub Author_list :Path('/ENCY/Author') :Args(0) {
+    my ($self, $c) = @_;
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @role_list;
+    my $is_editor = $is_admin || grep { $_ eq 'editor' } @role_list;
+
+    my @authors;
+    eval {
+        @authors = $c->model('ENCYModel')->ency_schema->resultset('Author')->search(
+            {}, { order_by => { -asc => 'full_name' } }
+        )->all;
+    };
+    $c->stash(
+        authors   => \@authors,
+        is_admin  => $is_admin,
+        is_editor => $is_editor,
+        template  => 'ENCY/AuthorList.tt',
+    );
+}
+
+sub Author_id :Path('/ENCY/Author') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @role_list;
+    my $is_editor = $is_admin || grep { $_ eq 'editor' } @role_list;
+
+    my $edit_mode = $c->request->param('edit') && $is_editor ? 1 : 0;
+
+    unless ($id && $id =~ /^\d+$/) {
+        $c->stash(error_msg => "Invalid author ID.", template => 'ENCY/AuthorList.tt');
+        return;
+    }
+
+    my $author = eval { $c->model('ENCYModel')->ency_schema->resultset('Author')->find($id) };
+    unless ($author) {
+        $c->stash(error_msg => "Author #$id not found.", template => 'ENCY/AuthorList.tt');
+        return;
+    }
+
+    if ($c->request->method eq 'POST' && $is_editor) {
+        my $p = $c->request->body_parameters;
+        eval {
+            $author->update({
+                full_name          => $p->{full_name}          || $author->full_name,
+                credentials        => $p->{credentials}        // '',
+                affiliation        => $p->{affiliation}        // '',
+                specialty          => $p->{specialty}          // '',
+                born_year          => ($p->{born_year}  && $p->{born_year}  =~ /^\d{4}$/) ? $p->{born_year}  : undef,
+                died_year          => ($p->{died_year}  && $p->{died_year}  =~ /^\d{4}$/) ? $p->{died_year}  : undef,
+                nationality        => $p->{nationality}        // '',
+                bio                => $p->{bio}                // '',
+                notes              => $p->{notes}              // '',
+                url                => $p->{url}                // '',
+            });
+        };
+        if ($@) {
+            $c->stash(error_msg => "Failed to update author: $@");
+        } else {
+            $c->flash->{success_msg} = "Author updated.";
+            $c->response->redirect($c->uri_for('/ENCY/Author', $id));
+            return;
+        }
+    }
+
+    my @works = eval { $author->reference_authors->search_related('reference', {}, { order_by => 'reference_id' })->all };
+    $c->stash(
+        author    => $author,
+        works     => \@works,
+        edit_mode => $edit_mode,
+        is_admin  => $is_admin,
+        is_editor => $is_editor,
+        ency_ai_entity_name    => ($author && $author->full_name ? $author->full_name : ''),
+        ency_ai_auto_web_search => 1,
+        ency_ai_prompt => 'full_name, credentials, specialty, born_year, died_year, nationality, affiliation, url, bio, notes. IMPORTANT INSTRUCTIONS: You are looking up a REAL specific person — use their actual known biographical facts only. Do NOT invent, hallucinate, or use placeholder text like "Last, First" or "First Last". full_name: the real person\'s name in "Last, First" format (e.g. "McKinney, Neil"). credentials: all real degrees earned in chronological order (e.g. "BSc, ND"). specialty: real clinical specialties. born_year: 4-digit birth year if reliably known, omit if uncertain. nationality: real country of citizenship. affiliation: real institutions where they practiced/taught with city and province/state. url: only include if you are confident the URL actually exists — do not fabricate URLs. bio: 3-4 factual paragraphs covering their real education, clinical career, publications, and teaching legacy. notes: relevance to herbal/naturopathic medicine. If you do not have reliable information about this person, say so in the bio field rather than inventing details.',
+        template  => 'ENCY/AuthorDetail.tt',
+    );
+}
+
+sub Author_add :Path('/ENCY/Author/add') :Args(0) {
+    my ($self, $c) = @_;
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @role_list;
+    my $is_editor = $is_admin || grep { $_ eq 'editor' } @role_list;
+
+    unless ($is_editor) {
+        $c->stash(error_msg => "You do not have permission to add authors.",
+                  template  => 'ENCY/AuthorList.tt');
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $new_author;
+        eval {
+            $new_author = $c->model('ENCYModel')->ency_schema->resultset('Author')->create({
+                full_name          => $p->{full_name}          || 'Unknown',
+                credentials        => $p->{credentials}        // '',
+                affiliation        => $p->{affiliation}        // '',
+                specialty          => $p->{specialty}          // '',
+                born_year          => ($p->{born_year}  && $p->{born_year}  =~ /^\d{4}$/) ? $p->{born_year}  : undef,
+                died_year          => ($p->{died_year}  && $p->{died_year}  =~ /^\d{4}$/) ? $p->{died_year}  : undef,
+                nationality        => $p->{nationality}        // '',
+                bio                => $p->{bio}                // '',
+                notes              => $p->{notes}              // '',
+                url                => $p->{url}                // '',
+                sitename           => $c->session->{site_name} // 'ENCY',
+                username_of_poster => $c->session->{username}  // '',
+                date_time_posted   => substr("${\scalar localtime}", 0, 30),
+            });
+        };
+        if ($@ || !$new_author) {
+            $c->stash(error_msg => "Failed to create author: $@",
+                      author => {}, edit_mode => 1, is_editor => $is_editor,
+                      template => 'ENCY/AuthorDetail.tt');
+            return;
+        }
+        $c->flash->{success_msg} = "Author '" . $new_author->full_name . "' created.";
+        $c->response->redirect($c->uri_for('/ENCY/Author', $new_author->author_id));
+        return;
+    }
+
+    $c->stash(
+        author    => {},
+        edit_mode => 1,
+        is_admin  => $is_admin,
+        is_editor => $is_editor,
+        ency_ai_entity_name    => '',
+        ency_ai_auto_web_search => 1,
+        ency_ai_prompt => 'full_name, credentials, specialty, born_year, died_year, nationality, affiliation, url, bio, notes. IMPORTANT INSTRUCTIONS: You are looking up a REAL specific person — use their actual known biographical facts only. Do NOT invent, hallucinate, or use placeholder text like "Last, First" or "First Last". full_name: the real person\'s name in "Last, First" format (e.g. "McKinney, Neil"). credentials: all real degrees earned in chronological order (e.g. "BSc, ND"). specialty: real clinical specialties. born_year: 4-digit birth year if reliably known, omit if uncertain. nationality: real country of citizenship. affiliation: real institutions where they practiced/taught with city and province/state. url: only include if you are confident the URL actually exists — do not fabricate URLs. bio: 3-4 factual paragraphs covering their real education, clinical career, publications, and teaching legacy. notes: relevance to herbal/naturopathic medicine. If you do not have reliable information about this person, say so in the bio field rather than inventing details.',
+        template  => 'ENCY/AuthorDetail.tt',
+    );
+}
+
 sub add_herb :Path('/ENCY/add_herb') :Args(0) {
     my ( $self, $c ) = @_;
 
@@ -301,8 +707,9 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
         # Display the form
         $self->_stash_image_files($c);
         $c->stash(
-            template => 'ENCY/add_herb_form.tt',
-            user_role => $c->session->{roles}  # Pass user role to the template
+            template       => 'ENCY/add_herb_form.tt',
+            user_role      => $c->session->{roles},
+            ency_ai_prompt => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator',
         );
     }
 }
@@ -364,7 +771,7 @@ sub add_animal : Path('/ENCY/Animal/add') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to add animals.",
             template  => 'ENCY/AnimalList.tt',
@@ -438,7 +845,7 @@ sub edit_animal : Path('/ENCY/Animal/edit') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to edit animals.",
             template  => 'ENCY/AnimalList.tt',
@@ -446,7 +853,7 @@ sub edit_animal : Path('/ENCY/Animal/edit') : Args(0) {
         return;
     }
 
-    my $record_id = $c->session->{record_id};
+    my $record_id = $c->request->param("record_id") || $c->session->{record_id};
 
     unless (defined $record_id && $record_id =~ /^\d+$/) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_animal',
@@ -471,6 +878,11 @@ sub edit_animal : Path('/ENCY/Animal/edit') : Args(0) {
 
     if ($c->request->method eq 'POST') {
         my $p = $c->request->body_parameters;
+        my $_clean_url = sub {
+            my $u = shift // '';
+            return '' if $u =~ m{workstation\.local|bmast\.local|localhost|127\.0\.0\.1|/ENCY/entry/}i;
+            return $u;
+        };
         my $data = {
             common_name          => $p->{common_name}          // '',
             scientific_name      => $p->{scientific_name}      // '',
@@ -491,7 +903,7 @@ sub edit_animal : Path('/ENCY/Animal/edit') : Args(0) {
             conservation_status  => $p->{conservation_status}  // '',
             constituents         => $p->{constituents}         // '',
             image                => $p->{image}                // '',
-            url                  => $p->{url}                  // '',
+            url                  => $_clean_url->($p->{url}),
             history              => $p->{history}              // '',
             reference            => $p->{reference}            // '',
         };
@@ -499,9 +911,12 @@ sub edit_animal : Path('/ENCY/Animal/edit') : Args(0) {
         my ($status, $msg) = $c->model('ENCYModel')->update_animal($c, $record_id, $data);
 
         if ($status) {
+            my $resolve  = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'animal', $record_id, $data);
+            my $n_linked = scalar @{ $resolve->{linked}     || [] };
+            my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_animal',
                 "Animal updated successfully for record_id: $record_id");
-            $c->flash->{success_msg} = "Animal details updated successfully.";
+            $c->flash->{success_msg} = "Animal updated. Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
             $c->response->redirect($c->uri_for('/ENCY/Animal', $record_id));
             return;
         } else {
@@ -589,7 +1004,7 @@ sub add_insect : Path('/ENCY/Insect/add') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to add insects.",
             template  => 'ENCY/InsectList.tt',
@@ -662,7 +1077,7 @@ sub edit_insect : Path('/ENCY/Insect/edit') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to edit insects.",
             template  => 'ENCY/InsectList.tt',
@@ -670,7 +1085,7 @@ sub edit_insect : Path('/ENCY/Insect/edit') : Args(0) {
         return;
     }
 
-    my $record_id = $c->session->{record_id};
+    my $record_id = $c->request->param("record_id") || $c->session->{record_id};
 
     unless (defined $record_id && $record_id =~ /^\d+$/) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_insect',
@@ -695,6 +1110,11 @@ sub edit_insect : Path('/ENCY/Insect/edit') : Args(0) {
 
     if ($c->request->method eq 'POST') {
         my $p = $c->request->body_parameters;
+        my $_clean_url = sub {
+            my $u = shift // '';
+            return '' if $u =~ m{workstation\.local|bmast\.local|localhost|127\.0\.0\.1|/ENCY/entry/}i;
+            return $u;
+        };
         my $data = {
             common_name       => $p->{common_name}       // '',
             scientific_name   => $p->{scientific_name}   // '',
@@ -714,7 +1134,7 @@ sub edit_insect : Path('/ENCY/Insect/edit') : Args(0) {
             pest_notes        => $p->{pest_notes}        // '',
             beneficial_notes  => $p->{beneficial_notes}  // '',
             image             => $p->{image}             // '',
-            url               => $p->{url}               // '',
+            url               => $_clean_url->($p->{url}),
             history           => $p->{history}           // '',
             reference         => $p->{reference}         // '',
         };
@@ -722,9 +1142,12 @@ sub edit_insect : Path('/ENCY/Insect/edit') : Args(0) {
         my ($status, $msg) = $c->model('ENCYModel')->update_insect($c, $record_id, $data);
 
         if ($status) {
+            my $resolve  = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'insect', $record_id, $data);
+            my $n_linked = scalar @{ $resolve->{linked}     || [] };
+            my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_insect',
                 "Insect updated successfully for record_id: $record_id");
-            $c->flash->{success_msg} = "Insect details updated successfully.";
+            $c->flash->{success_msg} = "Insect updated. Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
             $c->response->redirect($c->uri_for('/ENCY/Insect', $record_id));
             return;
         } else {
@@ -812,7 +1235,7 @@ sub add_disease : Path('/ENCY/Disease/add') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to add diseases.",
             template  => 'ENCY/DiseaseList.tt',
@@ -882,7 +1305,7 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to edit diseases.",
             template  => 'ENCY/DiseaseList.tt',
@@ -890,7 +1313,7 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
         return;
     }
 
-    my $record_id = $c->session->{record_id};
+    my $record_id = $c->request->param("record_id") || $c->session->{record_id};
 
     unless (defined $record_id && $record_id =~ /^\d+$/) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_disease',
@@ -915,6 +1338,11 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
 
     if ($c->request->method eq 'POST') {
         my $p = $c->request->body_parameters;
+        my $_clean_url = sub {
+            my $u = shift // '';
+            return '' if $u =~ m{workstation\.local|bmast\.local|localhost|127\.0\.0\.1|/ENCY/entry/}i;
+            return $u;
+        };
         my $data = {
             common_name              => $p->{common_name}              // '',
             scientific_name          => $p->{scientific_name}          // '',
@@ -931,7 +1359,7 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
             icd_code                 => $p->{icd_code}                 // '',
             distribution             => $p->{distribution}             // '',
             image                    => $p->{image}                    // '',
-            url                      => $p->{url}                      // '',
+            url                      => $_clean_url->($p->{url}),
             history                  => $p->{history}                  // '',
             reference                => $p->{reference}                // '',
         };
@@ -939,9 +1367,12 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
         my ($status, $msg) = $c->model('ENCYModel')->update_disease($c, $record_id, $data);
 
         if ($status) {
+            my $resolve  = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'disease', $record_id, $data);
+            my $n_linked = scalar @{ $resolve->{linked}     || [] };
+            my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_disease',
                 "Disease updated successfully for record_id: $record_id");
-            $c->flash->{success_msg} = "Disease details updated successfully.";
+            $c->flash->{success_msg} = "Disease updated. Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
             $c->response->redirect($c->uri_for('/ENCY/Disease', $record_id));
             return;
         } else {
@@ -1033,7 +1464,7 @@ sub add_symptom : Path('/ENCY/Symptom/add') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to add symptoms.",
             template  => 'ENCY/SymptomList.tt',
@@ -1095,7 +1526,7 @@ sub edit_symptom : Path('/ENCY/Symptom/edit') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to edit symptoms.",
             template  => 'ENCY/SymptomList.tt',
@@ -1103,7 +1534,7 @@ sub edit_symptom : Path('/ENCY/Symptom/edit') : Args(0) {
         return;
     }
 
-    my $record_id = $c->session->{record_id};
+    my $record_id = $c->request->param("record_id") || $c->session->{record_id};
 
     unless (defined $record_id && $record_id =~ /^\d+$/) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_symptom',
@@ -1128,6 +1559,11 @@ sub edit_symptom : Path('/ENCY/Symptom/edit') : Args(0) {
 
     if ($c->request->method eq 'POST') {
         my $p = $c->request->body_parameters;
+        my $_clean_url = sub {
+            my $u = shift // '';
+            return '' if $u =~ m{workstation\.local|bmast\.local|localhost|127\.0\.0\.1|/ENCY/entry/}i;
+            return $u;
+        };
         my $data = {
             name          => $p->{name}          // '',
             common_name   => $p->{common_name}   // '',
@@ -1137,16 +1573,19 @@ sub edit_symptom : Path('/ENCY/Symptom/edit') : Args(0) {
             acute_chronic => $p->{acute_chronic} // '',
             host_type     => $p->{host_type}     // '',
             image         => $p->{image}         // '',
-            url           => $p->{url}           // '',
+            url           => $_clean_url->($p->{url}),
             reference     => $p->{reference}     // '',
         };
 
         my ($status, $msg) = $c->model('ENCYModel')->update_symptom($c, $record_id, $data);
 
         if ($status) {
+            my $resolve  = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'symptom', $record_id, $data);
+            my $n_linked = scalar @{ $resolve->{linked}     || [] };
+            my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_symptom',
                 "Symptom updated successfully for record_id: $record_id");
-            $c->flash->{success_msg} = "Symptom details updated successfully.";
+            $c->flash->{success_msg} = "Symptom updated. Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
             $c->response->redirect($c->uri_for('/ENCY/Symptom', $record_id));
             return;
         } else {
@@ -1236,7 +1675,7 @@ sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to add constituents.",
             template  => 'ENCY/ConstituentList.tt',
@@ -1285,11 +1724,18 @@ sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
         }
 
         my ($ok, $new_id) = $c->model('ENCYModel')->add_constituent($c, $data);
-        if ($ok && $new_id && $data->{found_in_herbs}) {
-            $c->model('ENCYModel')->auto_link_herb_constituent($c, $new_id, $data->{found_in_herbs});
+        if ($ok && $new_id) {
+            if ($data->{found_in_herbs}) {
+                $c->model('ENCYModel')->auto_link_herb_constituent($c, $new_id, $data->{found_in_herbs});
+            }
+            my $resolve = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'constituent', $new_id, $data);
+            my $n_linked = scalar @{ $resolve->{linked} || [] };
+            my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
+            $c->flash->{success_msg} = "Constituent added. Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
+        } else {
+            $c->flash->{success_msg} = 'Constituent added successfully.';
         }
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_constituent', "Constituent added: $data->{name}");
-        $c->flash->{success_msg} = 'Constituent added successfully.';
         $c->response->redirect($c->uri_for('/ENCY/Constituent'));
         return;
     }
@@ -1312,7 +1758,7 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to edit constituents.",
             template  => 'ENCY/ConstituentList.tt',
@@ -1375,9 +1821,12 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
             if ($data->{found_in_herbs}) {
                 $c->model('ENCYModel')->auto_link_herb_constituent($c, $record_id, $data->{found_in_herbs});
             }
+            my $resolve = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'constituent', $record_id, $data);
+            my $n_linked = scalar @{ $resolve->{linked} || [] };
+            my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_constituent',
                 "Constituent updated successfully for record_id: $record_id");
-            $c->flash->{success_msg} = "Constituent details updated successfully.";
+            $c->flash->{success_msg} = "Constituent updated. Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
             $c->response->redirect($c->uri_for('/ENCY/Constituent', $record_id));
             return;
         } else {
@@ -1465,7 +1914,7 @@ sub add_glossary : Path('/ENCY/Glossary/add') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to add glossary terms.",
             template  => 'ENCY/GlossaryList.tt',
@@ -1535,7 +1984,7 @@ sub edit_glossary : Path('/ENCY/Glossary/edit') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to edit glossary terms.",
             template  => 'ENCY/GlossaryList.tt',
@@ -1543,7 +1992,7 @@ sub edit_glossary : Path('/ENCY/Glossary/edit') : Args(0) {
         return;
     }
 
-    my $record_id = $c->session->{record_id};
+    my $record_id = $c->request->param("record_id") || $c->session->{record_id};
 
     unless (defined $record_id && $record_id =~ /^\d+$/) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_glossary',
@@ -1760,6 +2209,7 @@ sub drug_list : Path('/ENCY/Drug') : Args(0) {
         drugs     => $drugs,
         db_error  => $db_error,
         is_admin  => (grep { $_ eq 'admin' } @role_list) ? 1 : 0,
+        is_editor => (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) ? 1 : 0,
         template  => 'ENCY/DrugList.tt',
     );
 }
@@ -1808,7 +2258,7 @@ sub add_drug : Path('/ENCY/Drug/add') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to add drugs.",
             template  => 'ENCY/DrugList.tt',
@@ -1885,7 +2335,14 @@ sub add_drug : Path('/ENCY/Drug/add') : Args(0) {
             );
             return;
         }
-        $c->flash->{success_msg} = 'Drug added successfully.';
+        if ($new_id) {
+            my $resolve = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'drug', $new_id, $data);
+            my $n_linked = scalar @{ $resolve->{linked} || [] };
+            my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
+            $c->flash->{success_msg} = "Drug added. Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
+        } else {
+            $c->flash->{success_msg} = 'Drug added successfully.';
+        }
         $c->response->redirect($c->uri_for('/ENCY/Drug', $new_id ? ($new_id) : ()));
         return;
     }
@@ -1908,7 +2365,7 @@ sub edit_drug : Path('/ENCY/Drug/edit') : Args(0) {
 
     my $roles = $c->session->{roles} || [];
     my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
-    unless (grep { $_ eq 'admin' } @role_list) {
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
         $c->stash(
             error_msg => "You do not have permission to edit drugs.",
             template  => 'ENCY/DrugList.tt',
@@ -1984,9 +2441,12 @@ sub edit_drug : Path('/ENCY/Drug/edit') : Args(0) {
         my ($status, $msg) = $c->model('ENCYModel')->update_drug($c, $record_id, $data);
 
         if ($status) {
+            my $resolve = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'drug', $record_id, $data);
+            my $n_linked = scalar @{ $resolve->{linked} || [] };
+            my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_drug',
                 "Drug updated successfully for record_id: $record_id");
-            $c->flash->{success_msg} = "Drug details updated successfully.";
+            $c->flash->{success_msg} = "Drug updated. Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
             $c->response->redirect($c->uri_for('/ENCY/Drug', $record_id));
             return;
         } else {
@@ -2015,7 +2475,8 @@ sub formula_list : Path('/ENCY/Formula') : Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'formula_list', 'Formula list');
     my $roles    = $c->session->{roles} || [];
-    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    my $is_admin  = grep { $_ eq 'admin'                                         } (ref $roles ? @$roles : split(/s*,s*/, $roles));
+    my $is_editor = grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } (ref $roles ? @$roles : split(/s*,s*/, $roles));
     my $q = $c->request->param('q') || '';
     my $formulas;
     eval {
@@ -2035,6 +2496,7 @@ sub formula_list : Path('/ENCY/Formula') : Args(0) {
         formulas      => $formulas,
         search_query  => $q,
         is_admin      => $is_admin,
+        is_editor     => $is_editor,
         ai_fallback   => $ai_fallback,
         ai_query      => $q,
         template      => 'ENCY/FormulaList.tt',
@@ -2045,13 +2507,14 @@ sub formula_detail : Path('/ENCY/Formula') : Args(1) {
     my ($self, $c, $id) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'formula_detail', "Formula detail id=$id");
     my $roles    = $c->session->{roles} || [];
-    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    my $is_admin  = grep { $_ eq 'admin'                                         } (ref $roles ? @$roles : split(/s*,s*/, $roles));
+    my $is_editor = grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } (ref $roles ? @$roles : split(/s*,s*/, $roles));
     my ($formula, $herb_links, $disease_links) = $c->model('ENCYModel')->get_formula_with_herbs($c, $id);
     unless ($formula) {
         $c->stash(error_msg => "Formula $id not found.", template => 'ENCY/FormulaList.tt');
         return;
     }
-    if ($is_admin && $c->request->method eq 'POST' && $c->request->param('set_edit')) {
+    if ($is_editor && $c->request->method eq 'POST' && $c->request->param('set_edit')) {
         $c->session->{formula_record_id} = $id;
         $c->response->redirect($c->uri_for('/ENCY/Formula/edit'));
         return;
@@ -2061,6 +2524,7 @@ sub formula_detail : Path('/ENCY/Formula') : Args(1) {
         herb_links    => $herb_links,
         disease_links => $disease_links,
         is_admin      => $is_admin,
+        is_editor     => $is_editor,
         edit_mode     => 0,
         template      => 'ENCY/FormulaDetail.tt',
     );
@@ -2069,9 +2533,10 @@ sub formula_detail : Path('/ENCY/Formula') : Args(1) {
 sub add_formula : Path('/ENCY/Formula/add') : Args(0) {
     my ($self, $c) = @_;
     my $roles    = $c->session->{roles} || [];
-    my $is_admin = grep { $_ eq 'admin' } @$roles;
-    unless ($is_admin) {
-        $c->stash(error_msg => 'Admin access required.', template => 'ENCY/FormulaList.tt');
+    my $is_admin  = grep { $_ eq 'admin'                                         } (ref $roles ? @$roles : split(/s*,s*/, $roles));
+    my $is_editor = grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } (ref $roles ? @$roles : split(/s*,s*/, $roles));
+    unless ($is_editor) {
+        $c->stash(error_msg => 'Editor access required.', template => 'ENCY/FormulaList.tt');
         return;
     }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_formula', 'Add formula');
@@ -2097,7 +2562,7 @@ sub add_formula : Path('/ENCY/Formula/add') : Args(0) {
             share              => 0,
         };
         unless ($data->{name}) {
-            $c->stash(error_msg => 'Formula name is required.', formula => bless($data, 'HASH'), edit_mode => 1, is_admin => $is_admin, template => 'ENCY/FormulaDetail.tt');
+            $c->stash(error_msg => 'Formula name is required.', formula => bless($data, 'HASH'), edit_mode => 1, is_admin => $is_admin, is_editor => $is_editor, template => 'ENCY/FormulaDetail.tt');
             return;
         }
         my ($ok, $msg, $new_id) = $c->model('ENCYModel')->add_formula($c, $data);
@@ -2105,7 +2570,7 @@ sub add_formula : Path('/ENCY/Formula/add') : Args(0) {
             $c->flash->{success_msg} = "Formula added successfully.";
             $c->response->redirect($c->uri_for('/ENCY/Formula/' . $new_id));
         } else {
-            $c->stash(error_msg => "Could not save formula: $msg", formula => bless($data, 'HASH'), edit_mode => 1, is_admin => $is_admin, template => 'ENCY/FormulaDetail.tt');
+            $c->stash(error_msg => "Could not save formula: $msg", formula => bless($data, 'HASH'), edit_mode => 1, is_admin => $is_admin, is_editor => $is_editor, template => 'ENCY/FormulaDetail.tt');
         }
         return;
     }
@@ -2121,9 +2586,10 @@ sub add_formula : Path('/ENCY/Formula/add') : Args(0) {
 sub edit_formula : Path('/ENCY/Formula/edit') : Args(0) {
     my ($self, $c) = @_;
     my $roles    = $c->session->{roles} || [];
-    my $is_admin = grep { $_ eq 'admin' } @$roles;
-    unless ($is_admin) {
-        $c->stash(error_msg => 'Admin access required.', template => 'ENCY/FormulaList.tt');
+    my $is_admin  = grep { $_ eq 'admin'                                         } (ref $roles ? @$roles : split(/s*,s*/, $roles));
+    my $is_editor = grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } (ref $roles ? @$roles : split(/s*,s*/, $roles));
+    unless ($is_editor) {
+        $c->stash(error_msg => 'Editor access required.', template => 'ENCY/FormulaList.tt');
         return;
     }
     my $id = $c->session->{formula_record_id} || $c->request->param('record_id');
@@ -2155,7 +2621,7 @@ sub edit_formula : Path('/ENCY/Formula/edit') : Args(0) {
             $c->response->redirect($c->uri_for('/ENCY/Formula/' . $id));
         } else {
             my ($formula, $herb_links, $disease_links) = $c->model('ENCYModel')->get_formula_with_herbs($c, $id);
-            $c->stash(error_msg => "Could not update formula: $msg", formula => $formula, herb_links => $herb_links, disease_links => $disease_links, edit_mode => 1, is_admin => $is_admin, template => 'ENCY/FormulaDetail.tt');
+            $c->stash(error_msg => "Could not update formula: $msg", formula => $formula, herb_links => $herb_links, disease_links => $disease_links, edit_mode => 1, is_admin => $is_admin, is_editor => $is_editor, template => 'ENCY/FormulaDetail.tt');
         }
         return;
     }
@@ -2189,6 +2655,235 @@ sub practitioner_type_list : Path('/ENCY/PractitionerType') : Args(0) {
 sub practitioner_type_detail : Path('/ENCY/PractitionerType') : Args(1) {
     my ($self, $c, $id) = @_;
     $c->response->redirect($c->uri_for('/ENCY/PractitionerType'), 302);
+}
+
+sub ency_admin : Path('/ENCY/admin') : Args(0) {
+    my ($self, $c) = @_;
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    my $is_admin = grep { $_ eq 'admin' || $_ eq 'developer' } @role_list;
+
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'ENCY Admin requires admin or developer role.';
+        $c->response->redirect($c->uri_for('/ENCY'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ency_admin', 'Entered ENCY admin dashboard');
+
+    my $model  = $c->model('ENCYModel');
+    my $ency   = $model->ency_schema;
+    my $forager = $model->forager_schema;
+
+    my %counts;
+    my %ai_drafts;
+
+    # ── Entity record counts ────────────────────────────────────────────────
+    my @ency_entities = qw(Animal Insect Disease Symptom Constituent Glossary Drug Formula Reference);
+    for my $rs (@ency_entities) {
+        eval { $counts{ lc($rs) } = $ency->resultset($rs)->count };
+        $counts{ lc($rs) } //= 0;
+    }
+
+    # Herb lives in Forager schema
+    eval { $counts{herb} = $forager->resultset('Herb')->count };
+    $counts{herb} //= 0;
+
+    # ── AI draft counts ─────────────────────────────────────────────────────
+    my @ai_ency = qw(Animal Insect Disease Symptom Constituent Glossary Drug);
+    for my $rs (@ai_ency) {
+        eval {
+            $ai_drafts{ lc($rs) } = $ency->resultset($rs)->count({
+                username_of_poster => 'ai-draft',
+                share              => 0,
+            });
+        };
+        $ai_drafts{ lc($rs) } //= 0;
+    }
+    eval {
+        $ai_drafts{herb} = $forager->resultset('Herb')->count({
+            username_of_poster => 'ai-draft',
+            share              => 0,
+        });
+    };
+    $ai_drafts{herb} //= 0;
+    my $total_ai_drafts = 0;
+    $total_ai_drafts += $_ for values %ai_drafts;
+
+    # ── Junction table counts ───────────────────────────────────────────────
+    my %junctions;
+    my @ency_junctions = qw(
+        HerbConstituent HerbDisease HerbSymptom HerbCategory
+        DiseaseSymptom DiseaseAnimal DiseaseInsect DiseaseHerb
+        InsectHerb AnimalHerb ConstituentDisease ConstituentSymptom
+        DrugDisease DrugConstituent DrugSymptom DrugHerbInteraction
+        FormulaHerb FormulaDisease EntityReference
+    );
+    for my $rs (@ency_junctions) {
+        eval { $junctions{$rs} = $ency->resultset($rs)->count };
+        $junctions{$rs} //= 'N/A';
+    }
+
+    # ── Reference quality ───────────────────────────────────────────────────
+    my $refs_missing_title = 0;
+    my $refs_missing_author = 0;
+    my $refs_missing_isbn = 0;
+    eval {
+        $refs_missing_title  = $ency->resultset('Reference')->count({ -or => [ title  => undef, title  => '' ] });
+        $refs_missing_author = $ency->resultset('Reference')->count({ -or => [ author => undef, author => '' ] });
+        $refs_missing_isbn   = $ency->resultset('Reference')->count({ -or => [ isbn   => undef, isbn   => '' ] });
+    };
+
+    # ── Publisher / Author / ReferenceAuthor counts ──────────────────────────
+    eval { $counts{publisher}        = $ency->resultset('Publisher')->count };
+    $counts{publisher} //= 0;
+    eval { $counts{author}           = $ency->resultset('Author')->count };
+    $counts{author} //= 0;
+    eval { $counts{reference_author} = $ency->resultset('ReferenceAuthor')->count };
+    $counts{reference_author} //= 0;
+
+    # ── Unresolved ENCY todos ────────────────────────────────────────────────
+    my $open_todos = 0;
+    eval {
+        $open_todos = $ency->resultset('Todo')->count({
+            project_code => 'ENCY',
+            status       => { 'not in' => ['done', 'completed', 'cancelled'] },
+        });
+    };
+
+    # ── Recent errors in ENCY routes (from Log table) ───────────────────────
+    my @recent_errors;
+    eval {
+        @recent_errors = $ency->resultset('Log')->search(
+            {
+                log_level => { like => '%error%' },
+                file_path => { like => '%ENCY%' },
+            },
+            { order_by => { -desc => 'id' }, rows => 10 }
+        )->all;
+    };
+
+    $c->stash(
+        counts          => \%counts,
+        ai_drafts       => \%ai_drafts,
+        total_ai_drafts => $total_ai_drafts,
+        junctions       => \%junctions,
+        refs_missing_title  => $refs_missing_title,
+        refs_missing_author => $refs_missing_author,
+        refs_missing_isbn   => $refs_missing_isbn,
+        open_todos      => $open_todos,
+        recent_errors   => \@recent_errors,
+        is_admin        => $is_admin,
+        template        => 'ENCY/AdminDashboard.tt',
+    );
+}
+
+sub api_references : Path('/ENCY/api/references') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    my $q = $c->request->param('q') || '';
+    unless (length($q) >= 2) {
+        $c->response->body('{"results":[]}');
+        return;
+    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_references', "Searching references q=$q");
+    my @results;
+    eval {
+        my @refs = $c->model('ENCYModel')->ency_schema->resultset('Reference')->search(
+            { -or => [
+                title  => { like => "%$q%" },
+                author => { like => "%$q%" },
+                isbn   => { like => "%$q%" },
+            ]},
+            { order_by => 'reference_id', rows => 12 }
+        )->all;
+        @results = map { {
+            reference_id => $_->reference_id,
+            title        => $_->title        // '',
+            author       => $_->author       // '',
+            publisher    => $_->publisher    // '',
+            year         => ($_->publication_date ? substr($_->publication_date, 0, 4) : ''),
+            isbn         => $_->isbn         // '',
+        } } @refs;
+    } or do {
+        my $err = $@ || 'unknown';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_references', "Error: $err");
+    };
+    require JSON;
+    $c->response->body(JSON::encode_json({ results => \@results }));
+}
+
+sub api_link_reference : Path('/ENCY/api/link_reference') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    my $is_editor = grep { $_ eq 'admin' || $_ eq 'developer' || $_ eq 'editor' } @role_list;
+    unless ($is_editor) {
+        $c->response->body('{"ok":0,"error":"Permission denied"}');
+        return;
+    }
+    my $entity_type  = $c->request->param('entity_type')  || '';
+    my $entity_id    = $c->request->param('entity_id')    || 0;
+    my $reference_id = $c->request->param('reference_id') || 0;
+    unless ($entity_type && $entity_id && $reference_id) {
+        $c->response->body('{"ok":0,"error":"Missing parameters"}');
+        return;
+    }
+    my ($ok, $msg) = $c->model('ENCYModel')->link_entity_reference($c, $entity_type, $entity_id, $reference_id);
+    require JSON;
+    $c->response->body(JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
+}
+
+sub api_unlink_reference : Path('/ENCY/api/unlink_reference') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    my $is_editor = grep { $_ eq 'admin' || $_ eq 'developer' || $_ eq 'editor' } @role_list;
+    unless ($is_editor) {
+        $c->response->body('{"ok":0,"error":"Permission denied"}');
+        return;
+    }
+    my $entity_type  = $c->request->param('entity_type')  || '';
+    my $entity_id    = $c->request->param('entity_id')    || 0;
+    my $reference_id = $c->request->param('reference_id') || 0;
+    unless ($entity_type && $entity_id && $reference_id) {
+        $c->response->body('{"ok":0,"error":"Missing parameters"}');
+        return;
+    }
+    my ($ok, $msg) = $c->model('ENCYModel')->unlink_entity_reference($c, $entity_type, $entity_id, $reference_id);
+    require JSON;
+    $c->response->body(JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
+}
+
+sub api_entity_references : Path('/ENCY/api/entity_references') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    my $entity_type = $c->request->param('entity_type') || '';
+    my $entity_id   = $c->request->param('entity_id')   || 0;
+    unless ($entity_type && $entity_id =~ /^\d+$/) {
+        $c->response->body('{"references":[]}');
+        return;
+    }
+    my @refs = eval {
+        $c->model('ENCYModel')->get_references_for($c, $entity_type, $entity_id);
+    };
+    if ($@) {
+        $c->response->body('{"references":[]}');
+        return;
+    }
+    my @data = map { {
+        reference_id => $_->reference_id,
+        title        => $_->title        // '',
+        author       => $_->author       // '',
+        publisher    => $_->publisher    // '',
+        year         => ($_->publication_date ? substr($_->publication_date, 0, 4) : ''),
+        isbn         => $_->isbn         // '',
+    } } @refs;
+    require JSON;
+    $c->response->body(JSON::encode_json({ references => \@data }));
 }
 
 sub api_resolve : Path('/ENCY/api/resolve') : Args(0) {

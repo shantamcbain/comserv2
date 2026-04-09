@@ -2,6 +2,11 @@
 :root {
   --accent-color: #FFB900;
   --background-color: #FFF8E1;
+  --background-image: url('../images/BMaster/honey2.jpg');
+  --background-repeat: repeat-x;
+  --background-position: top center;
+  --background-attachment: scroll;
+  --background-size: auto;
   --border-color: #FFD54F;
   --footer-bg: #FFE082;
   --footer-text-color: #2C2C2C;
@@ -17,11 +22,5 @@
   --table-header-bg: #FFE082;
   --text-color: #2C2C2C;
   --warning-color: #f39c12;
-}
-
-body {
-  background-image: url('../images/BMaster/honey2.jpg');
-  background-repeat: repeat-x;
-  background-position: top center;
 }
 
