@@ -62,6 +62,7 @@ __PACKAGE__->register_class('InventoryStockLevel', 'Comserv::Model::Schema::Ency
 __PACKAGE__->register_class('InventoryTransaction', 'Comserv::Model::Schema::Ency::Result::InventoryTransaction');
 __PACKAGE__->register_class('InventoryAssignment', 'Comserv::Model::Schema::Ency::Result::InventoryAssignment');
 __PACKAGE__->register_class('InventoryItemSupplier', 'Comserv::Model::Schema::Ency::Result::InventoryItemSupplier');
+__PACKAGE__->register_class('InventoryItemBOM', 'Comserv::Model::Schema::Ency::Result::InventoryItemBOM');
 
 __PACKAGE__->meta->make_immutable(inline_constructor => 0);
 1;
