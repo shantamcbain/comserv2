@@ -1,5 +1,6 @@
 [% META title = 'HelpDesk' %]
-[% PageVersion = 'CSC/HelpDesk.tt,v 0.03 2025/04/18 shanta Exp shanta ' %]
+[% PageVersion = 'CSC/HelpDesk.tt,v 0.04 2026/03/24 shanta Exp shanta ' %]
+[% site_display_name = c.stash.SiteName || c.session.SiteName || 'Our' %]
 
 [% IF c.session.debug_mode == 1 %]
  <br>[% PageVersion %]</br>
@@ -17,9 +18,9 @@
 <div class="helpdesk-container">
     <!-- HelpDesk View -->
     [% IF c.session.username %]
-        <h2>Hello [% c.session.firstname %] [% c.session.lastname %]! Welcome to Our HelpDesk System</h2>
+        <h2>Hello [% c.session.firstname %] [% c.session.lastname %]! Welcome to [% site_display_name %] HelpDesk</h2>
     [% ELSE %]
-        <h2>Hello! Welcome to Computer System Consulting HelpDesk System</h2>
+        <h2>Welcome to [% site_display_name %] HelpDesk</h2>
     [% END %]
 
     <div class="helpdesk-options">
@@ -45,6 +46,12 @@
             <h3>Contact Support</h3>
             <p>Contact our support team directly.</p>
             <a href="[% c.uri_for('/HelpDesk/contact') %]" class="btn btn-primary">Contact Us</a>
+        </div>
+
+        <div class="option-card option-card-ai">
+            <h3>AI Support Assistant</h3>
+            <p>Chat with our AI assistant for instant help. It can search the knowledge base, create tickets, and escalate to a live agent.</p>
+            <a href="[% c.uri_for('/ai') %]" class="btn btn-success">Chat with AI</a>
         </div>
     </div>
 
@@ -90,6 +97,15 @@
     .btn-primary {
         background-color: #007bff;
         color: white;
+    }
+    
+    .btn-success {
+        background-color: #28a745;
+        color: white;
+    }
+    
+    .option-card-ai {
+        border-left: 4px solid #28a745;
     }
     
     .debug-message {

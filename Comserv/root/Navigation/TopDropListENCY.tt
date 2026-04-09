@@ -17,7 +17,7 @@
         <div class="submenu-item">
             <span class="submenu-header"><i class="icon-biology"></i>Biological</span>
             <div class="submenu">
-                <a href="/ENCY/botanical_name_view"><i class="icon-plant"></i>Plants &amp; Herbs</a>
+                <a href="/ENCY/BotanicalNameView"><i class="icon-plant"></i>Plants &amp; Herbs</a>
                 <a href="/ENCY/Animal"><i class="icon-animal"></i>Animals</a>
                 <a href="/ENCY/Insect"><i class="icon-insect"></i>Insects</a>
                 <a href="/ENCY/bee_pasture_view"><i class="icon-pollinator"></i>Bee Pasture / Pollinators</a>
@@ -41,6 +41,8 @@
             <span class="submenu-header"><i class="icon-docs"></i>Reference</span>
             <div class="submenu">
                 <a href="/ENCY/Glossary"><i class="icon-glossary"></i>Glossary</a>
+                <a href="/ENCY/Reference"><i class="icon-book"></i>Reference Library</a>
+                <a href="/ENCY/Author"><i class="icon-author"></i>Authors</a>
                 <a href="/ENCY/search?q=cultivation"><i class="icon-grow"></i>Cultivation</a>
                 <a href="/ENCY/search?q=conservation"><i class="icon-conservation"></i>Conservation</a>
                 <a href="/ENCY/search?q=ecology"><i class="icon-ecology"></i>Ecology</a>
@@ -62,14 +64,16 @@
                 <a href="/ENCY/Drug/add"><i class="icon-add"></i>Add Drug</a>
                 <a href="/ENCY/Formula/add"><i class="icon-add"></i>Add Formula</a>
                 <a href="/ENCY/Glossary/add"><i class="icon-add"></i>Add Glossary Term</a>
+                <a href="/ENCY/Reference/add"><i class="icon-add"></i>Add Reference</a>
+                <a href="/ENCY/Author/add"><i class="icon-add"></i>Add Author</a>
             </div>
         </div>
         [% END %]
 
-        [%# Admin: link to admin desktop ENCY section %]
-        [% IF c.session.roles && c.session.roles.grep('admin').size %]
+        [%# Admin/Developer: link to ENCY admin dashboard %]
+        [% IF c.session.roles && (c.session.roles.grep('admin').size || c.session.roles.grep('developer').size) %]
         <div class="dropdown-divider"></div>
-        <a href="/admin/ency"><i class="icon-admin"></i>ENCY Administration</a>
+        <a href="/ENCY/admin"><i class="icon-admin"></i>ENCY Administration</a>
         [% END %]
     </div>
 </li>
