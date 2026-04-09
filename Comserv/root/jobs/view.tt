@@ -131,6 +131,11 @@
                   </select>
                   <button type="submit" class="btn btn-sm btn-primary">Update</button>
                 </form>
+                [% IF app.status == 'hired' && job.accept_points_payment && app.applicant %]
+                <a href="[% c.uri_for('/currency/transfer') %]?recipient_user_id=[% app.applicant.id %]&memo=Payment+for+job:[% job.title | uri %]"
+                   class="btn btn-sm btn-success" style="margin-left:0.25em"
+                   title="Transfer points to this hired applicant">&#9670; Pay via Points</a>
+                [% END %]
               </td>
             </tr>
             [% IF app.cover_letter %]
