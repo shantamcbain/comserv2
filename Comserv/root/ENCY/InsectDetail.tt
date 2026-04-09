@@ -28,7 +28,7 @@
 
 <p><a href="[% c.uri_for('/ENCY/Insect') %]">&larr; Back to Insects</a>
 [% IF is_editor && !edit_mode && insect.record_id %]
-  | <a href="[% c.uri_for('/ENCY/Insect/edit') %]" onclick="document.cookie='record_id=[% insect.record_id %]'">Edit</a>
+  | <a href="[% c.uri_for('/ENCY/Insect/edit', { record_id => insect.record_id }) %]">Edit</a>
 [% END %]
 </p>
 
@@ -287,6 +287,9 @@
 </ul>
 [% END %]
 
+[% IF !edit_mode %]
+[% PROCESS 'ENCY/partials/FormalRefs.tt' %]
+[% END %]
 [% IF edit_mode %]
 [% PROCESS 'ENCY/partials/AiFormFill.tt' %]
 <br/>

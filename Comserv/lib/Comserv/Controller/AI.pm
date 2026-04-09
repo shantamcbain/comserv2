@@ -157,8 +157,6 @@ sub index :Path :Args(0) {
                         push @external_models, { name => $id, provider => 'grok', label => $label };
                     }
                 } else {
-                    push @external_models, { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' };
-                    push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
                     push @external_models, { name => 'grok-4-0709',               provider => 'grok', label => 'Grok 4 (xAI)' };
                     push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
                     push @external_models, { name => 'grok-code-fast-1',          provider => 'grok', label => 'Grok Code Fast (xAI)' };
@@ -603,7 +601,25 @@ sub generate :Local :Args(0) {
                 die "Failed to load Grok model";
             }
             $grok->api_key($grok_api_key);
-            $grok->model($model) if $model;
+            if ($model) {
+                $grok->model($model);
+            } else {
+                # No model specified — use first available synced model from API key metadata
+                eval {
+                    my $schema  = $c->model('DBEncy')->schema;
+                    my $key_obj = $schema->resultset('UserApiKeys')->search(
+                        { service => 'grok', is_active => '1' }
+                    )->first;
+                    if ($key_obj) {
+                        my $meta   = $key_obj->get_metadata() || {};
+                        my $synced = $meta->{available_models} || [];
+                        my ($first) = grep { $_->{id} && $_->{id} !~ /imagine|video/i } @$synced;
+                        $grok->model($first->{id}) if $first && $first->{id};
+                    }
+                };
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                    'generate', "No model specified; using " . $grok->model . " from synced list or default");
+            }
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'generate', "Querying Grok API (model: " . $grok->model . ")");
@@ -622,19 +638,64 @@ sub generate :Local :Args(0) {
             
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
-                # Auto-fallback: if model is deprecated (410/404), retry with grok-3-mini
-                if ($error =~ /410|404|no longer available|not found/ && $grok->model ne 'grok-3-mini') {
-                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                        'generate', "Model " . $grok->model . " unavailable, retrying with grok-3-mini");
-                    $grok->model('grok-3-mini');
-                    $response = $grok->chat(
-                        messages   => \@grok_messages,
-                        use_search => $use_search,
-                    );
+                # Auto-fallback: if model is deprecated (410/404), live-query xAI for available models
+                if ($error =~ /410|404|no longer available|not found/) {
+                    my $failed_model = $grok->model;
+                    my $fallback;
+                    my $discovery_err = '';
+                    eval {
+                        require LWP::UserAgent;
+                        require HTTP::Request;
+                        my $ua  = LWP::UserAgent->new(timeout => 10);
+                        my $req = HTTP::Request->new(GET => 'https://api.x.ai/v1/models');
+                        $req->header('Authorization' => "Bearer $grok_api_key");
+                        $req->header('Content-Type'  => 'application/json');
+                        my $resp = $ua->request($req);
+                        if ($resp->is_success) {
+                            my $mdata = eval { decode_json($resp->content) } || {};
+                            my @live  = grep {
+                                $_->{id} && $_->{id} ne $failed_model
+                                         && $_->{id} !~ /imagine|video/i
+                            } @{ $mdata->{data} || [] };
+                            my ($best) = sort { $a->{id} cmp $b->{id} } @live;
+                            if ($best) {
+                                $fallback = $best->{id};
+                                my $schema  = $c->model('DBEncy')->schema;
+                                my $key_obj = $schema->resultset('UserApiKeys')->search(
+                                    { service => 'grok', is_active => '1' }
+                                )->first;
+                                if ($key_obj) {
+                                    my $meta = $key_obj->get_metadata() || {};
+                                    $meta->{available_models}  = [ map { { id => $_->{id} } } @live ];
+                                    $meta->{models_synced_at}  = time();
+                                    $key_obj->set_metadata($meta);
+                                    eval { $key_obj->update };
+                                }
+                            } else {
+                                $discovery_err = "xAI returned model list but no usable models found";
+                            }
+                        } else {
+                            $discovery_err = "xAI models endpoint returned: " . $resp->status_line;
+                        }
+                    };
+                    if ($@) { $discovery_err = "live model discovery exception: $@"; }
+                    if ($discovery_err) {
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                            'generate', "410 fallback failed — $discovery_err");
+                    }
+                    if ($fallback) {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                            'generate', "Model $failed_model unavailable; live-discovered $fallback");
+                        $grok->model($fallback);
+                        $response = $grok->chat(
+                            messages   => \@grok_messages,
+                            use_search => $use_search,
+                        );
+                    }
                 }
                 unless ($response) {
                     $error = $grok->last_error || $error;
-                    die "Grok query failed: $error";
+                    die "Grok query failed: $error — Admin: please go to /ai/models and Sync to update available models";
                 }
             }
             
@@ -1820,7 +1881,63 @@ sub chat :Local :Args(0) {
 
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
-                die "Grok chat failed: $error";
+                # Auto-fallback: if model is deprecated (410/404), live-query xAI for available models
+                if ($error =~ /410|404|no longer available|not found/) {
+                    my $failed_model = $grok->model;
+                    my $fallback;
+                    my $discovery_err = '';
+                    eval {
+                        require LWP::UserAgent;
+                        require HTTP::Request;
+                        my $ua  = LWP::UserAgent->new(timeout => 10);
+                        my $req = HTTP::Request->new(GET => 'https://api.x.ai/v1/models');
+                        $req->header('Authorization' => "Bearer $grok_api_key");
+                        $req->header('Content-Type'  => 'application/json');
+                        my $resp = $ua->request($req);
+                        if ($resp->is_success) {
+                            my $mdata = eval { decode_json($resp->content) } || {};
+                            my @live  = grep {
+                                $_->{id} && $_->{id} ne $failed_model
+                                         && $_->{id} !~ /imagine|video/i
+                            } @{ $mdata->{data} || [] };
+                            my ($best) = sort { $a->{id} cmp $b->{id} } @live;
+                            if ($best) {
+                                $fallback = $best->{id};
+                                my $schema  = $c->model('DBEncy')->schema;
+                                my $key_obj = $schema->resultset('UserApiKeys')->search(
+                                    { service => 'grok', is_active => '1' }
+                                )->first;
+                                if ($key_obj) {
+                                    my $meta = $key_obj->get_metadata() || {};
+                                    $meta->{available_models} = [ map { { id => $_->{id} } } @live ];
+                                    $meta->{models_synced_at} = time();
+                                    $key_obj->set_metadata($meta);
+                                    eval { $key_obj->update };
+                                }
+                            } else {
+                                $discovery_err = "xAI returned model list but no usable models found";
+                            }
+                        } else {
+                            $discovery_err = "xAI models endpoint returned: " . $resp->status_line;
+                        }
+                    };
+                    if ($@) { $discovery_err = "live model discovery exception: $@"; }
+                    if ($discovery_err) {
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                            'chat', "410 fallback failed — $discovery_err");
+                    }
+                    if ($fallback) {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                            'chat', "Model $failed_model unavailable; live-discovered $fallback");
+                        push @chat_trace, "⚠️ Model $failed_model unavailable (410); auto-switched to $fallback";
+                        $grok->model($fallback);
+                        $response = $grok->chat(messages => \@final_messages, use_search => $use_search_chat);
+                    }
+                }
+                unless ($response) {
+                    $error = $grok->last_error || $error;
+                    die "Grok chat failed: $error — Admin: please go to /ai/models and Sync to update available models";
+                }
             }
 
             if ($response->{choices} && ref($response->{choices}) eq 'ARRAY' && @{$response->{choices}}) {
@@ -5435,8 +5552,6 @@ sub get_user_providers :Local :Args(0) {
                 # Fallback to hardcoded Grok models if none stored in metadata
                 if (!@$models && $key->service eq 'grok') {
                     $models = [
-                        { id => 'grok-3-mini' },
-                        { id => 'grok-3' },
                         { id => 'grok-4-0709' },
                         { id => 'grok-4-fast-non-reasoning' },
                         { id => 'grok-code-fast-1' },
