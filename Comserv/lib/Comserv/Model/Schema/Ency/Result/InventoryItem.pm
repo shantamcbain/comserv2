@@ -142,4 +142,10 @@ __PACKAGE__->has_many(
     { cascade_delete => 0 }
 );
 
+__PACKAGE__->has_many(
+    'hive_components' => 'Comserv::Model::Schema::Ency::Result::HiveComponent',
+    { 'foreign.inventory_item_id' => 'self.id' },
+    { cascade_delete => 0 }
+);
+
 1;
