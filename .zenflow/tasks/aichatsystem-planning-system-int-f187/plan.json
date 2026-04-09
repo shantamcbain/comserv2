@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "id": "6b7860c3-a8a9-4edc-a66e-f454e95e3528",
+      "name": "Audit current AI ↔ Planning integration state",
+      "description": "Review what currently exists: does ai_conversations/ai_messages have any project_id or task_id columns? Does DailyPlan show any AI activity? Does the AI controller read from the project/todo tables? Document the gap between current state and goal.",
+      "status": "Pending",
+      "sort_order": 0,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-30T05:29:05.481526783Z",
+      "updated_at": "2026-03-30T05:29:05.481526783Z"
+    },
+    {
+      "id": "4b274a21-05c4-424f-b3df-2028af8f98fd",
+      "name": "Add project_id / task_id to ai_conversations table",
+      "description": "DB migration: add nullable project_id and task_id columns to the ai_conversations table so each conversation can be linked to a specific Zenflow project and task. Update the DBEncy schema result class and AI controller to populate these when context is available.",
+      "status": "Pending",
+      "sort_order": 1,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-30T05:29:05.481526783Z",
+      "updated_at": "2026-03-30T05:29:05.481526783Z"
+    },
+    {
+      "id": "e7dadcb6-a09c-4e63-81a9-def18689375e",
+      "name": "Inject project/todo context into AI system prompt",
+      "description": "When a user is on a Planning or project page, automatically query the project's todos and recent activity and inject a summary into the AI system prompt. This allows the AI to answer 'What is the next todo?' or 'What is the state of this project?' accurately from live DB data.",
+      "status": "Pending",
+      "sort_order": 2,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-30T05:29:05.481526783Z",
+      "updated_at": "2026-03-30T05:29:05.481526783Z"
+    },
+    {
+      "id": "526d9c11-d941-40cb-8adf-fab1d04b370c",
+      "name": "Show AI chat activity on DailyPlan / project detail pages",
+      "description": "Add a section to the DailyPlan and /project/details pages that lists recent AI conversations linked to that project/task — showing conversation title, model used, timestamp, and a link to /ai/conversation/ID. Admins and developers should see this panel.",
+      "status": "Pending",
+      "sort_order": 3,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-30T05:29:05.481526783Z",
+      "updated_at": "2026-03-30T05:29:05.481526783Z"
+    },
+    {
+      "id": "06514bc4-ae54-45b5-95e9-86b293799dce",
+      "name": "Add AI conversation link to task/todo views",
+      "description": "In the task detail view, show a list of AI conversations that were run in the context of that task. Allow navigating directly to the conversation history from the task page.",
+      "status": "Pending",
+      "sort_order": 4,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-30T05:29:05.481526783Z",
+      "updated_at": "2026-03-30T05:29:05.481526783Z"
+    },
+    {
+      "id": "1f8b666c-8fbe-494e-ad5e-ec81dd06bde5",
+      "name": "Test and verify end-to-end integration",
+      "description": "Test: open a project page, ask Chat with AI about the project state, verify the conversation is linked to the project in DB, verify it appears in the DailyPlan AI activity panel, verify the thinking trace is visible in conversation history.",
+      "status": "Pending",
+      "sort_order": 5,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-03-30T05:29:05.481526783Z",
+      "updated_at": "2026-03-30T05:29:05.481526783Z"
+    }
+  ]
+}

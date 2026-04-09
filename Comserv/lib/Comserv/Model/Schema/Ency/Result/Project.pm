@@ -77,4 +77,5 @@ __PACKAGE__->has_many(sub_projects => 'Comserv::Model::Schema::Ency::Result::Pro
 __PACKAGE__->has_many(todos => 'Comserv::Model::Schema::Ency::Result::Todo', 'project_id', { cascade_delete => 1 });
 __PACKAGE__->has_many(project_sites => 'Comserv::Model::Schema::Ency::Result::ProjectSite', 'project_id');
 __PACKAGE__->many_to_many(sites => 'project_sites', 'site');
+__PACKAGE__->has_many(ai_conversations => 'Comserv::Model::Schema::Ency::Result::AiConversation', 'project_id');
 1;

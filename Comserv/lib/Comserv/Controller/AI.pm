@@ -83,16 +83,22 @@ sub index :Path :Args(0) {
     # Get or set the current Ollama configuration
     my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
     
+    # Accept optional project/task context from query params
+    my $context_project_id = $c->request->params->{project_id} || undef;
+    my $context_task_id    = $c->request->params->{task_id}    || undef;
+
     # Set template variables
     $c->stash(
-        template => 'ai/index.md',
-        page_title => 'AI Assistant',
-        username => $username,
-        can_select_model => $can_select_model,
-        current_host => $current_host,
-        current_port => $current_port,
-        current_model => $current_model,
-        installed_models => $installed_models
+        template          => 'ai/index.md',
+        page_title        => 'AI Assistant',
+        username          => $username,
+        can_select_model  => $can_select_model,
+        current_host      => $current_host,
+        current_port      => $current_port,
+        current_model     => $current_model,
+        installed_models  => $installed_models,
+        context_project_id => $context_project_id,
+        context_task_id    => $context_task_id,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
@@ -428,10 +434,14 @@ sub chat :Local :Args(0) {
     };
     
     # Get parameters from JSON or fallback to form params
-    my $prompt = $json_data->{prompt} || $c->request->params->{prompt} || '';
-    my $model = $json_data->{model} || $c->request->params->{model} || '';
-    my $history = $json_data->{history} || [];
-    
+    my $prompt          = $json_data->{prompt}          || $c->request->params->{prompt}          || '';
+    my $model           = $json_data->{model}           || $c->request->params->{model}           || '';
+    my $history         = $json_data->{history}         || [];
+    my $project_id      = $json_data->{project_id}      || $c->request->params->{project_id}      || undef;
+    my $task_id         = $json_data->{task_id}         || $c->request->params->{task_id}         || undef;
+    my $conversation_id = $json_data->{conversation_id} || $c->request->params->{conversation_id} || undef;
+    my $system_prompt   = $json_data->{system}          || $c->request->params->{system}          || '';
+
     # Validate prompt
     unless ($prompt && length($prompt) > 0) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
@@ -445,16 +455,32 @@ sub chat :Local :Args(0) {
         $c->response->status(400);
         return;
     }
+
+    # Inject project/todo context into system prompt when project_id or task_id is provided
+    if ($project_id || $task_id) {
+        my $context = $self->_build_project_context($c, $project_id, $task_id);
+        if ($context) {
+            $system_prompt = $context . ($system_prompt ? "\n\n" . $system_prompt : '');
+        }
+    }
     
     # Build messages array for chat API
     my @messages = ();
+
+    # Add system message if present
+    if ($system_prompt && length($system_prompt) > 0) {
+        push @messages, {
+            role    => 'system',
+            content => $system_prompt
+        };
+    }
     
     # Add history if provided
     if ($history && ref($history) eq 'ARRAY') {
         foreach my $msg (@$history) {
             if (ref($msg) eq 'HASH' && $msg->{role} && $msg->{content}) {
                 push @messages, {
-                    role => $msg->{role},
+                    role    => $msg->{role},
                     content => $msg->{content}
                 };
             }
@@ -463,7 +489,7 @@ sub chat :Local :Args(0) {
     
     # Add current user message
     push @messages, {
-        role => 'user',
+        role    => 'user',
         content => $prompt
     };
     
@@ -526,15 +552,27 @@ sub chat :Local :Args(0) {
         my $model_used = $response->{model} || $ollama->model;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
             'chat', "Chat successful for user '$username' - Model: $model_used, Response length: $response_length chars");
+
+        # Persist conversation and messages to database
+        my $saved_conversation_id = $self->_persist_chat($c, {
+            username        => $username,
+            conversation_id => $conversation_id,
+            project_id      => $project_id,
+            task_id         => $task_id,
+            model           => $model_used,
+            prompt          => $prompt,
+            response        => $ai_response,
+        });
         
         # Build JSON response
         $response_data = {
-            success => JSON::true,
-            response => $ai_response,
-            model => $model_used,
-            created_at => $response->{created_at} || '',
-            total_duration => $response->{total_duration} || 0,
-            eval_count => $response->{eval_count} || 0
+            success         => JSON::true,
+            response        => $ai_response,
+            model           => $model_used,
+            created_at      => $response->{created_at} || '',
+            total_duration  => $response->{total_duration} || 0,
+            eval_count      => $response->{eval_count} || 0,
+            conversation_id => $saved_conversation_id || undef,
         };
         
     } catch {
@@ -1358,6 +1396,301 @@ sub _get_current_ollama_config {
     };
     
     return ($current_host, $current_port, $current_model, $installed_models);
+}
+
+=head2 conversation
+
+View a single AI conversation and its messages.
+
+=cut
+
+sub conversation :Local :Args(1) {
+    my ($self, $c, $conv_id) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $username = $c->session->{username};
+    my $user_id  = $c->session->{user_id};
+
+    my $schema = $c->model('DBEncy');
+    my $conversation;
+    eval {
+        $conversation = $schema->resultset('AiConversation')->find(
+            { id => $conv_id, user_id => $user_id },
+            { prefetch => 'ai_messages' }
+        );
+    };
+
+    unless ($conversation) {
+        $c->stash(
+            template  => 'ai/conversation.tt',
+            error_msg => 'Conversation not found or access denied.',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    my @messages = $conversation->ai_messages->search(
+        {},
+        { order_by => { -asc => 'created_at' } }
+    );
+
+    $c->stash(
+        template     => 'ai/conversation.tt',
+        page_title   => $conversation->get_display_title,
+        conversation => $conversation,
+        messages     => \@messages,
+    );
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'conversation', "User '$username' viewing conversation $conv_id");
+
+    $c->forward($c->view('TT'));
+}
+
+=head2 conversations
+
+List the current user's AI conversations with optional project/task filtering.
+
+=cut
+
+sub conversations :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $username   = $c->session->{username};
+    my $user_id    = $c->session->{user_id};
+    my $project_id = $c->request->params->{project_id} || undef;
+    my $task_id    = $c->request->params->{task_id}    || undef;
+
+    my $schema = $c->model('DBEncy');
+    my %search = ( user_id => $user_id );
+    $search{project_id} = $project_id if $project_id;
+    $search{task_id}    = $task_id    if $task_id;
+
+    my @conversations;
+    eval {
+        @conversations = $schema->resultset('AiConversation')->search(
+            \%search,
+            { order_by => { -desc => 'updated_at' }, rows => 50 }
+        );
+    };
+
+    $c->stash(
+        template      => 'ai/conversations.tt',
+        page_title    => 'AI Conversations',
+        conversations => \@conversations,
+        filter_project_id => $project_id,
+        filter_task_id    => $task_id,
+    );
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'conversations', "User '$username' listing conversations");
+
+    $c->forward($c->view('TT'));
+}
+
+=head2 project_conversations
+
+JSON endpoint: returns recent AI conversations for a given project_id.
+Used by project detail page AJAX or template server-side rendering.
+
+=cut
+
+sub project_conversations :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Authentication required' }));
+        $c->response->status(401);
+        return;
+    }
+
+    my $project_id = $c->request->params->{project_id} || '';
+    unless ($project_id) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'project_id required' }));
+        $c->response->status(400);
+        return;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my @convs;
+    eval {
+        @convs = $schema->resultset('AiConversation')->search(
+            { project_id => $project_id },
+            { order_by => { -desc => 'updated_at' }, rows => 10 }
+        );
+    };
+
+    my @data = map {
+        {
+            id          => $_->id,
+            title       => $_->get_display_title,
+            model       => $_->model || '',
+            status      => $_->status,
+            updated_at  => $_->updated_at . '',
+            message_count => $_->get_message_count,
+        }
+    } @convs;
+
+    $c->response->body(encode_json({ success => JSON::true, conversations => \@data }));
+}
+
+=head2 _persist_chat
+
+Private method: create or update an ai_conversations record and append messages.
+Returns the conversation ID on success, undef on failure.
+
+=cut
+
+sub _persist_chat {
+    my ($self, $c, $args) = @_;
+
+    my $username        = $args->{username}        || '';
+    my $conversation_id = $args->{conversation_id} || undef;
+    my $project_id      = $args->{project_id}      || undef;
+    my $task_id         = $args->{task_id}          || undef;
+    my $model           = $args->{model}            || '';
+    my $prompt          = $args->{prompt}           || '';
+    my $response        = $args->{response}         || '';
+
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            '_persist_chat', "No user_id in session for user '$username', skipping DB persist");
+        return undef;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my $conv;
+
+    eval {
+        if ($conversation_id) {
+            $conv = $schema->resultset('AiConversation')->find(
+                { id => $conversation_id, user_id => $user_id }
+            );
+        }
+
+        unless ($conv) {
+            my $title = length($prompt) > 80 ? substr($prompt, 0, 80) . '...' : $prompt;
+            $conv = $schema->resultset('AiConversation')->create({
+                user_id    => $user_id,
+                title      => $title,
+                project_id => $project_id,
+                task_id    => $task_id,
+                model      => $model,
+                status     => 'active',
+            });
+        } else {
+            $conv->update({
+                model      => $model,
+                project_id => $project_id // $conv->project_id,
+                task_id    => $task_id    // $conv->task_id,
+            });
+        }
+
+        $schema->resultset('AiMessage')->create({
+            conversation_id => $conv->id,
+            role            => 'user',
+            content         => $prompt,
+            metadata        => undef,
+        });
+
+        $schema->resultset('AiMessage')->create({
+            conversation_id => $conv->id,
+            role            => 'assistant',
+            content         => $response,
+            metadata        => encode_json({ model => $model }),
+        });
+    };
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_persist_chat', "Failed to persist chat for user '$username': $@");
+        return undef;
+    }
+
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+        '_persist_chat', "Persisted chat to conversation " . $conv->id . " for user '$username'");
+
+    return $conv->id;
+}
+
+=head2 _build_project_context
+
+Private method: build a system prompt context block from project/todo data.
+
+=cut
+
+sub _build_project_context {
+    my ($self, $c, $project_id, $task_id) = @_;
+
+    my $schema = $c->model('DBEncy');
+    my @lines;
+
+    eval {
+        if ($project_id) {
+            my $project = $schema->resultset('Project')->find($project_id);
+            if ($project) {
+                push @lines, "## Project Context";
+                push @lines, "Project: " . $project->name;
+                push @lines, "Description: " . ($project->description || 'N/A');
+                push @lines, "Status: " . ($project->status || 'N/A');
+
+                my @todos = $schema->resultset('Todo')->search(
+                    { project_id => $project_id },
+                    { order_by => { -asc => 'priority' }, rows => 20 }
+                );
+
+                if (@todos) {
+                    push @lines, "\nProject Todos:";
+                    foreach my $todo (@todos) {
+                        my $status_text = do {
+                            my $s = $todo->status || '';
+                            $s == 1 ? 'New'
+                          : $s == 2 ? 'In Progress'
+                          : $s == 3 ? 'Completed'
+                          : $s;
+                        };
+                        push @lines, "- [" . $status_text . "] " . $todo->subject
+                            . ($todo->due_date ? " (due: " . $todo->due_date . ")" : '');
+                    }
+                }
+            }
+        }
+
+        if ($task_id) {
+            my $todo = $schema->resultset('Todo')->find($task_id);
+            if ($todo) {
+                my $status_text = do {
+                    my $s = $todo->status || '';
+                    $s == 1 ? 'New' : $s == 2 ? 'In Progress' : $s == 3 ? 'Completed' : $s;
+                };
+                push @lines, "\n## Current Task Context";
+                push @lines, "Task: " . $todo->subject;
+                push @lines, "Description: " . ($todo->description || 'N/A');
+                push @lines, "Status: $status_text";
+                push @lines, "Due: " . ($todo->due_date || 'N/A');
+            }
+        }
+    };
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            '_build_project_context', "Failed to build project context: $@");
+        return '';
+    }
+
+    return @lines ? join("\n", @lines) : '';
 }
 
 =head1 AUTHOR

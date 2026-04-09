@@ -130,6 +130,26 @@
         <button type="submit">Edit Todo</button>
     </form>
 </div>
+
+<!-- AI Conversations linked to this task -->
+[% IF ai_conversations && ai_conversations.size > 0 %]
+<div style="margin-top: 20px; padding: 15px; background: rgba(0,100,200,0.05); border-left: 3px solid #0064c8; border-radius: 4px;">
+    <h3 style="margin-top:0; color:#0064c8;">AI Conversations</h3>
+    <ul>
+        [% FOREACH conv IN ai_conversations %]
+        <li>
+            <a href="/ai/conversation/[% conv.id %]">[% conv.get_display_title %]</a>
+            &mdash; [% conv.model || 'Unknown model' %],
+            [% conv.get_message_count %] messages,
+            [% conv.updated_at %]
+        </li>
+        [% END %]
+    </ul>
+    <p><a href="/ai/conversations?task_id=[% record.get_column('record_id') %]">View all AI conversations for this task</a></p>
+</div>
+[% END %]
+<p><a href="/ai?task_id=[% record.get_column('record_id') %]&amp;project_id=[% record.get_column('project_id') %]">Start AI Chat for this Task</a></p>
+
 <!-- Return navigation buttons -->
 <div class="return-nav">
     <a href="/todo" class="return-button">Return to List View</a>

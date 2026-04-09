@@ -57,6 +57,16 @@
     </div>
     [% END %]
     
+    <!-- Project/Task Context Banner -->
+    [% IF context_project_id || context_task_id %]
+    <div id="context-banner" style="background:#e3f2fd; border-left:4px solid #0064c8; padding:10px 15px; margin-bottom:10px; border-radius:4px;">
+        <strong>Context:</strong>
+        [% IF context_project_id %] Project ID: [% context_project_id %][% END %]
+        [% IF context_task_id %] &mdash; Task ID: [% context_task_id %][% END %]
+        &mdash; The AI will be aware of this project/task context.
+    </div>
+    [% END %]
+
     <!-- Chat Messages Container -->
     <div class="chat-messages" id="chat-messages">
         <div class="welcome-message">
@@ -524,6 +534,7 @@
 // Chat state management
 let conversationHistory = [];
 let isProcessing = false;
+let currentConversationId = null;
 
 // DOM elements
 const chatForm = document.getElementById('chat-form');
@@ -679,7 +690,10 @@ async function handleSubmit(e) {
             body: JSON.stringify({
                 prompt: prompt,
                 model: selectedModel,
-                history: conversationHistory.slice(-10) // Send last 10 messages for context
+                history: conversationHistory.slice(-10), // Send last 10 messages for context
+                project_id: [% context_project_id || 'null' %],
+                task_id: [% context_task_id || 'null' %],
+                conversation_id: currentConversationId || null
             })
         });
         
@@ -689,6 +703,10 @@ async function handleSubmit(e) {
         removeLoadingMessage(loadingId);
         
         if (data.success) {
+            // Track conversation ID for subsequent messages in same session
+            if (data.conversation_id) {
+                currentConversationId = data.conversation_id;
+            }
             // Add AI response to chat
             addMessage('assistant', data.response, data.model);
         } else {

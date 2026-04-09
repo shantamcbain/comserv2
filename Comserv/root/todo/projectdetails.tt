@@ -155,6 +155,41 @@
 <!-- Display total accumulated time for all projects -->
 <h3>Total Accumulated Time for All Projects: [% total_accumulated_time %]</h3>
 
+<!-- AI Chat Activity Panel (admin/developer/editor only) -->
+[% IF can_see_ai %]
+<div class="ai-activity-panel">
+    <h3>AI Chat Activity</h3>
+    [% IF ai_conversations && ai_conversations.size > 0 %]
+    <table class="project-details-table">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Model</th>
+                <th>Messages</th>
+                <th>Last Updated</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% FOREACH conv IN ai_conversations %]
+            <tr>
+                <td>[% conv.get_display_title %]</td>
+                <td>[% conv.model || 'Unknown' %]</td>
+                <td>[% conv.get_message_count %]</td>
+                <td>[% conv.updated_at %]</td>
+                <td><a href="/ai/conversation/[% conv.id %]">View</a></td>
+            </tr>
+            [% END %]
+        </tbody>
+    </table>
+    <p><a href="/ai/conversations?project_id=[% project.id %]">View all AI conversations for this project</a></p>
+    [% ELSE %]
+    <p>No AI conversations linked to this project yet.</p>
+    [% END %]
+    <p><a href="/ai?project_id=[% project.id %]">Start AI Chat for this Project</a></p>
+</div>
+[% END %]
+
 <!-- Button to go back to the project list -->
 <button type="button" onclick="window.location.href='/project';">Back to Projects</button>
 
@@ -412,5 +447,20 @@ select.priority-display {
 /* Make the priority display inline */
 .priority-display-wrapper {
     display: inline-block;
+}
+
+/* AI Activity Panel */
+.ai-activity-panel {
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 15px;
+    background: rgba(0, 100, 200, 0.05);
+    border-left: 3px solid #0064c8;
+    border-radius: 4px;
+}
+
+.ai-activity-panel h3 {
+    margin-top: 0;
+    color: #0064c8;
 }
 </style>

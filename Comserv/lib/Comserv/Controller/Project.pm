@@ -293,11 +293,35 @@ sub details :Path('details') :Args(0) {
     # Fetch sub-projects and their todos recursively
     my $project_tree = $self->build_project_tree($c, $project);
 
+    # Fetch recent AI conversations linked to this project
+    my @ai_conversations;
+    eval {
+        @ai_conversations = $schema->resultset('AiConversation')->search(
+            { project_id => $project_id },
+            { order_by => { -desc => 'updated_at' }, rows => 10 }
+        );
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'details',
+            "Failed to fetch AI conversations for project $project_id: $@");
+    }
+
+    # Determine if user can see AI activity panel
+    my $user_roles = $c->session->{roles} || [];
+    if (!ref($user_roles)) {
+        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
+    }
+    my $can_see_ai = ref($user_roles) eq 'ARRAY'
+        ? grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles
+        : 0;
+
     # Add the project tree (including sub-projects and todos) to the stash
     $c->stash(
-        project => $project_tree,
-        todos => \@todos,
-        template => 'todo/projectdetails.tt'
+        project          => $project_tree,
+        todos            => \@todos,
+        ai_conversations => \@ai_conversations,
+        can_see_ai       => $can_see_ai,
+        template         => 'todo/projectdetails.tt'
     );
 
     # Logging: End of details action

@@ -1,0 +1,70 @@
+[% PageVersion = 'ai/conversations.tt,v 0.1 2026/04/09 Exp' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+<div style="max-width:1000px; margin:20px auto; padding:20px;">
+    <h1>AI Conversations</h1>
+
+    [% IF filter_project_id %]
+    <div style="background:#e3f2fd; padding:10px 15px; border-left:4px solid #0064c8; border-radius:4px; margin-bottom:15px;">
+        Filtered by Project ID: [% filter_project_id %]
+        &nbsp;&mdash;&nbsp;
+        <a href="/ai/conversations">Clear filter</a>
+    </div>
+    [% END %]
+    [% IF filter_task_id %]
+    <div style="background:#e3f2fd; padding:10px 15px; border-left:4px solid #0064c8; border-radius:4px; margin-bottom:15px;">
+        Filtered by Task ID: [% filter_task_id %]
+        &nbsp;&mdash;&nbsp;
+        <a href="/ai/conversations">Clear filter</a>
+    </div>
+    [% END %]
+
+    [% IF conversations && conversations.size > 0 %]
+    <table style="width:100%; border-collapse:collapse; margin-top:10px;">
+        <thead>
+            <tr style="background:#f2f2f2;">
+                <th style="padding:10px; border:1px solid #ddd; text-align:left;">Title</th>
+                <th style="padding:10px; border:1px solid #ddd; text-align:left;">Model</th>
+                <th style="padding:10px; border:1px solid #ddd; text-align:left;">Project</th>
+                <th style="padding:10px; border:1px solid #ddd; text-align:left;">Task</th>
+                <th style="padding:10px; border:1px solid #ddd; text-align:left;">Messages</th>
+                <th style="padding:10px; border:1px solid #ddd; text-align:left;">Last Updated</th>
+                <th style="padding:10px; border:1px solid #ddd; text-align:left;">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% FOREACH conv IN conversations %]
+            <tr>
+                <td style="padding:10px; border:1px solid #ddd;">[% conv.get_display_title %]</td>
+                <td style="padding:10px; border:1px solid #ddd;">[% conv.model || 'Unknown' %]</td>
+                <td style="padding:10px; border:1px solid #ddd;">
+                    [% IF conv.project_id %]
+                        <a href="/project/details?project_id=[% conv.project_id %]">[% conv.project_id %]</a>
+                    [% ELSE %]
+                        &mdash;
+                    [% END %]
+                </td>
+                <td style="padding:10px; border:1px solid #ddd;">
+                    [% IF conv.task_id %]
+                        <a href="/todo/details?record_id=[% conv.task_id %]">[% conv.task_id %]</a>
+                    [% ELSE %]
+                        &mdash;
+                    [% END %]
+                </td>
+                <td style="padding:10px; border:1px solid #ddd;">[% conv.get_message_count %]</td>
+                <td style="padding:10px; border:1px solid #ddd;">[% conv.updated_at %]</td>
+                <td style="padding:10px; border:1px solid #ddd;">
+                    <a href="/ai/conversation/[% conv.id %]">View</a>
+                </td>
+            </tr>
+            [% END %]
+        </tbody>
+    </table>
+    [% ELSE %]
+    <p style="color:#888; margin-top:30px;">No conversations found.</p>
+    [% END %]
+
+    <div style="margin-top:20px;">
+        <a href="/ai">Start New Chat</a>
+    </div>
+</div>

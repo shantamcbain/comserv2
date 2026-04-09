@@ -374,11 +374,25 @@ sub details :Path('/todo/details') :Args {
                 "Error fetching projects: $@");
         }
 
+        # Fetch AI conversations linked to this task
+        my @ai_conversations;
+        eval {
+            @ai_conversations = $schema->resultset('AiConversation')->search(
+                { task_id => $record_id },
+                { order_by => { -desc => 'updated_at' }, rows => 10 }
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'details',
+                "Failed to fetch AI conversations for task $record_id: $@");
+        }
+
         # Add the todo, accumulative_time, and projects to the stash
         $c->stash(
-            record => $todo, 
+            record            => $todo, 
             accumulative_time => $accumulative_time,
-            projects => $projects
+            projects          => $projects,
+            ai_conversations  => \@ai_conversations,
         );
 
         # Set the template to 'todo/details.tt'
@@ -943,6 +957,7 @@ sub day :Path('/todo/day') :Args {
 
     # Get the Todo model
     my $todo_model = $c->model('Todo');
+    my $schema = $c->model('DBEncy');
 
     # Fetch ALL todos for the site for calendar view
     my $todos = $todo_model->get_all_todos_for_calendar($c, $c->session->{SiteName});
@@ -962,14 +977,48 @@ sub day :Path('/todo/day') :Args {
         }
     }
 
+    # Fetch AI conversations active on this date for privileged users
+    my @ai_daily_conversations;
+    my $user_roles_day = $c->session->{roles} || [];
+    if (!ref($user_roles_day)) {
+        $user_roles_day = [split(/\s*,\s*/, $user_roles_day)] if $user_roles_day;
+    }
+    my $can_see_ai_day = ref($user_roles_day) eq 'ARRAY'
+        ? grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_day
+        : 0;
+
+    if ($can_see_ai_day) {
+        eval {
+            my $day_start = $date . ' 00:00:00';
+            my $day_end   = $date . ' 23:59:59';
+            @ai_daily_conversations = $schema->resultset('AiConversation')->search(
+                {
+                    updated_at => {
+                        '>=' => $day_start,
+                        '<=' => $day_end,
+                    }
+                },
+                {
+                    order_by => { -desc => 'updated_at' },
+                    prefetch => 'project',
+                }
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'day',
+                "Failed to fetch AI conversations for date $date: $@");
+        }
+    }
+
     # Add the todos to the stash
     $c->stash(
-        todos => $filtered_todos,
-        sitename => $c->session->{SiteName},
-        date => $date,
-        previous_date => $previous_date,
-        next_date => $next_date,
-        template => 'todo/day.tt',
+        todos                  => $filtered_todos,
+        sitename               => $c->session->{SiteName},
+        date                   => $date,
+        previous_date          => $previous_date,
+        next_date              => $next_date,
+        ai_daily_conversations => \@ai_daily_conversations,
+        template               => 'todo/day.tt',
     );
 
     $c->forward($c->view('TT'));
