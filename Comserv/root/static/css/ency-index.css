@@ -159,3 +159,20 @@
     font-size: var(--font-size-small);
     color: var(--text-muted-color);
 }
+
+/* ── Transparent containers so site background image shows through ─── */
+/* Sites define --ency-form-bg and --ency-container-bg in their own CSS.
+   Fallback is semi-transparent white which works on any background. */
+form,
+table,
+.apiary-header,
+.stat-card,
+.ency-admin-card,
+.ency-admin-grid > *,
+.context-item {
+    background: var(--ency-form-bg, rgba(255,255,255,0.82)) !important;
+}
+
+.apiary-container {
+    background: var(--ency-container-bg, rgba(255,255,255,0.70)) !important;
+}
