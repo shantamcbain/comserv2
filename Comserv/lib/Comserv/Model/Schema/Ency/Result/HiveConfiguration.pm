@@ -141,6 +141,11 @@ __PACKAGE__->add_columns(
         size => 50,
         is_nullable => 1,
     },
+    inventory_item_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+        comment     => 'FK → inventory_items — optional link to a BOM-bearing item that represents this configuration',
+    },
 );
 
 __PACKAGE__->set_primary_key('id');
@@ -150,18 +155,11 @@ __PACKAGE__->add_unique_constraint(
 );
 
 # Relationships
-__PACKAGE__->has_many(
-    'configuration_boxes',
-    'Comserv::Model::Schema::Ency::Result::ConfigurationBox',
-    'configuration_id',
-    { cascade_delete => 1 }
-);
-
-__PACKAGE__->has_many(
-    'configuration_inventory',
-    'Comserv::Model::Schema::Ency::Result::ConfigurationInventory',
-    'configuration_id',
-    { cascade_delete => 1 }
+__PACKAGE__->belongs_to(
+    'inventory_item',
+    'Comserv::Model::Schema::Ency::Result::InventoryItem',
+    { 'foreign.id' => 'self.inventory_item_id' },
+    { is_deferrable => 1, on_delete => 'SET NULL', join_type => 'LEFT' }
 );
 
 __PACKAGE__->has_many(
@@ -263,14 +261,18 @@ sub equipment_list {
 
 sub inventory_requirements {
     my $self = shift;
-    
-    # Get detailed inventory from configuration_inventory relationship
-    my @requirements = $self->configuration_inventory->search(
-        {},
-        { prefetch => 'inventory_item' }
-    );
-    
-    return \@requirements;
+
+    # If this configuration is linked to an InventoryItem with a BOM, return that BOM.
+    # Otherwise fall back to the built-in equipment_list summary.
+    if ($self->inventory_item_id) {
+        my @bom = $self->inventory_item->bom_components->search(
+            {},
+            { prefetch => 'component_item', order_by => 'sort_order' }
+        );
+        return \@bom;
+    }
+
+    return [];
 }
 
 sub seasonal_transitions {
@@ -334,35 +336,19 @@ sub create_from_template {
     
     my $new_config = $self->result_source->resultset->create(\%clone_data);
     
-    # Clone associated boxes and inventory
-    for my $box ($self->configuration_boxes) {
-        my %box_data = $box->get_columns;
-        delete $box_data{id};
-        $box_data{configuration_id} = $new_config->id;
-        $new_config->create_related('configuration_boxes', \%box_data);
-    }
-    
-    for my $inventory ($self->configuration_inventory) {
-        my %inv_data = $inventory->get_columns;
-        delete $inv_data{id};
-        $inv_data{configuration_id} = $new_config->id;
-        $new_config->create_related('configuration_inventory', \%inv_data);
-    }
+    # BOM is inherited via inventory_item_id — no cloning needed as the
+    # new config points to the same InventoryItem and its BOM.
     
     return $new_config;
 }
 
 sub calculate_total_frames {
     my $self = shift;
-    
-    my $total = 0;
-    for my $box ($self->configuration_boxes) {
-        $total += $box->frame_count;
-    }
-    
-    # Update the stored total
+
+    my $total = ($self->brood_boxes || 0) * 10 + ($self->honey_boxes || 0) * 10;
+
     $self->update({ total_frames => $total });
-    
+
     return $total;
 }
 

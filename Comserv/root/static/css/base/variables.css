@@ -15,6 +15,10 @@
   --info-color: #17a2b8;
   --light-color: #f8f9fa;
   --text-muted-color: #6c757d;
+
+  /* Aliases for templates using alternate naming conventions */
+  --bg-color: var(--background-color);
+  --bg-secondary: #f0f0f0;
   
   /* Typography */
   --header-font: Verdana, Helvetica, sans-serif;
