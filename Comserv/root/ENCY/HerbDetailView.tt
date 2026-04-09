@@ -18,7 +18,7 @@
 <div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
 [% END %]
 
-[% IF is_admin %]
+[% IF is_editor %]
     <a href="/ENCY/edit_herb">Edit Herb</a>
 [% END %]
 <h1>[% herb.botanical_name %]</h1>
@@ -52,7 +52,7 @@
 <p>History [% herb.history %] </p>
 <p>Reference [% herb.reference %]</p>
 <!-- Display the Add Herb button only for admin users -->
-[% IF is_admin %]
+[% IF is_editor %]
     <a href="/ENCY/add_herb" class="btn btn-primary">Add Herb</a>
 [% END %]
 <table>

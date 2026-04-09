@@ -30,6 +30,16 @@
 [% MACRO ency_img_tag(val, w, h) BLOCK %]
 [% SET src = ency_img_src(val) %]
 [% IF src %]
+[% SET wstyle = w ? 'width:' _ w _ 'px;' : '' %]
+[% SET hstyle = h ? 'max-height:' _ h _ 'px;' : '' %]
+[% IF src.match('\.svg$') || src.match('\.svg\?') %]
+<object data="[% src %]" type="image/svg+xml"
+        style="[% wstyle %][% hstyle %]max-width:100%;display:block">
+  <a href="[% src %]" target="_blank" rel="noopener" style="font-size:.8rem;word-break:break-all">
+    View image: [% src %]
+  </a>
+</object>
+[% ELSE %]
 <img src="[% src %]"
      [% IF w %]width="[% w %]"[% END %]
      [% IF h %]height="[% h %]"[% END %]
@@ -39,6 +49,7 @@
   (image unavailable)<br>
   <a href="[% src %]" target="_blank" rel="noopener" style="font-size:.75rem;word-break:break-all">[% src %]</a>
 </span>
+[% END %]
 [% ELSE %]
 <span style="color:#aaa;font-size:.85rem">(no image)</span>
 [% END %]
