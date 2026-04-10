@@ -797,11 +797,14 @@ sub generate :Local :Args(0) {
             my ($tier_small, $tier_large) = $self->_pick_ollama_tier(
                 $installed_models, $current_model, $agent_id, $page_context);
             my $manual_model = ($model && $can_select_model_gen) ? $model : '';
-            my $use_model    = $manual_model || $tier_small;
+            # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier
+            my $force_large = (!$is_guest && !$manual_model &&
+                $normalized_agent_type =~ /^(planning|ency|bmaster)$/i) ? 1 : 0;
+            my $use_model = $manual_model || ($force_large ? $tier_large : $tier_small);
 
             push @trace, sprintf("🔍 Tier selection: small=%s large=%s → using=%s%s",
                 $tier_small, $tier_large, $use_model,
-                $manual_model ? " (manual override)" : "");
+                $manual_model ? " (manual override)" : ($force_large ? " (agent forced large)" : ""));
 
             $ollama->host($current_host);
             $ollama->port($current_port) if $current_port;
@@ -2077,14 +2080,17 @@ sub chat :Local :Args(0) {
 
             # If user manually picked a model (admin override), skip escalation logic
             my $manual_model = ($model && $can_select_model_perm) ? $model : '';
+            # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier
+            my $chat_force_large = (!$is_guest && !$manual_model &&
+                $chat_agent_id =~ /^(planning|ency|bmaster)$/i) ? 1 : 0;
 
             push @chat_trace, sprintf("🔍 Tier selection: small=%s large=%s → using=%s%s",
                 $tier_small, $tier_large,
-                $manual_model || $tier_small,
-                $manual_model ? ' (manual override)' : '');
+                $manual_model || ($chat_force_large ? $tier_large : $tier_small),
+                $manual_model ? ' (manual override)' : ($chat_force_large ? ' (agent forced large)' : ''));
 
             # ── Prefer in-memory models to avoid cold-start delays ──────────────
-            my $chat_use_model = $manual_model || $tier_small;
+            my $chat_use_model = $manual_model || ($chat_force_large ? $tier_large : $tier_small);
             unless ($manual_model) {
                 my $running = $avail_check->get_running_models() || [];
                 if (@$running) {
@@ -6728,6 +6734,19 @@ sub action :Local :Args(0) {
         return;
     }
 
+    # ── open_project_wizard ───────────────────────────────────────────────────
+    # This is handled entirely client-side; the server just echoes the params back
+    # so the JS wizard handler can pre-fill the form fields.
+    if ($action_name eq 'open_project_wizard') {
+        $c->response->body(encode_json({
+            success       => JSON::true,
+            action        => 'open_project_wizard',
+            wizard_title  => $params->{title} || '',
+            message       => 'Project wizard opened',
+        }));
+        return;
+    }
+
     # ── create_project ────────────────────────────────────────────────────────
     if ($action_name eq 'create_project') {
         my $name = $params->{name};
@@ -7448,9 +7467,22 @@ AVAILABLE MODULES IN THIS APPLICATION (use these when assessing dependencies):
 
 $projects_list
 
-ACTION FORMATS (emit only after user confirms):
-- Create a project: [ACTION: {"action": "create_project", "params": {"name": "Project Name", "description": "...", "parent_id": OPTIONAL_PARENT_ID, "due_date": "YYYY-MM-DD"}}]
-- Create a todo:    [ACTION: {"action": "create_todo", "params": {"subject": "Todo subject", "project_id": PROJECT_ID, "due_date": "YYYY-MM-DD", "description": "...", "priority": 2}}]
+ACTION FORMATS:
+- Open project wizard (Step 1 — do this FIRST when user wants to create a new project/feature):
+  [ACTION: {"action": "open_project_wizard", "params": {"title": "Feature name the user mentioned"}}]
+  The wizard form collects: name, description, due date, and dependency checkboxes.
+  Only emit this once per conversation turn. After opening the wizard, ask the user to fill it in.
+
+- Create a project (Step 5 — only after wizard submitted OR user explicitly confirms):
+  [ACTION: {"action": "create_project", "params": {"name": "Project Name", "description": "...", "parent_id": OPTIONAL_PARENT_ID, "due_date": "YYYY-MM-DD"}}]
+
+- Create a todo (Step 5 — after project created):
+  [ACTION: {"action": "create_todo", "params": {"subject": "Todo subject", "project_id": PROJECT_ID, "due_date": "YYYY-MM-DD", "description": "...", "priority": 2}}]
+
+IMPORTANT: When the user says "I need to add X" or "I want to build X" or "create a X system":
+1. Immediately emit open_project_wizard with the feature name pre-filled
+2. Then in your text response ask the dependency questions (inventory? billing? etc.)
+3. Do NOT jump straight to create_project
 
 The current user is: $username
 END_PROMPT
