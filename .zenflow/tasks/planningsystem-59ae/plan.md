@@ -225,10 +225,23 @@ Audit complete. Implemented SiteName-based access controls:
 **Session 11 fix (commit 502c48de on main):**
 - Planning menu `can_plan` now: any logged-in non-guest user (not role-gated) — content within DailyPlan is role/site filtered
 
-### [ ] Step: Test & Verify
+### [x] Step: Test & Verify
+<!-- chat-id: 9732369c-eb90-424b-a6e5-487401b33c1c -->
 - Manual test: CSC admin sees text plan + DB plan
 - Manual test: non-CSC user sees DailyPlan with DB-only tabs (no CSC text tabs)
 - Manual test: all sites — Planning nav link goes to /Documentation/DailyPlan
 - Manual test: plan creation form works (GET shows form, POST saves and redirects)
 - Manual test: non-admin planning access via 'normal' role works (Planning nav now visible — commit 502c48de)
-- Manual test: points awarded on todo create/complete (once points step implemented)
+- Manual test: points awarded on todo create/complete (once points step implemented — DEFERRED to pointsystem-542abc9c task)
+
+**Audit Results (2026-04-10):**
+- ✅ `perl -cw Comserv/script/comserv_server.pl` → syntax OK
+- ✅ `Documentation.pm::daily_plan` — `is_csc` computed from `SiteName`, passed to stash line 2627; access gate at line 2189 requires authenticated role
+- ✅ `DailyPlan.tt` line 15 — `is_csc` derived from stash; CSC-only tabs gated with `[% IF is_csc %]` (lines 161, 431, 593, 605, 663)
+- ✅ `PlanManagement::begin` — `is_csc_admin` computed; access allows admin/developer/devops/editor/user/normal roles
+- ✅ `PlanManagement::list` — CSC admin sees all sites; non-CSC sees own site only; optional `?sitename=X` filter for CSC admin
+- ✅ `PlanManagement::details` — non-CSC blocked from other sites' plans (403)
+- ✅ `PlanManagement::create` — GET renders `admin/plan/create.tt`; POST saves + redirects to `/admin/plan/list`
+- ✅ `TopDropListLogin.tt` `can_plan` — covers normal/user/editor/developer/devops/admin roles; Planning nav link renders as clickable href to `/Documentation/DailyPlan`
+- ✅ Plan templates exist: `create.tt`, `list.tt`, `view.tt` in `root/admin/plan/`
+- ⚠️ Points test deferred — points step handed off to dedicated task `542abc9c` (pointsystem branch)
