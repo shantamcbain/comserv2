@@ -24,12 +24,7 @@
 %]
 
 [%# ── Role check ─────────────────────────────────────────────────────────── %]
-[%# Catalyst TT exposes stash keys as top-level vars; also check c.stash and session as fallbacks %]
-[% SET _is_privileged = is_admin || c.stash.is_admin || c.session.is_admin
-    || is_editor || c.stash.is_editor
-    || (c.session.roles && c.session.roles.grep('admin').size > 0)
-    || (c.session.roles && c.session.roles.grep('editor').size > 0)
-    || (c.session.roles && c.session.roles.grep('developer').size > 0) %]
+[% SET _is_privileged = is_admin || is_editor %]
 
 [%# ── Defaults ────────────────────────────────────────────────────────────── %]
 [% ai_form_entity_label = ai_form_entity_label || 'record' %]
