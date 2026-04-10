@@ -83,6 +83,11 @@
     </tr>
   </table>
 </form>
+[% PROCESS 'ai/partials/ai_form_assistant.tt'
+   ai_form_entity_label = 'stock adjustment'
+   ai_form_context      = 'inventory stock level adjustment'
+   ai_form_fields       = 'transaction_type, quantity, unit_cost, reference_number, notes'
+%]
 
 [% IF debug_errors && debug_errors.size > 0 %]
 <div class="debug">[% FOREACH err IN debug_errors %]<p>[% err %]</p>[% END %]</div>
