@@ -72,3 +72,8 @@
     </tr>
   </table>
 </form>
+[% PROCESS 'ai/partials/ai_form_assistant.tt'
+   ai_form_entity_label = 'inventory item'
+   ai_form_context      = 'inventory item management'
+   ai_form_fields       = 'name, sku, description, category, unit_of_measure, unit_cost, reorder_point, reorder_quantity, status, notes'
+%]
