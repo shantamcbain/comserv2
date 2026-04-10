@@ -6,8 +6,7 @@ use base 'DBIx::Class::Core';
 __PACKAGE__->load_components('InflateColumn::DateTime', 'TimeStamp');
 __PACKAGE__->table('inventory_items');
 
-__PACKAGE__->add_columns(
-    id => {
+__PACKAGE__->add_columns(id => {
         data_type         => 'integer',
         is_auto_increment => 1,
         is_nullable       => 0,
@@ -117,6 +116,12 @@ __PACKAGE__->add_columns(
         set_on_create => 1,
         set_on_update => 1,
     },
+    box_size => {
+        data_type   => 'varchar',
+        size        => 20,
+        is_nullable => 1,
+        comment     => 'enum: deep, medium, shallow (for bee frame boxes)',
+    }
 );
 
 __PACKAGE__->set_primary_key('id');
