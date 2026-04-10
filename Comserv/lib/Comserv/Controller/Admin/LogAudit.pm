@@ -5,6 +5,7 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::HealthLogger;
 use Template;
+use DateTime;
 
 BEGIN { extends 'Comserv::Controller::Base'; }
 
@@ -18,8 +19,13 @@ has 'logging' => (
 sub index :Path('/admin/logging/audit') :Args(0) {
     my ($self, $c) = @_;
 
-    my $hours = int($c->req->param('hours') || 24);
+    my $hours  = int($c->req->param('hours')  || 24);
     $hours = 24 unless $hours > 0 && $hours <= 720;
+
+    my $filter_system = $c->req->param('system') // '';
+    my $filter_level  = $c->req->param('level')  // '';
+    $filter_system =~ s/[^\w\.\-:]//g;
+    $filter_level  =~ s/[^A-Z]//g;
 
     # Local Docker containers (fast — direct docker ps)
     my $docker_health = [];
@@ -33,11 +39,35 @@ sub index :Path('/admin/logging/audit') :Args(0) {
         );
     };
 
+    # When arriving via a health-alert link fetch the actual log entries that
+    # triggered the alert so the admin can see them immediately at the top.
+    my $recent_alerts = [];
+    if ($filter_system || $filter_level) {
+        eval {
+            my %cond;
+            $cond{system_identifier} = $filter_system if $filter_system;
+            $cond{level}             = $filter_level  if $filter_level;
+            # Limit to the last 30 minutes so the list stays relevant
+            my $cutoff = DateTime->now->subtract(minutes => 30)->strftime('%Y-%m-%d %H:%M:%S');
+            $cond{timestamp} = { '>=' => $cutoff };
+
+            $recent_alerts = [
+                $c->model('DBEncy')->resultset('SystemLog')->search(
+                    \%cond,
+                    { order_by => { -desc => 'timestamp' }, rows => 20 }
+                )->all
+            ];
+        };
+    }
+
     $c->stash(
         template         => 'admin/Logging/LogAudit.tt',
         docker_health    => $docker_health,
         docker_health_db => $docker_health_db,
         hours            => $hours,
+        filter_system    => $filter_system,
+        filter_level     => $filter_level,
+        recent_alerts    => $recent_alerts,
     );
 }
 
@@ -49,13 +79,21 @@ sub stats :Path('/admin/logging/audit/stats') :Args(0) {
     my $hours = int($c->req->param('hours') || 24);
     $hours = 24 unless $hours > 0 && $hours <= 720;
 
+    my $filter_system = $c->req->param('system') // '';
+    my $filter_level  = $c->req->param('level')  // '';
+    $filter_system =~ s/[^\w\.\-:]//g;
+    $filter_level  =~ s/[^A-Z]//g;
+
     my $audit      = {};
     my $alerts     = [];
     my $page_error = '';
 
     eval {
         my $schema = $c->model('DBEncy');
-        $audit = Comserv::Util::HealthLogger->audit_stats($schema, hours => $hours);
+        $audit = Comserv::Util::HealthLogger->audit_stats($schema, hours => $hours,
+            ($filter_system ? (system => $filter_system) : ()),
+            ($filter_level  ? (level  => $filter_level)  : ()),
+        );
     };
     if ($@) {
         my $err = "$@";
@@ -94,11 +132,13 @@ sub stats :Path('/admin/logging/audit/stats') :Args(0) {
 
         my $vars = {
             %{ $c->stash },
-            c          => $c,
-            audit      => $audit,
-            alerts     => $alerts,
-            hours      => $hours,
-            page_error => $page_error,
+            c             => $c,
+            audit         => $audit,
+            alerts        => $alerts,
+            hours         => $hours,
+            filter_system => $filter_system,
+            filter_level  => $filter_level,
+            page_error    => $page_error,
         };
         $tt->process('admin/Logging/LogAuditStats.tt', $vars, \$body)
             or die $tt->error;

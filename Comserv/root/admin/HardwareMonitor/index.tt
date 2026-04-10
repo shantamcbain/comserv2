@@ -7,8 +7,8 @@
    page_version = "0.02"
    last_updated = "2026-03-16"
 %]
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="/static/js/chart.umd.min.js"></script>
+<script src="/static/js/chartjs-adapter-date-fns.bundle.min.js"></script>
 <style>
 .hw-filter-row   { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-bottom:16px; }
 .hw-filter-row label { font-size:.85em; font-weight:bold; display:block; margin-bottom:2px; }
@@ -122,73 +122,112 @@
         </div>
     </form>
 
+    <details style="margin-bottom:16px;">
+        <summary style="cursor:pointer;font-size:.88em;color:#888;padding:4px 0;">&#128268; Remote agent setup — add any server-room device (one cron line per machine)</summary>
+        <div style="margin-top:8px;background:#f8f9fa;border:1px solid #ddd;border-radius:4px;padding:12px;font-size:.85em;">
+
+            <p style="margin:0 0 8px;font-weight:bold;font-size:1.05em;">How it works</p>
+            <p style="margin:0 0 6px;">The agent script lives on the NFS server (<strong>192.168.1.175</strong>) and is readable by any machine that mounts the NFS share — no per-machine script copy needed. Each machine runs the script from <em>its own</em> NFS mount point and POSTs metrics to the <strong>production Comserv server</strong> (<code>comserv.computersystemconsulting.ca</code>) which runs 24/7 in Docker — not the dev workstation, which is only up when in use.</p>
+
+            <p style="margin:8px 0 4px;font-weight:bold;">Step 1 — Mount the NFS share (if not already done)</p>
+            <p style="margin:0 0 4px;">Add to <code>/etc/fstab</code> on the remote machine, then run <code>mount -a</code>:</p>
+            <pre style="background:#222;color:#eee;padding:8px;border-radius:4px;overflow-x:auto;margin:0 0 10px;">192.168.1.175:/mnt/data   /mnt/nfs_data   nfs   defaults,_netdev,nofail   0 0</pre>
+            <p style="margin:0 0 6px;color:#555;">After mounting, the agent script is at: <code>/mnt/nfs_data/comserv/scripts/device_agent.sh</code></p>
+
+            <p style="margin:8px 0 4px;font-weight:bold;">Step 2 — Add the cron job</p>
+            <p style="margin:0 0 4px;">Create <code>/etc/cron.d/comserv_agent</code> on the remote machine:</p>
+            <pre style="background:#222;color:#eee;padding:8px;border-radius:4px;overflow-x:auto;margin:0 0 10px;">*/5 * * * * root INGEST_URL="[% ingest_url | html %]" INGEST_TOKEN="[% ingest_token | html %]" /mnt/nfs_data/comserv/scripts/device_agent.sh</pre>
+            <p style="margin:0 0 6px;color:#555;">The script auto-detects the hostname of whichever machine runs it — no edits required. Metrics arrive here within 5 minutes.</p>
+
+            <p style="margin:8px 0 4px;font-weight:bold;">Reference — what each server uses</p>
+            <table style="border-collapse:collapse;font-size:.9em;width:100%;">
+                <tr style="background:#e9ecef;"><th style="padding:4px 8px;text-align:left;border:1px solid #ddd;">Machine</th><th style="padding:4px 8px;text-align:left;border:1px solid #ddd;">IP</th><th style="padding:4px 8px;text-align:left;border:1px solid #ddd;">Script path (from that machine)</th></tr>
+                <tr><td style="padding:4px 8px;border:1px solid #ddd;">workstation (this server)</td><td style="padding:4px 8px;border:1px solid #ddd;">192.168.1.199</td><td style="padding:4px 8px;border:1px solid #ddd;font-family:monospace;">/home/shanta/nfs/comserv/scripts/device_agent.sh</td></tr>
+                <tr><td style="padding:4px 8px;border:1px solid #ddd;">proxmox720, proxmoxt210, comservproduction1, DB server, etc.</td><td style="padding:4px 8px;border:1px solid #ddd;">varies</td><td style="padding:4px 8px;border:1px solid #ddd;font-family:monospace;">/mnt/nfs_data/comserv/scripts/device_agent.sh</td></tr>
+            </table>
+            <p style="margin:8px 0 0;color:#888;">&#128274; Change token: set <code>HW_INGEST_TOKEN=yourtoken</code> in the app environment + update cron lines.<br>&#9881; Override ingest URL: set <code>HW_INGEST_BASE_URL=http://192.168.1.199:3001</code> in the app environment.</p>
+        </div>
+    </details>
+
     [% IF latest.size || power_cards.size %]
-    <h3>Current Status</h3>
-    <div class="hw-summary-grid">
-        [% FOR pc IN power_cards %]
-        <div class="hw-card level-[% pc.worst_level %]">
-            <h4>[% pc.hostname | html %] &mdash; IPMI / Power</h4>
-            [% IF pc.ipmi_power_consumption %]
-            <div class="value">[% pc.ipmi_power_consumption.metric_value %]&thinsp;W</div>
+    <details style="margin-bottom:12px;">
+        <summary style="cursor:pointer;font-weight:bold;font-size:1.05em;padding:6px 0;list-style:none;display:flex;align-items:center;gap:8px;">
+            &#128202; Current Status <span style="font-size:.8em;font-weight:normal;color:#888;">(latest readings per host)</span>
+        </summary>
+        <div class="hw-summary-grid" style="margin-top:10px;">
+            [% FOR pc IN power_cards %]
+            <div class="hw-card level-[% pc.worst_level %]">
+                <h4>[% pc.hostname | html %] &mdash; IPMI / Power</h4>
+                [% IF pc.ipmi_power_consumption %]
+                <div class="value">[% pc.ipmi_power_consumption.metric_value %]&thinsp;W</div>
+                [% END %]
+                <div class="meta" style="margin-top:4px;line-height:1.8;">
+                    [% IF pc.ipmi_ps1_current %]PS1: [% pc.ipmi_ps1_current.metric_value %]&thinsp;A&emsp;[% END %]
+                    [% IF pc.ipmi_ps2_current %]PS2: [% pc.ipmi_ps2_current.metric_value %]&thinsp;A[% END %]
+                    [% IF pc.ipmi_ps1_status %]<br>PS1: [% pc.ipmi_ps1_status.metric_text | html %]&emsp;[% END %]
+                    [% IF pc.ipmi_ps2_status %]PS2: [% pc.ipmi_ps2_status.metric_text | html %][% END %]
+                    [% IF pc.ipmi_ps_redundancy %]<br>Redundancy: [% pc.ipmi_ps_redundancy.metric_text | html %][% END %]
+                    [% IF pc.ipmi_inlet_temp %]<br>Inlet: [% pc.ipmi_inlet_temp.metric_value %]&thinsp;&deg;C[% END %]
+                </div>
+                <div class="meta"><span class="badge-[% pc.worst_level %]">[% pc.worst_level | upper %]</span></div>
+            </div>
             [% END %]
-            <div class="meta" style="margin-top:4px;line-height:1.8;">
-                [% IF pc.ipmi_ps1_current %]PS1: [% pc.ipmi_ps1_current.metric_value %]&thinsp;A&emsp;[% END %]
-                [% IF pc.ipmi_ps2_current %]PS2: [% pc.ipmi_ps2_current.metric_value %]&thinsp;A[% END %]
-                [% IF pc.ipmi_ps1_status %]<br>PS1: [% pc.ipmi_ps1_status.metric_text | html %]&emsp;[% END %]
-                [% IF pc.ipmi_ps2_status %]PS2: [% pc.ipmi_ps2_status.metric_text | html %][% END %]
-                [% IF pc.ipmi_ps_redundancy %]<br>Redundancy: [% pc.ipmi_ps_redundancy.metric_text | html %][% END %]
-                [% IF pc.ipmi_inlet_temp %]<br>Inlet: [% pc.ipmi_inlet_temp.metric_value %]&thinsp;&deg;C[% END %]
+            [% FOR m IN latest %]
+            <div class="hw-card level-[% m.level %]">
+                <h4>[% m.hostname | html %] &mdash; [% m.metric_name | html %]</h4>
+                <div class="value">
+                    [% IF m.metric_value.defined %][% m.metric_value %][% IF m.unit %]&thinsp;[% m.unit | html %][% END %]
+                    [% ELSIF m.metric_text %][% m.metric_text | html %]
+                    [% ELSE %]&mdash;[% END %]
+                </div>
+                <div class="meta">
+                    <span class="badge-[% m.level %]">[% m.level | upper %]</span>
+                    &nbsp;[% m.timestamp | html %]
+                </div>
             </div>
-            <div class="meta"><span class="badge-[% pc.worst_level %]">[% pc.worst_level | upper %]</span></div>
+            [% END %]
         </div>
-        [% END %]
-        [% FOR m IN latest %]
-        <div class="hw-card level-[% m.level %]">
-            <h4>[% m.hostname | html %] &mdash; [% m.metric_name | html %]</h4>
-            <div class="value">
-                [% IF m.metric_value.defined %][% m.metric_value %][% IF m.unit %]&thinsp;[% m.unit | html %][% END %]
-                [% ELSIF m.metric_text %][% m.metric_text | html %]
-                [% ELSE %]&mdash;[% END %]
-            </div>
-            <div class="meta">
-                <span class="badge-[% m.level %]">[% m.level | upper %]</span>
-                &nbsp;[% m.timestamp | html %]
-            </div>
-        </div>
-        [% END %]
-    </div>
+    </details>
     [% END %]
 
-    <h3>Trend Graphs</h3>
-    <div class="hw-charts-grid" id="charts-container">
-        <p class="muted" id="charts-loading">Loading charts&hellip;</p>
-    </div>
+    <details style="margin-bottom:12px;">
+        <summary style="cursor:pointer;font-weight:bold;font-size:1.05em;padding:6px 0;list-style:none;display:flex;align-items:center;gap:8px;">
+            &#128200; Trend Graphs <span style="font-size:.8em;font-weight:normal;color:#888;">(CPU, memory, disk % over time)</span>
+        </summary>
+        <div class="hw-charts-grid" id="charts-container" style="margin-top:10px;">
+            <p class="muted" id="charts-loading">Loading charts&hellip;</p>
+        </div>
+    </details>
 
-    <h3>History ([% metrics.size %] records)</h3>
-    [% IF metrics.size %]
-    <div class="log-scroll">
-    <table class="data-table">
-        <thead>
-            <tr><th>Timestamp</th><th>Host</th><th>Metric</th><th>Value</th><th>Level</th><th>Message</th></tr>
-        </thead>
-        <tbody>
-        [% FOR m IN metrics %]
-            <tr class="level-[% m.level %]">
-                <td class="nowrap">[% m.timestamp | html %]</td>
-                <td>[% m.hostname | html %]</td>
-                <td>[% m.metric_name | html %]</td>
-                <td>[% IF m.metric_value.defined %][% m.metric_value %][% IF m.unit %] [% m.unit | html %][% END %]
-                    [% ELSIF m.metric_text %][% m.metric_text | html %][% ELSE %]&mdash;[% END %]</td>
-                <td><span class="badge-[% m.level %]">[% m.level | upper %]</span></td>
-                <td>[% m.message | html %]</td>
-            </tr>
+    <details style="margin-bottom:12px;">
+        <summary style="cursor:pointer;font-weight:bold;font-size:1.05em;padding:6px 0;list-style:none;display:flex;align-items:center;gap:8px;">
+            &#128203; History <span style="font-size:.8em;font-weight:normal;color:#888;">([% metrics.size %] records in window)</span>
+        </summary>
+        [% IF metrics.size %]
+        <div class="log-scroll" style="margin-top:10px;">
+        <table class="data-table">
+            <thead>
+                <tr><th>Timestamp</th><th>Host</th><th>Metric</th><th>Value</th><th>Level</th><th>Message</th></tr>
+            </thead>
+            <tbody>
+            [% FOR m IN metrics %]
+                <tr class="level-[% m.level %]">
+                    <td class="nowrap">[% m.timestamp | html %]</td>
+                    <td>[% m.hostname | html %]</td>
+                    <td>[% m.metric_name | html %]</td>
+                    <td>[% IF m.metric_value.defined %][% m.metric_value %][% IF m.unit %] [% m.unit | html %][% END %]
+                        [% ELSIF m.metric_text %][% m.metric_text | html %][% ELSE %]&mdash;[% END %]</td>
+                    <td><span class="badge-[% m.level %]">[% m.level | upper %]</span></td>
+                    <td>[% m.message | html %]</td>
+                </tr>
+            [% END %]
+            </tbody>
+        </table>
+        </div>
+        [% ELSE %]
+        <p class="muted" style="margin-top:10px;">No records found. Ensure the migration has been applied and <code>script/hardware_monitor.pl</code> has run at least once.</p>
         [% END %]
-        </tbody>
-    </table>
-    </div>
-    [% ELSE %]
-    <p class="muted">No records found. Ensure the migration has been applied and <code>script/hardware_monitor.pl</code> has run at least once.</p>
-    [% END %]
+    </details>
 </div>
 
 <script>
@@ -257,7 +296,7 @@
         });
     }
 
-    function makeChart(canvas, hostMap, unit) {
+    function makeChart(canvas, hostMap, unit, onClickCb) {
         var datasets = makeDatasets(hostMap);
         new Chart(canvas, {
             type: 'line',
@@ -265,6 +304,7 @@
             options: {
                 responsive: true, maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
+                onClick: onClickCb || null,
                 plugins: {
                     legend: {
                         position: 'bottom',
@@ -293,11 +333,12 @@
         });
     }
 
-    function addChart(title, hostMap, unit) {
+    function addChart(title, hostMap, unit, onClickCb) {
         var box = document.createElement('div');
         box.className = 'hw-chart-box';
         var h4 = document.createElement('h4');
         h4.innerHTML = title + '<span>drag bottom edge to resize</span>';
+        if (onClickCb) { box.style.cursor = 'pointer'; }
         box.appendChild(h4);
         var wrap = document.createElement('div');
         wrap.className = 'hw-chart-wrap';
@@ -305,7 +346,7 @@
         wrap.appendChild(canvas);
         box.appendChild(wrap);
         container.appendChild(box);
-        makeChart(canvas, hostMap, unit, 0);
+        makeChart(canvas, hostMap, unit, onClickCb);
     }
 
     function addSplitCard(title, topHostMap, topUnit, topLabel, botHostMap, botUnit, botLabel) {
@@ -366,10 +407,40 @@
         if (metric === 'ipmi_ps1_current' || metric === 'ipmi_ps2_current') return;
         if (metric.match(/_temp$/)) return;
 
+        if (metric.match(/^disk_/)) return;
+
         var unit = METRIC_UNITS[metric] || '';
         addChart(METRIC_LABELS[metric] || metric, hostMap, unit);
         rendered++;
     });
+
+    // Build one combined Disk Usage % chart: series label = "host — /mount"
+    var diskCombined = {};
+    rawData.forEach(function(entry) {
+        if (!entry.metric.match(/^disk_used_pct/) || !entry.hosts) return;
+        var mountPart = entry.metric.replace(/^disk_used_pct/, '') || '_';
+        var mountLabel = mountPart.replace(/^_/, '/').replace(/_/g, '/') || '/';
+        Object.keys(entry.hosts).forEach(function(host) {
+            var shortHost = host.replace(/\.computersystemconsulting\.ca$/, '').replace(/\..*$/, '');
+            diskCombined[shortHost + ' \u2014 ' + mountLabel] = entry.hosts[host];
+        });
+    });
+    if (Object.keys(diskCombined).length) {
+        var diskClickHandler = function(evt, items) {
+            if (!items || !items.length) return;
+            var dsIdx = items[0].datasetIndex;
+            var label = Object.keys(diskCombined).sort()[dsIdx] || '';
+            // label format: "hostname — /mount"
+            var parts = label.split(' \u2014 ');
+            var host  = parts[0] ? parts[0].trim() : 'workstation';
+            var mount = parts[1] ? parts[1].trim() : '/';
+            window.location.href = '/admin/hardware_monitor/disk_diagnose'
+                + '?hostname=' + encodeURIComponent(host)
+                + '&path='     + encodeURIComponent(mount);
+        };
+        addChart('Disk Usage % \u2014 <span style="font-size:.78em;font-weight:normal;color:#2196f3;margin-left:8px;">click a series to diagnose</span>', diskCombined, '%', diskClickHandler);
+        rendered++;
+    }
 
     var combinedTemps = {};
     rawData.forEach(function(entry) {

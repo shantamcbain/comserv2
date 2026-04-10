@@ -17,7 +17,15 @@
         [% IF c.session.username && (c.session.roles.grep('admin').size || c.session.roles.grep('workshop_leader').size) %]
         <a href="/workshop" onclick="activateSite('Workshops')" target="_blank"><i class="icon-workshop"></i>Workshops</a>
         [% END %]
-        
+
+        <div class="dropdown-divider"></div>
+
+        <!-- Community Services (previously in Global) -->
+        <a href="/mail"><i class="icon-mail"></i>Mail</a>
+        <a href="/jobs"><i class="icon-briefcase"></i>Jobs</a>
+        <a href="/join"><i class="icon-user-plus"></i>Join</a>
+        <a href="/jobs"><i class="icon-briefcase"></i>Jobs &amp; Employment</a>
+
         [% IF c.session.username %]
         <div class="dropdown-divider"></div>
         <a href="/navigation/add_link"><i class="icon-add"></i>Add Link</a>

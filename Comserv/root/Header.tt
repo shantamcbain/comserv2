@@ -124,6 +124,11 @@
     <link rel="stylesheet" type="text/css" href="/static/css/membership.css">
     [% END %]
 
+    [% IF c.stash.template.match('ENCY/') %]
+    <link rel="stylesheet" type="text/css" href="/static/css/ency-index.css">
+    <link rel="stylesheet" type="text/css" href="/static/css/ency-admin.css">
+    [% END %]
+
     <!-- Back to Top Button CSS -->
     <link rel="stylesheet" type="text/css" href="/static/css/back-to-top.css?v=[% USE date; date.format(date.now, '%s') %]">
 

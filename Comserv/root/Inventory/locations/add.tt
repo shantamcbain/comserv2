@@ -1,0 +1,61 @@
+[% PageVersion = 'Inventory/locations/add.tt,v 0.01 2026/03/30 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Add Location</h1>
+
+[% IF error_msg %]<p class="error">[% error_msg %]</p>[% END %]
+
+<form method="POST" action="/Inventory/location/add">
+  <table>
+    <tr>
+      <th><label for="name">Name *</label></th>
+      <td><input type="text" id="name" name="name" required maxlength="255"></td>
+    </tr>
+    <tr>
+      <th><label for="location_type">Type</label></th>
+      <td>
+        <select id="location_type" name="location_type">
+          <option value="warehouse">Warehouse</option>
+          <option value="shelf">Shelf</option>
+          <option value="bin">Bin</option>
+          <option value="room">Room</option>
+          <option value="vehicle">Vehicle</option>
+          <option value="offsite">Offsite</option>
+          <option value="other">Other</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="description">Description</label></th>
+      <td><textarea id="description" name="description" rows="3" cols="40"></textarea></td>
+    </tr>
+    <tr>
+      <th><label for="address">Address</label></th>
+      <td><textarea id="address" name="address" rows="3" cols="40"></textarea></td>
+    </tr>
+    <tr>
+      <th><label for="status">Status</label></th>
+      <td>
+        <select id="status" name="status">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="notes">Notes</label></th>
+      <td><textarea id="notes" name="notes" rows="3" cols="40"></textarea></td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <input type="submit" value="Create Location">
+        <a href="/Inventory/locations">Cancel</a>
+      </td>
+    </tr>
+  </table>
+</form>
+[% PROCESS 'ai/partials/ai_form_assistant.tt'
+   ai_form_entity_label = 'inventory location'
+   ai_form_context      = 'inventory storage location management'
+   ai_form_fields       = 'name, location_type, address, description, status, notes'
+%]

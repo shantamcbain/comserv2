@@ -1,0 +1,63 @@
+[% PageVersion = 'Inventory/suppliers/add.tt,v 0.01 2026/03/30 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Add Supplier</h1>
+
+[% IF error_msg %]<p class="error">[% error_msg %]</p>[% END %]
+
+<form method="POST" action="/Inventory/supplier/add">
+  <table>
+    <tr>
+      <th><label for="name">Name *</label></th>
+      <td><input type="text" id="name" name="name" required maxlength="255"></td>
+    </tr>
+    <tr>
+      <th><label for="contact_name">Contact Name</label></th>
+      <td><input type="text" id="contact_name" name="contact_name" maxlength="255"></td>
+    </tr>
+    <tr>
+      <th><label for="email">Email</label></th>
+      <td><input type="email" id="email" name="email" maxlength="255"></td>
+    </tr>
+    <tr>
+      <th><label for="phone">Phone</label></th>
+      <td><input type="text" id="phone" name="phone" maxlength="100"></td>
+    </tr>
+    <tr>
+      <th><label for="website">Website</label></th>
+      <td><input type="url" id="website" name="website" maxlength="255"></td>
+    </tr>
+    <tr>
+      <th><label for="address">Address</label></th>
+      <td><textarea id="address" name="address" rows="3" cols="40"></textarea></td>
+    </tr>
+    <tr>
+      <th><label for="lead_time_days">Lead Time (days)</label></th>
+      <td><input type="number" id="lead_time_days" name="lead_time_days" value="0" min="0"></td>
+    </tr>
+    <tr>
+      <th><label for="status">Status</label></th>
+      <td>
+        <select id="status" name="status">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="notes">Notes</label></th>
+      <td><textarea id="notes" name="notes" rows="3" cols="40"></textarea></td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <input type="submit" value="Create Supplier">
+        <a href="/Inventory/suppliers">Cancel</a>
+      </td>
+    </tr>
+  </table>
+</form>
+[% PROCESS 'ai/partials/ai_form_assistant.tt'
+   ai_form_entity_label = 'supplier'
+   ai_form_context      = 'inventory supplier management'
+   ai_form_fields       = 'name, contact_name, email, phone, address, website, lead_time_days, status, notes'
+%]

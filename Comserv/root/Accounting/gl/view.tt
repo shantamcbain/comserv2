@@ -1,0 +1,55 @@
+[% PageVersion = 'Accounting/gl/view.tt,v 0.01 2026/04/10 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>GL Entry: [% entry.reference %]</h1>
+<p><a href="/Accounting/gl">← General Ledger</a></p>
+
+<table border="1" cellpadding="4">
+  <tr><th>Reference</th><td>[% entry.reference %]</td></tr>
+  <tr><th>Type</th><td>[% entry.entry_type %]</td></tr>
+  <tr><th>Date</th><td>[% entry.post_date %]</td></tr>
+  <tr><th>Description</th><td>[% entry.description || '-' %]</td></tr>
+  <tr><th>Currency</th><td>[% entry.currency %]</td></tr>
+  <tr><th>Approved</th><td>[% entry.approved ? 'Yes' : 'No' %]</td></tr>
+  <tr><th>Site</th><td>[% entry.sitename %]</td></tr>
+  <tr><th>Balanced?</th><td>[% entry.is_balanced ? 'Yes ✓' : 'NO — UNBALANCED ✗' %]</td></tr>
+</table>
+
+<h2>Journal Lines</h2>
+[% IF entry.lines.count == 0 %]
+  <p>No lines.</p>
+[% ELSE %]
+<table border="1" cellpadding="4">
+  <thead>
+    <tr>
+      <th>Account</th>
+      <th>Description</th>
+      <th>Memo</th>
+      <th>Debit</th>
+      <th>Credit</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% SET total_debit  = 0 %]
+  [% SET total_credit = 0 %]
+  [% FOREACH line IN entry.lines %]
+    [% IF line.is_debit  %][% total_debit  = total_debit  + line.amount %][% END %]
+    [% IF line.is_credit %][% total_credit = total_credit - line.amount %][% END %]
+    <tr>
+      <td><a href="/Accounting/coa/view/[% line.account_id %]">[% line.account.accno %] — [% line.account.description %]</a></td>
+      <td>[% line.account.category_label %]</td>
+      <td>[% line.memo || '-' %]</td>
+      <td>[% line.is_debit  ? line.display_amount : '' %]</td>
+      <td>[% line.is_credit ? line.display_amount : '' %]</td>
+    </tr>
+  [% END %]
+  </tbody>
+  <tfoot>
+    <tr>
+      <th colspan="3">Totals</th>
+      <th>[% total_debit  %]</th>
+      <th>[% total_credit %]</th>
+    </tr>
+  </tfoot>
+</table>
+[% END %]

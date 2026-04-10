@@ -285,6 +285,15 @@ last_updated = '2026/02/08'
                         <a href="#anchor-workshops-project" class="jump-link">WorkShopsProject</a>
                     </div>
                     <div class="jump-line">
+                        <strong><a href="#group-bmaster" class="jump-link">🐝 BMaster Beekeeping</a></strong>:
+                        <a href="#anchor-bmaster-ui" class="jump-link">UI✅</a> |
+                        <a href="#anchor-bmaster-apiary" class="jump-link">Apiary⏳</a> |
+                        <a href="#anchor-bmaster-beepasture" class="jump-link">BeePasture📌</a> |
+                        <a href="#anchor-bmaster-health" class="jump-link">Health📌</a> |
+                        <a href="#anchor-bmaster-queens" class="jump-link">Queens📌</a> |
+                        <a href="#anchor-bmaster-products" class="jump-link">Products📌</a>
+                    </div>
+                    <div class="jump-line">
                         <strong><a href="#group-users" class="jump-link">👥 Users System</a></strong>:
                         <a href="#anchor-users-project" class="jump-link">UsersProject</a>
                     </div>
@@ -349,10 +358,9 @@ last_updated = '2026/02/08'
                 📦 All Projects from Database (Reference - Future State Preview)
             </summary>
             <div style="margin-top: 10px;">
-                <p><em>This shows all projects with their hierarchy. Eventually, all planning will be driven from the project database structure shown here.</em></p>
-                [% SET all_db_projects = c.model('DBEncy').resultset('Project').search({}, { order_by => 'id' }) %]
-                [% IF all_db_projects.count > 0 %]
-                    [% FOREACH proj IN all_db_projects.all %]
+                <p><em>Projects scoped to your site ([% planning_sitename || 'CSC' %][% planning_is_csc ? ' — all sites visible' : ' — own site only' %]). Eventually, all planning will be driven from the project database structure shown here.</em></p>
+                [% IF all_db_projects.size > 0 %]
+                    [% FOREACH proj IN all_db_projects %]
                         [% UNLESS proj.parent_id %]
                         <details style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
                             <summary style="cursor: pointer; font-weight: bold;">
@@ -363,7 +371,7 @@ last_updated = '2026/02/08'
                                 <p><a href="/project/details?project_id=[% proj.id %]" target="_blank">View Full Details</a></p>
 
                                 [% SET proj_subs = [] %]
-                                [% FOREACH check_sub IN all_db_projects.all %]
+                                [% FOREACH check_sub IN all_db_projects %]
                                     [% IF check_sub.parent_id == proj.id %]
                                         [% proj_subs.push(check_sub) %]
                                     [% END %]
@@ -855,12 +863,12 @@ last_updated = '2026/02/08'
                                 <li>⏳ Verify database entries and Planning.tt rendering</li>
                             </ul>
                         </li>
-                        <li><strong>Phase 1: Domain Detection Middleware</strong> (ID 159) - <span class="status-pending">PENDING</span>
+                        <li><strong>Phase 1: Domain Detection Middleware</strong> (ID 159) - <span class="status-completed">COMPLETED</span>
                             <ul>
-                                <li>Create domain configuration file</li>
-                                <li>Implement ApiDomainDetector middleware</li>
-                                <li>Register middleware in Catalyst</li>
-                                <li>Write unit tests</li>
+                                <li>✅ Create domain configuration file (<code>Comserv/config/api_domains.json</code>)</li>
+                                <li>✅ Implement <code>ApiDomainDetector</code> utility (<code>Comserv/Util/ApiDomainDetector.pm</code>)</li>
+                                <li>✅ No Catalyst registration needed — utility pattern (like ApiTokenValidator)</li>
+                                <li>✅ Write unit tests (<code>t/util/api_domain_detector.t</code>)</li>
                             </ul>
                         </li>
                         <li><strong>Phase 2: Controller Refactoring</strong> (ID 160) - <span class="status-pending">PENDING</span>
@@ -878,11 +886,13 @@ last_updated = '2026/02/08'
                                 <li>Test external access</li>
                             </ul>
                         </li>
-                        <li><strong>Phase 4: CLI Tool Development</strong> (ID 162) - <span class="status-pending">PENDING</span>
+                        <li><strong>Phase 4: CLI Tool Development</strong> (ID 162) - <span class="status-inprogress">IN PROGRESS</span>
                             <ul>
-                                <li>Create CLI script structure</li>
-                                <li>Implement CLI commands</li>
-                                <li>Add authentication support</li>
+                                <li>✅ Create <code>~/.comserv/credentials</code> (chmod 600) with API token + api_url</li>
+                                <li>✅ Create <code>Comserv::Util::ApiCredentials</code> — reads credentials file with env var overrides</li>
+                                <li>✅ Generate CLI Development Token (DB id=1, expires 2027-03-24)</li>
+                                <li>Create CLI script (<code>Comserv/script/comserv-api-cli</code>)</li>
+                                <li>Implement CLI commands (todos list, todo create/get/update, project get)</li>
                                 <li>Implement output formatting and error handling</li>
                                 <li>Test all CLI commands</li>
                             </ul>
@@ -1999,6 +2009,226 @@ last_updated = '2026/02/08'
                 <li><a href="/project/details?project_id=8">WorkShops Module (ID 8)</a></li>
                 <li><a href="/Documentation/project/details?project_id=157">API System Setup & Domain Migration (ID 157)</a></li>
             </ul>
+            </div>
+        </details>
+
+        <!-- Group 3.65: BMaster Beekeeping Platform -->
+        <div id="anchor-bmaster" class="nav-anchor"></div>
+        <details id="group-bmaster" class="priority-group-container" open>
+            <summary class="group-header">🐝 BMaster Beekeeping Platform</summary>
+            <div class="priority-content">
+
+            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Priority:</strong> <span class="status-in-progress">MEDIUM-HIGH</span></p>
+            <p><strong>Zenflow Task:</strong> <code>bmaster-f0fd</code> (port 4019) | <strong>Branch:</strong> <code>bmaster-f0fd</code></p>
+
+            <p><strong>Objective:</strong> Complete beekeeping management and education platform. Fix routing errors, enforce theme compliance, improve member conversion (Getting Started / membership CTAs), implement hive inspection workflow, integrate apiary equipment with inventory system, and expand public-facing content.</p>
+
+            <h4>📊 BMaster Project from Database</h4>
+            [% TRY %]
+                [% SET schema = c.model('DBEncy').schema %]
+                [% SET bmaster_project = schema.resultset('Project').search({ project_code => 'BMASTER' }, { rows => 1 }).first %]
+                [% IF bmaster_project %]
+                    <div style="margin:10px 0;padding:10px;border:1px solid #ccc;background:white;">
+                        <h3>[% bmaster_project.name %] (Project ID: [% bmaster_project.id %])</h3>
+                        <ul>
+                            <li><strong>Status:</strong> [% bmaster_project.status %]</li>
+                            <li><strong>Developer:</strong> [% bmaster_project.developer_name %]</li>
+                        </ul>
+                        <p><a href="/project/details?project_id=[% bmaster_project.id %]" style="color:#007bff;">View Details</a> | <a href="/project/editproject?project_id=[% bmaster_project.id %]" style="color:#007bff;">Edit Project</a></p>
+                        [% SET bmaster_todos = bmaster_project.todos.search({}, { order_by => 'sort_order' }) %]
+                        [% IF bmaster_todos.count > 0 %]
+                            <h4>📋 Todos ([% bmaster_todos.count %])</h4>
+                            <ul style="list-style-type:none;padding-left:0;">
+                                [% FOREACH todo IN bmaster_todos.all %]
+                                    <li style="margin:5px 0;padding:5px;border-left:2px solid #FF9800;background:#fafafa;">
+                                        [% IF todo.status == 'In-Process' %]⏳[% ELSIF todo.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                        [% todo.subject %]
+                                        <br><small style="color:#666;">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
+                                    </li>
+                                [% END %]
+                            </ul>
+                        [% ELSE %]
+                            <p>No todos linked yet. <a href="/todo/addtodo">Add a todo</a></p>
+                        [% END %]
+                    </div>
+                [% ELSE %]
+                    <div style="background:#fff3cd;border:1px solid #ffc107;padding:10px;margin:10px 0;">
+                        <strong>Note:</strong> BMaster project (code: BMASTER) not found in database.
+                        <a href="/project/addproject" style="color:#007bff;">Create Project</a>
+                    </div>
+                [% END %]
+            [% CATCH %]
+                <div style="background:#f8d7da;border:1px solid #dc3545;padding:10px;margin:10px 0;">
+                    <strong>Error loading project:</strong> [% error.info %]
+                </div>
+            [% END %]
+
+            <!-- Sub-project 1: BMaster UI and Routing (COMPLETED) -->
+            <div id="anchor-bmaster-ui" class="nav-anchor"></div>
+            <details id="bmaster-ui" class="priority-container">
+                <summary class="priority-summary">✅ BMaster UI, Routing and Theme Compliance — COMPLETED</summary>
+                <div class="priority-content">
+                    <div style="background:#d4edda;border:1px solid #28a745;border-radius:4px;padding:10px;margin:10px 0;">
+                        <strong>✅ DELIVERED:</strong> All critical routing errors fixed, theme compliance applied across BMaster and Apiary templates, Getting Started section added for guest conversion, Bee Pasture and Workshop sections enhanced, membership CTAs added throughout.
+                    </div>
+                    <h4>Completed Tasks</h4>
+                    <ul>
+                        <li>✅ Created missing <code>Apiary/index.tt</code> — fixed crash at /Apiary</li>
+                        <li>✅ Fixed <code>BMaster/yards.tt</code> — removed &lt;head&gt; tag, fixed broken links</li>
+                        <li>✅ Removed hardcoded localhost iframe from <code>BMaster/apiary.tt</code></li>
+                        <li>✅ Fixed debug output leakage — <code>[% PageVersion %]</code> guarded by <code>debug_mode == 1</code></li>
+                        <li>✅ Added <code>[% META title %]</code> blocks to all BMaster templates</li>
+                        <li>✅ Theme compliance for BMaster main + all sub-pages (app-container, app-section, form-container, etc.)</li>
+                        <li>✅ Apiary sub-pages migrated from Bootstrap to theme classes</li>
+                        <li>✅ BMaster.pm updated — honey, environment, education serve real .tt files</li>
+                        <li>✅ "Getting Started" new-beekeeper pathway added to main landing page (guests only)</li>
+                        <li>✅ Bee Pasture section elevated and linked to /ENCY/BeePastureView and /ENCY/search</li>
+                        <li>✅ Workshops &amp; Community sections enhanced with CTAs</li>
+                        <li>✅ Sidebar with member CTA + Quick Links added</li>
+                    </ul>
+                    <p><strong>Branch:</strong> <code>bmaster-f0fd</code> | <strong>Spec:</strong> <code>.zenflow/tasks/bmaster-f0fd/spec.md</code></p>
+                </div>
+            </details>
+
+            <!-- Sub-project 2: Schema, Inventory Integration, Hive Inspection -->
+            <div id="anchor-bmaster-apiary" class="nav-anchor"></div>
+            <details id="bmaster-apiary" class="priority-container" open>
+                <summary class="priority-summary">⏳ Apiary — Hive Inspection System and Schema Updates (NEXT)</summary>
+                <div class="priority-content">
+                    <p><strong>Full gap analysis:</strong> <code>.zenflow/tasks/bmaster-f0fd/spec.md</code> § "Hive Inspection Feature"</p>
+
+                    <h4>Schema Changes Required</h4>
+                    <ul>
+                        <li>📌 All schema changes go through <strong>Result files → SchemaComparison</strong> (NOT apiary_schema.sql direct apply)</li>
+                        <li>📌 <code>apiary_schema.sql</code> is a design reference — use <a href="/admin/schema_comparison">/admin/schema_comparison</a> to apply deltas</li>
+                        <li>⏳ <code>Inspection.pm</code> — add <code>queen_check</code> to inspection_type enum; add feeding fields (<code>feeding_done</code>, <code>feed_type</code>, <code>feed_amount</code>); add <code>boosted_from_hive</code> FK</li>
+                        <li>⏳ <code>HiveFrame.pm</code> — add <code>frame_size</code> ENUM (deep/dadant/medium/shallow), <code>frame_code</code> VARCHAR, <code>frame_type</code> enum (add: drone, comb)</li>
+                        <li>⏳ <code>Hive.pm</code> — add <code>configuration_id</code> FK → hive_configurations</li>
+                        <li>⏳ New <code>FrameMovement.pm</code> — tracks frame repositioning within/between hives and sales</li>
+                        <li>⏳ New <code>InspectionFeeding.pm</code> — multiple feeding events per inspection</li>
+                        <li>⏳ <code>InspectionDetail.pm</code> — add <code>treatment_id</code> FK → treatments alongside existing varchar</li>
+                        <li>⏳ Fix table name mismatch: HiveFrame.pm maps to <code>hive_frames</code>, SQL schema says <code>frames</code> — standardize to <code>hive_frames</code></li>
+                    </ul>
+
+                    <h4>Missing Result Classes (referenced by HiveConfiguration.pm)</h4>
+                    <ul>
+                        <li>⏳ <code>ConfigurationBox.pm</code> — box definitions per configuration template</li>
+                        <li>⏳ <code>ConfigurationInventory.pm</code> — bridge between configuration and InventoryItem</li>
+                        <li>⏳ <code>HiveConfigurationHistory.pm</code> — configuration change history</li>
+                        <li>⏳ <code>HiveAssembly.pm</code> — assembled hive instance from a template</li>
+                        <li>⏳ <code>HiveMovement.pm</code> — box/hive movement (SQL table <code>hive_movements</code> exists, no Result class)</li>
+                    </ul>
+
+                    <h4>Inventory Integration</h4>
+                    <div style="background:#fff3cd;border:1px solid #ffc107;padding:10px;border-radius:4px;margin:8px 0;">
+                        <strong>⚠️ Current state:</strong> Physical apiary items (frames, boxes, queen excluders) are <strong>NOT</strong> linked to the inventory system. Each is tracked as an operational entity with its own table only.
+                    </div>
+                    <ul>
+                        <li>⏳ <strong>Design needed:</strong> Should frames/boxes have an <code>inventory_item_id</code> FK so each physical item maps to an SKU in <code>inventory_items</code>? This enables cost tracking, reorder alerts, and supplier lookup.</li>
+                        <li>⏳ <code>ConfigurationInventory.pm</code> is the planned bridge — links a hive configuration template to required inventory items (e.g. "Langstroth Deep Box × 2, Wire Foundation × 20, Queen Excluder × 1")</li>
+                        <li>⏳ For individual frames as inventory: each <code>hive_frames</code> row could have <code>inventory_item_id</code> pointing to the frame SKU/type in inventory_items</li>
+                        <li>⏳ <code>InventoryAssignment.assigned_to_type</code> could be extended to include <code>'hive'</code> and <code>'yard'</code> as assignment targets</li>
+                        <li>📌 <strong>Decision required:</strong> Do we track individual frame identity (each physical frame has a unique ID / barcode) or just frame type/quantity per box? Answer determines whether <code>frame_code</code> on HiveFrame is sufficient or if a full inventory item per frame is needed.</li>
+                    </ul>
+
+                    <h4>Controller Actions Needed (Apiary.pm)</h4>
+                    <ul>
+                        <li>⏳ <code>/Apiary/inspections</code> GET — list</li>
+                        <li>⏳ <code>/Apiary/inspections/new</code> GET — form</li>
+                        <li>⏳ <code>/Apiary/inspections/create</code> POST — save + frame details</li>
+                        <li>⏳ <code>/Apiary/inspections/:id</code> GET — view with visual hive diagram</li>
+                        <li>⏳ <code>/Apiary/inspections/:id/edit</code> + update POST</li>
+                        <li>⏳ <code>/Apiary/inspections/reports</code> — seasonal summary</li>
+                        <li>⏳ <code>/Apiary/inspections/calendar</code> — schedule view</li>
+                        <li>⏳ <code>/Apiary/api/queen_search</code> — AJAX for inspection form</li>
+                        <li>⏳ <code>/Apiary/api/hive_frame_layout/:id</code> — JSON for visual diagram</li>
+                    </ul>
+
+                    <h4>Template Changes</h4>
+                    <ul>
+                        <li>⏳ Fix <code>Apiary/new_inspection.tt</code> — remove &lt;head&gt; tag, add META title</li>
+                        <li>⏳ New: <code>Apiary/inspection_view.tt</code> — with visual hive diagram</li>
+                        <li>⏳ New: <code>Apiary/_hive_diagram.tt</code> — color-coded frame layout component</li>
+                        <li>⏳ New: <code>Apiary/inspection_reports.tt</code>, <code>Apiary/inspection_calendar.tt</code></li>
+                    </ul>
+
+                    <p><strong>Frame color scheme:</strong> brood=orange | honey=yellow | pollen=green | empty=white | foundation=grey | drone=blue | comb=tan</p>
+                    <p><strong>Full spec:</strong> <code>.zenflow/tasks/bmaster-f0fd/spec.md</code> | <strong>Plan steps:</strong> <code>.zenflow/tasks/bmaster-f0fd/plan.md</code></p>
+                </div>
+            </details>
+
+            <!-- Sub-project 3: Bee Pasture and ENCY Integration -->
+            <div id="anchor-bmaster-beepasture" class="nav-anchor"></div>
+            <details id="bmaster-beepasture" class="priority-container">
+                <summary class="priority-summary">📌 Bee Pasture and ENCY Deep Integration (PLANNED)</summary>
+                <div class="priority-content">
+                    <ul>
+                        <li>📌 Seasonal forage calendar on BMaster landing page (bloom dates by region)</li>
+                        <li>📌 Link ENCY plant database to yard/location for local forage planning</li>
+                        <li>📌 Plant contribution workflow for members (photos, bloom dates, yield rating)</li>
+                        <li>📌 Bee Pasture search widget on BMaster home page → /ENCY/search</li>
+                        <li>📌 Pollen photo citizen science — upload pollen microscopy photos</li>
+                    </ul>
+                </div>
+            </details>
+
+            <!-- Sub-project 4: Health Monitoring and Environment -->
+            <div id="anchor-bmaster-health" class="nav-anchor"></div>
+            <details id="bmaster-health" class="priority-container">
+                <summary class="priority-summary">📌 Bee Health Monitoring and Environmental System (PLANNED)</summary>
+                <div class="priority-content">
+                    <ul>
+                        <li>📌 Varroa mite monitoring — alcohol wash / sticky board count tracking</li>
+                        <li>📌 Disease log and diagnostic tool with photo upload</li>
+                        <li>📌 Treatment schedule with withdrawal period calendar and reminder</li>
+                        <li>📌 Environmental monitoring — link yard to weather station / Weather controller</li>
+                        <li>📌 Seasonal management calendar (spring buildup, swarm season, winter prep)</li>
+                        <li>📌 Hive weight sensor integration (future — API endpoint for data ingestion)</li>
+                    </ul>
+                </div>
+            </details>
+
+            <!-- Sub-project 5: Queen Rearing System -->
+            <div id="anchor-bmaster-queens" class="nav-anchor"></div>
+            <details id="bmaster-queens" class="priority-container">
+                <summary class="priority-summary">📌 Queen Rearing System Enhancement (PLANNED)</summary>
+                <div class="priority-content">
+                    <ul>
+                        <li>📌 Grafting calendar — enter graft date, auto-calculate emergence/mating/laying dates</li>
+                        <li>📌 Queen bank management — track banked queens by cell bar and cage</li>
+                        <li>📌 Mating nuc tracking — link queen to nuc colony, monitor acceptance</li>
+                        <li>📌 Breeding records — lineage tracking, trait scoring (temperament, productivity)</li>
+                        <li>📌 Queen marketplace — members can list queens for sale</li>
+                    </ul>
+                </div>
+            </details>
+
+            <!-- Sub-project 6: Products, Services and Marketplace -->
+            <div id="anchor-bmaster-products" class="nav-anchor"></div>
+            <details id="bmaster-products" class="priority-container">
+                <summary class="priority-summary">📌 Products, Services and Marketplace (PLANNED)</summary>
+                <div class="priority-content">
+                    <ul>
+                        <li>📌 Member product listings — honey, beeswax, propolis, royal jelly, nucs, queens</li>
+                        <li>📌 Service advertising — pollination contracts, mentoring, equipment rental</li>
+                        <li>📌 Integration with points system — earn points from sales, spend on services</li>
+                        <li>📌 Honey production tracking — harvest records across operation</li>
+                        <li>📌 Product standards and grading guide (moisture content, filtration, labeling)</li>
+                    </ul>
+                </div>
+            </details>
+
+            <h4>📁 Documentation & Resources</h4>
+            <ul>
+                <li>Zenflow Task: <code>bmaster-f0fd</code></li>
+                <li>Technical Spec: <code>.zenflow/tasks/bmaster-f0fd/spec.md</code></li>
+                <li>Implementation Plan: <code>.zenflow/tasks/bmaster-f0fd/plan.md</code></li>
+                <li>Site: <a href="http://bmaster.workstation:4019/BMaster" target="_blank">bmaster.workstation:4019/BMaster</a></li>
+                <li>Apiary SQL: <code>Comserv/sql/apiary_schema.sql</code> (design reference — use SchemaComparison to apply)</li>
+                <li>Inventory SQL: <code>Comserv/sql/inventory_tables.sql</code></li>
+                <li>SchemaComparison: <a href="/admin/schema_comparison">/admin/schema_comparison</a></li>
+            </ul>
+
             </div>
         </details>
 

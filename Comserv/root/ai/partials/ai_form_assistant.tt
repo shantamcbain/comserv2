@@ -1,0 +1,490 @@
+[%#
+  ai/partials/ai_form_assistant.tt
+  ─────────────────────────────────────────────────────────────────────────────
+  Generic AI Form Assistant panel — include this in any add/edit form to give
+  admin/editor users AI-powered form filling, field review, and correction.
+
+  CONFIGURATION VARIABLES (all optional — set before PROCESS/INCLUDE):
+    ai_form_entity_label  — human label for the record, e.g. "todo task"  (default: "record")
+    ai_form_context       — short description of the form context          (default: "")
+    ai_form_fields        — comma-separated list of field names the AI
+                            should fill (shown as hint; leave blank for all)
+    ai_form_system        — override the full system prompt sent to AI
+    ai_form_show          — if set to 0/false, hides the panel entirely
+
+  USAGE: after your closing </form> tag add a PROCESS directive:
+    PROCESS 'ai/partials/ai_form_assistant.tt'
+       ai_form_entity_label = 'todo task'
+       ai_form_context      = 'project task management'
+       ai_form_fields       = 'subject, description, priority, due_date'
+
+  ROLES:  Panel only renders for admin, editor, or developer roles.
+  AUTHORITY: This file is owned by the aichatsystem branch. Do not fork
+             form-fill logic into other branches — extend this partial instead.
+%]
+
+[%# ── Role check — same pattern used across app (c.session.roles.grep) ─────── %]
+[% SET ai_form_ok = c.session.roles.grep('admin').size
+                 || c.session.roles.grep('editor').size
+                 || c.session.roles.grep('developer').size %]
+
+[%# ── Defaults ────────────────────────────────────────────────────────────── %]
+[% ai_form_entity_label = ai_form_entity_label || 'record' %]
+[% ai_form_context      = ai_form_context      || ''       %]
+[% ai_form_fields       = ai_form_fields       || ''       %]
+[% SET ai_form_show = 1 %]
+
+[% IF ai_form_ok && ai_form_show %]
+<div id="ai-form-assistant-panel"
+     style="margin:1.2em 0;padding:1em;border:1px solid #acd;background:#f0f7ff;border-radius:6px;">
+
+  <strong style="font-size:1.05em">🤖 AI Form Assistant</strong>
+
+  <span id="ai-form-meta"
+        data-entity-label="[% ai_form_entity_label | html %]"
+        data-context="[% ai_form_context | html %]"
+        data-fields="[% ai_form_fields | html %]"
+        data-system="[% ai_form_system | html %]"
+        style="display:none;"></span>
+
+  <div style="margin-top:0.6em;display:flex;flex-wrap:wrap;gap:0.5em;align-items:center;">
+    <input type="text" id="ai-form-entity-name"
+           placeholder="Describe what to fill in (e.g. name / topic)…"
+           size="38" style="padding:3px 6px;border:1px solid #ccc;border-radius:4px;" />
+    <select id="ai-form-model-sel" style="font-size:0.9em;padding:3px 5px;border:1px solid #ccc;border-radius:4px;">
+      <option value="">Loading models…</option>
+    </select>
+    <button type="button" id="ai-form-ask-btn"
+            style="padding:4px 12px;background:#0077cc;color:#fff;border:none;border-radius:4px;cursor:pointer;">
+      Ask AI
+    </button>
+    <button type="button" id="ai-form-review-btn"
+            title="Send current field values to AI and identify errors or inconsistencies"
+            style="padding:4px 10px;background:#fff3cd;border:1px solid #ffc107;border-radius:4px;cursor:pointer;">
+      Review &amp; Correct
+    </button>
+    <span id="ai-form-status" style="color:#555;font-style:italic;font-size:0.9em;"></span>
+  </div>
+
+  <div style="margin-top:0.5em;font-size:0.85em;color:#444;">
+    <label title="Leave blank to ask AI about all fields. Enter field names to ONLY update those fields.">
+      <strong>Limit to specific fields</strong> (blank = all):
+    </label>
+    <input type="text" id="ai-form-target-fields"
+           value="[% ai_form_fields | html %]"
+           placeholder="e.g. subject, description, priority"
+           style="width:28em;font-size:0.95em;margin-left:0.4em;padding:2px 5px;border:1px solid #ccc;border-radius:4px;"
+           title="Only these fields will be filled by AI. All others are untouched." />
+  </div>
+
+  <div style="margin-top:0.4em;font-size:0.82em;color:#666;display:flex;flex-wrap:wrap;gap:0.8em;align-items:center;">
+    <label style="cursor:pointer;">
+      <input type="checkbox" id="ai-form-override" style="vertical-align:middle;">
+      Override existing values (default: only fills empty fields)
+    </label>
+    <label style="cursor:pointer;" title="Grok live web search — uses current data from the web">
+      <input type="checkbox" id="ai-form-web-search" style="vertical-align:middle;">
+      Live web search (Grok only)
+    </label>
+  </div>
+
+  <div id="ai-form-raw" style="display:none;margin-top:0.8em;">
+    <strong>AI Raw Response:</strong>
+    <pre id="ai-form-raw-text"
+         style="background:#eee;padding:0.5em;max-height:180px;overflow:auto;font-size:0.85em;white-space:pre-wrap;"></pre>
+  </div>
+
+  <div id="ai-form-staged-panel" style="display:none;margin-top:0.8em;border-top:2px solid #4a90d9;padding-top:0.6em;">
+    <div style="display:flex;align-items:center;gap:0.8em;margin-bottom:0.6em;flex-wrap:wrap;">
+      <strong style="color:#1a4a7a;">AI Suggestions — Fields With Existing Content:</strong>
+      <button type="button" id="ai-form-stage-all-btn"
+              style="padding:3px 10px;cursor:pointer;background:#d4edda;border:1px solid #28a745;border-radius:3px;font-size:0.85em;">
+        Append All
+      </button>
+      <button type="button" id="ai-form-skip-all-btn"
+              style="padding:3px 10px;cursor:pointer;background:#f8f9fa;border:1px solid #aaa;border-radius:3px;font-size:0.85em;">
+        Skip All
+      </button>
+    </div>
+    <div id="ai-form-staged-items"></div>
+  </div>
+
+  <div id="ai-form-review-panel" style="display:none;margin-top:0.8em;border-top:2px solid #ffc107;padding-top:0.6em;">
+    <strong style="color:#856404;">AI Review Suggestions:</strong>
+    <div id="ai-form-review-results" style="margin-top:0.4em;"></div>
+  </div>
+
+</div>
+
+<script>
+(function() {
+    var META        = document.getElementById('ai-form-meta');
+    var entityLabel = META ? META.getAttribute('data-entity-label') || 'record' : 'record';
+    var context     = META ? META.getAttribute('data-context')      || ''       : '';
+    var customSystem= META ? META.getAttribute('data-system')       || ''       : '';
+
+    // ── Default system prompt ────────────────────────────────────────────────
+    var DEFAULT_SYSTEM = [
+        'You are an AI assistant helping to fill in a web application form.',
+        context ? ('The form is for: ' + context + '.') : '',
+        'When asked to fill in a ' + entityLabel + ', return ONLY a raw JSON object.',
+        'Keys must exactly match HTML form field name attributes.',
+        'Values must be plain strings or numbers — no nested objects or arrays.',
+        'Do not include markdown, code fences, explanations, or commentary.',
+        'Only include fields you are confident about — omit uncertain fields entirely.',
+        'Return pure JSON only.'
+    ].filter(Boolean).join(' ');
+
+    var SYSTEM = customSystem || DEFAULT_SYSTEM;
+
+    // ── Load model options ───────────────────────────────────────────────────
+    function loadModelOptions() {
+        var sel = document.getElementById('ai-form-model-sel');
+        if (!sel) return;
+        fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.success || !data.providers) return;
+                var opts = [];
+                data.providers.forEach(function(p) {
+                    if (p.service === 'ollama' && p.models) {
+                        p.models.filter(function(m) {
+                            return m.id && !m.id.match(/embed|rerank/i);
+                        }).forEach(function(m) {
+                            opts.push({ val: m.id + '|ollama', label: m.id + ' (Ollama)' });
+                        });
+                    }
+                    if (p.service === 'grok' && p.models) {
+                        p.models.filter(function(m) {
+                            return m.id && !m.id.match(/imagine|video/i);
+                        }).forEach(function(m) {
+                            var lbl = m.id.replace(/-/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
+                            opts.push({ val: m.id + '|grok', label: lbl + ' (Grok/xAI)' });
+                        });
+                    }
+                });
+                if (!opts.length) {
+                    opts = [{ val: 'mistral:latest|ollama', label: 'mistral:latest (Ollama)' }];
+                }
+                sel.innerHTML = '';
+                opts.forEach(function(o, i) {
+                    var opt = document.createElement('option');
+                    opt.value = o.val;
+                    opt.textContent = o.label;
+                    if (i === 0) opt.selected = true;
+                    sel.appendChild(opt);
+                });
+            })
+            .catch(function() {
+                var sel = document.getElementById('ai-form-model-sel');
+                if (sel) sel.innerHTML = '<option value="mistral:latest|ollama">mistral:latest (Ollama)</option>';
+            });
+    }
+    loadModelOptions();
+
+    // ── Auto-detect name field ───────────────────────────────────────────────
+    function autoDetectName() {
+        var inp = document.getElementById('ai-form-entity-name');
+        if (!inp || inp.value.trim()) return;
+        var candidates = ['subject','name','title','botanical_name','common_name','generic_name','term','label'];
+        for (var i = 0; i < candidates.length; i++) {
+            var f = document.querySelector('[name="' + candidates[i] + '"]');
+            if (f && f.value && f.value.trim()) { inp.value = f.value.trim(); break; }
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', autoDetectName);
+    } else {
+        autoDetectName();
+    }
+    ['subject','name','title','subject'].forEach(function(fn) {
+        var f = document.querySelector('[name="' + fn + '"]');
+        if (f) f.addEventListener('change', autoDetectName);
+    });
+
+    function getModelAndProvider() {
+        var sel = document.getElementById('ai-form-model-sel');
+        if (sel && sel.value) {
+            var parts = sel.value.split('|');
+            return { model: parts[0], provider: parts[1] || 'ollama' };
+        }
+        return { model: 'mistral:latest', provider: 'ollama' };
+    }
+
+    // ── Ask AI to fill ───────────────────────────────────────────────────────
+    document.getElementById('ai-form-ask-btn').addEventListener('click', function() {
+        var name = document.getElementById('ai-form-entity-name').value.trim();
+        if (!name) { alert('Please enter a description or name to look up.'); return; }
+        var statusEl     = document.getElementById('ai-form-status');
+        var btn          = document.getElementById('ai-form-ask-btn');
+        var overrideAll  = document.getElementById('ai-form-override').checked;
+        var useSearch    = document.getElementById('ai-form-web-search').checked;
+        var targetRaw    = (document.getElementById('ai-form-target-fields').value || '').trim();
+        var targetFields = targetRaw
+            ? targetRaw.split(/[\s,;]+/).map(function(f){return f.trim().toLowerCase();}).filter(Boolean)
+            : [];
+
+        var mp = getModelAndProvider();
+        var allFormFields = [];
+        document.querySelectorAll('input[name]:not([type=hidden]):not([type=submit]):not([type=button]), textarea[name], select[name]')
+            .forEach(function(el) { if (el.name) allFormFields.push(el.name); });
+        var fieldList = targetFields.length
+            ? targetFields.join(', ')
+            : allFormFields.join(', ');
+
+        var fieldInstruction = targetFields.length
+            ? 'Return ONLY a raw JSON object with ONLY these fields: ' + fieldList + '.'
+            : 'Return ONLY a raw JSON object. Fields available in this form: ' + fieldList + '. Fill fields you are confident about.';
+
+        btn.disabled = true;
+        statusEl.textContent = 'Asking ' + mp.model + '\u2026';
+        document.getElementById('ai-form-raw').style.display = 'none';
+
+        var timeoutMs = mp.provider === 'grok' ? 45000 : 120000;
+        var controller = new AbortController();
+        var tid = setTimeout(function() { controller.abort(); }, timeoutMs);
+
+        fetch('/ai/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            signal: controller.signal,
+            body: JSON.stringify({
+                prompt:     fieldInstruction + ' The subject is: ' + name,
+                system:     SYSTEM,
+                provider:   mp.provider,
+                model:      mp.model,
+                page_path:  window.location.pathname,
+                page_title: document.title,
+                use_search: (mp.provider === 'grok') && useSearch
+            })
+        })
+        .then(function(r) {
+            return r.text().then(function(t) {
+                try { return JSON.parse(t); }
+                catch(e) { throw new Error('Server returned non-JSON (HTTP ' + r.status + ')'); }
+            });
+        })
+        .then(function(data) {
+            clearTimeout(tid);
+            btn.disabled = false;
+            var modelUsed = data.model || mp.model;
+            if (!data.success) {
+                statusEl.textContent = 'AI error: ' + (data.error || 'unknown');
+                document.getElementById('ai-form-raw-text').textContent = JSON.stringify(data, null, 2);
+                document.getElementById('ai-form-raw').style.display = '';
+                return;
+            }
+            var raw = (data.response || '').trim();
+            document.getElementById('ai-form-raw-text').textContent = raw;
+            document.getElementById('ai-form-raw').style.display = '';
+
+            var jsonStart = raw.indexOf('{'), jsonEnd = raw.lastIndexOf('}');
+            if (jsonStart === -1 || jsonEnd === -1) {
+                statusEl.textContent = '[' + modelUsed + '] AI did not return JSON. See raw response.';
+                return;
+            }
+            try {
+                var fields = JSON.parse(raw.substring(jsonStart, jsonEnd + 1));
+                var filled = 0, staged = [], skipped = [];
+                Object.keys(fields).forEach(function(key) {
+                    if (targetFields.length && targetFields.indexOf(key.toLowerCase()) === -1) return;
+                    var el = document.querySelector('[name="' + key + '"]');
+                    if (!el) return;
+                    var aiVal = fields[key];
+                    if (aiVal === null || aiVal === undefined || aiVal === '') return;
+                    var val = Array.isArray(aiVal) ? aiVal.join('\n')
+                            : (typeof aiVal === 'object') ? Object.entries(aiVal).map(function(e){return e[0]+': '+e[1];}).join('\n')
+                            : String(aiVal);
+                    if (el.tagName === 'SELECT') {
+                        var matched = false;
+                        var hasVal  = el.selectedIndex > 0 && el.options[el.selectedIndex].value !== '';
+                        if (hasVal && !overrideAll) { skipped.push(key); return; }
+                        for (var i = 0; i < el.options.length; i++) {
+                            if (el.options[i].value.toLowerCase() === val.toLowerCase() ||
+                                el.options[i].text.toLowerCase()  === val.toLowerCase()) {
+                                el.selectedIndex = i; matched = true; filled++; break;
+                            }
+                        }
+                        if (!matched) skipped.push(key + '=' + val);
+                    } else {
+                        var cur = (el.value || '').trim();
+                        if (!cur) { el.value = val; filled++; }
+                        else if (overrideAll) { el.value = val; filled++; }
+                        else if (cur.indexOf(val) === -1) { staged.push({key:key, el:el, currentVal:cur, aiVal:val}); }
+                    }
+                });
+                var msg = '[' + modelUsed + '] Filled ' + filled + ' field(s).';
+                if (staged.length)  msg += ' ' + staged.length + ' staged for review.';
+                if (skipped.length) msg += ' Skipped: ' + skipped.join(', ') + '.';
+                statusEl.textContent = msg;
+                renderStagedDiff(staged);
+            } catch(e) {
+                statusEl.textContent = 'Could not parse JSON: ' + e.message;
+            }
+        })
+        .catch(function(err) {
+            clearTimeout(tid);
+            btn.disabled = false;
+            statusEl.textContent = err.name === 'AbortError'
+                ? 'Timed out \u2014 try a faster model.'
+                : 'Request failed: ' + err.message;
+        });
+    });
+
+    // ── Review & Correct ─────────────────────────────────────────────────────
+    document.getElementById('ai-form-review-btn').addEventListener('click', function() {
+        var name = document.getElementById('ai-form-entity-name').value.trim();
+        if (!name) { alert('Please enter the entity name first so AI knows what it is reviewing.'); return; }
+        var statusEl = document.getElementById('ai-form-status');
+        var btn      = document.getElementById('ai-form-review-btn');
+        var panel    = document.getElementById('ai-form-review-panel');
+        var results  = document.getElementById('ai-form-review-results');
+        btn.disabled = true;
+        panel.style.display = 'none';
+        results.innerHTML   = '';
+        statusEl.textContent = 'Reviewing field values\u2026';
+
+        var currentValues = {};
+        document.querySelectorAll('input[name]:not([type=hidden]):not([type=submit]):not([type=button]), textarea[name], select[name]')
+            .forEach(function(el) {
+                if (el.name && el.value && el.value.trim()) currentValues[el.name] = el.value.trim();
+            });
+
+        var mp  = getModelAndProvider();
+        var ctl = new AbortController();
+        setTimeout(function() { ctl.abort(); }, 60000);
+
+        fetch('/ai/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            signal: ctl.signal,
+            body: JSON.stringify({
+                prompt: 'You are reviewing a ' + entityLabel + ' record named "' + name + '". '
+                    + 'Current field values: ' + JSON.stringify(currentValues) + '. '
+                    + 'Identify fields that are obviously incorrect, inconsistent, or wrong for this ' + entityLabel + '. '
+                    + 'ONLY flag fields you are confident are wrong. '
+                    + 'Return ONLY raw JSON: {"corrections":[{"field":"name","current":"val","suggested":"val","reason":"why"}]}. '
+                    + 'If nothing is wrong return {"corrections":[]}.',
+                system:     SYSTEM,
+                provider:   mp.provider,
+                model:      mp.model,
+                page_path:  window.location.pathname,
+                page_title: document.title
+            })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            if (!data.success) { statusEl.textContent = 'Review failed: ' + (data.error || 'unknown'); return; }
+            var raw = (data.response || '').trim();
+            var js  = raw.indexOf('{'), je = raw.lastIndexOf('}');
+            if (js === -1) { statusEl.textContent = 'AI returned no JSON.'; return; }
+            var parsed      = JSON.parse(raw.substring(js, je+1));
+            var corrections = parsed.corrections || [];
+            if (!corrections.length) { statusEl.textContent = 'Review complete \u2014 no obvious errors found.'; return; }
+            statusEl.textContent = 'Found ' + corrections.length + ' potential issue(s):';
+            panel.style.display = '';
+            corrections.forEach(function(c) {
+                var el  = document.querySelector('[name="' + c.field + '"]');
+                var div = document.createElement('div');
+                div.style.cssText = 'margin:0.5em 0;padding:0.5em;background:#fffbe6;border:1px solid #ffc107;border-radius:4px;font-size:0.9em;';
+                div.innerHTML = '<strong>' + c.field + '</strong>: '
+                    + '<span style="color:#c00;text-decoration:line-through;">' + (c.current||'').substring(0,120).replace(/</g,'&lt;') + '</span> '
+                    + '&rarr; <span style="color:#155724;">' + (c.suggested||'').substring(0,200).replace(/</g,'&lt;') + '</span>'
+                    + '<br><em style="color:#666;">' + (c.reason||'').replace(/</g,'&lt;') + '</em>';
+                if (el) {
+                    var applyBtn = document.createElement('button');
+                    applyBtn.type = 'button';
+                    applyBtn.textContent = 'Apply';
+                    applyBtn.style.cssText = 'margin-left:0.8em;font-size:0.85em;padding:2px 8px;cursor:pointer;';
+                    applyBtn.onclick = (function(field, suggested) {
+                        return function() {
+                            var fe = document.querySelector('[name="' + field + '"]');
+                            if (fe) { fe.value = suggested; applyBtn.textContent = '\u2713 Applied'; applyBtn.disabled = true; }
+                        };
+                    })(c.field, c.suggested);
+                    div.appendChild(applyBtn);
+                }
+                results.appendChild(div);
+            });
+        })
+        .catch(function(err) {
+            document.getElementById('ai-form-review-btn').disabled = false;
+            document.getElementById('ai-form-status').textContent = err.name === 'AbortError'
+                ? 'Review timed out.' : 'Review failed: ' + err.message;
+        });
+    });
+
+    // ── Staged diff render ───────────────────────────────────────────────────
+    function renderStagedDiff(staged) {
+        var panel     = document.getElementById('ai-form-staged-panel');
+        var container = document.getElementById('ai-form-staged-items');
+        container.innerHTML = '';
+        panel.style.display = staged.length ? '' : 'none';
+        if (!staged.length) return;
+        staged.forEach(function(item) {
+            var div = document.createElement('div');
+            div.style.cssText = 'margin:0.5em 0;padding:0.6em;background:#f0f7ff;border:1px solid #4a90d9;border-radius:4px;';
+            div.setAttribute('data-key', item.key);
+            var label = document.createElement('div');
+            label.style.cssText = 'font-weight:bold;margin-bottom:0.3em;font-size:0.9em;';
+            label.textContent = item.key;
+            div.appendChild(label);
+            var row = document.createElement('div');
+            row.style.cssText = 'display:flex;gap:0.5em;margin-bottom:0.4em;flex-wrap:wrap;';
+            function box(title, val, bg, border) {
+                var b = document.createElement('div');
+                b.style.cssText = 'flex:1;min-width:180px;padding:0.4em;background:' + bg + ';border:1px solid ' + border + ';border-radius:3px;font-size:0.85em;white-space:pre-wrap;max-height:100px;overflow:auto;';
+                b.innerHTML = '<em style="display:block;margin-bottom:0.2em;color:#666;">' + title + '</em>' + val.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+                return b;
+            }
+            row.appendChild(box('Existing', item.currentVal, '#fff8f8', '#f5c6cb'));
+            row.appendChild(box('AI suggestion', item.aiVal, '#f0fff4', '#a3d9a5'));
+            div.appendChild(row);
+            var btns = document.createElement('div');
+            btns.style.cssText = 'display:flex;gap:0.5em;';
+            function mkBtn(label, bg, border, handler) {
+                var b = document.createElement('button');
+                b.type = 'button'; b.textContent = label;
+                b.style.cssText = 'padding:3px 10px;cursor:pointer;font-size:0.85em;background:' + bg + ';border:1px solid ' + border + ';border-radius:3px;';
+                b.onclick = function() { handler(b); };
+                return b;
+            }
+            btns.appendChild(mkBtn('Append', '#d4edda', '#28a745', function(b) {
+                item.el.value = item.currentVal + '\n' + item.aiVal;
+                div.style.borderColor = '#4caf50'; div.style.background = '#e8f5e9';
+                btns.querySelectorAll('button').forEach(function(x){x.disabled=true;});
+                b.disabled = false; b.textContent = '\u2713 Appended';
+            }));
+            btns.appendChild(mkBtn('Replace', '#fff3cd', '#ffc107', function(b) {
+                item.el.value = item.aiVal;
+                div.style.borderColor = '#ffc107'; div.style.background = '#fff3cd';
+                btns.querySelectorAll('button').forEach(function(x){x.disabled=true;});
+                b.disabled = false; b.textContent = '\u2713 Replaced';
+            }));
+            btns.appendChild(mkBtn('Skip', '#f8f9fa', '#aaa', function(b) {
+                div.style.borderColor = '#aaa'; div.style.background = '#f8f9fa';
+                btns.querySelectorAll('button').forEach(function(x){x.disabled=true;});
+                b.disabled = false; b.textContent = '\u2713 Skipped';
+            }));
+            div.appendChild(btns);
+            container.appendChild(div);
+        });
+        document.getElementById('ai-form-stage-all-btn').onclick = function() {
+            container.querySelectorAll('[data-key]').forEach(function(d) {
+                var btns = d.querySelectorAll('button');
+                if (btns[0] && !btns[0].disabled) btns[0].click();
+            });
+        };
+        document.getElementById('ai-form-skip-all-btn').onclick = function() {
+            container.querySelectorAll('[data-key]').forEach(function(d) {
+                var btns = d.querySelectorAll('button');
+                if (btns[2] && !btns[2].disabled) btns[2].click();
+            });
+        };
+    }
+})();
+</script>
+[% END %]

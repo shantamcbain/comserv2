@@ -32,6 +32,10 @@
   --warning-color: red;
 }
 
-body {
-  background-image: url(../images/BMaster/honey2.jpg);
+:root {
+  --background-image: url(../images/BMaster/honey2.jpg);
+  --background-repeat: repeat-x;
+  --background-position: top center;
+  --background-attachment: scroll;
+  --background-size: auto;
 }

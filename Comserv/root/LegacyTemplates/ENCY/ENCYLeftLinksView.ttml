@@ -1,0 +1,51 @@
+[%
+
+# the ENCY  Left Page template
+#	$Id: LeftPageView.ttml,v 1.3 2001/12/07 03:59:16 shanta Exp $	
+
+%]
+[% IF data.session_object %]
+
+   [% session_id = data.session_object.getId() %]
+   [% session_string = "session_id=$session_id" %]
+
+[% END %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+[% username = data.session_object.getAttribute('-KEY','auth_username') %]
+[% group = data.session_object.getAttribute('-KEY','auth_groups') %]
+[% fname = data.session_object.getAttribute('-KEY','auth_firstname') %]
+
+<!--  #### Start ENCYLeftLinksView #### -->
+  <tr>
+   <td class="NavTableCellStyle">
+          <a href="/cgi-bin/ENCY/ency.cgi?[% session_string %]" > <font   class="LeftSideBarNavStyle">ENCY Home</font></a><br>
+    </td>
+    </tr>
+   <td class="NavTableCellStyle">
+           <a href="http://forager.com" ><font   class="LeftSideBarNavStyle"> Forager </font></a><br>
+
+
+    </td>
+    </tr>
+    <td >
+           <a href="/cgi-bin/WebCal/webcal.cgi?[% session_string %]&amp;site=[% SiteName %]" ><font   class="LeftSideBarNavStyle"> ENCY Calendar </font></a><br>
+
+
+    </td>
+    </tr>
+   <tr>
+  <td>	<A HREF = "/cgi-bin/ENCY/ency_url.cgi?show_devel_urls=on&search1=ENCY&searchfield=owner&[% session_string %]&view=LinkListView&columns_to_view=name&columns_to_view=url"><font   class="LeftSideBarNavStyle"> ENCY Links</font></a>
+  </td>
+ </tr>
+
+  <tr>
+   <td >
+          <a href="/cgi-bin/CSC/csc.cgi?view=CSCHome&[% session_string %]" > <font   class="LeftSideBarNavStyle">Tech Support Home</font></a><br>
+    </td>
+    </tr>
+ <tr>
+   <td>&nbsp;</td>
+ </tr>
+ <tr>
+<!--  #### End ENCYLeftMainLinksView #### -->

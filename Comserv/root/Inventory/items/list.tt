@@ -1,0 +1,81 @@
+[% PageVersion = 'Inventory/items/list.tt,v 0.01 2026/03/30 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Inventory Items</h1>
+
+[% IF c.flash.success_msg %]<p class="success">[% c.flash.success_msg %]</p>[% END %]
+[% IF c.flash.error_msg %]<p class="error">[% c.flash.error_msg %]</p>[% END %]
+
+<div class="actions">
+  <a href="/Inventory/item/add">Add Item</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/stock/adjust">Adjust Stock</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory">Dashboard</a>
+</div>
+
+<form method="GET" action="/Inventory/items">
+  <label>Status:
+    <select name="status">
+      <option value="active" [% IF status == 'active' %]selected[% END %]>Active</option>
+      <option value="inactive" [% IF status == 'inactive' %]selected[% END %]>Inactive</option>
+      <option value="all" [% IF status == 'all' %]selected[% END %]>All</option>
+    </select>
+  </label>
+  <label>Category:
+    <input type="text" name="category" value="[% category %]">
+  </label>
+  <input type="submit" value="Filter">
+</form>
+
+[% IF items.size == 0 %]
+  <p>No items found. <a href="/Inventory/item/add">Add one now</a>.</p>
+[% ELSE %]
+<table border="1" cellpadding="4" cellspacing="0">
+  <thead>
+    <tr>
+      <th>SKU</th>
+      <th>Name</th>
+      <th>Category</th>
+      <th>Unit</th>
+      <th>Unit Cost</th>
+      <th>Stock (on hand)</th>
+      <th>Reorder Point</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH item IN items %]
+    [% total_stock = 0 %]
+    [% FOREACH sl IN item.stock_levels %]
+      [% total_stock = total_stock + sl.quantity_on_hand %]
+    [% END %]
+    <tr[% IF item.reorder_point && total_stock <= item.reorder_point %] style="background:#fff3cd"[% END %]>
+      <td>[% item.sku %]</td>
+      <td><a href="/Inventory/item/view/[% item.id %]">[% item.name %]</a></td>
+      <td>[% item.category || '-' %]</td>
+      <td>[% item.unit_of_measure %]</td>
+      <td>[% item.unit_cost ? item.unit_cost : '-' %]</td>
+      <td>[% total_stock %]</td>
+      <td>[% item.reorder_point || '0' %]</td>
+      <td>[% item.status %]</td>
+      <td>
+        <a href="/Inventory/item/view/[% item.id %]">View</a>
+        <a href="/Inventory/item/edit/[% item.id %]">Edit</a>
+        [% IF c.session.roles.grep('admin').size %]
+        <form method="POST" action="/Inventory/item/delete/[% item.id %]" style="display:inline"
+              onsubmit="return confirm('Delete this item?')">
+          <input type="submit" value="Delete">
+        </form>
+        [% END %]
+      </td>
+    </tr>
+  [% END %]
+  </tbody>
+</table>
+[% END %]
+
+[% IF debug_errors && debug_errors.size > 0 %]
+<div class="debug">[% FOREACH err IN debug_errors %]<p>[% err %]</p>[% END %]</div>
+[% END %]
