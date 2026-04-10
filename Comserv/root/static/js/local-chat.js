@@ -2091,12 +2091,24 @@
     // Returns { cleanText, actions[] } where cleanText has the blocks removed.
     function extractActions(text) {
         const actions = [];
-        const cleanText = text.replace(/\[ACTION:\s*(\{[\s\S]*?\})\]/g, function(match, jsonStr) {
+        // Use a greedy match for the JSON body to handle nested objects correctly,
+        // then trim to the last } to find the true end of the JSON.
+        // Also allow optional whitespace before the closing ].
+        const re = /\[ACTION:\s*(\{[\s\S]*\})\s*\]/g;
+        const cleanText = text.replace(re, function(match, jsonStr) {
+            // Normalize curly/smart quotes that some AI models emit
+            const normalized = jsonStr
+                .replace(/[\u2018\u2019]/g, "'")
+                .replace(/[\u201C\u201D]/g, '"')
+                .trim();
+            // Find the last } to strip any trailing content the greedy match pulled in
+            const lastBrace = normalized.lastIndexOf('}');
+            const candidate = lastBrace >= 0 ? normalized.slice(0, lastBrace + 1) : normalized;
             try {
-                const obj = JSON.parse(jsonStr);
+                const obj = JSON.parse(candidate);
                 if (obj && obj.action) actions.push(obj);
             } catch(e) {
-                console.warn('AI action JSON parse error:', e, jsonStr);
+                console.warn('AI action JSON parse error:', e, candidate);
             }
             return '';
         }).trim();
