@@ -23,21 +23,18 @@
              form-fill logic into other branches — extend this partial instead.
 %]
 
-[%# ── Role check — matches existing app pattern (c.session.roles / c.check_user_roles) %]
-[% SET _is_privileged = c.session.roles.grep('admin').size
-    || c.session.roles.grep('editor').size
-    || c.session.roles.grep('developer').size
-    || c.check_user_roles('admin')
-    || c.check_user_roles('editor')
-    || c.check_user_roles('developer') %]
+[%# ── Role check — same pattern used across app (c.session.roles.grep) ─────── %]
+[% SET ai_form_ok = c.session.roles.grep('admin').size
+                 || c.session.roles.grep('editor').size
+                 || c.session.roles.grep('developer').size %]
 
 [%# ── Defaults ────────────────────────────────────────────────────────────── %]
 [% ai_form_entity_label = ai_form_entity_label || 'record' %]
 [% ai_form_context      = ai_form_context      || ''       %]
 [% ai_form_fields       = ai_form_fields       || ''       %]
-[% ai_form_show         = ai_form_show.defined ? ai_form_show : 1 %]
+[% SET ai_form_show = 1 %]
 
-[% IF _is_privileged && ai_form_show %]
+[% IF ai_form_ok && ai_form_show %]
 <div id="ai-form-assistant-panel"
      style="margin:1.2em 0;padding:1em;border:1px solid #acd;background:#f0f7ff;border-radius:6px;">
 
