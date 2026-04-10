@@ -121,11 +121,17 @@ __PACKAGE__->add_columns(id => {
         size        => 20,
         is_nullable => 1,
         comment     => 'enum: deep, medium, shallow (for bee frame boxes)',
+    },
+    box_type => {
+        data_type   => 'varchar',
+        size        => 20,
+        is_nullable => 1,
+        comment     => 'enum: brood, honey, x_ways, super, deep, medium, shallow',
     }
 );
 
 __PACKAGE__->set_primary_key('id');
-__PACKAGE__->add_unique_constraint(['sku']);
+__PACKAGE__->add_unique_constraint(unique_sku => ['sku']);
 
 __PACKAGE__->has_many(
     'stock_levels' => 'Comserv::Model::Schema::Ency::Result::InventoryStockLevel',
