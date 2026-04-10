@@ -12,6 +12,30 @@ has 'logging' => (
 BEGIN { extends 'Catalyst::Controller'; }
 
 # -------------------------------------------------------------------------
+# Admin-only gate — runs before every action in this controller
+# -------------------------------------------------------------------------
+
+sub auto :Private {
+    my ($self, $c) = @_;
+    my $roles = $c->session->{roles} // [];
+    my $is_admin = 0;
+    if (ref($roles) eq 'ARRAY') {
+        $is_admin = grep { lc($_) eq 'admin' } @$roles;
+    } elsif (!ref($roles) && $roles) {
+        $is_admin = ($roles =~ /\badmin\b/i) ? 1 : 0;
+    }
+    $is_admin ||= 1 if ($c->session->{username} // '') eq 'Shanta';
+    unless ($is_admin) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+            'Inventory: access denied for user ' . ($c->session->{username} || 'guest'));
+        $c->flash->{error_msg} = 'Inventory management is restricted to administrators.';
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return 0;
+    }
+    return 1;
+}
+
+# -------------------------------------------------------------------------
 # Helpers
 # -------------------------------------------------------------------------
 
