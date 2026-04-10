@@ -1,24 +1,150 @@
-[% PageVersion = '3D Feature Landing Page, v0.1 2024/05/28 Shanta Exp shanta' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
+[% PageVersion = '3d/index.tt,v 1.00 2026/04/10 Shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.printing-3d-hero {
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 2em;
+    margin-bottom: 1.5em;
+    text-align: center;
+}
+.printing-3d-hero h1 {
+    color: var(--heading-color, var(--text-color));
+    font-size: 2em;
+    margin: 0 0 0.3em 0;
+}
+.printing-3d-hero p {
+    color: var(--text-color);
+    font-size: 1.1em;
+    margin: 0;
+}
+.printing-3d-stats {
+    display: flex;
+    gap: 1em;
+    flex-wrap: wrap;
+    margin-bottom: 1.5em;
+}
+.stat-card {
+    flex: 1;
+    min-width: 150px;
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1.2em 1em;
+    text-align: center;
+}
+.stat-card .stat-number {
+    font-size: 2em;
+    font-weight: bold;
+    color: var(--accent-color, var(--link-color));
+}
+.stat-card .stat-label {
+    color: var(--text-color);
+    font-size: 0.9em;
+    margin-top: 0.3em;
+}
+.printing-3d-actions {
+    display: flex;
+    gap: 1em;
+    flex-wrap: wrap;
+    margin-bottom: 1.5em;
+}
+.action-btn {
+    display: inline-block;
+    padding: 0.8em 1.5em;
+    background: var(--button-bg, var(--accent-color));
+    color: var(--button-text, white);
+    border-radius: 5px;
+    text-decoration: none;
+    font-weight: bold;
+    border: 1px solid var(--button-border, var(--accent-color));
+    transition: opacity 0.2s;
+}
+.action-btn:hover {
+    opacity: 0.85;
+    text-decoration: none;
+}
+.action-btn.secondary {
+    background: var(--secondary-color);
+    color: var(--link-color);
+    border-color: var(--border-color);
+}
+.printing-3d-notice {
+    background: var(--schema-alert-warning-bg, #fff3cd);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1em 1.2em;
+    color: var(--text-color);
+}
+</style>
+
+[% IF error_msg %]
+<div class="printing-3d-notice">
+    <strong>Notice:</strong> [% error_msg %]
+</div>
 [% END %]
 
-<h1 id="top">Join us in our 3D Community!</h1>
-<nav>
-    <a id="3dtop"></a>
-    <a href="#overview">Overview</a>|
-    <a href="#explore">Explore</a>|
-    <a href="#contact">Contact</a>
-</nav>
+[% IF c.flash.success_msg %]
+<div style="background:var(--success-color,#d4edda);border:1px solid var(--border-color);border-radius:6px;padding:1em 1.2em;margin-bottom:1em;color:var(--text-color);">
+    [% c.flash.success_msg %]
+</div>
+[% END %]
 
-<a id="overview"></a><a href="#3dtop">back to top</a>
-<h2>Overview</h2>
-<p>Welcome to the 3D feature of the Comserv application. This page provides an overview of the 3D models and interactive content available.</p>
+<div class="printing-3d-hero">
+    <h1><i class="icon-3d"></i> 3D Printing</h1>
+    <p>An add-on service for <strong>[% sitename || SiteName %]</strong> — browse models, order prints, and manage your printer farm.</p>
+</div>
 
-<a id="explore"></a><a href="#3dtop">back to top</a>
-<h2>Explore</h2>
-<p>Explore the various 3D models and interactive content we have to offer. Use the navigation links to browse through different sections.</p>
+[% IF module_enabled %]
 
-<a id="contact"></a><a href="#3dtop">back to top</a>
-<h2>Contact</h2>
-<p>If you have any questions or need assistance, please contact us at <a href="mailto:support@comserv.com">support@comserv.com</a>.</p>
+<div class="printing-3d-stats">
+    <div class="stat-card">
+        <div class="stat-number">[% model_count || 0 %]</div>
+        <div class="stat-label">Models Available</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">[% printer_count || 0 %]</div>
+        <div class="stat-label">Printers Ready</div>
+    </div>
+    [% IF c.session.user_id %]
+    <div class="stat-card">
+        <div class="stat-number">[% my_open_jobs || 0 %]</div>
+        <div class="stat-label">My Open Jobs</div>
+    </div>
+    [% END %]
+</div>
+
+<div class="printing-3d-actions">
+    <a href="/3d/browse" class="action-btn"><i class="icon-list"></i> Browse Models</a>
+    [% IF c.session.user_id %]
+    <a href="/3d/my_orders" class="action-btn secondary"><i class="icon-briefcase"></i> My Orders</a>
+    [% END %]
+    [% IF c.session.roles.grep('admin').size %]
+    <a href="/3d/admin" class="action-btn secondary"><i class="icon-admin"></i> Admin Dashboard</a>
+    <a href="/3d/queue" class="action-btn secondary"><i class="icon-list"></i> Print Queue</a>
+    <a href="/3d/printers" class="action-btn secondary"><i class="icon-server"></i> Printer Farm</a>
+    [% END %]
+</div>
+
+<h2>How It Works</h2>
+<ol>
+    <li><strong>Browse</strong> our catalog of 3D model files.</li>
+    <li><strong>Select</strong> a model and choose your filament preferences.</li>
+    <li><strong>Order</strong> — the system assigns your job to an available printer automatically, or queues it for the next available slot.</li>
+    <li><strong>Track</strong> your order status under <em>My Orders</em>.</li>
+</ol>
+
+[% ELSE %]
+
+<div class="printing-3d-notice">
+    <strong>3D Printing</strong> is not yet enabled for <strong>[% sitename || SiteName %]</strong>.
+    [% IF c.session.roles.grep('admin').size %]
+    <br>As a site admin, you can enable it under <a href="/admin">Admin</a> &rsaquo; Site Modules.
+    [% ELSE %]
+    <br>Please contact your site administrator to enable this feature.
+    [% END %]
+</div>
+
+[% END %]

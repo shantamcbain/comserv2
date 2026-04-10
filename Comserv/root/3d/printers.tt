@@ -1,0 +1,169 @@
+[% PageVersion = '3d/printers.tt,v 1.00 2026/04/10 Shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.printer-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 2em;
+}
+.printer-table th, .printer-table td {
+    padding: 0.7em 0.9em;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+    vertical-align: middle;
+    text-align: left;
+}
+.printer-table th { background: var(--table-header-bg, var(--secondary-color)); font-weight: bold; }
+.printer-table tr:last-child td { border-bottom: none; }
+.status-badge {
+    display: inline-block;
+    padding: 0.2em 0.6em;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: bold;
+    text-transform: capitalize;
+}
+.status-idle        { background: #28a745; color: white; }
+.status-printing    { background: #007bff; color: white; }
+.status-maintenance { background: #ffc107; color: #333; }
+.status-offline     { background: #6c757d; color: white; }
+.add-printer-form {
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1.2em;
+    margin-top: 1.5em;
+}
+.add-printer-form h2 { margin: 0 0 0.8em 0; font-size: 1.1em; color: var(--heading-color, var(--text-color)); }
+.form-row { display: flex; gap: 1em; flex-wrap: wrap; margin-bottom: 0.8em; }
+.form-group { flex: 1; min-width: 140px; display: flex; flex-direction: column; gap: 0.3em; }
+.form-group label { font-size: 0.9em; font-weight: bold; color: var(--text-color); }
+.form-group input, .form-group select {
+    padding: 0.4em 0.6em;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--input-bg, white);
+    color: var(--text-color);
+}
+.btn-add {
+    padding: 0.6em 1.4em;
+    background: var(--button-bg, var(--accent-color));
+    color: var(--button-text, white);
+    border: none;
+    border-radius: 4px;
+    font-size: 1em;
+    cursor: pointer;
+    font-weight: bold;
+}
+.btn-sm {
+    padding: 0.3em 0.6em;
+    font-size: 0.82em;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    color: white;
+    font-weight: bold;
+}
+.btn-maintenance { background: #ffc107; color: #333; }
+.btn-idle        { background: #28a745; }
+.btn-offline     { background: #6c757d; }
+.btn-delete      { background: #dc3545; }
+</style>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em;">
+    <h1>Printer Farm</h1>
+    <div>
+        <a href="/3d/queue" style="font-size:0.9em;">Print Queue</a> |
+        <a href="/3d/admin" style="font-size:0.9em;">Admin Dashboard</a>
+    </div>
+</div>
+
+[% IF printers && printers.size %]
+<table class="printer-table">
+    <thead>
+        <tr>
+            <th>Name</th><th>Model</th><th>Status</th>
+            <th>Nozzle</th><th>Bed Size</th><th>Notes</th><th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        [% FOREACH p IN printers %]
+        <tr>
+            <td>[% p.name | html %]</td>
+            <td>[% p.model | html %]</td>
+            <td><span class="status-badge status-[% p.status %]">[% p.status %]</span></td>
+            <td>[% p.nozzle_diameter %] mm</td>
+            <td>[% p.bed_size | html %]</td>
+            <td>[% p.notes | truncate(60) | html %]</td>
+            <td>
+                [% IF p.status != 'idle' %]
+                <form method="post" action="/3d/printers" style="display:inline;">
+                    <input type="hidden" name="action" value="update_status">
+                    <input type="hidden" name="printer_id" value="[% p.id %]">
+                    <input type="hidden" name="status" value="idle">
+                    <button type="submit" class="btn-sm btn-idle">Set Idle</button>
+                </form>
+                [% END %]
+                [% IF p.status != 'maintenance' %]
+                <form method="post" action="/3d/printers" style="display:inline;">
+                    <input type="hidden" name="action" value="update_status">
+                    <input type="hidden" name="printer_id" value="[% p.id %]">
+                    <input type="hidden" name="status" value="maintenance">
+                    <button type="submit" class="btn-sm btn-maintenance">Maintenance</button>
+                </form>
+                [% END %]
+                [% IF p.status == 'idle' %]
+                <form method="post" action="/3d/printers" style="display:inline;">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="printer_id" value="[% p.id %]">
+                    <button type="submit" class="btn-sm btn-delete"
+                        onclick="return confirm('Remove [% p.name | html %]?')">Remove</button>
+                </form>
+                [% END %]
+            </td>
+        </tr>
+        [% END %]
+    </tbody>
+</table>
+[% ELSE %]
+<div style="text-align:center;padding:2em;background:var(--secondary-color);border:1px dashed var(--border-color);border-radius:6px;color:var(--muted-color,#888);margin-bottom:1.5em;">
+    No printers in the farm yet. Add the first one below.
+</div>
+[% END %]
+
+<div class="add-printer-form">
+    <h2>Add a Printer</h2>
+    <form method="post" action="/3d/printers">
+        <input type="hidden" name="action" value="add">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Name *</label>
+                <input type="text" name="name" required placeholder="e.g. Prusa #1">
+            </div>
+            <div class="form-group">
+                <label>Model</label>
+                <input type="text" name="model" placeholder="e.g. Prusa MK4">
+            </div>
+            <div class="form-group">
+                <label>Nozzle (mm)</label>
+                <input type="number" name="nozzle_diameter" value="0.40" step="0.01" min="0.1" max="2.0">
+            </div>
+            <div class="form-group">
+                <label>Bed Size</label>
+                <input type="text" name="bed_size" placeholder="e.g. 250x210mm">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group" style="flex:2;">
+                <label>Notes</label>
+                <input type="text" name="notes" placeholder="Any notes about this printer">
+            </div>
+        </div>
+        <button type="submit" class="btn-add">Add Printer</button>
+    </form>
+</div>

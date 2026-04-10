@@ -424,6 +424,18 @@ sub auto :Private {
                 "Navigation controller not found - menus will be empty");
         }
         
+        # Load enabled site modules into stash (used by navigation templates)
+        eval {
+            my $schema = $c->model('DBEncy');
+            my @mods = $schema->resultset('SiteModule')->search(
+                { sitename => $site_name, enabled => 1 }
+            )->all;
+            my %mod_map;
+            for my $m (@mods) { $mod_map{ $m->module_name } = 1; }
+            $c->stash->{enabled_modules} = \%mod_map;
+        };
+        $c->stash->{enabled_modules} ||= {};
+
         # CRITICAL: Debug Bar Implementation - DO NOT REMOVE
         # This section provides server information for the debug bar UI
         # which displays hostname, IP, and database connection info to admins/debug mode.
