@@ -369,9 +369,10 @@ sub log_with_details {
     }
     my $log_message = sprintf("[%s] [%s] [%s:%d] %s - %s%s", $timestamp, $system_id, $file, $line, ($subroutine // 'unknown'), $message, $_req_suffix);
 
-    # Add to debug_errors in stash if Catalyst context is available
-    # But avoid calling $c->log methods to prevent recursion
-    if ($c && ref($c) && ref($c->stash) eq 'HASH') {
+    # Add to debug_errors in stash only when debug_mode is active
+    if ($c && ref($c) && ref($c->stash) eq 'HASH'
+        && $c->can('session') && $c->session
+        && ($c->session->{debug_mode} // 0) == 1) {
         my $debug_errors = $c->stash->{debug_errors} ||= [];
         push @$debug_errors, $log_message;
     }
@@ -447,9 +448,10 @@ sub log_error {
     # Pass 'ERROR' level explicitly
     log_to_file($log_message, undef, 'ERROR');
 
-    # Add to debug_errors in stash if Catalyst context is available
-    # But avoid calling $c->log methods to prevent recursion
-    if ($c && ref($c) && ref($c->stash) eq 'HASH') {
+    # Add to debug_errors in stash only when debug_mode is active
+    if ($c && ref($c) && ref($c->stash) eq 'HASH'
+        && $c->can('session') && $c->session
+        && ($c->session->{debug_mode} // 0) == 1) {
         my $debug_errors = $c->stash->{debug_errors} ||= [];
         push @$debug_errors, $log_message;
     }
