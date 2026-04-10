@@ -44,8 +44,8 @@
         <!-- HelpDesk Menu -->
         [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
         
-        <!-- Apiary Menu (only for BMaster site) -->
-        [% IF c.session.SiteName == 'BMaster' %]
+        <!-- Apiary Menu (site_modules enabled_modules.apiary or BMaster fallback) -->
+        [% IF c.stash.enabled_modules.apiary || (!c.stash.enabled_modules.defined && c.session.SiteName == 'BMaster') %]
             <li class="horizontal-dropdown">
                 <a href="/Apiary" class="dropbtn"><i class="icon-apiary"></i>Apiary</a>
                 <div class="dropdown-content">
