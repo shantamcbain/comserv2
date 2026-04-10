@@ -116,6 +116,18 @@ sub items :Path('/Inventory/items') :Args(0) {
     );
 }
 
+sub _load_coa_accounts {
+    my ($self, $c) = @_;
+    my @accounts;
+    eval {
+        @accounts = $self->_schema($c)->resultset('CoaAccount')->search(
+            { obsolete => 0 },
+            { prefetch => 'heading', order_by => 'accno' }
+        );
+    };
+    return \@accounts;
+}
+
 sub item_view :Path('/Inventory/item/view') :Args(1) {
     my ($self, $c, $id) = @_;
 
@@ -129,7 +141,11 @@ sub item_view :Path('/Inventory/item/view') :Args(1) {
     eval {
         $item = $schema->resultset('InventoryItem')->find(
             { id => $id },
-            { prefetch => ['stock_levels', 'item_suppliers', 'assignments'] }
+            { prefetch => [
+                'stock_levels', 'item_suppliers', 'assignments',
+                'inventory_account', 'income_account', 'expense_account', 'returns_account',
+                'bom_components',
+            ]}
         );
     };
     if ($@ || !$item) {
@@ -142,7 +158,7 @@ sub item_view :Path('/Inventory/item/view') :Args(1) {
     eval {
         @transactions = $schema->resultset('InventoryTransaction')->search(
             { item_id => $id },
-            { order_by => { -desc => 'transaction_date' }, rows => 20 }
+            { prefetch => ['location', 'gl_entry'], order_by => { -desc => 'transaction_date' }, rows => 20 }
         );
     };
 
@@ -169,20 +185,26 @@ sub item_add :Path('/Inventory/item/add') :Args(0) {
 
         eval {
             $schema->resultset('InventoryItem')->create({
-                sitename         => $sitename,
-                sku              => $params->{sku},
-                name             => $params->{name},
-                description      => $params->{description},
-                category         => $params->{category},
-                unit_of_measure  => $params->{unit_of_measure} || 'each',
-                unit_cost        => $params->{unit_cost} || undef,
-                reorder_point    => $params->{reorder_point} || 0,
-                reorder_quantity => $params->{reorder_quantity} || 0,
-                status           => $params->{status} || 'active',
-                notes            => $params->{notes},
-                created_by       => $c->session->{username} || 'system',
-                created_at       => $now,
-                updated_at       => $now,
+                sitename            => $sitename,
+                sku                 => $params->{sku},
+                name                => $params->{name},
+                description         => $params->{description},
+                category            => $params->{category},
+                item_origin         => $params->{item_origin} || 'purchased',
+                is_assemblable      => $params->{is_assemblable} ? 1 : 0,
+                unit_of_measure     => $params->{unit_of_measure} || 'each',
+                unit_cost           => $params->{unit_cost} || undef,
+                reorder_point       => $params->{reorder_point} || 0,
+                reorder_quantity    => $params->{reorder_quantity} || 0,
+                status              => $params->{status} || 'active',
+                notes               => $params->{notes},
+                inventory_accno_id  => $params->{inventory_accno_id} || undef,
+                income_accno_id     => $params->{income_accno_id}    || undef,
+                expense_accno_id    => $params->{expense_accno_id}   || undef,
+                returns_accno_id    => $params->{returns_accno_id}   || undef,
+                created_by          => $c->session->{username} || 'system',
+                created_at          => $now,
+                updated_at          => $now,
             });
         };
         if ($@) {
@@ -195,8 +217,9 @@ sub item_add :Path('/Inventory/item/add') :Args(0) {
     }
 
     $c->stash(
-        sitename => $sitename,
-        template => 'Inventory/items/add.tt',
+        sitename     => $sitename,
+        coa_accounts => $self->_load_coa_accounts($c),
+        template     => 'Inventory/items/add.tt',
     );
 }
 
@@ -221,17 +244,23 @@ sub item_edit :Path('/Inventory/item/edit') :Args(1) {
         my $params = $c->req->body_parameters;
         eval {
             $item->update({
-                sku              => $params->{sku},
-                name             => $params->{name},
-                description      => $params->{description},
-                category         => $params->{category},
-                unit_of_measure  => $params->{unit_of_measure} || 'each',
-                unit_cost        => $params->{unit_cost} || undef,
-                reorder_point    => $params->{reorder_point} || 0,
-                reorder_quantity => $params->{reorder_quantity} || 0,
-                status           => $params->{status} || 'active',
-                notes            => $params->{notes},
-                updated_at       => $self->_now(),
+                sku                => $params->{sku},
+                name               => $params->{name},
+                description        => $params->{description},
+                category           => $params->{category},
+                item_origin        => $params->{item_origin} || 'purchased',
+                is_assemblable     => $params->{is_assemblable} ? 1 : 0,
+                unit_of_measure    => $params->{unit_of_measure} || 'each',
+                unit_cost          => $params->{unit_cost} || undef,
+                reorder_point      => $params->{reorder_point} || 0,
+                reorder_quantity   => $params->{reorder_quantity} || 0,
+                status             => $params->{status} || 'active',
+                notes              => $params->{notes},
+                inventory_accno_id => $params->{inventory_accno_id} || undef,
+                income_accno_id    => $params->{income_accno_id}    || undef,
+                expense_accno_id   => $params->{expense_accno_id}   || undef,
+                returns_accno_id   => $params->{returns_accno_id}   || undef,
+                updated_at         => $self->_now(),
             });
         };
         if ($@) {
@@ -244,9 +273,10 @@ sub item_edit :Path('/Inventory/item/edit') :Args(1) {
     }
 
     $c->stash(
-        item     => $item,
-        sitename => $sitename,
-        template => 'Inventory/items/edit.tt',
+        item         => $item,
+        sitename     => $sitename,
+        coa_accounts => $self->_load_coa_accounts($c),
+        template     => 'Inventory/items/edit.tt',
     );
 }
 
@@ -358,7 +388,7 @@ sub supplier_edit :Path('/Inventory/supplier/edit') :Args(1) {
     my $schema   = $self->_schema($c);
 
     my $supplier;
-    eval { $supplier = $schema->resultset('InventorySupplier')->find($id) };
+    eval { $supplier = $schema->resultset('InventorySupplier')->find({ id => $id, sitename => $sitename }) };
     if ($@ || !$supplier) {
         $c->stash->{error_msg} = 'Supplier not found';
         $c->res->redirect($c->uri_for('/Inventory/suppliers'));
@@ -403,9 +433,10 @@ sub supplier_delete :Path('/Inventory/supplier/delete') :Args(1) {
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'supplier_delete', "Delete supplier $id");
 
-    my $schema = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
     eval {
-        my $supplier = $schema->resultset('InventorySupplier')->find($id);
+        my $supplier = $schema->resultset('InventorySupplier')->find({ id => $id, sitename => $sitename });
         $supplier->update({ status => 'inactive', updated_at => $self->_now() }) if $supplier;
     };
     if ($@) {
@@ -502,7 +533,7 @@ sub location_edit :Path('/Inventory/location/edit') :Args(1) {
     my $schema   = $self->_schema($c);
 
     my $location;
-    eval { $location = $schema->resultset('InventoryLocation')->find($id) };
+    eval { $location = $schema->resultset('InventoryLocation')->find({ id => $id, sitename => $sitename }) };
     if ($@ || !$location) {
         $c->stash->{error_msg} = 'Location not found';
         $c->res->redirect($c->uri_for('/Inventory/locations'));
@@ -564,6 +595,7 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
         my $qty      = $params->{quantity};
         my $type     = $params->{transaction_type};
         my $now      = $self->_now();
+        my $today    = substr($now, 0, 10);
 
         eval {
             $schema->txn_do(sub {
@@ -573,15 +605,64 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
                 );
 
                 my $new_qty = $stock->quantity_on_hand;
-                if ($type eq 'receive' || $type eq 'adjust_up') {
+                if ($type eq 'receive' || $type eq 'adjust_up' || $type eq 'produce' || $type eq 'harvest') {
                     $new_qty += $qty;
-                } elsif ($type eq 'issue' || $type eq 'adjust_down') {
+                } elsif ($type eq 'issue' || $type eq 'adjust_down' || $type eq 'consume' || $type eq 'forage') {
                     $new_qty -= $qty;
                 } else {
                     $new_qty += $qty;
                 }
 
                 $stock->update({ quantity_on_hand => $new_qty, updated_at => $now });
+
+                # Generate GL entry if item has COA accounts linked
+                my $gl_entry_id;
+                my $item_rec = $schema->resultset('InventoryItem')->find($item_id);
+                if ($item_rec && ($item_rec->inventory_accno_id || $item_rec->expense_accno_id)) {
+                    my $unit_cost  = $params->{unit_cost} || $item_rec->unit_cost || 0;
+                    my $value      = $qty * $unit_cost;
+                    my $ref        = 'INV-' . $item_id . '-' . time();
+                    my $gl = $schema->resultset('GlEntry')->create({
+                        reference   => $ref,
+                        description => ucfirst($type) . ': ' . ($item_rec->name || "Item $item_id") . " x$qty",
+                        entry_type  => 'inventory',
+                        post_date   => $today,
+                        approved    => 1,
+                        currency    => 'CAD',
+                        sitename    => $sitename,
+                        entered_by  => $c->session->{user_id} || undef,
+                    });
+                    $gl_entry_id = $gl->id;
+
+                    if ($value != 0) {
+                        my ($dr_acct, $cr_acct);
+                        if ($type eq 'receive' || $type eq 'adjust_up' || $type eq 'produce' || $type eq 'harvest') {
+                            $dr_acct = $item_rec->inventory_accno_id;
+                            $cr_acct = $item_rec->expense_accno_id || $item_rec->inventory_accno_id;
+                        } else {
+                            $dr_acct = $item_rec->expense_accno_id || $item_rec->inventory_accno_id;
+                            $cr_acct = $item_rec->inventory_accno_id;
+                        }
+                        if ($dr_acct) {
+                            $schema->resultset('GlEntryLine')->create({
+                                gl_entry_id => $gl_entry_id,
+                                account_id  => $dr_acct,
+                                amount      => $value,
+                                memo        => ucfirst($type) . " $qty units",
+                                sort_order  => 1,
+                            });
+                        }
+                        if ($cr_acct && $cr_acct != ($dr_acct || 0)) {
+                            $schema->resultset('GlEntryLine')->create({
+                                gl_entry_id => $gl_entry_id,
+                                account_id  => $cr_acct,
+                                amount      => -$value,
+                                memo        => ucfirst($type) . " $qty units",
+                                sort_order  => 2,
+                            });
+                        }
+                    }
+                }
 
                 $schema->resultset('InventoryTransaction')->create({
                     item_id          => $item_id,
@@ -591,6 +672,7 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
                     unit_cost        => $params->{unit_cost} || undef,
                     reference_number => $params->{reference_number},
                     todo_id          => $params->{todo_id} || undef,
+                    gl_entry_id      => $gl_entry_id || undef,
                     sitename         => $sitename,
                     notes            => $params->{notes},
                     performed_by     => $c->session->{username} || 'system',
