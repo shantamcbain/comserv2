@@ -57,6 +57,13 @@ __PACKAGE__->register_class('InternalCurrencyTransaction', 'Comserv::Model::Sche
 # Register Beekeeping hive component tracking
 __PACKAGE__->register_class('HiveComponent', 'Comserv::Model::Schema::Ency::Result::HiveComponent');
 
+# Register Chart of Accounts and General Ledger classes
+# (modeled on SQL-Ledger / LedgerSMB account + journal_entry + journal_line)
+__PACKAGE__->register_class('CoaAccountHeading', 'Comserv::Model::Schema::Ency::Result::CoaAccountHeading');
+__PACKAGE__->register_class('CoaAccount',        'Comserv::Model::Schema::Ency::Result::CoaAccount');
+__PACKAGE__->register_class('GlEntry',           'Comserv::Model::Schema::Ency::Result::GlEntry');
+__PACKAGE__->register_class('GlEntryLine',       'Comserv::Model::Schema::Ency::Result::GlEntryLine');
+
 # Register Inventory system classes
 __PACKAGE__->register_class('InventoryItem', 'Comserv::Model::Schema::Ency::Result::InventoryItem');
 __PACKAGE__->register_class('InventorySupplier', 'Comserv::Model::Schema::Ency::Result::InventorySupplier');

@@ -44,6 +44,11 @@ __PACKAGE__->add_columns(
         data_type   => 'integer',
         is_nullable => 1,
     },
+    gl_entry_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+        comment     => 'FK → gl_entries — the double-entry journal record for this stock movement',
+    },
     sitename => {
         data_type   => 'varchar',
         size        => 255,
@@ -88,5 +93,16 @@ __PACKAGE__->belongs_to(
     { 'foreign.record_id' => 'self.todo_id' },
     { join_type => 'LEFT' }
 );
+
+__PACKAGE__->belongs_to(
+    'gl_entry' => 'Comserv::Model::Schema::Ency::Result::GlEntry',
+    { 'foreign.id' => 'self.gl_entry_id' },
+    { join_type => 'LEFT', on_delete => 'SET NULL' }
+);
+
+sub total_value {
+    my $self = shift;
+    return ($self->quantity || 0) * ($self->unit_cost || 0);
+}
 
 1;
