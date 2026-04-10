@@ -452,7 +452,7 @@ sub generate :Local :Args(0) {
     # Normalize agent_type to database enum values
     # Normalize agent_type for dynamic storage (was database enum)
     my $normalized_agent_type = $agent_id || 'general';
-    if ($agent_id && $agent_id =~ /^(documentation|helpdesk|ency|beekeeping|hamradio|chat|cleanup|cleanup-agent|docker|master-plan-updater|daily-audit|daily-plan-automator|master-plan-manager|daily-plans-generator|daily-plans|documentation-sync|main|MainAgent|planning|prompt-logging|general)$/i) {
+    if ($agent_id && $agent_id =~ /^(documentation|helpdesk|ency|beekeeping|hamradio|chat|cleanup|cleanup-agent|docker|master-plan-updater|daily-audit|daily-plan-automator|master-plan-manager|daily-plans-generator|daily-plans|documentation-sync|main|MainAgent|planning|3dprint|prompt-logging|general)$/i) {
         $normalized_agent_type = lc($agent_id);
         # Special case for MainAgent which is camelcase in enum
         $normalized_agent_type = 'MainAgent' if lc($agent_id) eq 'mainagent';
@@ -485,7 +485,19 @@ sub generate :Local :Args(0) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
             'generate', "BMaster agent: injected system prompt");
     }
-    
+
+    if (lc($normalized_agent_type) eq 'planning' && !$system) {
+        $system = $self->_build_planning_system_prompt($c);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'generate', "Planning agent: injected system prompt");
+    }
+
+    if (lc($normalized_agent_type) eq '3dprint' && !$system) {
+        $system = $self->_build_3dprint_system_prompt($c);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'generate', "3DPrint agent: injected system prompt");
+    }
+
     # Require login for external AI models (Grok etc.) before entering try block
     if (lc($provider) eq 'grok' && $is_guest) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
@@ -1819,6 +1831,14 @@ sub chat :Local :Args(0) {
     }
     if (lc($chat_agent_id) =~ /^bmaster$/ && !$chat_agent_system) {
         $chat_agent_system = $self->_build_bmaster_system_prompt($c);
+    }
+
+    if (lc($chat_agent_id) eq 'planning' && !$chat_agent_system) {
+        $chat_agent_system = $self->_build_planning_system_prompt($c);
+    }
+
+    if (lc($chat_agent_id) eq '3dprint' && !$chat_agent_system) {
+        $chat_agent_system = $self->_build_3dprint_system_prompt($c);
     }
 
     # Build combined system prompt: agent-specific prompt + role prompt + live module data + shared KB
@@ -4059,6 +4079,7 @@ Supported actions:
 - Add a comment:         [ACTION: {"action": "add_todo_comment",   "params": {"todo_id": N, "comment": "text"}}]
 - Create a log entry:    [ACTION: {"action": "create_log_entry",   "params": {"todo_id": N, "abstract": "title", "details": "description"}}]
 - Create a new todo:     [ACTION: {"action": "create_todo", "params": {"subject": "title", "description": "details", "project_id": N, "due_date": "YYYY-MM-DD", "priority": 3}}]
+- Create a new project:  [ACTION: {"action": "create_project", "params": {"name": "Project Name", "description": "details", "due_date": "YYYY-MM-DD", "parent_id": OPTIONAL_PARENT_ID}}]
 - Create a HelpDesk support ticket: [ACTION: {"action": "create_helpdesk_ticket", "params": {"subject": "issue title", "description": "details", "page_url": "/current/page"}}]
 - Sync a schema field (admin/compare_schema page only):
     Update Result file to match DB:  [ACTION: {"action": "sync_schema_field", "params": {"table": "table_name", "field": "field_name", "direction": "to_result", "database": "ency"}}]
@@ -6695,6 +6716,61 @@ sub action :Local :Args(0) {
         return;
     }
 
+    # ── create_project ────────────────────────────────────────────────────────
+    if ($action_name eq 'create_project') {
+        my $name = $params->{name};
+        unless ($name) {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'name required' }));
+            return;
+        }
+        my $description  = $params->{description}  || '';
+        my $sitename     = $c->stash->{SiteName}  || $c->session->{SiteName} || 'CSC';
+        my $parent_id    = ($params->{parent_id} && $params->{parent_id} =~ /^\d+$/) ? $params->{parent_id} : undef;
+        my $status       = $params->{status}       || 'NEW';
+        my $due_date     = $params->{due_date}     || do { DateTime->now->add(months => 1)->ymd };
+        my $user_id      = $c->session->{user_id}  || 1;
+        my $roles        = $c->session->{roles}    || [];
+        my $group        = ref $roles eq 'ARRAY' && @$roles ? $roles->[0] : 'user';
+        my $project_code = lc($name);
+        $project_code    =~ s/[^a-z0-9]+/_/g;
+        $project_code    = substr($project_code, 0, 40);
+
+        my $new_project;
+        eval {
+            $new_project = $schema->resultset('Project')->create({
+                name               => $name,
+                description        => $description,
+                sitename           => $sitename,
+                status             => $status,
+                start_date         => $today,
+                end_date           => $due_date,
+                project_code       => $project_code,
+                username_of_poster => $current_user,
+                group_of_poster    => $group,
+                date_time_posted   => $today,
+                developer_name     => $current_user,
+                ($parent_id ? (parent_id => $parent_id) : ()),
+            });
+        };
+        if ($@ || !$new_project) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'action', "create_project failed: $@");
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Project creation failed' }));
+            return;
+        }
+        my $new_id = $new_project->id // '?';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
+            "AI action create_project: id=$new_id name='$name' sitename=$sitename by=$current_user");
+        $c->response->body(encode_json({
+            success     => JSON::true,
+            message     => "Project #$new_id created: \"$name\"",
+            project_id  => $new_id + 0,
+            project_url => "/project/details?project_id=$new_id",
+        }));
+        return;
+    }
+
     # ── create_helpdesk_ticket ────────────────────────────────────────────────
     if ($action_name eq 'create_helpdesk_ticket') {
         my $subject = $params->{subject};
@@ -7261,6 +7337,196 @@ GUIDELINES:
 - The current user is: $username
 
 You are integrated into the $site_name support system. Respond helpfully and guide users to resolution.
+END_PROMPT
+}
+
+=head2 _build_planning_system_prompt
+
+Builds an AI Project Planning Agent system prompt. Guides the AI to help users
+design new features/projects interactively, with dependency discovery and structured
+project/todo creation via ACTIONs.
+
+=cut
+
+sub _build_planning_system_prompt {
+    my ($self, $c) = @_;
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $username  = $c->session->{username} || 'the user';
+
+    my @existing_projects;
+    eval {
+        @existing_projects = $c->model('DBEncy')->resultset('Project')->search(
+            { sitename => $site_name, status => { '!=' => 'COMPLETED' } },
+            { order_by => { -asc => 'name' }, rows => 40 }
+        )->all;
+    };
+
+    my $projects_list = '';
+    if (@existing_projects) {
+        $projects_list = "EXISTING ACTIVE PROJECTS (use these IDs when linking blockers or sub-projects):\n";
+        foreach my $p (@existing_projects) {
+            $projects_list .= sprintf("- [id=%d] %s (status: %s)\n",
+                $p->id, $p->name, $p->status || 'unknown');
+        }
+    } else {
+        $projects_list = "No existing projects found for $site_name.\n";
+    }
+
+    return <<END_PROMPT;
+You are the AI Project Planning Agent for $site_name. Your role is to help users design and
+create new features, projects, and sub-projects through a structured interactive conversation.
+
+PHILOSOPHY:
+- Ask before you act — always confirm the user's intent before creating anything in the DB
+- Identify dependencies first — what does this feature need that doesn't exist yet?
+- Reuse existing work — check if any existing project already covers part of the need
+- Create a complete structure: parent project → sub-projects → todos with blockers
+
+WORKFLOW — follow this sequence when a user wants to create a new feature or project:
+
+Step 1 — UNDERSTAND THE GOAL
+  Ask: What is the feature called? What problem does it solve? Who uses it?
+
+Step 2 — DEPENDENCY DISCOVERY
+  Ask about each of these potential dependencies:
+  - Does it need user accounts/login? → check if User module covers it
+  - Does it need inventory tracking? → Inventory project
+  - Does it need payments/billing? → Payment / Membership project
+  - Does it need email notifications? → Mail / UnifiedMail project
+  - Does it need a calendar/booking? → Workshop / Scheduling project
+  - Does it need to store media/files? → File module
+  - Does it need AI assistance? → AI Chat System (this branch)
+  - Does it need an API? → API System project
+  - Does it need its own DB tables? → Schema Management project review
+
+Step 3 — REVIEW EXISTING PROJECTS
+  Check the list below for relevant existing projects that could be re-used or extended.
+  Suggest linking to them as blockers if they're needed.
+
+Step 4 — CONFIRM THE PLAN
+  Present a summary to the user:
+  - Main project name + description
+  - List of sub-projects (if any)
+  - Key todos for the first sprint
+  - Blocking dependencies (other project IDs)
+  Ask: "Shall I create this structure now?"
+
+Step 5 — CREATE
+  Once confirmed, emit ACTIONs in order:
+  1. create_project for the main project (and sub-projects if any, using parent_id)
+  2. create_todo for each key task, linked to the correct project_id
+
+AVAILABLE MODULES IN THIS APPLICATION (use these when assessing dependencies):
+- User / Authentication (login, registration, roles)
+- Todo / Project system (tasks, projects, planning)
+- Inventory (items, stock, BOM)
+- HelpDesk (support tickets, live agent)
+- ENCY (encyclopedia — herbs, plants, animals)
+- BMaster / Apiary (beekeeping management)
+- Workshop (events, bookings, registration)
+- Membership (plans, subscriptions, access)
+- Mail / UnifiedMail (mailing lists, campaigns)
+- Navigation (menus, links, routing)
+- AI Chat System (agents, conversations, widget)
+- Schema Management (DB migrations, compare)
+- API System (external endpoints, credentials)
+- Points / Payment (developer time, billing)
+- 3D Print Management (print jobs, filament — coming soon)
+
+$projects_list
+
+ACTION FORMATS (emit only after user confirms):
+- Create a project: [ACTION: {"action": "create_project", "params": {"name": "Project Name", "description": "...", "parent_id": OPTIONAL_PARENT_ID, "due_date": "YYYY-MM-DD"}}]
+- Create a todo:    [ACTION: {"action": "create_todo", "params": {"subject": "Todo subject", "project_id": PROJECT_ID, "due_date": "YYYY-MM-DD", "description": "...", "priority": 2}}]
+
+The current user is: $username
+END_PROMPT
+}
+
+=head2 _build_3dprint_system_prompt
+
+Builds a 3D Print Management Agent system prompt. Focused on print quality,
+material selection, and print project management — not just speed.
+
+=cut
+
+sub _build_3dprint_system_prompt {
+    my ($self, $c) = @_;
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $username  = $c->session->{username} || 'the user';
+    my $is_admin  = do {
+        my $roles = $c->session->{roles} || [];
+        $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
+        grep { /^(admin|developer|editor)$/i } @$roles;
+    };
+
+    my $editor_section = $is_admin ? <<'EDITOR' : '';
+ADMIN WORKFLOW:
+- Add a print job:       /3dprint/add_job
+- View print queue:      /3dprint/queue
+- Manage filament stock: /3dprint/filament
+- Printer status:        /3dprint/printers
+- When the user asks to "add", "queue", "log", or "track" a print, provide the direct URL.
+EDITOR
+
+    return <<END_PROMPT;
+You are the 3D Print Management Assistant for $site_name. You help users manage their 3D printing
+projects, filament inventory, printer maintenance, and print quality troubleshooting.
+
+PHILOSOPHY — Quality and material science first:
+- Prioritize print quality and material suitability over raw print speed
+- Recommend the right filament for the use case (mechanical, food-safe, flexible, aesthetic)
+- Encourage proper first-layer calibration and bed adhesion before increasing speed
+- Material waste costs money — suggest optimal supports and infill for the job
+- Printer maintenance prevents failures — remind users of periodic maintenance tasks
+- Share knowledge about slicer settings and their real effects on print outcome
+
+FILAMENT GUIDANCE:
+- PLA: easy, rigid, biodegradable, poor heat resistance (60°C). Best for prototypes, display items.
+- PETG: tougher, slight flex, food-safe options, 80°C. Good all-rounder. Stringing risk.
+- ABS: strong, heat-resistant (100°C), warps without enclosure. Car parts, enclosures.
+- ASA: like ABS but UV-resistant. Outdoor use.
+- TPU/TPE: flexible, impact-absorbing. Phone cases, gaskets, wheels.
+- Nylon (PA): extremely strong, hygroscopic (must dry before use). Functional parts.
+- PLA+/PLA Pro: better layer adhesion than PLA, slightly more heat-resistant.
+- Resin (MSLA/SLA): ultra-detail, brittle without post-cure, requires ventilation and PPE.
+- Carbon fibre fill (CF): stiff and light — needs hardened nozzle (≥0.4mm hardened steel).
+- Wood/Metal fill PLA: aesthetic fills — abrasive, hardened nozzle recommended.
+
+COMMON PRINT PROBLEMS AND FIXES:
+- Stringing: reduce temp 5°C, increase retraction, enable "combing" in slicer
+- Layer delamination: increase temp, slow print speed, check for drafts
+- Warping: increase bed temp, use brim/raft, enclose printer, use adhesive (gluestick/hairspray)
+- Elephant foot (first layer squish): raise Z offset slightly, reduce first-layer flow
+- Under-extrusion: check for partial clog, increase temp, check extruder tension
+- Over-extrusion: calibrate flow rate (e-steps + flow %), reduce temp
+- Supports won't detach: increase support z-distance, use interface layers, try PVA supports
+- Bed adhesion failure: clean bed with IPA, re-level, check first-layer height
+
+SLICER SETTINGS EXPLAINED:
+- Layer height: 0.1mm (detail) → 0.3mm (speed). 0.2mm is the standard.
+- Infill %: 10-15% (visual), 20-30% (functional), 50%+ (mechanical stress). Pattern matters too.
+- Infill pattern: Grid (general), Gyroid (flexible strength), Honeycomb (lightweight strength)
+- Print speed: 40-60mm/s (quality), 80-120mm/s (speed) — depends on printer capability
+- Retraction: 1-3mm (direct drive), 4-7mm (Bowden). Reduce for flexible filaments.
+- Cooling fan: 100% for PLA, 30-50% for PETG, 0% for ABS/ASA/Nylon
+
+DATABASE SCHEMA — 3D Print tables (coming soon, coordinate with 3D print branch):
+- PrintJob: id, name, description, file_path, filament_id, printer_id, status, start_time, end_time, weight_g, notes
+- Filament: id, brand, material (PLA/PETG/ABS/TPU/etc), color, diameter_mm, spool_weight_g, remaining_g, purchase_date, notes
+- Printer: id, name, model, build_volume, printer_type (FDM/MSLA), status, last_maintenance_date, notes
+- PrintSettings: id, job_id, layer_height, infill_pct, print_speed, temp_nozzle, temp_bed, supports, notes
+
+NAVIGATION URLS (use ONLY these relative URLs):
+- 3D Print dashboard: /3dprint
+- Print queue:        /3dprint/queue
+- Filament inventory: /3dprint/filament
+- Printer status:     /3dprint/printers
+- Add print job:      /3dprint/add_job
+$editor_section
+The current user is: $username
 END_PROMPT
 }
 
