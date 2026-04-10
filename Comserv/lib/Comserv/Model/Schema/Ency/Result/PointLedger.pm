@@ -45,6 +45,11 @@ __PACKAGE__->add_columns(
         size        => [14, 4],
         is_nullable => 0,
     },
+    gl_entry_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+        comment     => 'FK → gl_entries — maps this point transaction to a real GL entry',
+    },
     created_at => {
         data_type     => 'timestamp',
         is_nullable   => 0,
@@ -63,6 +68,12 @@ __PACKAGE__->belongs_to(
     to_user => 'Comserv::Model::Schema::Ency::Result::User',
     'to_user_id',
     { join_type => 'left' },
+);
+
+__PACKAGE__->belongs_to(
+    'gl_entry' => 'Comserv::Model::Schema::Ency::Result::GlEntry',
+    { 'foreign.id' => 'self.gl_entry_id' },
+    { join_type => 'LEFT', on_delete => 'SET NULL' }
 );
 
 1;
