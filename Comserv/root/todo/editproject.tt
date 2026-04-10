@@ -50,6 +50,11 @@ Edit Project
 
     <input type="submit" value="Update Project [% project.name %]">
 </form>
+[% PROCESS 'ai/partials/ai_form_assistant.tt'
+   ai_form_entity_label = 'project'
+   ai_form_context      = 'project management'
+   ai_form_fields       = 'name, description, status, comments'
+%]
 <script>
 function openAddSiteForm() {
     var url = window.location.origin + '/site/add_site_form';
