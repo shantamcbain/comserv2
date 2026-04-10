@@ -1,4 +1,4 @@
-[% PageVersion = 'Inventory/items/view.tt,v 0.01 2026/03/30 shanta Exp' %]
+[% PageVersion = 'Inventory/items/view.tt,v 0.02 2026/04/10 shanta Exp' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <h1>Item: [% item.name %]</h1>
@@ -18,6 +18,8 @@
   <tr><th>SKU</th><td>[% item.sku %]</td></tr>
   <tr><th>Name</th><td>[% item.name %]</td></tr>
   <tr><th>Category</th><td>[% item.category || '-' %]</td></tr>
+  <tr><th>Origin</th><td>[% item.item_origin || '-' %]</td></tr>
+  <tr><th>Has BOM?</th><td>[% item.is_assemblable ? 'Yes' : 'No' %]</td></tr>
   <tr><th>Description</th><td>[% item.description || '-' %]</td></tr>
   <tr><th>Unit of Measure</th><td>[% item.unit_of_measure %]</td></tr>
   <tr><th>Unit Cost</th><td>[% item.unit_cost ? item.unit_cost : '-' %]</td></tr>
@@ -26,6 +28,26 @@
   <tr><th>Status</th><td>[% item.status %]</td></tr>
   <tr><th>Notes</th><td>[% item.notes || '-' %]</td></tr>
   <tr><th>Created By</th><td>[% item.created_by || '-' %]</td></tr>
+</table>
+
+<h2>Accounting Links</h2>
+<table border="1" cellpadding="4">
+  <tr>
+    <th>Stock / Asset Account</th>
+    <td>[% item.inventory_account ? item.inventory_account.accno _ ' — ' _ item.inventory_account.description : '—' %]</td>
+  </tr>
+  <tr>
+    <th>Sales / Income Account</th>
+    <td>[% item.income_account ? item.income_account.accno _ ' — ' _ item.income_account.description : '—' %]</td>
+  </tr>
+  <tr>
+    <th>COGS / Expense Account</th>
+    <td>[% item.expense_account ? item.expense_account.accno _ ' — ' _ item.expense_account.description : '—' %]</td>
+  </tr>
+  <tr>
+    <th>Returns Account</th>
+    <td>[% item.returns_account ? item.returns_account.accno _ ' — ' _ item.returns_account.description : '—' %]</td>
+  </tr>
 </table>
 
 <h2>Stock Levels</h2>
@@ -52,6 +74,25 @@
       <td>[% sl.quantity_on_order %]</td>
       <td>[% sl.quantity_on_hand - sl.quantity_reserved %]</td>
       <td>[% sl.last_count_date || '-' %]</td>
+    </tr>
+  [% END %]
+  </tbody>
+</table>
+[% END %]
+
+[% IF item.bom_components.count %]
+<h2>Bill of Materials (Components)</h2>
+<table border="1" cellpadding="4">
+  <thead>
+    <tr><th>Component</th><th>Quantity</th><th>Unit</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+  [% FOREACH comp IN item.bom_components %]
+    <tr>
+      <td><a href="/Inventory/item/view/[% comp.component_item_id %]">[% comp.component.name || comp.component_item_id %]</a></td>
+      <td>[% comp.quantity %]</td>
+      <td>[% comp.unit_of_measure || '-' %]</td>
+      <td>[% comp.notes || '-' %]</td>
     </tr>
   [% END %]
   </tbody>
@@ -94,8 +135,11 @@
       <th>Date</th>
       <th>Type</th>
       <th>Qty</th>
+      <th>Unit Cost</th>
+      <th>Value</th>
       <th>Location</th>
       <th>Reference</th>
+      <th>GL Entry</th>
       <th>By</th>
       <th>Notes</th>
     </tr>
@@ -106,8 +150,15 @@
       <td>[% tx.transaction_date %]</td>
       <td>[% tx.transaction_type %]</td>
       <td>[% tx.quantity %]</td>
+      <td>[% tx.unit_cost || '-' %]</td>
+      <td>[% tx.unit_cost ? tx.total_value : '-' %]</td>
       <td>[% tx.location ? tx.location.name : '-' %]</td>
       <td>[% tx.reference_number || '-' %]</td>
+      <td>
+        [% IF tx.gl_entry %]
+          <a href="/Accounting/gl/view/[% tx.gl_entry_id %]">[% tx.gl_entry.reference %]</a>
+        [% ELSE %]—[% END %]
+      </td>
       <td>[% tx.performed_by || '-' %]</td>
       <td>[% tx.notes || '-' %]</td>
     </tr>
