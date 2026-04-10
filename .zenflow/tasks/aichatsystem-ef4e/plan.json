@@ -14,36 +14,47 @@
     },
     {
       "id": "eb76e394-31c8-4839-abd7-9c351396e7b3",
-      "name": "Test all implemented features at port 4002",
-      "description": "User must test the following at workstation.local:4002 and shanta.local:4002: (1) Chat widget visible on Shanta site with black border, (2) Thinking trace visible on all responses, (3) Errors saved to conversation history, (4) Model keep-alive 2h (no cold-start on warm models), (5) create_todo AI action works when AI is asked to create a todo.",
-      "status": "Pending",
+      "name": "Planning integration + Schema Compare AI + Grok 410 fix",
+      "description": "COMPLETED: project_id/task_id/model on ai_conversations; _build_project_context injected into AI prompt; AI activity panels on todo/project/day templates; project_conversations endpoint (project+task); schema_compare guided fix with sync_schema_field ACTION; Grok pre-flight deprecated-model check; chain_query in Ollama.pm; branch merged with main.",
+      "status": "Completed",
       "sort_order": 1,
       "start_new_chat": false,
       "stop_after_completion": false,
       "created_at": "2026-04-01T06:06:11.607642862Z",
-      "updated_at": "2026-04-01T06:06:11.607642862Z"
+      "updated_at": "2026-04-10T16:00:00.000000000Z"
     },
     {
       "id": "dd34d544-b915-4a90-9825-ecd199dbd5c5",
       "name": "Merge aichatsystem-ef4e to main",
-      "description": "Once features are verified at port 4002, merge the branch to main. Key files changed: AI.pm, Ollama.pm, DBEncy.pm, local-chat.js, ai-chat.css, conversations.tt, TopDropListLogin.tt. Update todo #567 description to reflect full scope before merging.",
+      "description": "Merge the worktree branch to main. Key files: AI.pm (guest sessions, planning integration, schema compare AI, Grok 410 fix), Ollama.pm (chain_query, keep-alive), AiConversation.pm (project_id/task_id/model), Project.pm (has_many ai_conversations), day.tt/details.tt/projectdetails.tt (AI activity panels), conversations.tt, ai_conversation_tables.sql, database-standards.md.",
       "status": "Pending",
       "sort_order": 2,
       "start_new_chat": false,
       "stop_after_completion": false,
       "created_at": "2026-04-01T06:06:11.607642862Z",
-      "updated_at": "2026-04-01T06:06:11.607642862Z"
+      "updated_at": "2026-04-10T16:00:00.000000000Z"
     },
     {
-      "id": "77a3a5a5-cc4e-4d4b-80db-b4aa05c140c4",
-      "name": "Planning System Integration (sub-task f1874939)",
-      "description": "Begin the 6-step Planning System Integration sub-task: (1) Audit current AI↔Planning state, (2) Add project_id/task_id to ai_conversations, (3) Inject project context into AI prompt, (4) Show AI activity on DailyPlan, (5) Link conversations to tasks, (6) End-to-end test.",
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "AI Project Planning Agent",
+      "description": "When a user asks AI to create a new feature/project, the AI should: (1) prompt user about dependencies (inventory, accounting, etc.), (2) examine existing projects for blockers, (3) create project/sub-project/todo structure via create_todo ACTION, (4) link to existing projects as blockers where possible. Requires: new AI agent type 'planning', enhanced create_todo ACTION to accept project dependencies, and prompt engineering for dependency discovery.",
       "status": "Pending",
       "sort_order": 3,
       "start_new_chat": false,
       "stop_after_completion": false,
-      "created_at": "2026-04-01T06:06:11.607642862Z",
-      "updated_at": "2026-04-01T06:06:11.607642862Z"
+      "created_at": "2026-04-10T16:00:00.000000000Z",
+      "updated_at": "2026-04-10T16:00:00.000000000Z"
+    },
+    {
+      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "name": "3D Print Management Agent",
+      "description": "Add a '3d' agent type to the AI system, focused on 3D printing project management. Similar to BMaster/ENCY agents: inject apiary-style schema context (print jobs, filament inventory, printer status), Bambu/OrcaSlicer API awareness if available, and bee-welfare-equivalent philosophy (what is best for the print, not just speed). Cross-branch request: 3D printing branch should add a sub-project/todo to its project that blocks on this aichatsystem agent being ready.",
+      "status": "Pending",
+      "sort_order": 4,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-04-10T16:00:00.000000000Z",
+      "updated_at": "2026-04-10T16:00:00.000000000Z"
     }
   ]
 }
