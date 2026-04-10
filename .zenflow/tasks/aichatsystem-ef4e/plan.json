@@ -36,14 +36,14 @@
     },
     {
       "id": "dd34d544-b915-4a90-9825-ecd199dbd5c5",
-      "name": "Final merge + verify aichatsystem-ef4e is in sync with main",
-      "description": "Verify both worktree (aichatsystem-ef4e) and main (comserv2) have all changes: extractActions fix, planning agent, 3dprint agent, create_project ACTION. Confirm AI.pm perl syntax OK in both. Run server restart at 4001. Test create_project ACTION end-to-end from planning agent.",
-      "status": "Pending",
+      "name": "AI Form Assistant + final sync to main",
+      "description": "COMPLETED: Created ai/partials/ai_form_assistant.tt (generic, role-gated, model-agnostic form-fill panel). Added to addtodo.tt, editproject.tt, AddWorkshop.tt, add_yard.tt, Navigation/add_link.tt. Features: Ask AI, Review & Correct, staged diff, field targeting, live web search toggle, model selector. Committed and synced to both worktree and main.",
+      "status": "Completed",
       "sort_order": 3,
       "start_new_chat": false,
       "stop_after_completion": false,
       "created_at": "2026-04-10T17:35:00.000000000Z",
-      "updated_at": "2026-04-10T17:35:00.000000000Z"
+      "updated_at": "2026-04-10T19:21:00.000000000Z"
     }
   ]
 }
