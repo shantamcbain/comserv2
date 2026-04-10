@@ -2024,14 +2024,13 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
     my $site_name = $c->session->{site_name} || $c->stash->{site_name} || 'default';
     my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $site_name);
     
-    # Debug: Log the structure of database_comparison
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
-        "Database comparison structure: " . Data::Dumper::Dumper($database_comparison));
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
         "Set theme_name in stash: $theme_name for site: $site_name");
     
     # Use the standard debug message system
     if ($c->session->{debug_mode}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
+            "Database comparison structure: " . Data::Dumper::Dumper($database_comparison));
         $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
         push @{$c->stash->{debug_msg}}, "Admin controller schema_compare view - Template: admin/schema_compare.tt";
         push @{$c->stash->{debug_msg}}, "Site: $site_name, Theme: $theme_name";
