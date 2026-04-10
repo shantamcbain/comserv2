@@ -13,7 +13,9 @@
 [% SET is_csc   = (site == 'CSC') %]
 
 [%# Planning access: any logged-in non-guest user.
-    Content within DailyPlan is filtered by role/site. %]
+    Prefer enabled_modules.planning from DB (site_modules table); fall back to
+    role-based logic so nothing breaks if the table doesn't exist yet.
+    Content within DailyPlan is further filtered by role/site. %]
 [% SET guest_roles = ['guest', 'anonymous', 'Guest', 'Anonymous'] %]
 [% SET is_guest = 0 %]
 [% IF c.stash.user_roles %]
@@ -21,7 +23,13 @@
         [% IF c.stash.user_roles.grep(gr).size %][% SET is_guest = 1 %][% END %]
     [% END %]
 [% END %]
-[% SET can_plan = c.session.username && !is_guest %]
+[% SET base_can_plan = c.session.username && !is_guest %]
+[%# If enabled_modules is available, honour it; otherwise use the session-based check %]
+[% IF c.stash.enabled_modules.defined %]
+    [% SET can_plan = base_can_plan && c.stash.enabled_modules.planning %]
+[% ELSE %]
+    [% SET can_plan = base_can_plan %]
+[% END %]
 
 [% IF can_plan %]
 <li class="horizontal-dropdown">
