@@ -2103,9 +2103,85 @@
         return { cleanText, actions };
     }
 
+    // Fill form fields in the current page (or window.opener if popup).
+    // actionObj.fields is a plain object: { fieldName: value, ... }
+    // For checkboxes pass boolean/0/1; selects and inputs accept string values.
+    function _executeFillForm(actionObj) {
+        const chatMessages = document.getElementById('chat-messages');
+        const fields = actionObj.fields || {};
+
+        // When the chat is running in a detached popup window the form lives in the
+        // opener page — try that first, fall back to the current document.
+        const targetDoc = (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed)
+            ? window.opener.document
+            : document;
+
+        const filled = [];
+        const missed = [];
+
+        Object.keys(fields).forEach(function(fieldName) {
+            const value = fields[fieldName];
+            // Try by name first, then by id
+            let el = targetDoc.querySelector('[name="' + fieldName + '"]')
+                  || targetDoc.getElementById(fieldName);
+
+            if (!el) {
+                missed.push(fieldName);
+                return;
+            }
+
+            const tag  = el.tagName.toLowerCase();
+            const type = (el.getAttribute('type') || '').toLowerCase();
+
+            if (type === 'checkbox') {
+                el.checked = !!(value === true || value === 1 || value === '1' || value === 'true');
+            } else if (tag === 'select') {
+                el.value = String(value);
+                // Fallback: try case-insensitive match on option text
+                if (!el.value || el.value !== String(value)) {
+                    Array.from(el.options).forEach(function(opt) {
+                        if (opt.text.toLowerCase() === String(value).toLowerCase()) {
+                            el.value = opt.value;
+                        }
+                    });
+                }
+            } else {
+                el.value = value !== null && value !== undefined ? String(value) : '';
+            }
+
+            // Fire change/input events so any JS listeners react
+            el.dispatchEvent(new Event('input',  { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            filled.push(fieldName);
+        });
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+        const lbl = document.createElement('div');
+        lbl.className = 'msg-label';
+        lbl.textContent = 'System';
+        const el2 = document.createElement('div');
+        el2.className = 'message system-message';
+        let msg = '';
+        if (filled.length)  msg += '✅ Filled: ' + filled.join(', ') + '.';
+        if (missed.length)  msg += '\n⚠️ Not found: ' + missed.join(', ') + '.';
+        if (!filled.length && !missed.length) msg = '⚠️ No fields specified.';
+        el2.textContent = msg.trim();
+        wrapper.appendChild(lbl);
+        wrapper.appendChild(el2);
+        chatMessages.appendChild(wrapper);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
     // POST an action object to /ai/action and show a confirmation bubble.
     function executeAIAction(actionObj) {
         const chatMessages = document.getElementById('chat-messages');
+
+        // fill_form is handled entirely client-side — no server round-trip needed.
+        if (actionObj.action === 'fill_form') {
+            _executeFillForm(actionObj);
+            return;
+        }
 
         fetch('/ai/action', {
             method: 'POST',
