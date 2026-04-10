@@ -2091,130 +2091,97 @@
     // Returns { cleanText, actions[] } where cleanText has the blocks removed.
     function extractActions(text) {
         const actions = [];
-        // Use a greedy match for the JSON body to handle nested objects correctly,
-        // then trim to the last } to find the true end of the JSON.
-        // Also allow optional whitespace before the closing ].
-        const re = /\[ACTION:\s*(\{[\s\S]*\})\s*\]/g;
-        const cleanText = text.replace(re, function(match, jsonStr) {
-            // Normalize curly/smart quotes that some AI models emit
-            const normalized = jsonStr
-                .replace(/[\u2018\u2019]/g, "'")
-                .replace(/[\u201C\u201D]/g, '"')
-                .trim();
-            // Find the last } to strip any trailing content the greedy match pulled in
-            const lastBrace = normalized.lastIndexOf('}');
-            const candidate = lastBrace >= 0 ? normalized.slice(0, lastBrace + 1) : normalized;
+        const cleanText = text.replace(/\[ACTION:\s*(\{[\s\S]*?\})\]/g, function(match, jsonStr) {
             try {
-                const obj = JSON.parse(candidate);
+                const obj = JSON.parse(jsonStr);
                 if (obj && obj.action) actions.push(obj);
             } catch(e) {
-                console.warn('AI action JSON parse error:', e, candidate);
+                console.warn('AI action JSON parse error:', e, jsonStr);
             }
             return '';
         }).trim();
         return { cleanText, actions };
     }
 
-    // Project creation wizard — renders an inline form in the chat window.
-    // Submitted data is sent to /ai/action as a create_project ACTION.
-    function openProjectWizard(prefillTitle) {
+    // Fill form fields in the current page (or window.opener if popup).
+    // actionObj.fields is a plain object: { fieldName: value, ... }
+    // For checkboxes pass boolean/0/1; selects and inputs accept string values.
+    function _executeFillForm(actionObj) {
         const chatMessages = document.getElementById('chat-messages');
-        if (!chatMessages) return;
+        const fields = actionObj.fields || {};
 
-        // Remove any existing wizard
-        const existing = document.getElementById('ai-project-wizard');
-        if (existing) existing.remove();
+        // When the chat is running in a detached popup window the form lives in the
+        // opener page — try that first, fall back to the current document.
+        const targetDoc = (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed)
+            ? window.opener.document
+            : document;
+
+        const filled = [];
+        const missed = [];
+
+        Object.keys(fields).forEach(function(fieldName) {
+            const value = fields[fieldName];
+            // Try by name first, then by id
+            let el = targetDoc.querySelector('[name="' + fieldName + '"]')
+                  || targetDoc.getElementById(fieldName);
+
+            if (!el) {
+                missed.push(fieldName);
+                return;
+            }
+
+            const tag  = el.tagName.toLowerCase();
+            const type = (el.getAttribute('type') || '').toLowerCase();
+
+            if (type === 'checkbox') {
+                el.checked = !!(value === true || value === 1 || value === '1' || value === 'true');
+            } else if (tag === 'select') {
+                el.value = String(value);
+                // Fallback: try case-insensitive match on option text
+                if (!el.value || el.value !== String(value)) {
+                    Array.from(el.options).forEach(function(opt) {
+                        if (opt.text.toLowerCase() === String(value).toLowerCase()) {
+                            el.value = opt.value;
+                        }
+                    });
+                }
+            } else {
+                el.value = value !== null && value !== undefined ? String(value) : '';
+            }
+
+            // Fire change/input events so any JS listeners react
+            el.dispatchEvent(new Event('input',  { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            filled.push(fieldName);
+        });
 
         const wrapper = document.createElement('div');
         wrapper.className = 'msg-wrapper msg-wrapper-ai';
-        wrapper.id = 'ai-project-wizard';
-
         const lbl = document.createElement('div');
         lbl.className = 'msg-label';
-        lbl.textContent = 'Planning Agent';
-
-        const box = document.createElement('div');
-        box.className = 'message system-message';
-        box.style.cssText = 'padding:12px;max-width:480px;';
-
-        const DEPS = [
-            ['inventory',   'Inventory tracking'],
-            ['billing',     'Billing / payments'],
-            ['email',       'Email notifications'],
-            ['calendar',    'Calendar / bookings'],
-            ['helpdesk',    'HelpDesk / support'],
-            ['api',         'External API'],
-            ['schema',      'New DB tables needed'],
-            ['ai',          'AI / Chat integration'],
-        ];
-
-        box.innerHTML =
-            '<strong style="font-size:1.05em">📋 New Project Wizard</strong>' +
-            '<form id="ai-wizard-form" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">' +
-                '<label style="font-size:.85em;font-weight:600">Project name</label>' +
-                '<input id="wiz-name" type="text" required style="padding:4px 6px;border:1px solid #ccc;border-radius:4px;" value="' + (prefillTitle || '').replace(/"/g, '&quot;') + '">' +
-                '<label style="font-size:.85em;font-weight:600">Description</label>' +
-                '<textarea id="wiz-desc" rows="2" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px;resize:vertical;"></textarea>' +
-                '<label style="font-size:.85em;font-weight:600">Due date</label>' +
-                '<input id="wiz-due" type="date" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px;">' +
-                '<label style="font-size:.85em;font-weight:600">Dependencies needed (check all that apply)</label>' +
-                '<div id="wiz-deps" style="display:flex;flex-wrap:wrap;gap:4px 12px;">' +
-                    DEPS.map(function(d) {
-                        return '<label style="font-size:.82em"><input type="checkbox" name="dep" value="' + d[0] + '" style="margin-right:3px">' + d[1] + '</label>';
-                    }).join('') +
-                '</div>' +
-                '<div style="display:flex;gap:8px;margin-top:4px;">' +
-                    '<button type="submit" style="padding:5px 14px;background:#0077cc;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.85em">Create Project</button>' +
-                    '<button type="button" id="wiz-cancel" style="padding:5px 10px;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:.85em;background:#fff">Cancel</button>' +
-                '</div>' +
-            '</form>';
-
+        lbl.textContent = 'System';
+        const el2 = document.createElement('div');
+        el2.className = 'message system-message';
+        let msg = '';
+        if (filled.length)  msg += '✅ Filled: ' + filled.join(', ') + '.';
+        if (missed.length)  msg += '\n⚠️ Not found: ' + missed.join(', ') + '.';
+        if (!filled.length && !missed.length) msg = '⚠️ No fields specified.';
+        el2.textContent = msg.trim();
         wrapper.appendChild(lbl);
-        wrapper.appendChild(box);
+        wrapper.appendChild(el2);
         chatMessages.appendChild(wrapper);
         chatMessages.scrollTop = chatMessages.scrollHeight;
-
-        document.getElementById('wiz-cancel').addEventListener('click', function() {
-            wrapper.remove();
-        });
-
-        document.getElementById('ai-wizard-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            var name = document.getElementById('wiz-name').value.trim();
-            var desc = document.getElementById('wiz-desc').value.trim();
-            var due  = document.getElementById('wiz-due').value;
-            var deps = Array.from(document.querySelectorAll('#wiz-deps input:checked')).map(function(cb) { return cb.value; });
-
-            if (!name) { alert('Project name is required.'); return; }
-
-            var depNote = deps.length ? '\n\nDependencies: ' + deps.join(', ') : '';
-            wrapper.remove();
-
-            executeAIAction({
-                action: 'create_project',
-                params: {
-                    name:        name,
-                    description: desc + depNote,
-                    due_date:    due || undefined,
-                }
-            });
-
-            // Also send the dependency list to the AI as a follow-up so it can create blocking todos
-            if (deps.length) {
-                var depMsg = 'Project "' + name + '" was created. Dependencies noted: ' + deps.join(', ') + '. Please create the relevant sub-project todos and blocking dependencies.';
-                var chatInput = document.getElementById('chat-input') || document.getElementById('chat-message');
-                if (chatInput) {
-                    chatInput.value = depMsg;
-                    var sendBtn = document.getElementById('send-button') || document.querySelector('[data-action="send"]');
-                    if (sendBtn) sendBtn.click();
-                }
-            }
-        });
     }
 
     // POST an action object to /ai/action and show a confirmation bubble.
     function executeAIAction(actionObj) {
         const chatMessages = document.getElementById('chat-messages');
+
+        // fill_form is handled entirely client-side — no server round-trip needed.
+        if (actionObj.action === 'fill_form') {
+            _executeFillForm(actionObj);
+            return;
+        }
 
         fetch('/ai/action', {
             method: 'POST',
@@ -2224,10 +2191,6 @@
         })
         .then(function(r) { return r.json(); })
         .then(function(result) {
-            if (result.success && result.action === 'open_project_wizard') {
-                openProjectWizard(result.wizard_title || '');
-                return;
-            }
             const wrapper = document.createElement('div');
             wrapper.className = 'msg-wrapper msg-wrapper-ai';
             const lbl = document.createElement('div');
