@@ -1,0 +1,158 @@
+[% PageVersion = '3d/queue.tt,v 1.00 2026/04/10 Shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.queue-section {
+    margin-bottom: 2em;
+}
+.queue-section h2 {
+    color: var(--heading-color, var(--text-color));
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0.3em;
+    margin-bottom: 0.8em;
+}
+.queue-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.queue-table th, .queue-table td {
+    padding: 0.6em 0.9em;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+    vertical-align: middle;
+}
+.queue-table th {
+    background: var(--table-header-bg, var(--secondary-color));
+    font-weight: bold;
+    text-align: left;
+}
+.queue-table tr:last-child td { border-bottom: none; }
+.status-badge {
+    display: inline-block;
+    padding: 0.2em 0.6em;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: bold;
+    text-transform: capitalize;
+}
+.status-queued   { background: #ffc107; color: #333; }
+.status-assigned { background: #17a2b8; color: white; }
+.status-printing { background: #007bff; color: white; }
+.btn-action {
+    padding: 0.3em 0.7em;
+    font-size: 0.85em;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    color: white;
+}
+.btn-assign   { background: #17a2b8; }
+.btn-complete { background: #28a745; }
+.btn-cancel   { background: #dc3545; }
+</style>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em;">
+    <h1>Print Queue</h1>
+    <div>
+        <a href="/3d/printers" style="font-size:0.9em;">Printer Farm</a> |
+        <a href="/3d/admin" style="font-size:0.9em;">Admin Dashboard</a>
+    </div>
+</div>
+
+<div class="queue-section">
+    <h2>Queued — Waiting for Printer ([% queued_jobs.size %])</h2>
+    [% IF queued_jobs && queued_jobs.size %]
+    <table class="queue-table">
+        <thead>
+            <tr>
+                <th>#</th><th>Model</th><th>User</th><th>Filament</th><th>Qty</th>
+                <th>Requested</th><th>Assign Printer</th><th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% FOREACH job IN queued_jobs %]
+            <tr>
+                <td>[% job.id %]</td>
+                <td>[% IF job.model %][% job.model.name | html %][% ELSE %]#[% job.model_id %][% END %]</td>
+                <td>[% job.username | html %]</td>
+                <td>[% job.filament_type | html %] [% job.filament_color | html %]</td>
+                <td>[% job.quantity %]</td>
+                <td>[% job.created_at %]</td>
+                <td>
+                    [% IF idle_printers && idle_printers.size %]
+                    <form method="post" action="/3d/queue" style="display:inline;">
+                        <input type="hidden" name="job_id" value="[% job.id %]">
+                        <input type="hidden" name="action" value="assign">
+                        <select name="printer_id">
+                            [% FOREACH p IN idle_printers %]
+                            <option value="[% p.id %]">[% p.name | html %]</option>
+                            [% END %]
+                        </select>
+                        <button type="submit" class="btn-action btn-assign">Assign</button>
+                    </form>
+                    [% ELSE %]
+                    <em style="color:var(--muted-color,#888);">No idle printers</em>
+                    [% END %]
+                </td>
+                <td>
+                    <form method="post" action="/3d/queue" style="display:inline;">
+                        <input type="hidden" name="job_id" value="[% job.id %]">
+                        <input type="hidden" name="action" value="cancel">
+                        <button type="submit" class="btn-action btn-cancel"
+                            onclick="return confirm('Cancel this job?')">Cancel</button>
+                    </form>
+                </td>
+            </tr>
+            [% END %]
+        </tbody>
+    </table>
+    [% ELSE %]
+    <p style="color:var(--muted-color,#888);">No jobs in queue.</p>
+    [% END %]
+</div>
+
+<div class="queue-section">
+    <h2>Active — Printing ([% active_jobs.size %])</h2>
+    [% IF active_jobs && active_jobs.size %]
+    <table class="queue-table">
+        <thead>
+            <tr>
+                <th>#</th><th>Model</th><th>User</th><th>Printer</th>
+                <th>Status</th><th>Started</th><th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% FOREACH job IN active_jobs %]
+            <tr>
+                <td>[% job.id %]</td>
+                <td>[% IF job.model %][% job.model.name | html %][% ELSE %]#[% job.model_id %][% END %]</td>
+                <td>[% job.username | html %]</td>
+                <td>[% IF job.printer %][% job.printer.name | html %][% ELSE %]&mdash;[% END %]</td>
+                <td><span class="status-badge status-[% job.status %]">[% job.status %]</span></td>
+                <td>[% job.started_at || job.created_at %]</td>
+                <td>
+                    <form method="post" action="/3d/queue" style="display:inline;">
+                        <input type="hidden" name="job_id" value="[% job.id %]">
+                        <input type="hidden" name="action" value="complete">
+                        <button type="submit" class="btn-action btn-complete">Complete</button>
+                    </form>
+                    <form method="post" action="/3d/queue" style="display:inline;margin-left:0.3em;">
+                        <input type="hidden" name="job_id" value="[% job.id %]">
+                        <input type="hidden" name="action" value="cancel">
+                        <button type="submit" class="btn-action btn-cancel"
+                            onclick="return confirm('Cancel this job?')">Cancel</button>
+                    </form>
+                </td>
+            </tr>
+            [% END %]
+        </tbody>
+    </table>
+    [% ELSE %]
+    <p style="color:var(--muted-color,#888);">No active print jobs.</p>
+    [% END %]
+</div>

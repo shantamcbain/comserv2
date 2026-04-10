@@ -1,0 +1,156 @@
+[% PageVersion = '3d/browse.tt,v 1.00 2026/04/10 Shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.browse-3d-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1em;
+    margin-bottom: 1.2em;
+}
+.browse-3d-search form {
+    display: flex;
+    gap: 0.5em;
+}
+.browse-3d-search input[type=text] {
+    padding: 0.5em 0.8em;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--input-bg, var(--secondary-color));
+    color: var(--text-color);
+    min-width: 200px;
+}
+.browse-3d-search button {
+    padding: 0.5em 1em;
+    background: var(--button-bg, var(--accent-color));
+    color: var(--button-text, white);
+    border: 1px solid var(--button-border, transparent);
+    border-radius: 4px;
+    cursor: pointer;
+}
+.model-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1em;
+}
+.model-card {
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1em;
+    display: flex;
+    flex-direction: column;
+}
+.model-card h3 {
+    margin: 0 0 0.4em 0;
+    font-size: 1em;
+    color: var(--heading-color, var(--text-color));
+}
+.model-card .model-type {
+    font-size: 0.8em;
+    color: var(--muted-color, var(--text-color));
+    margin-bottom: 0.5em;
+}
+.model-card p {
+    font-size: 0.9em;
+    color: var(--text-color);
+    flex: 1;
+    margin: 0 0 0.8em 0;
+}
+.model-card-actions {
+    display: flex;
+    gap: 0.5em;
+}
+.btn-sm {
+    padding: 0.4em 0.8em;
+    font-size: 0.85em;
+    background: var(--button-bg, var(--accent-color));
+    color: var(--button-text, white);
+    border: none;
+    border-radius: 4px;
+    text-decoration: none;
+    cursor: pointer;
+}
+.btn-sm.secondary {
+    background: var(--secondary-color);
+    color: var(--link-color);
+    border: 1px solid var(--border-color);
+}
+.empty-notice {
+    text-align: center;
+    padding: 3em 1em;
+    color: var(--muted-color, var(--text-color));
+    background: var(--secondary-color);
+    border: 1px dashed var(--border-color);
+    border-radius: 6px;
+}
+.pending-notice {
+    background: var(--schema-alert-warning-bg, #fff3cd);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1em 1.2em;
+    margin-bottom: 1em;
+    color: var(--text-color);
+}
+</style>
+
+[% IF feature_pending %]
+<div class="pending-notice">
+    <strong>Note:</strong> [% pending_message %]
+</div>
+[% END %]
+
+<div class="browse-3d-header">
+    <h1>Browse 3D Models</h1>
+    <div class="browse-3d-search">
+        <form method="get" action="/3d/browse">
+            <input type="text" name="q" value="[% q | html %]" placeholder="Search models…">
+            <button type="submit"><i class="icon-search"></i> Search</button>
+        </form>
+    </div>
+</div>
+
+[% IF c.session.username %]
+<p style="margin-bottom:1em;">
+    <a href="/3d/search_deeper?q=[% q | uri %]" class="btn-sm secondary"><i class="icon-ai"></i> Deeper AI/Web Search</a>
+</p>
+[% END %]
+
+[% IF models && models.size %]
+<div class="model-grid">
+    [% FOREACH model IN models %]
+    <div class="model-card">
+        [% IF model.thumbnail_url %]
+        <img src="[% model.thumbnail_url | html %]" alt="[% model.name | html %]"
+             style="width:100%;height:140px;object-fit:cover;border-radius:4px;margin-bottom:0.6em;">
+        [% END %]
+        <h3>[% model.name | html %]</h3>
+        <div class="model-type">[% model.file_type | upper %]
+            [% IF model.tags %] &bull; [% model.tags | html %][% END %]
+        </div>
+        <p>[% model.description | truncate(100) | html %]</p>
+        <div class="model-card-actions">
+            <a href="/3d/model/[% model.id %]" class="btn-sm"><i class="icon-view"></i> View</a>
+            [% IF c.session.user_id %]
+            <a href="/3d/order?model_id=[% model.id %]" class="btn-sm secondary"><i class="icon-print"></i> Order</a>
+            [% END %]
+        </div>
+    </div>
+    [% END %]
+</div>
+[% ELSE %]
+<div class="empty-notice">
+    [% IF q %]
+    No models found matching &ldquo;<strong>[% q | html %]</strong>&rdquo;.
+    <br><a href="/3d/browse">Clear search</a> or
+    <a href="/3d/search_deeper?q=[% q | uri %]">try a deeper AI/web search</a>.
+    [% ELSE %]
+    No 3D models in the catalog yet.
+    [% IF c.session.roles.grep('admin').size %]
+    <br><a href="/3d/admin">Add models via the Admin panel.</a>
+    [% END %]
+    [% END %]
+</div>
+[% END %]

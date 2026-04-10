@@ -1,0 +1,57 @@
+[% PageVersion = '3d/order.tt,v 1.00 2026/04/10 Shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Order a Print</h1>
+
+[% IF error_msg %]
+<div style="background:var(--schema-alert-danger-bg,#f8d7da);border:1px solid var(--border-color);border-radius:6px;padding:1em 1.2em;margin-bottom:1em;color:var(--text-color);">
+    [% error_msg %]
+</div>
+[% END %]
+
+[% IF model %]
+<p><strong>Model:</strong> <a href="/3d/model/[% model.id %]">[% model.name | html %]</a></p>
+[% ELSE %]
+<p><a href="/3d/browse">Select a model to order</a></p>
+[% END %]
+
+<form method="post" action="/3d/order" style="background:var(--secondary-color);border:1px solid var(--border-color);border-radius:6px;padding:1.2em;max-width:500px;">
+    [% IF model %]
+    <input type="hidden" name="model_id" value="[% model.id %]">
+    [% ELSE %]
+    <div style="margin-bottom:0.8em;">
+        <label style="font-weight:bold;">Model ID</label><br>
+        <input type="number" name="model_id" required>
+    </div>
+    [% END %]
+
+    <div style="margin-bottom:0.8em;">
+        <label style="font-weight:bold;">Filament Color</label><br>
+        <input type="text" name="filament_color" placeholder="e.g. Black, White, Red"
+               style="width:100%;padding:0.5em 0.7em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);">
+    </div>
+
+    <div style="margin-bottom:0.8em;">
+        <label style="font-weight:bold;">Filament Type</label><br>
+        <input type="text" name="filament_type" placeholder="e.g. PLA, PETG, ABS"
+               style="width:100%;padding:0.5em 0.7em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);">
+    </div>
+
+    <div style="margin-bottom:0.8em;">
+        <label style="font-weight:bold;">Quantity</label><br>
+        <input type="number" name="quantity" value="1" min="1" max="50"
+               style="width:80px;padding:0.5em 0.7em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);">
+    </div>
+
+    <div style="margin-bottom:1em;">
+        <label style="font-weight:bold;">Notes (optional)</label><br>
+        <textarea name="notes" rows="3" placeholder="Any special instructions…"
+                  style="width:100%;padding:0.5em 0.7em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);"></textarea>
+    </div>
+
+    <button type="submit"
+            style="padding:0.7em 1.5em;background:var(--button-bg,var(--accent-color));color:var(--button-text,white);border:none;border-radius:4px;font-size:1em;font-weight:bold;cursor:pointer;">
+        Place Order
+    </button>
+    <a href="/3d/browse" style="margin-left:1em;font-size:0.9em;">Cancel</a>
+</form>
