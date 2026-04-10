@@ -57,3 +57,8 @@
     </tr>
   </table>
 </form>
+[% PROCESS 'ai/partials/ai_form_assistant.tt'
+   ai_form_entity_label = 'supplier'
+   ai_form_context      = 'inventory supplier management'
+   ai_form_fields       = 'name, contact_name, email, phone, address, website, lead_time_days, status, notes'
+%]
