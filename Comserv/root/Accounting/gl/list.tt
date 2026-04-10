@@ -1,0 +1,45 @@
+[% PageVersion = 'Accounting/gl/list.tt,v 0.01 2026/04/10 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>General Ledger</h1>
+<p><a href="/Accounting">← Accounting</a></p>
+
+<form method="GET" action="/Accounting/gl">
+  Filter by type:
+  <select name="type">
+    <option value="">— all —</option>
+    [% FOREACH t IN ['general','inventory','point','sale','purchase','adjustment'] %]
+    <option value="[% t %]" [% IF type == t %]selected[% END %]>[% t %]</option>
+    [% END %]
+  </select>
+  <input type="submit" value="Filter">
+</form>
+
+[% IF entries.size == 0 %]
+  <p>No journal entries found.</p>
+[% ELSE %]
+<table border="1" cellpadding="4">
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Reference</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Approved</th>
+      <th>Site</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH e IN entries %]
+    <tr>
+      <td>[% e.post_date %]</td>
+      <td><a href="/Accounting/gl/view/[% e.id %]">[% e.reference %]</a></td>
+      <td>[% e.entry_type %]</td>
+      <td>[% e.description || '-' %]</td>
+      <td>[% e.approved ? 'Yes' : 'No' %]</td>
+      <td>[% e.sitename %]</td>
+    </tr>
+  [% END %]
+  </tbody>
+</table>
+[% END %]
