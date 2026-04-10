@@ -23,8 +23,13 @@
              form-fill logic into other branches — extend this partial instead.
 %]
 
-[%# ── Role check ─────────────────────────────────────────────────────────── %]
-[% SET _is_privileged = is_admin || is_editor %]
+[%# ── Role check — matches existing app pattern (c.session.roles / c.check_user_roles) %]
+[% SET _is_privileged = c.session.roles.grep('admin').size
+    || c.session.roles.grep('editor').size
+    || c.session.roles.grep('developer').size
+    || c.check_user_roles('admin')
+    || c.check_user_roles('editor')
+    || c.check_user_roles('developer') %]
 
 [%# ── Defaults ────────────────────────────────────────────────────────────── %]
 [% ai_form_entity_label = ai_form_entity_label || 'record' %]
