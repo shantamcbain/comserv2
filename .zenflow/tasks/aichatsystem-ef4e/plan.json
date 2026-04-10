@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "id": "83bd01d6-a220-4d33-86ba-11df533fefb8",
+      "name": "Fix compilation error + start aichatsystem server at port 4002",
+      "description": "Fixed $fast_check→$avail_check in AI.pm chat action (line 1850). Confirmed AI.pm compiles cleanly. Started aichatsystem-ef4e at port 4002. Root cause identified: port 4001 was planningsystem branch, not aichatsystem.",
+      "status": "Completed",
+      "sort_order": 0,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-04-01T06:06:11.607642862Z",
+      "updated_at": "2026-04-01T06:06:15.784383616Z"
+    },
+    {
+      "id": "eb76e394-31c8-4839-abd7-9c351396e7b3",
+      "name": "Planning integration + Schema Compare AI + Grok 410 fix",
+      "description": "COMPLETED: project_id/task_id/model on ai_conversations; _build_project_context injected into AI prompt; AI activity panels on todo/project/day templates; project_conversations endpoint (project+task); schema_compare guided fix with sync_schema_field ACTION; Grok pre-flight deprecated-model check; chain_query in Ollama.pm; branch merged with main.",
+      "status": "Completed",
+      "sort_order": 1,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-04-01T06:06:11.607642862Z",
+      "updated_at": "2026-04-10T16:00:00.000000000Z"
+    },
+    {
+      "id": "dd34d544-b915-4a90-9825-ecd199dbd5c5",
+      "name": "Merge aichatsystem-ef4e to main",
+      "description": "Merge the worktree branch to main. Key files: AI.pm (guest sessions, planning integration, schema compare AI, Grok 410 fix), Ollama.pm (chain_query, keep-alive), AiConversation.pm (project_id/task_id/model), Project.pm (has_many ai_conversations), day.tt/details.tt/projectdetails.tt (AI activity panels), conversations.tt, ai_conversation_tables.sql, database-standards.md.",
+      "status": "Pending",
+      "sort_order": 2,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-04-01T06:06:11.607642862Z",
+      "updated_at": "2026-04-10T16:00:00.000000000Z"
+    },
+    {
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "AI Project Planning Agent",
+      "description": "When a user asks AI to create a new feature/project, the AI should: (1) prompt user about dependencies (inventory, accounting, etc.), (2) examine existing projects for blockers, (3) create project/sub-project/todo structure via create_todo ACTION, (4) link to existing projects as blockers where possible. Requires: new AI agent type 'planning', enhanced create_todo ACTION to accept project dependencies, and prompt engineering for dependency discovery.",
+      "status": "Pending",
+      "sort_order": 3,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-04-10T16:00:00.000000000Z",
+      "updated_at": "2026-04-10T16:00:00.000000000Z"
+    },
+    {
+      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "name": "3D Print Management Agent",
+      "description": "Add a '3d' agent type to the AI system, focused on 3D printing project management. Similar to BMaster/ENCY agents: inject apiary-style schema context (print jobs, filament inventory, printer status), Bambu/OrcaSlicer API awareness if available, and bee-welfare-equivalent philosophy (what is best for the print, not just speed). Cross-branch request: 3D printing branch should add a sub-project/todo to its project that blocks on this aichatsystem agent being ready.",
+      "status": "Pending",
+      "sort_order": 4,
+      "start_new_chat": false,
+      "stop_after_completion": false,
+      "created_at": "2026-04-10T16:00:00.000000000Z",
+      "updated_at": "2026-04-10T16:00:00.000000000Z"
+    }
+  ]
+}

@@ -1,1 +1,277 @@
-{"site_themes":{"usbm":"usbm","mcoop":"mcoop","bmaster":"apis","csc":"csc","default":"default","apis":"apis"},"themes":{"usbm":{"description":"USBM green theme","legacy_elements":{"month_wday_header":{"vertical-align":"top","font-size":"20px","color":"black","background":"#FF9900","font-family":"Verdana, Helvetica, sans-serif","text-align":"center"},"LeftNavTableStyle":{"border":"0","width":"150%","background":"#FFCC66"},"NavtableHeaderCellStyle":{"background":"#FF9900","text-align":"center","color":"black","vertical-align":"top"},"month_title_header":{"vertical-align":"top","color":"black","font-family":"Verdana, Helvetica, sans-serif","text-align":"center","background":"#FFCC66"},"day_title_header":{"vertical-align":"top","color":"black","font-family":"Verdana, Helvetica, sans-serif","text-align":"center","background":"#FFCC66"},"applicationSubMenuStyle":{"font-family":"Verdana, Helvetica, sans-serif","background":"white","font-size":"15px","color":"black"},"warning":{"font-size":"18px","background":"#E5E5E5","font-family":"Verdana, Helvetica, sans-serif","text-align":"center","border":"medium green","vertical-align":"top","color":"red","border-style":"dashed"}},"name":"USBM Theme","variables":{"nav-hover-bg":"rgba(0, 0, 0, 0.1)","font-size-base":"20px","font-size-xlarge":"28px","link-color":"black","button-text":"#ffffff","text-color":"black","nav-bg":"#009933","font-size-small":"15px","primary-color":"#009933","warning-color":"red","body-font":"Verdana, Helvetica, sans-serif","button-hover-bg":"#006622","accent-color":"#FFCC66","table-header-bg":"#e6e6e6","border-color":"#cccccc","success-color":"#339933","nav-text":"#ffffff","background-color":"#009933","button-bg":"#009933","link-hover-color":"black","secondary-color":"#f0f0f0","font-size-large":"24px","button-border":"#006622","header-font":"Verdana, Helvetica, sans-serif"}},"mcoop":{"description":"MCoop cooperative theme","name":"MCoop Theme","variables":{"border-color":"#FF9933","accent-color":"#FF6600","background-color":"#ffffff","secondary-color":"#FFCC99","primary-color":"#FF6600","text-color":"#333333"}},"csc":{"description":"Computer System Consulting theme","legacy_elements":{"body":{"font-size":"20px","color":"black","font-family":"Verdana, Helvetica, sans-serif","background-color":"#ccffff"},"project-details-table tr:hover":{"background-color":"#e0e0e0"},"dropbtn":{"color":"black"},"dropdown-content":{"background-color":"#f9f9f9"},"project-details-table":{"width":"100%","margin-bottom":"20px","border-collapse":"collapse"},"submenu":{"background-color":"#f9f9f9"},"project-details-table tr:nth-child(even)":{"background-color":"#f9f9f9"},"project-details-table th":{"background-color":"#f2f2f2","font-weight":"bold"},"dropdown-content a":{"color":"black"},"nav":{"background-color":"#ccffff"},"submenu a":{"color":"black"}},"variables":{"nav-hover-bg":"rgba(0, 0, 0, 0.1)","font-size-base":"20px","link-color":"black","font-size-xlarge":"24px","primary-color":"#ccffff","warning-color":"red","button-text":"black","text-color":"black","nav-bg":"#ccffff","font-size-small":"14px","body-font":"Verdana, Helvetica, sans-serif","button-hover-bg":"#e0e0e0","table-header-bg":"#f2f2f2","accent-color":"#FF9900","success-color":"#009900","border-color":"#cccccc","background-color":"#ccffff","button-bg":"#f2f2f2","nav-text":"black","link-hover-color":"black","secondary-color":"#f9f9f9","button-border":"#cccccc","header-font":"Verdana, Helvetica, sans-serif","font-size-large":"20px"},"name":"CSC Theme"},"default":{"name":"Default Theme","variables":{"body-font":"Verdana, Helvetica, sans-serif","button-text":"#000000","text-color":"#000000","nav-bg":"#ccffff","font-size-small":"14px","warning-color":"#ff0000","primary-color":"#ccffff","font-size-xlarge":"24px","link-color":"#0000FF","nav-hover-bg":"rgba(0, 0, 0, 0.1)","font-size-base":"16px","button-hover-bg":"#e0e0e0","nav-text":"#000000","background-color":"#ffffff","button-bg":"#f2f2f2","border-color":"#cccccc","success-color":"#009900","accent-color":"#FF9900","table-header-bg":"#f2f2f2","font-size-large":"20px","header-font":"Verdana, Helvetica, sans-serif","button-border":"#cccccc","secondary-color":"#f9f9f9","link-hover-color":"#000099"},"description":"The default system theme"},"apis":{"variables":{"link-hover-color":"#f8e45c","header-color":"#000000","secondary-color":"#4A4A4A","font-size-large":"24px","button-border":"#ffa348","header-font":"Arial, sans-serif","accent-color":"#FF9900","table-header-bg":"#f2f2f2","border-color":"#e5a50a","success-color":"#4CAF50","nav-text":"#000000","button-bg":"#e5a50a","background-color":"#f9f06b","link-decoration":"none","button-hover-bg":"#d49509","site-name-color":"#000000","site-name-weight":"normal","font-size-base":"16px","nav-hover-bg":"#f6d32d","link-color":"#f9f06b","font-size-xlarge":"28px","site-name-size":"24px","nav-bg":"#ff9900","font-size-small":"15px","button-text":"#000000","site-name-font":"Arial, sans-serif","text-color":"#000000","primary-color":"#ccffff","warning-color":"red","body-font":"Arial, sans-serif"},"name":"APIS Theme","description":"Beekeeping theme with honeycomb pattern","legacy_elements":{"submenu":{"background-color":"#f9f9f9"},"dropdown-content a":{"color":"black"},"submenu a":{"color":"black"},"dropdown-content":{"background-color":"#f9f9f9"},"nav":{"background-color":"#ccffff"}},"special_styles":{"body":"background-image: url(../images/BMaster/honey2.jpg);"}}},"component_styles":{"api_credentials":"api_credentials.css","todo":"todo.css"}}
+{
+  "site_themes": {
+    "usbm": "usbm",
+    "mcoop": "mcoop",
+    "bmaster": "apis",
+    "csc": "csc",
+    "default": "default",
+    "apis": "apis"
+  },
+  "themes": {
+    "usbm": {
+      "description": "USBM green theme",
+      "legacy_elements": {
+        "month_wday_header": {
+          "vertical-align": "top",
+          "font-size": "20px",
+          "color": "black",
+          "background": "#FF9900",
+          "font-family": "Verdana, Helvetica, sans-serif",
+          "text-align": "center"
+        },
+        "LeftNavTableStyle": {
+          "border": "0",
+          "width": "150%",
+          "background": "#FFCC66"
+        },
+        "NavtableHeaderCellStyle": {
+          "background": "#FF9900",
+          "text-align": "center",
+          "color": "black",
+          "vertical-align": "top"
+        },
+        "month_title_header": {
+          "vertical-align": "top",
+          "color": "black",
+          "font-family": "Verdana, Helvetica, sans-serif",
+          "text-align": "center",
+          "background": "#FFCC66"
+        },
+        "day_title_header": {
+          "vertical-align": "top",
+          "color": "black",
+          "font-family": "Verdana, Helvetica, sans-serif",
+          "text-align": "center",
+          "background": "#FFCC66"
+        },
+        "applicationSubMenuStyle": {
+          "font-family": "Verdana, Helvetica, sans-serif",
+          "background": "white",
+          "font-size": "15px",
+          "color": "black"
+        },
+        "warning": {
+          "font-size": "18px",
+          "background": "#E5E5E5",
+          "font-family": "Verdana, Helvetica, sans-serif",
+          "text-align": "center",
+          "border": "medium green",
+          "vertical-align": "top",
+          "color": "red",
+          "border-style": "dashed"
+        }
+      },
+      "name": "USBM Theme",
+      "variables": {
+        "nav-hover-bg": "rgba(0, 0, 0, 0.1)",
+        "font-size-base": "20px",
+        "font-size-xlarge": "28px",
+        "link-color": "black",
+        "button-text": "#ffffff",
+        "text-color": "black",
+        "nav-bg": "#009933",
+        "font-size-small": "15px",
+        "primary-color": "#009933",
+        "warning-color": "red",
+        "body-font": "Verdana, Helvetica, sans-serif",
+        "button-hover-bg": "#006622",
+        "accent-color": "#FFCC66",
+        "table-header-bg": "#e6e6e6",
+        "border-color": "#cccccc",
+        "success-color": "#339933",
+        "nav-text": "#ffffff",
+        "background-color": "#009933",
+        "button-bg": "#009933",
+        "link-hover-color": "black",
+        "secondary-color": "#f0f0f0",
+        "font-size-large": "24px",
+        "button-border": "#006622",
+        "header-font": "Verdana, Helvetica, sans-serif"
+      }
+    },
+    "mcoop": {
+      "description": "MCoop cooperative theme",
+      "name": "MCoop Theme",
+      "variables": {
+        "border-color": "#FF9933",
+        "accent-color": "#FF6600",
+        "background-color": "#ffffff",
+        "secondary-color": "#FFCC99",
+        "primary-color": "#FF6600",
+        "text-color": "#333333"
+      }
+    },
+    "csc": {
+      "description": "Computer System Consulting theme",
+      "legacy_elements": {
+        "body": {
+          "font-size": "20px",
+          "color": "black",
+          "font-family": "Verdana, Helvetica, sans-serif",
+          "background-color": "#ccffff"
+        },
+        "project-details-table tr:hover": {
+          "background-color": "#e0e0e0"
+        },
+        "dropbtn": {
+          "color": "black"
+        },
+        "dropdown-content": {
+          "background-color": "#f9f9f9"
+        },
+        "project-details-table": {
+          "width": "100%",
+          "margin-bottom": "20px",
+          "border-collapse": "collapse"
+        },
+        "submenu": {
+          "background-color": "#f9f9f9"
+        },
+        "project-details-table tr:nth-child(even)": {
+          "background-color": "#f9f9f9"
+        },
+        "project-details-table th": {
+          "background-color": "#f2f2f2",
+          "font-weight": "bold"
+        },
+        "dropdown-content a": {
+          "color": "black"
+        },
+        "nav": {
+          "background-color": "#ccffff"
+        },
+        "submenu a": {
+          "color": "black"
+        }
+      },
+      "variables": {
+        "nav-hover-bg": "rgba(0, 0, 0, 0.1)",
+        "font-size-base": "20px",
+        "link-color": "black",
+        "font-size-xlarge": "24px",
+        "primary-color": "#ccffff",
+        "warning-color": "red",
+        "button-text": "black",
+        "text-color": "black",
+        "nav-bg": "#ccffff",
+        "font-size-small": "14px",
+        "body-font": "Verdana, Helvetica, sans-serif",
+        "button-hover-bg": "#e0e0e0",
+        "table-header-bg": "#f2f2f2",
+        "accent-color": "#FF9900",
+        "success-color": "#009900",
+        "border-color": "#cccccc",
+        "background-color": "#ccffff",
+        "button-bg": "#f2f2f2",
+        "nav-text": "black",
+        "link-hover-color": "black",
+        "secondary-color": "#f9f9f9",
+        "button-border": "#cccccc",
+        "header-font": "Verdana, Helvetica, sans-serif",
+        "font-size-large": "20px"
+      },
+      "name": "CSC Theme"
+    },
+    "default": {
+      "name": "Default Theme",
+      "variables": {
+        "body-font": "Verdana, Helvetica, sans-serif",
+        "button-text": "#000000",
+        "text-color": "#000000",
+        "nav-bg": "#ccffff",
+        "font-size-small": "14px",
+        "warning-color": "#ff0000",
+        "primary-color": "#ccffff",
+        "font-size-xlarge": "24px",
+        "link-color": "#0000FF",
+        "nav-hover-bg": "rgba(0, 0, 0, 0.1)",
+        "font-size-base": "16px",
+        "button-hover-bg": "#e0e0e0",
+        "nav-text": "#000000",
+        "background-color": "#ffffff",
+        "button-bg": "#f2f2f2",
+        "border-color": "#cccccc",
+        "success-color": "#009900",
+        "accent-color": "#FF9900",
+        "table-header-bg": "#f2f2f2",
+        "font-size-large": "20px",
+        "header-font": "Verdana, Helvetica, sans-serif",
+        "button-border": "#cccccc",
+        "secondary-color": "#f9f9f9",
+        "link-hover-color": "#000099"
+      },
+      "description": "The default system theme"
+    },
+    "apis": {
+      "variables": {
+        "link-hover-color": "#f8e45c",
+        "header-color": "#000000",
+        "secondary-color": "#4A4A4A",
+        "font-size-large": "24px",
+        "button-border": "#ffa348",
+        "header-font": "Arial, sans-serif",
+        "accent-color": "#FF9900",
+        "table-header-bg": "#f2f2f2",
+        "border-color": "#e5a50a",
+        "success-color": "#4CAF50",
+        "nav-text": "#000000",
+        "button-bg": "#e5a50a",
+        "background-color": "#f9f06b",
+        "link-decoration": "none",
+        "button-hover-bg": "#d49509",
+        "site-name-color": "#000000",
+        "site-name-weight": "normal",
+        "font-size-base": "16px",
+        "nav-hover-bg": "#f6d32d",
+        "link-color": "#f9f06b",
+        "font-size-xlarge": "28px",
+        "site-name-size": "24px",
+        "nav-bg": "#ff9900",
+        "font-size-small": "15px",
+        "button-text": "#000000",
+        "site-name-font": "Arial, sans-serif",
+        "text-color": "#000000",
+        "primary-color": "#ccffff",
+        "warning-color": "red",
+        "body-font": "Arial, sans-serif",
+        "background-image": "url(/static/images/BMaster/honey2.jpg)",
+        "background-repeat": "repeat",
+        "background-attachment": "scroll"
+      },
+      "name": "APIS Theme",
+      "description": "Beekeeping theme with honeycomb pattern",
+      "legacy_elements": {
+        "submenu": {
+          "background-color": "#f9f9f9"
+        },
+        "dropdown-content a": {
+          "color": "black"
+        },
+        "submenu a": {
+          "color": "black"
+        },
+        "dropdown-content": {
+          "background-color": "#f9f9f9"
+        },
+        "nav": {
+          "background-color": "#ccffff"
+        }
+      },
+      "special_styles": {
+        "body": "background-image: url(/static/images/BMaster/honey2.jpg);"
+      }
+    }
+  },
+  "component_styles": {
+    "api_credentials": "api_credentials.css",
+    "todo": "todo.css"
+  },
+  "domain_favicons": {
+    "computersystemconsulting.ca": "/static/images/favicons/computersystemconsulting.ca.svg",
+    "ve7tit.com": "/static/images/favicons/ve7tit.com.svg",
+    "shanta.weaverbeck.com": "/static/images/favicons/shanta.weaverbeck.com.svg",
+    "weaverbeck.com": "/static/images/favicons/weaverbeck.com.svg",
+    "forager.com": "/static/images/favicons/forager.com.svg",
+    "usbm.ca": "/static/images/favicons/usbm.ca.svg"
+  }
+}

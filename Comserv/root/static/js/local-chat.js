@@ -503,8 +503,6 @@
                                         return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                                     })
                                 : [
-                                    { val: 'grok|grok-3-mini',               label: 'Grok 3 Mini (fast)' },
-                                    { val: 'grok|grok-3',                    label: 'Grok 3' },
                                     { val: 'grok|grok-4-0709',               label: 'Grok 4' },
                                     { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
                                     { val: 'grok|grok-code-fast-1',          label: 'Grok Code Fast' }
@@ -517,7 +515,7 @@
                             sel.appendChild(grp);
                             // Cheapest Grok for complex queries (non-guest)
                             if (!state.isGuest) {
-                                state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-3-mini';
+                                state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-4-0709';
                             }
                             // Show web search toggle for any user who has Grok access
                             // (toggle applies to Grok requests whether selected manually or via auto-routing)
@@ -866,9 +864,30 @@
                 const chatMessages = document.getElementById('chat-messages');
                 chatMessages.innerHTML = '';
                 
-                // Add conversation messages
+                // Add conversation messages (with thinking traces for admin users)
                 data.messages.forEach(msg => {
                     const className = msg.role === 'user' ? 'user-message' : 'ai-message';
+                    // Render thinking trace BEFORE the message content (for AI messages with traces)
+                    if (msg.role === 'assistant' && msg.thinking_trace && msg.thinking_trace.length > 0 && state.isAdmin) {
+                        var isErrTrace = msg.thinking_trace.some(function(s) { return s && s.indexOf('FAILED') !== -1; });
+                        var traceEl = document.createElement('details');
+                        traceEl.className = 'ai-thinking' + (isErrTrace ? '' : '');
+                        traceEl.open = false;
+                        var traceSummary = document.createElement('summary');
+                        traceSummary.textContent = (isErrTrace ? '⚠️ AI Thinking — Error Trace' : '🔍 AI Thinking')
+                            + ' (' + msg.thinking_trace.length + ' steps)';
+                        var traceBody = document.createElement('div');
+                        traceBody.className = 'ai-thinking-body';
+                        msg.thinking_trace.forEach(function(step) {
+                            var stepEl = document.createElement('div');
+                            stepEl.className = 'ai-thinking-step';
+                            stepEl.textContent = step;
+                            traceBody.appendChild(stepEl);
+                        });
+                        traceEl.appendChild(traceSummary);
+                        traceEl.appendChild(traceBody);
+                        chatMessages.appendChild(traceEl);
+                    }
                     addMessage(msg.content, className);
                 });
                 
@@ -914,9 +933,30 @@
                 if (selectorBar) selectorBar.style.display = 'none';
                 const histBtn = document.getElementById('toggle-history-btn');
                 if (histBtn) histBtn.style.display = 'none';
+                const convLink = document.getElementById('conversations-link');
+                if (convLink) convLink.style.display = 'none';
                 // Clear any stale conversation ID left from a previous login session
                 state.currentConversationId = null;
                 sessionStorage.removeItem('currentConversationId');
+                // For guests: still populate modelTiers from available Ollama models
+                // so query auto-tier selection works correctly.
+                if (data.providers) {
+                    data.providers.forEach(function(p) {
+                        if (p.service === 'ollama' && p.models && p.models.length > 0) {
+                            const chatModels = p.models.filter(function(m) { return isChatModel(m.id); });
+                            if (chatModels.length > 0) {
+                                const sorted = chatModels.slice().sort(function(a, b) {
+                                    return modelSizeScore(a.id) - modelSizeScore(b.id);
+                                });
+                                const usable = sorted.filter(function(m) { return modelSizeScore(m.id) >= 3; });
+                                const pool   = usable.length > 0 ? usable : sorted;
+                                state.modelTiers.small  = 'ollama|' + pool[0].id;
+                                state.modelTiers.large  = 'ollama|' + pool[pool.length - 1].id;
+                                state.modelTiers.medium = 'ollama|' + pool[Math.floor(pool.length / 2)].id;
+                            }
+                        }
+                    });
+                }
                 return;
             }
 
@@ -971,8 +1011,6 @@
                                 return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                             })
                         : [
-                            { val: 'grok|grok-3-mini',               label: 'Grok 3 Mini (fast)' },
-                            { val: 'grok|grok-3',                    label: 'Grok 3' },
                             { val: 'grok|grok-4-0709',               label: 'Grok 4' },
                             { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
                             { val: 'grok|grok-code-fast-1',          label: 'Grok Code Fast' }
@@ -1241,7 +1279,7 @@
             }
         }
 
-        // Parse provider|model format (e.g. "grok|grok-3-mini" or "ollama|llama3.1:latest")
+        // Parse provider|model format (e.g. "grok|grok-mini" or "ollama|llama3.1:latest")
         const providerParts = effectiveProvider.split('|');
         const providerName = providerParts[0];
         // Only pass a model name for Grok (client-chosen) or explicit user overrides.
@@ -1430,9 +1468,9 @@
         }
 
         // Provider-aware client timeout:
-        //   Ollama: 360 s (server-side is 300 s — code analysis generation can take 200+ s)
+        //   Ollama: 660 s (server-side is 600 s for cold starts, 300 s warm — give extra buffer)
         //   Grok:   90 s (server-side is 120 s — complex audit/analysis queries need time)
-        const clientTimeoutMs = isOllama ? 360000 : 90000;
+        const clientTimeoutMs = isOllama ? 660000 : 90000;
         const abortCtrl = new AbortController();
         state.currentAbortCtrl = abortCtrl;   // expose for cancel button
         const abortTimer = setTimeout(function() {
@@ -1466,9 +1504,9 @@
                 if (loadingEl && loadingEl.firstChild) loadingEl.firstChild.textContent = txt;
             };
             progressTimer1 = setTimeout(function() { _setLoadTxt('⏳ Processing your request…'); },      10000);
-            progressTimer2 = setTimeout(function() { _setLoadTxt('⏳ Model is generating response… (may take 60–120 s for long answers)'); }, 30000);
-            progressTimer3 = setTimeout(function() { _setLoadTxt('⏳ Still generating… complex analysis takes time on CPU — please wait'); }, 90000);
-            progressTimer4 = setTimeout(function() { _setLoadTxt('⏳ Almost there… finalising response (up to 6 min total for code analysis)'); }, 180000);
+            progressTimer2 = setTimeout(function() { _setLoadTxt('⏳ Model is generating response… (60–120 s warm / up to 5 min cold start)'); }, 30000);
+            progressTimer3 = setTimeout(function() { _setLoadTxt('⏳ Still working… model may be loading from disk on first use — please wait'); }, 90000);
+            progressTimer4 = setTimeout(function() { _setLoadTxt('⏳ Almost there… CPU inference is slow for large inputs (up to 10 min cold start)'); }, 300000);
         }
 
         fetch(config.apiEndpoints.generateResponse, {
@@ -1543,7 +1581,7 @@
                         // Re-send with Grok web search
                         const grokModel = (state.modelTiers && state.modelTiers.grok)
                                           ? state.modelTiers.grok
-                                          : 'grok|grok-3-mini';
+                                          : 'grok|grok-4-0709';
                         state.userModelOverride = grokModel;
                         const webEl = document.getElementById('enable-web-search');
                         if (webEl) webEl.checked = true;
@@ -1892,6 +1930,32 @@
         { label: 'ency',                       url: '/ENCY' },
         { label: 'admin',                      url: '/admin' },
         { label: 'admin dashboard',            url: '/admin' },
+        { label: 'schema compare',             url: '/admin/schema_compare' },
+        { label: 'schema comparison',          url: '/admin/schema_compare' },
+        { label: 'schema_compare',             url: '/admin/schema_compare' },
+        { label: 'compare schema',             url: '/admin/schema_compare' },
+        { label: 'admin users',                url: '/admin/users' },
+        { label: 'users',                      url: '/admin/users' },
+        { label: 'admin logs',                 url: '/admin/logs' },
+        { label: 'logs',                       url: '/admin/logs' },
+        { label: 'system info',                url: '/admin/system_info' },
+        { label: 'admin settings',             url: '/admin/settings' },
+        { label: 'settings',                   url: '/admin/settings' },
+        { label: 'docker containers',          url: '/admin/docker-containers' },
+        { label: 'docker',                     url: '/admin/docker-containers' },
+        { label: 'security scan',              url: '/admin/security-scan' },
+        { label: 'link crawler',               url: '/admin/security-scan' },
+        { label: 'crawler',                    url: '/admin/security-scan' },
+        { label: 'link checker',               url: '/admin/security-scan' },
+        { label: 'check links',                url: '/admin/security-scan' },
+        { label: 'broken links',               url: '/admin/security-scan' },
+        { label: 'git pull',                   url: '/admin/git_pull' },
+        { label: 'planning admin',             url: '/admin/planning' },
+        { label: 'workshops',                  url: '/workshop' },
+        { label: 'membership',                 url: '/membership' },
+        { label: 'navigation',                 url: '/navigation/manage_links' },
+        { label: 'manage navigation',          url: '/navigation/manage_links' },
+        { label: 'manage links',               url: '/navigation/manage_links' },
         { label: 'home',                       url: '/' },
         { label: 'main menu',                  url: '/' },
     ];
@@ -1926,7 +1990,7 @@
     // Try to resolve a navigation intent query to a list of {label,url} matches
     function resolveNavIntent(rawQuery) {
         const q = rawQuery
-            .replace(/^(open|go to|take me to|navigate to|visit|switch to|switch|bring me to|load)\s+/i, '')
+            .replace(/^(goto|go to|open|take me to|navigate to|visit|switch to|switch|bring me to|load)\s*/i, '')
             .replace(/^(the|a|an)\s+/i, '')
             .replace(/[^\w\s]/g, ' ')
             .replace(/\s+/g, ' ')
@@ -2039,9 +2103,85 @@
         return { cleanText, actions };
     }
 
+    // Fill form fields in the current page (or window.opener if popup).
+    // actionObj.fields is a plain object: { fieldName: value, ... }
+    // For checkboxes pass boolean/0/1; selects and inputs accept string values.
+    function _executeFillForm(actionObj) {
+        const chatMessages = document.getElementById('chat-messages');
+        const fields = actionObj.fields || {};
+
+        // When the chat is running in a detached popup window the form lives in the
+        // opener page — try that first, fall back to the current document.
+        const targetDoc = (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed)
+            ? window.opener.document
+            : document;
+
+        const filled = [];
+        const missed = [];
+
+        Object.keys(fields).forEach(function(fieldName) {
+            const value = fields[fieldName];
+            // Try by name first, then by id
+            let el = targetDoc.querySelector('[name="' + fieldName + '"]')
+                  || targetDoc.getElementById(fieldName);
+
+            if (!el) {
+                missed.push(fieldName);
+                return;
+            }
+
+            const tag  = el.tagName.toLowerCase();
+            const type = (el.getAttribute('type') || '').toLowerCase();
+
+            if (type === 'checkbox') {
+                el.checked = !!(value === true || value === 1 || value === '1' || value === 'true');
+            } else if (tag === 'select') {
+                el.value = String(value);
+                // Fallback: try case-insensitive match on option text
+                if (!el.value || el.value !== String(value)) {
+                    Array.from(el.options).forEach(function(opt) {
+                        if (opt.text.toLowerCase() === String(value).toLowerCase()) {
+                            el.value = opt.value;
+                        }
+                    });
+                }
+            } else {
+                el.value = value !== null && value !== undefined ? String(value) : '';
+            }
+
+            // Fire change/input events so any JS listeners react
+            el.dispatchEvent(new Event('input',  { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            filled.push(fieldName);
+        });
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+        const lbl = document.createElement('div');
+        lbl.className = 'msg-label';
+        lbl.textContent = 'System';
+        const el2 = document.createElement('div');
+        el2.className = 'message system-message';
+        let msg = '';
+        if (filled.length)  msg += '✅ Filled: ' + filled.join(', ') + '.';
+        if (missed.length)  msg += '\n⚠️ Not found: ' + missed.join(', ') + '.';
+        if (!filled.length && !missed.length) msg = '⚠️ No fields specified.';
+        el2.textContent = msg.trim();
+        wrapper.appendChild(lbl);
+        wrapper.appendChild(el2);
+        chatMessages.appendChild(wrapper);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
     // POST an action object to /ai/action and show a confirmation bubble.
     function executeAIAction(actionObj) {
         const chatMessages = document.getElementById('chat-messages');
+
+        // fill_form is handled entirely client-side — no server round-trip needed.
+        if (actionObj.action === 'fill_form') {
+            _executeFillForm(actionObj);
+            return;
+        }
 
         fetch('/ai/action', {
             method: 'POST',

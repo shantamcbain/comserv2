@@ -92,6 +92,16 @@
             </div>
             [% END %]
 
+            <!-- AI Assistant Submenu (all logged-in users) -->
+            <div class="dropdown-divider"></div>
+            <div class="submenu-item">
+                <a href="/ai" class="submenu-header submenu-header-link"><i class="icon-ai"></i>AI Assistant</a>
+                <div class="submenu">
+                    <a href="/ai" class="submenu-link"><i class="icon-chat"></i>AI Chat</a>
+                    <a href="/ai/conversations" class="submenu-link"><i class="icon-history"></i>Chat History</a>
+                </div>
+            </div>
+
             <!-- Planning Submenu (visible to all logged-in users; links filtered by role) -->
             <div class="dropdown-divider"></div>
             <div class="submenu-item">

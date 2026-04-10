@@ -1,0 +1,160 @@
+[% META
+   title = "Author Detail - ENCY Encyclopedia"
+   description = "Author biography and works"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-08"
+%]
+[% PageVersion = 'ENCY/AuthorDetail.tt,v 0.01 2026/04/08' %]
+
+[% IF success_msg || c.flash.success_msg %]
+<div class="alert alert-success">[% success_msg || c.flash.success_msg | html %]</div>
+[% END %]
+[% IF error_msg || c.flash.error_msg %]
+<div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
+[% END %]
+
+<h1>
+  [% IF edit_mode && !author.author_id %]Add New Author
+  [% ELSIF edit_mode %]Editing: [% author.full_name | html %]
+  [% ELSE %][% author.full_name | html %]
+  [% IF author.credentials %]<span style="font-size:0.75em;font-weight:normal;">[% author.credentials | html %]</span>[% END %]
+  [% END %]
+</h1>
+
+<p class="ency-admin-breadcrumb">
+  <a href="[% c.uri_for('/ENCY/Author') %]">&larr; All Authors</a>
+  &nbsp;|&nbsp; <a href="[% c.uri_for('/ENCY/Reference') %]">Reference Library</a>
+  [% IF is_editor && !edit_mode && author.author_id %]
+  &nbsp;|&nbsp; <a href="[% c.uri_for('/ENCY/Author', author.author_id, { edit => 1 }) %]">Edit</a>
+  [% END %]
+</p>
+
+[% IF edit_mode %]
+<form action="[% author.author_id ? c.uri_for('/ENCY/Author', author.author_id) : c.uri_for('/ENCY/Author/add') %]" method="post">
+[% PROCESS 'ENCY/partials/AiFormFill.tt' %]
+[% END %]
+
+<table class="ency-admin-table" style="width:100%;">
+  <tr>
+    <td style="width:160px;"><strong>Full Name</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <input type="text" name="full_name" value="[% author.full_name | html %]" style="width:98%;" required />
+      [% ELSE %]
+      [% author.full_name | html %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Credentials</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <input type="text" name="credentials" value="[% author.credentials | html %]" style="width:98%;"
+             placeholder="e.g. ND, PhD, MD, RH (AHG)" />
+      [% ELSE %]
+      [% author.credentials | html %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Specialty</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <input type="text" name="specialty" value="[% author.specialty | html %]" style="width:98%;"
+             placeholder="e.g. Naturopathic Oncology, Herbalism, Folk Medicine" />
+      [% ELSE %]
+      [% author.specialty | html %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Affiliation</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <input type="text" name="affiliation" value="[% author.affiliation | html %]" style="width:98%;" />
+      [% ELSE %]
+      [% author.affiliation | html %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Nationality</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <input type="text" name="nationality" value="[% author.nationality | html %]" style="width:30em;" />
+      [% ELSE %]
+      [% author.nationality | html %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Born / Died</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <input type="number" name="born_year" value="[% author.born_year | html %]" size="6" placeholder="YYYY" min="1400" max="2100" />
+      &ndash;
+      <input type="number" name="died_year" value="[% author.died_year | html %]" size="6" placeholder="YYYY (leave blank if living)" min="1400" max="2100" />
+      [% ELSE %]
+      [% author.born_year %][% IF author.died_year %] &ndash; [% author.died_year %][% ELSIF author.born_year %] &ndash; (living)[% END %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Website / URL</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <input type="text" name="url" value="[% author.url | html %]" style="width:98%;" placeholder="https://..." />
+      [% ELSE %]
+      [% IF author.url %]<a href="[% author.url | html %]" target="_blank">[% author.url | html %]</a>[% END %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Biography</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <textarea name="bio" rows="8" style="width:98%;">[% author.bio | html %]</textarea>
+      [% ELSE %]
+      [% author.bio | html %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Notes</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <textarea name="notes" rows="4" style="width:98%;">[% author.notes | html %]</textarea>
+      [% ELSE %]
+      [% author.notes | html %]
+      [% END %]
+    </td>
+  </tr>
+</table>
+
+[% IF edit_mode %]
+<p>
+  <button type="submit">Save</button>
+  &nbsp;
+  <a href="[% c.uri_for('/ENCY/Author', author.author_id) %]">Cancel</a>
+</p>
+</form>
+[% END %]
+
+[%# ── Works / References ──────────────────────────── %]
+[% IF works && works.size %]
+<h2>Works in Reference Library</h2>
+<table class="ency-admin-table" style="width:100%;">
+  <tr><th>#</th><th>Title</th><th>Year</th><th>Type</th></tr>
+  [% FOR ref IN works %]
+  <tr>
+    <td><a href="[% c.uri_for('/ENCY/Reference', ref.reference_id) %]">[% ref.reference_id %]</a></td>
+    <td><a href="[% c.uri_for('/ENCY/Reference', ref.reference_id) %]">[% ref.title | html %]</a></td>
+    <td>[% ref.publication_date ? ref.publication_date.substr(0,4) : '' %]</td>
+    <td>[% ref.reference_system | html %]</td>
+  </tr>
+  [% END %]
+</table>
+[% END %]

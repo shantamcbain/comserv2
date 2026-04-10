@@ -1,0 +1,148 @@
+[% META
+   title = "Add Cost Entry"
+   description = "Record a new operational cost entry"
+   roles = "admin,site_admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-04-03"
+%]
+[% PageVersion = 'membership/admin/AddCost.tt,v 0.01 2026/04/03' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Add Cost Entry</h1>
+    [% IF site %]<p>Site: <strong>[% site.name | html %]</strong></p>[% END %]
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <a href="[% c.uri_for('/membership/admin/cost_tracking') %]" class="btn btn-secondary">← Back to Cost Tracking</a>
+      </div>
+
+      <div class="content-section">
+        <form method="post" action="[% c.uri_for('/membership/admin/cost_tracking') %]">
+
+          <div class="form-row">
+            <div class="form-field">
+              <label for="cost_category">Category *</label>
+              <select id="cost_category" name="cost_category" required>
+                <option value="">-- Select Category --</option>
+                <optgroup label="Facility &amp; Power">
+                  <option value="power_electricity">Electricity / Power Bill</option>
+                  <option value="cooling_hvac">Cooling / HVAC</option>
+                  <option value="server_room_rent">Server Room / Office Rent</option>
+                  <option value="hardware_ups">UPS / Power Conditioning</option>
+                </optgroup>
+                <optgroup label="Hardware">
+                  <option value="hardware_servers">Servers (purchase / lease)</option>
+                  <option value="hardware_network">Network Equipment</option>
+                  <option value="hardware_storage">Storage / NAS / Backup Drives</option>
+                  <option value="hardware_workstations">Workstations / Dev Hardware</option>
+                </optgroup>
+                <optgroup label="Connectivity">
+                  <option value="isp_primary">ISP — Primary Internet Connection</option>
+                  <option value="isp_backup">ISP — Backup / Failover Connection</option>
+                  <option value="ip_addressing">Static IP / IP Block</option>
+                  <option value="cdn">CDN / Content Delivery</option>
+                </optgroup>
+                <optgroup label="Hosting &amp; Domains">
+                  <option value="hosting_cloud">Cloud / VPS Hosting</option>
+                  <option value="domain_registration">Domain Registration / Renewal</option>
+                  <option value="ssl_certificates">SSL / TLS Certificates</option>
+                  <option value="backup_services">Offsite Backup Services</option>
+                </optgroup>
+                <optgroup label="AI &amp; Compute">
+                  <option value="ai_ollama_gpu">Ollama / Local AI GPU Compute</option>
+                  <option value="ai_xai">xAI (Grok) API</option>
+                  <option value="ai_openai">OpenAI API</option>
+                  <option value="ai_anthropic">Anthropic (Claude) API</option>
+                  <option value="ai_other">Other AI / ML API</option>
+                </optgroup>
+                <optgroup label="Software &amp; Licensing">
+                  <option value="software_os">OS / Server Licenses</option>
+                  <option value="software_licenses">Software Subscriptions / Licenses</option>
+                  <option value="software_monitoring">Monitoring &amp; Alerting Tools</option>
+                  <option value="software_security">Security / Antivirus / WAF</option>
+                </optgroup>
+                <optgroup label="Communication">
+                  <option value="email_service">Email Service</option>
+                  <option value="sms_notifications">SMS / Push Notification Service</option>
+                </optgroup>
+                <optgroup label="Personnel &amp; Services">
+                  <option value="programming_labor">Programming / Development</option>
+                  <option value="sysadmin_labor">System Administration</option>
+                  <option value="customer_support">Customer Support</option>
+                  <option value="accounting_legal">Accounting / Legal</option>
+                </optgroup>
+                <optgroup label="Compliance &amp; Risk">
+                  <option value="insurance">Business / Cyber Insurance</option>
+                  <option value="security_audit">Security Audit / Penetration Testing</option>
+                </optgroup>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="amount">Amount *</label>
+              <input type="number" id="amount" name="amount" step="0.01" min="0" required>
+            </div>
+            <div class="form-field">
+              <label for="currency">Currency</label>
+              <select id="currency" name="currency">
+                <option value="CAD">CAD</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-field">
+              <label for="period_start">Period Start *</label>
+              <input type="date" id="period_start" name="period_start" required>
+            </div>
+            <div class="form-field">
+              <label for="period_end">Period End *</label>
+              <input type="date" id="period_end" name="period_end" required>
+            </div>
+            <div class="form-field">
+              <label><input type="checkbox" name="is_recurring" value="1"> Recurring Monthly</label>
+            </div>
+            <div class="form-field">
+              <label><input type="checkbox" name="is_global" value="1"> Global (all sites)</label>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-field">
+              <label for="vendor">Vendor</label>
+              <input type="text" id="vendor" name="vendor" placeholder="e.g. Shaw Business">
+            </div>
+            <div class="form-field">
+              <label for="invoice_reference">Invoice / Reference</label>
+              <input type="text" id="invoice_reference" name="invoice_reference">
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" rows="3"></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Add Cost Entry</button>
+            <a href="[% c.uri_for('/membership/admin/cost_tracking') %]" class="btn btn-secondary">Cancel</a>
+          </div>
+
+        </form>
+      </div>
+
+    </div>
+  </div>
+</div>

@@ -1,0 +1,351 @@
+[% META
+   title = "ENCY Admin Dashboard"
+   description = "Encyclopedia administration overview — record counts, AI drafts, reference quality, and system health"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-08"
+%]
+[% PageVersion = 'ENCY/AdminDashboard.tt,v 0.01 2026/04/08' %]
+
+[% IF success_msg || c.flash.success_msg %]
+<div class="alert alert-success">[% success_msg || c.flash.success_msg | html %]</div>
+[% END %]
+[% IF error_msg || c.flash.error_msg %]
+<div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
+[% END %]
+
+<h1>ENCY Administration Dashboard</h1>
+<p class="ency-admin-breadcrumb">
+  <a href="[% c.uri_for('/ENCY') %]">&larr; ENCY Home</a>
+  &nbsp;|&nbsp;
+  <a href="[% c.uri_for('/admin/schema_compare', { database => 'ency' }) %]">Schema Compare (Ency DB)</a>
+  &nbsp;|&nbsp;
+  <a href="[% c.uri_for('/admin/schema_compare', { database => 'forager' }) %]">Schema Compare (Forager DB)</a>
+  &nbsp;|&nbsp;
+  <a href="[% c.uri_for('/admin/logs') %]">System Logs</a>
+  &nbsp;|&nbsp;
+  <a href="[% c.uri_for('/todo') %]">Todo List</a>
+</p>
+
+<!-- ════════════════════════════════════════════════════════
+     SECTION 1: Entity Record Counts
+     ═══════════════════════════════════════════════════════ -->
+<div class="ency-admin-section">
+<h2>Entity Records</h2>
+<div class="ency-admin-grid">
+
+  <div class="ency-admin-card">
+    <h3>Biological</h3>
+    <div class="ency-admin-stat">
+      <a href="[% c.uri_for('/ENCY/BotanicalNameView') %]">Herbs</a>
+      <span class="ency-count [% counts.herb > 0 ? 'ok' : 'zero' %]">[% counts.herb || 0 %]</span>
+    </div>
+    <div class="ency-admin-stat">
+      <a href="[% c.uri_for('/ENCY/Animal') %]">Animals</a>
+      <span class="ency-count [% counts.animal > 0 ? 'ok' : 'zero' %]">[% counts.animal || 0 %]</span>
+    </div>
+    <div class="ency-admin-stat">
+      <a href="[% c.uri_for('/ENCY/Insect') %]">Insects</a>
+      <span class="ency-count [% counts.insect > 0 ? 'ok' : 'zero' %]">[% counts.insect || 0 %]</span>
+    </div>
+  </div>
+
+  <div class="ency-admin-card">
+    <h3>Therapeutic</h3>
+    <div class="ency-admin-stat">
+      <a href="[% c.uri_for('/ENCY/Disease') %]">Diseases</a>
+      <span class="ency-count [% counts.disease > 0 ? 'ok' : 'zero' %]">[% counts.disease || 0 %]</span>
+    </div>
+    <div class="ency-admin-stat">
+      <a href="[% c.uri_for('/ENCY/Symptom') %]">Symptoms</a>
+      <span class="ency-count [% counts.symptom > 0 ? 'ok' : 'zero' %]">[% counts.symptom || 0 %]</span>
+    </div>
+    <div class="ency-admin-stat">
+      <a href="[% c.uri_for('/ENCY/Constituent') %]">Constituents</a>
+      <span class="ency-count [% counts.constituent > 0 ? 'ok' : 'zero' %]">[% counts.constituent || 0 %]</span>
+    </div>
+  </div>
+
+  <div class="ency-admin-card">
+    <h3>Clinical &amp; Formulas</h3>
+    <div class="ency-admin-stat">
+      <a href="[% c.uri_for('/ENCY/Drug') %]">Drugs</a>
+      <span class="ency-count [% counts.drug > 0 ? 'ok' : 'zero' %]">[% counts.drug || 0 %]</span>
+    </div>
+    <div class="ency-admin-stat">
+      <a href="[% c.uri_for('/ENCY/Formula') %]">Formulas</a>
+      <span class="ency-count [% counts.formula > 0 ? 'ok' : 'zero' %]">[% counts.formula || 0 %]</span>
+    </div>
+    <div class="ency-admin-stat">
+      <a href="[% c.uri_for('/ENCY/Glossary') %]">Glossary Terms</a>
+      <span class="ency-count [% counts.glossary > 0 ? 'ok' : 'zero' %]">[% counts.glossary || 0 %]</span>
+    </div>
+  </div>
+
+  <div class="ency-admin-card">
+    <h3>Reference Library</h3>
+    <div class="ency-admin-stat">
+      <a href="[% c.uri_for('/ENCY/Reference') %]">Total References</a>
+      <span class="ency-count [% counts.reference > 0 ? 'ok' : 'zero' %]">[% counts.reference || 0 %]</span>
+    </div>
+    <div class="ency-admin-stat">
+      <span title="References missing title field">&#9675; Missing Title</span>
+      <span class="ency-count [% refs_missing_title > 0 ? 'warn' : 'ok' %]">[% refs_missing_title %]</span>
+    </div>
+    <div class="ency-admin-stat">
+      <span title="References missing author field">&#9675; Missing Author</span>
+      <span class="ency-count [% refs_missing_author > 0 ? 'warn' : 'ok' %]">[% refs_missing_author %]</span>
+    </div>
+    <div class="ency-admin-stat">
+      <span title="References missing ISBN">&#9675; Missing ISBN</span>
+      <span class="ency-count [% refs_missing_isbn > 0 ? 'warn' : 'ok' %]">[% refs_missing_isbn %]</span>
+    </div>
+    <h3 class="mt">Publishers &amp; Authors</h3>
+    <div class="ency-admin-stat">
+      <span>Publishers</span>
+      <span class="ency-count [% counts.publisher > 0 ? 'ok' : 'zero' %]">[% counts.publisher || 0 %]</span>
+    </div>
+    <div class="ency-admin-stat">
+      <a href="[% c.uri_for('/ENCY/Author') %]">Authors</a>
+      <span class="ency-count [% counts.author > 0 ? 'ok' : 'zero' %]">[% counts.author || 0 %]</span>
+    </div>
+    <div class="ency-admin-stat">
+      <span>Ref ↔ Author links</span>
+      <span class="ency-count [% counts.reference_author > 0 ? 'ok' : 'zero' %]">[% counts.reference_author || 0 %]</span>
+    </div>
+    <div class="ency-admin-stat mt">
+      <a href="[% c.uri_for('/ENCY/Reference/add') %]">+ Add Reference</a>
+      <a href="[% c.uri_for('/ENCY/Author/add') %]">+ Add Author</a>
+      <a href="[% c.uri_for('/ENCY/Reference') %]">References &rarr;</a>
+      <a href="[% c.uri_for('/ENCY/Author') %]">Authors &rarr;</a>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     SECTION 2: AI Drafts Pending Verification
+     ═══════════════════════════════════════════════════════ -->
+<div class="ency-admin-section">
+<h2>AI Drafts Pending Human Verification
+  [% IF total_ai_drafts > 0 %]
+  <span class="badge-warn">[% total_ai_drafts %] pending</span>
+  [% ELSE %]
+  <span class="badge-ok">none</span>
+  [% END %]
+</h2>
+[% IF total_ai_drafts > 0 %]
+<p class="ency-admin-note">Records with <code>username_of_poster = 'ai-draft'</code> and <code>share = 0</code> (not yet public). Review and edit before making public.</p>
+<table class="ency-admin-table">
+  <tr><th>Entity</th><th>AI Drafts</th><th>Action</th></tr>
+  [% FOR entity IN ['herb','animal','insect','disease','symptom','constituent','drug'] %]
+  [% SET n = ai_drafts.$entity || 0 %]
+  [% IF n > 0 %]
+  <tr>
+    <td>[% entity | ucfirst %]</td>
+    <td><span class="badge-warn">[% n %]</span></td>
+    <td>
+      [% IF entity == 'herb' %]
+      <a href="[% c.uri_for('/ENCY/BotanicalNameView') %]">Browse Herbs</a>
+      [% ELSIF entity == 'animal' %]
+      <a href="[% c.uri_for('/ENCY/Animal') %]">Browse Animals</a>
+      [% ELSIF entity == 'insect' %]
+      <a href="[% c.uri_for('/ENCY/Insect') %]">Browse Insects</a>
+      [% ELSIF entity == 'disease' %]
+      <a href="[% c.uri_for('/ENCY/Disease') %]">Browse Diseases</a>
+      [% ELSIF entity == 'symptom' %]
+      <a href="[% c.uri_for('/ENCY/Symptom') %]">Browse Symptoms</a>
+      [% ELSIF entity == 'constituent' %]
+      <a href="[% c.uri_for('/ENCY/Constituent') %]">Browse Constituents</a>
+      [% ELSIF entity == 'drug' %]
+      <a href="[% c.uri_for('/ENCY/Drug') %]">Browse Drugs</a>
+      [% END %]
+    </td>
+  </tr>
+  [% END %]
+  [% END %]
+</table>
+[% ELSE %]
+<p class="ency-admin-note">No AI draft records pending verification.</p>
+[% END %]
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     SECTION 3: Junction / Relationship Tables
+     ═══════════════════════════════════════════════════════ -->
+<div class="ency-admin-section">
+<h2>Relationship Tables (Junctions)</h2>
+<div class="ency-admin-grid">
+
+  <div class="ency-admin-card">
+    <h3>Herb Links</h3>
+    [% FOR pair IN [
+        ['HerbConstituent', 'Herb ↔ Constituent'],
+        ['HerbDisease',     'Herb ↔ Disease'],
+        ['HerbSymptom',     'Herb ↔ Symptom'],
+        ['HerbCategory',    'Herb ↔ Category'],
+        ['FormulaHerb',     'Formula ↔ Herb'],
+    ] %]
+    <div class="ency-admin-stat">
+      <span>[% pair.1 %]</span>
+      <span class="ency-count [% junctions.${pair.0} > 0 ? 'ok' : 'zero' %]">[% junctions.${pair.0} %]</span>
+    </div>
+    [% END %]
+  </div>
+
+  <div class="ency-admin-card">
+    <h3>Disease &amp; Symptom Links</h3>
+    [% FOR pair IN [
+        ['DiseaseSymptom', 'Disease ↔ Symptom'],
+        ['DiseaseAnimal',  'Disease ↔ Animal'],
+        ['DiseaseInsect',  'Disease ↔ Insect'],
+        ['DiseaseHerb',    'Disease ↔ Herb'],
+        ['FormulaDisease', 'Formula ↔ Disease'],
+    ] %]
+    <div class="ency-admin-stat">
+      <span>[% pair.1 %]</span>
+      <span class="ency-count [% junctions.${pair.0} > 0 ? 'ok' : 'zero' %]">[% junctions.${pair.0} %]</span>
+    </div>
+    [% END %]
+  </div>
+
+  <div class="ency-admin-card">
+    <h3>Animal &amp; Insect Links</h3>
+    [% FOR pair IN [
+        ['InsectHerb',  'Insect ↔ Herb'],
+        ['AnimalHerb',  'Animal ↔ Herb'],
+    ] %]
+    <div class="ency-admin-stat">
+      <span>[% pair.1 %]</span>
+      <span class="ency-count [% junctions.${pair.0} > 0 ? 'ok' : 'zero' %]">[% junctions.${pair.0} %]</span>
+    </div>
+    [% END %]
+
+    <h3 class="mt">Constituent Links</h3>
+    [% FOR pair IN [
+        ['ConstituentDisease', 'Constituent ↔ Disease'],
+        ['ConstituentSymptom', 'Constituent ↔ Symptom'],
+    ] %]
+    <div class="ency-admin-stat">
+      <span>[% pair.1 %]</span>
+      <span class="ency-count [% junctions.${pair.0} > 0 ? 'ok' : 'zero' %]">[% junctions.${pair.0} %]</span>
+    </div>
+    [% END %]
+  </div>
+
+  <div class="ency-admin-card">
+    <h3>Drug Links</h3>
+    [% FOR pair IN [
+        ['DrugDisease',          'Drug ↔ Disease'],
+        ['DrugConstituent',      'Drug ↔ Constituent'],
+        ['DrugSymptom',          'Drug ↔ Symptom'],
+        ['DrugHerbInteraction',  'Drug ↔ Herb Interaction'],
+    ] %]
+    <div class="ency-admin-stat">
+      <span>[% pair.1 %]</span>
+      <span class="ency-count [% junctions.${pair.0} > 0 ? 'ok' : 'zero' %]">[% junctions.${pair.0} %]</span>
+    </div>
+    [% END %]
+
+    <h3 class="mt">Reference Links</h3>
+    <div class="ency-admin-stat">
+      <span>Entity ↔ Reference (formal)</span>
+      <span class="ency-count [% junctions.EntityReference > 0 ? 'ok' : 'zero' %]">[% junctions.EntityReference %]</span>
+    </div>
+    <div class="ency-admin-stat sm">
+      <a href="[% c.uri_for('/ENCY/admin') %]?run_seed_refs=1">Run Reference Link Seeder (dry run)</a>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     SECTION 4: Open Todos & System Health
+     ═══════════════════════════════════════════════════════ -->
+<div class="ency-admin-grid">
+
+  <div class="ency-admin-card">
+    <h3>Open ENCY Todos
+      [% IF open_todos > 0 %]<span class="badge-warn">[% open_todos %]</span>[% ELSE %]<span class="badge-ok">0</span>[% END %]
+    </h3>
+    [% IF open_todos > 0 %]
+    <p class="ency-admin-note">[% open_todos %] open task(s) in ENCY project.</p>
+    [% END %]
+    <div class="ency-admin-stat">
+      <a href="[% c.uri_for('/todo', { project_code => 'ENCY' }) %]">View ENCY Todos</a>
+      <a href="[% c.uri_for('/todo/add', { project_code => 'ENCY' }) %]">+ Add Todo</a>
+    </div>
+  </div>
+
+  <div class="ency-admin-card">
+    <h3>Schema &amp; DB Tools</h3>
+    <div class="ency-admin-stat">
+      <a href="[% c.uri_for('/admin/schema_compare', { database => 'ency' }) %]">Schema Compare — Ency DB</a>
+    </div>
+    <div class="ency-admin-stat">
+      <a href="[% c.uri_for('/admin/schema_compare', { database => 'forager' }) %]">Schema Compare — Forager DB</a>
+    </div>
+    <div class="ency-admin-stat">
+      <a href="[% c.uri_for('/admin/logs') %]">System Logs</a>
+    </div>
+    <div class="ency-admin-stat">
+      <a href="[% c.uri_for('/admin') %]">Main Admin Panel</a>
+    </div>
+    <p class="ency-admin-note">
+      New tables requiring schema compare: <code>ency_entity_reference</code>
+      (EntityReference.pm added 2026-04-08).
+    </p>
+  </div>
+
+  [% IF recent_errors && recent_errors.size %]
+  <div class="ency-admin-card wide">
+    <h3>Recent ENCY Errors <span class="badge-error">[% recent_errors.size %]</span></h3>
+    <table class="ency-admin-table">
+      <tr><th>Line</th><th>Method</th><th>Message</th></tr>
+      [% FOR e IN recent_errors %]
+      <tr>
+        <td class="nowrap">[% e.line_number %]</td>
+        <td class="nowrap">[% e.sub_name | html %]</td>
+        <td class="sm">[% e.message.substr(0,120) | html %]</td>
+      </tr>
+      [% END %]
+    </table>
+    <div class="ency-admin-stat mt"><a href="[% c.uri_for('/admin/logs') %]">View full logs &rarr;</a></div>
+  </div>
+  [% ELSE %]
+  <div class="ency-admin-card">
+    <h3>Recent ENCY Errors</h3>
+    <p class="ency-admin-note">No recent errors found. <span class="badge-ok">clean</span></p>
+    <div class="ency-admin-stat"><a href="[% c.uri_for('/admin/logs') %]">View logs</a></div>
+  </div>
+  [% END %]
+
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     SECTION 5: Quick Add Links
+     ═══════════════════════════════════════════════════════ -->
+<div class="ency-admin-section">
+<h2>Quick Add</h2>
+<div class="ency-quick-add">
+  [% FOR item IN [
+      ['/ENCY/add_herb',        'Herb'],
+      ['/ENCY/Animal/add',      'Animal'],
+      ['/ENCY/Insect/add',      'Insect'],
+      ['/ENCY/Disease/add',     'Disease'],
+      ['/ENCY/Symptom/add',     'Symptom'],
+      ['/ENCY/Constituent/add', 'Constituent'],
+      ['/ENCY/Drug/add',        'Drug'],
+      ['/ENCY/Formula/add',     'Formula'],
+      ['/ENCY/Glossary/add',    'Glossary Term'],
+      ['/ENCY/Reference/add',   'Reference'],
+      ['/ENCY/Author/add',      'Author'],
+  ] %]
+  <a href="[% c.uri_for(item.0) %]">+ [% item.1 %]</a>
+  [% END %]
+</div>
+</div>

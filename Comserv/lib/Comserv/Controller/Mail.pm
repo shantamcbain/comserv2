@@ -855,20 +855,59 @@ sub lists :Local :Args(0) {
         );
         while (my $list = $rs->next) {
             my @subs;
-            my $sub_rs = $c->model('DBEncy')->resultset('MailingListSubscription')->search(
-                { mailing_list_id => $list->id, is_active => 1 },
-                { prefetch => 'user', order_by => 'user.username' }
-            );
-            while (my $sub = $sub_rs->next) {
-                my $u = $sub->user;
-                next unless $u && $u->email;
-                push @subs, {
-                    user_id    => $u->id,
-                    username   => $u->username   || '',
-                    first_name => $u->first_name || '',
-                    last_name  => $u->last_name  || '',
-                    email      => $u->email,
+            eval {
+                my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+                # Try full query with email-only columns; fall back to uid-only if columns missing
+                my $sth;
+                eval {
+                    $sth = $dbh->prepare(
+                        "SELECT s.id, s.user_id, s.email AS sub_email,
+                                s.first_name AS sub_first, s.last_name AS sub_last,
+                                u.username, u.first_name, u.last_name, u.email AS user_email
+                         FROM mailing_list_subscriptions s
+                         LEFT JOIN users u ON u.id = s.user_id
+                         WHERE s.mailing_list_id = ? AND s.is_active = 1
+                         ORDER BY COALESCE(u.username, s.email)"
+                    );
+                    $sth->execute($list->id);
                 };
+                if ($@) {
+                    # Fallback: columns not yet added — uid-only query
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'lists',
+                        "Falling back to uid-only subscription query (run ALTER migration): $@");
+                    $sth = $dbh->prepare(
+                        "SELECT s.id, s.user_id,
+                                u.username, u.first_name, u.last_name, u.email AS user_email
+                         FROM mailing_list_subscriptions s
+                         LEFT JOIN users u ON u.id = s.user_id
+                         WHERE s.mailing_list_id = ? AND s.is_active = 1
+                         ORDER BY u.username"
+                    );
+                    $sth->execute($list->id);
+                }
+                while (my $row = $sth->fetchrow_hashref) {
+                    if ($row->{user_email}) {
+                        push @subs, {
+                            user_id    => $row->{user_id},
+                            username   => $row->{username}   || '',
+                            first_name => $row->{first_name} || '',
+                            last_name  => $row->{last_name}  || '',
+                            email      => $row->{user_email},
+                        };
+                    } elsif ($row->{sub_email}) {
+                        push @subs, {
+                            user_id    => undef,
+                            username   => '',
+                            first_name => $row->{sub_first} || '',
+                            last_name  => $row->{sub_last}  || '',
+                            email      => $row->{sub_email},
+                        };
+                    }
+                }
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'lists',
+                    "Subscription query failed for list " . $list->id . ": $@");
             }
             my $row = {
                 id               => $list->id,
@@ -1103,11 +1142,32 @@ sub send_mass_email :Local :Args(0) {
     my @recipients;
 
     if ($group eq 'custom') {
-        # Custom addresses only
+        # Custom addresses from mailing list checkboxes — look up names from DB
         for my $addr (split /[\s,;]+/, $custom_addresses) {
             $addr =~ s/^\s+|\s+$//g;
-            push @recipients, { email => $addr, first_name => '', last_name => '', username => $addr }
-                if $addr =~ /\@/;
+            next unless $addr =~ /\@/;
+            my $rec = { email => $addr, first_name => '', last_name => '', username => '' };
+            eval {
+                my $u = $c->model('DBEncy')->resultset('User')->find({ email => $addr });
+                if ($u) {
+                    $rec->{first_name} = $u->first_name || '';
+                    $rec->{last_name}  = $u->last_name  || '';
+                    $rec->{username}   = $u->username   || '';
+                } else {
+                    # Try mailing_list_subscriptions for email-only entries
+                    my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+                    my $sth = $dbh->prepare(
+                        "SELECT first_name, last_name FROM mailing_list_subscriptions WHERE email=? AND is_active=1 LIMIT 1"
+                    );
+                    eval { $sth->execute($addr) };
+                    unless ($@) {
+                        my ($fn, $ln) = $sth->fetchrow_array;
+                        $rec->{first_name} = $fn || '';
+                        $rec->{last_name}  = $ln || '';
+                    }
+                }
+            };
+            push @recipients, $rec;
         }
     } else {
         # DB users (all or paid members)
@@ -1268,32 +1328,79 @@ sub _upsert_list_subscriptions {
     my $dbh = $c->model('DBEncy')->schema->storage->dbh;
 
     # Mark all auto subscriptions for this list+source inactive
-    $dbh->do(
-        "UPDATE mailing_list_subscriptions SET is_active=0 WHERE mailing_list_id=? AND subscription_source=?",
-        undef, $list_id, $source
-    );
+    eval {
+        $dbh->do(
+            "UPDATE mailing_list_subscriptions SET is_active=0 WHERE mailing_list_id=? AND subscription_source=?",
+            undef, $list_id, $source
+        );
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_upsert_list_subscriptions',
+            "Mark-inactive failed for list $list_id: $@");
+        return;
+    }
 
-    # Insert or re-activate each current user
-    # Use INSERT ... ON DUPLICATE KEY (MySQL) — key is (mailing_list_id, user_id, source_id)
-    # Since source_id is NULL for auto lists we can't rely on the unique key; use a simpler approach:
-    # check existence then insert/update.
-    my $check_sth = $dbh->prepare(
+    my $check_uid_sth = $dbh->prepare(
         "SELECT id FROM mailing_list_subscriptions WHERE mailing_list_id=? AND user_id=? AND subscription_source=?"
     );
     my $update_sth = $dbh->prepare(
         "UPDATE mailing_list_subscriptions SET is_active=1 WHERE id=?"
     );
-    my $insert_sth = $dbh->prepare(
+    my $insert_uid_sth = $dbh->prepare(
         "INSERT INTO mailing_list_subscriptions (mailing_list_id, user_id, subscription_source, is_active) VALUES (?,?,?,1)"
     );
 
-    for my $uid (@$user_ids_ref) {
-        $check_sth->execute($list_id, $uid, $source);
-        my $row = $check_sth->fetchrow_hashref;
-        if ($row) {
-            $update_sth->execute($row->{id});
+    # Lazily prepare email statements only if needed (columns may not exist yet pre-ALTER)
+    my ($check_email_sth, $insert_email_sth, $email_stmts_ok);
+
+    for my $entry (@$user_ids_ref) {
+        if (ref $entry eq 'HASH') {
+            my $email = $entry->{email};
+            my $first = $entry->{first_name} || '';
+            my $last  = $entry->{last_name}  || '';
+            next unless $email;
+
+            # Prepare email statements on first use
+            unless (defined $email_stmts_ok) {
+                eval {
+                    $check_email_sth = $dbh->prepare(
+                        "SELECT id FROM mailing_list_subscriptions WHERE mailing_list_id=? AND email=? AND subscription_source=?"
+                    );
+                    $insert_email_sth = $dbh->prepare(
+                        "INSERT INTO mailing_list_subscriptions (mailing_list_id, email, first_name, last_name, subscription_source, is_active) VALUES (?,?,?,?,?,1)"
+                    );
+                    $email_stmts_ok = 1;
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_upsert_list_subscriptions',
+                        "Email column not available yet (run ALTER migration): $@");
+                    $email_stmts_ok = 0;
+                }
+            }
+            next unless $email_stmts_ok;
+
+            eval { $check_email_sth->execute($list_id, $email, $source) };
+            next if $@;
+            my $row = $check_email_sth->fetchrow_hashref;
+            if ($row) {
+                eval { $update_sth->execute($row->{id}) };
+            } else {
+                eval { $insert_email_sth->execute($list_id, $email, $first, $last, $source) };
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_upsert_list_subscriptions',
+                    "email-only insert error for $email: $@") if $@;
+            }
         } else {
-            eval { $insert_sth->execute($list_id, $uid, $source) };
+            my $uid = $entry;
+            eval { $check_uid_sth->execute($list_id, $uid, $source) };
+            next if $@;
+            my $row = $check_uid_sth->fetchrow_hashref;
+            if ($row) {
+                eval { $update_sth->execute($row->{id}) };
+            } else {
+                eval { $insert_uid_sth->execute($list_id, $uid, $source) };
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_upsert_list_subscriptions',
+                    "user_id insert error for uid=$uid: $@") if $@;
+            }
         }
     }
 }
@@ -1371,54 +1478,111 @@ sub _sync_workshop_attendees_list {
 
     my $list = $self->_find_or_create_list($c, $site_id,
         'All Workshop Attendees',
-        '[auto] All users registered for any workshop on this site'
+        '[auto] All users registered for any active workshop on this site'
     );
 
-    # Get all workshop_ids for this site (via site_workshop join table OR workshop.site_id)
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
+        "Syncing workshop attendees for site_id=$site_id (active workshops only, excluding cancelled)");
+
+    # Get all active workshop_ids for this site — BOTH from site_workshop join table AND workshop.site_id
+    # Exclude only cancelled workshops; completed/in_progress/published are all valid
+    my %seen_wid;
     my @workshop_ids;
+
     eval {
-        # Primary: site_workshop linking table
-        @workshop_ids = $c->model('DBEncy')->resultset('SiteWorkshop')->search(
+        my @via_link = $c->model('DBEncy')->resultset('SiteWorkshop')->search(
             { site_id => $site_id }
         )->get_column('workshop_id')->all;
-    };
-    # Fallback: direct site_id on workshop table
-    unless (@workshop_ids) {
-        eval {
-            @workshop_ids = $c->model('DBEncy')->resultset('WorkShop')->search(
-                { site_id => $site_id }
+
+        if (@via_link) {
+            # Filter to non-cancelled workshops from the id list
+            my @active = $c->model('DBEncy')->resultset('WorkShop')->search(
+                { id => { -in => \@via_link }, status => { '!=' => 'cancelled' } }
             )->get_column('id')->all;
-        };
-    }
+            for my $wid (@active) {
+                unless ($seen_wid{$wid}++) { push @workshop_ids, $wid }
+            }
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
+            "Workshops via site_workshop for site_id=$site_id: [" . join(',', @workshop_ids) . "]");
+    };
 
-    my @user_ids;
+    eval {
+        my @via_direct = $c->model('DBEncy')->resultset('WorkShop')->search(
+            { site_id => $site_id, status => { '!=' => 'cancelled' } }
+        )->get_column('id')->all;
+        for my $wid (@via_direct) {
+            unless ($seen_wid{$wid}++) { push @workshop_ids, $wid }
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
+            "Workshops via WorkShop.site_id for site_id=$site_id: [" . join(',', @via_direct) . "]");
+    };
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
+        "Total unique workshops for site_id=$site_id: [" . join(',', @workshop_ids) . "]");
+
+    my @entries;
     if (@workshop_ids) {
-        # Include registered, waitlist, and attended — exclude only cancelled
-        my $part_rs = $c->model('DBEncy')->resultset('Participant')->search(
-            {
-                workshop_id => { -in  => \@workshop_ids },
-                status      => { '!=' => 'cancelled' },
-                user_id     => { '!=' => undef },
-            },
-            { columns => ['user_id'], distinct => 1 }
-        );
-        @user_ids = $part_rs->get_column('user_id')->all;
-
-        # Log what statuses are actually present to aid debugging
+        # Log statuses for debugging
         my $status_rs = $c->model('DBEncy')->resultset('Participant')->search(
             { workshop_id => { -in => \@workshop_ids } },
             { columns => ['status'], distinct => 1 }
         );
         my @statuses = $status_rs->get_column('status')->all;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
-            "Participant statuses found for workshops [" . join(',', @workshop_ids) . "]: " .
+            "Participant statuses for workshops [" . join(',', @workshop_ids) . "]: " .
             (scalar @statuses ? join(', ', @statuses) : 'NONE'));
+
+        # Include all non-cancelled participants
+        my $part_rs = $c->model('DBEncy')->resultset('Participant')->search(
+            {
+                workshop_id => { -in  => \@workshop_ids },
+                status      => { '!=' => 'cancelled' },
+            },
+            { columns => ['user_id', 'email', 'name', 'first_name', 'last_name'], distinct => 1 }
+        );
+
+        my %seen_email;
+        while (my $p = $part_rs->next) {
+            my $uid   = $p->user_id;
+            my $email = $p->email || '';
+
+            # Prefer explicit first/last; fall back to splitting the name field
+            my $first = eval { $p->first_name } || '';
+            my $last  = eval { $p->last_name  } || '';
+            if (!$first && !$last) {
+                my $name = $p->name || '';
+                ($first, $last) = $name =~ /^(\S+)\s+(.+)$/ ? ($1, $2) : ($name, '');
+            }
+
+            if ($uid) {
+                push @entries, $uid;
+            } elsif ($email && !$seen_email{lc $email}++) {
+                # Try to find user account by email
+                my $user;
+                eval {
+                    $user = $c->model('DBEncy')->resultset('User')->find({ email => $email });
+                };
+                if ($user && $user->id) {
+                    push @entries, $user->id;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
+                        "Resolved participant email $email to user_id=" . $user->id);
+                } else {
+                    push @entries, { email => $email, first_name => $first, last_name => $last };
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
+                        "Email-only participant: $email ($first $last) — no system account");
+                }
+            }
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
+            "Total participant entries: " . scalar(@entries) . " for " . scalar(@workshop_ids) . " workshops");
     }
 
-    $self->_upsert_list_subscriptions($c, $list->id, \@user_ids, 'auto-workshop');
+    $self->_upsert_list_subscriptions($c, $list->id, \@entries, 'auto-workshop');
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
-        "Synced Workshop Attendees: " . scalar(@user_ids) . " users for site_id=$site_id (" .
+        "Synced Workshop Attendees: " . scalar(@entries) . " entries for site_id=$site_id (" .
         scalar(@workshop_ids) . " workshops)");
 }
 

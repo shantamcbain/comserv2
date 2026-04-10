@@ -817,6 +817,248 @@ sub paypal_settings :Local :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+sub subscriber_details :Local :Args(1) {
+    my ($self, $c, $membership_id) = @_;
+    return unless $self->_require_admin($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'subscriber_details',
+        "Subscriber details called for membership_id=$membership_id");
+
+    my $membership = undef;
+    my @service_access = ();
+
+    eval {
+        $membership = $c->model('DBEncy')->resultset('UserMembership')->find(
+            $membership_id,
+            { prefetch => ['user', 'plan', 'site'] }
+        );
+    };
+    unless ($membership) {
+        $c->flash->{error_msg} = 'Membership record not found.';
+        $c->response->redirect($c->uri_for('/membership/admin/subscribers'));
+        return;
+    }
+
+    eval {
+        @service_access = $c->model('DBEncy')->resultset('MembershipServiceAccess')->search(
+            {
+                user_id => $membership->user_id,
+                site_id => $membership->site_id,
+            },
+            { order_by => 'service_name' }
+        )->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'subscriber_details',
+            "Could not load service access: $@");
+    }
+
+    $c->stash(
+        template       => 'membership/admin/SubscriberDetails.tt',
+        membership     => $membership,
+        service_access => \@service_access,
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub grant_access :Local :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_admin($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'grant_access',
+        "Grant access called, method=" . $c->req->method);
+
+    unless ($c->req->method eq 'POST') {
+        $c->flash->{error_msg} = 'Invalid request.';
+        $c->response->redirect($c->uri_for('/membership/admin/subscribers'));
+        return;
+    }
+
+    my $p = $c->req->params;
+    my $user_id      = $p->{user_id};
+    my $site_id      = $p->{site_id};
+    my $service_name = $p->{service_name};
+    my $membership_id = $p->{membership_id};
+    my $expires_at   = $p->{expires_at} || undef;
+
+    unless ($user_id && $site_id && $service_name) {
+        $c->flash->{error_msg} = 'Missing required fields.';
+        $c->response->redirect($c->uri_for('/membership/admin/subscribers'));
+        return;
+    }
+
+    eval {
+        $c->model('DBEncy')->resultset('MembershipServiceAccess')->update_or_create(
+            {
+                user_id      => $user_id,
+                site_id      => $site_id,
+                service_name => $service_name,
+                granted_by   => 'admin',
+                membership_id => $membership_id || undef,
+                is_active    => 1,
+                expires_at   => $expires_at || undef,
+            },
+            { key => 'unique_user_site_service' }
+        );
+        $c->flash->{success_msg} = "Access to '$service_name' granted.";
+    };
+    if ($@) {
+        my $err = "$@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'grant_access',
+            "Error granting access: $err");
+        $c->flash->{error_msg} = "Error granting access: $err";
+    }
+
+    my $back = $membership_id
+        ? $c->uri_for('/membership/admin/subscriber_details', $membership_id)
+        : $c->uri_for('/membership/admin/subscribers');
+    $c->response->redirect($back);
+}
+
+sub revoke_access :Local :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_admin($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'revoke_access',
+        "Revoke access called, method=" . $c->req->method);
+
+    unless ($c->req->method eq 'POST') {
+        $c->flash->{error_msg} = 'Invalid request.';
+        $c->response->redirect($c->uri_for('/membership/admin/subscribers'));
+        return;
+    }
+
+    my $p            = $c->req->params;
+    my $access_id    = $p->{access_id};
+    my $membership_id = $p->{membership_id};
+
+    unless ($access_id && $access_id =~ /^\d+$/) {
+        $c->flash->{error_msg} = 'Invalid access record.';
+        $c->response->redirect($c->uri_for('/membership/admin/subscribers'));
+        return;
+    }
+
+    eval {
+        my $row = $c->model('DBEncy')->resultset('MembershipServiceAccess')->find($access_id);
+        if ($row) {
+            $row->update({ is_active => 0 });
+            $c->flash->{success_msg} = "Access to '" . $row->service_name . "' revoked.";
+        } else {
+            $c->flash->{error_msg} = 'Access record not found.';
+        }
+    };
+    if ($@) {
+        my $err = "$@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'revoke_access',
+            "Error revoking access: $err");
+        $c->flash->{error_msg} = "Error revoking access: $err";
+    }
+
+    my $back = $membership_id
+        ? $c->uri_for('/membership/admin/subscriber_details', $membership_id)
+        : $c->uri_for('/membership/admin/subscribers');
+    $c->response->redirect($back);
+}
+
+sub pricing :Local :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_admin($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'pricing',
+        "Geographic pricing called, method=" . $c->req->method);
+
+    my $site  = $self->_get_site($c);
+    my @plans = ();
+    my @pricing_rows = ();
+
+    eval {
+        if ($site) {
+            @plans = $c->model('DBEncy')->resultset('MembershipPlan')->search(
+                { site_id => $site->id, is_active => 1 },
+                { order_by => 'sort_order' }
+            )->all;
+        }
+    };
+
+    my $selected_plan_id = $c->req->param('plan_id');
+
+    if ($c->req->method eq 'POST') {
+        my $p      = $c->req->params;
+        my $action = $p->{action} || 'add';
+
+        if ($action eq 'delete' && $p->{pricing_id} && $p->{pricing_id} =~ /^\d+$/) {
+            eval {
+                my $row = $c->model('DBEncy')->resultset('MembershipPlanPricing')->find($p->{pricing_id});
+                $row->delete if $row;
+                $c->flash->{success_msg} = 'Pricing entry deleted.';
+            };
+            if ($@) {
+                $c->flash->{error_msg} = "Error deleting entry: $@";
+            }
+        } elsif ($p->{plan_id} && $p->{region_code} && defined $p->{price_monthly}) {
+            eval {
+                $c->model('DBEncy')->resultset('MembershipPlanPricing')->update_or_create(
+                    {
+                        plan_id       => $p->{plan_id},
+                        region_code   => uc($p->{region_code}),
+                        price_monthly => $p->{price_monthly} || 0,
+                        price_annual  => $p->{price_annual}  || 0,
+                        currency      => $p->{currency}      || 'USD',
+                    },
+                    { key => 'plan_id_region_code' }
+                );
+                $c->flash->{success_msg} = 'Pricing entry saved.';
+            };
+            if ($@) {
+                my $err = "$@";
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'pricing',
+                    "Error saving pricing: $err");
+                $c->flash->{error_msg} = "Error saving pricing: $err";
+            }
+            $selected_plan_id = $p->{plan_id};
+        } else {
+            $c->flash->{error_msg} = 'Missing required fields (plan, region, price).';
+        }
+
+        my $redirect = $c->uri_for('/membership/admin/pricing');
+        $redirect .= '?plan_id=' . $selected_plan_id if $selected_plan_id;
+        $c->response->redirect($redirect);
+        return;
+    }
+
+    if ($selected_plan_id) {
+        eval {
+            @pricing_rows = $c->model('DBEncy')->resultset('MembershipPlanPricing')->search(
+                { plan_id => $selected_plan_id },
+                { prefetch => 'plan', order_by => 'region_code' }
+            )->all;
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'pricing',
+                "Could not load pricing rows: $@");
+        }
+    }
+
+    $c->stash(
+        template         => 'membership/admin/Pricing.tt',
+        site             => $site,
+        plans            => \@plans,
+        pricing_rows     => \@pricing_rows,
+        selected_plan_id => $selected_plan_id,
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub add_cost :Local :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_admin($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_cost',
+        "Add cost called");
+
+    $c->response->redirect($c->uri_for('/membership/admin/cost_tracking'));
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

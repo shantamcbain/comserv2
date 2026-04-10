@@ -1,0 +1,94 @@
+[% PageVersion = 'Inventory/stock/adjust.tt,v 0.01 2026/03/30 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Stock Adjustment</h1>
+
+[% IF error_msg %]<p class="error">[% error_msg %]</p>[% END %]
+[% IF c.flash.success_msg %]<p class="success">[% c.flash.success_msg %]</p>[% END %]
+
+<div class="actions">
+  <a href="/Inventory/items">Back to Items</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory">Dashboard</a>
+</div>
+
+<form method="POST" action="/Inventory/stock/adjust">
+  <table>
+    <tr>
+      <th><label for="item_id">Item *</label></th>
+      <td>
+        <select id="item_id" name="item_id" required>
+          <option value="">-- Select Item --</option>
+          [% FOREACH item IN items %]
+          <option value="[% item.id %]"
+            [% IF c.request.params.item_id == item.id %]selected[% END %]>
+            [% item.sku %] - [% item.name %]
+          </option>
+          [% END %]
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="location_id">Location *</label></th>
+      <td>
+        <select id="location_id" name="location_id" required>
+          <option value="">-- Select Location --</option>
+          [% FOREACH loc IN locations %]
+          <option value="[% loc.id %]">[% loc.name %]</option>
+          [% END %]
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="transaction_type">Transaction Type *</label></th>
+      <td>
+        <select id="transaction_type" name="transaction_type" required>
+          <option value="receive">Receive (increase stock)</option>
+          <option value="issue">Issue (decrease stock)</option>
+          <option value="adjust_up">Adjust Up</option>
+          <option value="adjust_down">Adjust Down</option>
+          <option value="transfer">Transfer</option>
+          <option value="return">Return</option>
+          <option value="count">Physical Count</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="quantity">Quantity *</label></th>
+      <td><input type="number" id="quantity" name="quantity" required min="0" step="0.001"></td>
+    </tr>
+    <tr>
+      <th><label for="unit_cost">Unit Cost</label></th>
+      <td><input type="number" id="unit_cost" name="unit_cost" step="0.01" min="0"></td>
+    </tr>
+    <tr>
+      <th><label for="reference_number">Reference #</label></th>
+      <td><input type="text" id="reference_number" name="reference_number" maxlength="100"
+          placeholder="PO#, invoice#, etc."></td>
+    </tr>
+    <tr>
+      <th><label for="todo_id">Todo/Project ID</label></th>
+      <td><input type="number" id="todo_id" name="todo_id" min="1"
+          placeholder="Link to todo item (optional)"></td>
+    </tr>
+    <tr>
+      <th><label for="notes">Notes</label></th>
+      <td><textarea id="notes" name="notes" rows="3" cols="40"></textarea></td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <input type="submit" value="Record Adjustment">
+        <a href="/Inventory/items">Cancel</a>
+      </td>
+    </tr>
+  </table>
+</form>
+[% PROCESS 'ai/partials/ai_form_assistant.tt'
+   ai_form_entity_label = 'stock adjustment'
+   ai_form_context      = 'inventory stock level adjustment'
+   ai_form_fields       = 'transaction_type, quantity, unit_cost, reference_number, notes'
+%]
+
+[% IF debug_errors && debug_errors.size > 0 %]
+<div class="debug">[% FOREACH err IN debug_errors %]<p>[% err %]</p>[% END %]</div>
+[% END %]

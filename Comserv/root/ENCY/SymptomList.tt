@@ -1,0 +1,84 @@
+[% META
+   title = "Symptoms - Encyclopedia of Biological Life"
+   description = "Browse all symptoms in the ENCY encyclopedia"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-02"
+%]
+[% PageVersion = 'ENCY/SymptomList.tt,v 0.01 2026/04/02' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.success_msg %]
+<div class="alert alert-success">[% c.flash.success_msg | html %]</div>
+[% END %]
+[% IF c.flash.error_msg %]
+<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
+[% END %]
+
+<h1>Symptoms</h1>
+
+<p><a href="[% c.uri_for('/ENCY') %]">&larr; Back to Encyclopedia</a></p>
+
+[% is_editor = is_editor || 0; is_admin = is_admin || 0 %]
+[% IF is_editor %]
+<a href="[% c.uri_for('/ENCY/Symptom/add') %]" class="btn btn-primary">Add Symptom</a>
+[% END %]
+
+<form method="get" action="[% c.uri_for('/ENCY/Symptom') %]">
+    <label>Body System:
+        <input type="text" name="body_system" value="[% body_system | html %]" size="20" />
+    </label>
+    <label>Host Type:
+        <select name="host_type">
+            <option value="">-- All --</option>
+            <option value="human"[% IF host_type == 'human' %] selected="selected"[% END %]>Human</option>
+            <option value="animal"[% IF host_type == 'animal' %] selected="selected"[% END %]>Animal</option>
+            <option value="plant"[% IF host_type == 'plant' %] selected="selected"[% END %]>Plant</option>
+            <option value="insect"[% IF host_type == 'insect' %] selected="selected"[% END %]>Insect</option>
+        </select>
+    </label>
+    <label>Severity:
+        <select name="severity">
+            <option value="">-- All --</option>
+            <option value="mild"[% IF severity == 'mild' %] selected="selected"[% END %]>Mild</option>
+            <option value="moderate"[% IF severity == 'moderate' %] selected="selected"[% END %]>Moderate</option>
+            <option value="severe"[% IF severity == 'severe' %] selected="selected"[% END %]>Severe</option>
+        </select>
+    </label>
+    <input type="submit" value="Filter" class="btn btn-default" />
+    <a href="[% c.uri_for('/ENCY/Symptom') %]">Clear</a>
+</form>
+
+[% IF symptoms && symptoms.size %]
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <th>Name</th>
+        <th>Common Name</th>
+        <th>Body System</th>
+        <th>Severity</th>
+        <th>Host Type</th>
+        <th></th>
+    </tr>
+    [% FOREACH symptom IN symptoms %]
+    <tr>
+        <td>[% symptom.name | html %]</td>
+        <td>[% symptom.common_name | html %]</td>
+        <td>[% symptom.body_system | html %]</td>
+        <td>[% symptom.severity | html %]</td>
+        <td>[% symptom.host_type | html %]</td>
+        <td><a href="[% c.uri_for('/ENCY/Symptom', symptom.record_id) %]">Details</a></td>
+    </tr>
+    [% END %]
+</table>
+[% ELSE %]
+<p>No symptoms found in the database.</p>
+[% END %]
+
+[% IF ai_fallback %]
+<div class="alert alert-info" style="margin-top:1em;">
+  No local results for &ldquo;[% ai_query | html %]&rdquo;.
+  <a href="/ai?prompt=Tell+me+about+[% ai_query | uri %]+in+the+context+of+the+encyclopedia">Ask AI</a>
+</div>
+[% END %]

@@ -140,3 +140,4 @@ AI_CONTROLLER_IMPLEMENTATION_SUMMARY.md
 /Comserv/data/ency_offline.db
 /Comserv/data/forager_offline.db
 /config/dbi_config.json
+deploy-logs/

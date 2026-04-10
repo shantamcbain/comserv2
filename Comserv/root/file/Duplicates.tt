@@ -162,8 +162,15 @@
                     padding:8px 12px;background:#f8f0e8;border:1px solid #e0c090;border-radius:4px;
                     margin-bottom:14px;font-size:.85rem">
           <strong style="white-space:nowrap">Bulk select:</strong>
-          <button type="button" class="btn btn-sm btn-secondary" onclick="dupSelectAll(true)">&#9745; Select All</button>
-          <button type="button" class="btn btn-sm btn-secondary" onclick="dupSelectAll(false)">&#9744; Clear</button>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="dupSelectRole('all',true)"
+                  title="Select every file on both sides">&#9745; All</button>
+          <button type="button" class="btn btn-sm" style="background:#c3e6cb;color:#155724;border:none"
+                  onclick="dupSelectRole('original',true)"
+                  title="Select all ORIGINAL (left / green) files">&#9745; Originals</button>
+          <button type="button" class="btn btn-sm" style="background:#ffe4b2;color:#7d4e00;border:none"
+                  onclick="dupSelectRole('duplicate',true)"
+                  title="Select all DUPLICATE (right / amber) files">&#9745; Duplicates</button>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="dupSelectRole('all',false)">&#9744; Clear</button>
           <span style="color:#888">|</span>
           <span class="dup-sel-count-display" style="color:#555;white-space:nowrap">0 selected</span>
           <span style="color:#888">|</span>
@@ -210,13 +217,21 @@
           <div class="dup-card [% card_class %]">
             <h4>
               [% IF rec %]
-              <input type="checkbox" class="dup-sel-cb" data-file-id="[% rec.id | html %]"
+              <input type="checkbox" class="dup-sel-cb"
+                     data-file-id="[% rec.id | html %]"
+                     data-role="[% role | html %]"
                      title="Select this file for batch delete"
                      onchange="dupUpdateCount()"
                      style="width:16px;height:16px;cursor:pointer;flex-shrink:0">
               [% END %]
               [% IF role == 'original' %]
               <span class="badge badge-original">ORIGINAL</span>
+              [% IF pair.sibling_count > 1 %]
+              <span style="font-size:.72rem;background:#1565c0;color:#fff;border-radius:3px;padding:1px 6px;font-weight:bold"
+                    title="This file has [% pair.sibling_count %] duplicate copies on this page">
+                [% pair.sibling_count %] dups
+              </span>
+              [% END %]
               [% ELSE %]
               <span class="badge badge-duplicate">DUPLICATE</span>
               [% END %]
@@ -373,8 +388,15 @@
                     padding:8px 12px;background:#f8f0e8;border:1px solid #e0c090;border-radius:4px;
                     margin-bottom:10px;font-size:.85rem">
           <strong style="white-space:nowrap">Bulk select:</strong>
-          <button type="button" class="btn btn-sm btn-secondary" onclick="dupSelectAll(true)">&#9745; Select All</button>
-          <button type="button" class="btn btn-sm btn-secondary" onclick="dupSelectAll(false)">&#9744; Clear</button>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="dupSelectRole('all',true)"
+                  title="Select every file on both sides">&#9745; All</button>
+          <button type="button" class="btn btn-sm" style="background:#c3e6cb;color:#155724;border:none"
+                  onclick="dupSelectRole('original',true)"
+                  title="Select all ORIGINAL (left / green) files">&#9745; Originals</button>
+          <button type="button" class="btn btn-sm" style="background:#ffe4b2;color:#7d4e00;border:none"
+                  onclick="dupSelectRole('duplicate',true)"
+                  title="Select all DUPLICATE (right / amber) files">&#9745; Duplicates</button>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="dupSelectRole('all',false)">&#9744; Clear</button>
           <span style="color:#888">|</span>
           <span class="dup-sel-count-display" style="color:#555;white-space:nowrap">0 selected</span>
           <span style="color:#888">|</span>
@@ -438,10 +460,15 @@ function dupUpdateCount() {
     });
 }
 
-function dupSelectAll(state) {
-    document.querySelectorAll('.dup-sel-cb').forEach(function(cb) { cb.checked = state; });
+function dupSelectRole(role, state) {
+    document.querySelectorAll('.dup-sel-cb').forEach(function(cb) {
+        if (role === 'all' || cb.getAttribute('data-role') === role) {
+            cb.checked = state;
+        }
+    });
     dupUpdateCount();
 }
+function dupSelectAll(state) { dupSelectRole('all', state); }
 
 function dupBatchAction(action) {
     var cbs = document.querySelectorAll('.dup-sel-cb:checked');

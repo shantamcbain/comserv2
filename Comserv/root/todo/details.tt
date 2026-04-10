@@ -1,156 +1,136 @@
 
-[% PageVersion  = 'todo/details.tt,v 0.05 2025/04/01 Shanta Exp Shanta'; %]
-[%# PageVersion  = 'todo/details.tt,v 0.1 2023/12/07 Shanta Exp Shanta'; %]
-[% IF debug_mode == 1 %]
+[% PageVersion  = 'todo/details.tt,v 0.06 2026/04/07 Shanta Exp Shanta'; %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
 
-    [% PageVersion %]
-[% END %]
+[% SET _grp      = c.session.group || '' %]
+[% SET is_editor = is_admin || _grp == 'editor' || _grp == 'developer' %]
+[% SET edit_mode = c.request.params.edit && is_editor %]
 
+<h1>Todo: [% record.get_column('subject') | html %]</h1>
 
-
-<h1>Record Details View.</h1>
-
-<!-- Return navigation buttons -->
 <div class="return-nav">
     <a href="/todo" class="return-button">Return to List View</a>
     <a href="/todo/day" class="return-button">Return to Day View</a>
     <a href="/todo/week" class="return-button">Return to Week View</a>
     <a href="/todo/month" class="return-button">Return to Month View</a>
     <button type="button" class="return-button" onclick="window.history.back();">Return to Previous Page</button>
+    [% IF is_editor && !edit_mode %]
+    <a href="[% c.uri_for('/todo/details', { record_id => record.get_column('record_id'), edit => 1 }) %]"
+       class="return-button">Edit</a>
+    [% END %]
 </div>
 
-<p>Record ID: [% record.get_column('record_id') %]</p>
-
-<!-- Display the accumulated time for the todo record -->
-<div>
-    <label for="accumulative_time_display">Accumulated Time:</label>
-    <span id="accumulative_time_display">[% accumulative_time %]</span>
-</div>
+[% IF edit_mode %]
 
 <form action="/todo/modify/[% record.get_column('record_id') %]" method="post">
-    <input type="hidden" name="return_to" value="[% return_to %]">
-    <div>
-        <label for="sitename">Site Name:</label>
-        <input type="text" id="sitename" name="sitename" value="[% record.get_column('sitename') %]">
-    </div>
+    <input type="hidden" name="return_to" value="[% c.uri_for('/todo/details', { record_id => record.get_column('record_id') }) %]">
 
-    <div>
-        <label for="start_date">Start Date:</label>
-        <input type="date" id="start_date" name="start_date" value="[% record.get_column('start_date') %]">[% record.get_column('start_date') %]
-    </div>
+    <table border="0" cellpadding="4">
+        <tr><td><label>Site:</label></td>
+            <td><input type="text" name="sitename" value="[% record.get_column('sitename') | html %]"></td></tr>
+        <tr><td><label>Subject:</label></td>
+            <td><input type="text" name="subject" style="width:400px" value="[% record.get_column('subject') | html %]"></td></tr>
+        <tr><td><label>Description:</label></td>
+            <td><textarea name="description" rows="6" cols="60">[% record.get_column('description') | html %]</textarea></td></tr>
+        <tr><td><label>Start Date:</label></td>
+            <td><input type="date" name="start_date" value="[% record.get_column('start_date') %]"></td></tr>
+        <tr><td><label>Due Date:</label></td>
+            <td><input type="date" name="due_date" value="[% record.get_column('due_date') %]"></td></tr>
+        <tr><td><label>Time of Day:</label></td>
+            <td><input type="time" name="time_of_day" value="[% record.get_column('time_of_day') %]"></td></tr>
+        <tr><td><label>Status:</label></td>
+            <td>
+                <select name="status">
+                    [% SET s = record.get_column('status') %]
+                    <option value="New"        [% IF s == 'New'        || s == 1 %]selected[% END %]>New</option>
+                    <option value="InProgress" [% IF s == 'InProgress' || s == 2 %]selected[% END %]>In Progress</option>
+                    <option value="Done"       [% IF s == 'Done'       || s == 3 %]selected[% END %]>Done</option>
+                    <option value="Cancelled"  [% IF s == 'Cancelled'             %]selected[% END %]>Cancelled</option>
+                </select>
+            </td></tr>
+        <tr><td><label>Priority:</label></td>
+            <td><input type="number" name="priority" value="[% record.get_column('priority') %]" size="4"></td></tr>
+        <tr><td><label>Est. Hours:</label></td>
+            <td><input type="number" name="estimated_man_hours" value="[% record.get_column('estimated_man_hours') %]" size="6"></td></tr>
+        <tr><td><label>Group:</label></td>
+            <td><input type="text" name="group_of_poster" value="[% record.get_column('group_of_poster') | html %]"></td></tr>
+        <tr><td><label>Project:</label></td>
+            <td>
+                [% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=record.get_column('project_id') field_name='project_id' %]
+            </td></tr>
+    </table>
 
-    <div>
-        <label for="due_date">Due Date:</label>
-        <input type="date" id="due_date" name="due_date" value="[% record.get_column('due_date') %]">
-    </div>
-
-    <div>
-        <label for="time_of_day">Time of Day:</label>
-        <input type="time" id="time_of_day" name="time_of_day" value="[% record.get_column('time_of_day') %]">
-    </div>
-
-        <label for="subject">Subject:</label>
-        <input type="text" id="subject" name="subject" value="[% record.get_column('subject') %]">
-    </div>
-
-    <div>
-        <label for="description">Description:</label>
-        <textarea id="description" name="description">[% record.get_column('description') %]</textarea>
-    </div>
-
-    <div>
-        <label for="estimated_man_hours">Estimated Man Hours:</label>
-        <input type="number" id="estimated_man_hours" name="estimated_man_hours" value="[% record.get_column('estimated_man_hours') %]">
-    </div>
-
-    <div>
-        <label for="accumulative_time">Accumulative Time:</label>
-        <input type="text" id="accumulative_time" name="accumulative_time" value="[% accumulative_time %]">
-    </div>
-
-    <div>
-        <label for="status">Status:</label>
-        <select id="status" name="status">
-            <option value="1" [% IF record.get_column('status') == status.1 %]selected[% END %]>NEW</option>
-            <option value="2" [% IF record.get_column('status') == status.2 %]selected[% END %]>IN PROGRESS</option>
-            <option value="3" [% IF record.get_column('status') == status.3 %]selected[% END %]>DONE</option>
-        </select>
-    </div>
-
-    <div>
-        <label for="priority">Priority:</label>
-        <input type="number" id="priority" name="priority" value="[% record.get_column('priority') %]">
-    </div>
-
-    <div>
-        <label for="last_mod_by">Last Modified By:</label>
-        <input type="text" id="last_mod_by" name="last_mod_by" value="[% record.get_column('last_mod_by') %]">
-    </div>
-
-    <div>
-        <label for="last_mod_date">Last Modified Date:</label>
-        <input type="date" id="last_mod_date" name="last_mod_date" value="[% record.get_column('last_mod_date') %]">
-    </div>
-
-    <div>
-        <label for="group_of_poster">Group of Poster:</label>
-        <input type="text" id="group_of_poster" name="group_of_poster" value="[% record.get_column('group_of_poster') %]">
-    </div>
-
-    <div>
-        <label for="user_id">User ID:</label>
-        <input type="number" id="user_id" name="user_id" value="[% record.get_column('user_id') %]">
-    </div>
-
-    <div>
-        <label for="project_id">Select Project:</label>
-        <div style="display: flex; align-items: center; gap: 10px;">
-          [% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=record.get_column('project_id') field_name='project_id' %]
-          <button type="button" class="btn btn-secondary" onclick="openAddProjectForm()" title="Add New Project">
-            <i class="fas fa-plus"></i> Add Project
-          </button>
-        </div>
-        <small style="color: #666; font-size: 0.9em;">Current Project ID: [% record.get_column('project_id') || 'None' %]</small>
-    </div>
-
-    <div>
-        <input type="submit" value="Submit">
-    </div>
+    <br>
+    <input type="submit" value="Save Changes" class="btn btn-primary">
+    <a href="[% c.uri_for('/todo/details', { record_id => record.get_column('record_id') }) %]" class="btn btn-default">Cancel</a>
 </form>
 
-<div class="action-buttons">
-    <form action="/log/log_form" method="POST" target="_blank">
+[% ELSE %]
+
+<table border="0" cellpadding="6" style="width:100%;max-width:800px">
+    <tr><th align="left" width="180">Record ID</th>
+        <td>[% record.get_column('record_id') %]</td></tr>
+    <tr><th align="left">Site</th>
+        <td>[% record.get_column('sitename') | html %]</td></tr>
+    <tr><th align="left">Subject</th>
+        <td><strong>[% record.get_column('subject') | html %]</strong></td></tr>
+    <tr><th align="left">Description</th>
+        <td style="white-space:pre-wrap">[% record.get_column('description') | html %]</td></tr>
+    <tr><th align="left">Status</th>
+        <td>[% record.get_column('status') | html %]</td></tr>
+    <tr><th align="left">Priority</th>
+        <td>[% record.get_column('priority') %]</td></tr>
+    <tr><th align="left">Start Date</th>
+        <td>[% record.get_column('start_date') %]</td></tr>
+    <tr><th align="left">Due Date</th>
+        <td>[% record.get_column('due_date') %]</td></tr>
+    <tr><th align="left">Time of Day</th>
+        <td>[% record.get_column('time_of_day') %]</td></tr>
+    <tr><th align="left">Est. Hours</th>
+        <td>[% record.get_column('estimated_man_hours') %]</td></tr>
+    <tr><th align="left">Accumulated Time</th>
+        <td>[% accumulative_time %]</td></tr>
+    <tr><th align="left">Project ID</th>
+        <td>[% record.get_column('project_id') || '—' %]</td></tr>
+    <tr><th align="left">Group</th>
+        <td>[% record.get_column('group_of_poster') | html %]</td></tr>
+    <tr><th align="left">Posted By</th>
+        <td>[% record.get_column('username_of_poster') | html %]</td></tr>
+    <tr><th align="left">Last Modified By</th>
+        <td>[% record.get_column('last_mod_by') | html %]</td></tr>
+    <tr><th align="left">Last Modified Date</th>
+        <td>[% record.get_column('last_mod_date') %]</td></tr>
+    <tr><th align="left">Date Posted</th>
+        <td>[% record.get_column('date_time_posted') %]</td></tr>
+    [% IF record.get_column('comments') %]
+    <tr><th align="left">Comments</th>
+        <td style="white-space:pre-wrap">[% record.get_column('comments') | html %]</td></tr>
+    [% END %]
+</table>
+
+[% END %]
+
+<div class="action-buttons" style="margin-top:16px">
+    <form action="/log/log_form" method="POST" target="_blank" style="display:inline">
         <input type="hidden" name="todo_record_id" value="[% record.get_column('record_id') %]">
-        <input type="hidden" name="site_name" value="[% record.get_column('sitename') %]">
-        <input type="hidden" name="start_date" value="[% record.get_column('start_date') %]">
-        <input type="hidden" name="due_date" value="[% record.get_column('due_date') %]">
-        <input type="hidden" name="abstract" value="[% record.get_column('subject') %]">
-        <input type="hidden" name="details" value="[% record.get_column('description') %]">
-        <input type="hidden" name="priority" value="[% record.get_column('priority') %]">
-        <input type="hidden" name="status" value="[% record.get_column('status') %]">
-        <input type="hidden" name="comments" value="[% record.get_column('comments') %]">
-        <button type="submit">Add Log Entry</button>
-    </form>
-    <form action="/todo/edit/[% record.get_column('record_id') %]" method="POST" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
-        <input type="hidden" name="record_id" value="[% record.get_column('record_id') %]">
-        <input type="hidden" name="return_to" value="">
-        <button type="submit">Edit Todo</button>
+        <input type="hidden" name="site_name"      value="[% record.get_column('sitename') %]">
+        <input type="hidden" name="start_date"     value="[% record.get_column('start_date') %]">
+        <input type="hidden" name="due_date"        value="[% record.get_column('due_date') %]">
+        <input type="hidden" name="abstract"        value="[% record.get_column('subject') %]">
+        <input type="hidden" name="details"         value="[% record.get_column('description') %]">
+        <input type="hidden" name="priority"        value="[% record.get_column('priority') %]">
+        <input type="hidden" name="status"          value="[% record.get_column('status') %]">
+        <input type="hidden" name="comments"        value="[% record.get_column('comments') %]">
+        <button type="submit" class="btn btn-secondary">Add Log Entry</button>
     </form>
 </div>
 
 [% IF todo_intervals && todo_intervals.size %]
-<div class="reschedule-log">
+<div class="reschedule-log" style="margin-top:20px">
     <h3>Rescheduling History</h3>
-    <table>
+    <table border="1" cellpadding="4">
         <thead>
-            <tr>
-                <th>#</th>
-                <th>Type</th>
-                <th>Change</th>
-                <th>Held From</th>
-                <th>Moved On</th>
-                <th>By</th>
-            </tr>
+            <tr><th>#</th><th>Type</th><th>Change</th><th>Held From</th><th>Moved On</th><th>By</th></tr>
         </thead>
         <tbody>
         [% FOREACH interval IN todo_intervals %]
@@ -158,8 +138,8 @@
                 <td>[% interval.record_id %]</td>
                 <td>[% interval.interval_type %]</td>
                 <td>[% interval.status %]</td>
-                <td>[% interval.start_date || '-' %]</td>
-                <td>[% interval.end_date || '-' %]</td>
+                <td>[% interval.start_date || '—' %]</td>
+                <td>[% interval.end_date   || '—' %]</td>
                 <td>[% interval.last_mod_by %]</td>
             </tr>
         [% END %]
@@ -168,11 +148,46 @@
 </div>
 [% END %]
 
-<!-- Return navigation buttons -->
-<div class="return-nav">
+[% SET task_id = record.get_column('record_id') %]
+<div class="ai-chat-activity-panel" style="margin-top:20px; border:1px solid #ddd; border-radius:4px; padding:16px; background:#fafafa;">
+    <h3 style="margin-top:0;">AI Chat Activity</h3>
+    <div id="ai-task-conversations" data-task-id="[% task_id %]">
+        <p style="color:#888; font-size:0.9em;">Loading conversations&hellip;</p>
+    </div>
+    <div style="margin-top:10px;">
+        <a href="/ai?task_id=[% task_id %]" class="button button-primary" style="font-size:0.9em;">Chat about this task</a>
+        <a href="/ai/conversations?task_id=[% task_id %]" class="button button-secondary" style="font-size:0.9em; margin-left:8px;">View all task conversations</a>
+    </div>
+</div>
+
+<script>
+(function() {
+    var el = document.getElementById('ai-task-conversations');
+    var taskId = el ? el.getAttribute('data-task-id') : null;
+    if (!taskId) return;
+    fetch('/ai/project_conversations?task_id=' + encodeURIComponent(taskId))
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (!d.success || !d.conversations || !d.conversations.length) {
+                el.innerHTML = '<p style="color:#888;font-size:0.9em;">No AI conversations for this task yet.</p>';
+                return;
+            }
+            var html = '<ul style="margin:0;padding-left:18px;">';
+            d.conversations.forEach(function(c) {
+                html += '<li><a href="/ai/conversation/' + c.id + '">' + (c.title || 'Untitled') + '</a>'
+                      + ' <span style="color:#888;font-size:0.85em;">(' + (c.model || 'unknown') + ' &mdash; ' + c.updated_at + ')</span></li>';
+            });
+            html += '</ul>';
+            el.innerHTML = html;
+        })
+        .catch(function() {
+            el.innerHTML = '<p style="color:#888;font-size:0.9em;">Could not load conversations.</p>';
+        });
+})();
+</script>
+
+<div class="return-nav" style="margin-top:16px">
     <a href="/todo" class="return-button">Return to List View</a>
     <a href="/todo/day" class="return-button">Return to Day View</a>
-    <a href="/todo/week" class="return-button">Return to Week View</a>
-    <a href="/todo/month" class="return-button">Return to Month View</a>
     <button type="button" class="return-button" onclick="window.history.back();">Return to Previous Page</button>
 </div>

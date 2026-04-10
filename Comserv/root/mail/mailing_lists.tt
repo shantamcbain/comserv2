@@ -156,9 +156,12 @@ details[open] .ml-chevron { transform: rotate(90deg); }
                         <span class="ml-member-name">
                             [% IF sub.first_name || sub.last_name %]
                                 [% sub.first_name | html %] [% sub.last_name | html %]
-                                <span style="color:#9ca3af;">([% sub.username | html %])</span>
-                            [% ELSE %]
+                                [% IF sub.username %]<span style="color:#9ca3af;">([% sub.username | html %])</span>[% END %]
+                                [% IF !sub.user_id %]<span style="color:#f59e0b;font-size:0.8em;" title="No system account">&#9993;</span>[% END %]
+                            [% ELSIF sub.username %]
                                 [% sub.username | html %]
+                            [% ELSE %]
+                                <span style="color:#6b7280;">[email only]</span>
                             [% END %]
                         </span>
                         <span class="ml-member-email">[% sub.email | html %]</span>
@@ -253,9 +256,12 @@ details[open] .ml-chevron { transform: rotate(90deg); }
                         <span class="ml-member-name">
                             [% IF sub.first_name || sub.last_name %]
                                 [% sub.first_name | html %] [% sub.last_name | html %]
-                                <span style="color:#9ca3af;">([% sub.username | html %])</span>
-                            [% ELSE %]
+                                [% IF sub.username %]<span style="color:#9ca3af;">([% sub.username | html %])</span>[% END %]
+                                [% IF !sub.user_id %]<span style="color:#f59e0b;font-size:0.8em;" title="No system account">&#9993;</span>[% END %]
+                            [% ELSIF sub.username %]
                                 [% sub.username | html %]
+                            [% ELSE %]
+                                <span style="color:#6b7280;">[email only]</span>
                             [% END %]
                         </span>
                         <span class="ml-member-email">[% sub.email | html %]</span>

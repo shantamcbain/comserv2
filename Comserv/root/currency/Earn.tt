@@ -1,0 +1,76 @@
+[% META
+   title = "Grant Coins (Admin)"
+   description = "Admin action to grant coins to a user"
+   roles = "admin,site_admin"
+   TemplateType = "Application"
+   category = "Currency"
+   page_version = "0.01"
+   last_updated = "2026-04-03"
+%]
+[% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Grant Coins <span style="font-size:0.7em;color:#888">(Admin)</span></h1>
+    <div class="header-actions">
+      <a href="[% c.uri_for('/currency/balance') %]" class="btn btn-secondary">My Balance</a>
+    </div>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <p style="font-size:0.9em;color:#666">
+          Use this form to credit coins to any user. This is logged and visible in the
+          user's transaction history as an admin action.
+        </p>
+
+        <form method="post" action="[% c.uri_for('/currency/earn') %]" style="max-width:480px">
+
+          <div class="form-group" style="margin-bottom:1rem">
+            <label for="username"><strong>Username</strong></label>
+            <input type="text" id="username" name="username"
+                   required
+                   placeholder="Enter username to credit"
+                   style="width:100%;padding:0.5rem;border:1px solid var(--border-color,#ccc);border-radius:4px;margin-top:0.3rem">
+          </div>
+
+          <div class="form-group" style="margin-bottom:1rem">
+            <label for="amount"><strong>Amount (coins)</strong></label>
+            <input type="number" id="amount" name="amount"
+                   required min="0.0001" step="0.0001"
+                   placeholder="0.0000"
+                   style="width:100%;padding:0.5rem;border:1px solid var(--border-color,#ccc);border-radius:4px;margin-top:0.3rem">
+          </div>
+
+          <div class="form-group" style="margin-bottom:1rem">
+            <label for="transaction_type"><strong>Grant Type</strong></label>
+            <select id="transaction_type" name="transaction_type"
+                    style="width:100%;padding:0.5rem;border:1px solid var(--border-color,#ccc);border-radius:4px;margin-top:0.3rem">
+              <option value="earn">Earn (contribution, service rendered)</option>
+              <option value="bonus">Bonus (special award)</option>
+              <option value="adjustment">Adjustment (correction)</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom:1.2rem">
+            <label for="description"><strong>Description / Reason</strong></label>
+            <input type="text" id="description" name="description"
+                   maxlength="400"
+                   placeholder="Reason for this grant"
+                   style="width:100%;padding:0.5rem;border:1px solid var(--border-color,#ccc);border-radius:4px;margin-top:0.3rem">
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Grant Coins</button>
+            <a href="[% c.uri_for('/currency/balance') %]" class="btn btn-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</div>
