@@ -540,7 +540,13 @@ sub generate :Local :Args(0) {
 
     # --- Live DB data injection (same as /ai/chat) ---
     my $site_name_gen = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-    my $module_data_gen = $self->_get_module_data($c, $prompt, $agent_id);
+    # Planning agent already injects project list via _build_planning_system_prompt;
+    # force a keyword override so _get_module_data always runs for planning/ency/bmaster.
+    my $inject_prompt = $prompt;
+    if ($normalized_agent_type =~ /^(planning|ency|bmaster)$/i) {
+        $inject_prompt = "project todo $prompt";
+    }
+    my $module_data_gen = $self->_get_module_data($c, $inject_prompt, $agent_id);
     if ($module_data_gen) {
         $system .= "\n\n" . $module_data_gen;
     }
@@ -937,8 +943,9 @@ sub generate :Local :Args(0) {
             # CPU Ollama prefill at ~46 tok/s: 3 000 tokens = ~65s — safe under 300s timeout.
             # Pass 1: trim history messages.  Pass 1.5: drop oldest history pairs.
             # Pass 2: strip page_content from system.  Pass 3: hard-cap system prompt.
-            my $BUDGET_CHARS  =  8_000;
-            my $SYS_MAX_CHARS =  4_000;  # system prompt hard cap (nav guide can be 30K+)
+            # Planning/ENCY/BMaster agents have large injected system prompts — raise limits.
+            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint)) ? 16_000 : 8_000;
+            my $SYS_MAX_CHARS = $normalized_agent_type eq 'planning' ? 12_000 : 6_000;
             my $raw_total_gen = 0;
             $raw_total_gen += length($_->{content} || '') for @ollama_msgs;
             if ($raw_total_gen > $BUDGET_CHARS) {
@@ -1846,8 +1853,12 @@ sub chat :Local :Args(0) {
     push @system_parts, $chat_agent_system if $chat_agent_system;
     push @system_parts, $role_prompt_chat  if $role_prompt_chat;
 
-    # Fetch live module data (workshops, ENCY, etc.) when the prompt contains relevant keywords
-    my $module_data = $self->_get_module_data($c, $prompt, $chat_agent_id);
+    # Fetch live module data — force inject for agents that always need project/todo data
+    my $chat_inject_prompt = $prompt;
+    if ($chat_agent_id =~ /^(planning|ency|bmaster)$/i) {
+        $chat_inject_prompt = "project todo $prompt";
+    }
+    my $module_data = $self->_get_module_data($c, $chat_inject_prompt, $chat_agent_id);
     push @system_parts, $module_data if $module_data;
 
     # Inject relevant past Q&A from the shared knowledge base (all users)
@@ -2123,8 +2134,9 @@ sub chat :Local :Args(0) {
             # 300s timeout even with generation.  Over-budget → trim history content first.
             # Pass 1: trim messages.  Pass 1.5: drop oldest history pairs.
             # Pass 2: strip page_content.  Pass 3: hard-cap system prompt.
-            my $BUDGET_CHARS  =  8_000;
-            my $SYS_MAX_CHARS_CHAT = 4_000;
+            # Planning/ENCY/BMaster agents have large injected system prompts — raise limits.
+            my $BUDGET_CHARS  = (grep { lc($chat_agent_id) eq $_ } qw(planning ency bmaster 3dprint)) ? 16_000 : 8_000;
+            my $SYS_MAX_CHARS_CHAT = lc($chat_agent_id) eq 'planning' ? 12_000 : 6_000;
             my $raw_total = 0;
             $raw_total += length($_->{content} || '') for @ollama_messages;
             if ($raw_total > $BUDGET_CHARS) {
