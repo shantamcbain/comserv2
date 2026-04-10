@@ -99,7 +99,7 @@ sub validate_token {
     my $api_token;
     
     try {
-        $api_token_rs = $c->model('Ency')->resultset('ApiToken');
+        $api_token_rs = $c->model('DBEncy')->resultset('ApiToken');
         $api_token = $api_token_rs->find({ token_hash => $token_hash });
     } catch {
         $logging->log_with_details($c, 'error', __FILE__, __LINE__, 'validate_token',

@@ -131,8 +131,8 @@ has 'temperature' => (
 has 'max_tokens' => (
     is => 'rw',
     isa => 'Int',
-    default => 2048,
-    documentation => 'Maximum tokens in response'
+    default => 800,
+    documentation => 'Maximum tokens in response (keep low for CPU inference speed)'
 );
 
 has 'ua' => (
@@ -267,6 +267,7 @@ sub query {
         options    => {
             temperature => $self->temperature,
             num_predict => $self->max_tokens,
+            num_ctx     => 4096,
         }
     };
     
@@ -407,6 +408,7 @@ sub chat {
         options    => {
             temperature => $self->temperature,
             num_predict => $self->max_tokens,
+            num_ctx     => 4096,
         }
     };
     
@@ -489,6 +491,86 @@ sub chat {
     }
     
     return $result;
+}
+
+=head2 chain_query
+
+Execute a chain of sequential prompts where each step's response is passed as
+context to the next step. Useful for multi-stage reasoning, refinement loops,
+and complex analysis pipelines.
+
+    my $result = $ollama->chain_query(
+        steps => [
+            { prompt => "Summarize the following text: ...", system => "You are a summarizer." },
+            { prompt => "Extract the key action items from the summary above." },
+            { prompt => "Prioritize these action items by urgency, highest first." },
+        ],
+        return_all => 0,   # 0 = final step only (default); 1 = all step results
+    );
+
+    # return_all => 0 (default): returns hashref { step, prompt, response, model }
+    # return_all => 1: returns arrayref of the same hashref per step
+
+Returns undef on failure; check $ollama->last_error.
+
+=cut
+
+sub chain_query {
+    my ($self, %args) = @_;
+
+    my $steps = $args{steps};
+    unless (ref($steps) eq 'ARRAY' && @$steps > 0) {
+        $self->last_error("chain_query: 'steps' must be a non-empty arrayref");
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'chain_query',
+            "steps must be a non-empty arrayref");
+        return undef;
+    }
+
+    my $return_all = $args{return_all} || 0;
+    my @results;
+    my $context = '';
+
+    for my $i (0 .. $#$steps) {
+        my $step   = $steps->[$i];
+        my $prompt = $step->{prompt} or do {
+            $self->last_error("chain_query: step " . ($i + 1) . " has no prompt");
+            $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'chain_query',
+                "Step " . ($i + 1) . " missing prompt");
+            return undef;
+        };
+        my $system = $step->{system} || '';
+
+        my @messages;
+        push @messages, { role => 'system',    content => $system  } if $system;
+        push @messages, { role => 'assistant', content => $context } if $context;
+        push @messages, { role => 'user',      content => $prompt  };
+
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'chain_query',
+            "Step " . ($i + 1) . "/" . scalar(@$steps) . " — model=" . $self->model
+            . " msgs=" . scalar(@messages));
+
+        my $resp = $self->chat(messages => \@messages);
+        unless ($resp && $resp->{response}) {
+            my $err = $self->last_error || 'empty response';
+            $self->last_error("chain_query: step " . ($i + 1) . " failed: $err");
+            $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'chain_query',
+                "Step " . ($i + 1) . " failed: $err");
+            return undef;
+        }
+
+        $context = $resp->{response};
+        push @results, {
+            step     => $i + 1,
+            prompt   => $prompt,
+            response => $resp->{response},
+            model    => $resp->{model} || $self->model,
+        };
+    }
+
+    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'chain_query',
+        "Chain complete — " . scalar(@results) . " steps");
+
+    return $return_all ? \@results : $results[-1];
 }
 
 =head2 _parse_streaming_chat_response
@@ -1179,173 +1261,147 @@ sub get_running_models {
 sub list_available_models {
     my ($self) = @_;
     
-    # Static list of popular Ollama models with metadata
-    # This should be updated periodically or fetched from an external source
+    # Current recommended Ollama models (updated 2026-04)
+    # CPU-friendly picks marked recommended => 1 (run well on 8-16 GB RAM)
+    # NOTE: Ollama has no public registry API — this list must be updated manually.
+    #       See https://ollama.com/library for current models.
     my @available_models = (
+        # ── Gemma 3 (Google) ────────────────────────────────────────────────────
         {
-            name => 'llama3.1',
-            description => 'Meta\'s latest Llama model with improved reasoning and coding',
-            size => '4.7GB',
-            params => '8B',
-            tags => ['general', 'chat', 'reasoning'],
+            name        => 'gemma3:1b',
+            description => 'Google Gemma 3 1B — tiny, very fast, 128k context',
+            size        => '0.8GB',
+            params      => '1B',
+            tags        => ['general', 'chat', 'fast', 'cpu-friendly'],
+        },
+        {
+            name        => 'gemma3:4b',
+            description => 'Google Gemma 3 4B — fast, capable, 128k context, great on CPU',
+            size        => '3.3GB',
+            params      => '4B',
+            tags        => ['general', 'chat', 'fast', 'cpu-friendly'],
             recommended => 1,
         },
         {
-            name => 'llama3.1:70b',
-            description => 'Larger Llama 3.1 model for complex tasks',
-            size => '40GB',
-            params => '70B',
-            tags => ['general', 'chat', 'reasoning', 'advanced'],
-        },
-        {
-            name => 'llama3.1:8b',
-            description => 'Efficient 8B parameter version of Llama 3.1',
-            size => '4.7GB',
-            params => '8B',
-            tags => ['general', 'chat', 'efficient'],
-        },
-        {
-            name => 'deepseek-r1:7b',
-            description => 'DeepSeek R1 reasoning model with chain-of-thought',
-            size => '4.1GB',
-            params => '7B',
-            tags => ['reasoning', 'math', 'logic'],
+            name        => 'gemma3:12b',
+            description => 'Google Gemma 3 12B — strong reasoning, 128k context',
+            size        => '7.7GB',
+            params      => '12B',
+            tags        => ['general', 'chat', 'reasoning'],
             recommended => 1,
         },
         {
-            name => 'codellama',
-            description => 'Specialized for code generation and understanding',
-            size => '3.8GB',
-            params => '7B',
-            tags => ['coding', 'programming'],
+            name        => 'gemma3:27b',
+            description => 'Google Gemma 3 27B — top open model, needs 16+ GB RAM',
+            size        => '17GB',
+            params      => '27B',
+            tags        => ['general', 'chat', 'advanced'],
+        },
+        # ── Llama (Meta) ───────────────────────────────────────────────────────
+        {
+            name        => 'llama3.2:3b',
+            description => 'Meta Llama 3.2 — fast 3B model, great for quick chat responses',
+            size        => '2.0GB',
+            params      => '3B',
+            tags        => ['general', 'chat', 'fast', 'cpu-friendly'],
             recommended => 1,
         },
         {
-            name => 'codellama:13b',
-            description => 'Larger CodeLlama for complex coding tasks',
-            size => '7.4GB',
-            params => '13B',
-            tags => ['coding', 'programming', 'advanced'],
-        },
-        {
-            name => 'codellama:34b',
-            description => 'Most capable CodeLlama model',
-            size => '19GB',
-            params => '34B',
-            tags => ['coding', 'programming', 'advanced'],
-        },
-        {
-            name => 'deepseek-coder',
-            description => 'DeepSeek\'s coding model with strong performance',
-            size => '3.8GB',
-            params => '6.7B',
-            tags => ['coding', 'programming'],
-        },
-        {
-            name => 'deepseek-coder:33b',
-            description => 'Larger DeepSeek coder for complex projects',
-            size => '18GB',
-            params => '33B',
-            tags => ['coding', 'programming', 'advanced'],
-        },
-        {
-            name => 'mistral',
-            description => 'Fast and efficient general-purpose model',
-            size => '4.1GB',
-            params => '7B',
-            tags => ['general', 'chat', 'efficient'],
+            name        => 'llama3.1:latest',
+            description => 'Meta Llama 3.1 8B — solid all-round model, good speed on CPU',
+            size        => '4.7GB',
+            params      => '8B',
+            tags        => ['general', 'chat', 'reasoning'],
             recommended => 1,
         },
         {
-            name => 'mixtral:8x7b',
-            description => 'Mixture of Experts model with excellent performance',
-            size => '26GB',
-            params => '47B',
-            tags => ['general', 'chat', 'advanced'],
+            name        => 'llama3.1:70b',
+            description => 'Meta Llama 3.1 70B — very capable, requires 40+ GB RAM',
+            size        => '40GB',
+            params      => '70B',
+            tags        => ['general', 'chat', 'reasoning', 'large'],
         },
         {
-            name => 'phi',
-            description => 'Microsoft\'s small but capable model',
-            size => '1.6GB',
-            params => '2.7B',
-            tags => ['general', 'efficient', 'small'],
+            name        => 'mistral:latest',
+            description => 'Mistral 7B — fast, efficient, excellent instruction following',
+            size        => '4.1GB',
+            params      => '7B',
+            tags        => ['general', 'chat', 'efficient'],
+            recommended => 1,
         },
         {
-            name => 'gemma',
-            description => 'Google\'s open model family',
-            size => '1.7GB',
-            params => '2B',
-            tags => ['general', 'efficient', 'small'],
+            name        => 'mistral-small3.1:24b',
+            description => 'Mistral Small 3.1 — 24B with 128k context and vision support',
+            size        => '15GB',
+            params      => '24B',
+            tags        => ['general', 'chat', 'vision', 'large-context'],
         },
         {
-            name => 'gemma:7b',
-            description => 'Larger Gemma model for better performance',
-            size => '5.0GB',
-            params => '7B',
-            tags => ['general', 'chat'],
+            name        => 'phi4:14b',
+            description => 'Microsoft Phi-4 — 14B, outstanding reasoning quality for its size',
+            size        => '8.5GB',
+            params      => '14B',
+            tags        => ['general', 'reasoning', 'quality'],
+            recommended => 1,
         },
         {
-            name => 'qwen',
-            description => 'Alibaba\'s multilingual model',
-            size => '4.5GB',
-            params => '7B',
-            tags => ['general', 'multilingual'],
+            name        => 'phi4-mini:3.8b',
+            description => 'Microsoft Phi-4 Mini — fast 3.8B with strong reasoning',
+            size        => '2.5GB',
+            params      => '3.8B',
+            tags        => ['general', 'reasoning', 'fast', 'cpu-friendly'],
+            recommended => 1,
         },
         {
-            name => 'qwen:14b',
-            description => 'Larger Qwen with better capabilities',
-            size => '8.2GB',
-            params => '14B',
-            tags => ['general', 'multilingual', 'advanced'],
+            name        => 'qwen2.5:7b',
+            description => 'Alibaba Qwen 2.5 7B — strong reasoning and multilingual support',
+            size        => '4.4GB',
+            params      => '7B',
+            tags        => ['general', 'reasoning', 'multilingual'],
+            recommended => 1,
         },
         {
-            name => 'llama2',
-            description => 'Previous generation Llama model',
-            size => '3.8GB',
-            params => '7B',
-            tags => ['general', 'chat', 'legacy'],
+            name        => 'qwen2.5:14b',
+            description => 'Alibaba Qwen 2.5 14B — better quality, needs ~9GB RAM',
+            size        => '8.9GB',
+            params      => '14B',
+            tags        => ['general', 'reasoning', 'multilingual', 'advanced'],
         },
         {
-            name => 'llama2:13b',
-            description => 'Medium-sized Llama 2',
-            size => '7.4GB',
-            params => '13B',
-            tags => ['general', 'chat', 'legacy'],
+            name        => 'gemma2:9b',
+            description => 'Google Gemma 2 9B — excellent quality-to-size ratio',
+            size        => '5.4GB',
+            params      => '9B',
+            tags        => ['general', 'chat', 'quality'],
+            recommended => 1,
         },
         {
-            name => 'llama2:70b',
-            description => 'Largest Llama 2 model',
-            size => '39GB',
-            params => '70B',
-            tags => ['general', 'chat', 'advanced', 'legacy'],
+            name        => 'gemma2:27b',
+            description => 'Google Gemma 2 27B — top open model, needs 16+ GB RAM',
+            size        => '16GB',
+            params      => '27B',
+            tags        => ['general', 'chat', 'advanced'],
         },
         {
-            name => 'vicuna',
-            description => 'Fine-tuned for conversation',
-            size => '3.8GB',
-            params => '7B',
-            tags => ['chat', 'conversation'],
+            name        => 'deepseek-r1:7b',
+            description => 'DeepSeek R1 7B — chain-of-thought reasoning model',
+            size        => '4.1GB',
+            params      => '7B',
+            tags        => ['reasoning', 'math', 'logic'],
         },
         {
-            name => 'orca-mini',
-            description => 'Small model trained on reasoning data',
-            size => '1.9GB',
-            params => '3B',
-            tags => ['reasoning', 'small', 'efficient'],
+            name        => 'deepseek-r1:14b',
+            description => 'DeepSeek R1 14B — stronger reasoning, needs ~9GB RAM',
+            size        => '8.9GB',
+            params      => '14B',
+            tags        => ['reasoning', 'math', 'logic', 'advanced'],
         },
         {
-            name => 'neural-chat',
-            description => 'Optimized for chat interactions',
-            size => '4.1GB',
-            params => '7B',
-            tags => ['chat', 'conversation'],
-        },
-        {
-            name => 'starling-lm',
-            description => 'RLHF-trained for helpful responses',
-            size => '4.1GB',
-            params => '7B',
-            tags => ['chat', 'helpful'],
+            name        => 'llava:7b',
+            description => 'LLaVA 7B — vision + language model, can analyse images',
+            size        => '4.5GB',
+            params      => '7B',
+            tags        => ['vision', 'multimodal', 'chat'],
         },
     );
     

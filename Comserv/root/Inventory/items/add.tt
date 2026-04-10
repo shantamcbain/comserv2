@@ -1,0 +1,79 @@
+[% PageVersion = 'Inventory/items/add.tt,v 0.01 2026/03/30 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Add Inventory Item</h1>
+
+[% IF error_msg %]<p class="error">[% error_msg %]</p>[% END %]
+
+<form method="POST" action="/Inventory/item/add">
+  <table>
+    <tr>
+      <th><label for="sku">SKU *</label></th>
+      <td><input type="text" id="sku" name="sku" required maxlength="100"></td>
+    </tr>
+    <tr>
+      <th><label for="name">Name *</label></th>
+      <td><input type="text" id="name" name="name" required maxlength="255"></td>
+    </tr>
+    <tr>
+      <th><label for="category">Category</label></th>
+      <td><input type="text" id="category" name="category" maxlength="100"></td>
+    </tr>
+    <tr>
+      <th><label for="description">Description</label></th>
+      <td><textarea id="description" name="description" rows="3" cols="40"></textarea></td>
+    </tr>
+    <tr>
+      <th><label for="unit_of_measure">Unit of Measure</label></th>
+      <td>
+        <select id="unit_of_measure" name="unit_of_measure">
+          <option value="each">Each</option>
+          <option value="box">Box</option>
+          <option value="case">Case</option>
+          <option value="kg">kg</option>
+          <option value="lb">lb</option>
+          <option value="litre">Litre</option>
+          <option value="metre">Metre</option>
+          <option value="hour">Hour</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="unit_cost">Unit Cost</label></th>
+      <td><input type="number" id="unit_cost" name="unit_cost" step="0.01" min="0"></td>
+    </tr>
+    <tr>
+      <th><label for="reorder_point">Reorder Point</label></th>
+      <td><input type="number" id="reorder_point" name="reorder_point" value="0" min="0"></td>
+    </tr>
+    <tr>
+      <th><label for="reorder_quantity">Reorder Quantity</label></th>
+      <td><input type="number" id="reorder_quantity" name="reorder_quantity" value="0" min="0"></td>
+    </tr>
+    <tr>
+      <th><label for="status">Status</label></th>
+      <td>
+        <select id="status" name="status">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="discontinued">Discontinued</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="notes">Notes</label></th>
+      <td><textarea id="notes" name="notes" rows="3" cols="40"></textarea></td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <input type="submit" value="Create Item">
+        <a href="/Inventory/items">Cancel</a>
+      </td>
+    </tr>
+  </table>
+</form>
+[% PROCESS 'ai/partials/ai_form_assistant.tt'
+   ai_form_entity_label = 'inventory item'
+   ai_form_context      = 'inventory item management'
+   ai_form_fields       = 'name, sku, description, category, unit_of_measure, unit_cost, reorder_point, reorder_quantity, status, notes'
+%]

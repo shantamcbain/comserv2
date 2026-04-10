@@ -80,6 +80,7 @@
    END;
 %]
 
+[% UNLESS include_mode %]
 <link rel="stylesheet" type="text/css" href="/static/css/week_view.css">
 <link rel="stylesheet" type="text/css" href="/static/css/components/tables.css">
 <link rel="stylesheet" type="text/css" href="/static/css/themes/themes.css">
@@ -87,7 +88,9 @@
 <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css">
 <link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css">
 <script src="/static/js/todo_drag_drop.js"></script>
+[% END %]
 
+[% UNLESS include_mode %]
 <style>
     /* Priority-based Collapsible Container Styles */
     .priority-container {
@@ -291,10 +294,6 @@
         pointer-events: none;
     }
 
-    .todo-item-day:hover .todo-popup {
-        display: block;
-    }
-    
     .todo-item-day:hover {
         z-index: 100;
     }
@@ -337,82 +336,48 @@
         }
     }
 </style>
+[% END %]
 
 <script>
-// Ensure theme class is applied based on site
-document.addEventListener('DOMContentLoaded', function() {
-    const sitename = '[% sitename %]';
-    const siteThemeMap = {
-        'default': 'theme-default',
-        'apis': 'theme-apis',
-        'usbm': 'theme-usbm', 
-        'csc': 'theme-csc',
-        'bmaster': 'theme-apis',
-        'mcoop': 'theme-mcoop'
-    };
-    
-    const themeClass = siteThemeMap[sitename.toLowerCase()] || 'theme-default';
-    if (!document.body.classList.contains(themeClass)) {
-        document.body.className = document.body.className.replace(/theme-\w+/, '');
-        document.body.classList.add(themeClass);
-    }
-
-    // Scroll today's cell into focus in month view (if applicable)
-    const todayCell = document.getElementById('today-cell');
-    if (todayCell) {
-        setTimeout(() => {
-            todayCell.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 500);
-    }
-
-    // Scroll to current hour in day view
-    const now = new Date();
-    const currentHour = now.getHours();
-    const hourId = 'add-todo-' + (currentHour < 10 ? '0' + currentHour : currentHour);
-    const hourElement = document.getElementById(hourId);
-    if (hourElement) {
-        setTimeout(() => {
-            hourElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 600);
-    }
-    
-    // Position todo popups on hover
-    document.querySelectorAll('.todo-item-day').forEach(item => {
-        item.addEventListener('mouseenter', function(e) {
-            const popup = this.querySelector('.todo-popup');
-            if (popup) {
+// Position todo popups on hover — runs once per include; DOMContentLoaded used for standalone, immediate for component
+(function setupPopups() {
+    function attachPopupListeners() {
+        document.querySelectorAll('.todo-item-day:not([data-popup-init])').forEach(function(item) {
+            item.setAttribute('data-popup-init', '1');
+            item.addEventListener('mouseenter', function() {
+                const popup = this.querySelector('.todo-popup');
+                if (!popup) return;
                 const rect = this.getBoundingClientRect();
-                const popupWidth = 350; // approximate width
-                const popupHeight = 200; // approximate height
-                const viewportWidth = window.innerWidth;
-                const viewportHeight = window.innerHeight;
-                
-                // Calculate horizontal position
-                let leftPos;
-                if (rect.right + popupWidth + 10 < viewportWidth) {
-                    // Position to the right if there's space
-                    leftPos = rect.right + 10;
-                } else if (rect.left - popupWidth - 10 > 0) {
-                    // Position to the left if there's space
-                    leftPos = rect.left - popupWidth - 10;
-                } else {
-                    // Center it within viewport if neither side has space
-                    leftPos = Math.max(10, (viewportWidth - popupWidth) / 2);
-                }
-                
-                // Calculate vertical position
-                let topPos = rect.top;
-                if (rect.top + popupHeight > viewportHeight) {
-                    // If popup would go below viewport, position it above or at bottom
-                    topPos = Math.max(10, viewportHeight - popupHeight - 10);
-                }
-                
-                popup.style.left = leftPos + 'px';
-                popup.style.top = topPos + 'px';
-            }
+                const vw = window.innerWidth, vh = window.innerHeight;
+                const pw = 360, ph = 220;
+                let left = (rect.right + pw + 10 < vw) ? rect.right + 10
+                         : (rect.left - pw - 10 > 0)   ? rect.left - pw - 10
+                         : Math.max(10, (vw - pw) / 2);
+                let top = (rect.top + ph > vh) ? Math.max(10, vh - ph - 10) : rect.top;
+                popup.style.left = left + 'px';
+                popup.style.top  = top  + 'px';
+                popup.style.display = 'block';
+            });
+            item.addEventListener('mouseleave', function() {
+                const popup = this.querySelector('.todo-popup');
+                if (popup) popup.style.display = 'none';
+            });
         });
-    });
-});
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachPopupListeners);
+    } else {
+        attachPopupListeners();
+    }
+[% UNLESS include_mode %]
+    // Standalone day view: scroll to current hour
+    const now = new Date();
+    const hh = now.getHours();
+    const hourId = 'add-todo-' + (hh < 10 ? '0' + hh : hh);
+    const hourEl = document.getElementById(hourId);
+    if (hourEl) setTimeout(function(){ hourEl.scrollIntoView({behavior:'smooth',block:'center'}); }, 600);
+[% END %]
+})();
 </script>
 
 <a id="day-view-anchor"></a>
@@ -473,6 +438,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div class="todo-subject todo-subject-shared">[% todo.subject %]</div>
                             <div class="todo-details todo-details-shared">
                                 <span class="status-[% todo.status %]">Overdue</span>
+                                [% IF todo.project_id %]<span>📁 [% proj_name_map.${todo.project_id} || todo.project_id %]</span>[% END %]
                                 [% IF todo.due_date %]<span>Due: [% todo.due_date %]</span>[% END %]
                                 [% IF todo.time_of_day %]<span>Time: [% todo.time_of_day.substr(0, 5) %]</span>[% END %]
                                 <span>Priority: [% todo.priority %]</span>
@@ -497,10 +463,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     <!-- Popup on hover -->
                     <div class="todo-popup">
                         <div class="popup-subject">[% todo.subject %]</div>
-                        [% IF todo.description %]
-                            <div class="popup-description">[% todo.description %]</div>
+                        [% SET _pd = todo.description | trim %][% IF _pd %]
+                            <div class="popup-description">[% _pd %]</div>
                         [% END %]
                         <div class="popup-details">
+                            [% IF todo.project_id %]<div><strong>Project:</strong> [% proj_name_map.${todo.project_id} || todo.project_id %]</div>[% END %]
                             [% IF todo.start_date %]<div><strong>Start:</strong> [% todo.start_date %] [% IF todo.time_of_day %][% todo.time_of_day.substr(0, 5) %][% END %]</div>[% END %]
                             [% IF todo.due_date %]<div><strong>Due:</strong> [% todo.due_date %]</div>[% END %]
                             [% IF todo.end_time %]<div><strong>End Time:</strong> [% todo.end_time %]</div>[% END %]
@@ -568,6 +535,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         [% IF todo.status == 1 %] New [% ELSIF todo.status == 2 %] In Progress [% ELSIF todo.status == 3 %] Completed [% ELSE %] Unknown [% END %]
                                     </span>
                                     
+                                    [% IF todo.project_id %]<span>📁 [% proj_name_map.${todo.project_id} || todo.project_id %]</span>[% END %]
                                     [% IF todo.due_date %]<span>Due: [% todo.due_date %]</span>[% END %]
                                     <span>Priority: [% todo.priority %]</span>
                                     
@@ -598,10 +566,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <!-- Popup on hover -->
                                 <div class="todo-popup">
                                     <div class="popup-subject">[% todo.subject %]</div>
-                                    [% IF todo.description %]
-                                        <div class="popup-description">[% todo.description %]</div>
+                                    [% SET _pd = todo.description | trim %][% IF _pd %]
+                                        <div class="popup-description">[% _pd %]</div>
                                     [% END %]
                                     <div class="popup-details">
+                                        [% IF todo.project_id %]<div><strong>Project:</strong> [% proj_name_map.${todo.project_id} || todo.project_id %]</div>[% END %]
                                         [% IF todo.start_date %]<div><strong>Start:</strong> [% todo.start_date %] [% IF todo.time_of_day %][% todo.time_of_day.substr(0, 5) %][% END %]</div>[% END %]
                                         [% IF todo.due_date %]<div><strong>Due:</strong> [% todo.due_date %]</div>[% END %]
                                         [% IF todo.end_time %]<div><strong>End Time:</strong> [% todo.end_time %]</div>[% END %]
@@ -633,6 +602,42 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     </div>
 </details>
+
+[% IF ai_daily_conversations && ai_daily_conversations.size > 0 %]
+<div style="margin-top:30px; padding:15px; background:rgba(0,100,200,0.05); border-left:3px solid #0064c8; border-radius:4px; max-width:100%;">
+    <h3 style="margin-top:0; color:#0064c8;">AI Activity for [% date %]</h3>
+    <table style="width:100%; border-collapse:collapse;">
+        <thead>
+            <tr style="background:#f2f2f2;">
+                <th style="padding:8px; border:1px solid #ddd; text-align:left;">Conversation</th>
+                <th style="padding:8px; border:1px solid #ddd; text-align:left;">Project</th>
+                <th style="padding:8px; border:1px solid #ddd; text-align:left;">Model</th>
+                <th style="padding:8px; border:1px solid #ddd; text-align:left;">Updated</th>
+                <th style="padding:8px; border:1px solid #ddd; text-align:left;">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% FOREACH conv IN ai_daily_conversations %]
+            <tr>
+                <td style="padding:8px; border:1px solid #ddd;">
+                    <a href="/ai/conversation/[% conv.id %]">[% conv.get_display_title | html %]</a>
+                </td>
+                <td style="padding:8px; border:1px solid #ddd;">
+                    [% IF conv.project %]
+                        <a href="/project/details?project_id=[% conv.project.id %]">[% conv.project.name | html %]</a>
+                    [% ELSE %]—[% END %]
+                </td>
+                <td style="padding:8px; border:1px solid #ddd;">[% conv.model | html %]</td>
+                <td style="padding:8px; border:1px solid #ddd;">[% conv.updated_at %]</td>
+                <td style="padding:8px; border:1px solid #ddd;">
+                    <a href="/ai?conversation_id=[% conv.id %]" style="font-size:0.85em;">Continue</a>
+                </td>
+            </tr>
+            [% END %]
+        </tbody>
+    </table>
+</div>
+[% END %]
 
 [% UNLESS is_daily_plan OR include_mode %]
 <div class="day-navigation view-navigation">

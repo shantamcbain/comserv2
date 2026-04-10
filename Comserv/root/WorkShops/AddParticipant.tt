@@ -4,13 +4,13 @@
    roles = "admin,workshop_leader"
    TemplateType = "Application"
    category = "WorkShops"
-   page_version = "0.01"
-   last_updated = "2026-02-27"
+   page_version = "0.02"
+   last_updated = "2026-03-26"
 %]
 
-[% PageVersion = 'WorkShops/AddParticipant.tt,v 0.01 2026/02/27 AI Exp AI' %]
-[% IF debug_mode == 1 %]
- [% PageVersion %]
+[% PageVersion = 'WorkShops/AddParticipant.tt,v 0.02 2026/03/26 shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %]
+    <div class="debug-info">PageVersion: [% PageVersion %]</div>
 [% END %]
 
 <div class="app-container">
@@ -21,13 +21,11 @@
     </div>
     
     <div class="content-container">
-        
         <div class="content-primary">
             
             [% IF c.flash.error_msg %]
                 <div class="error">[% c.flash.error_msg | html %]</div>
             [% END %]
-            
             [% IF error_msg %]
                 <div class="error">[% error_msg | html %]</div>
             [% END %]
@@ -42,7 +40,6 @@
                             <div class="form-field">
                                 <label for="name">Full Name: *</label>
                                 <input type="text" id="name" name="name" value="[% form_data.name || '' | html %]" class="form-input" required>
-                                <small>First and last name of the participant.</small>
                             </div>
                         </div>
                         
@@ -56,13 +53,12 @@
                         
                         <div class="form-row">
                             <div class="form-field">
-                                <label for="site_affiliation">Site/Affiliation:</label>
+                                <label for="site_affiliation">Site / Affiliation:</label>
                                 <input type="text" id="site_affiliation" name="site_affiliation" value="[% form_data.site_affiliation || '' | html %]" class="form-input">
-                                <small>Optional: Which site or organization this participant belongs to.</small>
                             </div>
                         </div>
                     </div>
-                    
+
                     [% IF workshop.max_participants %]
                     <div class="content-section">
                         <p><strong>Workshop Capacity:</strong> [% workshop.current_participants %] / [% workshop.max_participants %] registered</p>
@@ -71,6 +67,28 @@
                         [% END %]
                     </div>
                     [% END %]
+
+                    <div class="form-section">
+                        <h3>Confirmation Email</h3>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label>
+                                    <input type="checkbox" name="send_confirmation" value="1" checked>
+                                    Send registration confirmation email to this participant
+                                </label>
+                                <small>An email will be sent to the participant confirming their registration.</small>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="confirmation_note">Personal Note (optional):</label>
+                                <textarea id="confirmation_note" name="confirmation_note" rows="4" cols="60" class="form-input">[% form_data.confirmation_note || '' | html %]</textarea>
+                                <small>This note will be included at the end of the confirmation email.</small>
+                            </div>
+                        </div>
+                    </div>
                     
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary">Add Participant</button>
@@ -81,7 +99,6 @@
             </div>
             
         </div>
-        
     </div>
     
 </div>

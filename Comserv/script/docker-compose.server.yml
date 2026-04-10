@@ -1,0 +1,30 @@
+services:
+  web-prod:
+    image: shantamcsbain/comserv-web-prod:latest
+    container_name: comserv2-web-prod
+    restart: unless-stopped
+    ports:
+      - "5000:3000"
+    environment:
+      CATALYST_ENV: production
+      CATALYST_DEBUG: 0
+      WEB_PORT: 3000
+      TZ: UTC
+      WORKSHOP_RESOURCES_PATH: /data/nfs
+      COMSERV_SESSION_DIR: /tmp/comserv/session
+      COMSERV_SESSION_COOKIE: comserv_session
+    volumes:
+      - /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro
+      - /home/ubuntu/comserv-logs:/opt/comserv/root/log
+      - /home/ubuntu/comserv-workshop:/data/nfs:rw
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
