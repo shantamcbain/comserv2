@@ -12,12 +12,11 @@
     ai_form_system        — override the full system prompt sent to AI
     ai_form_show          — if set to 0/false, hides the panel entirely
 
-  USAGE:
-    [% PROCESS 'ai/partials/ai_form_assistant.tt'
+  USAGE: after your closing </form> tag add a PROCESS directive:
+    PROCESS 'ai/partials/ai_form_assistant.tt'
        ai_form_entity_label = 'todo task'
        ai_form_context      = 'project task management'
        ai_form_fields       = 'subject, description, priority, due_date'
-    %]
 
   ROLES:  Panel only renders for admin, editor, or developer roles.
   AUTHORITY: This file is owned by the aichatsystem branch. Do not fork
