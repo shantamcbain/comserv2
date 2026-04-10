@@ -50,6 +50,26 @@ __PACKAGE__->add_columns(
         default_value => 0,
         comment       => '1 if this item has a BOM (made from other items)',
     },
+    inventory_accno_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+        comment     => 'COA account for stock value (Asset — e.g. 1200 Inventory)',
+    },
+    income_accno_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+        comment     => 'COA account when item is sold (Income — e.g. 4000 Sales)',
+    },
+    expense_accno_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+        comment     => 'COA account for COGS/expense (Expense — e.g. 5000 COGS)',
+    },
+    returns_accno_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+        comment     => 'COA account for returns/refunds (e.g. 4100 Sales Returns)',
+    },
     unit_of_measure => {
         data_type     => 'varchar',
         size          => 50,
@@ -130,6 +150,34 @@ __PACKAGE__->many_to_many(
     'suppliers' => 'item_suppliers', 'supplier'
 );
 
+__PACKAGE__->belongs_to(
+    'inventory_account',
+    'Comserv::Model::Schema::Ency::Result::CoaAccount',
+    { 'foreign.id' => 'self.inventory_accno_id' },
+    { join_type => 'LEFT', on_delete => 'SET NULL' }
+);
+
+__PACKAGE__->belongs_to(
+    'income_account',
+    'Comserv::Model::Schema::Ency::Result::CoaAccount',
+    { 'foreign.id' => 'self.income_accno_id' },
+    { join_type => 'LEFT', on_delete => 'SET NULL' }
+);
+
+__PACKAGE__->belongs_to(
+    'expense_account',
+    'Comserv::Model::Schema::Ency::Result::CoaAccount',
+    { 'foreign.id' => 'self.expense_accno_id' },
+    { join_type => 'LEFT', on_delete => 'SET NULL' }
+);
+
+__PACKAGE__->belongs_to(
+    'returns_account',
+    'Comserv::Model::Schema::Ency::Result::CoaAccount',
+    { 'foreign.id' => 'self.returns_accno_id' },
+    { join_type => 'LEFT', on_delete => 'SET NULL' }
+);
+
 __PACKAGE__->has_many(
     'bom_components' => 'Comserv::Model::Schema::Ency::Result::InventoryItemBOM',
     { 'foreign.parent_item_id' => 'self.id' },
@@ -139,12 +187,6 @@ __PACKAGE__->has_many(
 __PACKAGE__->has_many(
     'bom_used_in' => 'Comserv::Model::Schema::Ency::Result::InventoryItemBOM',
     { 'foreign.component_item_id' => 'self.id' },
-    { cascade_delete => 0 }
-);
-
-__PACKAGE__->has_many(
-    'hive_components' => 'Comserv::Model::Schema::Ency::Result::HiveComponent',
-    { 'foreign.inventory_item_id' => 'self.id' },
     { cascade_delete => 0 }
 );
 
