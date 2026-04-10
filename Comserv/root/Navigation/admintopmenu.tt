@@ -170,6 +170,24 @@
             </div>
         </div>
 
+        <!-- Inventory & Accounting -->
+        <div class="submenu-item">
+            <span class="submenu-header"><a href="/Inventory" class="dropbtn"><i class="icon-inventory"></i>Inventory</a></span>
+            <div class="submenu">
+                <a href="/Inventory"><i class="icon-inventory"></i>Inventory Dashboard</a>
+                <a href="/Inventory/items"><i class="icon-list"></i>Items / SKUs</a>
+                <a href="/Inventory/item/add"><i class="icon-add"></i>Add Item</a>
+                <a href="/Inventory/suppliers"><i class="icon-supplier"></i>Suppliers</a>
+                <a href="/Inventory/locations"><i class="icon-location"></i>Locations</a>
+                <div class="submenu-section">
+                    <span class="submenu-section-title">Accounting</span>
+                    <a href="/Accounting"><i class="icon-accounting"></i>Accounting Dashboard</a>
+                    <a href="/Accounting/coa"><i class="icon-coa"></i>Chart of Accounts</a>
+                    <a href="/Accounting/gl"><i class="icon-gl"></i>General Ledger</a>
+                </div>
+            </div>
+        </div>
+
         <!-- Logging -->
         <div class="submenu-item">
             <span class="submenu-header"><a href="/log"><i class="icon-log"></i>Logging</a></span>

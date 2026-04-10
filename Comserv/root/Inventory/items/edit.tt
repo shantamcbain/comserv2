@@ -1,4 +1,4 @@
-[% PageVersion = 'Inventory/items/edit.tt,v 0.01 2026/03/30 shanta Exp' %]
+[% PageVersion = 'Inventory/items/edit.tt,v 0.02 2026/04/10 shanta Exp' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <h1>Edit Item: [% item.name %]</h1>
@@ -20,6 +20,20 @@
       <td><input type="text" id="category" name="category" maxlength="100" value="[% item.category %]"></td>
     </tr>
     <tr>
+      <th><label for="item_origin">Origin / How Made</label></th>
+      <td>
+        <select id="item_origin" name="item_origin">
+          [% FOREACH o IN ['purchased','manufactured','crafted','grown','foraged','harvested','3d_printed','other'] %]
+          <option value="[% o %]" [% IF item.item_origin == o %]selected[% END %]>[% o %]</option>
+          [% END %]
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="is_assemblable">Has BOM / Recipe?</label></th>
+      <td><input type="checkbox" id="is_assemblable" name="is_assemblable" value="1" [% IF item.is_assemblable %]checked[% END %]> Yes — this item is assembled from components</td>
+    </tr>
+    <tr>
       <th><label for="description">Description</label></th>
       <td><textarea id="description" name="description" rows="3" cols="40">[% item.description %]</textarea></td>
     </tr>
@@ -27,7 +41,7 @@
       <th><label for="unit_of_measure">Unit of Measure</label></th>
       <td>
         <select id="unit_of_measure" name="unit_of_measure">
-          [% FOREACH u IN ['each', 'box', 'case', 'kg', 'lb', 'litre', 'metre', 'hour'] %]
+          [% FOREACH u IN ['each','g','kg','ml','L','cm','m','sheet','box','case','lb','litre','metre','hour'] %]
           <option value="[% u %]" [% IF item.unit_of_measure == u %]selected[% END %]>[% u %]</option>
           [% END %]
         </select>
@@ -49,7 +63,7 @@
       <th><label for="status">Status</label></th>
       <td>
         <select id="status" name="status">
-          [% FOREACH s IN ['active', 'inactive', 'discontinued'] %]
+          [% FOREACH s IN ['active','inactive','discontinued'] %]
           <option value="[% s %]" [% IF item.status == s %]selected[% END %]>[% s %]</option>
           [% END %]
         </select>
@@ -59,11 +73,41 @@
       <th><label for="notes">Notes</label></th>
       <td><textarea id="notes" name="notes" rows="3" cols="40">[% item.notes %]</textarea></td>
     </tr>
+  </table>
+
+  [% IF coa_accounts && coa_accounts.size %]
+  <h3>Accounting Links <small style="font-weight:normal">(Chart of Accounts)</small></h3>
+  <table>
+    [% MACRO coa_select(fname, label, hint, current_id) BLOCK %]
     <tr>
-      <td colspan="2">
-        <input type="submit" value="Save Changes">
-        <a href="/Inventory/item/view/[% item.id %]">Cancel</a>
+      <th><label for="[% fname %]">[% label %]</label></th>
+      <td>
+        <select id="[% fname %]" name="[% fname %]">
+          <option value="">— none —</option>
+          [% FOREACH cat IN ['A','L','Q','I','E'] %]
+            [% SET cat_label = {A='Asset', L='Liability', Q='Equity', I='Income', E='Expense'} %]
+            <optgroup label="[% cat_label.$cat %]">
+            [% FOREACH acct IN coa_accounts %]
+              [% IF acct.category == cat %]
+              <option value="[% acct.id %]" [% IF acct.id == current_id %]selected[% END %]>[% acct.accno %] — [% acct.description %]</option>
+              [% END %]
+            [% END %]
+            </optgroup>
+          [% END %]
+        </select>
+        <small>[% hint %]</small>
       </td>
     </tr>
+    [% END %]
+    [% coa_select('inventory_accno_id', 'Stock/Asset Account',  'e.g. 1200 Inventory',   item.inventory_accno_id) %]
+    [% coa_select('income_accno_id',    'Income/Sales Account', 'e.g. 4000 Sales',        item.income_accno_id) %]
+    [% coa_select('expense_accno_id',   'COGS/Expense Account', 'e.g. 5000 COGS',         item.expense_accno_id) %]
+    [% coa_select('returns_accno_id',   'Returns Account',      'e.g. 4100 Returns',      item.returns_accno_id) %]
   </table>
+  [% END %]
+
+  <p>
+    <input type="submit" value="Save Changes">
+    <a href="/Inventory/item/view/[% item.id %]">Cancel</a>
+  </p>
 </form>

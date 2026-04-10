@@ -1,0 +1,18 @@
+[% PageVersion = 'Accounting/index.tt,v 0.01 2026/04/10 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Accounting</h1>
+<p>General Ledger and Chart of Accounts — modeled on SQL-Ledger/LedgerSMB.</p>
+
+<table border="1" cellpadding="8">
+  <tr>
+    <th>Chart of Accounts</th>
+    <td>[% acct_count %] active accounts</td>
+    <td><a href="/Accounting/coa">Browse COA</a></td>
+  </tr>
+  <tr>
+    <th>General Ledger</th>
+    <td>[% entry_count %] journal entries</td>
+    <td><a href="/Accounting/gl">Browse GL</a></td>
+  </tr>
+</table>
