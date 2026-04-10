@@ -388,7 +388,7 @@ sub supplier_edit :Path('/Inventory/supplier/edit') :Args(1) {
     my $schema   = $self->_schema($c);
 
     my $supplier;
-    eval { $supplier = $schema->resultset('InventorySupplier')->find($id) };
+    eval { $supplier = $schema->resultset('InventorySupplier')->find({ id => $id, sitename => $sitename }) };
     if ($@ || !$supplier) {
         $c->stash->{error_msg} = 'Supplier not found';
         $c->res->redirect($c->uri_for('/Inventory/suppliers'));
@@ -433,9 +433,10 @@ sub supplier_delete :Path('/Inventory/supplier/delete') :Args(1) {
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'supplier_delete', "Delete supplier $id");
 
-    my $schema = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
     eval {
-        my $supplier = $schema->resultset('InventorySupplier')->find($id);
+        my $supplier = $schema->resultset('InventorySupplier')->find({ id => $id, sitename => $sitename });
         $supplier->update({ status => 'inactive', updated_at => $self->_now() }) if $supplier;
     };
     if ($@) {
@@ -532,7 +533,7 @@ sub location_edit :Path('/Inventory/location/edit') :Args(1) {
     my $schema   = $self->_schema($c);
 
     my $location;
-    eval { $location = $schema->resultset('InventoryLocation')->find($id) };
+    eval { $location = $schema->resultset('InventoryLocation')->find({ id => $id, sitename => $sitename }) };
     if ($@ || !$location) {
         $c->stash->{error_msg} = 'Location not found';
         $c->res->redirect($c->uri_for('/Inventory/locations'));
