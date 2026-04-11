@@ -17,7 +17,7 @@
         <option value="[% s.id %]">[% s.name | html %]</option>
         [% END %]
       </select>
-      <button type="button" onclick="openPopup('/Inventory/supplier/add?popup=1', 'supplier_id', refreshSuppliers)"
+      <button type="button" onclick="openItemPopup('/Inventory/supplier/add?popup=1', 'supplier')"
               style="margin-left:4px;" title="Add new supplier">+ Supplier</button>
     </td>
   </tr>
@@ -43,7 +43,8 @@
         <option value="[% a.id %]"[% IF a.accno == '2000' %] selected[% END %]>[% a.accno %] [% a.description | html %]</option>
         [% END %]
       </select>
-      <small>Accounts Payable account (e.g. 2000 AP)</small>
+      <small>Accounts Payable account. Use 2000 AP regardless of payment method (PayPal, cash, card).
+      The payment method is recorded when you mark the invoice paid.</small>
     </td>
   </tr>
   [% END %]
@@ -54,13 +55,18 @@
 </table>
 
 <h2>Line Items</h2>
-<p><small>Select an existing item or type a description. Add a location to update stock.</small></p>
+<p><small>Select an existing item or type a description. Add a location to update stock on hand.</small></p>
+<p>
+  <button type="button" onclick="openItemPopup('/Inventory/item/add?popup=1', 'item')" style="font-size:0.85em;">
+    + Add New Item (opens popup)
+  </button>
+</p>
 
 <table id="lines-table" border="1" cellpadding="5" style="border-collapse:collapse;width:100%;">
   <thead>
     <tr>
       <th>#</th>
-      <th>Item <button type="button" onclick="openPopup('/Inventory/item/add?popup=1', null, refreshItems)" title="Add new item" style="font-size:0.75em;">+ New</button></th>
+      <th>Item</th>
       <th>Description</th>
       <th>Qty</th>
       <th>Unit Cost</th>
@@ -92,53 +98,49 @@ var lineIndex = 0;
 
 var items = [
   [% FOREACH i IN items %]
-  { id: [% i.id %], name: "[% i.name.replace('"', '&quot;') %]", cost: "[% i.unit_cost || '' %]",
-    expense_id: "[% i.expense_accno_id || '' %]" }[% ',' UNLESS loop.last %]
+  { id: [% i.id %], name: "[% i.name.replace('"', '&quot;') | html %]", sku: "[% i.sku | html %]",
+    cost: "[% i.unit_cost || '' %]", expense_id: "[% i.expense_accno_id || '' %]" }[% ',' UNLESS loop.last %]
   [% END %]
 ];
 
 var locations = [
   [% FOREACH l IN locations %]
-  { id: [% l.id %], name: "[% l.name.replace('"', '&quot;') %]" }[% ',' UNLESS loop.last %]
+  { id: [% l.id %], name: "[% l.name.replace('"', '&quot;') | html %]" }[% ',' UNLESS loop.last %]
   [% END %]
 ];
 
 var coaAccounts = [
   [% FOREACH a IN coa_accounts %]
-  { id: [% a.id %], label: "[% a.accno %] [% a.description.replace('"', '&quot;') %]" }[% ',' UNLESS loop.last %]
+  { id: [% a.id %], label: "[% a.accno %] [% a.description.replace('"', '&quot;') | html %]" }[% ',' UNLESS loop.last %]
   [% END %]
 ];
 
 function buildItemSelect(name, onchange) {
-  var s = '<select name="' + name + '" ' + (onchange ? 'onchange="' + onchange + '"' : '') + ' style="max-width:200px;">'
+  var s = '<select name="' + name + '" onchange="' + onchange + '" style="max-width:220px;">'
     + '<option value="">— select or leave blank —</option>';
   items.forEach(function(i) {
     s += '<option value="' + i.id + '" data-cost="' + i.cost + '" data-expense="' + i.expense_id + '">'
-       + i.name + '</option>';
+       + i.name + ' [' + i.sku + ']</option>';
   });
   s += '</select>';
   return s;
 }
 
 function buildLocationSelect(name) {
-  var s = '<select name="' + name + '">'
-    + '<option value="">— none —</option>';
+  var s = '<select name="' + name + '"><option value="">— none —</option>';
   locations.forEach(function(l) {
     s += '<option value="' + l.id + '">' + l.name + '</option>';
   });
-  s += '</select>';
-  return s;
+  return s + '</select>';
 }
 
 function buildAccountSelect(name, selectedId) {
-  var s = '<select name="' + name + '" style="max-width:200px;">'
-    + '<option value="">— none —</option>';
+  var s = '<select name="' + name + '" style="max-width:200px;"><option value="">— none —</option>';
   coaAccounts.forEach(function(a) {
     var sel = (selectedId && a.id == selectedId) ? ' selected' : '';
     s += '<option value="' + a.id + '"' + sel + '>' + a.label + '</option>';
   });
-  s += '</select>';
-  return s;
+  return s + '</select>';
 }
 
 function addLine() {
@@ -160,7 +162,7 @@ function addLine() {
 
 function itemChanged(sel, idx) {
   var opt = sel.options[sel.selectedIndex];
-  var cost = opt ? (opt.getAttribute('data-cost') || 0) : 0;
+  var cost      = opt ? (opt.getAttribute('data-cost')    || 0)  : 0;
   var expenseId = opt ? (opt.getAttribute('data-expense') || '') : '';
   var costField = document.querySelector('[name="unit_cost_' + idx + '"]');
   if (costField && cost) costField.value = parseFloat(cost).toFixed(2);
@@ -176,10 +178,9 @@ function itemChanged(sel, idx) {
 }
 
 function calcLine(idx) {
-  var qty  = parseFloat(document.querySelector('[name="quantity_' + idx + '"]').value) || 0;
+  var qty  = parseFloat(document.querySelector('[name="quantity_' + idx + '"]').value)  || 0;
   var cost = parseFloat(document.querySelector('[name="unit_cost_' + idx + '"]').value) || 0;
-  var lt   = qty * cost;
-  document.getElementById('total-' + idx).textContent = '$' + lt.toFixed(2);
+  document.getElementById('total-' + idx).textContent = '$' + (qty * cost).toFixed(2);
   calcTotal();
 }
 
@@ -197,24 +198,65 @@ function removeLine(idx) {
   calcTotal();
 }
 
-// Popup support
-function openPopup(url, selectId, callback) {
-  var w = window.open(url, 'popup', 'width=900,height=700,scrollbars=yes');
-  if (callback) {
-    w._onClose = callback;
-    var timer = setInterval(function() {
-      if (w.closed) { clearInterval(timer); callback(selectId); }
-    }, 500);
-  }
+// -----------------------------------------------------------------------
+// Popup support — opens add-item or add-supplier in a new window.
+// When the popup closes, refreshes ONLY the relevant dropdown via AJAX
+// so all existing invoice data is preserved.
+// -----------------------------------------------------------------------
+function openItemPopup(url, type) {
+  var w = window.open(url, 'inv_popup', 'width=920,height=720,scrollbars=yes');
+  var timer = setInterval(function() {
+    if (w.closed) {
+      clearInterval(timer);
+      if (type === 'item')     refreshItemsAjax();
+      if (type === 'supplier') refreshSuppliersAjax();
+    }
+  }, 600);
 }
 
-function refreshSuppliers(selectId) {
-  // Reload page to pick up new supplier — simple approach
-  location.reload();
+function refreshItemsAjax() {
+  fetch('/Inventory/api/items_with_accounts')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      items = data;
+      // Rebuild every item select that still has no value chosen
+      document.querySelectorAll('[name^="item_id_"]').forEach(function(sel) {
+        var cur = sel.value;
+        var idx = sel.name.replace('item_id_', '');
+        sel.innerHTML = '<option value="">— select or leave blank —</option>';
+        data.forEach(function(i) {
+          var opt = document.createElement('option');
+          opt.value = i.id;
+          opt.textContent = i.name + ' [' + i.sku + ']';
+          opt.setAttribute('data-cost',    i.unit_cost       || '');
+          opt.setAttribute('data-expense', i.expense_accno_id || '');
+          if (i.id == cur) opt.selected = true;
+          sel.appendChild(opt);
+        });
+      });
+    })
+    .catch(function(e) { console.warn('refreshItemsAjax failed', e); });
 }
 
-function refreshItems(selectId) {
-  location.reload();
+function refreshSuppliersAjax() {
+  fetch('/Inventory/api/suppliers')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var sel = document.getElementById('supplier_id');
+      if (!sel) return;
+      var cur = sel.value;
+      sel.innerHTML = '<option value="">— select supplier —</option>';
+      data.forEach(function(s) {
+        var opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.name;
+        if (s.id == cur) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      // Select the newest supplier (last in list) if nothing was selected
+      if (!cur && data.length) sel.value = data[data.length - 1].id;
+    })
+    .catch(function(e) { console.warn('refreshSuppliersAjax failed', e); });
 }
 
 // Add first line automatically
