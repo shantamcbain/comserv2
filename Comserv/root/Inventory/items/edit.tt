@@ -56,9 +56,90 @@
       </td>
     </tr>
     <tr>
+      <th><label for="item_origin">Item Origin</label></th>
+      <td>
+        <select id="item_origin" name="item_origin">
+          [% FOREACH o IN ['purchased','manufactured','3d_printed','grown','foraged','harvested','crafted','other'] %]
+          <option value="[% o %]" [% IF item.item_origin == o %]selected[% END %]>[% o %]</option>
+          [% END %]
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="is_consumable">Consumable?</label></th>
+      <td><input type="checkbox" id="is_consumable" name="is_consumable" value="1"
+          [% IF item.is_consumable %]checked[% END %]>
+          <small>Expensed when used (filament, wax, seed)</small></td>
+    </tr>
+    <tr>
+      <th><label for="is_assemblable">Has BOM?</label></th>
+      <td><input type="checkbox" id="is_assemblable" name="is_assemblable" value="1"
+          [% IF item.is_assemblable %]checked[% END %]>
+          <small>Made from other items (frame, box, printed part)</small></td>
+    </tr>
+    <tr>
       <th><label for="notes">Notes</label></th>
       <td><textarea id="notes" name="notes" rows="3" cols="40">[% item.notes %]</textarea></td>
     </tr>
+    [% IF coa_accounts.size %]
+    <tr><td colspan="2"><hr><strong>Accounting (optional)</strong></td></tr>
+    <tr>
+      <th><label for="inventory_accno_id">Inventory Account</label></th>
+      <td>
+        <select id="inventory_accno_id" name="inventory_accno_id">
+          <option value="">— none —</option>
+          [% FOREACH a IN coa_accounts %]
+          <option value="[% a.id %]" [% IF item.inventory_accno_id == a.id %]selected[% END %]>
+            [% a.accno %] [% a.description | html %]
+          </option>
+          [% END %]
+        </select>
+        <small>Asset account for stock value (e.g. 1200 Inventory Asset)</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="income_accno_id">Income Account</label></th>
+      <td>
+        <select id="income_accno_id" name="income_accno_id">
+          <option value="">— none —</option>
+          [% FOREACH a IN coa_accounts %]
+          <option value="[% a.id %]" [% IF item.income_accno_id == a.id %]selected[% END %]>
+            [% a.accno %] [% a.description | html %]
+          </option>
+          [% END %]
+        </select>
+        <small>Income account when sold (e.g. 4000 Sales, 4210 3D Print Sales)</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="expense_accno_id">Expense / COGS Account</label></th>
+      <td>
+        <select id="expense_accno_id" name="expense_accno_id">
+          <option value="">— none —</option>
+          [% FOREACH a IN coa_accounts %]
+          <option value="[% a.id %]" [% IF item.expense_accno_id == a.id %]selected[% END %]>
+            [% a.accno %] [% a.description | html %]
+          </option>
+          [% END %]
+        </select>
+        <small>Expense/COGS account (e.g. 5000 COGS, 6210 3D Print Materials)</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="returns_accno_id">Returns Account</label></th>
+      <td>
+        <select id="returns_accno_id" name="returns_accno_id">
+          <option value="">— none —</option>
+          [% FOREACH a IN coa_accounts %]
+          <option value="[% a.id %]" [% IF item.returns_accno_id == a.id %]selected[% END %]>
+            [% a.accno %] [% a.description | html %]
+          </option>
+          [% END %]
+        </select>
+        <small>Returns/refund contra account (e.g. 4100 Sales Returns)</small>
+      </td>
+    </tr>
+    [% END %]
     <tr>
       <td colspan="2">
         <input type="submit" value="Save Changes">
@@ -70,5 +151,5 @@
 [% PROCESS 'ai/partials/ai_form_assistant.tt'
    ai_form_entity_label = 'inventory item'
    ai_form_context      = 'inventory item management'
-   ai_form_fields       = 'name, sku, description, category, unit_of_measure, unit_cost, reorder_point, reorder_quantity, status, notes'
+   ai_form_fields       = 'name, sku, description, category, item_origin, unit_of_measure, unit_cost, reorder_point, reorder_quantity, status, notes, inventory_accno_id, income_accno_id, expense_accno_id, returns_accno_id'
 %]
