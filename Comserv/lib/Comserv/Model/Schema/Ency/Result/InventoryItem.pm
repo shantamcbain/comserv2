@@ -79,6 +79,19 @@ __PACKAGE__->add_columns(id => {
         data_type     => 'decimal',
         size          => [10, 2],
         is_nullable   => 1,
+        comment       => 'Purchase/cost price (what you pay the supplier)',
+    },
+    unit_price => {
+        data_type     => 'decimal',
+        size          => [10, 2],
+        is_nullable   => 1,
+        comment       => 'Selling price (what you charge the customer — maps to Square unit_price)',
+    },
+    barcode => {
+        data_type   => 'varchar',
+        size        => 100,
+        is_nullable => 1,
+        comment     => 'UPC/EAN/QR/Code128 barcode — used for scanning and Square catalog sync',
     },
     reorder_point => {
         data_type     => 'integer',
