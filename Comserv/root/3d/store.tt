@@ -1,0 +1,146 @@
+[% IF c.session.debug_mode == 1 %]<!-- Debug: 3d/store.tt loaded -->[% END %]
+
+<style>
+.store-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1.2em;
+    margin-top: 1em;
+}
+.store-card {
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.2em;
+    display: flex;
+    flex-direction: column;
+}
+.store-card h3 {
+    margin: 0 0 0.4em 0;
+    color: var(--heading-color, var(--text-color));
+    font-size: 1.05em;
+}
+.store-card .price {
+    font-size: 1.3em;
+    font-weight: bold;
+    color: var(--accent-color, var(--link-color));
+    margin-bottom: 0.4em;
+}
+.store-card .stock {
+    font-size: 0.85em;
+    color: var(--text-color);
+    margin-bottom: 0.8em;
+}
+.store-card .stock.out {
+    color: var(--schema-alert-danger-color, #c0392b);
+}
+.store-card .desc {
+    font-size: 0.9em;
+    color: var(--text-color);
+    flex: 1;
+    margin-bottom: 0.8em;
+}
+.store-card form {
+    display: flex;
+    gap: 0.5em;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.store-card input[type=number] {
+    width: 60px;
+    padding: 0.35em;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--input-bg, var(--background-color));
+    color: var(--text-color);
+}
+.btn-buy {
+    padding: 0.4em 1em;
+    background: var(--button-bg, var(--accent-color));
+    color: var(--button-text, white);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+.btn-buy:hover { opacity: 0.85; }
+.btn-buy:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.store-empty {
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 2em;
+    text-align: center;
+    color: var(--text-color);
+}
+</style>
+
+[% IF c.flash.success_msg %]
+<div style="background:var(--success-color,#d4edda);border:1px solid var(--border-color);border-radius:6px;padding:1em 1.2em;margin-bottom:1em;color:var(--text-color);">
+    [% c.flash.success_msg %]
+</div>
+[% END %]
+
+[% IF c.flash.error_msg %]
+<div style="background:var(--schema-alert-danger-bg,#f8d7da);border:1px solid var(--border-color);border-radius:6px;padding:1em 1.2em;margin-bottom:1em;color:var(--text-color);">
+    [% c.flash.error_msg %]
+</div>
+[% END %]
+
+<h1>3D Printed Items Store</h1>
+<p style="color:var(--text-color);">Ready-made items available for immediate purchase from <strong>[% sitename %]</strong>.</p>
+
+[% IF items.size %]
+<div class="store-grid">
+    [% FOR item IN items %]
+    <div class="store-card">
+        <h3>[% item.name | html %]</h3>
+        [% IF item.selling_price %]
+        <div class="price">$[% item.selling_price | format('%.2f') %]</div>
+        [% ELSIF item.unit_cost %]
+        <div class="price">$[% item.unit_cost | format('%.2f') %]</div>
+        [% ELSE %]
+        <div class="price">Price on request</div>
+        [% END %]
+
+        [% SET avail = available.item(item.id) || 0 %]
+        [% IF avail > 0 %]
+        <div class="stock">[% avail %] in stock</div>
+        [% ELSE %]
+        <div class="stock out">Out of stock</div>
+        [% END %]
+
+        [% IF item.description %]
+        <div class="desc">[% item.description | html %]</div>
+        [% END %]
+
+        [% IF avail > 0 %]
+            [% IF c.session.user_id %]
+            <form method="post" action="/3d/buy">
+                <input type="hidden" name="item_id" value="[% item.id %]">
+                <input type="number" name="quantity" value="1" min="1" max="[% avail %]">
+                <button type="submit" class="btn-buy">Buy</button>
+            </form>
+            [% ELSE %]
+            <a href="/user/login" style="font-size:0.9em;color:var(--link-color);">Log in to purchase</a>
+            [% END %]
+        [% ELSE %]
+        <button class="btn-buy" disabled>Out of Stock</button>
+        [% END %]
+    </div>
+    [% END %]
+</div>
+[% ELSE %]
+<div class="store-empty">
+    <p>No items currently available in the store.</p>
+    <p><a href="/3d/browse">Browse our 3D model catalog</a> to order a custom print instead.</p>
+</div>
+[% END %]
+
+<p style="margin-top:1.5em;">
+    <a href="/3d">&larr; Back to 3D Printing Home</a> &bull;
+    <a href="/3d/browse">Browse Models &amp; Order Prints</a>
+</p>
