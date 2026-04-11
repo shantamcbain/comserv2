@@ -1,0 +1,222 @@
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Enter Supplier Invoice</h1>
+<p><a href="/Inventory/invoice">← Invoices</a></p>
+
+[% IF error_msg %]<p style="color:red;font-weight:bold">[% error_msg %]</p>[% END %]
+
+<form method="POST" action="/Inventory/invoice/new" id="invoice-form">
+
+<table cellpadding="6">
+  <tr>
+    <th><label for="supplier_id">Supplier *</label></th>
+    <td>
+      <select id="supplier_id" name="supplier_id" required>
+        <option value="">— select supplier —</option>
+        [% FOREACH s IN suppliers %]
+        <option value="[% s.id %]">[% s.name | html %]</option>
+        [% END %]
+      </select>
+      <button type="button" onclick="openPopup('/Inventory/supplier/add?popup=1', 'supplier_id', refreshSuppliers)"
+              style="margin-left:4px;" title="Add new supplier">+ Supplier</button>
+    </td>
+  </tr>
+  <tr>
+    <th><label for="invoice_number">Invoice Number</label></th>
+    <td><input type="text" id="invoice_number" name="invoice_number" maxlength="100"></td>
+  </tr>
+  <tr>
+    <th><label for="invoice_date">Invoice Date *</label></th>
+    <td><input type="date" id="invoice_date" name="invoice_date" value="[% today %]" required></td>
+  </tr>
+  <tr>
+    <th><label for="due_date">Due Date</label></th>
+    <td><input type="date" id="due_date" name="due_date"></td>
+  </tr>
+  [% IF coa_accounts.size %]
+  <tr>
+    <th><label for="ap_account_id">AP Account</label></th>
+    <td>
+      <select id="ap_account_id" name="ap_account_id">
+        <option value="">— none (no GL entry) —</option>
+        [% FOREACH a IN coa_accounts %]
+        <option value="[% a.id %]"[% IF a.accno == '2000' %] selected[% END %]>[% a.accno %] [% a.description | html %]</option>
+        [% END %]
+      </select>
+      <small>Accounts Payable account (e.g. 2000 AP)</small>
+    </td>
+  </tr>
+  [% END %]
+  <tr>
+    <th><label for="notes">Notes</label></th>
+    <td><textarea id="notes" name="notes" rows="2" cols="50"></textarea></td>
+  </tr>
+</table>
+
+<h2>Line Items</h2>
+<p><small>Select an existing item or type a description. Add a location to update stock.</small></p>
+
+<table id="lines-table" border="1" cellpadding="5" style="border-collapse:collapse;width:100%;">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Item <button type="button" onclick="openPopup('/Inventory/item/add?popup=1', null, refreshItems)" title="Add new item" style="font-size:0.75em;">+ New</button></th>
+      <th>Description</th>
+      <th>Qty</th>
+      <th>Unit Cost</th>
+      <th>Total</th>
+      [% IF coa_accounts.size %]<th>Expense Account</th>[% END %]
+      <th>Location</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody id="lines-body">
+  </tbody>
+</table>
+
+<p>
+  <button type="button" onclick="addLine()">+ Add Line</button>
+</p>
+<p style="font-weight:bold">
+  Invoice Total: $<span id="invoice-total">0.00</span>
+</p>
+
+<p>
+  <input type="submit" value="Save Invoice" style="background:#007bff;color:white;padding:8px 18px;border:none;border-radius:4px;cursor:pointer;">
+  <a href="/Inventory/invoice" style="margin-left:1em;">Cancel</a>
+</p>
+</form>
+
+<script>
+var lineIndex = 0;
+
+var items = [
+  [% FOREACH i IN items %]
+  { id: [% i.id %], name: "[% i.name.replace('"', '&quot;') %]", cost: "[% i.unit_cost || '' %]",
+    expense_id: "[% i.expense_accno_id || '' %]" }[% ',' UNLESS loop.last %]
+  [% END %]
+];
+
+var locations = [
+  [% FOREACH l IN locations %]
+  { id: [% l.id %], name: "[% l.name.replace('"', '&quot;') %]" }[% ',' UNLESS loop.last %]
+  [% END %]
+];
+
+var coaAccounts = [
+  [% FOREACH a IN coa_accounts %]
+  { id: [% a.id %], label: "[% a.accno %] [% a.description.replace('"', '&quot;') %]" }[% ',' UNLESS loop.last %]
+  [% END %]
+];
+
+function buildItemSelect(name, onchange) {
+  var s = '<select name="' + name + '" ' + (onchange ? 'onchange="' + onchange + '"' : '') + ' style="max-width:200px;">'
+    + '<option value="">— select or leave blank —</option>';
+  items.forEach(function(i) {
+    s += '<option value="' + i.id + '" data-cost="' + i.cost + '" data-expense="' + i.expense_id + '">'
+       + i.name + '</option>';
+  });
+  s += '</select>';
+  return s;
+}
+
+function buildLocationSelect(name) {
+  var s = '<select name="' + name + '">'
+    + '<option value="">— none —</option>';
+  locations.forEach(function(l) {
+    s += '<option value="' + l.id + '">' + l.name + '</option>';
+  });
+  s += '</select>';
+  return s;
+}
+
+function buildAccountSelect(name, selectedId) {
+  var s = '<select name="' + name + '" style="max-width:200px;">'
+    + '<option value="">— none —</option>';
+  coaAccounts.forEach(function(a) {
+    var sel = (selectedId && a.id == selectedId) ? ' selected' : '';
+    s += '<option value="' + a.id + '"' + sel + '>' + a.label + '</option>';
+  });
+  s += '</select>';
+  return s;
+}
+
+function addLine() {
+  var idx = lineIndex++;
+  var hasCoa = coaAccounts.length > 0;
+  var row = document.createElement('tr');
+  row.id = 'line-' + idx;
+  row.innerHTML = '<td>' + (idx + 1) + '</td>'
+    + '<td>' + buildItemSelect('item_id_' + idx, 'itemChanged(this,' + idx + ')') + '</td>'
+    + '<td><input type="text" name="description_' + idx + '" size="20"></td>'
+    + '<td><input type="number" name="quantity_' + idx + '" value="1" min="0.0001" step="any" size="6" oninput="calcLine(' + idx + ')"></td>'
+    + '<td><input type="number" name="unit_cost_' + idx + '" value="0.00" min="0" step="0.01" size="10" oninput="calcLine(' + idx + ')"></td>'
+    + '<td id="total-' + idx + '" style="text-align:right">$0.00</td>'
+    + (hasCoa ? '<td id="acct-cell-' + idx + '">' + buildAccountSelect('account_id_' + idx, '') + '</td>' : '')
+    + '<td>' + buildLocationSelect('location_id_' + idx) + '</td>'
+    + '<td><button type="button" onclick="removeLine(' + idx + ')">✕</button></td>';
+  document.getElementById('lines-body').appendChild(row);
+}
+
+function itemChanged(sel, idx) {
+  var opt = sel.options[sel.selectedIndex];
+  var cost = opt ? (opt.getAttribute('data-cost') || 0) : 0;
+  var expenseId = opt ? (opt.getAttribute('data-expense') || '') : '';
+  var costField = document.querySelector('[name="unit_cost_' + idx + '"]');
+  if (costField && cost) costField.value = parseFloat(cost).toFixed(2);
+  if (expenseId) {
+    var acctSel = document.querySelector('[name="account_id_' + idx + '"]');
+    if (acctSel) {
+      for (var i = 0; i < acctSel.options.length; i++) {
+        if (acctSel.options[i].value == expenseId) { acctSel.selectedIndex = i; break; }
+      }
+    }
+  }
+  calcLine(idx);
+}
+
+function calcLine(idx) {
+  var qty  = parseFloat(document.querySelector('[name="quantity_' + idx + '"]').value) || 0;
+  var cost = parseFloat(document.querySelector('[name="unit_cost_' + idx + '"]').value) || 0;
+  var lt   = qty * cost;
+  document.getElementById('total-' + idx).textContent = '$' + lt.toFixed(2);
+  calcTotal();
+}
+
+function calcTotal() {
+  var total = 0;
+  document.querySelectorAll('[id^="total-"]').forEach(function(el) {
+    total += parseFloat(el.textContent.replace('$','')) || 0;
+  });
+  document.getElementById('invoice-total').textContent = total.toFixed(2);
+}
+
+function removeLine(idx) {
+  var row = document.getElementById('line-' + idx);
+  if (row) row.remove();
+  calcTotal();
+}
+
+// Popup support
+function openPopup(url, selectId, callback) {
+  var w = window.open(url, 'popup', 'width=900,height=700,scrollbars=yes');
+  if (callback) {
+    w._onClose = callback;
+    var timer = setInterval(function() {
+      if (w.closed) { clearInterval(timer); callback(selectId); }
+    }, 500);
+  }
+}
+
+function refreshSuppliers(selectId) {
+  // Reload page to pick up new supplier — simple approach
+  location.reload();
+}
+
+function refreshItems(selectId) {
+  location.reload();
+}
+
+// Add first line automatically
+addLine();
+</script>

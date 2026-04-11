@@ -158,6 +158,10 @@
                         <i class="fas fa-map-marker-alt"></i>
                         <span>Locations</span>
                     </a>
+                    <a href="[% c.uri_for('/Inventory/invoice') %]" class="admin-link">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                        <span>Supplier Invoices</span>
+                    </a>
                     <a href="[% c.uri_for('/Accounting') %]" class="admin-link">
                         <i class="fas fa-book"></i>
                         <span>Accounting Dashboard</span>
