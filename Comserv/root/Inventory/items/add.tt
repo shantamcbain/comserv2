@@ -40,7 +40,18 @@
     </tr>
     <tr>
       <th><label for="unit_cost">Unit Cost</label></th>
-      <td><input type="number" id="unit_cost" name="unit_cost" step="0.01" min="0"></td>
+      <td><input type="number" id="unit_cost" name="unit_cost" step="0.01" min="0">
+          <small>Purchase/cost price (what you pay the supplier)</small></td>
+    </tr>
+    <tr>
+      <th><label for="unit_price">Selling Price</label></th>
+      <td><input type="number" id="unit_price" name="unit_price" step="0.01" min="0">
+          <small>Sale price charged to customer (used for Square sync)</small></td>
+    </tr>
+    <tr>
+      <th><label for="barcode">Barcode</label></th>
+      <td><input type="text" id="barcode" name="barcode" maxlength="100">
+          <small>UPC / EAN / QR / Code128 — for scanning and Square catalog</small></td>
     </tr>
     <tr>
       <th><label for="reorder_point">Reorder Point</label></th>
