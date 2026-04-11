@@ -146,8 +146,8 @@ sub _load_coa_accounts {
     eval {
         @accounts = $self->_schema($c)->resultset('CoaAccount')->search(
             { obsolete => 0 },
-            { prefetch => 'heading', order_by => 'accno' }
-        );
+            { order_by => 'accno' }
+        )->all;
     };
     return \@accounts;
 }
