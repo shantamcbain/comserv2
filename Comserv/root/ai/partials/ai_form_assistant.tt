@@ -141,8 +141,11 @@
     function loadModelOptions() {
         var sel = document.getElementById('ai-form-model-sel');
         if (!sel) return;
-        fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include' })
-            .then(function(r) { return r.json(); })
+        sel.innerHTML = '<option value="">Loading models…</option>';
+        var ctl = new AbortController();
+        var tid = setTimeout(function() { ctl.abort(); }, 8000);
+        fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include', signal: ctl.signal })
+            .then(function(r) { clearTimeout(tid); return r.json(); })
             .then(function(data) {
                 if (!data.success || !data.providers) return;
                 var opts = [];
@@ -175,9 +178,22 @@
                     sel.appendChild(opt);
                 });
             })
-            .catch(function() {
+            .catch(function(err) {
+                clearTimeout(tid);
                 var sel = document.getElementById('ai-form-model-sel');
-                if (sel) sel.innerHTML = '<option value="mistral:latest|ollama">mistral:latest (Ollama)</option>';
+                if (!sel) return;
+                var isTimeout = err && err.name === 'AbortError';
+                sel.innerHTML = ''
+                    + '<option value="mistral:latest|ollama">mistral:latest (Ollama)</option>'
+                    + '<option value="phi4:latest|ollama">phi4:latest (Ollama)</option>'
+                    + '<option value="gemma3:4b|ollama">gemma3:4b (Ollama)</option>';
+                if (isTimeout) {
+                    var warn = document.createElement('option');
+                    warn.disabled = true;
+                    warn.textContent = '⚠ Timed out — enter model name manually or retry';
+                    sel.insertBefore(warn, sel.firstChild);
+                    sel.selectedIndex = 1;
+                }
             });
     }
     loadModelOptions();
