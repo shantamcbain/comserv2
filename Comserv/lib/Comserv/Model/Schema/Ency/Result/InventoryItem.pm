@@ -84,11 +84,35 @@ __PACKAGE__->add_columns(id => {
         data_type     => 'integer',
         is_nullable   => 1,
         default_value => 0,
+        comment       => 'Minimum stock level before reorder (replaces minimum_stock)',
+    },
+    maximum_stock => {
+        data_type     => 'integer',
+        is_nullable   => 1,
+        default_value => 0,
+        comment       => 'Maximum stock level to keep on hand (upper reorder limit)',
     },
     reorder_quantity => {
         data_type     => 'integer',
         is_nullable   => 1,
         default_value => 0,
+    },
+    is_consumable => {
+        data_type     => 'tinyint',
+        is_nullable   => 0,
+        default_value => 0,
+        comment       => '1 = expensed when used (consumable,
+    warranty_expiry => {
+        data_type => 'date',
+        is_nullable => 1,
+    }
+); 0 = capitalized asset',
+    },
+    is_reusable => {
+        data_type     => 'tinyint',
+        is_nullable   => 0,
+        default_value => 1,
+        comment       => '1 = returns to stock after use (frame); 0 = used up (foundation, wax)',
     },
     status => {
         data_type     => 'varchar',
@@ -100,7 +124,29 @@ __PACKAGE__->add_columns(id => {
         data_type   => 'text',
         is_nullable => 1,
     },
+    condition => {
+        data_type     => 'varchar',
+        size          => 20,
+        is_nullable   => 1,
+        default_value => 'new',
+        comment       => 'Asset condition: new, good, fair, poor, damaged',
+    },
+    purchase_date => {
+        data_type   => 'date',
+        is_nullable => 1,
+        comment     => 'Date item was purchased/acquired',
+    },
+    warranty_expiry => {
+        data_type   => 'date',
+        is_nullable => 1,
+        comment     => 'Warranty expiry date for physical assets/equipment',
+    },
     created_by => {
+        data_type   => 'varchar',
+        size        => 255,
+        is_nullable => 1,
+    },
+    updated_by => {
         data_type   => 'varchar',
         size        => 255,
         is_nullable => 1,
@@ -116,18 +162,6 @@ __PACKAGE__->add_columns(id => {
         set_on_create => 1,
         set_on_update => 1,
     },
-    box_size => {
-        data_type   => 'varchar',
-        size        => 20,
-        is_nullable => 1,
-        comment     => 'enum: deep, medium, shallow (for bee frame boxes)',
-    },
-    box_type => {
-        data_type   => 'varchar',
-        size        => 20,
-        is_nullable => 1,
-        comment     => 'enum: brood, honey, x_ways, super, deep, medium, shallow',
-    }
 );
 
 __PACKAGE__->set_primary_key('id');
