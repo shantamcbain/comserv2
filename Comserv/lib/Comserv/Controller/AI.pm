@@ -157,9 +157,9 @@ sub index :Path :Args(0) {
                         push @external_models, { name => $id, provider => 'grok', label => $label };
                     }
                 } else {
-                    push @external_models, { name => 'grok-4-0709',               provider => 'grok', label => 'Grok 4 (xAI)' };
-                    push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
-                    push @external_models, { name => 'grok-code-fast-1',          provider => 'grok', label => 'Grok Code Fast (xAI)' };
+                    push @external_models, { name => 'grok-3',          provider => 'grok', label => 'Grok 3 (xAI)' };
+                    push @external_models, { name => 'grok-3-mini',     provider => 'grok', label => 'Grok 3 Mini (xAI)' };
+                    push @external_models, { name => 'grok-3-fast',     provider => 'grok', label => 'Grok 3 Fast (xAI)' };
                 }
             }
         } catch {
@@ -5685,9 +5685,9 @@ sub get_user_providers :Local :Args(0) {
                 # Fallback to hardcoded Grok models if none stored in metadata
                 if (!@$models && $key->service eq 'grok') {
                     $models = [
-                        { id => 'grok-4-0709' },
-                        { id => 'grok-4-fast-non-reasoning' },
-                        { id => 'grok-code-fast-1' },
+                        { id => 'grok-3' },
+                        { id => 'grok-3-mini' },
+                        { id => 'grok-3-fast' },
                     ];
                 }
 
