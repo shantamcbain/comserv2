@@ -68,6 +68,20 @@ sub database_env {
     return Comserv::Util::DatabaseEnv->new();
 }
 
+sub _write_result_file_safe {
+    my ($self, $result_file_path, $content) = @_;
+    my $tmpfile = $result_file_path . '.syntaxcheck.tmp';
+    write_file($tmpfile, $content);
+    my $check = `perl -c "$tmpfile" 2>&1`;
+    unlink $tmpfile;
+    unless ($check =~ /syntax OK/) {
+        die "Generated code failed Perl syntax check — file NOT written.\n"
+          . "Error: $check";
+    }
+    write_file($result_file_path, $content);
+    return 1;
+}
+
 sub validate_database_environment {
     my ($self, $c, $database_environment, $allow_production) = @_;
     
@@ -244,7 +258,7 @@ sub sync_primary_key_to_result :Path('/schema-comparison/sync_primary_key_to_res
             }
         }
         
-        write_file($result_file_path, $content);
+        $self->_write_result_file_safe($result_file_path, $content);
         
         $c->stash(json => {
             success => 1,
@@ -479,7 +493,7 @@ sub sync_unique_constraint_to_result :Path('/schema-comparison/sync_unique_const
             }
         }
         
-        write_file($result_file_path, $content);
+        $self->_write_result_file_safe($result_file_path, $content);
         
         $c->stash(json => {
             success => 1,
@@ -541,7 +555,7 @@ sub sync_table_name_to_result :Path('/schema-comparison/sync_table_name_to_resul
             }
         }
         
-        write_file($result_file_path, $content);
+        $self->_write_result_file_safe($result_file_path, $content);
         
         $c->stash(json => {
             success => 1,
@@ -729,7 +743,7 @@ sub create_result_from_table :Path('/schema-comparison/create_result_from_table'
             make_path($result_dir) or die "Could not create directory '$result_dir': $!";
         }
         
-        write_file($result_file_path, $result_content);
+        $self->_write_result_file_safe($result_file_path, $result_content);
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_result_from_table',
             "Successfully created Result file '$result_file_path' for table '$table_name'");
@@ -1021,7 +1035,7 @@ sub remove_field_from_result :Path('/schema-comparison/remove_field_from_result'
 
             my $new_content = $prefix . $cols . $suffix;
             $content =~ s/__PACKAGE__->add_columns\s*\(.*?\)\s*;/$new_content/s;
-            write_file($result_file_path, $content);
+            $self->_write_result_file_safe($result_file_path, $content);
 
             $c->stash(json => {
                 success => 1,
@@ -1259,21 +1273,7 @@ sub update_result_field_from_table {
         my $new_content = $content;
         $new_content =~ s/__PACKAGE__->add_columns\s*\(.*?\)\s*;/$new_add_columns/s;
 
-        # Syntax-check before writing — prevents server crash on bad generated code
-        my $tmpfile = $result_file_path . '.syntaxcheck.tmp';
-        eval { write_file($tmpfile, $new_content) };
-        if ($@) {
-            die "Could not write temp file for syntax check: $@";
-        }
-        my $perl_check = `perl -c "$tmpfile" 2>&1`;
-        unlink $tmpfile;
-        unless ($perl_check =~ /syntax OK/) {
-            die "Generated code failed Perl syntax check — NOT written to disk.\n"
-              . "Error: $perl_check\n"
-              . "Field definition attempted:\n$new_field_def";
-        }
-
-        write_file($result_file_path, $new_content);
+        $self->_write_result_file_safe($result_file_path, $new_content);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_result_field_from_table',
             "Updated/Added field '$field_name' in result file '$result_file_path'");
         
@@ -1386,7 +1386,7 @@ sub generate_result_file {
         my $result_file_content = $self->generate_result_file_content($table_name, $db_schema);
         
         my $result_file_path = $c->path_to('lib', 'Comserv', 'Model', 'Schema', 'Ency', 'Result', ucfirst($table_name) . '.pm');
-        write_file($result_file_path, $result_file_content);
+        $self->_write_result_file_safe($result_file_path, $result_file_content);
         
         $c->flash->{success_msg} = "Result file generated successfully for table '$table_name'.";
         
@@ -2225,7 +2225,7 @@ sub create_result_from_table :Chained('base') :PathPart('create-result-from-tabl
         make_path($result_dir) unless -d $result_dir;
         
         # Write result file
-        write_file($result_file_path, $result_file_content);
+        $self->_write_result_file_safe($result_file_path, $result_file_content);
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_result_from_table', 
             "Successfully created result file $result_file_path for table $table_name");
@@ -2325,7 +2325,7 @@ sub sync_table_to_result_file {
     make_path($result_dir) unless -d $result_dir;
     
     # Write updated result file
-    write_file($result_file_path, $result_content);
+    $self->_write_result_file_safe($result_file_path, $result_content);
     
     return {
         success => 1,
