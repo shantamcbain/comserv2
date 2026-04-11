@@ -1976,6 +1976,17 @@ sub chat :Local :Args(0) {
             }
 
             $grok->api_key($grok_api_key);
+            # Hardcoded known-dead Grok models — substitute before any API call
+            my %GROK_DEAD_CHAT = map { $_ => 'grok-3' } qw(
+                grok-code-fast-1
+                grok-4-0709
+                grok-4-fast-non-reasoning
+            );
+            if ($model && $GROK_DEAD_CHAT{$model}) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'chat', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD_CHAT{$model}'");
+                $model = $GROK_DEAD_CHAT{$model};
+            }
             $grok->model($model) if $model;
 
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
