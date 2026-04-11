@@ -331,6 +331,22 @@ last_updated = '2026/02/08'
                 <li><strong>ProjectConfig:</strong> <a href="[% base_url %]3000/Documentation/DailyPlan" target="_blank">set-up-project-config-d327</a> <em>(ports 3000, 5000)</em> - Zenflow Project Configuration & Docker Container Testing</li>
                 <li><strong>FileManagement:</strong> <a href="[% base_url %]4006/admin/planning" target="_blank">new-task-bb05</a> <em>(port 4006)</em> - NFS-backed File Management System with multi-tier access control, duplicate detection, and workshop file sharing across SiteNames</li>
                 <li><strong>UnifiedMailSystem:</strong> <a href="[% base_url %]4007/Documentation/DailyPlan" target="_blank">unified-mail-system-site-managed-2c53</a> <em>(port 4007)</em> - Unified Mail System — Site-Managed SMTP with PMG + Harper Integration</li>
+                <li><strong>Membership:</strong> <a href="[% base_url %]4008/membership" target="_blank">membership-1304</a> <em>(port 4008)</em> - Membership plans, roles, and user access management</li>
+                <li><strong>PointSystem:</strong> <a href="[% base_url %]4009/Documentation/DailyPlan" target="_blank">pointsystem-3230</a> <em>(port 4009)</em> - Customer-facing points and payment flow</li>
+                <li><strong>AIChatSystem:</strong> <a href="[% base_url %]4010/Documentation/DailyPlan" target="_blank">aichatsystem-ef4e</a> <em>(port 4010)</em> - AI Chat System with Agent Architecture</li>
+                <li><strong>CssThemes:</strong> <a href="[% base_url %]4011/Documentation/DailyPlan" target="_blank">cssthemes-9195</a> <em>(port 4011)</em> - CSS Theme Management System</li>
+                <li><strong>ENCY:</strong> <a href="[% base_url %]4012/ENCY" target="_blank">ency-53b0</a> <em>(port 4012)</em> - Encyclopedia of Biological Life</li>
+                <li><strong>HelpDesk:</strong> <a href="[% base_url %]4013/HelpDesk" target="_blank">helpdesk-7217</a> <em>(port 4013)</em> - Help Desk ticket system</li>
+                <li><strong>HealthPlanning:</strong> <a href="[% base_url %]4014/Documentation/DailyPlan" target="_blank">healthplanning-9db9</a> <em>(port 4014)</em> - Health Planning System</li>
+                <li><strong>ProdServerHealth:</strong> <a href="[% base_url %]4015/Documentation/DailyPlan" target="_blank">productionserverhealth-82fb</a> <em>(port 4015)</em> - Production Server Health monitoring</li>
+                <li><strong>Security:</strong> <a href="[% base_url %]4016/Documentation/DailyPlan" target="_blank">security-764f</a> <em>(port 4016)</em> - Security system</li>
+                <li><strong>Documentation:</strong> <a href="[% base_url %]4017/Documentation" target="_blank">documentation-9122</a> <em>(port 4017)</em> - Documentation system refactoring</li>
+                <li><strong>APISystem:</strong> <a href="[% base_url %]4018/Documentation/DailyPlan" target="_blank">api-bc05</a> <em>(port 4018)</em> - API System Setup &amp; Domain Migration</li>
+                <li><strong>BMaster:</strong> <a href="[% base_url %]4019/Documentation/DailyPlan" target="_blank">bmaster-f0fd</a> <em>(port 4019)</em> - Beemaster web application</li>
+                <li><strong>AIChatPlanInt:</strong> <a href="[% base_url %]4020/Documentation/DailyPlan" target="_blank">aichatsystem-planning-system-int-f187</a> <em>(port 4020)</em> - AI Chat + Planning System integration</li>
+                <li><strong>Inventory:</strong> <a href="[% base_url %]4021/Documentation/DailyPlan" target="_blank">inventory-system</a> <em>(port 4021)</em> - Inventory system with BOM, accounting, and GL</li>
+                <li><strong>DevTimeLogging:</strong> <a href="[% base_url %]4022/Documentation/DailyPlan" target="_blank">developer-time-logging-points-ba-542a</a> <em>(port 4022)</em> - Developer time logging and points-based payment</li>
+                <li><strong>3DPrinting:</strong> <a href="[% base_url %]4030/Documentation/DailyPlan" target="_blank">3dprinting-use-this-as-the-branc-41f3</a> <em>(port 4030)</em> - 3D Printing business system: inventory, invoicing, file management (STL/images), sales</li>
             </ul>
             
             <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 10px; margin-top: 10px;">
