@@ -71,16 +71,22 @@ sub coa_list :Path('/Accounting/coa') :Args(0) {
 
     my $schema = $self->_schema($c);
     my @accounts;
+    my $list_error;
     eval {
         @accounts = $schema->resultset('CoaAccount')->search(
             { obsolete => 0 },
-            { prefetch => 'heading', order_by => 'accno' }
+            { order_by => 'accno' }
         );
     };
+    if ($@) {
+        $list_error = $@;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'coa_list', "COA list error: $@");
+    }
 
     $c->stash(
-        accounts => \@accounts,
-        template => 'Accounting/coa/list.tt',
+        accounts   => \@accounts,
+        list_error => $list_error,
+        template   => 'Accounting/coa/list.tt',
     );
 }
 
