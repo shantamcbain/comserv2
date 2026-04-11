@@ -5,7 +5,7 @@
 
 [% IF error_msg %]<p class="error">[% error_msg %]</p>[% END %]
 
-<form method="POST" action="/Inventory/supplier/add">
+<form method="POST" action="/Inventory/supplier/add[% IF is_popup %]?popup=1[% END %]">
   <table>
     <tr>
       <th><label for="name">Name *</label></th>
@@ -51,11 +51,22 @@
     <tr>
       <td colspan="2">
         <input type="submit" value="Create Supplier">
+        [% IF is_popup %]
+        <button type="button" onclick="window.close()">Cancel</button>
+        [% ELSE %]
         <a href="/Inventory/suppliers">Cancel</a>
+        [% END %]
       </td>
     </tr>
   </table>
 </form>
+[% IF is_popup %]
+<script>
+[% IF c.req.params.done %]
+window.close();
+[% END %]
+</script>
+[% END %]
 [% PROCESS 'ai/partials/ai_form_assistant.tt'
    ai_form_entity_label = 'supplier'
    ai_form_context      = 'inventory supplier management'
