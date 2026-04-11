@@ -808,36 +808,37 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
         return;
     };
     
-    my $result_name = $json_data->{result_name};
-    my $database = $json_data->{database};
-    
+    my $result_name   = $json_data->{result_name};
+    my $database      = $json_data->{database};
+    my $force_recreate = $json_data->{force_recreate} ? 1 : 0;
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-        "Received parameters - result_name: " . ($result_name || 'UNDEFINED') . 
-        ", database: " . ($database || 'UNDEFINED'));
-    
+        "Received parameters - result_name: " . ($result_name || 'UNDEFINED') .
+        ", database: " . ($database || 'UNDEFINED') .
+        ", force_recreate: $force_recreate");
+
     unless ($result_name && $database) {
         my $error_msg = 'Missing required parameters: ';
         $error_msg .= 'result_name' unless $result_name;
         $error_msg .= ', database' unless $database;
-        
+
         $c->response->status(400);
         $c->stash(json => { success => 0, error => $error_msg });
         $c->forward('View::JSON');
         return;
     }
-    
+
     try {
         # Load the Result class dynamically
-        my $namespace = $database eq 'ency' ? 'Ency' : 'Forager';
+        my $namespace  = $database eq 'ency' ? 'Ency' : 'Forager';
         my $class_name = "Comserv::Model::Schema::${namespace}::Result::${result_name}";
-        
-        # Try to require the class using eval (proper module loading)
+
         eval "require $class_name";
         if ($@) {
             die "Could not load Result class '$class_name': $@";
         }
-        
-        # Get the schema
+
+        # Get the schema / DBH
         my $schema;
         if ($database eq 'ency') {
             $schema = $c->model('DBEncy')->schema;
@@ -846,73 +847,81 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
         } else {
             die "Invalid database: $database";
         }
-        
-        # Get a DBI database handle
+
         my $dbh = $schema->storage->dbh;
-        
+
         # Get table name from the loaded Result class
         my $table_name = $class_name->table;
         unless ($table_name) {
             die "Could not retrieve table name from Result class '$class_name'";
         }
-        
-        # Execute a SHOW TABLES LIKE 'table_name' SQL statement to check if table exists
+
+        # Check if table exists
         my $sth = $dbh->prepare("SHOW TABLES LIKE ?");
         $sth->execute($table_name);
         my $table_exists = $sth->fetch;
-        
+
+        # Handle force_recreate: drop the table if it exists but is empty
+        if ($table_exists && $force_recreate) {
+            my ($row_count) = $dbh->selectrow_array("SELECT COUNT(*) FROM `$table_name`");
+            if ($row_count > 0) {
+                die "Cannot force-recreate table '$table_name' — it contains $row_count rows. "
+                  . "Delete all rows first, or use the per-field sync buttons instead.";
+            }
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
+                "force_recreate: dropping empty table '$table_name'");
+            $dbh->do("SET FOREIGN_KEY_CHECKS=0");
+            $dbh->do("DROP TABLE `$table_name`");
+            $dbh->do("SET FOREIGN_KEY_CHECKS=1");
+            $table_exists = undef;  # proceed to creation below
+        }
+
         if (!$table_exists) {
-            # The table does not exist, create it using deployment_statements
+            # Create the table using deployment_statements
             try {
-                # Get the deployment SQL statements for this specific table
                 my $source = $schema->source($result_name);
                 unless ($source) {
                     die "Could not find source '$result_name' in schema";
                 }
-                
-                # Generate and execute the deployment SQL for just this table
+
                 my @statements = $schema->deployment_statements('MySQL');
-                
-                # Filter to only statements that create the target table (exact match with backtick delimiters)
                 my @table_statements = grep { /CREATE TABLE\s+`\Q$table_name\E`/i } @statements;
-                
+
                 if (@table_statements) {
                     $dbh->do('SET FOREIGN_KEY_CHECKS=0');
                     foreach my $statement (@table_statements) {
-                        # Strip CONSTRAINT lines to avoid FK formation errors (type/charset mismatches)
                         my $safe_statement = _strip_fk_constraints($statement);
                         $dbh->do($safe_statement);
                     }
                     $dbh->do('SET FOREIGN_KEY_CHECKS=1');
                     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-                        "Successfully created table '$table_name' from Result class '$class_name' using SQL deployment");
+                        "Successfully created table '$table_name' from Result class '$class_name'");
                 } else {
-                    # Fallback: Try the full deploy if we can't isolate the statement
                     $dbh->do('SET FOREIGN_KEY_CHECKS=0');
                     $schema->deploy();
                     $dbh->do('SET FOREIGN_KEY_CHECKS=1');
                     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-                        "Successfully created table '$table_name' from Result class '$class_name' using schema->deploy()");
+                        "Deployed table '$table_name' via schema->deploy()");
                 }
             } catch {
                 my $deploy_error = $_;
                 eval { $dbh->do('SET FOREIGN_KEY_CHECKS=1') };
                 if ($deploy_error =~ /access denied|permission/i) {
-                    die "Database user does not have CREATE TABLE privileges for table '$table_name': $deploy_error";
+                    die "Database user lacks CREATE TABLE privilege for '$table_name': $deploy_error";
                 } else {
                     die "Failed to deploy table '$table_name': $deploy_error";
                 }
             };
         } else {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-                "Table '$table_name' already exists, no creation needed");
+                "Table '$table_name' already exists — use force_recreate:true (only if empty) to replace it");
         }
-        
+
         $c->stash(json => {
-            success => 1,
-            message => "Successfully created table '$table_name' from Result file",
-            table_name => $table_name,
-            database => $database,
+            success      => 1,
+            message      => "Successfully created table '$table_name' from Result file",
+            table_name   => $table_name,
+            database     => $database,
             result_class => $class_name,
             already_existed => !!$table_exists
         });
@@ -1805,6 +1814,7 @@ sub get_table_result_comparison_v2 {
         table_name => $table_name,
         database => $database,
         has_result_file => $result_info ? 1 : 0,
+        result_name => $result_info ? $result_info->{result_name} : undef,
         result_file_path => $result_info ? $result_info->{result_path} : undef,
         package_table => $result_schema->{table_name},
         fields => {},

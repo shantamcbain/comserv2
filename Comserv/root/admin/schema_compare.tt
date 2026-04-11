@@ -290,7 +290,10 @@
                                 <div class="table-comparison-actions">
                                     [% IF table_comparison.sync_status == 'needs_sync' %]
                                         <button class="sync-btn" onclick="syncTable('[% table_comparison.table_name | html %]', 'ency'); event.stopPropagation();">
-                                            <i class="fas fa-sync"></i> Sync
+                                            <i class="fas fa-sync"></i> Sync Fields
+                                        </button>
+                                        <button class="recreate-btn" title="Drop and recreate table from Result file (empty tables only)" style="background:#fd7e14;color:white;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;" onclick="recreateTableFromResult('[% table_comparison.result_name || table_comparison.table_name | html %]', 'ency'); event.stopPropagation();">
+                                            <i class="fas fa-redo"></i> Recreate
                                         </button>
                                     [% END %]
                                     <i class="fas fa-chevron-right expand-icon"></i>
@@ -1506,6 +1509,47 @@ function refreshFieldComparison(tableName, database) {
         content.innerHTML = '<div class="loading-indicator"><i class="fas fa-spinner fa-spin"></i><span>Loading field comparison...</span></div>';
         loadFieldComparison(content, tableName, database);
     }
+}
+
+// syncTable: expand the detail card so the user can use field-level sync buttons
+function syncTable(tableName, database) {
+    const card = document.querySelector('.table-comparison-card[data-table="' + tableName + '"][data-database="' + database + '"]');
+    if (!card) { alert('Table card not found: ' + tableName); return; }
+    if (card.classList.contains('collapsed')) {
+        const header = card.querySelector('.table-comparison-header');
+        if (header) header.click();
+    }
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// recreateTableFromResult: drop and recreate a table from its Result file (empty tables only)
+function recreateTableFromResult(resultName, database) {
+    if (!confirm('WARNING: This will DROP the existing "' + resultName + '" table and recreate it from the Result file.\n\nThis is only safe when the table is empty.\n\nContinue?')) {
+        return;
+    }
+
+    fetch('[% c.uri_for("/schema-comparison/create_table_from_result") %]', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            result_name: resultName,
+            database: database,
+            force_recreate: true
+        })
+    })
+    .then(handleFetchResponse)
+    .then(data => {
+        if (data.success) {
+            alert('Table recreated successfully from Result file!');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        if (error.message && error.message.includes('auth')) return;
+        alert('Failed to recreate table. See server log for details.');
+    });
 }
 
 // Batch sync all fields for a table
