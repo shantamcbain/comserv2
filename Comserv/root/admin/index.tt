@@ -138,6 +138,44 @@
     <div class="admin-sections">
         <div class="admin-section theme-section">
             <div class="section-header">
+                <h3><i class="fas fa-boxes"></i> Inventory &amp; Accounting</h3>
+            </div>
+            <div class="section-content">
+                <div class="admin-links">
+                    <a href="[% c.uri_for('/Inventory') %]" class="admin-link">
+                        <i class="fas fa-warehouse"></i>
+                        <span>Inventory Dashboard</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/items') %]" class="admin-link">
+                        <i class="fas fa-list"></i>
+                        <span>Items / SKUs</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/suppliers') %]" class="admin-link">
+                        <i class="fas fa-truck"></i>
+                        <span>Suppliers</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/locations') %]" class="admin-link">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span>Locations</span>
+                    </a>
+                    <a href="[% c.uri_for('/Accounting') %]" class="admin-link">
+                        <i class="fas fa-book"></i>
+                        <span>Accounting Dashboard</span>
+                    </a>
+                    <a href="[% c.uri_for('/Accounting/coa') %]" class="admin-link">
+                        <i class="fas fa-list-ol"></i>
+                        <span>Chart of Accounts</span>
+                    </a>
+                    <a href="[% c.uri_for('/Accounting/gl') %]" class="admin-link">
+                        <i class="fas fa-balance-scale"></i>
+                        <span>General Ledger</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-section theme-section">
+            <div class="section-header">
                 <h3><i class="fas fa-database"></i> Database Management</h3>
             </div>
             <div class="section-content">
