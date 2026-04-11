@@ -76,7 +76,7 @@ sub coa_list :Path('/Accounting/coa') :Args(0) {
         @accounts = $schema->resultset('CoaAccount')->search(
             { obsolete => 0 },
             { order_by => 'accno' }
-        );
+        )->all;
     };
     if ($@) {
         $list_error = $@;
@@ -105,8 +105,8 @@ sub coa_view :Path('/Accounting/coa/view') :Args(1) {
     eval {
         @lines = $schema->resultset('GlEntryLine')->search(
             { account_id => $id },
-            { prefetch => 'gl_entry', order_by => { -desc => 'me.id' }, rows => 50 }
-        );
+            { order_by => { -desc => 'me.id' }, rows => 50 }
+        )->all;
     };
 
     $c->stash(
@@ -136,7 +136,7 @@ sub gl_list :Path('/Accounting/gl') :Args(0) {
         @entries = $schema->resultset('GlEntry')->search(
             \%search,
             { order_by => { -desc => 'post_date' }, rows => 100 }
-        );
+        )->all;
     };
 
     $c->stash(
