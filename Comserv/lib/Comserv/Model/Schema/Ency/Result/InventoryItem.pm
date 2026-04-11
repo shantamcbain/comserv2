@@ -116,18 +116,6 @@ __PACKAGE__->add_columns(id => {
         set_on_create => 1,
         set_on_update => 1,
     },
-    box_size => {
-        data_type   => 'varchar',
-        size        => 20,
-        is_nullable => 1,
-        comment     => 'enum: deep, medium, shallow (for bee frame boxes)',
-    },
-    box_type => {
-        data_type   => 'varchar',
-        size        => 20,
-        is_nullable => 1,
-        comment     => 'enum: brood, honey, x_ways, super, deep, medium, shallow',
-    }
 );
 
 __PACKAGE__->set_primary_key('id');
