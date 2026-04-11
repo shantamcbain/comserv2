@@ -88,6 +88,12 @@ __PACKAGE__->add_columns(id => {
         is_nullable   => 1,
         default_value => 'new',
         comment       => 'Asset condition: new, good, fair, poor, damaged',
+    },
+    is_consumable => {
+        data_type     => 'tinyint',
+        is_nullable   => 0,
+        default_value => 0,
+        comment       => '1 = expensed when used (consumable); 0 = capitalized asset',
     }
 );
 
