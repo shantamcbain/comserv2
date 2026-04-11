@@ -2353,8 +2353,10 @@ sub get_database_comparison {
 sub compare_table_with_result_file {
     my ($self, $c, $table_name, $database) = @_;
     
+    my $result_name = $self->table_name_to_result_name($table_name);
     my $comparison = {
         table_name => $table_name,
+        result_name => $result_name,
         database => $database,
         has_result_file => 0,
         result_file_path => undef,
