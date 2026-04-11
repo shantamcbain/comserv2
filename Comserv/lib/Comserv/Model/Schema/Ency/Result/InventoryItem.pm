@@ -100,7 +100,22 @@ __PACKAGE__->add_columns(id => {
         data_type   => 'text',
         is_nullable => 1,
     },
+    purchase_date => {
+        data_type   => 'date',
+        is_nullable => 1,
+        comment     => 'Date item was purchased/acquired',
+    },
+    warranty_expiry => {
+        data_type   => 'date',
+        is_nullable => 1,
+        comment     => 'Warranty expiry date for physical assets/equipment',
+    },
     created_by => {
+        data_type   => 'varchar',
+        size        => 255,
+        is_nullable => 1,
+    },
+    updated_by => {
         data_type   => 'varchar',
         size        => 255,
         is_nullable => 1,
