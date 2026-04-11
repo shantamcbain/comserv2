@@ -101,12 +101,7 @@ __PACKAGE__->add_columns(id => {
         data_type     => 'tinyint',
         is_nullable   => 0,
         default_value => 0,
-        comment       => '1 = expensed when used (consumable,
-    warranty_expiry => {
-        data_type => 'date',
-        is_nullable => 1,
-    }
-); 0 = capitalized asset',
+        comment       => '1 = expensed when used (consumable); 0 = capitalized asset',
     },
     is_reusable => {
         data_type     => 'tinyint',
