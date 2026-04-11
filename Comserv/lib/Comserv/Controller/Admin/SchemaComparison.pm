@@ -1239,11 +1239,11 @@ sub update_result_field_from_table {
         my ($prefix, $columns_section, $suffix) = ($1, $2, $3);
         
         # Look for field name followed by => { ... }
-        # We use a non-greedy match but try to catch the closing brace correctly
-        # Most DBIx::Class fields end with }, or just } at the end of add_columns
-        if ($columns_section =~ /(['"]?)$field_name\1\s*=>\s*\{/s) {
-            # Update existing field. We match from field name until the closing brace that is followed by a comma or closing paren
-            $columns_section =~ s/(['"]?)$field_name\1\s*=>\s*\{.*?\}(?=\s*(?:,|\s*$))/$field_name => $new_field_def/s;
+        # Must match at start-of-line/after comma (not inside string values)
+        # Use (?:^|,)\s* anchor to avoid matching field names inside comment/string values
+        if ($columns_section =~ /(?:^|,)\s*(['"]?)$field_name\1\s*=>\s*\{/ms) {
+            # Update existing field — anchored to start of field definition
+            $columns_section =~ s/(?:^|(?<=,))\s*(['"]?)$field_name\1\s*=>\s*\{.*?\}(?=\s*(?:,|\s*\z))/\n    $field_name => $new_field_def/ms;
         } else {
             # Add new field definition
             # Ensure there's a comma before if not empty
