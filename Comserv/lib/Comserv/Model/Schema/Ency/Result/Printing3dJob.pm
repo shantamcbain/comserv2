@@ -54,6 +54,21 @@ __PACKAGE__->add_columns(
         data_type   => 'text',
         is_nullable => 1,
     },
+    filament_item_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
+    filament_quantity => {
+        data_type     => 'decimal',
+        size          => [10, 3],
+        is_nullable   => 1,
+        default_value => '1.000',
+    },
+    inventory_reserved => {
+        data_type     => 'tinyint',
+        is_nullable   => 0,
+        default_value => 0,
+    },
     created_at => {
         data_type     => 'datetime',
         default_value => \'CURRENT_TIMESTAMP',
@@ -86,6 +101,12 @@ __PACKAGE__->belongs_to(
 __PACKAGE__->belongs_to(
     user => 'Comserv::Model::Schema::Ency::Result::User',
     'user_id',
+    { join_type => 'left' }
+);
+
+__PACKAGE__->belongs_to(
+    filament_item => 'Comserv::Model::Schema::Ency::Result::InventoryItem',
+    'filament_item_id',
     { join_type => 'left' }
 );
 

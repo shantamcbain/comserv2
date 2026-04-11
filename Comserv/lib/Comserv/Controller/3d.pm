@@ -17,16 +17,28 @@ Comserv::Controller::3d - Catalyst Controller for the 3D Printing add-on module
 
 =head1 DESCRIPTION
 
-Site add-on module providing 3D printing services:
-- Browse/search 3D model files (FileManager DB, NFS local, AI/web search)
-- Order prints from the farm
-- Print queue and job management
-- Printer farm administration
-- Inventory integration for filaments and supplies
+Site add-on module providing 3D printing services.
 
 Module name in site_modules table: C<printing_3d>
 
+All inventory movements (filament reservation, consumption, item sales) are
+recorded as transactions in the C<inventory_transactions> table, keeping the
+Inventory accounting system as the single source of truth.
+
+Transaction types used:
+  reserve         — filament reserved when a print job is placed
+  reserve_release — reservation reversed when a job is cancelled
+  issue           — filament consumed when job completes / item sold to customer
+
+Reference number format:
+  3D-JOB-{id}    — print job transactions
+  3D-SALE-{id}   — direct store sale transactions
+
 =cut
+
+# ============================================================
+# Private helpers
+# ============================================================
 
 sub _sitename {
     my ($self, $c) = @_;
@@ -45,10 +57,9 @@ sub _now {
 sub _is_module_enabled {
     my ($self, $c) = @_;
     my $sitename = $self->_sitename($c);
-    my $schema   = $self->_schema($c);
     my $mod;
     eval {
-        $mod = $schema->resultset('SiteModule')->find(
+        $mod = $self->_schema($c)->resultset('SiteModule')->find(
             { sitename => $sitename, module_name => 'printing_3d', enabled => 1 }
         );
     };
@@ -64,9 +75,18 @@ sub _require_module {
     }
 }
 
+sub _require_login {
+    my ($self, $c) = @_;
+    unless ($c->session->{user_id}) {
+        $c->flash->{error_msg} = 'Please log in to continue.';
+        $c->res->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        $c->detach;
+    }
+}
+
 sub _require_admin {
     my ($self, $c) = @_;
-    my $roles = $c->session->{roles} || [];
+    my $roles    = $c->session->{roles} || [];
     my $is_admin = grep { $_ eq 'admin' } @{$roles};
     unless ($is_admin) {
         $c->stash->{error_msg} = 'Admin access required.';
@@ -76,27 +96,107 @@ sub _require_admin {
 }
 
 # ============================================================
+# Inventory accounting helper
+# Records a transaction AND updates stock level in one txn
+# ============================================================
+
+sub _inventory_transaction {
+    my ($self, $c, %p) = @_;
+    # Required: schema, sitename, item_id, transaction_type, quantity, reference_number
+    # Optional: location_id, unit_cost, notes, performed_by
+    my $schema   = $p{schema};
+    my $sitename = $p{sitename};
+    my $now      = _now();
+
+    $schema->txn_do(sub {
+
+        # Record the transaction in the ledger
+        $schema->resultset('InventoryTransaction')->create({
+            item_id          => $p{item_id},
+            location_id      => $p{location_id}  || undef,
+            transaction_type => $p{transaction_type},
+            quantity         => $p{quantity},
+            unit_cost        => $p{unit_cost}     || undef,
+            reference_number => $p{reference_number},
+            sitename         => $sitename,
+            notes            => $p{notes}         || '',
+            performed_by     => $p{performed_by}  || 'system',
+            transaction_date => $now,
+            created_at       => $now,
+        });
+
+        # Update the stock level
+        my %find = (item_id => $p{item_id});
+        $find{location_id} = $p{location_id} if $p{location_id};
+
+        my $stock;
+        if ($p{location_id}) {
+            $stock = $schema->resultset('InventoryStockLevel')->find_or_create(
+                { item_id => $p{item_id}, location_id => $p{location_id} },
+                { default => {
+                    quantity_on_hand => 0,
+                    quantity_reserved => 0,
+                    quantity_on_order => 0,
+                }}
+            );
+        } else {
+            # No location — work with the first stock level row for this item
+            $stock = $schema->resultset('InventoryStockLevel')->search(
+                { item_id => $p{item_id} }
+            )->first;
+        }
+
+        return unless $stock;
+
+        my $type = $p{transaction_type};
+        my $qty  = $p{quantity};
+
+        if ($type eq 'reserve') {
+            $stock->update({ quantity_reserved => $stock->quantity_reserved + $qty });
+        } elsif ($type eq 'reserve_release') {
+            my $new_res = $stock->quantity_reserved - $qty;
+            $new_res = 0 if $new_res < 0;
+            $stock->update({ quantity_reserved => $new_res });
+        } elsif ($type eq 'issue') {
+            my $new_hand = $stock->quantity_on_hand - $qty;
+            my $new_res  = $stock->quantity_reserved - $qty;
+            $new_hand = 0 if $new_hand < 0;
+            $new_res  = 0 if $new_res  < 0;
+            $stock->update({
+                quantity_on_hand  => $new_hand,
+                quantity_reserved => $new_res,
+            });
+        } elsif ($type eq 'receive') {
+            $stock->update({ quantity_on_hand => $stock->quantity_on_hand + $qty });
+        }
+    });
+}
+
+# ============================================================
 # Landing page
 # ============================================================
 
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
-    my $sitename = $self->_sitename($c);
-    my $schema   = $self->_schema($c);
+    my $sitename       = $self->_sitename($c);
+    my $schema         = $self->_schema($c);
+    my $module_enabled = $self->_is_module_enabled($c);
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
-        "3D Printing index for site=$sitename");
+        "3D index site=$sitename enabled=$module_enabled");
 
-    my ($model_count, $printer_count, $my_open_jobs) = (0, 0, 0);
-    my $module_enabled = $self->_is_module_enabled($c);
+    my ($model_count, $printer_count, $my_open_jobs, $store_item_count) = (0, 0, 0, 0);
 
     if ($module_enabled) {
         eval {
-            $model_count   = $schema->resultset('Printing3dModel')->search(
+            $model_count = $schema->resultset('Printing3dModel')->search(
                 { sitename => $sitename, is_active => 1 })->count;
             $printer_count = $schema->resultset('Printing3dPrinter')->search(
                 { sitename => $sitename, status => 'idle' })->count;
+            $store_item_count = $schema->resultset('InventoryItem')->search(
+                { sitename => $sitename, category => '3d_printed_item', status => 'active' }
+            )->count;
             if ($c->session->{user_id}) {
                 $my_open_jobs = $schema->resultset('Printing3dJob')->search(
                     { sitename => $sitename, user_id => $c->session->{user_id},
@@ -107,13 +207,140 @@ sub index :Path :Args(0) {
     }
 
     $c->stash(
-        sitename       => $sitename,
-        module_enabled => $module_enabled,
-        model_count    => $model_count,
-        printer_count  => $printer_count,
-        my_open_jobs   => $my_open_jobs,
-        template       => '3d/index.tt',
+        sitename         => $sitename,
+        module_enabled   => $module_enabled,
+        model_count      => $model_count,
+        printer_count    => $printer_count,
+        my_open_jobs     => $my_open_jobs,
+        store_item_count => $store_item_count,
+        template         => '3d/index.tt',
     );
+}
+
+# ============================================================
+# Customer Store — buy ready-made printed items from inventory
+# ============================================================
+
+sub store :Path('/3d/store') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'store',
+        "3D store site=$sitename");
+
+    my @items;
+    eval {
+        @items = $schema->resultset('InventoryItem')->search(
+            { sitename => $sitename, category => '3d_printed_item', status => 'active' },
+            {
+                prefetch => 'stock_levels',
+                order_by => { -asc => 'name' },
+            }
+        )->all;
+    };
+    push @{$c->stash->{debug_errors}}, "Error loading store items: $@" if $@;
+
+    # Build available-quantity map per item
+    my %available;
+    for my $item (@items) {
+        my $avail = 0;
+        for my $sl ($item->stock_levels->all) {
+            $avail += ($sl->quantity_on_hand - $sl->quantity_reserved);
+        }
+        $available{ $item->id } = $avail > 0 ? $avail : 0;
+    }
+
+    $c->stash(
+        sitename  => $sitename,
+        items     => \@items,
+        available => \%available,
+        template  => '3d/store.tt',
+    );
+}
+
+# ============================================================
+# Buy — purchase a printed item from stock
+# Creates an inventory "issue" transaction (accounting entry)
+# ============================================================
+
+sub buy :Path('/3d/buy') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_login($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $item_id  = $c->req->params->{item_id};
+    my $quantity = $c->req->params->{quantity} || 1;
+
+    unless ($item_id) {
+        $c->res->redirect($c->uri_for('/3d/store'));
+        $c->detach;
+    }
+
+    my $item;
+    eval {
+        $item = $schema->resultset('InventoryItem')->find(
+            { id => $item_id, sitename => $sitename, category => '3d_printed_item', status => 'active' }
+        );
+    };
+    unless ($item) {
+        $c->flash->{error_msg} = 'Item not found or not available.';
+        $c->res->redirect($c->uri_for('/3d/store'));
+        $c->detach;
+    }
+
+    # Check available stock
+    my $total_available = 0;
+    eval {
+        for my $sl ($item->stock_levels->all) {
+            $total_available += ($sl->quantity_on_hand - $sl->quantity_reserved);
+        }
+    };
+
+    if ($total_available < $quantity) {
+        $c->flash->{error_msg} =
+            "Sorry, only $total_available unit(s) available. "
+            . "Please reduce quantity or contact us for custom order.";
+        $c->res->redirect($c->uri_for('/3d/store'));
+        $c->detach;
+    }
+
+    # Get first stock level location for transaction
+    my $first_stock = eval { ($item->stock_levels->all)[0] };
+    my $location_id = $first_stock ? $first_stock->location_id : undef;
+    my $ref_num     = '3D-SALE-' . time();
+
+    eval {
+        $self->_inventory_transaction($c,
+            schema           => $schema,
+            sitename         => $sitename,
+            item_id          => $item_id,
+            location_id      => $location_id,
+            transaction_type => 'issue',
+            quantity         => $quantity,
+            unit_cost        => $item->selling_price || $item->unit_cost || 0,
+            reference_number => $ref_num,
+            notes            => "Customer sale: qty=$quantity, user=" . ($c->session->{username} || 'guest'),
+            performed_by     => $c->session->{username} || 'system',
+        );
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Purchase could not be completed: $@";
+    } else {
+        my $price = $item->selling_price || $item->unit_cost || 0;
+        $c->flash->{success_msg} =
+            "Purchase recorded! $quantity x " . $item->name
+            . sprintf(" (\$%.2f each)", $price)
+            . " — Ref: $ref_num. "
+            . "Our team will confirm your order shortly.";
+    }
+
+    $c->res->redirect($c->uri_for('/3d/store'));
+    $c->detach;
 }
 
 # ============================================================
@@ -128,9 +355,6 @@ sub browse :Path('/3d/browse') :Args(0) {
     my $schema   = $self->_schema($c);
     my $q        = $c->req->params->{q} || '';
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'browse',
-        "3D browse site=$sitename q=$q");
-
     my @models;
     eval {
         my %search = (sitename => $sitename, is_active => 1);
@@ -142,8 +366,7 @@ sub browse :Path('/3d/browse') :Args(0) {
             ];
         }
         @models = $schema->resultset('Printing3dModel')->search(
-            \%search,
-            { order_by => { -asc => 'name' } }
+            \%search, { order_by => { -asc => 'name' } }
         )->all;
     };
     push @{$c->stash->{debug_errors}}, "Error loading models: $@" if $@;
@@ -179,45 +402,53 @@ sub model_detail :Path('/3d/model') :Args(1) {
         $c->detach;
     }
 
+    # Load actual filament inventory items for the order form
     my @filaments;
     eval {
         @filaments = $schema->resultset('InventoryItem')->search(
-            { sitename => $sitename, category => '3d_filament', status => 'active' }
+            { sitename => $sitename, category => '3d_filament', status => 'active' },
+            { prefetch => 'stock_levels', order_by => 'name' }
         )->all;
     };
 
+    # Build available qty per filament
+    my %fil_available;
+    for my $f (@filaments) {
+        my $avail = 0;
+        for my $sl ($f->stock_levels->all) {
+            $avail += ($sl->quantity_on_hand - $sl->quantity_reserved);
+        }
+        $fil_available{ $f->id } = $avail;
+    }
+
     $c->stash(
-        sitename  => $sitename,
-        model     => $model,
-        filaments => \@filaments,
-        template  => '3d/model_detail.tt',
+        sitename      => $sitename,
+        model         => $model,
+        filaments     => \@filaments,
+        fil_available => \%fil_available,
+        template      => '3d/model_detail.tt',
     );
 }
 
 # ============================================================
-# Order a Print
+# Order a Print — reserves filament in inventory
 # ============================================================
 
 sub order :Path('/3d/order') :Args(0) {
     my ($self, $c) = @_;
     $self->_require_module($c);
-
-    unless ($c->session->{user_id}) {
-        $c->flash->{error_msg} = 'You must be logged in to order a print.';
-        $c->res->redirect($c->uri_for('/user/login',
-            { destination => $c->req->uri }));
-        $c->detach;
-    }
+    $self->_require_login($c);
 
     my $sitename = $self->_sitename($c);
     my $schema   = $self->_schema($c);
 
     if ($c->req->method eq 'POST') {
-        my $model_id       = $c->req->params->{model_id};
-        my $filament_color = $c->req->params->{filament_color} || '';
-        my $filament_type  = $c->req->params->{filament_type}  || '';
-        my $quantity       = $c->req->params->{quantity}        || 1;
-        my $notes          = $c->req->params->{notes}           || '';
+        my $model_id         = $c->req->params->{model_id};
+        my $filament_item_id = $c->req->params->{filament_item_id} || undef;
+        my $filament_quantity= $c->req->params->{filament_quantity} || 1;
+        my $filament_color   = $c->req->params->{filament_color}    || '';
+        my $quantity         = $c->req->params->{quantity}           || 1;
+        my $notes            = $c->req->params->{notes}              || '';
 
         my $model;
         eval {
@@ -231,64 +462,121 @@ sub order :Path('/3d/order') :Args(0) {
             $c->detach;
         }
 
-        my ($idle_printer, $job_status);
+        # Validate filament stock if a specific filament was selected
+        if ($filament_item_id) {
+            my $fil;
+            eval { $fil = $schema->resultset('InventoryItem')->find($filament_item_id); };
+            if ($fil) {
+                my $avail = 0;
+                for my $sl ($fil->stock_levels->all) {
+                    $avail += ($sl->quantity_on_hand - $sl->quantity_reserved);
+                }
+                if ($avail < $filament_quantity) {
+                    $c->stash->{error_msg} =
+                        "Insufficient filament stock (" . $fil->name . "): "
+                        . "$avail " . $fil->unit_of_measure . " available.";
+                    $c->stash->{template} = '3d/model_detail.tt';
+                    $c->stash->{model}    = $model;
+                    return;
+                }
+            }
+        }
+
+        # Find idle printer
+        my $idle_printer;
         eval {
             $idle_printer = $schema->resultset('Printing3dPrinter')->search(
-                { sitename => $sitename, status => 'idle' },
-                { rows => 1 }
+                { sitename => $sitename, status => 'idle' }, { rows => 1 }
             )->first;
         };
-
-        $job_status = $idle_printer ? 'assigned' : 'queued';
+        my $job_status = $idle_printer ? 'assigned' : 'queued';
 
         my $job;
         eval {
-            $job = $schema->resultset('Printing3dJob')->create({
-                sitename       => $sitename,
-                model_id       => $model_id,
-                user_id        => $c->session->{user_id},
-                username       => $c->session->{username} || '',
-                printer_id     => $idle_printer ? $idle_printer->id : undef,
-                status         => $job_status,
-                filament_color => $filament_color,
-                filament_type  => $filament_type,
-                quantity       => $quantity,
-                notes          => $notes,
-                created_at     => _now(),
-            });
-
-            if ($idle_printer) {
-                $idle_printer->update({
-                    status         => 'printing',
-                    current_job_id => $job->id,
-                    updated_at     => _now(),
+            $schema->txn_do(sub {
+                $job = $schema->resultset('Printing3dJob')->create({
+                    sitename           => $sitename,
+                    model_id           => $model_id,
+                    user_id            => $c->session->{user_id},
+                    username           => $c->session->{username} || '',
+                    printer_id         => $idle_printer ? $idle_printer->id : undef,
+                    status             => $job_status,
+                    filament_item_id   => $filament_item_id || undef,
+                    filament_quantity  => $filament_quantity,
+                    filament_color     => $filament_color,
+                    quantity           => $quantity,
+                    notes              => $notes,
+                    inventory_reserved => 0,
+                    created_at         => _now(),
                 });
-            }
+
+                if ($idle_printer) {
+                    $idle_printer->update({
+                        status         => 'printing',
+                        current_job_id => $job->id,
+                        updated_at     => _now(),
+                    });
+                }
+            });
         };
         if ($@) {
             $c->stash->{error_msg} = "Error creating print job: $@";
-        } else {
-            my $msg = $job_status eq 'assigned'
-                ? 'Print job created and assigned to a printer!'
-                : 'Print job queued — a printer will be assigned when one is available.';
-            $c->flash->{success_msg} = $msg;
-            $c->res->redirect($c->uri_for('/3d/my_orders'));
-            $c->detach;
+            $c->stash->{template}  = '3d/model_detail.tt';
+            $c->stash->{model}     = $model;
+            return;
         }
+
+        # Reserve filament in inventory (outside the job txn so job id is available)
+        if ($filament_item_id && $job) {
+            my $fil;
+            eval { $fil = $schema->resultset('InventoryItem')->find($filament_item_id); };
+            my $first_stock = eval { ($fil->stock_levels->all)[0] } if $fil;
+            my $loc_id      = $first_stock ? $first_stock->location_id : undef;
+
+            eval {
+                $self->_inventory_transaction($c,
+                    schema           => $schema,
+                    sitename         => $sitename,
+                    item_id          => $filament_item_id,
+                    location_id      => $loc_id,
+                    transaction_type => 'reserve',
+                    quantity         => $filament_quantity,
+                    reference_number => '3D-JOB-' . $job->id,
+                    notes            => 'Filament reserved for print job #' . $job->id,
+                    performed_by     => $c->session->{username} || 'system',
+                );
+                $job->update({ inventory_reserved => 1 });
+            };
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'order',
+                "Filament reservation failed for job " . $job->id . ": $@") if $@;
+        }
+
+        my $msg = $job_status eq 'assigned'
+            ? 'Print job created and assigned to a printer!'
+            : 'Print job queued — a printer will be assigned when one is available.';
+        $c->flash->{success_msg} = $msg;
+        $c->res->redirect($c->uri_for('/3d/my_orders'));
+        $c->detach;
     }
 
+    # GET — show order form for a specific model
     my $model_id = $c->req->params->{model_id};
-    my $model;
+    my ($model, @filaments);
     eval {
         $model = $schema->resultset('Printing3dModel')->find(
             { id => $model_id, sitename => $sitename }
         ) if $model_id;
+        @filaments = $schema->resultset('InventoryItem')->search(
+            { sitename => $sitename, category => '3d_filament', status => 'active' },
+            { order_by => 'name' }
+        )->all;
     };
 
     $c->stash(
-        sitename => $sitename,
-        model    => $model,
-        template => '3d/order.tt',
+        sitename  => $sitename,
+        model     => $model,
+        filaments => \@filaments,
+        template  => '3d/order.tt',
     );
 }
 
@@ -299,12 +587,7 @@ sub order :Path('/3d/order') :Args(0) {
 sub my_orders :Path('/3d/my_orders') :Args(0) {
     my ($self, $c) = @_;
     $self->_require_module($c);
-
-    unless ($c->session->{user_id}) {
-        $c->res->redirect($c->uri_for('/user/login',
-            { destination => $c->req->uri }));
-        $c->detach;
-    }
+    $self->_require_login($c);
 
     my $sitename = $self->_sitename($c);
     my $schema   = $self->_schema($c);
@@ -313,7 +596,10 @@ sub my_orders :Path('/3d/my_orders') :Args(0) {
     eval {
         @jobs = $schema->resultset('Printing3dJob')->search(
             { sitename => $sitename, user_id => $c->session->{user_id} },
-            { prefetch => ['model', 'printer'], order_by => { -desc => 'created_at' } }
+            {
+                prefetch => ['model', 'printer', 'filament_item'],
+                order_by => { -desc => 'created_at' },
+            }
         )->all;
     };
     push @{$c->stash->{debug_errors}}, "Error loading jobs: $@" if $@;
@@ -326,7 +612,7 @@ sub my_orders :Path('/3d/my_orders') :Args(0) {
 }
 
 # ============================================================
-# Admin — Print Queue
+# Admin — Print Queue (with inventory accounting on status change)
 # ============================================================
 
 sub queue :Path('/3d/queue') :Args(0) {
@@ -344,22 +630,23 @@ sub queue :Path('/3d/queue') :Args(0) {
 
         eval {
             my $job = $schema->resultset('Printing3dJob')->find($job_id);
-            if ($job && $action eq 'assign' && $printer_id) {
+            return unless $job;
+
+            if ($action eq 'assign' && $printer_id) {
                 my $printer = $schema->resultset('Printing3dPrinter')->find($printer_id);
                 if ($printer) {
-                    $job->update({
-                        printer_id => $printer_id,
-                        status     => 'assigned',
-                    });
+                    $job->update({ printer_id => $printer_id, status => 'assigned' });
                     $printer->update({
                         status         => 'printing',
                         current_job_id => $job_id,
                         updated_at     => _now(),
                     });
                 }
-            } elsif ($job && $action eq 'complete') {
+
+            } elsif ($action eq 'complete') {
                 my $printer = $job->printer;
                 $job->update({ status => 'completed', completed_at => _now() });
+
                 if ($printer) {
                     $printer->update({
                         status         => 'idle',
@@ -367,18 +654,66 @@ sub queue :Path('/3d/queue') :Args(0) {
                         updated_at     => _now(),
                     });
                 }
-            } elsif ($job && $action eq 'cancel') {
+
+                # Inventory accounting: issue (consume) the reserved filament
+                if ($job->filament_item_id && $job->inventory_reserved) {
+                    my $fil  = $job->filament_item;
+                    my $fsl  = eval { ($fil->stock_levels->all)[0] };
+                    eval {
+                        $self->_inventory_transaction($c,
+                            schema           => $schema,
+                            sitename         => $sitename,
+                            item_id          => $job->filament_item_id,
+                            location_id      => $fsl ? $fsl->location_id : undef,
+                            transaction_type => 'issue',
+                            quantity         => $job->filament_quantity || 1,
+                            reference_number => '3D-JOB-' . $job->id,
+                            notes            => 'Filament consumed — print job #' . $job->id . ' completed',
+                            performed_by     => $c->session->{username} || 'system',
+                        );
+                    };
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+                        "Filament issue transaction failed for job $job_id: $@") if $@;
+                }
+
+            } elsif ($action eq 'cancel') {
                 my $printer = $job->printer;
                 $job->update({ status => 'cancelled', completed_at => _now() });
-                if ($printer && $printer->current_job_id == $job_id) {
+
+                if ($printer && ($printer->current_job_id // 0) == $job_id) {
                     $printer->update({
                         status         => 'idle',
                         current_job_id => undef,
                         updated_at     => _now(),
                     });
                 }
+
+                # Inventory accounting: release the filament reservation
+                if ($job->filament_item_id && $job->inventory_reserved) {
+                    my $fil  = $job->filament_item;
+                    my $fsl  = eval { ($fil->stock_levels->all)[0] };
+                    eval {
+                        $self->_inventory_transaction($c,
+                            schema           => $schema,
+                            sitename         => $sitename,
+                            item_id          => $job->filament_item_id,
+                            location_id      => $fsl ? $fsl->location_id : undef,
+                            transaction_type => 'reserve_release',
+                            quantity         => $job->filament_quantity || 1,
+                            reference_number => '3D-JOB-' . $job->id,
+                            notes            => 'Filament reservation released — job #' . $job->id . ' cancelled',
+                            performed_by     => $c->session->{username} || 'system',
+                        );
+                        $job->update({ inventory_reserved => 0 });
+                    };
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+                        "Filament release failed for job $job_id: $@") if $@;
+                }
             }
         };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+            "Queue action error: $@") if $@;
+
         $c->res->redirect($c->uri_for('/3d/queue'));
         $c->detach;
     }
@@ -386,12 +721,12 @@ sub queue :Path('/3d/queue') :Args(0) {
     my (@queued_jobs, @active_jobs, @idle_printers);
     eval {
         @queued_jobs = $schema->resultset('Printing3dJob')->search(
-            { sitename => $sitename, status => { -in => ['queued'] } },
-            { prefetch => ['model', 'printer'], order_by => { -asc => 'created_at' } }
+            { sitename => $sitename, status => 'queued' },
+            { prefetch => ['model', 'printer', 'filament_item'], order_by => { -asc => 'created_at' } }
         )->all;
         @active_jobs = $schema->resultset('Printing3dJob')->search(
-            { sitename => $sitename, status => { -in => ['assigned', 'printing'] } },
-            { prefetch => ['model', 'printer'], order_by => { -asc => 'created_at' } }
+            { sitename => $sitename, status => { -in => ['assigned','printing'] } },
+            { prefetch => ['model', 'printer', 'filament_item'], order_by => { -asc => 'created_at' } }
         )->all;
         @idle_printers = $schema->resultset('Printing3dPrinter')->search(
             { sitename => $sitename, status => 'idle' }
@@ -426,11 +761,11 @@ sub printers :Path('/3d/printers') :Args(0) {
                 $schema->resultset('Printing3dPrinter')->create({
                     sitename        => $sitename,
                     name            => $c->req->params->{name},
-                    model           => $c->req->params->{model} || '',
+                    model           => $c->req->params->{model}           || '',
                     status          => 'idle',
                     nozzle_diameter => $c->req->params->{nozzle_diameter} || '0.40',
-                    bed_size        => $c->req->params->{bed_size} || '',
-                    notes           => $c->req->params->{notes} || '',
+                    bed_size        => $c->req->params->{bed_size}        || '',
+                    notes           => $c->req->params->{notes}           || '',
                     created_at      => _now(),
                 });
             } elsif ($action eq 'update_status') {
@@ -479,7 +814,8 @@ sub admin :Path('/3d/admin') :Args(0) {
     my $sitename = $self->_sitename($c);
     my $schema   = $self->_schema($c);
 
-    my ($total_printers, $idle_printers, $total_models, $queued_jobs, $active_jobs);
+    my ($total_printers, $idle_printers, $total_models,
+        $queued_jobs, $active_jobs, $store_items);
     eval {
         $total_printers = $schema->resultset('Printing3dPrinter')->search(
             { sitename => $sitename })->count;
@@ -491,23 +827,25 @@ sub admin :Path('/3d/admin') :Args(0) {
             { sitename => $sitename, status => 'queued' })->count;
         $active_jobs    = $schema->resultset('Printing3dJob')->search(
             { sitename => $sitename, status => { -in => ['assigned','printing'] } })->count;
+        $store_items    = $schema->resultset('InventoryItem')->search(
+            { sitename => $sitename, category => '3d_printed_item', status => 'active' })->count;
     };
 
     $c->stash(
-        sitename        => $sitename,
-        total_printers  => $total_printers  || 0,
-        idle_printers   => $idle_printers   || 0,
-        total_models    => $total_models    || 0,
-        queued_jobs     => $queued_jobs     || 0,
-        active_jobs     => $active_jobs     || 0,
-        template        => '3d/admin.tt',
+        sitename       => $sitename,
+        total_printers => $total_printers || 0,
+        idle_printers  => $idle_printers  || 0,
+        total_models   => $total_models   || 0,
+        queued_jobs    => $queued_jobs    || 0,
+        active_jobs    => $active_jobs    || 0,
+        store_items    => $store_items    || 0,
+        template       => '3d/admin.tt',
     );
 }
 
 # ============================================================
-# Deeper Search — AI / Web Search
-# BLOCKED: Requires AIChatSystem extension (see todo for BLOCK-1)
-# When AIChatSystem adds /ai/search_3d_models, wire this action.
+# Deeper Search — AI / Web Search stub
+# BLOCKED: Requires AIChatSystem extension
 # ============================================================
 
 sub search_deeper :Path('/3d/search_deeper') :Args(0) {
@@ -517,16 +855,11 @@ sub search_deeper :Path('/3d/search_deeper') :Args(0) {
     my $sitename = $self->_sitename($c);
     my $q        = $c->req->params->{q} || '';
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'search_deeper',
-        "Deeper search requested site=$sitename q=$q");
-
-    # BLOCKED: AIChatSystem endpoint /ai/search_3d_models not yet implemented.
-    # When ready, forward request to AI controller for web/AI search.
-    # Track progress in Todo: "AIChatSystem: Add /ai/search_3d_models for 3D file web search"
+    # BLOCKED: AIChatSystem /ai/search_3d_models not yet implemented.
     $c->stash(
         sitename        => $sitename,
         q               => $q,
-        search_results  => [],
+        models          => [],
         feature_pending => 1,
         pending_message => 'AI-powered web search for 3D models is coming soon. '
             . 'This feature is pending the AIChatSystem web-search extension.',

@@ -114,10 +114,15 @@
         <div class="stat-label">My Open Jobs</div>
     </div>
     [% END %]
+    <div class="stat-card">
+        <div class="stat-number">[% store_item_count || 0 %]</div>
+        <div class="stat-label">Items in Store</div>
+    </div>
 </div>
 
 <div class="printing-3d-actions">
     <a href="/3d/browse" class="action-btn"><i class="icon-list"></i> Browse Models</a>
+    <a href="/3d/store" class="action-btn"><i class="icon-shop"></i> Shop Printed Items</a>
     [% IF c.session.user_id %]
     <a href="/3d/my_orders" class="action-btn secondary"><i class="icon-briefcase"></i> My Orders</a>
     [% END %]
