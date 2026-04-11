@@ -1256,9 +1256,24 @@ sub update_result_field_from_table {
         
         # Reconstruct content
         my $new_add_columns = "__PACKAGE__->add_columns($columns_section);";
-        $content =~ s/__PACKAGE__->add_columns\s*\(.*?\)\s*;/$new_add_columns/s;
-        
-        write_file($result_file_path, $content);
+        my $new_content = $content;
+        $new_content =~ s/__PACKAGE__->add_columns\s*\(.*?\)\s*;/$new_add_columns/s;
+
+        # Syntax-check before writing — prevents server crash on bad generated code
+        my $tmpfile = $result_file_path . '.syntaxcheck.tmp';
+        eval { write_file($tmpfile, $new_content) };
+        if ($@) {
+            die "Could not write temp file for syntax check: $@";
+        }
+        my $perl_check = `perl -c "$tmpfile" 2>&1`;
+        unlink $tmpfile;
+        unless ($perl_check =~ /syntax OK/) {
+            die "Generated code failed Perl syntax check — NOT written to disk.\n"
+              . "Error: $perl_check\n"
+              . "Field definition attempted:\n$new_field_def";
+        }
+
+        write_file($result_file_path, $new_content);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_result_field_from_table',
             "Updated/Added field '$field_name' in result file '$result_file_path'");
         
