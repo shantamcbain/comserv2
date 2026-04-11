@@ -80,24 +80,145 @@
 </table>
 [% END %]
 
-[% IF item.bom_components.count %]
+[% IF item.is_assemblable %]
 <h2>Bill of Materials (Components)</h2>
-<table border="1" cellpadding="4">
+
+[% IF c.flash.success_msg %]<p style="color:green">[% c.flash.success_msg %]</p>[% END %]
+[% IF c.flash.error_msg %]<p style="color:red">[% c.flash.error_msg %]</p>[% END %]
+
+[% SET bom_rows = item.bom_components %]
+[% IF bom_rows.size %]
+<table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;">
   <thead>
-    <tr><th>Component</th><th>Quantity</th><th>Unit</th><th>Notes</th></tr>
+    <tr>
+      <th>Component Item</th>
+      <th>Qty</th>
+      <th>Unit</th>
+      <th>Optional?</th>
+      <th>Scrap %</th>
+      <th>Notes</th>
+      <th></th>
+    </tr>
   </thead>
   <tbody>
-  [% FOREACH comp IN item.bom_components %]
+  [% FOREACH comp IN bom_rows %]
     <tr>
-      <td><a href="/Inventory/item/view/[% comp.component_item_id %]">[% comp.component.name || comp.component_item_id %]</a></td>
-      <td>[% comp.quantity %]</td>
-      <td>[% comp.unit_of_measure || '-' %]</td>
-      <td>[% comp.notes || '-' %]</td>
+      <td>
+        [% IF comp.component_item %]
+          <a href="/Inventory/item/view/[% comp.component_item.id %]">
+            [% comp.component_item.name | html %]
+          </a>
+          <small style="color:#666">[% comp.component_item.sku %]</small>
+        [% ELSE %]
+          #[% comp.component_item_id %]
+        [% END %]
+      </td>
+      <td style="text-align:right">[% comp.quantity %]</td>
+      <td>[% comp.unit %]</td>
+      <td style="text-align:center">[% comp.is_optional ? 'Yes' : '' %]</td>
+      <td style="text-align:right">[% comp.scrap_factor ? (comp.scrap_factor * 100) _ '%' : '' %]</td>
+      <td>[% comp.notes | html %]</td>
+      <td>
+        <form method="POST" action="/Inventory/bom/remove/[% comp.id %]"
+              onsubmit="return confirm('Remove [% comp.component_item.name | html %] from BOM?');"
+              style="display:inline;">
+          <input type="submit" value="Remove"
+                 style="background:#dc3545;color:white;border:none;padding:2px 8px;border-radius:3px;cursor:pointer;font-size:0.85em;">
+        </form>
+      </td>
     </tr>
   [% END %]
   </tbody>
 </table>
+[% ELSE %]
+<p><em>No components yet. Add the first component below.</em></p>
 [% END %]
+
+<h3>Add Component</h3>
+[% IF all_items.size %]
+<form method="POST" action="/Inventory/bom/add/[% item.id %]">
+  <table cellpadding="4">
+    <tr>
+      <th><label for="component_item_id">Component Item *</label></th>
+      <td>
+        <select id="component_item_id" name="component_item_id" required style="max-width:280px;"
+                onchange="setDefaultUnit(this)">
+          <option value="">— select component —</option>
+          [% FOREACH ci IN all_items %]
+          <option value="[% ci.id %]" data-uom="[% ci.unit_of_measure %]">
+            [% ci.name | html %] [[% ci.sku %]]
+          </option>
+          [% END %]
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="quantity">Quantity *</label></th>
+      <td><input type="number" id="quantity" name="quantity" value="1" min="0.0001" step="0.0001"
+                 style="width:80px;" required></td>
+    </tr>
+    <tr>
+      <th><label for="unit">Unit</label></th>
+      <td>
+        <select id="unit" name="unit">
+          <option value="each">each</option>
+          <option value="g">g</option>
+          <option value="kg">kg</option>
+          <option value="ml">ml</option>
+          <option value="L">L</option>
+          <option value="cm">cm</option>
+          <option value="m">m</option>
+          <option value="sheet">sheet</option>
+          <option value="hour">hour</option>
+        </select>
+        <small>(auto-set from item; change if needed)</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="is_optional">Optional?</label></th>
+      <td><input type="checkbox" id="is_optional" name="is_optional" value="1">
+          <small>e.g. foundation in a frame, paint on a box</small></td>
+    </tr>
+    <tr>
+      <th><label for="scrap_factor">Waste/Scrap %</label></th>
+      <td><input type="number" id="scrap_factor" name="scrap_factor" value="0" min="0" max="100"
+                 step="0.1" style="width:70px;">
+          <small>e.g. 5 = 5% extra material for waste</small></td>
+    </tr>
+    <tr>
+      <th><label for="notes">Notes</label></th>
+      <td><input type="text" id="notes" name="notes" style="width:260px;"
+                 placeholder="e.g. 30cm length, pre-drilled"></td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <input type="submit" value="Add to BOM"
+               style="background:#28a745;color:white;padding:5px 14px;border:none;border-radius:4px;cursor:pointer;">
+      </td>
+    </tr>
+  </table>
+</form>
+
+<script>
+var uomMap = {
+[% FOREACH ci IN all_items %]
+  [% ci.id %]: "[% ci.unit_of_measure %]"[% ',' UNLESS loop.last %]
+[% END %]
+};
+var unitSel = document.getElementById('unit');
+function setDefaultUnit(sel) {
+  var uom = uomMap[sel.value] || 'each';
+  for (var i = 0; i < unitSel.options.length; i++) {
+    if (unitSel.options[i].value === uom) { unitSel.selectedIndex = i; break; }
+  }
+}
+</script>
+
+[% ELSE %]
+<p><em>No other active items in this site to use as components. <a href="/Inventory/item/add">Add items</a> first.</em></p>
+[% END %]
+
+[% END %][%# end is_assemblable %]
 
 <h2>Suppliers</h2>
 [% IF item.item_suppliers.count == 0 %]

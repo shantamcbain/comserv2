@@ -7,6 +7,7 @@
 </p>
 
 [% IF flash.success_msg %]<p style="color:green;font-weight:bold">[% flash.success_msg %]</p>[% END %]
+[% IF error_msg %]<p style="color:red;font-weight:bold">List error: [% error_msg %]</p>[% END %]
 [% IF flash.error_msg %]<p style="color:red">[% flash.error_msg %]</p>[% END %]
 
 [% IF invoices.size %]
@@ -30,8 +31,17 @@
     <td>[% inv.invoice_date %]</td>
     <td>[% inv.due_date || '' %]</td>
     <td style="text-align:right">$[% inv.total_amount %]</td>
-    <td>[% inv.status | html %]</td>
-    <td><a href="/Inventory/invoice/view/[% inv.id %]">View</a></td>
+    <td>
+      [% IF inv.status == 'draft' %]<span style="background:#ffc107;color:#333;padding:1px 7px;border-radius:3px;font-size:0.85em;">draft</span>
+      [% ELSIF inv.status == 'posted' %]<span style="background:#28a745;color:white;padding:1px 7px;border-radius:3px;font-size:0.85em;">posted</span>
+      [% ELSE %][% inv.status | html %][% END %]
+    </td>
+    <td>
+      <a href="/Inventory/invoice/view/[% inv.id %]">View</a>
+      [% IF inv.status == 'draft' %]
+      | <a href="/Inventory/invoice/edit/[% inv.id %]">Edit</a>
+      [% END %]
+    </td>
   </tr>
   [% END %]
   </tbody>

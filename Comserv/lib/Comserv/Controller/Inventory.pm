@@ -168,7 +168,7 @@ sub item_view :Path('/Inventory/item/view') :Args(1) {
             { prefetch => [
                 'stock_levels', 'item_suppliers', 'assignments',
                 'inventory_account', 'income_account', 'expense_account', 'returns_account',
-                'bom_components',
+                { 'bom_components' => 'component_item' },
             ]}
         );
     };
@@ -186,9 +186,18 @@ sub item_view :Path('/Inventory/item/view') :Args(1) {
         );
     };
 
+    my @all_items;
+    eval {
+        @all_items = $schema->resultset('InventoryItem')->search(
+            { sitename => $sitename, status => 'active', id => { '!=' => $id } },
+            { columns => ['id','name','sku','unit_of_measure'], order_by => 'name' }
+        )->all;
+    };
+
     $c->stash(
         item         => $item,
         transactions => \@transactions,
+        all_items    => \@all_items,
         sitename     => $sitename,
         template     => 'Inventory/items/view.tt',
     );
@@ -207,8 +216,9 @@ sub item_add :Path('/Inventory/item/add') :Args(0) {
         my $schema = $self->_schema($c);
         my $now    = $self->_now();
 
+        my $new_item;
         eval {
-            $schema->resultset('InventoryItem')->create({
+            $new_item = $schema->resultset('InventoryItem')->create({
                 sitename            => $sitename,
                 sku                 => $params->{sku},
                 name                => $params->{name},
@@ -236,9 +246,13 @@ sub item_add :Path('/Inventory/item/add') :Args(0) {
         if ($@) {
             $c->stash->{error_msg} = "Failed to create item: $@";
         } else {
-            $c->flash->{success_msg} = 'Item created successfully';
+            $c->flash->{success_msg} = $params->{is_assemblable}
+                ? 'Item created. Now add BOM components below.'
+                : 'Item created successfully';
             if ($c->req->params->{popup}) {
                 $c->res->redirect($c->uri_for('/Inventory/item/add', { popup => 1, done => 1 }));
+            } elsif ($params->{is_assemblable} && $new_item) {
+                $c->res->redirect($c->uri_for('/Inventory/item/view', [$new_item->id]));
             } else {
                 $c->res->redirect($c->uri_for('/Inventory/items'));
             }
@@ -330,6 +344,70 @@ sub item_delete :Path('/Inventory/item/delete') :Args(1) {
         $c->flash->{success_msg} = 'Item deleted';
     }
     $c->res->redirect($c->uri_for('/Inventory/items'));
+}
+
+# -------------------------------------------------------------------------
+# BOM (Bill of Materials)
+# -------------------------------------------------------------------------
+
+sub bom_add :Path('/Inventory/bom/add') :Args(1) {
+    my ($self, $c, $parent_id) = @_;
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $params   = $c->req->body_parameters;
+
+    eval {
+        my $parent = $schema->resultset('InventoryItem')->find($parent_id);
+        unless ($parent && $parent->sitename eq $sitename) {
+            die "Item not found\n";
+        }
+        die "Item is not marked as assemblable (Has BOM must be checked)\n"
+            unless $parent->is_assemblable;
+        die "Component item required\n"
+            unless $params->{component_item_id};
+        die "Cannot use an item as its own component\n"
+            if $params->{component_item_id} == $parent_id;
+
+        $schema->resultset('InventoryItemBOM')->update_or_create({
+            parent_item_id    => $parent_id,
+            component_item_id => $params->{component_item_id},
+            quantity          => $params->{quantity}   || 1,
+            unit              => $params->{unit}        || 'each',
+            is_optional       => $params->{is_optional} ? 1 : 0,
+            scrap_factor      => $params->{scrap_factor} || 0,
+            sort_order        => $params->{sort_order}   || 0,
+            notes             => $params->{notes}        || undef,
+        }, { key => 'unique_parent_component' });
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Failed to add component: $@";
+    } else {
+        $c->flash->{success_msg} = 'Component added to BOM.';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/item/view', [$parent_id]));
+}
+
+sub bom_remove :Path('/Inventory/bom/remove') :Args(1) {
+    my ($self, $c, $bom_id) = @_;
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $parent_id;
+
+    eval {
+        my $bom = $schema->resultset('InventoryItemBOM')->find($bom_id);
+        if ($bom) {
+            my $parent = $schema->resultset('InventoryItem')->find($bom->parent_item_id);
+            die "Access denied\n" unless $parent && $parent->sitename eq $sitename;
+            $parent_id = $bom->parent_item_id;
+            $bom->delete;
+        }
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Failed to remove component: $@";
+    } else {
+        $c->flash->{success_msg} = 'Component removed from BOM.';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/item/view', [$parent_id || 0]));
 }
 
 # -------------------------------------------------------------------------
@@ -868,16 +946,19 @@ sub invoice_list :Path('/Inventory/invoice') :Args(0) {
     my ($self, $c) = @_;
     my $sitename = $self->_sitename($c);
     my @invoices;
+    my $list_error;
     eval {
         @invoices = $self->_schema($c)->resultset('InventorySupplierInvoice')->search(
-            { sitename => $sitename },
-            { prefetch => 'supplier', order_by => { -desc => 'invoice_date' } }
+            { 'me.sitename' => $sitename },
+            { prefetch => 'supplier', order_by => { -desc => 'me.invoice_date' } }
         )->all;
     };
+    $list_error = $@ if $@;
     $c->stash(
-        invoices => \@invoices,
-        sitename => $sitename,
-        template => 'Inventory/invoice/list.tt',
+        invoices   => \@invoices,
+        error_msg  => $list_error,
+        sitename   => $sitename,
+        template   => 'Inventory/invoice/list.tt',
     );
 }
 
@@ -903,18 +984,28 @@ sub invoice_new :Path('/Inventory/invoice/new') :Args(0) {
 
         eval {
             $schema->txn_do(sub {
+                my $tax_amt      = $params->{tax_amount}      || 0;
+                my $shipping_amt = $params->{shipping_amount} || 0;
+                my $discount_amt = $params->{discount_amount} || 0;
+
                 my $invoice = $schema->resultset('InventorySupplierInvoice')->create({
-                    sitename       => $sitename,
-                    supplier_id    => $params->{supplier_id},
-                    invoice_number => $params->{invoice_number},
-                    invoice_date   => $params->{invoice_date},
-                    due_date       => $params->{due_date}      || undef,
-                    ap_account_id  => $params->{ap_account_id} || undef,
-                    status         => 'received',
-                    notes          => $params->{notes},
-                    created_by     => $c->session->{username} || 'system',
-                    created_at     => $now,
-                    updated_at     => $now,
+                    sitename             => $sitename,
+                    supplier_id          => $params->{supplier_id},
+                    invoice_number       => $params->{invoice_number},
+                    invoice_date         => $params->{invoice_date},
+                    due_date             => $params->{due_date}            || undef,
+                    ap_account_id        => $params->{ap_account_id}       || undef,
+                    tax_amount           => $tax_amt,
+                    shipping_amount      => $shipping_amt,
+                    discount_amount      => $discount_amt,
+                    tax_account_id       => $params->{tax_account_id}      || undef,
+                    shipping_account_id  => $params->{shipping_account_id} || undef,
+                    discount_account_id  => $params->{discount_account_id} || undef,
+                    status               => 'draft',
+                    notes                => $params->{notes},
+                    created_by           => $c->session->{username} || 'system',
+                    created_at           => $now,
+                    updated_at           => $now,
                 });
 
                 my $line_total_sum = 0;
@@ -925,8 +1016,7 @@ sub invoice_new :Path('/Inventory/invoice/new') :Args(0) {
                     my $cost = $l->{unit_cost} || 0;
                     my $lt   = $qty * $cost;
                     $line_total_sum += $lt;
-
-                    my $line = $invoice->create_related('lines', {
+                    $invoice->create_related('lines', {
                         item_id     => $l->{item_id}     || undef,
                         description => $l->{description} || undef,
                         quantity    => $qty,
@@ -935,69 +1025,17 @@ sub invoice_new :Path('/Inventory/invoice/new') :Args(0) {
                         account_id  => $l->{account_id}  || undef,
                         location_id => $l->{location_id} || undef,
                     });
-
-                    # Update stock level if item and location provided
-                    if ($l->{item_id} && $l->{location_id}) {
-                        my $sl = $schema->resultset('InventoryStockLevel')->find_or_create(
-                            { item_id => $l->{item_id}, location_id => $l->{location_id} },
-                            { key => 'item_id_location_id' }
-                        );
-                        my $new_qty = ($sl->quantity_on_hand || 0) + $qty;
-                        $sl->update({ quantity_on_hand => $new_qty });
-
-                        $schema->resultset('InventoryTransaction')->create({
-                            item_id          => $l->{item_id},
-                            location_id      => $l->{location_id},
-                            transaction_type => 'receive',
-                            quantity         => $qty,
-                            unit_cost        => $cost,
-                            reference        => 'INV-' . ($params->{invoice_number} || $invoice->id),
-                            transaction_date => $params->{invoice_date},
-                            created_by       => $c->session->{username} || 'system',
-                        });
-                    }
                 }
 
-                $invoice->update({ total_amount => $line_total_sum });
-
-                # Create GL entry if AP account set
-                if ($params->{ap_account_id} && $line_total_sum > 0) {
-                    my $gl = $schema->resultset('GlEntry')->create({
-                        sitename    => $sitename,
-                        entry_type  => 'AP',
-                        description => 'Supplier Invoice ' . ($params->{invoice_number} || ''),
-                        post_date   => $params->{invoice_date},
-                        created_by  => $c->session->{username} || 'system',
-                    });
-
-                    # Credit AP (negative = credit in SQL-Ledger convention)
-                    $gl->create_related('lines', {
-                        account_id => $params->{ap_account_id},
-                        amount     => -$line_total_sum,
-                        memo       => 'AP ' . ($params->{invoice_number} || ''),
-                    });
-
-                    # Debit each line's account (positive = debit)
-                    for my $idx (sort { $a <=> $b } keys %lines_by_idx) {
-                        my $l = $lines_by_idx{$idx};
-                        next unless ($l->{item_id} || $l->{description});
-                        next unless $l->{account_id};
-                        my $lt = ($l->{quantity} || 1) * ($l->{unit_cost} || 0);
-                        $gl->create_related('lines', {
-                            account_id => $l->{account_id},
-                            amount     => $lt,
-                            memo       => $l->{description} || "Item $l->{item_id}",
-                        });
-                    }
-
-                    $invoice->update({ gl_entry_id => $gl->id });
-                }
+                my $grand_total = $line_total_sum + $tax_amt + $shipping_amt - $discount_amt;
+                $invoice->update({ total_amount => $grand_total });
             });
         };
         if ($@) {
             $c->stash->{error_msg} = "Failed to save invoice: $@";
+            $c->stash->{submitted} = $c->req->body_parameters;
         } else {
-            $c->flash->{success_msg} = 'Supplier invoice received and stock updated.';
+            $c->flash->{success_msg} = 'Invoice saved as draft. Review and Post when ready.';
             $c->res->redirect($c->uri_for('/Inventory/invoice'));
             return;
         }
@@ -1026,12 +1064,227 @@ sub invoice_new :Path('/Inventory/invoice/new') :Args(0) {
     );
 }
 
+sub invoice_edit :Path('/Inventory/invoice/edit') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $invoice;
+    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find(
+        $id, { prefetch => { lines => ['item'] } }) };
+
+    unless ($invoice && $invoice->sitename eq $sitename) {
+        $c->flash->{error_msg} = 'Invoice not found.';
+        $c->res->redirect($c->uri_for('/Inventory/invoice'));
+        return;
+    }
+    if ($invoice->status ne 'draft') {
+        $c->flash->{error_msg} = 'Only draft invoices can be edited.';
+        $c->res->redirect($c->uri_for('/Inventory/invoice/view', [$id]));
+        return;
+    }
+
+    if ($c->req->method eq 'POST') {
+        my $params = $c->req->body_parameters;
+        my $now    = $self->_now();
+
+        my %lines_by_idx;
+        for my $key (keys %$params) {
+            if ($key =~ /^(item_id|description|quantity|unit_cost|account_id|location_id)_(\d+)$/) {
+                $lines_by_idx{$2}{$1} = $params->{$key};
+            }
+        }
+
+        eval {
+            $schema->txn_do(sub {
+                my $tax_amt      = $params->{tax_amount}      || 0;
+                my $shipping_amt = $params->{shipping_amount} || 0;
+                my $discount_amt = $params->{discount_amount} || 0;
+
+                $invoice->update({
+                    supplier_id          => $params->{supplier_id},
+                    invoice_number       => $params->{invoice_number},
+                    invoice_date         => $params->{invoice_date},
+                    due_date             => $params->{due_date}            || undef,
+                    ap_account_id        => $params->{ap_account_id}       || undef,
+                    tax_amount           => $tax_amt,
+                    shipping_amount      => $shipping_amt,
+                    discount_amount      => $discount_amt,
+                    tax_account_id       => $params->{tax_account_id}      || undef,
+                    shipping_account_id  => $params->{shipping_account_id} || undef,
+                    discount_account_id  => $params->{discount_account_id} || undef,
+                    notes                => $params->{notes},
+                    updated_at           => $now,
+                });
+
+                $invoice->lines->delete_all;
+
+                my $line_total_sum = 0;
+                for my $idx (sort { $a <=> $b } keys %lines_by_idx) {
+                    my $l = $lines_by_idx{$idx};
+                    next unless ($l->{item_id} || $l->{description});
+                    my $qty  = $l->{quantity}  || 1;
+                    my $cost = $l->{unit_cost} || 0;
+                    my $lt   = $qty * $cost;
+                    $line_total_sum += $lt;
+                    $invoice->create_related('lines', {
+                        item_id     => $l->{item_id}     || undef,
+                        description => $l->{description} || undef,
+                        quantity    => $qty,
+                        unit_cost   => $cost,
+                        line_total  => $lt,
+                        account_id  => $l->{account_id}  || undef,
+                        location_id => $l->{location_id} || undef,
+                    });
+                }
+
+                my $grand_total = $line_total_sum + $tax_amt + $shipping_amt - $discount_amt;
+                $invoice->update({ total_amount => $grand_total });
+            });
+        };
+        if ($@) {
+            $c->stash->{error_msg} = "Failed to update invoice: $@";
+        } else {
+            $c->flash->{success_msg} = 'Invoice updated.';
+            $c->res->redirect($c->uri_for('/Inventory/invoice/view', [$id]));
+            return;
+        }
+    }
+
+    my @suppliers;
+    eval { @suppliers = $schema->resultset('InventorySupplier')->search(
+        { sitename => $sitename }, { order_by => 'name' })->all };
+    my @items;
+    eval { @items = $schema->resultset('InventoryItem')->search(
+        { sitename => $sitename, status => 'active' }, { order_by => 'name' })->all };
+    my @locations;
+    eval { @locations = $schema->resultset('InventoryLocation')->search(
+        { sitename => $sitename }, { order_by => 'name' })->all };
+
+    $c->stash(
+        invoice      => $invoice,
+        suppliers    => \@suppliers,
+        items        => \@items,
+        locations    => \@locations,
+        coa_accounts => $self->_load_coa_accounts($c),
+        sitename     => $sitename,
+        today        => do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) },
+        template     => 'Inventory/invoice/edit.tt',
+    );
+}
+
+sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $invoice;
+    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find(
+        $id, { prefetch => { lines => ['item'] } }) };
+
+    unless ($invoice && $invoice->sitename eq $sitename) {
+        $c->flash->{error_msg} = 'Invoice not found.';
+        $c->res->redirect($c->uri_for('/Inventory/invoice'));
+        return;
+    }
+    if ($invoice->status ne 'draft') {
+        $c->flash->{error_msg} = 'Invoice is already posted.';
+        $c->res->redirect($c->uri_for('/Inventory/invoice/view', [$id]));
+        return;
+    }
+
+    eval {
+        $schema->txn_do(sub {
+            my $ref = 'INV-' . ($invoice->invoice_number || $invoice->id);
+
+            for my $line ($invoice->lines->all) {
+                if ($line->item_id && $line->location_id) {
+                    my $sl = $schema->resultset('InventoryStockLevel')->find_or_create(
+                        { item_id => $line->item_id, location_id => $line->location_id },
+                        { key => 'item_id_location_id' }
+                    );
+                    $sl->update({ quantity_on_hand => ($sl->quantity_on_hand || 0) + $line->quantity });
+
+                    $schema->resultset('InventoryTransaction')->create({
+                        item_id          => $line->item_id,
+                        location_id      => $line->location_id,
+                        transaction_type => 'receive',
+                        quantity         => $line->quantity,
+                        unit_cost        => $line->unit_cost,
+                        reference        => $ref,
+                        transaction_date => $invoice->invoice_date,
+                        created_by       => $c->session->{username} || 'system',
+                    });
+                }
+            }
+
+            if ($invoice->ap_account_id && $invoice->total_amount > 0) {
+                my $gl = $schema->resultset('GlEntry')->create({
+                    sitename    => $sitename,
+                    entry_type  => 'AP',
+                    description => 'Supplier Invoice ' . ($invoice->invoice_number || ''),
+                    post_date   => $invoice->invoice_date,
+                    created_by  => $c->session->{username} || 'system',
+                });
+
+                $gl->create_related('lines', {
+                    account_id => $invoice->ap_account_id,
+                    amount     => -$invoice->total_amount,
+                    memo       => 'AP ' . ($invoice->invoice_number || ''),
+                });
+
+                for my $line ($invoice->lines->all) {
+                    next unless $line->account_id;
+                    $gl->create_related('lines', {
+                        account_id => $line->account_id,
+                        amount     => $line->line_total,
+                        memo       => $line->description || 'Item ' . ($line->item_id || ''),
+                    });
+                }
+
+                if ($invoice->tax_amount && $invoice->tax_amount > 0 && $invoice->tax_account_id) {
+                    $gl->create_related('lines', {
+                        account_id => $invoice->tax_account_id,
+                        amount     => $invoice->tax_amount,
+                        memo       => 'Tax',
+                    });
+                }
+                if ($invoice->shipping_amount && $invoice->shipping_amount > 0 && $invoice->shipping_account_id) {
+                    $gl->create_related('lines', {
+                        account_id => $invoice->shipping_account_id,
+                        amount     => $invoice->shipping_amount,
+                        memo       => 'Shipping',
+                    });
+                }
+                if ($invoice->discount_amount && $invoice->discount_amount > 0 && $invoice->discount_account_id) {
+                    $gl->create_related('lines', {
+                        account_id => $invoice->discount_account_id,
+                        amount     => -$invoice->discount_amount,
+                        memo       => 'Supplier Discount',
+                    });
+                }
+
+                $invoice->update({ gl_entry_id => $gl->id });
+            }
+
+            $invoice->update({ status => 'posted' });
+        });
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Failed to post invoice: $@";
+    } else {
+        $c->flash->{success_msg} = 'Invoice posted. Stock updated and GL entry created.';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/invoice/view', [$id]));
+}
+
 sub invoice_view :Path('/Inventory/invoice/view') :Args(1) {
     my ($self, $c, $id) = @_;
     my $invoice;
     eval {
         $invoice = $self->_schema($c)->resultset('InventorySupplierInvoice')->find(
-            $id, { prefetch => ['supplier', 'ap_account', { lines => ['item', 'account', 'location'] }] }
+            $id, { prefetch => ['supplier', 'ap_account', 'tax_account', 'shipping_account',
+                                'discount_account', { lines => ['item', 'account', 'location'] }] }
         );
     };
     unless ($invoice) {

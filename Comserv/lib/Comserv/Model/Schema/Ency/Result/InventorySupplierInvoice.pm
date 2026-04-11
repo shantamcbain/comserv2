@@ -46,6 +46,30 @@ __PACKAGE__->add_columns(
         is_nullable   => 1,
         default_value => '0.00',
     },
+    shipping_amount => {
+        data_type     => 'decimal',
+        size          => [12, 2],
+        is_nullable   => 1,
+        default_value => '0.00',
+    },
+    tax_account_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
+    shipping_account_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
+    discount_amount => {
+        data_type     => 'decimal',
+        size          => [12, 2],
+        is_nullable   => 1,
+        default_value => '0.00',
+    },
+    discount_account_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
     status => {
         data_type     => 'varchar',
         size          => 20,
@@ -102,6 +126,27 @@ __PACKAGE__->belongs_to(
     'gl_entry',
     'Comserv::Model::Schema::Ency::Result::GlEntry',
     { 'foreign.id' => 'self.gl_entry_id' },
+    { join_type => 'LEFT', on_delete => 'SET NULL' }
+);
+
+__PACKAGE__->belongs_to(
+    'tax_account',
+    'Comserv::Model::Schema::Ency::Result::CoaAccount',
+    { 'foreign.id' => 'self.tax_account_id' },
+    { join_type => 'LEFT', on_delete => 'SET NULL' }
+);
+
+__PACKAGE__->belongs_to(
+    'shipping_account',
+    'Comserv::Model::Schema::Ency::Result::CoaAccount',
+    { 'foreign.id' => 'self.shipping_account_id' },
+    { join_type => 'LEFT', on_delete => 'SET NULL' }
+);
+
+__PACKAGE__->belongs_to(
+    'discount_account',
+    'Comserv::Model::Schema::Ency::Result::CoaAccount',
+    { 'foreign.id' => 'self.discount_account_id' },
     { join_type => 'LEFT', on_delete => 'SET NULL' }
 );
 
