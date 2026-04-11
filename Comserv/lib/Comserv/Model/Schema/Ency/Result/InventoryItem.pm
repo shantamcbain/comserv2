@@ -84,11 +84,30 @@ __PACKAGE__->add_columns(id => {
         data_type     => 'integer',
         is_nullable   => 1,
         default_value => 0,
+        comment       => 'Minimum stock level before reorder (replaces minimum_stock)',
+    },
+    maximum_stock => {
+        data_type     => 'integer',
+        is_nullable   => 1,
+        default_value => 0,
+        comment       => 'Maximum stock level to keep on hand (upper reorder limit)',
     },
     reorder_quantity => {
         data_type     => 'integer',
         is_nullable   => 1,
         default_value => 0,
+    },
+    is_consumable => {
+        data_type     => 'tinyint',
+        is_nullable   => 0,
+        default_value => 0,
+        comment       => '1 = expensed when used (consumable); 0 = capitalized asset',
+    },
+    is_reusable => {
+        data_type     => 'tinyint',
+        is_nullable   => 0,
+        default_value => 1,
+        comment       => '1 = returns to stock after use (frame); 0 = used up (foundation, wax)',
     },
     status => {
         data_type     => 'varchar',
