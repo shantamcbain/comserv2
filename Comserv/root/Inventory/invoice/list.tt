@@ -1,0 +1,51 @@
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Supplier Invoices</h1>
+<p>
+  <a href="/Inventory/invoice/new" style="background:#007bff;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">+ New Invoice</a>
+  <a href="/Inventory" style="margin-left:1em;">← Inventory</a>
+</p>
+
+[% IF flash.success_msg %]<p style="color:green;font-weight:bold">[% flash.success_msg %]</p>[% END %]
+[% IF error_msg %]<p style="color:red;font-weight:bold">List error: [% error_msg %]</p>[% END %]
+[% IF flash.error_msg %]<p style="color:red">[% flash.error_msg %]</p>[% END %]
+
+[% IF invoices.size %]
+<table border="1" cellpadding="6" style="width:100%;border-collapse:collapse;">
+  <thead>
+    <tr>
+      <th>Invoice #</th>
+      <th>Supplier</th>
+      <th>Date</th>
+      <th>Due</th>
+      <th>Total</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH inv IN invoices %]
+  <tr>
+    <td><a href="/Inventory/invoice/view/[% inv.id %]">[% inv.invoice_number || inv.id %]</a></td>
+    <td>[% inv.supplier.name | html %]</td>
+    <td>[% inv.invoice_date %]</td>
+    <td>[% inv.due_date || '' %]</td>
+    <td style="text-align:right">$[% inv.total_amount %]</td>
+    <td>
+      [% IF inv.status == 'draft' %]<span style="background:#ffc107;color:#333;padding:1px 7px;border-radius:3px;font-size:0.85em;">draft</span>
+      [% ELSIF inv.status == 'posted' %]<span style="background:#28a745;color:white;padding:1px 7px;border-radius:3px;font-size:0.85em;">posted</span>
+      [% ELSE %][% inv.status | html %][% END %]
+    </td>
+    <td>
+      <a href="/Inventory/invoice/view/[% inv.id %]">View</a>
+      [% IF inv.status == 'draft' %]
+      | <a href="/Inventory/invoice/edit/[% inv.id %]">Edit</a>
+      [% END %]
+    </td>
+  </tr>
+  [% END %]
+  </tbody>
+</table>
+[% ELSE %]
+<p>No invoices yet. <a href="/Inventory/invoice/new">Enter the first supplier invoice.</a></p>
+[% END %]

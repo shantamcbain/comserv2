@@ -1,0 +1,338 @@
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Edit Draft Invoice — [% invoice.invoice_number || invoice.id %]</h1>
+<p><a href="/Inventory/invoice/view/[% invoice.id %]">← Back to Invoice</a></p>
+
+[% IF error_msg %]<p style="color:red;font-weight:bold">[% error_msg %]</p>[% END %]
+
+<form method="POST" action="/Inventory/invoice/edit/[% invoice.id %]" id="invoice-form">
+
+<table cellpadding="6">
+  <tr>
+    <th><label for="supplier_id">Supplier *</label></th>
+    <td>
+      <select id="supplier_id" name="supplier_id" required>
+        <option value="">— select supplier —</option>
+        [% FOREACH s IN suppliers %]
+        <option value="[% s.id %]"[% IF s.id == invoice.supplier_id %] selected[% END %]>[% s.name | html %]</option>
+        [% END %]
+      </select>
+      <button type="button" onclick="openItemPopup('/Inventory/supplier/add?popup=1', 'supplier')"
+              style="margin-left:4px;" title="Add new supplier">+ Supplier</button>
+    </td>
+  </tr>
+  <tr>
+    <th><label for="invoice_number">Invoice Number</label></th>
+    <td><input type="text" id="invoice_number" name="invoice_number" maxlength="100" value="[% invoice.invoice_number | html %]"></td>
+  </tr>
+  <tr>
+    <th><label for="invoice_date">Invoice Date *</label></th>
+    <td><input type="date" id="invoice_date" name="invoice_date" value="[% invoice.invoice_date %]" required></td>
+  </tr>
+  <tr>
+    <th><label for="due_date">Due Date</label></th>
+    <td><input type="date" id="due_date" name="due_date" value="[% invoice.due_date %]"></td>
+  </tr>
+  [% IF coa_accounts.size %]
+  <tr>
+    <th><label for="ap_account_id">AP Account</label></th>
+    <td>
+      <select id="ap_account_id" name="ap_account_id">
+        <option value="">— none (no GL entry) —</option>
+        [% FOREACH a IN coa_accounts %]
+        <option value="[% a.id %]"[% IF a.id == invoice.ap_account_id %] selected[% END %]>[% a.accno %] [% a.description | html %]</option>
+        [% END %]
+      </select>
+      <small>Accounts Payable. Use 2000 AP regardless of payment method.</small>
+    </td>
+  </tr>
+  [% END %]
+  <tr>
+    <th><label for="notes">Notes</label></th>
+    <td><textarea id="notes" name="notes" rows="2" cols="50">[% invoice.notes | html %]</textarea></td>
+  </tr>
+</table>
+
+<h2>Line Items</h2>
+<p><small>Select an existing item or type a description. Add a location to update stock on hand when posted.</small></p>
+<p>
+  <button type="button" onclick="openItemPopup('/Inventory/item/add?popup=1', 'item')" style="font-size:0.85em;">
+    + Add New Item (opens popup)
+  </button>
+</p>
+
+<table id="lines-table" border="1" cellpadding="5" style="border-collapse:collapse;width:100%;">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Item</th>
+      <th>Description</th>
+      <th>Qty</th>
+      <th>Unit Cost</th>
+      <th>Total</th>
+      [% IF coa_accounts.size %]<th>Expense Account</th>[% END %]
+      <th>Location</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody id="lines-body">
+  </tbody>
+</table>
+
+<p>
+  <button type="button" onclick="addLine()">+ Add Line</button>
+</p>
+
+<table cellpadding="5" style="margin-top:8px;">
+  <tr>
+    <th align="right">Lines Subtotal:</th>
+    <td>$<span id="lines-subtotal">0.00</span></td>
+  </tr>
+  <tr>
+    <th align="right"><label for="tax_amount">Tax:</label></th>
+    <td>
+      <input type="number" id="tax_amount" name="tax_amount" value="[% invoice.tax_amount || '0.00' %]" step="0.01" min="0" style="width:90px;" oninput="recalcGrandTotal()">
+      [% IF coa_accounts.size %]
+      <select id="tax_account_id" name="tax_account_id" style="margin-left:6px;">
+        <option value="">— tax account —</option>
+        [% FOREACH a IN coa_accounts %]
+        <option value="[% a.id %]"[% IF a.id == invoice.tax_account_id %] selected[% ELSIF a.accno == '6310' && !invoice.tax_account_id %] selected[% END %]>[% a.accno %] [% a.description | html %]</option>
+        [% END %]
+      </select>
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <th align="right"><label for="shipping_amount">Shipping:</label></th>
+    <td>
+      <input type="number" id="shipping_amount" name="shipping_amount" value="[% invoice.shipping_amount || '0.00' %]" step="0.01" min="0" style="width:90px;" oninput="recalcGrandTotal()">
+      [% IF coa_accounts.size %]
+      <select id="shipping_account_id" name="shipping_account_id" style="margin-left:6px;">
+        <option value="">— shipping account —</option>
+        [% FOREACH a IN coa_accounts %]
+        <option value="[% a.id %]"[% IF a.id == invoice.shipping_account_id %] selected[% ELSIF a.accno == '6400' && !invoice.shipping_account_id %] selected[% END %]>[% a.accno %] [% a.description | html %]</option>
+        [% END %]
+      </select>
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <th align="right"><label for="discount_amount">Discount:</label></th>
+    <td>
+      <input type="number" id="discount_amount" name="discount_amount" value="[% invoice.discount_amount || '0.00' %]" step="0.01" min="0" style="width:90px;" oninput="recalcGrandTotal()">
+      [% IF coa_accounts.size %]
+      <select id="discount_account_id" name="discount_account_id" style="margin-left:6px;">
+        <option value="">— discount account —</option>
+        [% FOREACH a IN coa_accounts %]
+        <option value="[% a.id %]"[% IF a.id == invoice.discount_account_id %] selected[% ELSIF a.accno == '5200' && !invoice.discount_account_id %] selected[% END %]>[% a.accno %] [% a.description | html %]</option>
+        [% END %]
+      </select>
+      [% END %]
+      <small style="margin-left:4px;">Subtracted from total</small>
+    </td>
+  </tr>
+  <tr>
+    <th align="right" style="font-size:1.1em;font-weight:bold;">Invoice Total:</th>
+    <td style="font-size:1.1em;font-weight:bold;">$<span id="invoice-total">0.00</span></td>
+  </tr>
+</table>
+
+<p>
+  <input type="submit" value="Save Changes" style="background:#007bff;color:white;padding:8px 18px;border:none;border-radius:4px;cursor:pointer;">
+  <a href="/Inventory/invoice/view/[% invoice.id %]" style="margin-left:1em;">Cancel</a>
+</p>
+</form>
+
+<script>
+var lineIndex = 0;
+
+var existingLines = [
+  [% SET line_list = invoice.lines %]
+  [% FOREACH ln IN line_list %]
+  { item_id: "[% ln.item_id || '' %]", description: "[% ln.description.replace('"','&quot;') | html %]",
+    quantity: "[% ln.quantity %]", unit_cost: "[% ln.unit_cost %]", line_total: "[% ln.line_total %]",
+    account_id: "[% ln.account_id || '' %]", location_id: "[% ln.location_id || '' %]" }[% ',' UNLESS loop.last %]
+  [% END %]
+];
+
+var items = [
+  [% FOREACH i IN items %]
+  { id: [% i.id %], name: "[% i.name.replace('"', '&quot;') | html %]", sku: "[% i.sku | html %]",
+    cost: "[% i.unit_cost || '' %]", expense_id: "[% i.expense_accno_id || '' %]" }[% ',' UNLESS loop.last %]
+  [% END %]
+];
+
+var locations = [
+  [% FOREACH l IN locations %]
+  { id: [% l.id %], name: "[% l.name.replace('"', '&quot;') | html %]" }[% ',' UNLESS loop.last %]
+  [% END %]
+];
+
+var coaAccounts = [
+  [% FOREACH a IN coa_accounts %]
+  { id: [% a.id %], label: "[% a.accno %] [% a.description.replace('"', '&quot;') | html %]" }[% ',' UNLESS loop.last %]
+  [% END %]
+];
+
+function buildItemSelect(name, onchange, selectedId) {
+  var s = '<select name="' + name + '" onchange="' + onchange + '" style="max-width:220px;">'
+    + '<option value="">— select or leave blank —</option>';
+  items.forEach(function(i) {
+    var sel = (selectedId && i.id == selectedId) ? ' selected' : '';
+    s += '<option value="' + i.id + '" data-cost="' + i.cost + '" data-expense="' + i.expense_id
+       + '" data-name="' + i.name.replace(/"/g, '&quot;') + '"' + sel + '>'
+       + i.name + ' [' + i.sku + ']</option>';
+  });
+  s += '</select>';
+  return s;
+}
+
+function buildLocationSelect(name, selectedId) {
+  var s = '<select name="' + name + '"><option value="">— none —</option>';
+  locations.forEach(function(l) {
+    var sel = (selectedId && l.id == selectedId) ? ' selected' : '';
+    s += '<option value="' + l.id + '"' + sel + '>' + l.name + '</option>';
+  });
+  return s + '</select>';
+}
+
+function buildAccountSelect(name, selectedId) {
+  var s = '<select name="' + name + '" style="max-width:200px;"><option value="">— none —</option>';
+  coaAccounts.forEach(function(a) {
+    var sel = (selectedId && a.id == selectedId) ? ' selected' : '';
+    s += '<option value="' + a.id + '"' + sel + '>' + a.label + '</option>';
+  });
+  return s + '</select>';
+}
+
+function addLine(prefill) {
+  var idx = lineIndex++;
+  var hasCoa = coaAccounts.length > 0;
+  prefill = prefill || {};
+  var row = document.createElement('tr');
+  row.id = 'line-' + idx;
+  row.innerHTML = '<td>' + (idx + 1) + '</td>'
+    + '<td>' + buildItemSelect('item_id_' + idx, 'itemChanged(this,' + idx + ')', prefill.item_id) + '</td>'
+    + '<td><input type="text" name="description_' + idx + '" size="20" value="' + (prefill.description || '') + '"></td>'
+    + '<td><input type="number" name="quantity_' + idx + '" value="' + (prefill.quantity || '1') + '" min="0.0001" step="any" size="6" oninput="calcLine(' + idx + ')"></td>'
+    + '<td><input type="number" name="unit_cost_' + idx + '" value="' + (prefill.unit_cost || '0.00') + '" min="0" step="0.01" size="10" oninput="calcLine(' + idx + ')"></td>'
+    + '<td id="total-' + idx + '" style="text-align:right">$' + (prefill.line_total || '0.00') + '</td>'
+    + (hasCoa ? '<td id="acct-cell-' + idx + '">' + buildAccountSelect('account_id_' + idx, prefill.account_id) + '</td>' : '')
+    + '<td>' + buildLocationSelect('location_id_' + idx, prefill.location_id) + '</td>'
+    + '<td><button type="button" onclick="removeLine(' + idx + ')">&#x2715;</button></td>';
+  document.getElementById('lines-body').appendChild(row);
+}
+
+function itemChanged(sel, idx) {
+  var opt = sel.options[sel.selectedIndex];
+  var cost      = opt ? (opt.getAttribute('data-cost')    || 0)  : 0;
+  var expenseId = opt ? (opt.getAttribute('data-expense') || '') : '';
+  var itemName  = opt ? (opt.getAttribute('data-name')    || '') : '';
+  var costField = document.querySelector('[name="unit_cost_' + idx + '"]');
+  if (costField && cost) costField.value = parseFloat(cost).toFixed(2);
+  var descField = document.querySelector('[name="description_' + idx + '"]');
+  if (descField && itemName && !descField.value) descField.value = itemName;
+  if (expenseId) {
+    var acctSel = document.querySelector('[name="account_id_' + idx + '"]');
+    if (acctSel) {
+      for (var i = 0; i < acctSel.options.length; i++) {
+        if (acctSel.options[i].value == expenseId) { acctSel.selectedIndex = i; break; }
+      }
+    }
+  }
+  calcLine(idx);
+}
+
+function calcLine(idx) {
+  var qty  = parseFloat(document.querySelector('[name="quantity_' + idx + '"]').value)  || 0;
+  var cost = parseFloat(document.querySelector('[name="unit_cost_' + idx + '"]').value) || 0;
+  document.getElementById('total-' + idx).textContent = '$' + (qty * cost).toFixed(2);
+  calcTotal();
+}
+
+function calcTotal() {
+  var subtotal = 0;
+  document.querySelectorAll('[id^="total-"]').forEach(function(el) {
+    subtotal += parseFloat(el.textContent.replace('$','')) || 0;
+  });
+  var subtotalEl = document.getElementById('lines-subtotal');
+  if (subtotalEl) subtotalEl.textContent = subtotal.toFixed(2);
+  recalcGrandTotal();
+}
+
+function recalcGrandTotal() {
+  var subtotal  = parseFloat((document.getElementById('lines-subtotal')  || {}).textContent) || 0;
+  var tax       = parseFloat((document.getElementById('tax_amount')      || {}).value)       || 0;
+  var shipping  = parseFloat((document.getElementById('shipping_amount') || {}).value)       || 0;
+  var discount  = parseFloat((document.getElementById('discount_amount') || {}).value)       || 0;
+  document.getElementById('invoice-total').textContent = (subtotal + tax + shipping - discount).toFixed(2);
+}
+
+function removeLine(idx) {
+  var row = document.getElementById('line-' + idx);
+  if (row) row.remove();
+  calcTotal();
+}
+
+function openItemPopup(url, type) {
+  var w = window.open(url, 'inv_popup', 'width=920,height=720,scrollbars=yes');
+  var timer = setInterval(function() {
+    if (w.closed) {
+      clearInterval(timer);
+      if (type === 'item')     refreshItemsAjax();
+      if (type === 'supplier') refreshSuppliersAjax();
+    }
+  }, 600);
+}
+
+function refreshItemsAjax() {
+  fetch('/Inventory/api/items_with_accounts')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      items = data;
+      document.querySelectorAll('[name^="item_id_"]').forEach(function(sel) {
+        var cur = sel.value;
+        var idx = sel.name.replace('item_id_', '');
+        sel.innerHTML = '<option value="">— select or leave blank —</option>';
+        data.forEach(function(i) {
+          var opt = document.createElement('option');
+          opt.value = i.id;
+          opt.textContent = i.name + ' [' + i.sku + ']';
+          opt.setAttribute('data-cost',    i.unit_cost        || '');
+          opt.setAttribute('data-expense', i.expense_accno_id || '');
+          opt.setAttribute('data-name',    i.name             || '');
+          if (i.id == cur) opt.selected = true;
+          sel.appendChild(opt);
+        });
+      });
+    })
+    .catch(function(e) { console.warn('refreshItemsAjax failed', e); });
+}
+
+function refreshSuppliersAjax() {
+  fetch('/Inventory/api/suppliers')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var sel = document.getElementById('supplier_id');
+      if (!sel) return;
+      var cur = sel.value;
+      sel.innerHTML = '<option value="">— select supplier —</option>';
+      data.forEach(function(s) {
+        var opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.name;
+        if (s.id == cur) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    })
+    .catch(function(e) { console.warn('refreshSuppliersAjax failed', e); });
+}
+
+// Pre-populate existing lines, then recalc
+if (existingLines.length) {
+  existingLines.forEach(function(ln) { addLine(ln); });
+} else {
+  addLine();
+}
+calcTotal();
+</script>

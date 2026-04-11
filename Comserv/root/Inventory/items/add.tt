@@ -5,7 +5,7 @@
 
 [% IF error_msg %]<p class="error">[% error_msg %]</p>[% END %]
 
-<form method="POST" action="/Inventory/item/add">
+<form method="POST" action="/Inventory/item/add[% IF is_popup %]?popup=1[% END %]">
   <table>
     <tr>
       <th><label for="sku">SKU *</label></th>
@@ -40,7 +40,18 @@
     </tr>
     <tr>
       <th><label for="unit_cost">Unit Cost</label></th>
-      <td><input type="number" id="unit_cost" name="unit_cost" step="0.01" min="0"></td>
+      <td><input type="number" id="unit_cost" name="unit_cost" step="0.01" min="0">
+          <small>Purchase/cost price (what you pay the supplier)</small></td>
+    </tr>
+    <tr>
+      <th><label for="unit_price">Selling Price</label></th>
+      <td><input type="number" id="unit_price" name="unit_price" step="0.01" min="0">
+          <small>Sale price charged to customer (used for Square sync)</small></td>
+    </tr>
+    <tr>
+      <th><label for="barcode">Barcode</label></th>
+      <td><input type="text" id="barcode" name="barcode" maxlength="100">
+          <small>UPC / EAN / QR / Code128 — for scanning and Square catalog</small></td>
     </tr>
     <tr>
       <th><label for="reorder_point">Reorder Point</label></th>
@@ -143,11 +154,22 @@
     <tr>
       <td colspan="2">
         <input type="submit" value="Create Item">
+        [% IF is_popup %]
+        <button type="button" onclick="window.close()">Cancel</button>
+        [% ELSE %]
         <a href="/Inventory/items">Cancel</a>
+        [% END %]
       </td>
     </tr>
   </table>
 </form>
+[% IF is_popup %]
+<script>
+[% IF c.req.params.done %]
+window.close();
+[% END %]
+</script>
+[% END %]
 [% PROCESS 'ai/partials/ai_form_assistant.tt'
    ai_form_entity_label = 'inventory item'
    ai_form_context      = 'inventory item management'
