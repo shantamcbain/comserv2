@@ -625,8 +625,19 @@ sub generate :Local :Args(0) {
                 die "Failed to load Grok model";
             }
             $grok->api_key($grok_api_key);
+            # Hardcoded list of known-dead Grok models (410 Gone) — always substitute regardless of DB state
+            my %GROK_DEAD = map { $_ => 'grok-3' } qw(
+                grok-code-fast-1
+                grok-4-0709
+                grok-4-fast-non-reasoning
+            );
+            if ($model && $GROK_DEAD{$model}) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'generate', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD{$model}'");
+                $model = $GROK_DEAD{$model};
+            }
             if ($model) {
-                # Pre-flight: if the requested model is known deprecated, use last_working_model instead
+                # Pre-flight: if the requested model is known deprecated in DB, use last_working_model instead
                 eval {
                     my $schema  = $c->model('DBEncy')->schema;
                     my $key_obj = $schema->resultset('UserApiKeys')->search(
@@ -637,7 +648,7 @@ sub generate :Local :Args(0) {
                         my $deprecated = $meta->{deprecated_models} || {};
                         if ($deprecated->{$model}) {
                             my $replacement = $meta->{last_working_model} || '';
-                            if ($replacement && $replacement ne $model) {
+                            if ($replacement && $replacement ne $model && !$GROK_DEAD{$replacement}) {
                                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                                     'generate', "Requested model '$model' is deprecated; using '$replacement' instead");
                                 $model = $replacement;
