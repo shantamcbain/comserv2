@@ -100,6 +100,13 @@ __PACKAGE__->add_columns(id => {
         data_type   => 'text',
         is_nullable => 1,
     },
+    condition => {
+        data_type     => 'varchar',
+        size          => 20,
+        is_nullable   => 1,
+        default_value => 'new',
+        comment       => 'Asset condition: new, good, fair, poor, damaged',
+    },
     purchase_date => {
         data_type   => 'date',
         is_nullable => 1,
