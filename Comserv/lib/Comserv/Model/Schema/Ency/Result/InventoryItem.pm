@@ -6,7 +6,8 @@ use base 'DBIx::Class::Core';
 __PACKAGE__->load_components('InflateColumn::DateTime', 'TimeStamp');
 __PACKAGE__->table('inventory_items');
 
-__PACKAGE__->add_columns(id => {
+__PACKAGE__->add_columns(
+    id => {
         data_type         => 'integer',
         is_auto_increment => 1,
         is_nullable       => 0,
@@ -34,40 +35,33 @@ __PACKAGE__->add_columns(id => {
         data_type   => 'varchar',
         size        => 100,
         is_nullable => 1,
-        comment     => 'Free-text: Apiary, Garden, Hardware, 3D Print, Craft, etc.',
     },
     item_origin => {
         data_type     => 'varchar',
         size          => 50,
         is_nullable   => 0,
         default_value => 'purchased',
-        comment       => 'purchased | grown | foraged | manufactured | 3d_printed | harvested | crafted | other',
     },
     is_assemblable => {
         data_type     => 'tinyint',
         is_nullable   => 0,
         default_value => 0,
-        comment       => '1 if this item has a BOM (made from other items)',
     },
     inventory_accno_id => {
         data_type   => 'integer',
         is_nullable => 1,
-        comment     => 'COA account for stock value (Asset — e.g. 1200 Inventory)',
     },
     income_accno_id => {
         data_type   => 'integer',
         is_nullable => 1,
-        comment     => 'COA account when item is sold (Income — e.g. 4000 Sales)',
     },
     expense_accno_id => {
         data_type   => 'integer',
         is_nullable => 1,
-        comment     => 'COA account for COGS/expense (Expense — e.g. 5000 COGS)',
     },
     returns_accno_id => {
         data_type   => 'integer',
         is_nullable => 1,
-        comment     => 'COA account for returns/refunds (e.g. 4100 Sales Returns)',
     },
     unit_of_measure => {
         data_type     => 'varchar',
@@ -76,21 +70,29 @@ __PACKAGE__->add_columns(id => {
         default_value => 'each',
     },
     unit_cost => {
-        data_type     => 'decimal',
-        size          => [10, 2],
-        is_nullable   => 1,
+        data_type   => 'decimal',
+        size        => [10, 2],
+        is_nullable => 1,
+    },
+    unit_price => {
+        data_type   => 'decimal',
+        size        => [10, 2],
+        is_nullable => 1,
+    },
+    barcode => {
+        data_type   => 'varchar',
+        size        => 100,
+        is_nullable => 1,
     },
     reorder_point => {
         data_type     => 'integer',
         is_nullable   => 1,
         default_value => 0,
-        comment       => 'Minimum stock level before reorder (replaces minimum_stock)',
     },
     maximum_stock => {
         data_type     => 'integer',
         is_nullable   => 1,
         default_value => 0,
-        comment       => 'Maximum stock level to keep on hand (upper reorder limit)',
     },
     reorder_quantity => {
         data_type     => 'integer',
@@ -101,13 +103,11 @@ __PACKAGE__->add_columns(id => {
         data_type     => 'tinyint',
         is_nullable   => 0,
         default_value => 0,
-        comment       => '1 = expensed when used (consumable); 0 = capitalized asset',
     },
     is_reusable => {
         data_type     => 'tinyint',
         is_nullable   => 0,
         default_value => 1,
-        comment       => '1 = returns to stock after use (frame); 0 = used up (foundation, wax)',
     },
     status => {
         data_type     => 'varchar',
@@ -124,17 +124,14 @@ __PACKAGE__->add_columns(id => {
         size          => 20,
         is_nullable   => 1,
         default_value => 'new',
-        comment       => 'Asset condition: new, good, fair, poor, damaged',
     },
     purchase_date => {
         data_type   => 'date',
         is_nullable => 1,
-        comment     => 'Date item was purchased/acquired',
     },
     warranty_expiry => {
         data_type   => 'date',
         is_nullable => 1,
-        comment     => 'Warranty expiry date for physical assets/equipment',
     },
     created_by => {
         data_type   => 'varchar',
