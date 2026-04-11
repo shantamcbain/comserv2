@@ -163,5 +163,77 @@ sub gl_view :Path('/Accounting/gl/view') :Args(1) {
     );
 }
 
+# -------------------------------------------------------------------------
+# Seed default Chart of Accounts (idempotent — skips if accounts exist)
+# -------------------------------------------------------------------------
+
+sub seed_coa :Path('/Accounting/coa/seed') :Args(0) {
+    my ($self, $c) = @_;
+    my $schema = $self->_schema($c);
+
+    my $existing = 0;
+    eval { $existing = $schema->resultset('CoaAccount')->count };
+
+    if ($existing > 0) {
+        $c->flash->{info_msg} = "Chart of Accounts already has $existing accounts — seed skipped.";
+        $c->res->redirect($c->uri_for('/Accounting/coa'));
+        return;
+    }
+
+    my @default_accounts = (
+        # Assets
+        { accno => '1000', description => 'Cash',                       category => 'A' },
+        { accno => '1100', description => 'Accounts Receivable',        category => 'A' },
+        { accno => '1200', description => 'Inventory Asset',            category => 'A' },
+        { accno => '1300', description => 'Prepaid Expenses',           category => 'A' },
+        { accno => '1500', description => 'Fixed Assets',               category => 'A' },
+        # Liabilities
+        { accno => '2000', description => 'Accounts Payable',           category => 'L' },
+        { accno => '2100', description => 'Sales Tax Payable',          category => 'L' },
+        { accno => '2200', description => 'Accrued Liabilities',        category => 'L' },
+        # Equity
+        { accno => '3000', description => "Owner's Equity",             category => 'Q' },
+        { accno => '3100', description => 'Retained Earnings',          category => 'Q' },
+        # Income
+        { accno => '4000', description => 'Sales Revenue',              category => 'I' },
+        { accno => '4100', description => 'Sales Returns & Allowances', category => 'I', is_contra => 1 },
+        { accno => '4200', description => 'Service Revenue',            category => 'I' },
+        { accno => '4900', description => 'Other Income',               category => 'I' },
+        # Cost of Goods Sold / Expenses
+        { accno => '5000', description => 'Cost of Goods Sold',         category => 'E' },
+        { accno => '5100', description => 'Purchases',                  category => 'E' },
+        { accno => '6000', description => 'General & Administrative',   category => 'E' },
+        { accno => '6100', description => 'Wages & Salaries',           category => 'E' },
+        { accno => '6200', description => 'Supplies Expense',           category => 'E' },
+        { accno => '6300', description => 'Equipment Expense',          category => 'E' },
+        { accno => '6400', description => 'Shipping & Postage',         category => 'E' },
+        { accno => '6500', description => 'Depreciation Expense',       category => 'E' },
+        { accno => '6900', description => 'Other Expenses',             category => 'E' },
+    );
+
+    my $added = 0;
+    eval {
+        for my $acct (@default_accounts) {
+            $schema->resultset('CoaAccount')->find_or_create({
+                accno       => $acct->{accno},
+                description => $acct->{description},
+                category    => $acct->{category},
+                is_contra   => $acct->{is_contra} || 0,
+                obsolete    => 0,
+            });
+            $added++;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'seed_coa', "Seed failed: $@");
+        $c->flash->{error_msg} = "Seed failed: $@";
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'seed_coa', "Seeded $added COA accounts");
+        $c->flash->{success_msg} = "Seeded $added default Chart of Accounts entries.";
+    }
+
+    $c->res->redirect($c->uri_for('/Accounting/coa'));
+}
+
 __PACKAGE__->meta->make_immutable;
 1;
