@@ -1,0 +1,68 @@
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Order #[% order.id %] — [% order.customer_name | html %]
+  [% IF order.status == 'pending' %]<span style="background:#ffc107;color:#333;padding:2px 8px;border-radius:3px;font-size:0.7em;vertical-align:middle;">PENDING</span>
+  [% ELSIF order.status == 'confirmed' %]<span style="background:#17a2b8;color:white;padding:2px 8px;border-radius:3px;font-size:0.7em;vertical-align:middle;">CONFIRMED</span>
+  [% ELSIF order.status == 'completed' %]<span style="background:#28a745;color:white;padding:2px 8px;border-radius:3px;font-size:0.7em;vertical-align:middle;">COMPLETED</span>
+  [% ELSIF order.status == 'cancelled' %]<span style="background:#dc3545;color:white;padding:2px 8px;border-radius:3px;font-size:0.7em;vertical-align:middle;">CANCELLED</span>
+  [% END %]
+</h1>
+
+<p>
+  <a href="/CustomerOrder">← All Orders</a>
+  <a href="/Inventory" style="margin-left:1em;">← Inventory</a>
+</p>
+
+[% IF flash.success_msg %]<p style="color:green;font-weight:bold">[% flash.success_msg %]</p>[% END %]
+[% IF flash.error_msg %]<p style="color:red">[% flash.error_msg %]</p>[% END %]
+
+<table cellpadding="6">
+  <tr><th>Customer</th><td>[% order.customer_name | html %]</td></tr>
+  [% IF order.customer_email %]
+  <tr><th>Email</th><td>[% order.customer_email | html %]</td></tr>
+  [% END %]
+  [% IF order.customer_phone %]
+  <tr><th>Phone</th><td>[% order.customer_phone | html %]</td></tr>
+  [% END %]
+  <tr><th>Date</th><td>[% order.created_at %]</td></tr>
+  [% IF order.notes %]
+  <tr><th>Notes</th><td>[% order.notes | html %]</td></tr>
+  [% END %]
+  <tr><th>Total (est.)</th><td><strong>$[% order.total_amount || '0.00' %]</strong></td></tr>
+</table>
+
+<h2>Items Ordered</h2>
+[% SET line_list = order.lines %]
+[% IF line_list.size %]
+<table border="1" cellpadding="6" style="width:100%;border-collapse:collapse;">
+  <thead>
+    <tr><th>Item</th><th>Description</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+  [% FOREACH ln IN line_list %]
+  <tr>
+    <td>[% IF ln.item %]<a href="/Inventory/item/view/[% ln.item.id %]">[% ln.item.name | html %]</a>[% ELSE %]—[% END %]</td>
+    <td>[% ln.description | html %]</td>
+    <td style="text-align:right">[% ln.quantity %]</td>
+    <td style="text-align:right">$[% ln.unit_price || '0.00' %]</td>
+    <td style="text-align:right">$[% ln.line_total || '0.00' %]</td>
+    <td>[% ln.notes | html %]</td>
+  </tr>
+  [% END %]
+  </tbody>
+</table>
+[% ELSE %]
+<p>No line items.</p>
+[% END %]
+
+<h2>Update Status</h2>
+<form method="POST" action="/CustomerOrder/status/[% order.id %]" style="display:inline;">
+  <select name="status">
+    <option value="pending"  [% IF order.status == 'pending'   %] selected[% END %]>Pending</option>
+    <option value="confirmed"[% IF order.status == 'confirmed' %] selected[% END %]>Confirmed</option>
+    <option value="completed"[% IF order.status == 'completed' %] selected[% END %]>Completed</option>
+    <option value="cancelled"[% IF order.status == 'cancelled' %] selected[% END %]>Cancelled</option>
+  </select>
+  <input type="submit" value="Update Status"
+         style="background:#007bff;color:white;padding:4px 12px;border:none;border-radius:3px;cursor:pointer;">
+</form>
