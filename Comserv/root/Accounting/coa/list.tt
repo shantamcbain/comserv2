@@ -4,6 +4,19 @@
 <h1>Chart of Accounts</h1>
 <p><a href="/Accounting">← Accounting</a></p>
 
+[% IF flash.success_msg %]<p style="color:green;font-weight:bold">[% flash.success_msg %]</p>[% END %]
+[% IF flash.info_msg %]<p style="color:#888">[% flash.info_msg %]</p>[% END %]
+[% IF flash.error_msg %]<p style="color:red">[% flash.error_msg %]</p>[% END %]
+[% IF list_error %]<p style="color:red"><strong>Query error:</strong> [% list_error %]</p>[% END %]
+
+[% IF accounts.size == 0 && !list_error %]
+<p><strong>No accounts found.</strong>
+  <a href="/Accounting/coa/seed" style="background:#007bff;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">
+    Seed Default Chart of Accounts
+  </a>
+</p>
+[% END %]
+
 [% SET cat_labels = {A='Asset', L='Liability', Q='Equity', I='Income', E='Expense'} %]
 [% FOREACH cat IN ['A','L','Q','I','E'] %]
   [% SET cat_accounts = accounts.grep(item => item.category == cat) %]
