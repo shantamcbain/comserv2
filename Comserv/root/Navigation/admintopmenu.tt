@@ -181,6 +181,7 @@
                 <a href="/Inventory/suppliers"><i class="icon-supplier"></i>Suppliers</a>
                 <a href="/Inventory/locations"><i class="icon-location"></i>Locations</a>
                 <a href="/Inventory/invoice"><i class="icon-invoice"></i>Supplier Invoices</a>
+                <a href="/CustomerOrder"><i class="icon-cart"></i>Customer Orders</a>
                 <div class="submenu-section">
                     <span class="submenu-section-title">Accounting</span>
                     <a href="/Accounting"><i class="icon-accounting"></i>Accounting Dashboard</a>

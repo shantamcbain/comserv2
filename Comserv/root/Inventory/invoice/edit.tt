@@ -1,11 +1,11 @@
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
-<h1>Enter Supplier Invoice</h1>
-<p><a href="/Inventory/invoice">← Invoices</a></p>
+<h1>Edit Draft Invoice — [% invoice.invoice_number || invoice.id %]</h1>
+<p><a href="/Inventory/invoice/view/[% invoice.id %]">← Back to Invoice</a></p>
 
 [% IF error_msg %]<p style="color:red;font-weight:bold">[% error_msg %]</p>[% END %]
 
-<form method="POST" action="/Inventory/invoice/new" id="invoice-form">
+<form method="POST" action="/Inventory/invoice/edit/[% invoice.id %]" id="invoice-form">
 
 <table cellpadding="6">
   <tr>
@@ -14,7 +14,7 @@
       <select id="supplier_id" name="supplier_id" required>
         <option value="">— select supplier —</option>
         [% FOREACH s IN suppliers %]
-        <option value="[% s.id %]"[% IF submitted.supplier_id == s.id %] selected[% END %]>[% s.name | html %]</option>
+        <option value="[% s.id %]"[% IF s.id == invoice.supplier_id %] selected[% END %]>[% s.name | html %]</option>
         [% END %]
       </select>
       <button type="button" onclick="openItemPopup('/Inventory/supplier/add?popup=1', 'supplier')"
@@ -23,15 +23,15 @@
   </tr>
   <tr>
     <th><label for="invoice_number">Invoice Number</label></th>
-    <td><input type="text" id="invoice_number" name="invoice_number" maxlength="100" value="[% submitted.invoice_number | html %]"></td>
+    <td><input type="text" id="invoice_number" name="invoice_number" maxlength="100" value="[% invoice.invoice_number | html %]"></td>
   </tr>
   <tr>
     <th><label for="invoice_date">Invoice Date *</label></th>
-    <td><input type="date" id="invoice_date" name="invoice_date" value="[% submitted.invoice_date || today %]" required></td>
+    <td><input type="date" id="invoice_date" name="invoice_date" value="[% invoice.invoice_date %]" required></td>
   </tr>
   <tr>
     <th><label for="due_date">Due Date</label></th>
-    <td><input type="date" id="due_date" name="due_date" value="[% submitted.due_date %]"></td>
+    <td><input type="date" id="due_date" name="due_date" value="[% invoice.due_date %]"></td>
   </tr>
   [% IF coa_accounts.size %]
   <tr>
@@ -40,22 +40,21 @@
       <select id="ap_account_id" name="ap_account_id">
         <option value="">— none (no GL entry) —</option>
         [% FOREACH a IN coa_accounts %]
-        <option value="[% a.id %]"[% IF submitted.ap_account_id ? (submitted.ap_account_id == a.id) : (a.accno == '2000') %] selected[% END %]>[% a.accno %] [% a.description | html %]</option>
+        <option value="[% a.id %]"[% IF a.id == invoice.ap_account_id %] selected[% END %]>[% a.accno %] [% a.description | html %]</option>
         [% END %]
       </select>
-      <small>Accounts Payable account. Use 2000 AP regardless of payment method (PayPal, cash, card).
-      The payment method is recorded when you mark the invoice paid.</small>
+      <small>Accounts Payable. Use 2000 AP regardless of payment method.</small>
     </td>
   </tr>
   [% END %]
   <tr>
     <th><label for="notes">Notes</label></th>
-    <td><textarea id="notes" name="notes" rows="2" cols="50">[% submitted.notes | html %]</textarea></td>
+    <td><textarea id="notes" name="notes" rows="2" cols="50">[% invoice.notes | html %]</textarea></td>
   </tr>
 </table>
 
 <h2>Line Items</h2>
-<p><small>Select an existing item or type a description. Add a location to update stock on hand.</small></p>
+<p><small>Select an existing item or type a description. Add a location to update stock on hand when posted.</small></p>
 <p>
   <button type="button" onclick="openItemPopup('/Inventory/item/add?popup=1', 'item')" style="font-size:0.85em;">
     + Add New Item (opens popup)
@@ -92,12 +91,12 @@
   <tr>
     <th align="right"><label for="tax_amount">Tax:</label></th>
     <td>
-      <input type="number" id="tax_amount" name="tax_amount" value="[% submitted.tax_amount || '0.00' %]" step="0.01" min="0" style="width:90px;" oninput="recalcGrandTotal()">
+      <input type="number" id="tax_amount" name="tax_amount" value="[% invoice.tax_amount || '0.00' %]" step="0.01" min="0" style="width:90px;" oninput="recalcGrandTotal()">
       [% IF coa_accounts.size %]
       <select id="tax_account_id" name="tax_account_id" style="margin-left:6px;">
         <option value="">— tax account —</option>
         [% FOREACH a IN coa_accounts %]
-        <option value="[% a.id %]"[% IF submitted.tax_account_id ? (submitted.tax_account_id == a.id) : (a.accno == '6310') %] selected[% END %]>[% a.accno %] [% a.description | html %]</option>
+        <option value="[% a.id %]"[% IF a.id == invoice.tax_account_id %] selected[% ELSIF a.accno == '6310' && !invoice.tax_account_id %] selected[% END %]>[% a.accno %] [% a.description | html %]</option>
         [% END %]
       </select>
       [% END %]
@@ -106,12 +105,12 @@
   <tr>
     <th align="right"><label for="shipping_amount">Shipping:</label></th>
     <td>
-      <input type="number" id="shipping_amount" name="shipping_amount" value="[% submitted.shipping_amount || '0.00' %]" step="0.01" min="0" style="width:90px;" oninput="recalcGrandTotal()">
+      <input type="number" id="shipping_amount" name="shipping_amount" value="[% invoice.shipping_amount || '0.00' %]" step="0.01" min="0" style="width:90px;" oninput="recalcGrandTotal()">
       [% IF coa_accounts.size %]
       <select id="shipping_account_id" name="shipping_account_id" style="margin-left:6px;">
         <option value="">— shipping account —</option>
         [% FOREACH a IN coa_accounts %]
-        <option value="[% a.id %]"[% IF submitted.shipping_account_id ? (submitted.shipping_account_id == a.id) : (a.accno == '6400') %] selected[% END %]>[% a.accno %] [% a.description | html %]</option>
+        <option value="[% a.id %]"[% IF a.id == invoice.shipping_account_id %] selected[% ELSIF a.accno == '6400' && !invoice.shipping_account_id %] selected[% END %]>[% a.accno %] [% a.description | html %]</option>
         [% END %]
       </select>
       [% END %]
@@ -120,12 +119,12 @@
   <tr>
     <th align="right"><label for="discount_amount">Discount:</label></th>
     <td>
-      <input type="number" id="discount_amount" name="discount_amount" value="[% submitted.discount_amount || '0.00' %]" step="0.01" min="0" style="width:90px;" oninput="recalcGrandTotal()">
+      <input type="number" id="discount_amount" name="discount_amount" value="[% invoice.discount_amount || '0.00' %]" step="0.01" min="0" style="width:90px;" oninput="recalcGrandTotal()">
       [% IF coa_accounts.size %]
       <select id="discount_account_id" name="discount_account_id" style="margin-left:6px;">
         <option value="">— discount account —</option>
         [% FOREACH a IN coa_accounts %]
-        <option value="[% a.id %]"[% IF submitted.discount_account_id ? (submitted.discount_account_id == a.id) : (a.accno == '5200') %] selected[% END %]>[% a.accno %] [% a.description | html %]</option>
+        <option value="[% a.id %]"[% IF a.id == invoice.discount_account_id %] selected[% ELSIF a.accno == '5200' && !invoice.discount_account_id %] selected[% END %]>[% a.accno %] [% a.description | html %]</option>
         [% END %]
       </select>
       [% END %]
@@ -139,13 +138,22 @@
 </table>
 
 <p>
-  <input type="submit" value="Save Invoice" style="background:#007bff;color:white;padding:8px 18px;border:none;border-radius:4px;cursor:pointer;">
-  <a href="/Inventory/invoice" style="margin-left:1em;">Cancel</a>
+  <input type="submit" value="Save Changes" style="background:#007bff;color:white;padding:8px 18px;border:none;border-radius:4px;cursor:pointer;">
+  <a href="/Inventory/invoice/view/[% invoice.id %]" style="margin-left:1em;">Cancel</a>
 </p>
 </form>
 
 <script>
 var lineIndex = 0;
+
+var existingLines = [
+  [% SET line_list = invoice.lines %]
+  [% FOREACH ln IN line_list %]
+  { item_id: "[% ln.item_id || '' %]", description: "[% ln.description.replace('"','&quot;') | html %]",
+    quantity: "[% ln.quantity %]", unit_cost: "[% ln.unit_cost %]", line_total: "[% ln.line_total %]",
+    account_id: "[% ln.account_id || '' %]", location_id: "[% ln.location_id || '' %]" }[% ',' UNLESS loop.last %]
+  [% END %]
+];
 
 var items = [
   [% FOREACH i IN items %]
@@ -266,11 +274,6 @@ function removeLine(idx) {
   calcTotal();
 }
 
-// -----------------------------------------------------------------------
-// Popup support — opens add-item or add-supplier in a new window.
-// When the popup closes, refreshes ONLY the relevant dropdown via AJAX
-// so all existing invoice data is preserved.
-// -----------------------------------------------------------------------
 function openItemPopup(url, type) {
   var w = window.open(url, 'inv_popup', 'width=920,height=720,scrollbars=yes');
   var timer = setInterval(function() {
@@ -287,7 +290,6 @@ function refreshItemsAjax() {
     .then(function(r) { return r.json(); })
     .then(function(data) {
       items = data;
-      // Rebuild every item select that still has no value chosen
       document.querySelectorAll('[name^="item_id_"]').forEach(function(sel) {
         var cur = sel.value;
         var idx = sel.name.replace('item_id_', '');
@@ -296,8 +298,9 @@ function refreshItemsAjax() {
           var opt = document.createElement('option');
           opt.value = i.id;
           opt.textContent = i.name + ' [' + i.sku + ']';
-          opt.setAttribute('data-cost',    i.unit_cost       || '');
+          opt.setAttribute('data-cost',    i.unit_cost        || '');
           opt.setAttribute('data-expense', i.expense_accno_id || '');
+          opt.setAttribute('data-name',    i.name             || '');
           if (i.id == cur) opt.selected = true;
           sel.appendChild(opt);
         });
@@ -321,32 +324,15 @@ function refreshSuppliersAjax() {
         if (s.id == cur) opt.selected = true;
         sel.appendChild(opt);
       });
-      // Select the newest supplier (last in list) if nothing was selected
-      if (!cur && data.length) sel.value = data[data.length - 1].id;
     })
     .catch(function(e) { console.warn('refreshSuppliersAjax failed', e); });
 }
 
-// Restore submitted lines on error, or add a blank first line
-var submittedLines = [% IF submitted %][% SET max_idx = -1 %][% FOREACH key IN submitted.keys %][% IF key.match('^quantity_(\d+)$') %][% SET idx = key.replace('quantity_','') %][% IF idx > max_idx %][% SET max_idx = idx %][% END %][% END %][% END %][% IF max_idx >= 0 %]
-  (function() {
-    var lines = [];
-    [% FOREACH n IN [0..max_idx] %]
-    [% SET qk = "quantity_$n" %][% SET ck = "unit_cost_$n" %][% SET ik = "item_id_$n" %][% SET dk = "description_$n" %][% SET ak = "account_id_$n" %][% SET lk = "location_id_$n" %]
-    [% IF submitted.$qk || submitted.$ik || submitted.$dk %]
-    lines.push({ item_id: "[% submitted.$ik %]", description: "[% submitted.$dk.replace('"','&quot;') %]",
-      quantity: "[% submitted.$qk || 1 %]", unit_cost: "[% submitted.$ck || '0.00' %]",
-      account_id: "[% submitted.$ak %]", location_id: "[% submitted.$lk %]", line_total: "" });
-    [% END %]
-    [% END %]
-    return lines;
-  })()
-[% ELSE %][][% END %][% ELSE %][][% END %];
-
-if (submittedLines.length) {
-  submittedLines.forEach(function(ln) { addLine(ln); });
-  calcTotal();
+// Pre-populate existing lines, then recalc
+if (existingLines.length) {
+  existingLines.forEach(function(ln) { addLine(ln); });
 } else {
   addLine();
 }
+calcTotal();
 </script>
