@@ -47,6 +47,13 @@
         <!-- HelpDesk Menu -->
         [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
         
+        <!-- Place Order (3D printing sites) -->
+        [% IF c.session.SiteName == '3d' || c.session.SiteName == 'Mcoop' %]
+            <li class="horizontal-dropdown">
+                <a href="/CustomerOrder/new" class="dropbtn"><i class="icon-cart"></i>Place Order</a>
+            </li>
+        [% END %]
+
         <!-- Apiary Menu (only for BMaster site) -->
         [% IF c.session.SiteName == 'BMaster' %]
             <li class="horizontal-dropdown">
