@@ -778,6 +778,44 @@ sub api_items :Path('/Inventory/api/items') :Args(0) {
     $c->detach;
 }
 
+sub api_suppliers :Path('/Inventory/api/suppliers') :Args(0) {
+    my ($self, $c) = @_;
+    my $sitename = $c->req->params->{sitename} || $self->_sitename($c);
+    my @suppliers;
+    eval {
+        @suppliers = $self->_schema($c)->resultset('InventorySupplier')->search(
+            { sitename => $sitename, status => 'active' },
+            { order_by => 'name' }
+        )->all;
+    };
+    my @result = map { { id => $_->id, name => $_->name } } @suppliers;
+    $c->res->content_type('application/json');
+    $c->res->body(do { require JSON; JSON::encode_json(\@result) });
+    $c->detach;
+}
+
+sub api_items_with_accounts :Path('/Inventory/api/items_with_accounts') :Args(0) {
+    my ($self, $c) = @_;
+    my $sitename = $c->req->params->{sitename} || $self->_sitename($c);
+    my @items;
+    eval {
+        @items = $self->_schema($c)->resultset('InventoryItem')->search(
+            { sitename => $sitename, status => 'active' },
+            { order_by => 'name' }
+        )->all;
+    };
+    my @result = map { {
+        id              => $_->id,
+        name            => $_->name,
+        sku             => $_->sku,
+        unit_cost       => $_->unit_cost,
+        expense_accno_id => $_->expense_accno_id,
+    } } @items;
+    $c->res->content_type('application/json');
+    $c->res->body(do { require JSON; JSON::encode_json(\@result) });
+    $c->detach;
+}
+
 sub api_stock :Path('/Inventory/api/stock') :Args(0) {
     my ($self, $c) = @_;
 
