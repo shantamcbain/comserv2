@@ -423,7 +423,39 @@ sub auto :Private {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
                 "Navigation controller not found - menus will be empty");
         }
-        
+
+        # Load enabled_modules for current SiteName from site_modules table.
+        # Populates $c->stash->{enabled_modules} as a hashref: module_name => 1/0
+        # Templates gate content with: [% IF c.stash.enabled_modules.planning %]
+        eval {
+            my $mod_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+            my %enabled;
+            my @site_mods = $c->model('DBEncy')->resultset('SiteModule')->search(
+                { sitename => $mod_site },
+                { columns  => [qw(module_name enabled)] }
+            )->all;
+            for my $row (@site_mods) {
+                $enabled{ $row->module_name } = $row->enabled ? 1 : 0;
+            }
+
+            # Apply per-user overrides from user_module_access
+            if ($c->session->{username}) {
+                my @overrides = $c->model('DBEncy')->resultset('UserModuleAccess')->search({
+                    username => $c->session->{username},
+                    sitename => $mod_site,
+                })->all;
+                for my $ov (@overrides) {
+                    $enabled{ $ov->module_name } = $ov->granted ? 1 : 0;
+                }
+            }
+            $c->stash->{enabled_modules} = \%enabled;
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+                "enabled_modules load failed (table may not exist yet): $@");
+            $c->stash->{enabled_modules} = {};
+        }
+
         # CRITICAL: Debug Bar Implementation - DO NOT REMOVE
         # This section provides server information for the debug bar UI
         # which displays hostname, IP, and database connection info to admins/debug mode.
