@@ -50,7 +50,15 @@ body.has-bg-image .col-100,
 /* app-section / app-card used in newer templates */
 body.has-bg-image .app-section,
 body.has-bg-image .app-page,
-body.has-bg-image .app-body {
+body.has-bg-image .app-body,
+/* admin dashboard wrappers */
+body.has-bg-image .admin-dashboard,
+body.has-bg-image .admin-sections,
+body.has-bg-image .dashboard-header,
+body.has-bg-image .section-content,
+body.has-bg-image .admin-links,
+body.has-bg-image .stats-grid,
+body.has-bg-image .action-buttons {
   background-color: transparent !important;
   background-image: none !important;
 }
