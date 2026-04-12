@@ -180,7 +180,8 @@
                 <a href="/Inventory/item/add"><i class="icon-add"></i>Add Item</a>
                 <a href="/Inventory/suppliers"><i class="icon-supplier"></i>Suppliers</a>
                 <a href="/Inventory/locations"><i class="icon-location"></i>Locations</a>
-                <a href="/Inventory/invoice"><i class="icon-invoice"></i>Supplier Invoices</a>
+                <a href="/Inventory/invoice"><i class="icon-invoice"></i>Supplier Invoices (AP)</a>
+                <a href="/Inventory/sales"><i class="icon-invoice"></i>Sales Invoices (AR)</a>
                 <a href="/CustomerOrder"><i class="icon-cart"></i>Customer Orders</a>
                 <div class="submenu-section">
                     <span class="submenu-section-title">Accounting</span>

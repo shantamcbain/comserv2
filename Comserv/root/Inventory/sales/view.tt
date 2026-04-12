@@ -1,0 +1,123 @@
+[% INCLUDE 'header.tt' %]
+
+<h1>Sales Invoice [% invoice.invoice_number | html %]</h1>
+<p>
+  <a href="/Inventory/sales">← Sales Invoices</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory">Inventory</a>
+  &nbsp;|&nbsp;
+  <a href="/Accounting">Accounting</a>
+</p>
+
+[% IF c.flash.success_msg %]<p style="color:green;font-weight:bold">[% c.flash.success_msg %]</p>[% END %]
+[% IF c.flash.error_msg %]<p style="color:red;font-weight:bold">[% c.flash.error_msg %]</p>[% END %]
+
+[% SET status_color = (invoice.status == 'posted') ? 'green' : (invoice.status == 'void') ? 'red' : '#888' %]
+<p>
+  Status: <strong style="color:[% status_color %]">[% invoice.status | upper %]</strong>
+  [% IF invoice.status == 'draft' %]
+  &nbsp;
+  <form method="POST" action="/Inventory/sales/post/[% invoice.id %]" style="display:inline"
+        onsubmit="return confirm('Post this invoice? Stock will be reduced and GL entries created.');">
+    <input type="submit" value="Post Invoice"
+           style="background:#28a745;color:white;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:1em;">
+  </form>
+  [% END %]
+</p>
+
+<table cellpadding="6">
+  <tr><th>Customer</th><td>[% invoice.customer_name | html %]</td></tr>
+  [% IF invoice.customer_email %]
+  <tr><th>Email</th><td>[% invoice.customer_email | html %]</td></tr>
+  [% END %]
+  <tr><th>Invoice Date</th><td>[% invoice.invoice_date %]</td></tr>
+  [% IF invoice.due_date %]
+  <tr><th>Due Date</th><td>[% invoice.due_date %]</td></tr>
+  [% END %]
+  [% IF invoice.ar_account %]
+  <tr><th>AR Account</th><td>[% invoice.ar_account.accno %] [% invoice.ar_account.description | html %]</td></tr>
+  [% END %]
+  [% IF invoice.income_account %]
+  <tr><th>Income Account</th><td>[% invoice.income_account.accno %] [% invoice.income_account.description | html %]</td></tr>
+  [% END %]
+  [% IF invoice.customer_order %]
+  <tr><th>From Order</th><td><a href="/CustomerOrder/view/[% invoice.customer_order.id %]">Order #[% invoice.customer_order.id %] — [% invoice.customer_order.customer_name | html %]</a></td></tr>
+  [% END %]
+  [% IF invoice.notes %]
+  <tr><th>Notes</th><td>[% invoice.notes | html %]</td></tr>
+  [% END %]
+  [% IF invoice.created_by %]
+  <tr><th>Created By</th><td>[% invoice.created_by | html %]</td></tr>
+  [% END %]
+</table>
+
+<h2>Line Items</h2>
+<table border="1" cellpadding="6" style="border-collapse:collapse;width:100%;">
+  <thead>
+    <tr style="background:#f0f0f0;">
+      <th>#</th>
+      <th>Item</th>
+      <th>Description</th>
+      <th>Qty</th>
+      <th>Unit Cost</th>
+      <th>Unit Price</th>
+      <th>Line Total</th>
+      <th>Income Acct</th>
+      <th>COGS Acct</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH line IN invoice.lines %]
+  [% SET loop_n = loop.index + 1 %]
+  <tr>
+    <td style="text-align:right">[% loop_n %]</td>
+    <td>
+      [% IF line.item %]
+        <a href="/Inventory/item/view/[% line.item.id %]">[% line.item.name | html %]</a>
+        <small>[% line.item.sku %]</small>
+      [% ELSE %]—[% END %]
+    </td>
+    <td>[% line.description | html %]</td>
+    <td style="text-align:right">[% line.quantity %]</td>
+    <td style="text-align:right">[% line.unit_cost ? '$' _ line.unit_cost : '—' %]</td>
+    <td style="text-align:right">$[% line.unit_price %]</td>
+    <td style="text-align:right">$[% line.line_total %]</td>
+    <td>
+      [% IF line.income_account %]
+        [% line.income_account.accno %] [% line.income_account.description | html %]
+      [% ELSE %]—[% END %]
+    </td>
+    <td>
+      [% IF line.cogs_account %]
+        [% line.cogs_account.accno %] [% line.cogs_account.description | html %]
+      [% ELSE %]—[% END %]
+    </td>
+    <td>[% line.notes | html %]</td>
+  </tr>
+  [% END %]
+  </tbody>
+</table>
+
+<table cellpadding="6" style="margin-top:8px;margin-left:auto;">
+  [% IF invoice.tax_amount && invoice.tax_amount > 0 %]
+  <tr>
+    <th align="right">Subtotal:</th>
+    <td style="text-align:right">$[% invoice.total_amount - invoice.tax_amount %]</td>
+  </tr>
+  <tr>
+    <th align="right">Tax[% IF invoice.tax_account %] ([% invoice.tax_account.accno %])[% END %]:</th>
+    <td style="text-align:right">$[% invoice.tax_amount %]</td>
+  </tr>
+  [% END %]
+  <tr>
+    <th align="right" style="font-size:1.15em;">Total:</th>
+    <td style="text-align:right;font-size:1.15em;font-weight:bold;">$[% invoice.total_amount %]</td>
+  </tr>
+</table>
+
+[% IF invoice.gl_entry_id %]
+<p><small>GL Entry #[% invoice.gl_entry_id %] created on post. <a href="/Accounting/gl/view/[% invoice.gl_entry_id %]">View in GL</a></small></p>
+[% END %]
+
+[% INCLUDE 'footer.tt' %]
