@@ -220,6 +220,11 @@ sub auto :Private {
             my $bg_raw      = $theme_vars->{'primary-color'} || $theme_vars->{'background-color'} || '#ccffff';
             (my $bg_hex = $bg_raw) =~ s/^#//;
             $c->stash->{favicon_bg_color} = $bg_hex;
+            # Flag whether this theme has a background image so templates can
+            # add the 'has-bg-image' body class, which theme-overrides.css uses
+            # to make all structural containers transparent.
+            my $bg_img = $theme_vars->{'background-image'} || '';
+            $c->stash->{has_bg_image} = ($bg_img && $bg_img ne 'none') ? 1 : 0;
             alarm(0);
         };
         alarm(0);  # Make sure alarm is cancelled

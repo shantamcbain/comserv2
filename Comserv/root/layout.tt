@@ -18,7 +18,7 @@
  [% PageVersion %]
 [% END %]
     [% INCLUDE 'Header.tt' %]
-<body class="theme-[% theme_name || c.stash.theme_name || c.session.theme_name || 'default' %]">
+<body class="theme-[% theme_name || c.stash.theme_name || c.session.theme_name || 'default' %][% IF c.stash.has_bg_image %] has-bg-image[% END %]">
 [% IF c.stash.ai_popup_mode %]
     [%# Popup / detached-widget mode: render bare — no nav, no footer, no back-to-top %]
     [% content %]
