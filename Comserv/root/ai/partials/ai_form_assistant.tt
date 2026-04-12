@@ -25,7 +25,9 @@
 
 [%# ── Role check — use stash.is_admin (case-insensitive, pre-computed by auto) ── %]
 [%# Fall back to session roles grep for editor/developer (also try case-insensitive) %]
-[% SET ai_form_ok = c.stash.is_admin
+[%# is_admin is a direct stash variable (most reliable); c.stash.is_admin also works %]
+[% SET ai_form_ok = is_admin
+                 || c.stash.is_admin
                  || c.session.is_admin
                  || c.session.roles.grep('(?i)editor').size
                  || c.session.roles.grep('(?i)developer').size %]
