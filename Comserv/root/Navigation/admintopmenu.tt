@@ -171,7 +171,7 @@
         </div>
 
         <!-- Inventory & Accounting — admin only -->
-        [% IF c.session.roles.grep('admin').size || c.session.username == 'Shanta' %]
+        [% IF c.stash.is_admin || c.session.username == 'Shanta' %]
         <div class="submenu-item">
             <span class="submenu-header"><a href="/Inventory" class="dropbtn"><i class="icon-inventory"></i>Inventory</a></span>
             <div class="submenu">
