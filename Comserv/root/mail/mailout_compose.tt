@@ -64,6 +64,11 @@
             </div>
 
             <div class="form-section" style="margin-top:20px;">
+                [% PROCESS 'ai/partials/ai_form_assistant.tt'
+                   ai_form_entity_label = 'mass email'
+                   ai_form_context      = 'mass email / mailout composition for site users'
+                   ai_form_fields       = 'subject, body'
+                %]
                 <h3>Message</h3>
                 <div class="form-group">
                     <label for="subject">Subject <span style="color:red;">*</span></label>
@@ -141,12 +146,6 @@
     </div>
     [% END %]
 </div>
-
-[% PROCESS 'ai/partials/ai_form_assistant.tt'
-   ai_form_entity_label = 'mass email'
-   ai_form_context      = 'mass email / mailout composition for site users'
-   ai_form_fields       = 'subject, body'
-%]
 
 <script>
 var counts = { all: [% user_count %], paid: [% paid_count %], custom: 0 };
