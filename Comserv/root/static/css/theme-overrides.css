@@ -20,8 +20,7 @@ body[class*="theme-"] {
    ============================================================================= */
 
 /* --- Fully transparent wrappers (no visual background needed) --- */
-body.has-bg-image,
-body.has-bg-image html,
+/* NOTE: body itself is NOT in this list — it carries the background image */
 body.has-bg-image main,
 body.has-bg-image article,
 body.has-bg-image section,
@@ -118,7 +117,6 @@ body[class*="theme-"]:not(.has-bg-image) .table-container {
 /* Ensure background image covers the whole page and is visible */
 html, body {
   min-height: 100%;
-  background-attachment: fixed !important;
 }
 
 /* Link styles (excluding menu links) */
