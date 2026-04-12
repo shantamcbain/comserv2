@@ -108,6 +108,7 @@
             <tr>
               <th>Name</th>
               <th>Email</th>
+              <th>Resume</th>
               <th>Points Payment</th>
               <th>Status</th>
               <th>Submitted</th>
@@ -119,6 +120,13 @@
             <tr>
               <td>[% app.applicant_name | html %]</td>
               <td>[% app.applicant_email | html %]</td>
+              <td>
+                [% IF app.resume_file %]
+                  <a href="[% c.uri_for('/' _ app.resume_file) %]" class="btn btn-sm btn-secondary" target="_blank">Download</a>
+                [% ELSE %]
+                  <span style="color:#999">None</span>
+                [% END %]
+              </td>
               <td>[% app.use_points_payment ? 'Yes' : 'No' %]</td>
               <td>[% app.status | ucfirst | html %]</td>
               <td style="font-size:0.85em">[% app.created_at | html %]</td>
@@ -131,11 +139,17 @@
                   </select>
                   <button type="submit" class="btn btn-sm btn-primary">Update</button>
                 </form>
+                [% IF app.status == 'hired' && job.accept_points_payment && app.applicant %]
+                <a href="[% c.uri_for('/currency/transfer') %]?recipient_user_id=[% app.applicant.id %]&memo=Payment+for+job:[% job.title | uri %]"
+                   class="btn btn-sm btn-success" style="margin-left:0.25em"
+                   title="Transfer points to this hired applicant">&#9670; Pay via Points</a>
+                [% END %]
               </td>
             </tr>
             [% IF app.cover_letter %]
             <tr>
               <td colspan="6" style="background:#f9f9f9;font-size:0.85em;padding:0.5em 1em">
+              <td colspan="7" style="background:#f9f9f9;font-size:0.85em;padding:0.5em 1em">
                 <strong>Cover letter:</strong> [% app.cover_letter | html_line_break %]
               </td>
             </tr>

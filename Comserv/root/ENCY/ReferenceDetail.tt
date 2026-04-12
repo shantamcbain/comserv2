@@ -1,0 +1,266 @@
+[% META
+   title = "Reference Detail - ENCY Encyclopedia"
+   description = "View and edit a reference in the ENCY encyclopedia"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-07"
+%]
+[% PageVersion = 'ENCY/ReferenceDetail.tt,v 0.01 2026/04/07' %]
+[% PROCESS 'ENCY/ImageHelper.tt' %]
+
+[% IF success_msg || c.flash.success_msg %]
+<div class="alert alert-success">[% success_msg || c.flash.success_msg | html %]</div>
+[% END %]
+[% IF error_msg || c.flash.error_msg %]
+<div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
+[% END %]
+
+[% SET ref_id = reference.reference_id || '' %]
+[% IF edit_mode %]
+<h1>[% ref_id ? "Editing Reference #$ref_id" : "Add New Reference" %]</h1>
+[% ELSE %]
+<h1>Reference #[% ref_id %]: [% reference.title | html %]</h1>
+[% END %]
+
+<p>
+  <a href="[% c.uri_for('/ENCY/Reference') %]">&larr; All References</a>
+  [% IF is_editor && !edit_mode && ref_id %]
+  | <a href="[% c.uri_for('/ENCY/Reference', ref_id, { edit => 1 }) %]">Edit</a>
+  [% END %]
+  [% IF is_editor %]
+  | <a href="[% c.uri_for('/ENCY/Reference/add') %]">+ Add Reference</a>
+  [% END %]
+</p>
+
+[% IF edit_mode %]
+<form action="[% ref_id ? c.uri_for('/ENCY/Reference', ref_id) : c.uri_for('/ENCY/Reference/add') %]" method="post">
+[% IF ref_id %]<input type="hidden" name="record_id" value="[% ref_id %]" />[% END %]
+[% PROCESS 'ENCY/partials/AiFormFill.tt' %]
+[% END %]
+
+<table border="1" cellpadding="5" cellspacing="0" style="width:100%;border-collapse:collapse;">
+  <tr>
+    <td style="width:160px;"><strong>Title</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <input type="text" name="title" value="[% reference.title | html %]" style="width:98%;" />
+      [% ELSE %]
+      [% reference.title | html %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Author(s)</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <input type="text" name="author" value="[% reference.author | html %]" style="width:98%;"
+             placeholder="Last, First; Last, First" />
+      [% ELSE %]
+      [% reference.author | html %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Publisher</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <input type="text" name="publisher" value="[% reference.publisher | html %]" style="width:98%;" />
+      [% ELSE %]
+      [% IF reference.publisher_record %][% reference.publisher_record.name | html %][% ELSE %][% reference.publisher | html %][% END %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Publication Date</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <input type="text" name="publication_date" value="[% reference.publication_date | html %]"
+             placeholder="YYYY-MM-DD or YYYY" size="15" />
+      [% ELSE %]
+      [% IF reference.publication_date %][% reference.publication_date.substr(0,4) %][% END %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>ISBN</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <input type="text" name="isbn" value="[% reference.isbn | html %]" size="20"
+             placeholder="978-..." />
+      [% ELSE %]
+      [% IF reference.isbn %]
+      <a href="https://openlibrary.org/isbn/[% reference.isbn | uri %]" target="_blank">[% reference.isbn | html %]</a>
+      (Open Library)
+      [% END %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Edition</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <input type="text" name="edition" value="[% reference.edition | html %]" size="20"
+             placeholder="e.g. 2nd Edition, Rev. 1985" />
+      [% ELSE %]
+      [% reference.edition | html %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Type</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <select name="reference_system">
+        [% FOR t IN ['book','journal','magazine','course','personal','website','thesis','monograph','pharmacopoeia','traditional_text','personal_communication'] %]
+        <option value="[% t %]"[% reference.reference_system == t ? ' selected' : '' %]>[% t %]</option>
+        [% END %]
+      </select>
+      [% ELSE %]
+      [% reference.reference_system | html %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Format</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <select name="format">
+        [% FOR f IN ['', 'hardcover', 'paperback', 'pdf', 'digital', 'online', 'microfilm', 'audio'] %]
+        <option value="[% f %]"[% reference.format == f ? ' selected' : '' %]>[% f || '— select —' %]</option>
+        [% END %]
+      </select>
+      [% ELSE %]
+      [% reference.format | html %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Physical Location</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <input type="text" name="physical_location" value="[% reference.physical_location | html %]" style="width:98%;"
+             placeholder="e.g. Library shelf B-3, Office bookcase, NFS storage box 4" />
+      <div style="font-size:0.82em;color:#666;margin-top:2px;">Where is the physical copy held?</div>
+      [% ELSE %]
+      [% reference.physical_location | html %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Digital Path / URL</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <input type="text" name="digital_path" value="[% reference.digital_path | html %]" style="width:98%;"
+             placeholder="e.g. /mnt/nfs/library/herbs.pdf or https://archive.org/..." />
+      <div style="font-size:0.82em;color:#666;margin-top:2px;">NFS path, local file path, or public URL to digital copy.</div>
+      [% ELSE %]
+      [% IF reference.digital_path %]
+        [% IF reference.digital_path.match('^https?://') %]
+        <a href="[% reference.digital_path | html %]" target="_blank">[% reference.digital_path | html %]</a>
+        [% ELSE %]
+        <code>[% reference.digital_path | html %]</code>
+        [% END %]
+      [% END %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>URL / Archive Link</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <input type="text" name="url" value="[% reference.url | html %]" style="width:98%;"
+             placeholder="https://archive.org/details/... or publisher URL" />
+      <div style="font-size:0.82em;color:#666;margin-top:2px;">
+        Use <a href="https://archive.org" target="_blank">archive.org</a> for public domain books,
+        <a href="https://www.gutenberg.org" target="_blank">gutenberg.org</a> for classic texts.
+      </div>
+      [% ELSE %]
+      [% IF reference.url %]
+      <a href="[% reference.url | html %]" target="_blank">[% reference.url | html %]</a>
+      [% IF reference.url.match('archive.org') %]
+      <span style="color:#155724;font-size:0.85em;">(Internet Archive — may be downloadable for local AI)</span>
+      [% END %]
+      [% END %]
+      [% END %]
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Page Reference &amp; Excerpt</strong></td>
+    <td>
+      [% IF edit_mode %]
+      <textarea name="notes" rows="8" style="width:98%;">[% reference.notes | html %]</textarea>
+      <div style="font-size:0.82em;color:#666;margin-top:2px;">
+        Include: page numbers, edition, chapter, and a short excerpt of the passage where the herb/treatment is mentioned.
+        Example: <em>p. 422 — "Huang Lian (Coptis chinensis) is used for Heat in the Lower Burner…"</em>
+      </div>
+      [% ELSE %]
+      [% IF reference.notes %]
+      <div style="background:#fffde7;padding:0.6em;border-left:3px solid #ffc107;white-space:pre-wrap;">[% reference.notes | html %]</div>
+      [% END %]
+      [% END %]
+    </td>
+  </tr>
+</table>
+
+[% IF edit_mode %]
+<br/>
+<input type="submit"
+       value="[% ref_id ? 'Update Reference' : 'Add Reference' %]"
+       class="btn btn-primary" />
+<a href="[% ref_id ? c.uri_for('/ENCY/Reference', ref_id) : c.uri_for('/ENCY/Reference') %]"
+   class="btn btn-default">Cancel</a>
+</form>
+[% END %]
+
+[% IF !edit_mode && ref_id %]
+
+[%# ── Linked Authors ──────────────────────────────────────── %]
+[% IF ref_authors && ref_authors.size %]
+<h2 style="margin-top:1.5em;">Authors</h2>
+<ul style="margin:0.5em 0 1em;">
+  [% FOR ra IN ref_authors %]
+  [% SET aobj = ra.author %]
+  <li>
+    [% IF aobj %]
+    <a href="[% c.uri_for('/ENCY/Author', aobj.author_id) %]"><strong>[% aobj.full_name | html %]</strong></a>
+    [% IF aobj.credentials %] <em>[% aobj.credentials | html %]</em>[% END %]
+    [% IF aobj.affiliation %] — [% aobj.affiliation | html %][% END %]
+    [% ELSE %]
+    Author #[% ra.author_id %]
+    [% END %]
+  </li>
+  [% END %]
+</ul>
+[% END %]
+
+[%# ── Entities citing this reference ─────────────────────── %]
+<h2 style="margin-top:1.5em;">Where Reference #[% ref_id %] is Cited</h2>
+[% IF entity_links && entity_links.size %]
+<p style="color:#666;font-size:0.9em;">[% entity_links.size %] formally linked record(s):</p>
+<table style="border-collapse:collapse;width:100%;font-size:0.95em;">
+  <thead>
+  <tr style="background:#e8f0f8;">
+    <th style="padding:0.35em 0.6em;text-align:left;">Type</th>
+    <th style="padding:0.35em 0.6em;text-align:left;">Record</th>
+  </tr>
+  </thead>
+  <tbody>
+  [% FOR link IN entity_links %]
+  <tr style="border-bottom:1px solid #dde;">
+    <td style="padding:0.3em 0.6em;text-transform:capitalize;white-space:nowrap;">[% link.entity_type | html %]</td>
+    <td style="padding:0.3em 0.6em;">
+      <a href="[% link.url | html %]">[% link.name | html %]</a>
+      <span style="color:#888;font-size:0.85em;">(#[% link.entity_id %])</span>
+    </td>
+  </tr>
+  [% END %]
+  </tbody>
+</table>
+[% ELSE %]
+<p style="color:#666;font-size:0.9em;">No formally linked records yet.
+  <a href="[% c.uri_for('/ENCY/search', { search_string => ref_id }) %]">Search ENCY for text citations of #[% ref_id %]</a>
+</p>
+[% END %]
+[% END %]

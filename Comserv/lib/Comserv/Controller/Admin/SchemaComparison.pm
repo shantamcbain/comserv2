@@ -68,6 +68,20 @@ sub database_env {
     return Comserv::Util::DatabaseEnv->new();
 }
 
+sub _write_result_file_safe {
+    my ($self, $result_file_path, $content) = @_;
+    my $tmpfile = $result_file_path . '.syntaxcheck.tmp';
+    write_file($tmpfile, $content);
+    my $check = `perl -c "$tmpfile" 2>&1`;
+    unlink $tmpfile;
+    unless ($check =~ /syntax OK/) {
+        die "Generated code failed Perl syntax check — file NOT written.\n"
+          . "Error: $check";
+    }
+    write_file($result_file_path, $content);
+    return 1;
+}
+
 sub validate_database_environment {
     my ($self, $c, $database_environment, $allow_production) = @_;
     
@@ -244,7 +258,7 @@ sub sync_primary_key_to_result :Path('/schema-comparison/sync_primary_key_to_res
             }
         }
         
-        write_file($result_file_path, $content);
+        $self->_write_result_file_safe($result_file_path, $content);
         
         $c->stash(json => {
             success => 1,
@@ -479,7 +493,7 @@ sub sync_unique_constraint_to_result :Path('/schema-comparison/sync_unique_const
             }
         }
         
-        write_file($result_file_path, $content);
+        $self->_write_result_file_safe($result_file_path, $content);
         
         $c->stash(json => {
             success => 1,
@@ -541,7 +555,7 @@ sub sync_table_name_to_result :Path('/schema-comparison/sync_table_name_to_resul
             }
         }
         
-        write_file($result_file_path, $content);
+        $self->_write_result_file_safe($result_file_path, $content);
         
         $c->stash(json => {
             success => 1,
@@ -729,7 +743,7 @@ sub create_result_from_table :Path('/schema-comparison/create_result_from_table'
             make_path($result_dir) or die "Could not create directory '$result_dir': $!";
         }
         
-        write_file($result_file_path, $result_content);
+        $self->_write_result_file_safe($result_file_path, $result_content);
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_result_from_table',
             "Successfully created Result file '$result_file_path' for table '$table_name'");
@@ -808,36 +822,37 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
         return;
     };
     
-    my $result_name = $json_data->{result_name};
-    my $database = $json_data->{database};
-    
+    my $result_name   = $json_data->{result_name};
+    my $database      = $json_data->{database};
+    my $force_recreate = $json_data->{force_recreate} ? 1 : 0;
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-        "Received parameters - result_name: " . ($result_name || 'UNDEFINED') . 
-        ", database: " . ($database || 'UNDEFINED'));
-    
+        "Received parameters - result_name: " . ($result_name || 'UNDEFINED') .
+        ", database: " . ($database || 'UNDEFINED') .
+        ", force_recreate: $force_recreate");
+
     unless ($result_name && $database) {
         my $error_msg = 'Missing required parameters: ';
         $error_msg .= 'result_name' unless $result_name;
         $error_msg .= ', database' unless $database;
-        
+
         $c->response->status(400);
         $c->stash(json => { success => 0, error => $error_msg });
         $c->forward('View::JSON');
         return;
     }
-    
+
     try {
         # Load the Result class dynamically
-        my $namespace = $database eq 'ency' ? 'Ency' : 'Forager';
+        my $namespace  = $database eq 'ency' ? 'Ency' : 'Forager';
         my $class_name = "Comserv::Model::Schema::${namespace}::Result::${result_name}";
-        
-        # Try to require the class using eval (proper module loading)
+
         eval "require $class_name";
         if ($@) {
             die "Could not load Result class '$class_name': $@";
         }
-        
-        # Get the schema
+
+        # Get the schema / DBH
         my $schema;
         if ($database eq 'ency') {
             $schema = $c->model('DBEncy')->schema;
@@ -846,73 +861,81 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
         } else {
             die "Invalid database: $database";
         }
-        
-        # Get a DBI database handle
+
         my $dbh = $schema->storage->dbh;
-        
+
         # Get table name from the loaded Result class
         my $table_name = $class_name->table;
         unless ($table_name) {
             die "Could not retrieve table name from Result class '$class_name'";
         }
-        
-        # Execute a SHOW TABLES LIKE 'table_name' SQL statement to check if table exists
+
+        # Check if table exists
         my $sth = $dbh->prepare("SHOW TABLES LIKE ?");
         $sth->execute($table_name);
         my $table_exists = $sth->fetch;
-        
+
+        # Handle force_recreate: drop the table if it exists but is empty
+        if ($table_exists && $force_recreate) {
+            my ($row_count) = $dbh->selectrow_array("SELECT COUNT(*) FROM `$table_name`");
+            if ($row_count > 0) {
+                die "Cannot force-recreate table '$table_name' — it contains $row_count rows. "
+                  . "Delete all rows first, or use the per-field sync buttons instead.";
+            }
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
+                "force_recreate: dropping empty table '$table_name'");
+            $dbh->do("SET FOREIGN_KEY_CHECKS=0");
+            $dbh->do("DROP TABLE `$table_name`");
+            $dbh->do("SET FOREIGN_KEY_CHECKS=1");
+            $table_exists = undef;  # proceed to creation below
+        }
+
         if (!$table_exists) {
-            # The table does not exist, create it using deployment_statements
+            # Create the table using deployment_statements
             try {
-                # Get the deployment SQL statements for this specific table
                 my $source = $schema->source($result_name);
                 unless ($source) {
                     die "Could not find source '$result_name' in schema";
                 }
-                
-                # Generate and execute the deployment SQL for just this table
+
                 my @statements = $schema->deployment_statements('MySQL');
-                
-                # Filter to only statements that create the target table (exact match with backtick delimiters)
                 my @table_statements = grep { /CREATE TABLE\s+`\Q$table_name\E`/i } @statements;
-                
+
                 if (@table_statements) {
                     $dbh->do('SET FOREIGN_KEY_CHECKS=0');
                     foreach my $statement (@table_statements) {
-                        # Strip CONSTRAINT lines to avoid FK formation errors (type/charset mismatches)
                         my $safe_statement = _strip_fk_constraints($statement);
                         $dbh->do($safe_statement);
                     }
                     $dbh->do('SET FOREIGN_KEY_CHECKS=1');
                     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-                        "Successfully created table '$table_name' from Result class '$class_name' using SQL deployment");
+                        "Successfully created table '$table_name' from Result class '$class_name'");
                 } else {
-                    # Fallback: Try the full deploy if we can't isolate the statement
                     $dbh->do('SET FOREIGN_KEY_CHECKS=0');
                     $schema->deploy();
                     $dbh->do('SET FOREIGN_KEY_CHECKS=1');
                     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-                        "Successfully created table '$table_name' from Result class '$class_name' using schema->deploy()");
+                        "Deployed table '$table_name' via schema->deploy()");
                 }
             } catch {
                 my $deploy_error = $_;
                 eval { $dbh->do('SET FOREIGN_KEY_CHECKS=1') };
                 if ($deploy_error =~ /access denied|permission/i) {
-                    die "Database user does not have CREATE TABLE privileges for table '$table_name': $deploy_error";
+                    die "Database user lacks CREATE TABLE privilege for '$table_name': $deploy_error";
                 } else {
                     die "Failed to deploy table '$table_name': $deploy_error";
                 }
             };
         } else {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-                "Table '$table_name' already exists, no creation needed");
+                "Table '$table_name' already exists — use force_recreate:true (only if empty) to replace it");
         }
-        
+
         $c->stash(json => {
-            success => 1,
-            message => "Successfully created table '$table_name' from Result file",
-            table_name => $table_name,
-            database => $database,
+            success      => 1,
+            message      => "Successfully created table '$table_name' from Result file",
+            table_name   => $table_name,
+            database     => $database,
             result_class => $class_name,
             already_existed => !!$table_exists
         });
@@ -1012,7 +1035,7 @@ sub remove_field_from_result :Path('/schema-comparison/remove_field_from_result'
 
             my $new_content = $prefix . $cols . $suffix;
             $content =~ s/__PACKAGE__->add_columns\s*\(.*?\)\s*;/$new_content/s;
-            write_file($result_file_path, $content);
+            $self->_write_result_file_safe($result_file_path, $content);
 
             $c->stash(json => {
                 success => 1,
@@ -1230,11 +1253,11 @@ sub update_result_field_from_table {
         my ($prefix, $columns_section, $suffix) = ($1, $2, $3);
         
         # Look for field name followed by => { ... }
-        # We use a non-greedy match but try to catch the closing brace correctly
-        # Most DBIx::Class fields end with }, or just } at the end of add_columns
-        if ($columns_section =~ /(['"]?)$field_name\1\s*=>\s*\{/s) {
-            # Update existing field. We match from field name until the closing brace that is followed by a comma or closing paren
-            $columns_section =~ s/(['"]?)$field_name\1\s*=>\s*\{.*?\}(?=\s*(?:,|\s*$))/$field_name => $new_field_def/s;
+        # Must match at start-of-line/after comma (not inside string values)
+        # Use (?:^|,)\s* anchor to avoid matching field names inside comment/string values
+        if ($columns_section =~ /(?:^|,)\s*(['"]?)$field_name\1\s*=>\s*\{/ms) {
+            # Update existing field — anchored to start of field definition
+            $columns_section =~ s/(?:^|(?<=,))\s*(['"]?)$field_name\1\s*=>\s*\{.*?\}(?=\s*(?:,|\s*\z))/\n    $field_name => $new_field_def/ms;
         } else {
             # Add new field definition
             # Ensure there's a comma before if not empty
@@ -1247,9 +1270,10 @@ sub update_result_field_from_table {
         
         # Reconstruct content
         my $new_add_columns = "__PACKAGE__->add_columns($columns_section);";
-        $content =~ s/__PACKAGE__->add_columns\s*\(.*?\)\s*;/$new_add_columns/s;
-        
-        write_file($result_file_path, $content);
+        my $new_content = $content;
+        $new_content =~ s/__PACKAGE__->add_columns\s*\(.*?\)\s*;/$new_add_columns/s;
+
+        $self->_write_result_file_safe($result_file_path, $new_content);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_result_field_from_table',
             "Updated/Added field '$field_name' in result file '$result_file_path'");
         
@@ -1362,7 +1386,7 @@ sub generate_result_file {
         my $result_file_content = $self->generate_result_file_content($table_name, $db_schema);
         
         my $result_file_path = $c->path_to('lib', 'Comserv', 'Model', 'Schema', 'Ency', 'Result', ucfirst($table_name) . '.pm');
-        write_file($result_file_path, $result_file_content);
+        $self->_write_result_file_safe($result_file_path, $result_file_content);
         
         $c->flash->{success_msg} = "Result file generated successfully for table '$table_name'.";
         
@@ -1805,6 +1829,7 @@ sub get_table_result_comparison_v2 {
         table_name => $table_name,
         database => $database,
         has_result_file => $result_info ? 1 : 0,
+        result_name => $result_info ? $result_info->{result_name} : undef,
         result_file_path => $result_info ? $result_info->{result_path} : undef,
         package_table => $result_schema->{table_name},
         fields => {},
@@ -2157,6 +2182,260 @@ sub parse_result_file_columns {
 =head2 clean_scalar_refs
 
 Recursively clean scalar references from data structures for JSON serialization
+
+# AJAX endpoint: Create result file from database table
+# WARNING: This is the NON-PREFERRED direction. The preferred workflow is:
+#   1. Create the Result file first (it is the authoritative schema definition)
+#   2. Then run create_table_from_result to create the DB table from the Result file
+# Creating a Result file from an existing table is a recovery/catch-up operation only.
+sub create_result_from_table :Chained('base') :PathPart('create-result-from-table') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json; charset=utf-8');
+    
+    my $table_name = $c->req->param('table_name');
+    my $database = $c->req->param('database');
+    
+    unless ($table_name && $database) {
+        $c->response->body(encode_json({ error => 'Missing required parameters' }));
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_result_from_table',
+        "NON-PREFERRED DIRECTION: Creating Result file FROM table '$table_name'. "
+        . "Preferred workflow: create Result file first, then use create_table_from_result.");
+    
+    try {
+        my $schema = $database eq 'Ency' ? $c->model('DBEncy') : $c->model('DBForager');
+        
+        # Get table structure using internal DBI system
+        my $table_fields = $self->get_table_structure_via_model($c, $database, $table_name);
+        
+        unless (@$table_fields) {
+            $c->response->body(encode_json({ error => 'Table not found or has no fields' }));
+            return;
+        }
+        
+        # Create result file
+        my $result_file_content = $self->generate_result_file_content($table_name, $table_fields, $database);
+        my $result_file_path = $self->determine_result_file_path($c, $table_name, $database);
+        
+        # Ensure directory exists
+        my $result_dir = dirname($result_file_path);
+        make_path($result_dir) unless -d $result_dir;
+        
+        # Write result file
+        $self->_write_result_file_safe($result_file_path, $result_file_content);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_result_from_table', 
+            "Successfully created result file $result_file_path for table $table_name");
+        
+        $c->response->body(encode_json({
+            success => 1,
+            message => "Successfully created result file for $table_name",
+            file_path => $result_file_path,
+            fields_exported => scalar(@$table_fields),
+            workflow_warning => "NON-PREFERRED DIRECTION: Result file was generated from the database table. "
+                . "Review and correct the generated file — do not treat it as authoritative. "
+                . "Going forward, create the Result file first, then use 'Create Table from Result'.",
+            preferred_direction => "Result file first \x{2192} Create Table from Result",
+        }));
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_result_from_table', 
+            "Result file creation failed: $_");
+        $c->response->body(encode_json({ error => "Result file creation failed: $_" }));
+    };
+}
+
+# AJAX endpoint: Sync table schema to result file
+sub sync_table_to_result :Chained('base') :PathPart('sync-table-to-result') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json; charset=utf-8');
+    
+    my $table_name = $c->req->param('table_name');
+    my $database = $c->req->param('database');
+    
+    unless ($table_name && $database) {
+        $c->response->body(encode_json({ error => 'Missing required parameters' }));
+        return;
+    }
+    
+    try {
+        my $result = $self->sync_table_to_result_file($c, $table_name, $database);
+        $c->response->body(encode_json($result));
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'sync_table_to_result', 
+            "Table to result sync failed: $_");
+        $c->response->body(encode_json({ error => "Sync failed: $_" }));
+    };
+}
+
+# AJAX endpoint: Sync result file to table schema
+sub sync_result_to_table :Chained('base') :PathPart('sync-result-to-table') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json; charset=utf-8');
+    
+    my $table_name = $c->req->param('table_name');
+    my $database = $c->req->param('database');
+    
+    unless ($table_name && $database) {
+        $c->response->body(encode_json({ error => 'Missing required parameters' }));
+        return;
+    }
+    
+    try {
+        my $result = $self->sync_result_to_table_schema($c, $table_name, $database);
+        $c->response->body(encode_json($result));
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'sync_result_to_table', 
+            "Result to table sync failed: $_");
+        $c->response->body(encode_json({ error => "Sync failed: $_" }));
+    };
+}
+
+# Helper method: Sync table schema to result file
+sub sync_table_to_result_file {
+    my ($self, $c, $table_name, $database) = @_;
+    
+    my $schema = $database eq 'Ency' ? $c->model('DBEncy') : $c->model('DBForager');
+    
+    # Get current table structure using internal DBI system
+    my $table_fields = $self->get_table_structure_via_model($c, $database, $table_name);
+    
+    # Find or determine result file path
+    my $result_file_path = $self->find_result_file_for_table($c, $table_name);
+    $result_file_path ||= $self->determine_result_file_path($c, $table_name, $database);
+    
+    # Generate updated result file content
+    my $result_content = $self->generate_result_file_content($table_name, $table_fields, $database);
+    
+    # Backup existing file if it exists
+    if (-f $result_file_path) {
+        my $backup_path = $result_file_path . '.backup.' . time();
+        copy($result_file_path, $backup_path);
+    }
+    
+    # Ensure directory exists
+    my $result_dir = dirname($result_file_path);
+    make_path($result_dir) unless -d $result_dir;
+    
+    # Write updated result file
+    $self->_write_result_file_safe($result_file_path, $result_content);
+    
+    return {
+        success => 1,
+        message => "Successfully synchronized table $table_name to result file",
+        file_path => $result_file_path,
+        fields_synchronized => scalar(@$table_fields)
+    };
+}
+
+# Helper method: Sync result file to table schema
+sub sync_result_to_table_schema {
+    my ($self, $c, $table_name, $database) = @_;
+    
+    # Find result file
+    my $result_file_path = $self->find_result_file_for_table($c, $table_name);
+    
+    unless ($result_file_path && -f $result_file_path) {
+        return { error => "Result file not found for table $table_name" };
+    }
+    
+    # Parse result file fields
+    my $result_fields = $self->parse_result_file_fields($result_file_path);
+    
+    unless (@$result_fields) {
+        return { error => "No fields found in result file" };
+    }
+    
+    # Use DBSchemaManager to modify the table
+    my $db_manager = $c->model('DBSchemaManager');
+    my $schema_model = $database eq 'Ency' ? 'DBEncy' : 'DBForager';
+    
+    my $alter_result = $db_manager->sync_table_with_result_fields($table_name, $result_fields, $schema_model);
+    
+    return $alter_result;
+}
+
+# Helper method: Generate result file content from table structure
+sub generate_result_file_content {
+    my ($self, $table_name, $fields, $database) = @_;
+    
+    # Convert table name to class name
+    my $class_name = join('', map { ucfirst(lc($_)) } split(/_/, $table_name));
+    my $namespace = $database eq 'Ency' ? 'Comserv::Model::DBEncy::Result' : 'Comserv::Model::DBForager::Result';
+    
+    my $content = qq{package ${namespace}::${class_name};
+
+use strict;
+use warnings;
+use base 'DBIx::Class::Core';
+
+__PACKAGE__->table('${table_name}');
+
+__PACKAGE__->add_columns(
+};
+
+    foreach my $field (@$fields) {
+        my $field_name = $field->{name};
+        my $data_type = $self->convert_mysql_to_dbic_type($field->{type});
+        
+        $content .= qq{    "${field_name}" => {
+        data_type => "${data_type}",
+        is_nullable => } . ($field->{null} eq 'YES' ? '1' : '0') . qq{,
+};
+        
+        # Add size if applicable
+        if ($field->{type} =~ /\((\d+)\)/) {
+            $content .= qq{        size => $1,
+};
+        }
+        
+        # Add default value if present
+        if (defined $field->{default} && $field->{default} ne '') {
+            $content .= qq{        default_value => '$field->{default}',
+};
+        }
+        
+        # Add auto_increment if present
+        if ($field->{extra} && $field->{extra} =~ /auto_increment/i) {
+            $content .= qq{        is_auto_increment => 1,
+};
+        }
+        
+        $content .= qq{    },
+};
+    }
+    
+    $content .= qq{);
+
+# Set primary key
+};
+    
+    # Find primary key fields
+    my @pk_fields = grep { $_->{key} eq 'PRI' } @$fields;
+    if (@pk_fields) {
+        my $pk_list = join(', ', map { qq{"$_->{name}"} } @pk_fields);
+        $content .= qq{__PACKAGE__->set_primary_key($pk_list);
+
+};
+    }
+    
+    $content .= qq{1;
+
+=head1 NAME
+
+${namespace}::${class_name} - Result class for '${table_name}' table
+
+=head1 DESCRIPTION
+
+Auto-generated DBIx::Class result class for the '${table_name}' table.
+Generated from database schema on } . strftime('%Y-%m-%d %H:%M:%S', localtime()) . qq{
 
 =cut
 
