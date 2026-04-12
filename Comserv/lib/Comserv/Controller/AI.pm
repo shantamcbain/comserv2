@@ -3165,7 +3165,10 @@ sub unload_model :Local :Args(0) {
     }
 
     my $json_data  = {};
-    my $body_text  = $c->request->content || '';
+    my $body_text;
+    if ($c->req->can('content')) { $body_text = $c->req->content }
+    else { my $b = $c->req->body; $body_text = ref($b) ? do { seek($b,0,0); local $/; <$b> } : $b; }
+    $body_text //= '';
     eval { $json_data = decode_json($body_text) if $body_text; };
 
     my $model_name  = $json_data->{model}  || '';
@@ -6497,9 +6500,20 @@ sub action :Local :Args(0) {
     }
 
     # Parse JSON body
-    my $body_text = $c->request->content;
+    my $body_text;
+    if ($c->req->can('content')) {
+        $body_text = $c->req->content;
+    } else {
+        my $body = $c->req->body;
+        if (ref($body) && $body->can('seek')) {
+            seek($body, 0, 0);
+            $body_text = do { local $/; <$body> };
+        } else {
+            $body_text = $body;
+        }
+    }
     my $req;
-    eval { $req = decode_json($body_text) };
+    eval { $req = decode_json($body_text) } if $body_text;
     if ($@ || !ref $req) {
         $c->response->status(400);
         $c->response->body(encode_json({ success => JSON::false, error => 'Invalid JSON body' }));
