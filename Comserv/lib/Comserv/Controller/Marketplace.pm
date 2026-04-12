@@ -22,6 +22,22 @@ sub _sitename {
     return $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
 }
 
+sub _categories {
+    my ($self, $c, %extra_where) = @_;
+    my @cats;
+    eval {
+        @cats = $self->_schema($c)->resultset('MarketplaceCategory')->search(
+            { active => 1, %extra_where },
+            { order_by => { -asc => 'sort_order' } }
+        )->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_categories',
+            "MarketplaceCategory query failed: $@");
+    }
+    return @cats;
+}
+
 # -------------------------------------------------------------------------
 # Public browse page — /marketplace
 # -------------------------------------------------------------------------
@@ -29,13 +45,12 @@ sub index :Path('/marketplace') :Args(0) {
     my ($self, $c) = @_;
 
     my $schema   = $self->_schema($c);
-    my $sitename = $self->_sitename($c);
     my $params   = $c->req->query_parameters;
 
     my $category_id = $params->{category} || undef;
     my $search      = $params->{q}        || '';
     my $sort        = $params->{sort}     || 'newest';
-    my $page        = $params->{page}     || 1;
+    my $page        = int($params->{page} || 1);
     my $per_page    = 20;
 
     my %where = (status => 'active');
@@ -47,25 +62,26 @@ sub index :Path('/marketplace') :Args(0) {
         ];
     }
 
-    my $order = $sort eq 'price_asc'  ? 'price ASC'
-              : $sort eq 'price_desc' ? 'price DESC'
-              :                         'created_at DESC';
+    my $order_by = $sort eq 'price_asc'  ? { -asc  => 'price' }
+                 : $sort eq 'price_desc' ? { -desc => 'price' }
+                 :                         { -desc => 'created_at' };
 
-    my @listings = $schema->resultset('MarketplaceListing')->search(
-        \%where,
-        {
-            order_by => \$order,
-            rows     => $per_page,
-            offset   => ($page - 1) * $per_page,
-        }
-    )->all;
+    my (@listings, $total);
+    eval {
+        @listings = $schema->resultset('MarketplaceListing')->search(
+            \%where,
+            { order_by => $order_by, rows => $per_page, offset => ($page - 1) * $per_page }
+        )->all;
+        $total = $schema->resultset('MarketplaceListing')->count(\%where);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+            "MarketplaceListing query failed: $@");
+        $c->stash(error_msg => 'Could not load listings. Please try again later.');
+        $total = 0;
+    }
 
-    my $total = $schema->resultset('MarketplaceListing')->count(\%where);
-
-    my @categories = $schema->resultset('MarketplaceCategory')->search(
-        { active => 1 },
-        { order_by => 'sort_order ASC' }
-    )->all;
+    my @categories = $self->_categories($c);
 
     $c->stash(
         listings      => \@listings,
@@ -73,7 +89,7 @@ sub index :Path('/marketplace') :Args(0) {
         search        => $search,
         sort          => $sort,
         current_page  => $page,
-        total_pages   => int(($total + $per_page - 1) / $per_page) || 1,
+        total_pages   => $total ? int(($total + $per_page - 1) / $per_page) : 1,
         selected_cat  => $category_id || 'all',
         template      => 'marketplace/index.tt',
     );
@@ -85,20 +101,22 @@ sub index :Path('/marketplace') :Args(0) {
 sub view :Path('/marketplace/view') :Args(1) {
     my ($self, $c, $id) = @_;
 
-    my $schema  = $self->_schema($c);
-    my $listing = $schema->resultset('MarketplaceListing')->find($id);
+    my $listing;
+    eval {
+        $listing = $self->_schema($c)->resultset('MarketplaceListing')->find($id);
+        $listing->update({ views => $listing->views + 1 }) if $listing;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view',
+            "Listing fetch/update failed: $@");
+    }
 
     unless ($listing) {
         $c->stash(error_msg => 'Listing not found.', template => 'marketplace/index.tt');
         return;
     }
 
-    $listing->update({ views => $listing->views + 1 });
-
-    $c->stash(
-        listing  => $listing,
-        template => 'marketplace/view.tt',
-    );
+    $c->stash(listing => $listing, template => 'marketplace/view.tt');
 }
 
 # -------------------------------------------------------------------------
@@ -113,10 +131,7 @@ sub add :Path('/marketplace/add') :Args(0) {
     }
 
     my $schema = $self->_schema($c);
-    my @categories = $schema->resultset('MarketplaceCategory')->search(
-        { active => 1, slug => { '!=' => 'all' } },
-        { order_by => 'sort_order ASC' }
-    )->all;
+    my @categories = $self->_categories($c, slug => { '!=' => 'all' });
 
     if ($c->req->method eq 'POST') {
         my $p = $c->req->body_parameters;
@@ -217,10 +232,18 @@ sub admin_index :Path('/admin/marketplace') :Args(0) {
     $where{sitename} = $sitename if $sitename;
     $where{status}   = $status   if $status;
 
-    my @listings = $schema->resultset('MarketplaceListing')->search(
-        \%where,
-        { order_by => 'created_at DESC' }
-    )->all;
+    my @listings;
+    eval {
+        @listings = $schema->resultset('MarketplaceListing')->search(
+            \%where,
+            { order_by => { -desc => 'created_at' } }
+        )->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_index',
+            "Admin listing query failed: $@");
+        $c->stash(error_msg => 'Could not load listings.');
+    }
 
     $c->stash(
         listings      => \@listings,
@@ -265,9 +288,17 @@ sub admin_categories :Path('/admin/marketplace/categories') :Args(0) {
         $c->detach;
     }
 
-    my @categories = $schema->resultset('MarketplaceCategory')->search(
-        {}, { order_by => 'sort_order ASC' }
-    )->all;
+    my @categories;
+    eval {
+        @categories = $schema->resultset('MarketplaceCategory')->search(
+            {}, { order_by => { -asc => 'sort_order' } }
+        )->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_categories',
+            "Category query failed: $@");
+        $c->stash(error_msg => 'Could not load categories.');
+    }
 
     $c->stash(categories => \@categories, template => 'marketplace/admin/categories.tt');
 }
