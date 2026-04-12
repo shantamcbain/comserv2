@@ -4273,6 +4273,14 @@ sub _build_navigation_command_guide {
             [ 'Projects home',              '/project'                  ],
             [ 'Add a project',              '/project/addproject'       ],
         ]],
+        [ 'Marketplace', 'guest', [
+            [ 'Marketplace / buy and sell', '/marketplace'              ],
+            [ 'Browse listings',            '/marketplace/browse'       ],
+        ]],
+        [ 'Marketplace (logged in)', 'user', [
+            [ 'Post a listing / sell item', '/marketplace/add'          ],
+            [ 'My listings',                '/marketplace/my_listings'  ],
+        ]],
         [ 'User account', 'guest', [
             [ 'Login',                      '/user/login'               ],
             [ 'Create account',             '/user/create_account'      ],
