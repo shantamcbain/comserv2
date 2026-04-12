@@ -47,8 +47,15 @@
         <!-- HelpDesk Menu -->
         [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
         
-        <!-- Apiary Menu (only for BMaster site) -->
-        [% IF c.session.SiteName == 'BMaster' %]
+        <!-- Place Order (3D printing sites) -->
+        [% IF c.session.SiteName == '3d' || c.session.SiteName == 'Mcoop' %]
+            <li class="horizontal-dropdown">
+                <a href="/CustomerOrder/new" class="dropbtn"><i class="icon-cart"></i>Place Order</a>
+            </li>
+        [% END %]
+
+        <!-- Apiary Menu (site_modules enabled_modules.apiary or BMaster fallback) -->
+        [% IF c.stash.enabled_modules.apiary || (!c.stash.enabled_modules.defined && c.session.SiteName == 'BMaster') %]
             <li class="horizontal-dropdown">
                 <a href="/Apiary" class="dropbtn"><i class="icon-apiary"></i>Apiary</a>
                 <div class="dropdown-content">

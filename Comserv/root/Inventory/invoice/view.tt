@@ -1,0 +1,67 @@
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Supplier Invoice — [% invoice.invoice_number || invoice.id %]
+  [% IF invoice.status == 'draft' %]<span style="background:#ffc107;color:#333;padding:2px 8px;border-radius:3px;font-size:0.7em;vertical-align:middle;">DRAFT</span>[% END %]
+  [% IF invoice.status == 'posted' %]<span style="background:#28a745;color:white;padding:2px 8px;border-radius:3px;font-size:0.7em;vertical-align:middle;">POSTED</span>[% END %]
+</h1>
+<p>
+  <a href="/Inventory/invoice">← All Invoices</a>
+  [% IF invoice.status == 'draft' %]
+  &nbsp;|&nbsp;
+  <a href="/Inventory/invoice/edit/[% invoice.id %]"
+     style="background:#007bff;color:white;padding:4px 12px;border-radius:3px;text-decoration:none;">Edit</a>
+  &nbsp;
+  <a href="/Inventory/invoice/post/[% invoice.id %]"
+     onclick="return confirm('Post this invoice? Stock will be updated and a GL entry created. This cannot be undone.');"
+     style="background:#28a745;color:white;padding:4px 12px;border-radius:3px;text-decoration:none;">Post Invoice</a>
+  [% END %]
+</p>
+
+<table cellpadding="6">
+  <tr><th>Supplier</th><td>[% invoice.supplier.name | html %]</td></tr>
+  <tr><th>Invoice #</th><td>[% invoice.invoice_number || '—' %]</td></tr>
+  <tr><th>Invoice Date</th><td>[% invoice.invoice_date %]</td></tr>
+  <tr><th>Due Date</th><td>[% invoice.due_date || '—' %]</td></tr>
+  <tr><th>Status</th><td>[% invoice.status | html %]</td></tr>
+  [% IF invoice.ap_account %]
+  <tr><th>AP Account</th><td>[% invoice.ap_account.accno %] [% invoice.ap_account.description | html %]</td></tr>
+  [% END %]
+  [% IF invoice.tax_amount && invoice.tax_amount > 0 %]
+  <tr><th>Tax</th><td>$[% invoice.tax_amount %][% IF invoice.tax_account %] <small>([% invoice.tax_account.accno %] [% invoice.tax_account.description | html %])</small>[% END %]</td></tr>
+  [% END %]
+  [% IF invoice.shipping_amount && invoice.shipping_amount > 0 %]
+  <tr><th>Shipping</th><td>$[% invoice.shipping_amount %][% IF invoice.shipping_account %] <small>([% invoice.shipping_account.accno %] [% invoice.shipping_account.description | html %])</small>[% END %]</td></tr>
+  [% END %]
+  [% IF invoice.discount_amount && invoice.discount_amount > 0 %]
+  <tr><th>Discount</th><td style="color:green">-$[% invoice.discount_amount %][% IF invoice.discount_account %] <small>([% invoice.discount_account.accno %] [% invoice.discount_account.description | html %])</small>[% END %]</td></tr>
+  [% END %]
+  <tr><th>Total</th><td><strong>$[% invoice.total_amount %]</strong></td></tr>
+  [% IF invoice.notes %]
+  <tr><th>Notes</th><td>[% invoice.notes | html %]</td></tr>
+  [% END %]
+</table>
+
+<h2>Line Items</h2>
+[% SET line_list = invoice.lines %]
+[% IF line_list.size %]
+<table border="1" cellpadding="6" style="width:100%;border-collapse:collapse;">
+  <thead>
+    <tr><th>Item</th><th>Description</th><th>Qty</th><th>Unit Cost</th><th>Total</th><th>Account</th><th>Location</th></tr>
+  </thead>
+  <tbody>
+  [% FOREACH ln IN line_list %]
+  <tr>
+    <td>[% IF ln.item %]<a href="/Inventory/item/view/[% ln.item.id %]">[% ln.item.name | html %]</a>[% ELSE %]—[% END %]</td>
+    <td>[% ln.description | html %]</td>
+    <td style="text-align:right">[% ln.quantity %]</td>
+    <td style="text-align:right">$[% ln.unit_cost %]</td>
+    <td style="text-align:right">$[% ln.line_total %]</td>
+    <td>[% IF ln.account %][% ln.account.accno %] [% ln.account.description | html %][% END %]</td>
+    <td>[% IF ln.location %][% ln.location.name | html %][% END %]</td>
+  </tr>
+  [% END %]
+  </tbody>
+</table>
+[% ELSE %]
+<p>No line items.</p>
+[% END %]

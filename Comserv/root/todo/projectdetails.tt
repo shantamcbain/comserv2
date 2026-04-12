@@ -99,6 +99,43 @@
     <!-- Display the main project and all its sub-projects recursively -->
     [% display_project_details(project, 0) %]
 </div>
+
+<div class="ai-chat-activity-panel" style="margin-top:20px; border:1px solid #ddd; border-radius:4px; padding:16px; background:#fafafa;">
+    <h3 style="margin-top:0;">AI Chat Activity</h3>
+    <div id="ai-project-conversations" data-project-id="[% project.id %]">
+        <p style="color:#888; font-size:0.9em;">Loading conversations&hellip;</p>
+    </div>
+    <div style="margin-top:10px;">
+        <a href="/ai?project_id=[% project.id %]" class="button button-primary" style="font-size:0.9em;">Chat about this project</a>
+        <a href="/ai/conversations?project_id=[% project.id %]" class="button button-secondary" style="font-size:0.9em; margin-left:8px;">View all project conversations</a>
+    </div>
+</div>
+
+<script>
+(function() {
+    var el = document.getElementById('ai-project-conversations');
+    var projId = el ? el.getAttribute('data-project-id') : null;
+    if (!projId) return;
+    fetch('/ai/project_conversations?project_id=' + encodeURIComponent(projId))
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (!d.success || !d.conversations || !d.conversations.length) {
+                el.innerHTML = '<p style="color:#888;font-size:0.9em;">No AI conversations for this project yet.</p>';
+                return;
+            }
+            var html = '<ul style="margin:0;padding-left:18px;">';
+            d.conversations.forEach(function(c) {
+                html += '<li><a href="/ai/conversation/' + c.id + '">' + (c.title || 'Untitled') + '</a>'
+                      + ' <span style="color:#888;font-size:0.85em;">(' + (c.model || 'unknown') + ' &mdash; ' + c.updated_at + ')</span></li>';
+            });
+            html += '</ul>';
+            el.innerHTML = html;
+        })
+        .catch(function() {
+            el.innerHTML = '<p style="color:#888;font-size:0.9em;">Could not load conversations.</p>';
+        });
+})();
+</script>
 [% END %]
 
 <!-- Display total accumulated time for all projects -->

@@ -27,6 +27,11 @@
     
     <div class="content-container">
         <div class="content-primary">
+            <div style="border-left: 4px solid #28a745; background: #f0fff4; padding: 12px 16px; margin-bottom: 16px; border-radius: 4px;">
+                <strong><i class="fas fa-check-circle" style="color: #28a745;"></i> Preferred Action: Create Table from Result</strong>
+                <p style="margin: 6px 0 0;">These Result files define schemas for tables that do not yet exist in the database. <strong>Creating the table from the Result file is the correct, preferred workflow.</strong></p>
+                <p style="margin: 4px 0 0;">The Result file is the authoritative definition — the database table will be created to match it exactly.</p>
+            </div>
             <p class="intro">Result files that exist but do not have corresponding database tables. These may represent tables that need to be created or result files that should be removed.</p>
             
             <!-- Statistics Summary -->
