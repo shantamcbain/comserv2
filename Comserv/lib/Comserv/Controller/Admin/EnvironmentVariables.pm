@@ -37,8 +37,8 @@ sub _require_admin {
     my $admin_type = $admin_auth->get_admin_type($c);
     unless ($admin_type && $admin_type ne 'none') {
         $c->flash->{error_msg} = 'Access denied. Administrator rights required.';
-        $c->response->redirect($c->uri_for('/'));
-        return 0;
+        $c->response->redirect($c->uri_for('/user/login'));
+        $c->detach();
     }
     return 1;
 }
