@@ -1987,6 +1987,36 @@
         return map;
     }
 
+    // Levenshtein edit distance for typo tolerance
+    function _editDist(a, b) {
+        if (a === b) return 0;
+        if (!a.length) return b.length;
+        if (!b.length) return a.length;
+        var prev = Array.from({ length: b.length + 1 }, function(_, i) { return i; });
+        for (var i = 0; i < a.length; i++) {
+            var curr = [i + 1];
+            for (var j = 0; j < b.length; j++) {
+                curr.push(Math.min(
+                    curr[j] + 1,
+                    prev[j + 1] + 1,
+                    prev[j] + (a[i] === b[j] ? 0 : 1)
+                ));
+            }
+            prev = curr;
+        }
+        return prev[b.length];
+    }
+
+    // Returns true if word `w` fuzzy-matches any word in `labelWords`
+    // Threshold: 1 edit for words 4-5 chars, 2 edits for 6+ chars
+    function _fuzzyWordMatch(w, labelWords) {
+        if (w.length < 3) return false;
+        var maxDist = w.length >= 6 ? 2 : 1;
+        return labelWords.some(function(lw) {
+            return lw.length >= 3 && _editDist(w, lw) <= maxDist;
+        });
+    }
+
     // Try to resolve a navigation intent query to a list of {label,url} matches
     function resolveNavIntent(rawQuery) {
         const q = rawQuery
@@ -2007,7 +2037,14 @@
             return words.every(function(w) { return item.label.includes(w); })
                 || item.label.split(/\s+/).some(function(w) { return words.includes(w) && w.length > 3; });
         });
-        return partial.length ? partial : null;
+        if (partial.length) return partial;
+        // Typo-tolerant fallback: fuzzy match each query word against label words
+        const fuzzy = map.filter(function(item) {
+            const labelWords = item.label.split(/\s+/);
+            return words.filter(function(w) { return w.length >= 3; })
+                .some(function(w) { return _fuzzyWordMatch(w, labelWords); });
+        });
+        return fuzzy.length ? fuzzy : null;
     }
 
     // Navigation command regex — explicit nav keywords (voice-friendly: "open X", "go to X", etc.)
