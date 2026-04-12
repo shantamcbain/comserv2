@@ -184,6 +184,32 @@
 
         <div class="admin-section theme-section">
             <div class="section-header">
+                <h3><i class="fas fa-store"></i> Marketplace</h3>
+            </div>
+            <div class="section-content">
+                <div class="admin-links">
+                    <a href="[% c.uri_for('/marketplace') %]" class="admin-link">
+                        <i class="fas fa-store"></i>
+                        <span>Browse Listings</span>
+                    </a>
+                    <a href="[% c.uri_for('/marketplace/add') %]" class="admin-link">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Add Listing</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/marketplace') %]" class="admin-link">
+                        <i class="fas fa-tasks"></i>
+                        <span>Manage Listings</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/marketplace/categories') %]" class="admin-link">
+                        <i class="fas fa-folder-open"></i>
+                        <span>Manage Categories</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-section theme-section">
+            <div class="section-header">
                 <h3><i class="fas fa-database"></i> Database Management</h3>
             </div>
             <div class="section-content">
