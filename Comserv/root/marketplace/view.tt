@@ -1,0 +1,88 @@
+[% META title = listing.title %]
+
+<div class="container" style="max-width:800px;margin:0 auto;padding:20px;">
+
+  <div style="margin-bottom:15px;">
+    <a href="/marketplace" style="color:var(--primary-color,#007bff);text-decoration:none;">← Back to Marketplace</a>
+  </div>
+
+  [% IF c.req.query_parameters.success %]
+    <div style="background:#d4edda;color:#155724;border:1px solid #c3e6cb;border-radius:5px;padding:10px 15px;margin-bottom:15px;">
+      Your listing has been posted successfully!
+    </div>
+  [% END %]
+
+  <div style="border:1px solid #ddd;border-radius:8px;background:var(--bg-color,#fff);overflow:hidden;">
+
+    <div style="padding:24px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+        <h1 style="margin:0;font-size:1.5rem;">[% listing.title | html %]</h1>
+        <span style="padding:4px 10px;border-radius:4px;font-size:0.8rem;font-weight:bold;
+          [% IF listing.status == 'active' %]background:#d4edda;color:#155724;
+          [% ELSIF listing.status == 'sold' %]background:#f8d7da;color:#721c24;
+          [% ELSE %]background:#e2e3e5;color:#383d41;[% END %]">
+          [% listing.status | upper %]
+        </span>
+      </div>
+
+      <div style="display:flex;gap:15px;flex-wrap:wrap;margin-bottom:20px;font-size:0.9rem;color:var(--text-muted-color,#666);">
+        <span><i class="fas fa-user"></i> [% listing.seller_username | html %]</span>
+        <span><i class="fas fa-clock"></i> [% listing.created_at %]</span>
+        <span><i class="fas fa-eye"></i> [% listing.views %] views</span>
+        [% IF listing.category %]
+          <span><i class="fas fa-folder"></i> [% listing.category.name | html %]</span>
+        [% END %]
+      </div>
+
+      <div style="font-size:1.8rem;font-weight:bold;color:var(--primary-color,#007bff);margin-bottom:16px;">
+        [% IF listing.price > 0 %]
+          [% listing.price %] [% listing.currency %]
+        [% ELSE %]
+          Free / Negotiable
+        [% END %]
+        [% IF listing.accepts_points %]
+          <span style="font-size:0.85rem;background:#fff3cd;color:#856404;border:1px solid #ffc107;border-radius:4px;padding:3px 8px;margin-left:10px;">★ Points Accepted</span>
+        [% END %]
+      </div>
+
+      <div style="white-space:pre-wrap;line-height:1.6;margin-bottom:20px;border-top:1px solid #eee;padding-top:16px;">
+        [% listing.description | html %]
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;border-top:1px solid #eee;padding-top:16px;">
+        [% IF listing.order_url && listing.status == 'active' %]
+          <a href="[% listing.order_url | html %]" target="_blank"
+             style="padding:10px 20px;background:var(--primary-color,#007bff);color:#fff;border-radius:5px;text-decoration:none;">
+            <i class="fas fa-shopping-cart"></i> Place Order
+          </a>
+        [% END %]
+
+        [% IF listing.status == 'active' && c.session.username && c.session.username != listing.seller_username %]
+          <a href="mailto:[% listing.seller_username | html %]?subject=Re: [% listing.title | html %]"
+             style="padding:10px 20px;background:#6c757d;color:#fff;border-radius:5px;text-decoration:none;">
+            <i class="fas fa-envelope"></i> Contact Seller
+          </a>
+        [% END %]
+
+        [% IF c.session.username == listing.seller_username || c.stash.is_admin %]
+          [% IF listing.status == 'active' %]
+          <form method="POST" action="/marketplace/sold/[% listing.id %]" style="display:inline;">
+            <button type="submit" style="padding:10px 20px;background:#28a745;color:#fff;border:none;border-radius:5px;cursor:pointer;">
+              <i class="fas fa-check"></i> Mark Sold
+            </button>
+          </form>
+          [% END %]
+          <form method="POST" action="/marketplace/delete/[% listing.id %]" style="display:inline;"
+                onsubmit="return confirm('Delete this listing?')">
+            <button type="submit" style="padding:10px 20px;background:#dc3545;color:#fff;border:none;border-radius:5px;cursor:pointer;">
+              <i class="fas fa-trash"></i> Delete
+            </button>
+          </form>
+        [% END %]
+      </div>
+    </div>
+
+  </div>
+
+</div>
