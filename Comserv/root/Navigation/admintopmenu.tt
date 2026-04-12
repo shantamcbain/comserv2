@@ -170,6 +170,19 @@
             </div>
         </div>
 
+        <!-- Marketplace — admin management -->
+        [% IF c.stash.is_admin || c.session.username == 'Shanta' %]
+        <div class="submenu-item">
+            <span class="submenu-header"><a href="/marketplace" class="dropbtn"><i class="icon-marketplace"></i>Marketplace</a></span>
+            <div class="submenu">
+                <a href="/marketplace"><i class="icon-list"></i>Browse Listings</a>
+                <a href="/marketplace/add"><i class="icon-add"></i>Add Listing</a>
+                <a href="/admin/marketplace"><i class="icon-admin"></i>Manage Listings</a>
+                <a href="/admin/marketplace/categories"><i class="icon-folder"></i>Manage Categories</a>
+            </div>
+        </div>
+        [% END %]
+
         <!-- Inventory & Accounting — admin only -->
         [% IF c.stash.is_admin || c.session.username == 'Shanta' %]
         <div class="submenu-item">
