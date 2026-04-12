@@ -24,11 +24,12 @@
     [% END %]
 [% END %]
 [% SET base_can_plan = c.session.username && !is_guest %]
-[%# If enabled_modules is available, honour it; otherwise use the session-based check %]
-[% IF c.stash.enabled_modules.defined %]
-    [% SET can_plan = base_can_plan && c.stash.enabled_modules.planning %]
-[% ELSE %]
-    [% SET can_plan = base_can_plan %]
+[%# Planning defaults to ON for all non-guest users.
+    Only disable if site_modules explicitly sets planning = 0 (disabled).
+    If the table doesn't exist or has no 'planning' entry, fall back to base_can_plan. %]
+[% SET can_plan = base_can_plan %]
+[% IF c.stash.enabled_modules.defined && c.stash.enabled_modules.planning.defined && !c.stash.enabled_modules.planning %]
+    [% SET can_plan = 0 %]
 [% END %]
 
 [% IF can_plan %]
