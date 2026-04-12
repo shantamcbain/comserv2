@@ -1,10 +1,7 @@
 body {
-  font-family: Verdana, Helvetica, sans-serif;
-  font-size: 20px;
-  color: black;
-  background: url("../images/CSC/background.jpg") no-repeat center center fixed;
-  background-size: cover;
-  background-color: #ccffff; /* Fallback color */
+  font-family: var(--body-font, Verdana, Helvetica, sans-serif);
+  font-size: var(--font-size-base, 20px);
+  color: var(--text-color, black);
 }
 
 header {
@@ -19,9 +16,9 @@ h1 {
 .debug-content {
 
 }
-/* Main Menu */
+/* Main Menu — let theme system control nav background */
 nav {
-    background-color: #ccffff;
+    background-color: var(--nav-bg, #ccffff);
 }
 
 .horizontal-menu {
