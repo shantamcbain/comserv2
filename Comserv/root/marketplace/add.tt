@@ -1,4 +1,20 @@
 [% META title = 'Post a Listing' %]
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('input[name="listing_type"]').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            document.querySelectorAll('input[name="listing_type"]').forEach(function(r) {
+                r.closest('label').style.borderColor = '#dee2e6';
+                r.closest('label').style.background  = '';
+            });
+            if (this.checked) {
+                this.closest('label').style.borderColor = 'var(--primary-color, #007bff)';
+                this.closest('label').style.background  = '#f0f7ff';
+            }
+        });
+    });
+});
+</script>
 
 <div class="container" style="max-width:700px;margin:0 auto;padding:20px;">
 
@@ -15,9 +31,30 @@
   <form method="POST" action="/marketplace/add" style="background:var(--bg-color,#fff);border:1px solid #ddd;border-radius:8px;padding:24px;">
 
     <div style="margin-bottom:16px;">
+      <label style="display:block;font-weight:bold;margin-bottom:8px;">Listing Type <span style="color:red;">*</span></label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        [% FOR t IN [
+            {val => 'sale',   icon => '🏷️', label => 'For Sale',   desc => 'I have something to sell'},
+            {val => 'wanted', icon => '🔍', label => 'Wanted',     desc => 'I am looking for something'},
+            {val => 'job',    icon => '💼', label => 'Job / Gig',  desc => 'Offering or seeking work'},
+        ] %]
+        <label style="flex:1;min-width:140px;border:2px solid #dee2e6;border-radius:6px;padding:10px;cursor:pointer;text-align:center;
+               [% IF form.listing_type == t.val || (!form.listing_type && t.val == 'sale') %]border-color:var(--primary-color,#007bff);background:#f0f7ff;[% END %]">
+          <input type="radio" name="listing_type" value="[% t.val %]"
+                 [% IF form.listing_type == t.val || (!form.listing_type && t.val == 'sale') %]checked[% END %]
+                 style="display:none;">
+          <div style="font-size:1.4rem;">[% t.icon %]</div>
+          <div style="font-weight:bold;font-size:0.95rem;">[% t.label %]</div>
+          <div style="font-size:0.75rem;color:#666;">[% t.desc %]</div>
+        </label>
+        [% END %]
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px;">
       <label style="display:block;font-weight:bold;margin-bottom:5px;">Title <span style="color:red;">*</span></label>
       <input type="text" name="title" value="[% form.title | html %]" required maxlength="255"
-             placeholder="What are you selling?"
+             placeholder="What are you selling / looking for / offering?"
              style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;">
     </div>
 

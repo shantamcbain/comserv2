@@ -47,13 +47,15 @@ sub index :Path('/marketplace') :Args(0) {
     my $schema   = $self->_schema($c);
     my $params   = $c->req->query_parameters;
 
-    my $category_id = $params->{category} || undef;
-    my $search      = $params->{q}        || '';
-    my $sort        = $params->{sort}     || 'newest';
-    my $page        = int($params->{page} || 1);
-    my $per_page    = 20;
+    my $category_id   = $params->{category} || undef;
+    my $listing_type  = $params->{type}     || 'all';
+    my $search        = $params->{q}        || '';
+    my $sort          = $params->{sort}     || 'newest';
+    my $page          = int($params->{page} || 1);
+    my $per_page      = 20;
 
     my %where = (status => 'active');
+    $where{listing_type} = $listing_type if $listing_type && $listing_type ne 'all';
     $where{category_id} = $category_id if $category_id && $category_id ne 'all';
     if ($search) {
         $where{-or} = [
@@ -88,6 +90,7 @@ sub index :Path('/marketplace') :Args(0) {
         categories    => \@categories,
         search        => $search,
         sort          => $sort,
+        listing_type  => $listing_type,
         current_page  => $page,
         total_pages   => $total ? int(($total + $per_page - 1) / $per_page) : 1,
         selected_cat  => $category_id || 'all',
@@ -148,10 +151,13 @@ sub add :Path('/marketplace/add') :Args(0) {
             return;
         }
 
+        my $ltype = $p->{listing_type} || 'sale';
+        $ltype = 'sale' unless $ltype =~ /^(sale|wanted|job)$/;
         my $listing = eval {
             $schema->resultset('MarketplaceListing')->create({
                 seller_username => $c->session->{username},
                 sitename        => $self->_sitename($c),
+                listing_type    => $ltype,
                 title           => $title,
                 description     => $desc,
                 price           => $p->{price}   || 0,

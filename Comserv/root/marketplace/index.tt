@@ -19,8 +19,30 @@
     <div style="background:#d4edda;color:#155724;border:1px solid #c3e6cb;border-radius:5px;padding:10px 15px;margin-bottom:15px;">[% c.flash.success_msg %]</div>
   [% END %]
 
+  <!-- Type Tabs -->
+  [% SET tab_base = '/marketplace?' _ (search ? 'q=' _ search _ '&' : '') _ (selected_cat != 'all' ? 'category=' _ selected_cat _ '&' : '') %]
+  <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid #dee2e6;padding-bottom:0;">
+    [% FOR t IN [
+        {key => 'all',    label => '🏪 All'},
+        {key => 'sale',   label => '🏷️ For Sale'},
+        {key => 'wanted', label => '🔍 Wanted'},
+        {key => 'job',    label => '💼 Jobs & Gigs'},
+    ] %]
+    <a href="[% tab_base %]type=[% t.key %]"
+       style="padding:8px 16px;border-radius:6px 6px 0 0;text-decoration:none;font-weight:bold;
+         [% IF listing_type == t.key || (t.key == 'all' && !listing_type) %]
+           background:var(--primary-color,#007bff);color:#fff;
+         [% ELSE %]
+           background:var(--bg-secondary,#f8f9fa);color:var(--text-color,#555);border:1px solid #dee2e6;border-bottom:none;
+         [% END %]">
+      [% t.label %]
+    </a>
+    [% END %]
+  </div>
+
   <!-- Search & Filter Bar -->
   <form method="GET" action="/marketplace" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;">
+    <input type="hidden" name="type" value="[% listing_type | html %]">
     <input type="text" name="q" value="[% search | html %]" placeholder="Search listings..."
            style="flex:1;min-width:180px;padding:8px 12px;border:1px solid #ccc;border-radius:5px;">
     <select name="category" style="padding:8px 12px;border:1px solid #ccc;border-radius:5px;">
@@ -48,6 +70,8 @@
         <div style="padding:16px;">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
             <h3 style="margin:0;font-size:1rem;flex:1;">
+              [% IF l.listing_type == 'wanted' %]<span style="font-size:0.7rem;background:#cfe2ff;color:#084298;border-radius:3px;padding:1px 5px;margin-right:4px;">WANTED</span>[% END %]
+              [% IF l.listing_type == 'job' %]<span style="font-size:0.7rem;background:#d1e7dd;color:#0f5132;border-radius:3px;padding:1px 5px;margin-right:4px;">JOB</span>[% END %]
               <a href="/marketplace/view/[% l.id %]" style="text-decoration:none;color:var(--text-color,#333);">[% l.title | html %]</a>
             </h3>
             [% IF l.accepts_points %]
