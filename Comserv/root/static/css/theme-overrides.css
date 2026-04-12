@@ -55,12 +55,52 @@ body.has-bg-image .app-body,
 body.has-bg-image .admin-dashboard,
 body.has-bg-image .admin-sections,
 body.has-bg-image .dashboard-header,
-body.has-bg-image .section-content,
 body.has-bg-image .admin-links,
 body.has-bg-image .stats-grid,
-body.has-bg-image .action-buttons {
+body.has-bg-image .action-buttons,
+body.has-bg-image .admin-container,
+body.has-bg-image .admin-section,
+/* base-containers.css structural wrappers */
+body.has-bg-image .apiary-container,
+body.has-bg-image .dashboard-stats,
+body.has-bg-image .quick-actions,
+body.has-bg-image .actions-grid,
+body.has-bg-image .inspection-list,
+body.has-bg-image .hive-grid,
+body.has-bg-image .data-section,
+body.has-bg-image .documentation-page,
+body.has-bg-image .documentation-container,
+body.has-bg-image .documentation-content,
+body.has-bg-image .doc-page,
+body.has-bg-image .doc-section,
+body.has-bg-image .doc-subsection,
+body.has-bg-image .markdown-content,
+body.has-bg-image .container-content,
+/* workshop / content wrappers */
+body.has-bg-image .workshop-container,
+body.has-bg-image .workshops-container,
+body.has-bg-image .page-container,
+body.has-bg-image .section-wrapper,
+/* user / todo page wrappers */
+body.has-bg-image .user-container,
+body.has-bg-image .todo-container,
+body.has-bg-image .todo-wrapper,
+body.has-bg-image .plan-container {
   background-color: transparent !important;
   background-image: none !important;
+}
+
+/* --- Structural elements that use var(--background-color) should be transparent when bg-image active --- */
+body.has-bg-image .apiary-header,
+body.has-bg-image .stat-card,
+body.has-bg-image .plan-card,
+body.has-bg-image .command-card,
+body.has-bg-image .info-card,
+body.has-bg-image .feature-card,
+body.has-bg-image .theme-container,
+body.has-bg-image .section-content {
+  background-color: rgba(255,255,255,0.12) !important;
+  backdrop-filter: blur(2px);
 }
 
 /* --- Semi-transparent content cards (readable but lets bg show through) --- */
