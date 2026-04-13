@@ -450,7 +450,7 @@
 }
 
 .theme-section {
-    background: rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.15);
     border: 1px solid var(--border-color, #ccc);
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.15);
