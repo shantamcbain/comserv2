@@ -306,7 +306,19 @@ sub auto :Private {
         $c->stash->{user_roles} = $user_roles;
         $c->stash->{is_admin} = $is_admin;
         $c->stash->{user_logged_in} = $user_logged_in;
-        
+
+        # Check if this site has active inventory items available for public purchase
+        $c->stash->{has_shop_items} = 0;
+        eval {
+            my $shop_sitename = $c->session->{SiteName} || '';
+            if ($shop_sitename) {
+                my $shop_count = $c->model('DBEncy')->resultset('InventoryItem')->count(
+                    { sitename => $shop_sitename, status => 'active' }
+                );
+                $c->stash->{has_shop_items} = $shop_count ? 1 : 0;
+            }
+        };
+
         # Initialize navigation variables with defaults to prevent template crashes
         $c->stash->{main_pages} = [];
         $c->stash->{member_pages} = [];
