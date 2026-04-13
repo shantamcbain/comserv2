@@ -1,0 +1,102 @@
+[% PageVersion = 'Cart/checkout.tt v0.01 2026/04/13 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Checkout</h1>
+
+[% IF error_msg %]<p class="error">[% error_msg %]</p>[% END %]
+
+<div style="display:flex;gap:2em;flex-wrap:wrap">
+
+<div style="flex:1;min-width:280px">
+<h2>Order Summary</h2>
+<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%">
+  <thead style="background:#f5f5f5">
+    <tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>
+  </thead>
+  <tbody>
+  [% FOREACH key IN cart.keys %]
+    [% line = cart.$key %]
+    <tr>
+      <td>[% line.name %][% IF line.options %] <small>([% line.options %])</small>[% END %]</td>
+      <td>[% line.quantity %]</td>
+      <td>$[% line.unit_price | format('%.2f') %]</td>
+      <td>$[% (line.quantity * line.unit_price) | format('%.2f') %]</td>
+    </tr>
+  [% END %]
+  </tbody>
+  <tfoot>
+    <tr>
+      <td colspan="3" style="text-align:right">Subtotal</td>
+      <td>$[% cart_total %]</td>
+    </tr>
+    <tr>
+      <td colspan="3" style="text-align:right">Tax (13% HST)</td>
+      <td>$[% (cart_total * 0.13) | format('%.2f') %]</td>
+    </tr>
+    <tr style="font-weight:bold">
+      <td colspan="3" style="text-align:right">Total</td>
+      <td>$[% (cart_total * 1.13) | format('%.2f') %]</td>
+    </tr>
+  </tfoot>
+</table>
+<p><a href="/Cart">← Edit Cart</a></p>
+</div>
+
+<div style="flex:1;min-width:280px">
+<h2>Your Information</h2>
+<form method="POST" action="/Cart/place_order">
+
+<div style="margin-bottom:0.7em">
+  <label>Name *<br>
+    <input type="text" name="customer_name" value="[% username %]" required style="width:100%">
+  </label>
+</div>
+<div style="margin-bottom:0.7em">
+  <label>Email<br>
+    <input type="email" name="customer_email" style="width:100%">
+  </label>
+</div>
+<div style="margin-bottom:0.7em">
+  <label>Phone<br>
+    <input type="text" name="customer_phone" style="width:100%">
+  </label>
+</div>
+<div style="margin-bottom:0.7em">
+  <label>Address / Notes for delivery<br>
+    <textarea name="customer_address" rows="2" style="width:100%"></textarea>
+  </label>
+</div>
+
+<h3>Payment Method</h3>
+<div style="margin-bottom:0.7em">
+  <label>
+    <input type="radio" name="payment_method" value="cash" checked>
+    Cash / E-transfer
+  </label>
+  <br>
+  <label>
+    <input type="radio" name="payment_method" value="ap">
+    Invoice Me (Accounts Payable / Net 30)
+  </label>
+  <br>
+  [% IF user_id %]
+  <label>
+    <input type="radio" name="payment_method" value="points">
+    Pay with Points (Balance: [% points_bal %] pts)
+  </label>
+  [% ELSE %]
+  <p><small><em>Log in to pay with points.</em></small></p>
+  [% END %]
+</div>
+
+<div style="margin-bottom:0.7em">
+  <label>Order Notes<br>
+    <textarea name="notes" rows="2" style="width:100%"></textarea>
+  </label>
+</div>
+
+<input type="submit" value="Place Order →" style="font-size:1.1em;padding:0.4em 1em">
+</form>
+</div>
+
+</div>

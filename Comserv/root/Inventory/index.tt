@@ -44,6 +44,14 @@
   </ul>
 </div>
 
+<div class="inventory-actions">
+  <h2>Customer Shop</h2>
+  <ul>
+    <li><a href="/Cart/price_list">Price List / Shop</a></li>
+    <li><a href="/Cart/orders">Customer Orders</a></li>
+  </ul>
+</div>
+
 <div class="inventory-api-info">
   <h2>API Endpoints</h2>
   <ul>
