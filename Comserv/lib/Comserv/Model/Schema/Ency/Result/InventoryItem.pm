@@ -80,6 +80,18 @@ __PACKAGE__->add_columns(id => {
         size          => [10, 2],
         is_nullable   => 1,
     },
+    unit_price => {
+        data_type   => 'decimal',
+        size        => [10, 2],
+        is_nullable => 1,
+        comment     => 'Selling price shown to customers (if null, falls back to unit_cost)',
+    },
+    barcode => {
+        data_type   => 'varchar',
+        size        => 100,
+        is_nullable => 1,
+        comment     => 'Barcode / UPC for Square POS or label printing',
+    },
     reorder_point => {
         data_type     => 'integer',
         is_nullable   => 1,

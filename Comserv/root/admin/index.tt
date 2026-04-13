@@ -170,6 +170,14 @@
                         <i class="fas fa-balance-scale"></i>
                         <span>General Ledger</span>
                     </a>
+                    <a href="[% c.uri_for('/Cart/orders') %]" class="admin-link">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span>Customer Orders</span>
+                    </a>
+                    <a href="[% c.uri_for('/Cart/price_list') %]" class="admin-link">
+                        <i class="fas fa-store"></i>
+                        <span>Price List / Shop</span>
+                    </a>
                 </div>
             </div>
         </div>
