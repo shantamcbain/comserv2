@@ -40,7 +40,10 @@
     [% line = cart.$key %]
     [% line_total = line.quantity * line.unit_price %]
     <tr style="color:var(--text-color)">
-      <td style="padding:0.5em 0.8em;border:1px solid var(--border-color)"><small>[% line.sku %]</small></td>
+      <td style="padding:0.5em 0.8em;border:1px solid var(--border-color)">
+        <small>[% line.sku %]</small>
+        [% IF line.item_type == 'workshop' %]<br><span style="font-size:0.75em;color:var(--primary-color)"><i class="fas fa-chalkboard-teacher"></i> Workshop</span>[% END %]
+      </td>
       <td style="padding:0.5em 0.8em;border:1px solid var(--border-color)">[% line.name %]</td>
       <td style="padding:0.5em 0.8em;border:1px solid var(--border-color)"><small style="color:var(--text-muted-color)">[% line.options || '—' %]</small></td>
       <td style="padding:0.5em 0.8em;border:1px solid var(--border-color);text-align:right">$[% line.unit_price | format('%.2f') %]</td>
