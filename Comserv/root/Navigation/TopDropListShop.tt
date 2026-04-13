@@ -1,8 +1,8 @@
 [% PageVersion = 'Navigation/TopDropListShop.tt,v 0.01 2026/04/13 shanta Exp' %]
 [% IF c.session.debug_mode == 1 %][%# PageVersion %][% END %]
 
-[%# Show the Shop nav only when this site has active inventory items for sale. %]
-[% IF c.stash.has_shop_items %]
+[%# Show the Shop nav for all users on all sites. %]
+[% IF 1 %]
 [% SET _cart_count = 0 %]
 [% IF c.session.cart %]
     [% FOREACH _k IN c.session.cart.keys %]
