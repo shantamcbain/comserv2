@@ -187,6 +187,11 @@
                 <a href="/Inventory/suppliers"><i class="icon-supplier"></i>Suppliers</a>
                 <a href="/Inventory/locations"><i class="icon-location"></i>Locations</a>
                 <div class="submenu-section">
+                    <span class="submenu-section-title">Shop / Orders</span>
+                    <a href="/Cart/price_list"><i class="fas fa-store"></i>Price List / Shop</a>
+                    <a href="/Cart/orders"><i class="fas fa-shopping-cart"></i>Customer Orders</a>
+                </div>
+                <div class="submenu-section">
                     <span class="submenu-section-title">Accounting</span>
                     <a href="/Accounting"><i class="icon-accounting"></i>Accounting Dashboard</a>
                     <a href="/Accounting/coa"><i class="icon-coa"></i>Chart of Accounts</a>

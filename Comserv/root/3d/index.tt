@@ -20,6 +20,12 @@
 <h2>Explore</h2>
 <p>Explore the various 3D models and interactive content we have to offer. Use the navigation links to browse through different sections.</p>
 
+<h3>Products &amp; Services</h3>
+<p>Browse our available 3D printed items, supplies, and services. Add items to your cart and check out online.</p>
+<p style="margin-top:0.5em">
+  <a href="/Cart/price_list" style="display:inline-block;padding:0.5em 1.2em;background:#1a7abf;color:#fff;border-radius:4px;text-decoration:none;font-weight:bold">🛒 View Price List &amp; Shop</a>
+</p>
+
 <a id="contact"></a><a href="#3dtop">back to top</a>
 <h2>Contact</h2>
 <p>If you have any questions or need assistance, please contact us at <a href="mailto:support@comserv.com">support@comserv.com</a>.</p>

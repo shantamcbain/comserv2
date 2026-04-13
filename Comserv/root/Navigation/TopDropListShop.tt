@@ -1,0 +1,36 @@
+[% PageVersion = 'Navigation/TopDropListShop.tt,v 0.01 2026/04/13 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][%# PageVersion %][% END %]
+
+[%# Show the Shop nav on any site that has inventory items in its price list.
+    Currently enabled for: 3d, Mcoop, CSC (always show — graceful if empty) %]
+[% SET _show_shop = 0 %]
+[% SET _site = c.session.SiteName || SiteName || '' %]
+[% IF _site == '3d' || _site == 'Mcoop' || _site == 'CSC' || _site == 'csc' %]
+    [% SET _show_shop = 1 %]
+[% END %]
+
+[% IF _show_shop %]
+[% SET _cart_count = 0 %]
+[% IF c.session.cart %]
+    [% FOREACH _k IN c.session.cart.keys %]
+        [% _cart_count = _cart_count + c.session.cart.$_k.quantity %]
+    [% END %]
+[% END %]
+
+<li class="horizontal-dropdown">
+    <a href="/Cart/price_list" class="dropbtn">
+        🛒 Shop[% IF _cart_count > 0 %] <span style="background:#e00;color:#fff;border-radius:10px;padding:1px 6px;font-size:0.8em">[% _cart_count %]</span>[% END %]
+    </a>
+    <div class="dropdown-content">
+        <a href="/Cart/price_list"><i class="fas fa-store"></i> Price List</a>
+        <a href="/Cart"><i class="fas fa-shopping-cart"></i> View Cart[% IF _cart_count > 0 %] ([% _cart_count %])[% END %]</a>
+        [% IF _cart_count > 0 %]
+        <a href="/Cart/checkout" style="font-weight:bold"><i class="fas fa-credit-card"></i> Checkout</a>
+        [% END %]
+        [% IF c.session.username %]
+        <div class="dropdown-divider"></div>
+        <a href="/currency/balance"><i class="fas fa-coins"></i> My Points Balance</a>
+        [% END %]
+    </div>
+</li>
+[% END %]
