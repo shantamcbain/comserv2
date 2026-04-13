@@ -1,0 +1,53 @@
+[% META
+   title = "Application Submitted"
+   description = "Your job application has been submitted"
+   roles = "any"
+   TemplateType = "Application"
+   category = "Jobs"
+   page_version = "0.01"
+   last_updated = "2026-04-09"
+%]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1><i class="fas fa-check-circle"></i> Application Submitted</h1>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <div class="alert alert-success">
+          <strong>Thank you, [% name | html %]!</strong>
+          Your application for <em>[% job.title | html %]</em> has been submitted successfully.
+          A confirmation will be sent to [% email | html %].
+        </div>
+
+        [% IF is_guest %]
+        <div class="card" style="margin-top:1.5rem;border:1px solid #007bff;border-radius:4px">
+          <div class="card-header" style="background:#007bff;color:#fff;padding:0.75rem 1rem">
+            <h4 style="margin:0"><i class="fas fa-user-plus"></i> Create a Free Account</h4>
+          </div>
+          <div class="card-body" style="padding:1rem">
+            <p>
+              Register an account to track your applications, receive updates, and use the points payment system.
+              Your application email (<strong>[% email | html %]</strong>) will be linked automatically.
+            </p>
+            <a href="[% c.uri_for('/user/register') %]?email=[% email | uri %]&name=[% name | uri %]"
+               class="btn btn-primary">Create an Account</a>
+            <a href="[% c.uri_for('/jobs/view', [job.id]) %]" class="btn btn-secondary" style="margin-left:0.5rem">
+              No thanks, back to job
+            </a>
+          </div>
+        </div>
+        [% ELSE %]
+        <p style="margin-top:1rem">
+          <a href="[% c.uri_for('/jobs/view', [job.id]) %]" class="btn btn-secondary">&larr; Back to Job</a>
+          <a href="[% c.uri_for('/jobs') %]" class="btn btn-secondary" style="margin-left:0.5rem">Browse More Jobs</a>
+        </p>
+        [% END %]
+      </div>
+
+    </div>
+  </div>
+</div>

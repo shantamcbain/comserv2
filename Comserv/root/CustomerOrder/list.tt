@@ -1,0 +1,50 @@
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Customer Orders — [% sitename | html %]</h1>
+<p>
+  <a href="/CustomerOrder/new" style="background:#007bff;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">+ New Order Form</a>
+  <a href="/Inventory" style="margin-left:1em;">← Inventory</a>
+</p>
+
+[% IF flash.success_msg %]<p style="color:green;font-weight:bold">[% flash.success_msg %]</p>[% END %]
+[% IF flash.error_msg %]<p style="color:red">[% flash.error_msg %]</p>[% END %]
+[% IF error_msg %]<p style="color:red">Error: [% error_msg %]</p>[% END %]
+
+[% IF orders.size %]
+<table border="1" cellpadding="6" style="width:100%;border-collapse:collapse;">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Customer</th>
+      <th>Email</th>
+      <th>Phone</th>
+      <th>Date</th>
+      <th>Total</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH o IN orders %]
+  <tr>
+    <td><a href="/CustomerOrder/view/[% o.id %]">[% o.id %]</a></td>
+    <td>[% o.customer_name | html %]</td>
+    <td>[% o.customer_email | html %]</td>
+    <td>[% o.customer_phone | html %]</td>
+    <td>[% o.created_at %]</td>
+    <td style="text-align:right">$[% o.total_amount || '0.00' %]</td>
+    <td>
+      [% IF o.status == 'pending' %]<span style="background:#ffc107;color:#333;padding:1px 7px;border-radius:3px;font-size:0.85em;">pending</span>
+      [% ELSIF o.status == 'confirmed' %]<span style="background:#17a2b8;color:white;padding:1px 7px;border-radius:3px;font-size:0.85em;">confirmed</span>
+      [% ELSIF o.status == 'completed' %]<span style="background:#28a745;color:white;padding:1px 7px;border-radius:3px;font-size:0.85em;">completed</span>
+      [% ELSIF o.status == 'cancelled' %]<span style="background:#dc3545;color:white;padding:1px 7px;border-radius:3px;font-size:0.85em;">cancelled</span>
+      [% ELSE %][% o.status | html %][% END %]
+    </td>
+    <td><a href="/CustomerOrder/view/[% o.id %]">View</a></td>
+  </tr>
+  [% END %]
+  </tbody>
+</table>
+[% ELSE %]
+<p>No orders yet. <a href="/CustomerOrder/new">Be the first to place an order.</a></p>
+[% END %]

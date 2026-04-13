@@ -14,9 +14,9 @@
   --font-size-xlarge: 28px;
   --header-color: #000000;
   --header-font: Arial, sans-serif;
-  --link-color: #f9f06b;
+  --link-color: #7a3b00;
   --link-decoration: none;
-  --link-hover-color: #f8e45c;
+  --link-hover-color: #5a2a00;
   --nav-bg: #ff9900;
   --nav-hover-bg: #f6d32d;
   --nav-text: #000000;
@@ -33,9 +33,9 @@
 }
 
 :root {
-  --background-image: url(../images/BMaster/honey2.jpg);
-  --background-repeat: repeat-x;
-  --background-position: top center;
+  --background-image: url(/static/images/BMaster/honey2.jpg);
+  --background-repeat: repeat;
+  --background-position: top left;
   --background-attachment: scroll;
   --background-size: auto;
 }
