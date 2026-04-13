@@ -98,7 +98,15 @@ body.has-bg-image .command-card,
 body.has-bg-image .info-card,
 body.has-bg-image .feature-card,
 body.has-bg-image .theme-container,
-body.has-bg-image .section-content {
+body.has-bg-image .section-content,
+/* documentation-specific */
+body.has-bg-image .documentation-section,
+body.has-bg-image .recent-updates-section,
+body.has-bg-image .all-docs-section,
+body.has-bg-image .theme-section,
+/* status cards on admin */
+body.has-bg-image .status-card,
+body.has-bg-image .status-cards {
   background-color: rgba(255,255,255,0.12) !important;
   backdrop-filter: blur(2px);
 }
@@ -112,6 +120,9 @@ body.has-bg-image .data-container,
 body.has-bg-image .form-section,
 body.has-bg-image .table-container,
 body.has-bg-image .data-table-wrapper,
+body.has-bg-image .documentation-card,
+body.has-bg-image .documentation-list li,
+body.has-bg-image .file-card,
 /* Bootstrap-style cards */
 body.has-bg-image .card,
 body.has-bg-image .card-body,
