@@ -1,8 +1,6 @@
-[% PageVersion = 'Navigation/TopDropListShop.tt,v 0.01 2026/04/13 shanta Exp' %]
+[% PageVersion = 'Navigation/TopDropListShop.tt,v 0.02 2026/04/13 shanta Exp' %]
 [% IF c.session.debug_mode == 1 %][%# PageVersion %][% END %]
 
-[%# Show the Shop nav for all users on all sites. %]
-[% IF 1 %]
 [% SET _cart_count = 0 %]
 [% IF c.session.cart %]
     [% FOREACH _k IN c.session.cart.keys %]
@@ -12,18 +10,18 @@
 
 <li class="horizontal-dropdown">
     <a href="/Cart/price_list" class="dropbtn">
-        🛒 Shop[% IF _cart_count > 0 %] <span style="background:#e00;color:#fff;border-radius:10px;padding:1px 6px;font-size:0.8em">[% _cart_count %]</span>[% END %]
+        <i class="fas fa-store"></i> Shop[% IF _cart_count > 0 %] <span class="dropdown-role-badge">[% _cart_count %]</span>[% END %]
     </a>
     <div class="dropdown-content">
-        <a href="/Cart/price_list"><i class="fas fa-store"></i> Price List</a>
-        <a href="/Cart"><i class="fas fa-shopping-cart"></i> View Cart[% IF _cart_count > 0 %] ([% _cart_count %])[% END %]</a>
+        <a href="/Cart/price_list" class="menu-item"><i class="fas fa-store"></i> Price List</a>
+        <a href="/Cart" class="menu-item"><i class="fas fa-shopping-cart"></i> View Cart[% IF _cart_count > 0 %] ([% _cart_count %])[% END %]</a>
         [% IF _cart_count > 0 %]
-        <a href="/Cart/checkout" style="font-weight:bold"><i class="fas fa-credit-card"></i> Checkout</a>
+        <div class="dropdown-divider"></div>
+        <a href="/Cart/checkout" class="menu-item"><i class="fas fa-credit-card"></i> Checkout</a>
         [% END %]
         [% IF c.session.username %]
         <div class="dropdown-divider"></div>
-        <a href="/currency/balance"><i class="fas fa-coins"></i> My Points Balance</a>
+        <a href="/currency/balance" class="menu-item"><i class="fas fa-coins"></i> My Points Balance</a>
         [% END %]
     </div>
 </li>
-[% END %]
