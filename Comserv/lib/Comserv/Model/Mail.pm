@@ -11,6 +11,7 @@ BEGIN {
     }
 }
 use Encode qw(encode);
+use HTML::Entities qw(decode_entities);
 use Comserv::Util::Logging;
 use Comserv::Util::HealthLogger;
 extends 'Catalyst::Model';
@@ -74,12 +75,29 @@ sub send_email {
     );
     push @headers, ('Reply-To' => $leader_email) if $leader_email;
 
+    # Auto-detect HTML or use explicit flag
+    my $is_html = $opts->{html} || ($body =~ /<[a-z][^>]*>/i);
+
+    # If sending as HTML but body looks HTML-entity-escaped (e.g. pasted as text into editor),
+    # decode entities so &lt;div&gt; becomes <div> and the email renders properly.
+    if ($is_html && $body =~ /&lt;[a-z]/i) {
+        $body = decode_entities($body);
+    }
+
+    # Strip full HTML document wrapper if present — email body only needs inner HTML.
+    # Some editors paste the full <!DOCTYPE html>...<body>...</body> structure.
+    if ($is_html && $body =~ /<!DOCTYPE\s+html/i) {
+        $body =~ s/^[\s\S]*?<body[^>]*>//i;
+        $body =~ s/<\/body>[\s\S]*$//i;
+    }
+
     # Create Email::MIME message (Email::MIME is installed; MIME::Lite is not)
     my $msg = Email::MIME->create(
         header_str => \@headers,
         attributes => {
-            encoding => 'quoted-printable',
-            charset  => 'UTF-8',
+            content_type => $is_html ? 'text/html' : 'text/plain',
+            encoding     => 'quoted-printable',
+            charset      => 'UTF-8',
         },
         body_str => $body,
     );

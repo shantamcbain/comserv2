@@ -73,6 +73,18 @@
         </div>
     [% END %]
 
+    <!-- Result-First Policy Banner -->
+    <div class="instructions-info" style="border-left: 4px solid #28a745; background: #f0fff4; margin-bottom: 10px;">
+        <i class="fas fa-shield-alt" style="color: #28a745;"></i>
+        <strong style="color: #155724;">Result File First Policy</strong>
+        <p style="margin: 6px 0 4px;">The <strong>Result file is the authoritative schema definition</strong>. Always follow this order:</p>
+        <ol style="margin: 4px 0;">
+            <li><strong>Create or edit the Result file first</strong> (under <code>lib/Comserv/Model/Schema/Ency/Result/</code>)</li>
+            <li><strong>Then create/alter the DB table from the Result file</strong> using "Create Table from Result"</li>
+        </ol>
+        <p style="margin: 4px 0; color: #856404;"><i class="fas fa-exclamation-triangle"></i> <strong>Never</strong> create a Result file by reverse-engineering an existing DB table as a normal workflow — that direction is a recovery-only operation and may introduce drift.</p>
+    </div>
+
     <!-- Instructions -->
     <div class="instructions-info">
         <i class="fas fa-info-circle"></i>
@@ -81,9 +93,10 @@
             <li>Each database is compared with its corresponding Result files</li>
             <li>Click on table comparison cards to view detailed field comparisons between database and Result file</li>
             <li>Fields with differences are highlighted with ⚠ warning icons</li>
-            <li>Use "To Result" buttons to sync table values to result files</li>
-            <li>Use "To Table" buttons to sync result values to database tables (caution: modifies database)</li>
-            <li>Use "Create" buttons for missing Result files or tables</li>
+            <li>Use "To Result" buttons to sync table values to result files (safe — no DB change)</li>
+            <li>Use "To Table" buttons to sync result values to database tables (<strong>caution: modifies database</strong>)</li>
+            <li><strong>Preferred:</strong> Use "Create Table from Result" for Result files that have no table yet</li>
+            <li><em>Recovery only:</em> Use "Create Result File" for orphan tables that lack a Result file</li>
         </ol>
         
         <div class="legend" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px;">
@@ -1180,25 +1193,35 @@ function createTableFromResult(resultName) {
     });
 }
 
-// Create result from table
-function createResultFromTable(tableName) {
-    if (!confirm('Are you sure you want to create a result from table "' + tableName + '"?')) {
+// Create result from table (NON-PREFERRED direction — recovery only)
+function createResultFromTable(tableName, database) {
+    const warningMsg = 'WARNING: Creating a Result file FROM a database table is the NON-PREFERRED direction.\n\n'
+        + 'Preferred workflow: Create the Result file first, then use "Create Table from Result".\n\n'
+        + 'The generated Result file MUST be reviewed and corrected before use — it is not authoritative.\n\n'
+        + 'Continue with this recovery operation for table "' + tableName + '"?';
+    if (!confirm(warningMsg)) {
         return;
     }
-    
+
+    const params = new URLSearchParams();
+    params.append('table_name', tableName);
+    if (database) params.append('database', database);
+
     fetch('[% c.uri_for("/admin/create_result_from_table") %]', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify({
-            table_name: tableName
-        })
+        body: params.toString()
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('Result created successfully!');
+            let msg = 'Result file created for "' + tableName + '".\n\n';
+            if (data.workflow_warning) {
+                msg += '\u26a0\ufe0f ' + data.workflow_warning;
+            }
+            alert(msg);
             refreshComparison();
         } else {
             alert('Error creating result: ' + (data.error || 'Unknown error'));

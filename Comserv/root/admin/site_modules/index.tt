@@ -1,0 +1,133 @@
+[%
+   title = "Module Access Control"
+   roles = "admin"
+   PageVersion = 'admin/site_modules/index.tt v1.0 2026/04/10 Module Access Control — SiteName-aware'
+%]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.sm-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding-bottom:10px; border-bottom:2px solid var(--primary-color); }
+.sm-header h1 { margin:0; font-size:1.4em; }
+.sm-table { width:100%; border-collapse:collapse; font-size:0.9em; }
+.sm-table th { background:var(--bg-secondary); padding:8px 12px; text-align:left; border-bottom:2px solid var(--border-color); }
+.sm-table td { padding:8px 12px; border-bottom:1px solid var(--border-color); vertical-align:middle; }
+.sm-table tr:hover td { background:var(--bg-secondary); }
+.badge-on  { display:inline-block; padding:2px 8px; border-radius:3px; background:#28a745; color:#fff; font-size:0.78em; font-weight:bold; }
+.badge-off { display:inline-block; padding:2px 8px; border-radius:3px; background:#6c757d; color:#fff; font-size:0.78em; font-weight:bold; }
+.btn-sm { padding:3px 10px; font-size:0.82em; border:none; border-radius:3px; cursor:pointer; text-decoration:none; }
+.btn-primary   { background:var(--primary-color); color:#fff; }
+.btn-secondary { background:var(--bg-secondary); color:var(--text-color); border:1px solid var(--border-color); }
+.btn-danger    { background:#dc3545; color:#fff; }
+.add-form { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:6px; padding:16px; margin-top:24px; }
+.add-form h2 { margin-top:0; font-size:1.1em; }
+.add-form label { display:inline-block; width:120px; font-size:0.9em; }
+.add-form input, .add-form select { padding:4px 8px; border:1px solid var(--border-color); border-radius:3px; background:var(--bg-color); color:var(--text-color); }
+.tab-bar { display:flex; gap:8px; margin-bottom:16px; }
+.tab-bar a { padding:6px 16px; border-radius:4px; text-decoration:none; background:var(--bg-secondary); color:var(--text-color); border:1px solid var(--border-color); font-size:0.9em; }
+.tab-bar a.active { background:var(--primary-color); color:#fff; border-color:var(--primary-color); }
+</style>
+
+<div class="container">
+<div class="sm-header">
+    <h1>Module Access Control</h1>
+    <span style="font-size:0.85em; color:var(--text-muted-color);">Site: [% c.stash.SiteName || c.session.SiteName || 'CSC' %]</span>
+</div>
+
+<div class="tab-bar">
+    <a href="/admin/site_modules" class="active">Site Modules</a>
+    <a href="/admin/site_modules/user_overrides">User Overrides</a>
+</div>
+
+[% IF error %]
+<div style="background:#fee; border:1px solid #f88; padding:10px; border-radius:4px; margin-bottom:16px; color:#c00;">[% error %]</div>
+[% END %]
+
+<table class="sm-table">
+<thead>
+<tr>
+    <th>SiteName</th>
+    <th>Module</th>
+    <th>Status</th>
+    <th>Min Role</th>
+    <th>Actions</th>
+</tr>
+</thead>
+<tbody>
+[% IF modules.size %]
+[% FOREACH m IN modules %]
+<tr>
+    <td><strong>[% m.sitename %]</strong></td>
+    <td>[% m.module_name %]</td>
+    <td>
+        [% IF m.enabled %]
+            <span class="badge-on">ENABLED</span>
+        [% ELSE %]
+            <span class="badge-off">DISABLED</span>
+        [% END %]
+    </td>
+    <td>
+        <form method="post" action="/admin/site_modules/set_min_role" style="display:inline;">
+            <input type="hidden" name="id" value="[% m.id %]">
+            <select name="min_role" onchange="this.form.submit()" style="padding:2px 6px; font-size:0.82em; border:1px solid var(--border-color); border-radius:3px; background:var(--bg-color); color:var(--text-color);">
+                [% FOREACH role IN ['member','editor','developer','admin'] %]
+                <option value="[% role %]" [% IF m.min_role == role %]selected[% END %]>[% role %]</option>
+                [% END %]
+            </select>
+        </form>
+    </td>
+    <td>
+        [% IF m.enabled %]
+        <form method="post" action="/admin/site_modules/toggle" style="display:inline;">
+            <input type="hidden" name="id" value="[% m.id %]">
+            <input type="hidden" name="enabled" value="0">
+            <button type="submit" class="btn-sm btn-danger">Disable</button>
+        </form>
+        [% ELSE %]
+        <form method="post" action="/admin/site_modules/toggle" style="display:inline;">
+            <input type="hidden" name="id" value="[% m.id %]">
+            <input type="hidden" name="enabled" value="1">
+            <button type="submit" class="btn-sm btn-primary">Enable</button>
+        </form>
+        [% END %]
+    </td>
+</tr>
+[% END %]
+[% ELSE %]
+<tr><td colspan="5" style="text-align:center; color:var(--text-muted-color); padding:24px;">No modules configured yet. Add one below.</td></tr>
+[% END %]
+</tbody>
+</table>
+
+<div class="add-form">
+    <h2>Add / Update Module</h2>
+    <form method="post" action="/admin/site_modules/add">
+        <p>
+            <label for="sm-site">SiteName:</label>
+            <select id="sm-site" name="sitename">
+                [% FOREACH s IN sitenames %]
+                <option value="[% s %]">[% s %]</option>
+                [% END %]
+            </select>
+        </p>
+        <p>
+            <label for="sm-mod">Module:</label>
+            <input id="sm-mod" type="text" name="module_name" placeholder="planning, apiary, filemanager…" style="width:200px;">
+        </p>
+        <p>
+            <label>Enabled:</label>
+            <input type="checkbox" name="enabled" value="1" checked>
+        </p>
+        <p>
+            <label for="sm-role">Min Role:</label>
+            <select id="sm-role" name="min_role">
+                <option value="member">member</option>
+                <option value="editor">editor</option>
+                <option value="developer">developer</option>
+                <option value="admin">admin</option>
+            </select>
+        </p>
+        <button type="submit" class="btn-sm btn-primary">Save</button>
+    </form>
+</div>
+
+</div>

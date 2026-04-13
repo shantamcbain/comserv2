@@ -157,9 +157,9 @@ sub index :Path :Args(0) {
                         push @external_models, { name => $id, provider => 'grok', label => $label };
                     }
                 } else {
-                    push @external_models, { name => 'grok-4-0709',               provider => 'grok', label => 'Grok 4 (xAI)' };
-                    push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
-                    push @external_models, { name => 'grok-code-fast-1',          provider => 'grok', label => 'Grok Code Fast (xAI)' };
+                    push @external_models, { name => 'grok-3',          provider => 'grok', label => 'Grok 3 (xAI)' };
+                    push @external_models, { name => 'grok-3-mini',     provider => 'grok', label => 'Grok 3 Mini (xAI)' };
+                    push @external_models, { name => 'grok-3-fast',     provider => 'grok', label => 'Grok 3 Fast (xAI)' };
                 }
             }
         } catch {
@@ -452,7 +452,7 @@ sub generate :Local :Args(0) {
     # Normalize agent_type to database enum values
     # Normalize agent_type for dynamic storage (was database enum)
     my $normalized_agent_type = $agent_id || 'general';
-    if ($agent_id && $agent_id =~ /^(documentation|helpdesk|ency|beekeeping|hamradio|chat|cleanup|cleanup-agent|docker|master-plan-updater|daily-audit|daily-plan-automator|master-plan-manager|daily-plans-generator|daily-plans|documentation-sync|main|MainAgent|planning|prompt-logging|general)$/i) {
+    if ($agent_id && $agent_id =~ /^(documentation|helpdesk|ency|beekeeping|hamradio|chat|cleanup|cleanup-agent|docker|master-plan-updater|daily-audit|daily-plan-automator|master-plan-manager|daily-plans-generator|daily-plans|documentation-sync|main|MainAgent|planning|3dprint|prompt-logging|general)$/i) {
         $normalized_agent_type = lc($agent_id);
         # Special case for MainAgent which is camelcase in enum
         $normalized_agent_type = 'MainAgent' if lc($agent_id) eq 'mainagent';
@@ -485,7 +485,19 @@ sub generate :Local :Args(0) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
             'generate', "BMaster agent: injected system prompt");
     }
-    
+
+    if (lc($normalized_agent_type) eq 'planning' && !$system) {
+        $system = $self->_build_planning_system_prompt($c);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'generate', "Planning agent: injected system prompt");
+    }
+
+    if (lc($normalized_agent_type) eq '3dprint' && !$system) {
+        $system = $self->_build_3dprint_system_prompt($c);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'generate', "3DPrint agent: injected system prompt");
+    }
+
     # Require login for external AI models (Grok etc.) before entering try block
     if (lc($provider) eq 'grok' && $is_guest) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
@@ -520,9 +532,21 @@ sub generate :Local :Args(0) {
         $use_search = 0;
     }
 
+    # Inject schema_compare context when on that page
+    if ($page_path && $page_path =~ m{/admin/(?:compare_schema|schema_compare)}) {
+        my $schema_ctx = $self->_build_schema_compare_context();
+        $system .= "\n\n" . $schema_ctx;
+    }
+
     # --- Live DB data injection (same as /ai/chat) ---
     my $site_name_gen = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-    my $module_data_gen = $self->_get_module_data($c, $prompt, $agent_id);
+    # Planning agent already injects project list via _build_planning_system_prompt;
+    # force a keyword override so _get_module_data always runs for planning/ency/bmaster.
+    my $inject_prompt = $prompt;
+    if ($normalized_agent_type =~ /^(planning|ency|bmaster)$/i) {
+        $inject_prompt = "project todo $prompt";
+    }
+    my $module_data_gen = $self->_get_module_data($c, $inject_prompt, $agent_id);
     if ($module_data_gen) {
         $system .= "\n\n" . $module_data_gen;
     }
@@ -601,8 +625,19 @@ sub generate :Local :Args(0) {
                 die "Failed to load Grok model";
             }
             $grok->api_key($grok_api_key);
+            # Hardcoded list of known-dead Grok models (410 Gone) — always substitute regardless of DB state
+            my %GROK_DEAD = map { $_ => 'grok-3' } qw(
+                grok-code-fast-1
+                grok-4-0709
+                grok-4-fast-non-reasoning
+            );
+            if ($model && $GROK_DEAD{$model}) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'generate', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD{$model}'");
+                $model = $GROK_DEAD{$model};
+            }
             if ($model) {
-                # Pre-flight: if the requested model is known deprecated, use last_working_model instead
+                # Pre-flight: if the requested model is known deprecated in DB, use last_working_model instead
                 eval {
                     my $schema  = $c->model('DBEncy')->schema;
                     my $key_obj = $schema->resultset('UserApiKeys')->search(
@@ -613,7 +648,7 @@ sub generate :Local :Args(0) {
                         my $deprecated = $meta->{deprecated_models} || {};
                         if ($deprecated->{$model}) {
                             my $replacement = $meta->{last_working_model} || '';
-                            if ($replacement && $replacement ne $model) {
+                            if ($replacement && $replacement ne $model && !$GROK_DEAD{$replacement}) {
                                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                                     'generate', "Requested model '$model' is deprecated; using '$replacement' instead");
                                 $model = $replacement;
@@ -773,11 +808,14 @@ sub generate :Local :Args(0) {
             my ($tier_small, $tier_large) = $self->_pick_ollama_tier(
                 $installed_models, $current_model, $agent_id, $page_context);
             my $manual_model = ($model && $can_select_model_gen) ? $model : '';
-            my $use_model    = $manual_model || $tier_small;
+            # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier
+            my $force_large = (!$is_guest && !$manual_model &&
+                $normalized_agent_type =~ /^(planning|ency|bmaster)$/i) ? 1 : 0;
+            my $use_model = $manual_model || ($force_large ? $tier_large : $tier_small);
 
             push @trace, sprintf("🔍 Tier selection: small=%s large=%s → using=%s%s",
                 $tier_small, $tier_large, $use_model,
-                $manual_model ? " (manual override)" : "");
+                $manual_model ? " (manual override)" : ($force_large ? " (agent forced large)" : ""));
 
             $ollama->host($current_host);
             $ollama->port($current_port) if $current_port;
@@ -919,8 +957,9 @@ sub generate :Local :Args(0) {
             # CPU Ollama prefill at ~46 tok/s: 3 000 tokens = ~65s — safe under 300s timeout.
             # Pass 1: trim history messages.  Pass 1.5: drop oldest history pairs.
             # Pass 2: strip page_content from system.  Pass 3: hard-cap system prompt.
-            my $BUDGET_CHARS  =  8_000;
-            my $SYS_MAX_CHARS =  4_000;  # system prompt hard cap (nav guide can be 30K+)
+            # Planning/ENCY/BMaster agents have large injected system prompts — raise limits.
+            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint)) ? 16_000 : 8_000;
+            my $SYS_MAX_CHARS = $normalized_agent_type eq 'planning' ? 12_000 : 6_000;
             my $raw_total_gen = 0;
             $raw_total_gen += length($_->{content} || '') for @ollama_msgs;
             if ($raw_total_gen > $BUDGET_CHARS) {
@@ -1725,6 +1764,8 @@ sub chat :Local :Args(0) {
     my $chat_agent_id     = $json_data->{agent_id}      || $c->request->params->{agent_id}      || '';
     my $chat_agent_system = $json_data->{system}        || $c->request->params->{system}        || '';
     my $chat_page_content = $json_data->{page_content}  || $c->request->params->{page_content}  || '';
+    my $project_id        = $json_data->{project_id}    || $c->request->params->{project_id}    || undef;
+    my $task_id           = $json_data->{task_id}       || $c->request->params->{task_id}       || undef;
     
     # Validate prompt
     unless ($prompt && length($prompt) > 0) {
@@ -1740,6 +1781,20 @@ sub chat :Local :Args(0) {
         return;
     }
     
+    # Inject project/task context into system prompt if provided
+    if ($project_id || $task_id) {
+        my $ctx = $self->_build_project_context($c, $project_id, $task_id);
+        if ($ctx) {
+            $chat_agent_system = ($chat_agent_system ? $chat_agent_system . "\n\n" : '') . $ctx;
+        }
+    }
+
+    # Inject schema_compare page-specific context when on that page
+    if ($chat_page_path && $chat_page_path =~ m{/admin/(?:compare_schema|schema_compare)}) {
+        my $schema_ctx = $self->_build_schema_compare_context();
+        $chat_agent_system = ($chat_agent_system ? $chat_agent_system . "\n\n" : '') . $schema_ctx;
+    }
+
     # Build messages array for chat API
     my @messages = ();
     
@@ -1799,13 +1854,25 @@ sub chat :Local :Args(0) {
         $chat_agent_system = $self->_build_bmaster_system_prompt($c);
     }
 
+    if (lc($chat_agent_id) eq 'planning' && !$chat_agent_system) {
+        $chat_agent_system = $self->_build_planning_system_prompt($c);
+    }
+
+    if (lc($chat_agent_id) eq '3dprint' && !$chat_agent_system) {
+        $chat_agent_system = $self->_build_3dprint_system_prompt($c);
+    }
+
     # Build combined system prompt: agent-specific prompt + role prompt + live module data + shared KB
     my @system_parts;
     push @system_parts, $chat_agent_system if $chat_agent_system;
     push @system_parts, $role_prompt_chat  if $role_prompt_chat;
 
-    # Fetch live module data (workshops, ENCY, etc.) when the prompt contains relevant keywords
-    my $module_data = $self->_get_module_data($c, $prompt, $chat_agent_id);
+    # Fetch live module data — force inject for agents that always need project/todo data
+    my $chat_inject_prompt = $prompt;
+    if ($chat_agent_id =~ /^(planning|ency|bmaster)$/i) {
+        $chat_inject_prompt = "project todo $prompt";
+    }
+    my $module_data = $self->_get_module_data($c, $chat_inject_prompt, $chat_agent_id);
     push @system_parts, $module_data if $module_data;
 
     # Inject relevant past Q&A from the shared knowledge base (all users)
@@ -1909,6 +1976,17 @@ sub chat :Local :Args(0) {
             }
 
             $grok->api_key($grok_api_key);
+            # Hardcoded known-dead Grok models — substitute before any API call
+            my %GROK_DEAD_CHAT = map { $_ => 'grok-3' } qw(
+                grok-code-fast-1
+                grok-4-0709
+                grok-4-fast-non-reasoning
+            );
+            if ($model && $GROK_DEAD_CHAT{$model}) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'chat', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD_CHAT{$model}'");
+                $model = $GROK_DEAD_CHAT{$model};
+            }
             $grok->model($model) if $model;
 
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
@@ -2024,14 +2102,17 @@ sub chat :Local :Args(0) {
 
             # If user manually picked a model (admin override), skip escalation logic
             my $manual_model = ($model && $can_select_model_perm) ? $model : '';
+            # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier
+            my $chat_force_large = (!$is_guest && !$manual_model &&
+                $chat_agent_id =~ /^(planning|ency|bmaster)$/i) ? 1 : 0;
 
             push @chat_trace, sprintf("🔍 Tier selection: small=%s large=%s → using=%s%s",
                 $tier_small, $tier_large,
-                $manual_model || $tier_small,
-                $manual_model ? ' (manual override)' : '');
+                $manual_model || ($chat_force_large ? $tier_large : $tier_small),
+                $manual_model ? ' (manual override)' : ($chat_force_large ? ' (agent forced large)' : ''));
 
             # ── Prefer in-memory models to avoid cold-start delays ──────────────
-            my $chat_use_model = $manual_model || $tier_small;
+            my $chat_use_model = $manual_model || ($chat_force_large ? $tier_large : $tier_small);
             unless ($manual_model) {
                 my $running = $avail_check->get_running_models() || [];
                 if (@$running) {
@@ -2081,8 +2162,9 @@ sub chat :Local :Args(0) {
             # 300s timeout even with generation.  Over-budget → trim history content first.
             # Pass 1: trim messages.  Pass 1.5: drop oldest history pairs.
             # Pass 2: strip page_content.  Pass 3: hard-cap system prompt.
-            my $BUDGET_CHARS  =  8_000;
-            my $SYS_MAX_CHARS_CHAT = 4_000;
+            # Planning/ENCY/BMaster agents have large injected system prompts — raise limits.
+            my $BUDGET_CHARS  = (grep { lc($chat_agent_id) eq $_ } qw(planning ency bmaster 3dprint)) ? 16_000 : 8_000;
+            my $SYS_MAX_CHARS_CHAT = lc($chat_agent_id) eq 'planning' ? 12_000 : 6_000;
             my $raw_total = 0;
             $raw_total += length($_->{content} || '') for @ollama_messages;
             if ($raw_total > $BUDGET_CHARS) {
@@ -2273,10 +2355,13 @@ sub chat :Local :Args(0) {
                 };
                 
                 my $conversation = $schema->resultset('AiConversation')->create({
-                    user_id => $user_id,
-                    title => $title,
-                    status => 'active',
-                    metadata => encode_json($conversation_metadata)
+                    user_id    => $user_id,
+                    title      => $title,
+                    project_id => $project_id,
+                    task_id    => $task_id,
+                    model      => $model_used || '',
+                    status     => 'active',
+                    metadata   => encode_json($conversation_metadata)
                 });
                 
                 unless ($conversation) {
@@ -3080,7 +3165,10 @@ sub unload_model :Local :Args(0) {
     }
 
     my $json_data  = {};
-    my $body_text  = $c->request->content || '';
+    my $body_text;
+    if ($c->req->can('content')) { $body_text = $c->req->content }
+    else { my $b = $c->req->body; $body_text = ref($b) ? do { seek($b,0,0); local $/; <$b> } : $b; }
+    $body_text //= '';
     eval { $json_data = decode_json($body_text) if $body_text; };
 
     my $model_name  = $json_data->{model}  || '';
@@ -4034,7 +4122,12 @@ Supported actions:
 - Add a comment:         [ACTION: {"action": "add_todo_comment",   "params": {"todo_id": N, "comment": "text"}}]
 - Create a log entry:    [ACTION: {"action": "create_log_entry",   "params": {"todo_id": N, "abstract": "title", "details": "description"}}]
 - Create a new todo:     [ACTION: {"action": "create_todo", "params": {"subject": "title", "description": "details", "project_id": N, "due_date": "YYYY-MM-DD", "priority": 3}}]
+- Create a new project:  [ACTION: {"action": "create_project", "params": {"name": "Project Name", "description": "details", "due_date": "YYYY-MM-DD", "parent_id": OPTIONAL_PARENT_ID}}]
 - Create a HelpDesk support ticket: [ACTION: {"action": "create_helpdesk_ticket", "params": {"subject": "issue title", "description": "details", "page_url": "/current/page"}}]
+- Sync a schema field (admin/compare_schema page only):
+    Update Result file to match DB:  [ACTION: {"action": "sync_schema_field", "params": {"table": "table_name", "field": "field_name", "direction": "to_result", "database": "ency"}}]
+    ALTER TABLE to match Result file: [ACTION: {"action": "sync_schema_field", "params": {"table": "table_name", "field": "field_name", "direction": "to_table", "database": "ency"}}]
+    (Omit "field" to sync all fields in the table. Use "database": "forager" for the forager DB.)
 
 Rules:
 - ONLY emit an [ACTION: ...] block when the user explicitly asks you to perform a write operation.
@@ -4182,6 +4275,14 @@ sub _build_navigation_command_guide {
         [ 'Projects', 'user', [
             [ 'Projects home',              '/project'                  ],
             [ 'Add a project',              '/project/addproject'       ],
+        ]],
+        [ 'Marketplace', 'guest', [
+            [ 'Marketplace / buy and sell', '/marketplace'              ],
+            [ 'Browse listings',            '/marketplace/browse'       ],
+        ]],
+        [ 'Marketplace (logged in)', 'user', [
+            [ 'Post a listing / sell item', '/marketplace/add'          ],
+            [ 'My listings',                '/marketplace/my_listings'  ],
         ]],
         [ 'User account', 'guest', [
             [ 'Login',                      '/user/login'               ],
@@ -4856,10 +4957,30 @@ sub conversation :Local :Args(1) {
             id         => $conv->id,
             title      => $conv->title || 'Untitled',
             status     => $conv->status || 'active',
+            model      => $conv->model || '',
+            project_id => $conv->project_id || 0,
+            task_id    => $conv->task_id || 0,
             created_at => $conv->created_at,
             updated_at => $conv->updated_at,
             metadata   => $meta,
         };
+
+        if ($conv->project_id) {
+            eval {
+                my $proj = $c->model('DBEncy')->schema->resultset('Project')->find($conv->project_id);
+                if ($proj) {
+                    $conversation->{project} = { id => $proj->id, name => $proj->name || '' };
+                }
+            };
+        }
+        if ($conv->task_id) {
+            eval {
+                my $task = $c->model('DBEncy')->schema->resultset('Todo')->find($conv->task_id);
+                if ($task) {
+                    $conversation->{task} = { id => $task->record_id, subject => $task->subject || '' };
+                }
+            };
+        }
 
         my $msg_rs = $schema->resultset('AiMessage')->search(
             { conversation_id => $conv_id },
@@ -5597,9 +5718,9 @@ sub get_user_providers :Local :Args(0) {
                 # Fallback to hardcoded Grok models if none stored in metadata
                 if (!@$models && $key->service eq 'grok') {
                     $models = [
-                        { id => 'grok-4-0709' },
-                        { id => 'grok-4-fast-non-reasoning' },
-                        { id => 'grok-code-fast-1' },
+                        { id => 'grok-3' },
+                        { id => 'grok-3-mini' },
+                        { id => 'grok-3-fast' },
                     ];
                 }
 
@@ -5809,6 +5930,235 @@ sub sync_models :Local :Args(0) {
             'sync_models', "Error syncing models: $_");
         $c->response->body(encode_json({ success => JSON::false, error => "Sync failed: $_" }));
     };
+}
+
+=head2 project_conversations
+
+JSON endpoint: returns recent AI conversations for a given project_id.
+
+=cut
+
+sub project_conversations :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Authentication required' }));
+        $c->response->status(401);
+        return;
+    }
+
+    my $project_id = $c->request->params->{project_id} || '';
+    my $task_id    = $c->request->params->{task_id}    || '';
+
+    unless ($project_id || $task_id) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'project_id or task_id required' }));
+        $c->response->status(400);
+        return;
+    }
+
+    my %where;
+    $where{project_id} = $project_id if $project_id;
+    $where{task_id}    = $task_id    if $task_id;
+
+    my $schema = $c->model('DBEncy')->schema;
+    my @convs;
+    eval {
+        @convs = $schema->resultset('AiConversation')->search(
+            \%where,
+            { order_by => { -desc => 'updated_at' }, rows => 10 }
+        )->all;
+    };
+
+    my @data = map {
+        {
+            id            => $_->id,
+            title         => $_->get_display_title,
+            model         => $_->model || '',
+            status        => $_->status,
+            updated_at    => $_->updated_at . '',
+            message_count => $_->get_message_count,
+        }
+    } @convs;
+
+    $c->response->body(encode_json({ success => JSON::true, conversations => \@data }));
+}
+
+=head2 _persist_chat
+
+Private method: create or update an AiConversation record and append user + AI messages.
+Stores project_id, task_id, and model on the conversation.
+Returns the conversation ID on success, undef on failure.
+
+=cut
+
+sub _persist_chat {
+    my ($self, $c, $args) = @_;
+
+    my $username        = $args->{username}        || '';
+    my $conversation_id = $args->{conversation_id} || undef;
+    my $project_id      = $args->{project_id}      || undef;
+    my $task_id         = $args->{task_id}         || undef;
+    my $model           = $args->{model}           || '';
+    my $prompt          = $args->{prompt}          || '';
+    my $response        = $args->{response}        || '';
+
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            '_persist_chat', "No user_id in session for user '$username', skipping DB persist");
+        return undef;
+    }
+
+    my $schema = $c->model('DBEncy')->schema;
+    my $conv;
+
+    eval {
+        if ($conversation_id) {
+            $conv = $schema->resultset('AiConversation')->find(
+                { id => $conversation_id, user_id => $user_id }
+            );
+        }
+
+        unless ($conv) {
+            my $title = length($prompt) > 80 ? substr($prompt, 0, 80) . '...' : $prompt;
+            $conv = $schema->resultset('AiConversation')->create({
+                user_id    => $user_id,
+                title      => $title,
+                project_id => $project_id,
+                task_id    => $task_id,
+                model      => $model,
+                status     => 'active',
+            });
+        } else {
+            $conv->update({
+                model      => $model,
+                project_id => $project_id // $conv->project_id,
+                task_id    => $task_id    // $conv->task_id,
+            });
+        }
+
+        $schema->resultset('AiMessage')->create({
+            conversation_id => $conv->id,
+            role            => 'user',
+            content         => $prompt,
+            metadata        => undef,
+        });
+
+        $schema->resultset('AiMessage')->create({
+            conversation_id => $conv->id,
+            role            => 'assistant',
+            content         => $response,
+            metadata        => encode_json({ model => $model }),
+        });
+    };
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_persist_chat', "Failed to persist chat for user '$username': $@");
+        return undef;
+    }
+
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+        '_persist_chat', "Persisted chat to conversation " . $conv->id . " for user '$username'");
+
+    return $conv->id;
+}
+
+=head2 _build_schema_compare_context
+
+Private method: build a system prompt addendum for the schema comparison page.
+Instructs the AI to guide the user toward the correct fix direction and emit
+a sync_schema_field ACTION when asked.
+
+=cut
+
+sub _build_schema_compare_context {
+    my ($self) = @_;
+    return <<'SCHEMA_CTX';
+
+## Schema Compare Assistant Mode
+
+You are helping the admin resolve differences between the live database and the DBIx::Class Result files on the /admin/compare_schema page.
+
+For each difference you explain, follow this structure:
+1. **What the difference is**: describe the field, what the DB has vs what the Result file has.
+2. **Which direction to fix**:
+   - **Update Result file to match DB** ("to_result"): safe — changes only the Perl file, no DB alteration. Use when the DB schema is correct and the Result file is out of date.
+   - **ALTER TABLE to match Result file** ("to_table"): changes the live database. Use with caution — only when the Result file intentionally defines a stricter or different schema.
+3. **Ask the user which direction** they prefer before emitting an ACTION.
+4. **Once the user chooses**, emit the appropriate ACTION:
+   - To update the Result file: [ACTION: {"action": "sync_schema_field", "params": {"table": "TABLE_NAME", "field": "FIELD_NAME", "direction": "to_result", "database": "ency"}}]
+   - To alter the database:     [ACTION: {"action": "sync_schema_field", "params": {"table": "TABLE_NAME", "field": "FIELD_NAME", "direction": "to_table", "database": "ency"}}]
+   - Omit "field" to sync all differences in the table at once.
+   - Use "database": "forager" for the forager database.
+
+**Do NOT emit a sync ACTION unless the user has explicitly confirmed which direction they want.**
+SCHEMA_CTX
+}
+
+=head2 _build_project_context
+
+Private method: build a system prompt context block from project/todo data.
+
+=cut
+
+sub _build_project_context {
+    my ($self, $c, $project_id, $task_id) = @_;
+
+    my $schema = $c->model('DBEncy')->schema;
+    my @lines;
+
+    eval {
+        if ($project_id) {
+            my $project = $schema->resultset('Project')->find($project_id);
+            if ($project) {
+                push @lines, "## Project Context";
+                push @lines, "Project: " . $project->name;
+                push @lines, "Description: " . ($project->description || 'N/A');
+                push @lines, "Status: " . ($project->status || 'N/A');
+
+                my @todos = $schema->resultset('Todo')->search(
+                    { project_id => $project_id },
+                    { order_by => { -asc => 'priority' }, rows => 20 }
+                )->all;
+
+                if (@todos) {
+                    push @lines, "\nProject Todos:";
+                    foreach my $todo (@todos) {
+                        my $s = $todo->status || '';
+                        my $status_text = $s == 1 ? 'New' : $s == 2 ? 'In Progress'
+                                        : $s == 3 ? 'Completed' : $s;
+                        push @lines, "- [$status_text] " . $todo->subject
+                            . ($todo->due_date ? " (due: " . $todo->due_date . ")" : '');
+                    }
+                }
+            }
+        }
+
+        if ($task_id) {
+            my $todo = $schema->resultset('Todo')->find($task_id);
+            if ($todo) {
+                my $s = $todo->status || '';
+                my $status_text = $s == 1 ? 'New' : $s == 2 ? 'In Progress'
+                                : $s == 3 ? 'Completed' : $s;
+                push @lines, "\n## Current Task Context";
+                push @lines, "Task: " . $todo->subject;
+                push @lines, "Description: " . ($todo->description || 'N/A');
+                push @lines, "Status: $status_text";
+                push @lines, "Due: " . ($todo->due_date || 'N/A');
+            }
+        }
+    };
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            '_build_project_context', "Failed to build project context: $@");
+        return '';
+    }
+
+    return @lines ? join("\n", @lines) : '';
 }
 
 =head1 AUTHOR
@@ -6150,9 +6500,20 @@ sub action :Local :Args(0) {
     }
 
     # Parse JSON body
-    my $body_text = $c->request->content;
+    my $body_text;
+    if ($c->req->can('content')) {
+        $body_text = $c->req->content;
+    } else {
+        my $body = $c->req->body;
+        if (ref($body) && $body->can('seek')) {
+            seek($body, 0, 0);
+            $body_text = do { local $/; <$body> };
+        } else {
+            $body_text = $body;
+        }
+    }
     my $req;
-    eval { $req = decode_json($body_text) };
+    eval { $req = decode_json($body_text) } if $body_text;
     if ($@ || !ref $req) {
         $c->response->status(400);
         $c->response->body(encode_json({ success => JSON::false, error => 'Invalid JSON body' }));
@@ -6417,6 +6778,74 @@ sub action :Local :Args(0) {
         return;
     }
 
+    # ── open_project_wizard ───────────────────────────────────────────────────
+    # This is handled entirely client-side; the server just echoes the params back
+    # so the JS wizard handler can pre-fill the form fields.
+    if ($action_name eq 'open_project_wizard') {
+        $c->response->body(encode_json({
+            success       => JSON::true,
+            action        => 'open_project_wizard',
+            wizard_title  => $params->{title} || '',
+            message       => 'Project wizard opened',
+        }));
+        return;
+    }
+
+    # ── create_project ────────────────────────────────────────────────────────
+    if ($action_name eq 'create_project') {
+        my $name = $params->{name};
+        unless ($name) {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'name required' }));
+            return;
+        }
+        my $description  = $params->{description}  || '';
+        my $sitename     = $c->stash->{SiteName}  || $c->session->{SiteName} || 'CSC';
+        my $parent_id    = ($params->{parent_id} && $params->{parent_id} =~ /^\d+$/) ? $params->{parent_id} : undef;
+        my $status       = $params->{status}       || 'NEW';
+        my $due_date     = $params->{due_date}     || do { DateTime->now->add(months => 1)->ymd };
+        my $user_id      = $c->session->{user_id}  || 1;
+        my $roles        = $c->session->{roles}    || [];
+        my $group        = ref $roles eq 'ARRAY' && @$roles ? $roles->[0] : 'user';
+        my $project_code = lc($name);
+        $project_code    =~ s/[^a-z0-9]+/_/g;
+        $project_code    = substr($project_code, 0, 40);
+
+        my $new_project;
+        eval {
+            $new_project = $schema->resultset('Project')->create({
+                name               => $name,
+                description        => $description,
+                sitename           => $sitename,
+                status             => $status,
+                start_date         => $today,
+                end_date           => $due_date,
+                project_code       => $project_code,
+                username_of_poster => $current_user,
+                group_of_poster    => $group,
+                date_time_posted   => $today,
+                developer_name     => $current_user,
+                ($parent_id ? (parent_id => $parent_id) : ()),
+            });
+        };
+        if ($@ || !$new_project) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'action', "create_project failed: $@");
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Project creation failed' }));
+            return;
+        }
+        my $new_id = $new_project->id // '?';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
+            "AI action create_project: id=$new_id name='$name' sitename=$sitename by=$current_user");
+        $c->response->body(encode_json({
+            success     => JSON::true,
+            message     => "Project #$new_id created: \"$name\"",
+            project_id  => $new_id + 0,
+            project_url => "/project/details?project_id=$new_id",
+        }));
+        return;
+    }
+
     # ── create_helpdesk_ticket ────────────────────────────────────────────────
     if ($action_name eq 'create_helpdesk_ticket') {
         my $subject = $params->{subject};
@@ -6460,6 +6889,63 @@ sub action :Local :Args(0) {
             message    => "Support ticket #$ticket_id created: \"$subject\". An admin will be notified.",
             ticket_id  => $ticket_id + 0,
             ticket_url => "/ai/support/$ticket_id",
+        }));
+        return;
+    }
+
+    # ── sync_schema_field ─────────────────────────────────────────────────────
+    # direction: "to_result" = update Result file to match DB
+    #            "to_table"  = ALTER TABLE to match Result file
+    if ($action_name eq 'sync_schema_field') {
+        my $table     = $params->{table}     || '';
+        my $field     = $params->{field}     || '';
+        my $direction = $params->{direction} || '';
+        my $database  = $params->{database}  || 'ency';
+
+        unless ($table && $direction && $direction =~ /^(to_result|to_table)$/) {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false,
+                error => "sync_schema_field requires table, field (optional), direction (to_result|to_table)" }));
+            return;
+        }
+
+        my $endpoint = ($direction eq 'to_result')
+            ? '/admin/sync_table_to_result'
+            : '/admin/sync_result_to_table';
+
+        my $payload = encode_json({
+            table    => $table,
+            field    => $field || undef,
+            database => $database,
+        });
+
+        my $result;
+        eval {
+            require LWP::UserAgent;
+            require HTTP::Request;
+            my $ua = LWP::UserAgent->new(timeout => 30);
+            my $req = HTTP::Request->new(POST => $c->uri_for($endpoint));
+            $req->content_type('application/json');
+            $req->content($payload);
+            # Forward session cookie
+            my $cookie = $c->request->header('Cookie') || '';
+            $req->header('Cookie' => $cookie) if $cookie;
+            my $resp = $ua->request($req);
+            $result = eval { decode_json($resp->content) } || { success => 0, error => $resp->status_line };
+        };
+        if ($@) { $result = { success => 0, error => "Internal error: $@" }; }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
+            "sync_schema_field: table=$table field=" . ($field||'ALL') . " direction=$direction result=" . ($result->{success} ? 'ok' : $result->{error}));
+
+        $c->response->body(encode_json({
+            success   => $result->{success} ? JSON::true : JSON::false,
+            message   => $result->{success}
+                ? "Schema sync ($direction) applied for table '$table'" . ($field ? ", field '$field'" : " (all fields)")
+                : "Schema sync failed: " . ($result->{error} || 'unknown error'),
+            direction => $direction,
+            table     => $table,
+            field     => $field || undef,
         }));
         return;
     }
@@ -6926,6 +7412,209 @@ GUIDELINES:
 - The current user is: $username
 
 You are integrated into the $site_name support system. Respond helpfully and guide users to resolution.
+END_PROMPT
+}
+
+=head2 _build_planning_system_prompt
+
+Builds an AI Project Planning Agent system prompt. Guides the AI to help users
+design new features/projects interactively, with dependency discovery and structured
+project/todo creation via ACTIONs.
+
+=cut
+
+sub _build_planning_system_prompt {
+    my ($self, $c) = @_;
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $username  = $c->session->{username} || 'the user';
+
+    my @existing_projects;
+    eval {
+        @existing_projects = $c->model('DBEncy')->resultset('Project')->search(
+            { sitename => $site_name, status => { '!=' => 'COMPLETED' } },
+            { order_by => { -asc => 'name' }, rows => 40 }
+        )->all;
+    };
+
+    my $projects_list = '';
+    if (@existing_projects) {
+        $projects_list = "EXISTING ACTIVE PROJECTS (use these IDs when linking blockers or sub-projects):\n";
+        foreach my $p (@existing_projects) {
+            $projects_list .= sprintf("- [id=%d] %s (status: %s)\n",
+                $p->id, $p->name, $p->status || 'unknown');
+        }
+    } else {
+        $projects_list = "No existing projects found for $site_name.\n";
+    }
+
+    return <<END_PROMPT;
+You are the AI Project Planning Agent for $site_name. Your role is to help users design and
+create new features, projects, and sub-projects through a structured interactive conversation.
+
+PHILOSOPHY:
+- Ask before you act — always confirm the user's intent before creating anything in the DB
+- Identify dependencies first — what does this feature need that doesn't exist yet?
+- Reuse existing work — check if any existing project already covers part of the need
+- Create a complete structure: parent project → sub-projects → todos with blockers
+
+WORKFLOW — follow this sequence when a user wants to create a new feature or project:
+
+Step 1 — UNDERSTAND THE GOAL
+  Ask: What is the feature called? What problem does it solve? Who uses it?
+
+Step 2 — DEPENDENCY DISCOVERY
+  Ask about each of these potential dependencies:
+  - Does it need user accounts/login? → check if User module covers it
+  - Does it need inventory tracking? → Inventory project
+  - Does it need payments/billing? → Payment / Membership project
+  - Does it need email notifications? → Mail / UnifiedMail project
+  - Does it need a calendar/booking? → Workshop / Scheduling project
+  - Does it need to store media/files? → File module
+  - Does it need AI assistance? → AI Chat System (this branch)
+  - Does it need an API? → API System project
+  - Does it need its own DB tables? → Schema Management project review
+
+Step 3 — REVIEW EXISTING PROJECTS
+  Check the list below for relevant existing projects that could be re-used or extended.
+  Suggest linking to them as blockers if they're needed.
+
+Step 4 — CONFIRM THE PLAN
+  Present a summary to the user:
+  - Main project name + description
+  - List of sub-projects (if any)
+  - Key todos for the first sprint
+  - Blocking dependencies (other project IDs)
+  Ask: "Shall I create this structure now?"
+
+Step 5 — CREATE
+  Once confirmed, emit ACTIONs in order:
+  1. create_project for the main project (and sub-projects if any, using parent_id)
+  2. create_todo for each key task, linked to the correct project_id
+
+AVAILABLE MODULES IN THIS APPLICATION (use these when assessing dependencies):
+- User / Authentication (login, registration, roles)
+- Todo / Project system (tasks, projects, planning)
+- Inventory (items, stock, BOM)
+- HelpDesk (support tickets, live agent)
+- ENCY (encyclopedia — herbs, plants, animals)
+- BMaster / Apiary (beekeeping management)
+- Workshop (events, bookings, registration)
+- Membership (plans, subscriptions, access)
+- Mail / UnifiedMail (mailing lists, campaigns)
+- Navigation (menus, links, routing)
+- AI Chat System (agents, conversations, widget)
+- Schema Management (DB migrations, compare)
+- API System (external endpoints, credentials)
+- Points / Payment (developer time, billing)
+- 3D Print Management (print jobs, filament — coming soon)
+
+$projects_list
+
+ACTION FORMATS:
+- Open project wizard (Step 1 — do this FIRST when user wants to create a new project/feature):
+  [ACTION: {"action": "open_project_wizard", "params": {"title": "Feature name the user mentioned"}}]
+  The wizard form collects: name, description, due date, and dependency checkboxes.
+  Only emit this once per conversation turn. After opening the wizard, ask the user to fill it in.
+
+- Create a project (Step 5 — only after wizard submitted OR user explicitly confirms):
+  [ACTION: {"action": "create_project", "params": {"name": "Project Name", "description": "...", "parent_id": OPTIONAL_PARENT_ID, "due_date": "YYYY-MM-DD"}}]
+
+- Create a todo (Step 5 — after project created):
+  [ACTION: {"action": "create_todo", "params": {"subject": "Todo subject", "project_id": PROJECT_ID, "due_date": "YYYY-MM-DD", "description": "...", "priority": 2}}]
+
+IMPORTANT: When the user says "I need to add X" or "I want to build X" or "create a X system":
+1. Immediately emit open_project_wizard with the feature name pre-filled
+2. Then in your text response ask the dependency questions (inventory? billing? etc.)
+3. Do NOT jump straight to create_project
+
+The current user is: $username
+END_PROMPT
+}
+
+=head2 _build_3dprint_system_prompt
+
+Builds a 3D Print Management Agent system prompt. Focused on print quality,
+material selection, and print project management — not just speed.
+
+=cut
+
+sub _build_3dprint_system_prompt {
+    my ($self, $c) = @_;
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $username  = $c->session->{username} || 'the user';
+    my $is_admin  = do {
+        my $roles = $c->session->{roles} || [];
+        $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
+        grep { /^(admin|developer|editor)$/i } @$roles;
+    };
+
+    my $editor_section = $is_admin ? <<'EDITOR' : '';
+ADMIN WORKFLOW:
+- Add a print job:       /3dprint/add_job
+- View print queue:      /3dprint/queue
+- Manage filament stock: /3dprint/filament
+- Printer status:        /3dprint/printers
+- When the user asks to "add", "queue", "log", or "track" a print, provide the direct URL.
+EDITOR
+
+    return <<END_PROMPT;
+You are the 3D Print Management Assistant for $site_name. You help users manage their 3D printing
+projects, filament inventory, printer maintenance, and print quality troubleshooting.
+
+PHILOSOPHY — Quality and material science first:
+- Prioritize print quality and material suitability over raw print speed
+- Recommend the right filament for the use case (mechanical, food-safe, flexible, aesthetic)
+- Encourage proper first-layer calibration and bed adhesion before increasing speed
+- Material waste costs money — suggest optimal supports and infill for the job
+- Printer maintenance prevents failures — remind users of periodic maintenance tasks
+- Share knowledge about slicer settings and their real effects on print outcome
+
+FILAMENT GUIDANCE:
+- PLA: easy, rigid, biodegradable, poor heat resistance (60°C). Best for prototypes, display items.
+- PETG: tougher, slight flex, food-safe options, 80°C. Good all-rounder. Stringing risk.
+- ABS: strong, heat-resistant (100°C), warps without enclosure. Car parts, enclosures.
+- ASA: like ABS but UV-resistant. Outdoor use.
+- TPU/TPE: flexible, impact-absorbing. Phone cases, gaskets, wheels.
+- Nylon (PA): extremely strong, hygroscopic (must dry before use). Functional parts.
+- PLA+/PLA Pro: better layer adhesion than PLA, slightly more heat-resistant.
+- Resin (MSLA/SLA): ultra-detail, brittle without post-cure, requires ventilation and PPE.
+- Carbon fibre fill (CF): stiff and light — needs hardened nozzle (≥0.4mm hardened steel).
+- Wood/Metal fill PLA: aesthetic fills — abrasive, hardened nozzle recommended.
+
+COMMON PRINT PROBLEMS AND FIXES:
+- Stringing: reduce temp 5°C, increase retraction, enable "combing" in slicer
+- Layer delamination: increase temp, slow print speed, check for drafts
+- Warping: increase bed temp, use brim/raft, enclose printer, use adhesive (gluestick/hairspray)
+- Elephant foot (first layer squish): raise Z offset slightly, reduce first-layer flow
+- Under-extrusion: check for partial clog, increase temp, check extruder tension
+- Over-extrusion: calibrate flow rate (e-steps + flow %), reduce temp
+- Supports won't detach: increase support z-distance, use interface layers, try PVA supports
+- Bed adhesion failure: clean bed with IPA, re-level, check first-layer height
+
+SLICER SETTINGS EXPLAINED:
+- Layer height: 0.1mm (detail) → 0.3mm (speed). 0.2mm is the standard.
+- Infill %: 10-15% (visual), 20-30% (functional), 50%+ (mechanical stress). Pattern matters too.
+- Infill pattern: Grid (general), Gyroid (flexible strength), Honeycomb (lightweight strength)
+- Print speed: 40-60mm/s (quality), 80-120mm/s (speed) — depends on printer capability
+- Retraction: 1-3mm (direct drive), 4-7mm (Bowden). Reduce for flexible filaments.
+- Cooling fan: 100% for PLA, 30-50% for PETG, 0% for ABS/ASA/Nylon
+
+DATABASE SCHEMA — 3D Print tables (coming soon, coordinate with 3D print branch):
+- PrintJob: id, name, description, file_path, filament_id, printer_id, status, start_time, end_time, weight_g, notes
+- Filament: id, brand, material (PLA/PETG/ABS/TPU/etc), color, diameter_mm, spool_weight_g, remaining_g, purchase_date, notes
+- Printer: id, name, model, build_volume, printer_type (FDM/MSLA), status, last_maintenance_date, notes
+- PrintSettings: id, job_id, layer_height, infill_pct, print_speed, temp_nozzle, temp_bed, supports, notes
+
+NAVIGATION URLS (use ONLY these relative URLs):
+- 3D Print dashboard: /3dprint
+- Print queue:        /3dprint/queue
+- Filament inventory: /3dprint/filament
+- Printer status:     /3dprint/printers
+- Add print job:      /3dprint/add_job
+$editor_section
+The current user is: $username
 END_PROMPT
 }
 

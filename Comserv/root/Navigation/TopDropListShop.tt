@@ -1,15 +1,9 @@
 [% PageVersion = 'Navigation/TopDropListShop.tt,v 0.01 2026/04/13 shanta Exp' %]
 [% IF c.session.debug_mode == 1 %][%# PageVersion %][% END %]
 
-[%# Show the Shop nav on any site that has inventory items in its price list.
-    Currently enabled for: 3d, Mcoop, CSC (always show — graceful if empty) %]
-[% SET _show_shop = 0 %]
-[% SET _site = c.session.SiteName || SiteName || '' %]
-[% IF _site == '3d' || _site == 'Mcoop' || _site == 'CSC' || _site == 'csc' %]
-    [% SET _show_shop = 1 %]
-[% END %]
-
-[% IF _show_shop %]
+[%# Show the Shop nav on all sites — the price list gracefully shows
+    "No items available" if the site has no inventory items. %]
+[% IF 1 %]
 [% SET _cart_count = 0 %]
 [% IF c.session.cart %]
     [% FOREACH _k IN c.session.cart.keys %]

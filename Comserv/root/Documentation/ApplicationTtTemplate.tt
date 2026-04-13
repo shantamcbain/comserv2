@@ -4,8 +4,8 @@
    roles = "admin,developer,editor"
    TemplateType = "Documentation"
    category = "Documentation"
-   page_version = "0.01" #this is icremeted on each update.
-   last_updated = "Wed Oct 15 09:31:09 AM PDT 2025" # replaced with the current date use the date command if you don't know it.
+   page_version = "0.02"
+   last_updated = "Mon Apr 13 2026"
 %]
 
 [% PageVersion  = 'Documantation/application_tt_template.tt,v 0.01 2025/10/15 09:31:09 Shanta Exp shanta'; %]
@@ -330,12 +330,89 @@ $c->stash->{
         
         <ul>
             <li><strong>Use semantic containers</strong> - Each major section should be wrapped in an appropriate container</li>
-            <li><strong>Avoid inline styles</strong> - All styling should use global CSS classes</li>
+            <li><strong>Avoid inline styles</strong> - All styling should use global CSS classes or CSS variables</li>
             <li><strong>Maintain consistent spacing</strong> - Use standard margin/padding classes</li>
             <li><strong>Responsive design</strong> - Containers should adapt to different screen sizes</li>
             <li><strong>Accessibility</strong> - Use proper heading hierarchy and ARIA labels</li>
             <li><strong>Modularity</strong> - Break complex layouts into reusable components</li>
         </ul>
+    </div>
+
+    <div class="app-section">
+        <h2>Theme Background Image Compliance</h2>
+        <p>
+            Themes may define a <code>--background-image</code> CSS variable (e.g. the BMaster honeycomb pattern).
+            When active, the <code>&lt;body&gt;</code> receives the class <code>has-bg-image</code> and
+            <code>theme-overrides.css</code> makes all major structural containers transparent so the image
+            shows through. Your templates <strong>must not block</strong> the background image.
+        </p>
+
+        <div class="content-section">
+            <h3>Rules — DO</h3>
+            <ul>
+                <li>Use <strong><code>rgba(255,255,255,0.12)</code></strong> (or similar low-opacity white) for section-level wrappers so the background shows through</li>
+                <li>Use <strong><code>rgba(255,255,255,0.88)</code></strong> for individual content cards that need readable contrast</li>
+                <li>Use <strong><code>var(--background-color)</code></strong> only for elements where a solid theme colour is intentional (e.g. table headers, nav bars)</li>
+                <li>Use <strong><code>background-attachment: scroll</code></strong> — never <code>fixed</code> (breaks with overflow/backdrop-filter/mobile)</li>
+                <li>Keep main page wrappers (<code>.app-container</code>, <code>.content-container</code>, etc.) transparent or inherit from the theme override rules</li>
+            </ul>
+        </div>
+
+        <div class="content-section">
+            <h3>Rules — AVOID</h3>
+            <ul>
+                <li><strong>Never use <code>overflow: hidden</code></strong> on full-page section containers — it clips the background image display</li>
+                <li><strong>Never use <code>backdrop-filter</code></strong> on main structural wrappers — creates stacking context issues</li>
+                <li><strong>Never hardcode <code>background-color: white</code></strong> — use <code>rgba(255,255,255,0.88)</code> instead</li>
+                <li><strong>Never use <code>background-attachment: fixed</code></strong> — breaks on mobile browsers and any ancestor with overflow/transform</li>
+                <li><strong>Never use <code>var(--secondary-color)</code> for large area backgrounds</strong> — the secondary colour varies per theme and may be very dark (e.g. <code>#4A4A4A</code> for the apis/BMaster theme)</li>
+            </ul>
+        </div>
+
+        <div class="content-section">
+            <h3>Example — theme-compliant container with background-image support</h3>
+            <pre class="code-block">
+/* CORRECT — structural wrapper: fully transparent so body bg shows through */
+.my-page-wrapper {
+    background-color: transparent;
+    padding: 20px;
+}
+
+/* CORRECT — section card: semi-transparent so bg partially shows */
+.my-section-card {
+    background-color: rgba(255,255,255,0.12);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+}
+
+/* CORRECT — readable content card: high opacity but still themed */
+.my-content-card {
+    background-color: rgba(255,255,255,0.88);
+    border-radius: 6px;
+    padding: 15px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* WRONG — blocks background image */
+.bad-wrapper {
+    background-color: white;           /* use rgba(255,255,255,0.88) instead */
+    background-attachment: fixed;      /* use scroll instead */
+    overflow: hidden;                  /* remove from page-level containers */
+    backdrop-filter: blur(4px);        /* remove from structural wrappers */
+}</pre>
+        </div>
+
+        <div class="content-section">
+            <h3>CSS Variables for Backgrounds (safe to use)</h3>
+            <ul>
+                <li><code>var(--nav-bg)</code> — correct for nav bars and section headers</li>
+                <li><code>var(--table-header-bg)</code> — correct for table headers and info badges</li>
+                <li><code>var(--border-color)</code> — correct for borders</li>
+                <li><code>var(--button-bg)</code> — correct for buttons</li>
+                <li><code>var(--background-color)</code> — safe only when a solid theme colour is intentional; <em>not</em> for full-page wrappers when bg-image is active</li>
+            </ul>
+        </div>
     </div>
     
     <div class="app-section">

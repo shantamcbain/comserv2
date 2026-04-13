@@ -54,6 +54,9 @@ __PACKAGE__->register_class('PaymentTransaction', 'Comserv::Model::Schema::Ency:
 __PACKAGE__->register_class('InternalCurrencyAccount', 'Comserv::Model::Schema::Ency::Result::InternalCurrencyAccount');
 __PACKAGE__->register_class('InternalCurrencyTransaction', 'Comserv::Model::Schema::Ency::Result::InternalCurrencyTransaction');
 
+# Register Beekeeping hive component tracking
+__PACKAGE__->register_class('HiveComponent', 'Comserv::Model::Schema::Ency::Result::HiveComponent');
+
 # Register Chart of Accounts and General Ledger classes
 # (modeled on SQL-Ledger / LedgerSMB account + journal_entry + journal_line)
 __PACKAGE__->register_class('CoaAccountHeading', 'Comserv::Model::Schema::Ency::Result::CoaAccountHeading');

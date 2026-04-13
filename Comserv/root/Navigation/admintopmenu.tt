@@ -171,13 +171,7 @@
         </div>
 
         <!-- Inventory & Accounting — admin only -->
-        [% SET _is_admin = 0 %]
-        [% IF c.session.roles %]
-          [% IF c.session.roles.grep('^admin$').size %][% SET _is_admin = 1 %][% END %]
-          [% IF c.session.roles.grep('^Admin$').size %][% SET _is_admin = 1 %][% END %]
-        [% END %]
-        [% IF c.session.username == 'Shanta' %][% SET _is_admin = 1 %][% END %]
-        [% IF _is_admin %]
+        [% IF c.stash.is_admin || c.session.username == 'Shanta' %]
         <div class="submenu-item">
             <span class="submenu-header"><a href="/Inventory" class="dropbtn"><i class="icon-inventory"></i>Inventory</a></span>
             <div class="submenu">
@@ -186,6 +180,7 @@
                 <a href="/Inventory/item/add"><i class="icon-add"></i>Add Item</a>
                 <a href="/Inventory/suppliers"><i class="icon-supplier"></i>Suppliers</a>
                 <a href="/Inventory/locations"><i class="icon-location"></i>Locations</a>
+                <a href="/Inventory/invoice"><i class="icon-invoice"></i>Supplier Invoices (AP)</a>
                 <div class="submenu-section">
                     <span class="submenu-section-title">Shop / Orders</span>
                     <a href="/Cart/price_list"><i class="fas fa-store"></i>Price List / Shop</a>
