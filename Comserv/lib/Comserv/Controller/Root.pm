@@ -200,6 +200,9 @@ sub auto :Private {
         # Set up theme using canonical ThemeConfig model with timeout protection
         my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
 
+        # CSS cache-busting version (Unix timestamp, changes every request forcing fresh CSS)
+        $c->stash->{css_v} = time();
+
         # Determine request domain (host without port) and non-standard port
         my $req_host = $c->req->uri->host;   # strips port already
         my $req_port = $c->req->uri->port;
