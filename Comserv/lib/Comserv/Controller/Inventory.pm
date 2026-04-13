@@ -815,6 +815,66 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
 }
 
 # -------------------------------------------------------------------------
+# Marketplace integration
+# -------------------------------------------------------------------------
+
+sub push_to_marketplace :Path('/Inventory/push_to_marketplace') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->_require_admin($c) or return;
+
+    my $item_id  = $c->req->body_parameters->{item_id};
+    my $sitename = $c->session->{SiteName} || 'CSC';
+    my $schema   = $c->model('DBEncy');
+
+    unless ($item_id) {
+        $c->flash->{error_msg} = 'No item specified';
+        $c->res->redirect($c->uri_for('/Cart/price_list'));
+        return;
+    }
+
+    my $item;
+    eval { $item = $schema->resultset('InventoryItem')->find($item_id) };
+
+    unless ($item) {
+        $c->flash->{error_msg} = 'Item not found';
+        $c->res->redirect($c->uri_for('/Cart/price_list'));
+        return;
+    }
+
+    if ($item->marketplace_listing_id) {
+        $c->flash->{success_msg} = '"' . $item->name . '" is already listed in the Marketplace';
+        $c->res->redirect($c->uri_for('/Cart/price_list'));
+        return;
+    }
+
+    my $listing;
+    eval {
+        $listing = $schema->resultset('MarketplaceListing')->create({
+            seller_username => $c->session->{username} || 'admin',
+            sitename        => $sitename,
+            title           => $item->name,
+            description     => $item->description || $item->name,
+            price           => $item->unit_price || $item->unit_cost || 0,
+            listing_type    => 'sale',
+            currency        => 'CAD',
+            accepts_points  => 0,
+            order_url       => '/Cart/price_list',
+            status          => 'active',
+        });
+        $item->update({ marketplace_listing_id => $listing->id, list_in_marketplace => 1 });
+    };
+
+    if ($@ || !$listing) {
+        $c->flash->{error_msg} = 'Failed to create marketplace listing: ' . ($@ || 'unknown error');
+    } else {
+        $c->flash->{success_msg} = '"' . $item->name . '" listed in Marketplace (#' . $listing->id . ')';
+    }
+
+    $c->res->redirect($c->uri_for('/Cart/price_list'));
+}
+
+# -------------------------------------------------------------------------
 # API endpoint for future accounting integration
 # -------------------------------------------------------------------------
 

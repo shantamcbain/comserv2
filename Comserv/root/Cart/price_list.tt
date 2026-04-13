@@ -76,6 +76,18 @@
           <button type="submit" style="padding:4px 12px;background:var(--primary-color);color:var(--text-color);border:1px solid var(--border-color);border-radius:4px;cursor:pointer;font-family:var(--body-font)">Add to Cart</button>
         </div>
       </form>
+      [% IF c.stash.is_admin %]
+      <div style="margin-top:0.4em">
+        [% IF item.marketplace_listing_id %]
+          <a href="/marketplace/listing/[% item.marketplace_listing_id %]" style="font-size:var(--font-size-small);color:var(--primary-color)"><i class="fas fa-store"></i> Listed in Marketplace</a>
+        [% ELSE %]
+          <form method="POST" action="/Inventory/push_to_marketplace" style="display:inline">
+            <input type="hidden" name="item_id" value="[% item.id %]">
+            <button type="submit" style="font-size:var(--font-size-small);padding:2px 8px;background:none;border:1px solid var(--border-color);border-radius:3px;cursor:pointer;color:var(--primary-color);font-family:var(--body-font)"><i class="fas fa-store"></i> Push to Marketplace</button>
+          </form>
+        [% END %]
+      </div>
+      [% END %]
     </div>
     [% ELSE %]
     <div style="border-top:1px solid var(--border-color);padding:0.6em var(--spacing-medium);background:var(--bg-secondary,var(--secondary-color))">
@@ -86,6 +98,42 @@
 [% END %]
 </div>
 
+[% END %]
+
+[% IF workshops.size > 0 && !category %]
+<h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:var(--spacing-large)"><i class="fas fa-chalkboard-teacher"></i> Workshops &amp; Events</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--spacing-medium)">
+[% FOREACH ws IN workshops %]
+  <div style="border:1px solid var(--border-color);border-radius:6px;background:var(--bg-color,var(--background-color))">
+    <div style="padding:var(--spacing-medium)">
+      <h3 style="margin:0 0 0.3em;color:var(--text-color);font-family:var(--header-font);font-size:1rem">[% ws.title %]</h3>
+      [% IF ws.date %]
+        <p style="margin:0 0 0.3em;font-size:var(--font-size-small);color:var(--text-muted-color);font-family:var(--body-font)"><i class="fas fa-calendar"></i> [% ws.date %]</p>
+      [% END %]
+      [% IF ws.location %]
+        <p style="margin:0 0 0.3em;font-size:var(--font-size-small);color:var(--text-muted-color);font-family:var(--body-font)"><i class="fas fa-map-marker-alt"></i> [% ws.location %]</p>
+      [% END %]
+      [% IF ws.instructor %]
+        <p style="margin:0 0 0.4em;font-size:var(--font-size-small);color:var(--text-muted-color);font-family:var(--body-font)"><i class="fas fa-user-tie"></i> [% ws.instructor %]</p>
+      [% END %]
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <strong style="color:var(--primary-color);font-size:1.1rem">$[% ws.registration_fee | format('%.2f') %]</strong>
+        <span style="font-size:var(--font-size-small);color:var(--text-muted-color)">
+          [% IF ws.status == 'registration_closed' %]Registration Closed[% ELSE %]Open[% END %]
+        </span>
+      </div>
+    </div>
+    [% IF ws.status != 'registration_closed' %]
+    <div style="border-top:1px solid var(--border-color);padding:0.6em var(--spacing-medium);background:var(--bg-secondary,var(--secondary-color))">
+      <form method="POST" action="/Cart/add">
+        <input type="hidden" name="workshop_id" value="[% ws.id %]">
+        <button type="submit" style="padding:4px 12px;background:var(--primary-color);color:var(--text-color);border:1px solid var(--border-color);border-radius:4px;cursor:pointer;font-family:var(--body-font)"><i class="fas fa-ticket-alt"></i> Register</button>
+      </form>
+    </div>
+    [% END %]
+  </div>
+[% END %]
+</div>
 [% END %]
 
 [% IF cart_count > 0 %]

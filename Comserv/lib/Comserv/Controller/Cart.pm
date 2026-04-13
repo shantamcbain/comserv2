@@ -90,7 +90,7 @@ sub price_list :Path('/Cart/price_list') :Args(0) {
     my %search = (sitename => $sitename, status => 'active');
     $search{category} = $category if $category;
 
-    my (@items, @categories);
+    my (@items, @categories, @workshops);
     eval {
         @items = $schema->resultset('InventoryItem')->search(
             \%search,
@@ -103,11 +103,20 @@ sub price_list :Path('/Cart/price_list') :Args(0) {
             { sitename => $sitename, status => 'active', category => { '!=' => undef } },
             { columns  => ['category'], distinct => 1, order_by => 'category' }
         );
+        @workshops = $schema->resultset('WorkShop')->search(
+            {
+                sitename          => $sitename,
+                status            => { -in => ['published', 'registration_closed'] },
+                registration_fee  => { '>' => 0 },
+            },
+            { order_by => ['date'] }
+        ) unless $category;
     };
 
     $c->stash(
         items      => \@items,
         categories => \@categories,
+        workshops  => \@workshops,
         category   => $category,
         sitename   => $sitename,
         cart_count => $self->_cart_count($c),
@@ -139,22 +148,51 @@ sub view_cart :Path('/Cart') :Args(0) {
 sub add_to_cart :Path('/Cart/add') :Args(0) {
     my ($self, $c) = @_;
 
-    my $params  = $c->req->body_parameters;
-    my $item_id = $params->{item_id};
-    my $qty     = $params->{quantity} || 1;
-    my $options = $params->{options}  || '';
+    my $params      = $c->req->body_parameters;
+    my $item_id     = $params->{item_id};
+    my $workshop_id = $params->{workshop_id};
+    my $qty         = $params->{quantity} || 1;
+    my $options     = $params->{options}  || '';
 
-    unless ($item_id) {
+    unless ($item_id || $workshop_id) {
         $c->flash->{error_msg} = 'No item specified';
         $c->res->redirect($c->uri_for('/Cart/price_list'));
         return;
     }
 
     my $schema = $self->_schema($c);
+    my $cart   = $self->_cart($c);
+
+    if ($workshop_id) {
+        my $ws;
+        eval { $ws = $schema->resultset('WorkShop')->find($workshop_id) };
+        unless ($ws) {
+            $c->flash->{error_msg} = 'Workshop not found';
+            $c->res->redirect($c->uri_for('/Cart/price_list'));
+            return;
+        }
+        my $cart_key = "ws_$workshop_id";
+        if (exists $cart->{$cart_key}) {
+            $cart->{$cart_key}{quantity} += $qty;
+        } else {
+            $cart->{$cart_key} = {
+                workshop_id => $workshop_id + 0,
+                item_type   => 'workshop',
+                sku         => 'WS-' . $workshop_id,
+                name        => $ws->title,
+                unit_price  => ($ws->registration_fee // 0) + 0,
+                quantity    => 1,
+                options     => ($ws->date ? $ws->date . '' : ''),
+            };
+        }
+        $c->session->{cart} = $cart;
+        $c->flash->{success_msg} = '"' . $ws->title . '" added to cart';
+        $c->res->redirect($c->uri_for('/Cart/price_list'));
+        return;
+    }
+
     my $item;
-    eval {
-        $item = $schema->resultset('InventoryItem')->find($item_id);
-    };
+    eval { $item = $schema->resultset('InventoryItem')->find($item_id) };
 
     unless ($item) {
         $c->flash->{error_msg} = 'Item not found';
@@ -163,14 +201,14 @@ sub add_to_cart :Path('/Cart/add') :Args(0) {
     }
 
     my $unit_price = $item->unit_price // $item->unit_cost // 0;
-    my $cart       = $self->_cart($c);
     my $cart_key   = $item_id . ($options ? "_$options" : '');
 
     if (exists $cart->{$cart_key}) {
         $cart->{$cart_key}{quantity} += $qty;
     } else {
         $cart->{$cart_key} = {
-            item_id    => $item_id,
+            item_id    => $item_id + 0,
+            item_type  => 'item',
             sku        => $item->sku,
             name       => $item->name,
             unit_price => $unit_price + 0,
