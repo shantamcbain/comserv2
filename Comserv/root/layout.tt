@@ -22,8 +22,8 @@
 [% IF c.stash.ai_popup_mode %]
     [%# Popup / detached-widget mode: render bare — no nav, no footer, no back-to-top %]
     [% content %]
-    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% USE date; TRY; date.format(date.now, '%Y%m%d%H'); CATCH; '1'; END %]">
-    <script src="/static/js/local-chat.js?v=[% TRY; date.format(date.now, '%Y%m%d%H'); CATCH; '1'; END %]"></script>
+    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% USE date; date.format(date.now, '%s') || '1' %]">
+    <script src="/static/js/local-chat.js?v=[% date.format(date.now, '%s') || '1' %]"></script>
 [% ELSE %]
     [% INCLUDE 'pagetop.tt' %]
 [%# INCLUDE 'home.tt' %]
@@ -42,8 +42,8 @@
     [% END %]
 
     <!-- Chat widget CSS and JS — outside footer TRY/CATCH so it appears on every page -->
-    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% USE date; TRY; date.format(date.now, '%Y%m%d%H'); CATCH; '1'; END %]">
-    <script src="/static/js/local-chat.js?v=[% TRY; date.format(date.now, '%Y%m%d%H'); CATCH; '1'; END %]"></script>
+    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% USE date; date.format(date.now, '%s') || '1' %]">
+    <script src="/static/js/local-chat.js?v=[% date.format(date.now, '%s') || '1' %]"></script>
 [% END %]
 
 </body>
