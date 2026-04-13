@@ -236,7 +236,9 @@
         "body-font": "Arial, sans-serif",
         "background-image": "url(/static/images/BMaster/honey2.jpg)",
         "background-repeat": "repeat",
-        "background-attachment": "scroll"
+        "background-attachment": "scroll",
+        "background-position": "top left",
+        "background-size": "auto"
       },
       "name": "APIS Theme",
       "description": "Beekeeping theme with honeycomb pattern",

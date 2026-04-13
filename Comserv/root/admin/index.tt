@@ -455,8 +455,6 @@
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.15);
     margin-bottom: 25px;
-    overflow: hidden;
-    backdrop-filter: blur(2px);
 }
 
 .section-header {
