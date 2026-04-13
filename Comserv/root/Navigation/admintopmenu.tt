@@ -170,6 +170,19 @@
             </div>
         </div>
 
+        <!-- Marketplace — admin management -->
+        [% IF c.stash.is_admin || c.session.username == 'Shanta' %]
+        <div class="submenu-item">
+            <span class="submenu-header"><a href="/marketplace" class="dropbtn"><i class="icon-marketplace"></i>Marketplace</a></span>
+            <div class="submenu">
+                <a href="/marketplace"><i class="icon-list"></i>Browse Listings</a>
+                <a href="/marketplace/add"><i class="icon-add"></i>Add Listing</a>
+                <a href="/admin/marketplace"><i class="icon-admin"></i>Manage Listings</a>
+                <a href="/admin/marketplace/categories"><i class="icon-folder"></i>Manage Categories</a>
+            </div>
+        </div>
+        [% END %]
+
         <!-- Inventory & Accounting — admin only -->
         [% IF c.stash.is_admin || c.session.username == 'Shanta' %]
         <div class="submenu-item">
@@ -181,10 +194,12 @@
                 <a href="/Inventory/suppliers"><i class="icon-supplier"></i>Suppliers</a>
                 <a href="/Inventory/locations"><i class="icon-location"></i>Locations</a>
                 <a href="/Inventory/invoice"><i class="icon-invoice"></i>Supplier Invoices (AP)</a>
+                <a href="/Inventory/sales"><i class="icon-invoice"></i>Sales Invoices (AR)</a>
                 <div class="submenu-section">
                     <span class="submenu-section-title">Shop / Orders</span>
                     <a href="/Cart/price_list"><i class="fas fa-store"></i>Price List / Shop</a>
-                    <a href="/Cart/orders"><i class="fas fa-shopping-cart"></i>Customer Orders</a>
+                    <a href="/Cart/orders"><i class="fas fa-shopping-cart"></i>Cart Orders</a>
+                    <a href="/CustomerOrder"><i class="icon-cart"></i>Customer Orders</a>
                 </div>
                 <div class="submenu-section">
                     <span class="submenu-section-title">Accounting</span>
