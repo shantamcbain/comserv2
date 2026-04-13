@@ -6,7 +6,7 @@ body[class*="theme-"] {
   background-image: var(--background-image) !important;
   background-repeat: var(--background-repeat, repeat) !important;
   background-position: var(--background-position, top left) !important;
-  background-attachment: var(--background-attachment, fixed) !important;
+  background-attachment: var(--background-attachment, scroll) !important;
   background-size: var(--background-size, auto) !important;
   color: var(--text-color) !important;
 }
