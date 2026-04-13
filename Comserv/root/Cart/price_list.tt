@@ -41,7 +41,7 @@
   [% FOREACH sl IN item.stock_levels %][% total_stock = total_stock + sl.quantity_on_hand %][% END %]
   [% display_price = item.unit_price || item.unit_cost || 0 %]
 
-  <div style="border:1px solid var(--border-color);border-radius:6px;overflow:hidden;background:var(--bg-color,var(--background-color))">
+  <div style="border:1px solid var(--border-color);border-radius:6px;background:var(--bg-color,var(--background-color))">
     <div style="padding:var(--spacing-medium)">
       <h3 style="margin:0 0 0.4em;color:var(--text-color);font-family:var(--header-font);font-size:1rem">[% item.name %]</h3>
       [% IF item.description %]

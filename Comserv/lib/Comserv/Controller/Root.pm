@@ -464,6 +464,20 @@ sub auto :Private {
             $c->stash->{enabled_modules} = {};
         }
 
+        # Check if current site has active priced inventory items (for Shop nav visibility)
+        eval {
+            my $shop_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'none';
+            my $shop_count = $c->model('DBEncy')->resultset('InventoryItem')->search({
+                sitename => $shop_site,
+                status   => 'active',
+                unit_price => { '>' => 0 },
+            }, { rows => 1 })->count;
+            $c->stash->{site_has_shop} = $shop_count ? 1 : 0;
+        };
+        if ($@) {
+            $c->stash->{site_has_shop} = 0;
+        }
+
         # CRITICAL: Debug Bar Implementation - DO NOT REMOVE
         # This section provides server information for the debug bar UI
         # which displays hostname, IP, and database connection info to admins/debug mode.
