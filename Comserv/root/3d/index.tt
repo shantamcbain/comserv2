@@ -14,72 +14,21 @@
 <h2 style="color:var(--text-color);font-family:var(--header-font)">Overview</h2>
 <p style="color:var(--text-color);font-family:var(--body-font)">Welcome to the 3D printing community. Browse our available print services and products below, add items to your cart, and check out online.</p>
 
-<!-- ===== PUBLIC SHOP SECTION ===== -->
+<!-- ===== SHOP LINK ===== -->
 <a id="shop"></a><a href="#3dtop" style="color:var(--text-muted-color);font-size:var(--font-size-small)">↑ top</a>
-<h2 style="color:var(--text-color);font-family:var(--header-font)"><i class="fas fa-store"></i> Products &amp; Services</h2>
-
-[% IF shop_items.size > 0 %]
-
-[% IF c.session.cart %]
-  [% _cc = 0 %]
-  [% FOREACH _k IN c.session.cart.keys %][% _cc = _cc + c.session.cart.$_k.quantity %][% END %]
-  [% IF _cc > 0 %]
-  <p style="font-family:var(--body-font)">
-    <a href="/Cart" style="color:var(--primary-color);font-weight:bold"><i class="fas fa-shopping-cart"></i> View Cart ([% _cc %] items)</a>
-    &nbsp;|&nbsp;
-    <a href="/Cart/checkout" style="color:var(--primary-color)">Checkout →</a>
-  </p>
-  [% END %]
-[% END %]
-
-<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:var(--spacing-medium);margin-bottom:var(--spacing-medium)">
-[% FOREACH item IN shop_items %]
-  [% total_stock = 0 %]
-  [% FOREACH sl IN item.stock_levels %][% total_stock = total_stock + sl.quantity_on_hand %][% END %]
-  [% display_price = item.unit_price || item.unit_cost || 0 %]
-
-  <div style="border:1px solid var(--border-color);border-radius:6px;background:var(--bg-color,var(--background-color))">
-    <div style="padding:var(--spacing-medium)">
-      <h3 style="margin:0 0 0.3em;color:var(--text-color);font-family:var(--header-font);font-size:1rem">[% item.name %]</h3>
-      [% IF item.category %]
-        <p style="margin:0 0 0.3em;font-size:var(--font-size-small);color:var(--text-muted-color);font-family:var(--body-font)"><i class="fas fa-tag"></i> [% item.category %]</p>
-      [% END %]
-      [% IF item.description %]
-        <p style="margin:0 0 0.5em;color:var(--text-muted-color);font-size:var(--font-size-small);font-family:var(--body-font)">[% item.description | truncate(90) %]</p>
-      [% END %]
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <strong style="color:var(--primary-color);font-size:1.1rem">
-          [% IF display_price > 0 %]$[% display_price | format('%.2f') %][% ELSE %]<em style="font-size:0.85rem;color:var(--text-muted-color)">Contact</em>[% END %]
-        </strong>
-        <span style="font-size:var(--font-size-small);color:[% IF total_stock > 0 %]var(--success-color,green)[% ELSE %]var(--text-muted-color)[% END %]">
-          [% IF total_stock > 0 %]&#10003; In stock[% ELSE %]Out of stock[% END %]
-        </span>
-      </div>
-    </div>
-    [% IF display_price > 0 %]
-    <div style="border-top:1px solid var(--border-color);padding:0.5em var(--spacing-medium);background:var(--bg-secondary,var(--secondary-color))">
-      <form method="POST" action="/Cart/add">
-        <input type="hidden" name="item_id" value="[% item.id %]">
-        <div style="display:flex;gap:0.4em;align-items:center">
-          <input type="number" name="quantity" value="1" min="1" style="width:55px;padding:3px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
-          <button type="submit" style="padding:4px 10px;background:var(--primary-color);color:var(--text-color);border:1px solid var(--border-color);border-radius:4px;cursor:pointer;font-family:var(--body-font)">Add to Cart</button>
-        </div>
-      </form>
-    </div>
+<h2 style="color:var(--text-color);font-family:var(--header-font)"><i class="fas fa-store"></i> Shop</h2>
+<p style="color:var(--text-color);font-family:var(--body-font)">
+  Browse our 3D print services, filament, and products.
+  [% IF c.session.cart %]
+    [% _cc = 0 %][% FOREACH _k IN c.session.cart.keys %][% _cc = _cc + c.session.cart.$_k.quantity %][% END %]
+    [% IF _cc > 0 %]
+      You have <a href="/Cart" style="color:var(--primary-color);font-weight:bold">[% _cc %] item[% IF _cc != 1 %]s[% END %] in your cart</a>.
     [% END %]
-  </div>
-[% END %]
-</div>
-
+  [% END %]
+</p>
 <p style="font-family:var(--body-font)">
-  <a href="/Cart/price_list" style="color:var(--primary-color)"><i class="fas fa-list"></i> View full price list &amp; all products →</a>
+  <a href="/Cart/price_list" class="menu-item" style="color:var(--primary-color);font-weight:bold"><i class="fas fa-store"></i> Browse Products &amp; Services →</a>
 </p>
-
-[% ELSE %]
-<p style="color:var(--text-muted-color);font-family:var(--body-font)">
-  No products are currently listed. Please check back soon, or <a href="#contact" style="color:var(--primary-color)">contact us</a> to request a print.
-</p>
-[% END %]
 
 <!-- ===== EXPLORE ===== -->
 <a id="explore"></a><a href="#3dtop" style="color:var(--text-muted-color);font-size:var(--font-size-small)">↑ top</a>
