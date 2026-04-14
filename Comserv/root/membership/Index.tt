@@ -144,7 +144,16 @@
           [% END %]
         [% END %]
 
-        [% IF csc_hosting_plans.size %]
+      </div>
+      [% END %][%# /IF is_admin AND !site_is_csc %]
+
+      [%# CSC hosting plan cards — visible to all users when site is an active hosting partner %]
+      [% IF !site_is_csc AND hosting_account AND hosting_account.status == 'active' AND csc_hosting_plans.size %]
+      <div class="content-section">
+        <h2>&#127760; CSC Hosting Plans</h2>
+        <p style="color:#555;margin-bottom:1rem;">
+          [% site_name | html %] is a CSC hosting partner. Members can purchase hosting plans directly through CSC.
+        </p>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;">
           [% FOREACH hplan IN csc_hosting_plans %]
           <div style="border:1px solid #c8e6c9;border-radius:6px;padding:1rem;background:#f8fdf4[% IF hplan.is_featured %];border-color:#4a8c3f;border-width:2px[% END %]">
@@ -164,12 +173,15 @@
               [% IF hplan.has_planning %]<li>Planning &amp; project tools</li>[% END %]
               [% IF hplan.ai_requests_per_day > 0 %]<li>[% hplan.ai_requests_per_day %] AI requests/day</li>[% END %]
             </ul>
+            <a href="[% c.uri_for('/membership/subscribe', { plan_id => hplan.id }) %]"
+               class="btn btn-primary" style="margin-top:0.6rem;display:inline-block;font-size:0.9rem;">
+              Get Hosting →
+            </a>
           </div>
           [% END %]
         </div>
-        [% END %]
       </div>
-      [% END %][%# /IF is_admin AND !site_is_csc %]
+      [% END %]
 
       [% IF plans.size %]
       <div class="content-section">
