@@ -999,24 +999,20 @@ sub fetch_and_set {
     }
 
     if (!defined $c->stash->{SiteName}) {
-        if (defined $c->session->{SiteName}) {
-            $c->stash->{SiteName} = $c->session->{SiteName};
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "SiteName found in session: " . $c->session->{SiteName});
-        } else {
-            my $domain = $c->req->uri->host;
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Extracted domain: $domain");
+        my $domain = $c->req->uri->host;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Extracted domain: $domain");
 
-            my $site_domain = $c->model('Site')->get_site_domain($c, $domain);
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site domain retrieved: " . Dumper($site_domain));
+        my $site_domain = $c->model('Site')->get_site_domain($c, $domain);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site domain retrieved: " . Dumper($site_domain));
 
-            if ($site_domain) {
-                my $site_id = $site_domain->site_id;
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site ID: $site_id");
+        if ($site_domain) {
+            my $site_id = $site_domain->site_id;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site ID: $site_id");
 
-                my $site = $c->model('Site')->get_site_details($c, $site_id);
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site details retrieved: " . Dumper($site));
+            my $site = $c->model('Site')->get_site_details($c, $site_id);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site details retrieved: " . Dumper($site));
 
-                if ($site) {
+            if ($site) {
                     $value = $site->name;
                     $c->stash->{SiteName} = $value;
                     $c->session->{SiteName} = $value;
@@ -1045,10 +1041,15 @@ sub fetch_and_set {
                     }
                 }
             } else {
-                $c->session->{SiteName} = 'none';
-                $c->stash->{SiteName} = 'none';
-                $c->session->{ControllerName} = 'Root';
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "No site domain found, defaulting SiteName and ControllerName to 'none' and 'Root'");
+                if (defined $c->session->{SiteName}) {
+                    $c->stash->{SiteName} = $c->session->{SiteName};
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Domain not in DB; using session SiteName: " . $c->session->{SiteName});
+                } else {
+                    $c->session->{SiteName} = 'none';
+                    $c->stash->{SiteName} = 'none';
+                    $c->session->{ControllerName} = 'Root';
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "No site domain found, defaulting SiteName to 'none'");
+                }
             }
         }
     }
