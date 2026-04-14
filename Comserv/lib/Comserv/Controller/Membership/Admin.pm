@@ -1218,17 +1218,20 @@ sub hosting_account_edit :Local :Args(1) {
 
     if ($c->req->method eq 'POST') {
         my $p = $c->req->body_parameters;
+        my @addon_keys = qw(beekeeping planning ai workshops helpdesk foraging ency ecommerce membership);
+        my $addons_str = join(',', grep { $p->{"addon_$_"} } @addon_keys);
         eval {
             $acct->update({
-                plan_slug      => $p->{plan_slug}      || $acct->plan_slug,
-                domain         => $p->{domain}         // '',
-                domain_type    => $p->{domain_type}    || 'subdomain',
-                parent_domain  => $p->{parent_domain}  // '',
-                contact_email  => $p->{contact_email}  // '',
-                monthly_cost   => $p->{monthly_cost}   // $acct->monthly_cost,
-                cpanel_username => $p->{cpanel_username} // '',
-                notes          => $p->{notes}          // '',
-                updated_at     => \'NOW()',
+                plan_slug        => $p->{plan_slug}       || $acct->plan_slug,
+                domain           => $p->{domain}          // '',
+                domain_type      => $p->{domain_type}     || 'subdomain',
+                parent_domain    => $p->{parent_domain}   // '',
+                contact_email    => $p->{contact_email}   // '',
+                monthly_cost     => $p->{monthly_cost}    // $acct->monthly_cost,
+                cpanel_username  => $p->{cpanel_username} // '',
+                notes            => $p->{notes}           // '',
+                requested_addons => $addons_str,
+                updated_at       => \'NOW()',
             });
         };
         if ($@) {
