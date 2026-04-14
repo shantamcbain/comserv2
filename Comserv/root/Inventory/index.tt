@@ -41,6 +41,7 @@
     <li><a href="/Inventory/supplier/add">Add Supplier</a></li>
     <li><a href="/Inventory/location/add">Add Location</a></li>
     <li><a href="/Inventory/stock/adjust">Adjust Stock</a></li>
+    <li><a href="/Inventory/bom/list">Bill of Materials (BOM)</a></li>
     <li><a href="/Inventory/invoice">Supplier Invoices (AP)</a></li>
     <li><a href="/Inventory/sales">Sales Invoices (AR)</a></li>
     <li><a href="/Accounting">Accounting &amp; Chart of Accounts</a></li>

@@ -9,6 +9,10 @@
   <a href="/Inventory/item/edit/[% item.id %]">Edit</a>
   &nbsp;|&nbsp;
   <a href="/Inventory/stock/adjust?item_id=[% item.id %]">Adjust Stock</a>
+  [% IF item.is_assemblable %]
+  &nbsp;|&nbsp;
+  <a href="/Inventory/bom/[% item.id %]"><strong>Manage BOM</strong></a>
+  [% END %]
   &nbsp;|&nbsp;
   <a href="/Inventory/items">Back to List</a>
 </div>
@@ -137,6 +141,7 @@
 <h3>Add Component</h3>
 [% IF all_items.size %]
 <form method="POST" action="/Inventory/bom/add/[% item.id %]">
+  <input type="hidden" name="redirect_to" value="item">
   <table cellpadding="4">
     <tr>
       <th><label for="component_item_id">Component Item *</label></th>

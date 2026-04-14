@@ -158,6 +158,10 @@
                         <i class="fas fa-map-marker-alt"></i>
                         <span>Locations</span>
                     </a>
+                    <a href="[% c.uri_for('/Inventory/bom/list') %]" class="admin-link">
+                        <i class="fas fa-sitemap"></i>
+                        <span>Bill of Materials</span>
+                    </a>
                     <a href="[% c.uri_for('/Inventory/invoice') %]" class="admin-link">
                         <i class="fas fa-file-invoice-dollar"></i>
                         <span>Supplier Invoices</span>
