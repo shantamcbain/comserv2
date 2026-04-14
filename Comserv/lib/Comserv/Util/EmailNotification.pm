@@ -541,6 +541,51 @@ This is an automated notification from the Comserv platform.
     return $self->send_email($c, $email, $smtp_config);
 }
 
+sub send_hosting_signup_confirmation {
+    my ($self, $c, $account) = @_;
+
+    my $contact_email = $account->contact_email;
+    return 0 unless $contact_email;
+
+    my $smtp_config = $self->get_smtp_config($c, 'CSC');
+    return 0 unless $smtp_config->{smtp_host};
+
+    my $timestamp  = scalar localtime;
+    my $addons_str = $account->requested_addons || 'none';
+
+    my $body = qq{
+CSC Hosting — Registration Received
+Time: $timestamp
+
+Thank you for registering with CSC hosting!
+
+  SiteName      : ${\$account->sitename}
+  Plan          : ${\($account->plan_slug || 'N/A')}
+  Domain        : ${\($account->domain || 'To be confirmed')}
+  Domain Type   : ${\($account->domain_type || 'subdomain')}
+  Add-ons       : $addons_str
+
+Your registration is now pending CSC review. You will receive
+another email once your account is approved and active.
+
+If you have questions contact us at helpdesk\@computersystemconsulting.ca.
+
+This is an automated notification from the Comserv platform.
+};
+
+    my $email = Email::MIME->create(
+        header_str => [
+            From    => $smtp_config->{smtp_from} || 'noreply@computersystemconsulting.ca',
+            To      => $contact_email,
+            Subject => "[CSC] Hosting registration received for " . $account->sitename,
+        ],
+        attributes => { encoding => 'quoted-printable', charset => 'UTF-8' },
+        body_str   => $body,
+    );
+
+    return $self->send_email($c, $email, $smtp_config);
+}
+
 sub send_hosting_approval_notification {
     my ($self, $c, $account) = @_;
 

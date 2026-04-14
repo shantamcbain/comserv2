@@ -9,6 +9,22 @@
         [% END %]
     </div>
 
+    [%# ── Persistent action-required banners ──────────────────────── %]
+    [% IF pending_hosting > 0 %]
+    <div style="background:#fff3cd;border:2px solid #e67e22;border-radius:8px;padding:1rem 1.4rem;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <strong style="color:#b45309;font-size:1.05rem;">&#9888; [% pending_hosting %] Hosting Registration[% IF pending_hosting > 1 %]s[% END %] Awaiting Approval</strong>
+        <div style="margin-top:0.25rem;color:#78350f;">
+          A SiteName admin has submitted a CSC hosting registration request and is waiting for your approval.
+        </div>
+      </div>
+      <a href="[% c.uri_for('/membership/admin/hosting_accounts') %]"
+         style="white-space:nowrap;margin-left:1.5rem;background:#e67e22;color:#fff;padding:0.5rem 1.1rem;border-radius:6px;text-decoration:none;font-weight:bold;">
+        Review &amp; Approve →
+      </a>
+    </div>
+    [% END %]
+
     <!-- Software Management Status - Prominent Section -->
     <div class="software-management-section theme-section">
         <div class="section-header">

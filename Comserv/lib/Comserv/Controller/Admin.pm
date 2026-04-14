@@ -197,12 +197,22 @@ sub index :Path :Args(0) {
         push @{$c->stash->{debug_msg}}, "Admin controller index view - Template: admin/index.tt";
     }
     
-    # Pass data to the template
+    my $pending_hosting = 0;
+    eval {
+        my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+        if (lc($site_name) eq 'csc') {
+            $pending_hosting = $c->model('DBEncy')->resultset('HostingAccount')->search(
+                { status => 'pending' }
+            )->count;
+        }
+    };
+
     $c->stash(
-        template => 'admin/index.tt',
-        stats => $stats,
+        template        => 'admin/index.tt',
+        stats           => $stats,
         recent_activity => $recent_activity,
-        notifications => $notifications
+        notifications   => $notifications,
+        pending_hosting => $pending_hosting,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
