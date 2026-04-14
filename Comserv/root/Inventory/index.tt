@@ -51,6 +51,15 @@
 </div>
 
 <div class="inventory-actions">
+  <h2>Print &amp; Labels</h2>
+  <ul>
+    <li><a href="/Inventory/print/labels" target="_blank">Print All Item Labels</a></li>
+    <li><a href="/Inventory/print/stock" target="_blank">Print Stock Report</a></li>
+    <li><a href="/Inventory/print/stock?low_only=1" target="_blank">Print Low-Stock Report</a></li>
+  </ul>
+</div>
+
+<div class="inventory-actions">
   <h2>Customer Shop</h2>
   <ul>
     <li><a href="/Cart/price_list">Price List / Shop</a></li>

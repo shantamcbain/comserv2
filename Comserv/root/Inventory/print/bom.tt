@@ -1,0 +1,285 @@
+[% PageVersion = 'Inventory/print/bom.tt,v 0.01 2026/04/14 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+  @media print {
+    .no-print { display: none !important; }
+    body { margin: 12mm; padding: 0; font-size: 10pt; }
+    table { font-size: 9pt; }
+    h1 { font-size: 15pt; }
+    tr { page-break-inside: avoid; }
+    .optional-row { color: #666 !important; font-style: italic; }
+  }
+
+  body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; }
+
+  .print-controls {
+    background: #333;
+    color: #fff;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .print-controls a { color: #adf; text-decoration: none; }
+  .print-controls button {
+    background: #28a745;
+    color: #fff;
+    border: none;
+    padding: 7px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: bold;
+  }
+
+  .bom-page {
+    max-width: 260mm;
+    margin: 12px auto;
+    background: #fff;
+    padding: 15mm;
+    box-shadow: 0 0 8px rgba(0,0,0,0.15);
+  }
+
+  .bom-header {
+    border-bottom: 2px solid #333;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+  }
+
+  .bom-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85em;
+    color: #555;
+    margin: 6px 0;
+  }
+
+  .item-info-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+    font-size: 0.9em;
+  }
+  .item-info-table th {
+    text-align: left;
+    padding: 4px 10px 4px 0;
+    color: #555;
+    font-weight: normal;
+    white-space: nowrap;
+    width: 140px;
+  }
+  .item-info-table td {
+    padding: 4px 10px 4px 0;
+    font-weight: bold;
+  }
+
+  .components-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+  }
+
+  .components-table th {
+    background: #444;
+    color: #fff;
+    padding: 5px 8px;
+    text-align: left;
+    font-size: 0.85em;
+  }
+
+  .components-table th.right,
+  .components-table td.right {
+    text-align: right;
+  }
+
+  .components-table td {
+    padding: 5px 8px;
+    border-bottom: 1px solid #ddd;
+    font-size: 0.9em;
+    vertical-align: top;
+  }
+
+  .components-table tr:nth-child(even) td { background: #f9f9f9; }
+
+  .optional-row td {
+    color: #777;
+    font-style: italic;
+  }
+
+  .totals-row td {
+    font-weight: bold;
+    border-top: 2px solid #333;
+    background: #f0f0f0 !important;
+  }
+
+  .cost-badge {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.85em;
+  }
+  .cost-over { background: #fde; color: #c00; }
+  .cost-under { background: #efe; color: #080; }
+
+  .signature-block {
+    margin-top: 24px;
+    display: flex;
+    gap: 30mm;
+  }
+  .signature-line {
+    border-top: 1px solid #000;
+    width: 60mm;
+    padding-top: 4px;
+    font-size: 0.8em;
+    color: #555;
+  }
+
+  @media print {
+    .bom-page { box-shadow: none; padding: 0; max-width: none; }
+  }
+</style>
+
+<div class="no-print print-controls">
+  <a href="/Inventory/bom/[% item.id %]">&larr; Back to BOM</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/item/view/[% item.id %]">Item View</a>
+  &nbsp;
+  <button onclick="window.print()">&#128438; Print BOM Sheet</button>
+</div>
+
+<div class="bom-page">
+  <div class="bom-header">
+    <h1>Bill of Materials</h1>
+    <div class="bom-meta">
+      <span>Site: <strong>[% sitename %]</strong></span>
+      <span>Printed: [% print_date %]</span>
+    </div>
+  </div>
+
+  <table class="item-info-table">
+    <tr>
+      <th>Assembly Item:</th>
+      <td>[% item.name | html %]</td>
+      <th>SKU:</th>
+      <td style="font-family:'Courier New',monospace;font-weight:bold;letter-spacing:2px;">[% item.sku %]</td>
+    </tr>
+    <tr>
+      <th>Category:</th>
+      <td>[% item.category || '—' %]</td>
+      <th>Unit of Measure:</th>
+      <td>[% item.unit_of_measure %]</td>
+    </tr>
+    <tr>
+      <th>Origin:</th>
+      <td>[% item.item_origin || '—' %]</td>
+      <th>Listed Unit Cost:</th>
+      <td>[% item.unit_cost ? '$' _ item.unit_cost : '—' %]</td>
+    </tr>
+    <tr>
+      <th>Assembled Cost (req.):</th>
+      <td>
+        <strong>[% assembled_cost > 0 ? '$' _ assembled_cost : '—' %]</strong>
+        [% IF assembled_cost > 0 && item.unit_cost %]
+          [% IF assembled_cost > item.unit_cost %]
+            <span class="cost-badge cost-over">over listed</span>
+          [% ELSE %]
+            <span class="cost-badge cost-under">under listed</span>
+          [% END %]
+        [% END %]
+      </td>
+      <th>Description:</th>
+      <td>[% item.description | html || '—' %]</td>
+    </tr>
+  </table>
+
+  [% SET bom_rows = item.bom_components %]
+
+  [% IF bom_rows.size == 0 %]
+    <p><em>No components defined for this assembly.</em></p>
+  [% ELSE %]
+
+  <table class="components-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Component</th>
+        <th>SKU</th>
+        <th class="right">Unit Cost</th>
+        <th class="right">Qty</th>
+        <th>Unit</th>
+        <th class="right">Waste %</th>
+        <th class="right">Eff. Qty</th>
+        <th class="right">Line Cost</th>
+        <th>Optional</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+    [% SET row_num = 0 %]
+    [% SET total_req = 0 %]
+    [% SET total_opt = 0 %]
+    [% FOREACH comp IN bom_rows %]
+      [% row_num = row_num + 1 %]
+      [% ci = comp.component_item %]
+      [% eff_qty = comp.quantity * (1 + (comp.scrap_factor || 0)) %]
+      [% line_cost = ci && ci.unit_cost ? (ci.unit_cost * eff_qty) : 0 %]
+      [% IF comp.is_optional %][% total_opt = total_opt + line_cost %]
+      [% ELSE %][% total_req = total_req + line_cost %][% END %]
+      <tr[% IF comp.is_optional %] class="optional-row"[% END %]>
+        <td style="text-align:center;color:#888;">[% row_num %]</td>
+        <td>[% ci ? (ci.name | html) : ('#' _ comp.component_item_id) %]</td>
+        <td style="font-family:'Courier New',monospace;font-size:0.85em;">[% ci ? ci.sku : '' %]</td>
+        <td class="right">[% ci && ci.unit_cost ? ('$' _ ci.unit_cost) : '—' %]</td>
+        <td class="right">[% comp.quantity %]</td>
+        <td>[% comp.unit %]</td>
+        <td class="right">[% comp.scrap_factor ? (comp.scrap_factor * 100) _ '%' : '0%' %]</td>
+        <td class="right">[% eff_qty %]</td>
+        <td class="right" style="[% comp.is_optional ? '' : 'font-weight:bold;' %]">
+          [% line_cost > 0 ? ('$' _ line_cost) : '—' %]
+        </td>
+        <td style="text-align:center;">[% comp.is_optional ? 'Yes' : '' %]</td>
+        <td style="font-size:0.85em;">[% comp.notes | html %]</td>
+      </tr>
+    [% END %]
+    </tbody>
+    <tfoot>
+      <tr class="totals-row">
+        <td colspan="8" style="text-align:right;padding-right:8px;">Required components total:</td>
+        <td class="right">$[% total_req %]</td>
+        <td colspan="2"></td>
+      </tr>
+      [% IF total_opt > 0 %]
+      <tr style="color:#888;background:#f8f8f8;">
+        <td colspan="8" style="text-align:right;padding-right:8px;font-style:italic;">Optional components total:</td>
+        <td class="right">$[% total_opt %]</td>
+        <td colspan="2"></td>
+      </tr>
+      <tr class="totals-row">
+        <td colspan="8" style="text-align:right;padding-right:8px;">Grand total (required + optional):</td>
+        <td class="right">$[% total_req + total_opt %]</td>
+        <td colspan="2"></td>
+      </tr>
+      [% END %]
+    </tfoot>
+  </table>
+
+  [% END %]
+
+  <div style="margin-top:20px;padding:8px 0;border-top:1px dashed #aaa;font-size:0.85em;color:#555;">
+    <strong>Notes / Work Instructions:</strong>
+    <div style="min-height:30mm;border-bottom:1px dashed #ccc;margin-top:6px;"></div>
+  </div>
+
+  <div class="signature-block no-print">
+  </div>
+  <div class="signature-block" style="margin-top:16px;">
+    <div class="signature-line">Prepared by / Date</div>
+    <div class="signature-line">Reviewed by / Date</div>
+    <div class="signature-line">Approved by / Date</div>
+  </div>
+
+  <div style="margin-top:16px;font-size:0.75em;color:#aaa;text-align:right;">
+    [% sitename %] Inventory System &mdash; BOM Sheet &mdash; [% print_date %]
+  </div>
+</div>

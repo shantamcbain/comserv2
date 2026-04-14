@@ -12,6 +12,8 @@
   &nbsp;|&nbsp;
   <a href="/Inventory/stock/transactions">Transaction Log</a>
   &nbsp;|&nbsp;
+  <a href="/Inventory/print/stock[% low_only ? '?low_only=1' : '' %]" target="_blank">&#128438; Print Report</a>
+  &nbsp;|&nbsp;
   <a href="/Inventory/items">Items</a>
   &nbsp;|&nbsp;
   <a href="/Inventory">Dashboard</a>
