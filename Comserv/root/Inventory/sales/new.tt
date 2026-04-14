@@ -1,5 +1,3 @@
-[% INCLUDE 'header.tt' %]
-
 <h1>New Sales Invoice</h1>
 <p><a href="/Inventory/sales">← Sales Invoices</a></p>
 
@@ -276,4 +274,4 @@ function prefillFromOrder(sel) {
 }
 </script>
 
-[% INCLUDE 'footer.tt' %]
+
