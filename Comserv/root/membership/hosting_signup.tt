@@ -111,6 +111,34 @@
         </div>
 
         <div class="content-section">
+          <h2>Feature Add-ons</h2>
+          <p style="color:#666;font-size:0.9rem;">Select any features you want enabled for your hosted site. CSC will confirm availability and pricing.</p>
+          [% SET current_addons = hosting_account.requested_addons || '' %]
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.75rem;">
+            [% FOREACH addon IN [
+                { key = 'beekeeping',  label = '🐝 Beekeeping / Apiary',    hint = 'Hive management, inspections, honey tracking' },
+                { key = 'planning',    label = '📋 Planning Tools',          hint = 'Project planning and task management' },
+                { key = 'ai',          label = '🤖 AI Models',               hint = 'Access to AI chat and form-fill tools' },
+                { key = 'workshops',   label = '🎓 Workshop Calendar',       hint = 'Event scheduling and registration' },
+                { key = 'helpdesk',    label = '🎫 HelpDesk',               hint = 'Ticket system for your members' },
+                { key = 'foraging',    label = '🌿 Foraging / ENCY',        hint = 'Encyclopedia of biological life' },
+                { key = 'ecommerce',   label = '🛒 Shop / Price List',       hint = 'Inventory price list and cart' },
+                { key = 'membership',  label = '👥 Membership Plans',        hint = 'Paid membership tiers for your site' },
+            ] %]
+            <label style="display:flex;gap:0.5rem;align-items:flex-start;border:1px solid #ddd;border-radius:6px;padding:0.75rem;cursor:pointer;background:#fafafa;">
+              <input type="checkbox" name="addon_[% addon.key %]" value="1"
+                [% IF current_addons.search(addon.key) %]checked[% END %]
+                style="margin-top:0.2rem;flex-shrink:0;">
+              <div>
+                <strong>[% addon.label %]</strong><br>
+                <small style="color:#666;">[% addon.hint %]</small>
+              </div>
+            </label>
+            [% END %]
+          </div>
+        </div>
+
+        <div class="content-section">
           <h2>Additional Information</h2>
           <div class="form-field">
             <label for="notes">Notes for CSC Admin <span style="color:#888;font-size:0.85em;">(optional)</span></label>

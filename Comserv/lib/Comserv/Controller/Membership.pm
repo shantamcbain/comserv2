@@ -192,6 +192,8 @@ sub hosting_signup :Local :Args(0) {
 
     if ($c->req->method eq 'POST') {
         my $p = $c->req->body_parameters;
+        my @addon_keys = qw(beekeeping planning ai workshops helpdesk foraging ecommerce membership);
+        my $addons_str = join(',', grep { $p->{"addon_$_"} } @addon_keys);
         eval {
             if ($hosting_account) {
                 $hosting_account->update({
@@ -202,6 +204,7 @@ sub hosting_signup :Local :Args(0) {
                     referring_sitename => $p->{referring_sitename},
                     contact_email      => $p->{contact_email},
                     notes              => $p->{notes},
+                    requested_addons   => $addons_str,
                     updated_at         => \'NOW()',
                 });
             } else {
@@ -216,6 +219,7 @@ sub hosting_signup :Local :Args(0) {
                     status             => 'pending',
                     monthly_cost       => 0,
                     notes              => $p->{notes},
+                    requested_addons   => $addons_str,
                     created_by         => $c->session->{username},
                 });
             }
@@ -230,6 +234,7 @@ sub hosting_signup :Local :Args(0) {
             eval {
                 my $notifier = Comserv::Util::EmailNotification->new(logging => $self->logging);
                 $notifier->send_hosting_signup_notification($c, $new_account);
+                $notifier->send_hosting_signup_confirmation($c, $new_account);
             };
             return $c->response->redirect($c->uri_for('/membership'));
         }

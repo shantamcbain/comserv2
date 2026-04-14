@@ -86,6 +86,11 @@ __PACKAGE__->add_columns(
         data_type   => 'text',
         is_nullable => 1,
     },
+    requested_addons => {
+        data_type     => 'text',
+        is_nullable   => 1,
+        documentation => 'Comma-separated add-ons requested: beekeeping,planning,ai,workshops,helpdesk',
+    },
     created_by => {
         data_type   => 'varchar',
         size        => 100,
