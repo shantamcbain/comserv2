@@ -7,7 +7,11 @@
 [% IF c.flash.success_msg %]<p class="success">[% c.flash.success_msg %]</p>[% END %]
 
 <div class="actions">
-  <a href="/Inventory/items">Back to Items</a>
+  <a href="/Inventory/stock/levels">Stock Levels</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/stock/transactions">Transaction Log</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/items">Items</a>
   &nbsp;|&nbsp;
   <a href="/Inventory">Dashboard</a>
 </div>
@@ -21,7 +25,7 @@
           <option value="">-- Select Item --</option>
           [% FOREACH item IN items %]
           <option value="[% item.id %]"
-            [% IF c.request.params.item_id == item.id %]selected[% END %]>
+            [% IF c.request.params.item_id == item.id || c.request.query_params.item_id == item.id %]selected[% END %]>
             [% item.sku %] - [% item.name %]
           </option>
           [% END %]
@@ -34,7 +38,7 @@
         <select id="location_id" name="location_id" required>
           <option value="">-- Select Location --</option>
           [% FOREACH loc IN locations %]
-          <option value="[% loc.id %]">[% loc.name %]</option>
+          <option value="[% loc.id %]"[% IF c.request.params.location_id == loc.id || c.request.query_params.location_id == loc.id %] selected[% END %]>[% loc.name %]</option>
           [% END %]
         </select>
       </td>

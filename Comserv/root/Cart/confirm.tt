@@ -1,0 +1,105 @@
+[% PageVersion = 'Cart/confirm.tt v0.01 2026/04/13 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div style="text-align:center;padding:2em 0">
+  <h1 style="color:green">✓ Order Placed!</h1>
+  <p style="font-size:1.2em">Thank you for your order.</p>
+  <p>Your order number is: <strong>[% invoice.invoice_number %]</strong></p>
+</div>
+
+<div style="max-width:600px;margin:0 auto">
+  <h2>Order Details</h2>
+  <table style="width:100%;border-collapse:collapse" border="1" cellpadding="5">
+    <tr>
+      <th style="background:#f5f5f5;text-align:left">Invoice #</th>
+      <td>[% invoice.invoice_number %]</td>
+    </tr>
+    <tr>
+      <th style="background:#f5f5f5;text-align:left">Customer</th>
+      <td>[% invoice.customer_name || '—' %]</td>
+    </tr>
+    <tr>
+      <th style="background:#f5f5f5;text-align:left">Email</th>
+      <td>[% invoice.customer_email || '—' %]</td>
+    </tr>
+    <tr>
+      <th style="background:#f5f5f5;text-align:left">Payment Method</th>
+      <td>
+        [% SWITCH invoice.payment_method %]
+          [% CASE 'cash' %]Cash / E-transfer
+          [% CASE 'ap' %]Invoice (Accounts Payable)
+          [% CASE 'points' %]Points Redeemed
+          [% CASE %][% invoice.payment_method %]
+        [% END %]
+      </td>
+    </tr>
+    <tr>
+      <th style="background:#f5f5f5;text-align:left">Payment Status</th>
+      <td>[% invoice.payment_status %]</td>
+    </tr>
+  </table>
+
+  <h3 style="margin-top:1.5em">Items Ordered</h3>
+  <table style="width:100%;border-collapse:collapse" border="1" cellpadding="5">
+    <thead style="background:#f5f5f5">
+      <tr>
+        <th>Item</th>
+        <th>Options</th>
+        <th>Qty</th>
+        <th>Unit Price</th>
+        <th>Total</th>
+      </tr>
+    </thead>
+    <tbody>
+    [% FOREACH line IN invoice.lines %]
+      <tr>
+        <td>[% line.item_name %]<br><small>[% line.sku %]</small></td>
+        <td><small>[% line.options || '—' %]</small></td>
+        <td>[% line.quantity %]</td>
+        <td>$[% line.unit_price | format('%.2f') %]</td>
+        <td>$[% line.line_total | format('%.2f') %]</td>
+      </tr>
+    [% END %]
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="4" style="text-align:right">Subtotal</td>
+        <td>$[% invoice.subtotal | format('%.2f') %]</td>
+      </tr>
+      <tr>
+        <td colspan="4" style="text-align:right">Tax</td>
+        <td>$[% invoice.tax_amount | format('%.2f') %]</td>
+      </tr>
+      <tr style="font-weight:bold">
+        <td colspan="4" style="text-align:right">Total</td>
+        <td>$[% invoice.total_amount | format('%.2f') %]</td>
+      </tr>
+      [% IF invoice.points_redeemed > 0 %]
+      <tr>
+        <td colspan="4" style="text-align:right">Points Redeemed</td>
+        <td>[% invoice.points_redeemed %] pts</td>
+      </tr>
+      [% END %]
+    </tfoot>
+  </table>
+
+  [% IF invoice.payment_method == 'cash' %]
+  <div style="margin-top:1.5em;padding:1em;background:#fff8dc;border:1px solid #e0c000">
+    <strong>Payment Instructions:</strong><br>
+    Please send e-transfer to <strong>billing@[% sitename %].ca</strong> with reference <strong>[% invoice.invoice_number %]</strong>.
+    Your order will be processed once payment is received.
+  </div>
+  [% ELSIF invoice.payment_method == 'ap' %]
+  <div style="margin-top:1.5em;padding:1em;background:#f0f8ff;border:1px solid #99b">
+    A formal invoice will be sent to you. Payment due within 30 days.
+  </div>
+  [% ELSIF invoice.payment_method == 'points' %]
+  <div style="margin-top:1.5em;padding:1em;background:#f0fff0;border:1px solid #090">
+    <strong>[% invoice.points_redeemed %] points</strong> have been deducted from your account.
+  </div>
+  [% END %]
+
+  <div style="margin-top:2em;text-align:center">
+    <a href="/Cart/price_list">← Continue Shopping</a>
+  </div>
+</div>

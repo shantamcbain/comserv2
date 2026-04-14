@@ -1,0 +1,148 @@
+[% PageVersion = 'Cart/price_list.tt v0.02 2026/04/13 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+
+<div class="page-header">
+  <h1 style="color:var(--text-color);font-family:var(--header-font)"><i class="fas fa-store"></i> Shop — [% sitename %]</h1>
+  [% IF cart_count > 0 %]
+  <p><a href="/Cart" style="color:var(--primary-color)"><i class="fas fa-shopping-cart"></i> View Cart ([% cart_count %] items)</a></p>
+  [% END %]
+</div>
+
+[% IF c.flash.success_msg %]
+  <div style="background:var(--success-color,#d4edda);color:#155724;border:1px solid #c3e6cb;border-radius:4px;padding:0.6em 1em;margin-bottom:1em">[% c.flash.success_msg %]</div>
+[% END %]
+[% IF c.flash.error_msg %]
+  <div style="background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:4px;padding:0.6em 1em;margin-bottom:1em">[% c.flash.error_msg %]</div>
+[% END %]
+
+<div class="content-container">
+
+<form method="GET" action="/Cart/price_list" style="margin-bottom:var(--spacing-medium)">
+  <label style="color:var(--text-color);font-family:var(--body-font)">Filter by Category:
+    <select name="category" onchange="this.form.submit()" style="padding:4px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+      <option value="">— All Categories —</option>
+      [% FOREACH cat IN categories %]
+        <option value="[% cat.category %]" [% IF category == cat.category %]selected[% END %]>[% cat.category %]</option>
+      [% END %]
+    </select>
+  </label>
+  [% IF category %]<a href="/Cart/price_list" style="color:var(--primary-color);margin-left:0.5em">Clear filter</a>[% END %]
+</form>
+
+[% IF items.size == 0 %]
+  <p style="color:var(--text-muted-color);font-family:var(--body-font)">No items are currently available. Please check back later.</p>
+[% ELSE %]
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:var(--spacing-medium)">
+[% FOREACH item IN items %]
+  [% total_stock = 0 %]
+  [% FOREACH sl IN item.stock_levels %][% total_stock = total_stock + sl.quantity_on_hand %][% END %]
+  [% display_price = item.unit_price || item.unit_cost || 0 %]
+
+  <div style="border:1px solid var(--border-color);border-radius:6px;background:var(--bg-color,var(--background-color))">
+    <div style="padding:var(--spacing-medium)">
+      <h3 style="margin:0 0 0.4em;color:var(--text-color);font-family:var(--header-font);font-size:1rem">[% item.name %]</h3>
+      [% IF item.description %]
+        <p style="margin:0 0 0.6em;color:var(--text-muted-color);font-size:var(--font-size-small);font-family:var(--body-font)">[% item.description | truncate(100) %]</p>
+      [% END %]
+      [% IF item.category %]
+        <p style="margin:0 0 0.4em;font-size:var(--font-size-small);color:var(--text-muted-color);font-family:var(--body-font)"><i class="fas fa-tag"></i> [% item.category %]</p>
+      [% END %]
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6em">
+        <strong style="font-size:1.1rem;color:var(--primary-color)">
+          [% IF display_price > 0 %]$[% display_price | format('%.2f') %][% ELSE %]<em style="font-size:0.9rem">Contact for price</em>[% END %]
+        </strong>
+        <span style="font-size:var(--font-size-small);color:[% IF total_stock > 0 %]var(--success-color,green)[% ELSE %]var(--text-muted-color)[% END %]">
+          [% IF total_stock > 0 %]&#10003; [% total_stock %] in stock[% ELSE %]Out of stock[% END %]
+        </span>
+      </div>
+    </div>
+    [% IF display_price > 0 %]
+    <div style="border-top:1px solid var(--border-color);padding:0.6em var(--spacing-medium);background:var(--bg-secondary,var(--secondary-color))">
+      <form method="POST" action="/Cart/add">
+        <input type="hidden" name="item_id" value="[% item.id %]">
+        <input type="hidden" name="category" value="[% category %]">
+        <div style="display:flex;gap:0.5em;align-items:center;flex-wrap:wrap">
+          <label style="font-size:var(--font-size-small);color:var(--text-color);font-family:var(--body-font)">
+            Qty: <input type="number" name="quantity" value="1" min="1" style="width:55px;padding:3px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+          </label>
+          [% IF item.description && item.description.match('(?i)option|custom|colour|color|material|size') %]
+          <label style="font-size:var(--font-size-small);color:var(--text-color);font-family:var(--body-font)">
+            Options: <input type="text" name="options" placeholder="e.g. red, large" style="width:110px;padding:3px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+          </label>
+          [% END %]
+          <button type="submit" style="padding:4px 12px;background:var(--primary-color);color:var(--text-color);border:1px solid var(--border-color);border-radius:4px;cursor:pointer;font-family:var(--body-font)">Add to Cart</button>
+        </div>
+      </form>
+      [% IF c.stash.is_admin %]
+      <div style="margin-top:0.4em">
+        [% IF item.marketplace_listing_id %]
+          <a href="/marketplace/listing/[% item.marketplace_listing_id %]" style="font-size:var(--font-size-small);color:var(--primary-color)"><i class="fas fa-store"></i> Listed in Marketplace</a>
+        [% ELSE %]
+          <form method="POST" action="/Inventory/push_to_marketplace" style="display:inline">
+            <input type="hidden" name="item_id" value="[% item.id %]">
+            <button type="submit" style="font-size:var(--font-size-small);padding:2px 8px;background:none;border:1px solid var(--border-color);border-radius:3px;cursor:pointer;color:var(--primary-color);font-family:var(--body-font)"><i class="fas fa-store"></i> Push to Marketplace</button>
+          </form>
+        [% END %]
+      </div>
+      [% END %]
+    </div>
+    [% ELSE %]
+    <div style="border-top:1px solid var(--border-color);padding:0.6em var(--spacing-medium);background:var(--bg-secondary,var(--secondary-color))">
+      <a href="mailto:[% sitename %]@cscoop.ca" style="color:var(--primary-color);font-size:var(--font-size-small)">Enquire by email</a>
+    </div>
+    [% END %]
+  </div>
+[% END %]
+</div>
+
+[% END %]
+
+[% IF workshops.size > 0 && !category %]
+<h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:var(--spacing-large)"><i class="fas fa-chalkboard-teacher"></i> Workshops &amp; Events</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--spacing-medium)">
+[% FOREACH ws IN workshops %]
+  <div style="border:1px solid var(--border-color);border-radius:6px;background:var(--bg-color,var(--background-color))">
+    <div style="padding:var(--spacing-medium)">
+      <h3 style="margin:0 0 0.3em;color:var(--text-color);font-family:var(--header-font);font-size:1rem">[% ws.title %]</h3>
+      [% IF ws.date %]
+        <p style="margin:0 0 0.3em;font-size:var(--font-size-small);color:var(--text-muted-color);font-family:var(--body-font)"><i class="fas fa-calendar"></i> [% ws.date %]</p>
+      [% END %]
+      [% IF ws.location %]
+        <p style="margin:0 0 0.3em;font-size:var(--font-size-small);color:var(--text-muted-color);font-family:var(--body-font)"><i class="fas fa-map-marker-alt"></i> [% ws.location %]</p>
+      [% END %]
+      [% IF ws.instructor %]
+        <p style="margin:0 0 0.4em;font-size:var(--font-size-small);color:var(--text-muted-color);font-family:var(--body-font)"><i class="fas fa-user-tie"></i> [% ws.instructor %]</p>
+      [% END %]
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <strong style="color:var(--primary-color);font-size:1.1rem">$[% ws.registration_fee | format('%.2f') %]</strong>
+        <span style="font-size:var(--font-size-small);color:var(--text-muted-color)">
+          [% IF ws.status == 'registration_closed' %]Registration Closed[% ELSE %]Open[% END %]
+        </span>
+      </div>
+    </div>
+    [% IF ws.status != 'registration_closed' %]
+    <div style="border-top:1px solid var(--border-color);padding:0.6em var(--spacing-medium);background:var(--bg-secondary,var(--secondary-color))">
+      <form method="POST" action="/Cart/add">
+        <input type="hidden" name="workshop_id" value="[% ws.id %]">
+        <button type="submit" style="padding:4px 12px;background:var(--primary-color);color:var(--text-color);border:1px solid var(--border-color);border-radius:4px;cursor:pointer;font-family:var(--body-font)"><i class="fas fa-ticket-alt"></i> Register</button>
+      </form>
+    </div>
+    [% END %]
+  </div>
+[% END %]
+</div>
+[% END %]
+
+[% IF cart_count > 0 %]
+<div style="margin-top:var(--spacing-large);text-align:right">
+  <a href="/Cart" style="display:inline-block;padding:0.5em 1.4em;background:var(--primary-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font);border:1px solid var(--border-color)">
+    <i class="fas fa-shopping-cart"></i> View Cart ([% cart_count %] items) →
+  </a>
+</div>
+[% END %]
+
+</div>
+</div>

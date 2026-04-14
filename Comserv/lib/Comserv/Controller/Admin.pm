@@ -7,6 +7,7 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::UserVerification;
+use DateTime;
 use Data::Dumper;
 use JSON qw(decode_json encode_json);
 use Try::Tiny;
@@ -197,12 +198,34 @@ sub index :Path :Args(0) {
         push @{$c->stash->{debug_msg}}, "Admin controller index view - Template: admin/index.tt";
     }
     
-    # Pass data to the template
+    my $pending_hosting = 0;
+    my $outstanding_invoices = [];
+    eval {
+        my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+        if (lc($site_name) eq 'csc') {
+            $pending_hosting = $c->model('DBEncy')->resultset('HostingAccount')->search(
+                { status => 'pending' }
+            )->count;
+        } else {
+            my @inv = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search(
+                { sitename => $site_name, status => 'outstanding' },
+                { join => 'supplier', prefetch => 'supplier', order_by => { -asc => 'me.due_date' } }
+            )->all;
+            $outstanding_invoices = \@inv;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index',
+            "Outstanding invoices query error: $@");
+    }
+
     $c->stash(
-        template => 'admin/index.tt',
-        stats => $stats,
-        recent_activity => $recent_activity,
-        notifications => $notifications
+        template             => 'admin/index.tt',
+        stats                => $stats,
+        recent_activity      => $recent_activity,
+        notifications        => $notifications,
+        pending_hosting      => $pending_hosting,
+        outstanding_invoices => $outstanding_invoices,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
@@ -373,6 +396,39 @@ sub get_system_notifications {
         }
     };
     
+    # Check for pending CSC hosting registrations (CSC site only)
+    eval {
+        my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+        if (lc($site_name) eq 'csc') {
+            my $pending = $c->model('DBEncy')->resultset('HostingAccount')->search(
+                { status => 'pending' }
+            )->count;
+            if ($pending > 0) {
+                push @notifications, {
+                    type    => 'warning',
+                    message => "$pending pending hosting registration(s) require CSC approval",
+                    link    => $c->uri_for('/membership/admin/hosting_accounts'),
+                };
+            }
+
+            # Recently paid hosting invoices (last 48h)
+            my $cutoff = DateTime->now->subtract(hours => 48)->strftime('%Y-%m-%d %H:%M:%S');
+            my @paid = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search(
+                { sitename => { '!=' => 'CSC' }, status => 'paid',
+                  updated_at => { '>=' => $cutoff } },
+                { order_by => { -desc => 'updated_at' } }
+            )->all;
+            for my $inv (@paid) {
+                push @notifications, {
+                    type    => 'success',
+                    message => 'Payment received: ' . $inv->sitename . ' — ' . $inv->invoice_number
+                               . ' (CAD ' . $inv->total_amount . ')',
+                    link    => $c->uri_for('/Inventory/invoice/view/' . $inv->id),
+                };
+            }
+        }
+    };
+
     return \@notifications;
 }
 

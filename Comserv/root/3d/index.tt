@@ -1,24 +1,43 @@
-[% PageVersion = '3D Feature Landing Page, v0.1 2024/05/28 Shanta Exp shanta' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
-[% END %]
+[% PageVersion = '3D Feature Landing Page, v0.2 2026/04/13 Shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
-<h1 id="top">Join us in our 3D Community!</h1>
-<nav>
+<h1 id="top" style="color:var(--text-color);font-family:var(--header-font)">Join us in our 3D Community!</h1>
+<nav style="margin-bottom:var(--spacing-medium);font-family:var(--body-font)">
     <a id="3dtop"></a>
-    <a href="#overview">Overview</a>|
-    <a href="#explore">Explore</a>|
-    <a href="#contact">Contact</a>
+    <a href="#overview" style="color:var(--primary-color)">Overview</a> |
+    <a href="#shop" style="color:var(--primary-color)">Shop</a> |
+    <a href="#explore" style="color:var(--primary-color)">Explore</a> |
+    <a href="#contact" style="color:var(--primary-color)">Contact</a>
 </nav>
 
-<a id="overview"></a><a href="#3dtop">back to top</a>
-<h2>Overview</h2>
-<p>Welcome to the 3D feature of the Comserv application. This page provides an overview of the 3D models and interactive content available.</p>
+<a id="overview"></a><a href="#3dtop" style="color:var(--text-muted-color);font-size:var(--font-size-small)">↑ top</a>
+<h2 style="color:var(--text-color);font-family:var(--header-font)">Overview</h2>
+<p style="color:var(--text-color);font-family:var(--body-font)">Welcome to the 3D printing community. Browse our available print services and products below, add items to your cart, and check out online.</p>
 
-<a id="explore"></a><a href="#3dtop">back to top</a>
-<h2>Explore</h2>
-<p>Explore the various 3D models and interactive content we have to offer. Use the navigation links to browse through different sections.</p>
+<!-- ===== SHOP LINK ===== -->
+<a id="shop"></a><a href="#3dtop" style="color:var(--text-muted-color);font-size:var(--font-size-small)">↑ top</a>
+<h2 style="color:var(--text-color);font-family:var(--header-font)"><i class="fas fa-store"></i> Shop</h2>
+<p style="color:var(--text-color);font-family:var(--body-font)">
+  Browse our 3D print services, filament, and products.
+  [% IF c.session.cart %]
+    [% _cc = 0 %][% FOREACH _k IN c.session.cart.keys %][% _cc = _cc + c.session.cart.$_k.quantity %][% END %]
+    [% IF _cc > 0 %]
+      You have <a href="/Cart" style="color:var(--primary-color);font-weight:bold">[% _cc %] item[% IF _cc != 1 %]s[% END %] in your cart</a>.
+    [% END %]
+  [% END %]
+</p>
+<p style="font-family:var(--body-font)">
+  <a href="/Cart/price_list" class="menu-item" style="color:var(--primary-color);font-weight:bold"><i class="fas fa-store"></i> Browse Products &amp; Services →</a>
+</p>
 
-<a id="contact"></a><a href="#3dtop">back to top</a>
-<h2>Contact</h2>
-<p>If you have any questions or need assistance, please contact us at <a href="mailto:support@comserv.com">support@comserv.com</a>.</p>
+<!-- ===== EXPLORE ===== -->
+<a id="explore"></a><a href="#3dtop" style="color:var(--text-muted-color);font-size:var(--font-size-small)">↑ top</a>
+<h2 style="color:var(--text-color);font-family:var(--header-font)">Explore</h2>
+<p style="color:var(--text-color);font-family:var(--body-font)">Explore the various 3D models and interactive content we have to offer.</p>
+
+<!-- ===== CONTACT ===== -->
+<a id="contact"></a><a href="#3dtop" style="color:var(--text-muted-color);font-size:var(--font-size-small)">↑ top</a>
+<h2 style="color:var(--text-color);font-family:var(--header-font)">Contact</h2>
+<p style="color:var(--text-color);font-family:var(--body-font)">
+  Questions or custom print requests? Contact us at <a href="mailto:3d@cscoop.ca" style="color:var(--primary-color)">3d@cscoop.ca</a>
+</p>

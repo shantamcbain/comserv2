@@ -1,0 +1,27 @@
+[% PageVersion = 'Navigation/TopDropListShop.tt,v 0.02 2026/04/13 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][%# PageVersion %][% END %]
+
+[% SET _cart_count = 0 %]
+[% IF c.session.cart %]
+    [% FOREACH _k IN c.session.cart.keys %]
+        [% _cart_count = _cart_count + c.session.cart.$_k.quantity %]
+    [% END %]
+[% END %]
+
+<li class="horizontal-dropdown">
+    <a href="/Cart/price_list" class="dropbtn">
+        <i class="fas fa-store"></i> Shop[% IF _cart_count > 0 %] <span class="dropdown-role-badge">[% _cart_count %]</span>[% END %]
+    </a>
+    <div class="dropdown-content">
+        <a href="/Cart/price_list" class="menu-item"><i class="fas fa-store"></i> Price List</a>
+        <a href="/Cart" class="menu-item"><i class="fas fa-shopping-cart"></i> View Cart[% IF _cart_count > 0 %] ([% _cart_count %])[% END %]</a>
+        [% IF _cart_count > 0 %]
+        <div class="dropdown-divider"></div>
+        <a href="/Cart/checkout" class="menu-item"><i class="fas fa-credit-card"></i> Checkout</a>
+        [% END %]
+        [% IF c.session.username %]
+        <div class="dropdown-divider"></div>
+        <a href="/currency/balance" class="menu-item"><i class="fas fa-coins"></i> My Points Balance</a>
+        [% END %]
+    </div>
+</li>

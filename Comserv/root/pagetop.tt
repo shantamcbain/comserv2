@@ -345,10 +345,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 <a href="[% c.session.return_url %]" class="dropbtn">Back</a>
             </li>
         [% INCLUDE 'Navigation/TopDropListMain.tt' %]
+        [% IF site_has_shop %][% INCLUDE 'Navigation/TopDropListShop.tt' %][% END %]
         [% INCLUDE 'Navigation/TopDropListLogin.tt' %]
         [%# Global discontinued — Mail/Jobs/Join moved to Main %]
         [% IF 0 %][% INCLUDE 'Navigation/TopDropListGlobal.tt' %][% END %]
-        [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
+        [% IF c.session.SiteName == 'CSC' %][% INCLUDE 'Navigation/TopDropListHosted.tt' %][% END %]
         [% INCLUDE 'Navigation/TopDropListMember.tt' %]
         [% INCLUDE 'Navigation/TopDropListENCY.tt' %]
         [% INCLUDE 'Navigation/TopDropListWeather.tt' %]

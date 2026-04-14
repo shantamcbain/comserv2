@@ -2,6 +2,8 @@ package Comserv::Controller::Inventory;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::PointSystem;
+use Comserv::Util::EmailNotification;
 use POSIX qw(strftime);
 
 has 'logging' => (
@@ -26,6 +28,14 @@ sub auto :Private {
     }
     $is_admin ||= 1 if ($c->session->{username} // '') eq 'Shanta';
     unless ($is_admin) {
+        my $path = $c->req->path;
+        if ($path =~ m{/Inventory/api/}i) {
+            my $token    = $c->req->header('X-API-Token') || $c->req->params->{api_token};
+            my $expected = $c->config->{api_token} || $ENV{COMSERV_API_TOKEN} || '';
+            if ($expected && $token && $token eq $expected) {
+                return 1;
+            }
+        }
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
             'Inventory: access denied for user ' . ($c->session->{username} || 'guest'));
         $c->flash->{error_msg} = 'Inventory management is restricted to administrators.';
@@ -194,12 +204,21 @@ sub item_view :Path('/Inventory/item/view') :Args(1) {
         )->all;
     };
 
+    my @all_suppliers;
+    eval {
+        @all_suppliers = $schema->resultset('InventorySupplier')->search(
+            { sitename => $sitename, status => 'active' },
+            { columns => ['id','name'], order_by => 'name' }
+        )->all;
+    };
+
     $c->stash(
-        item         => $item,
-        transactions => \@transactions,
-        all_items    => \@all_items,
-        sitename     => $sitename,
-        template     => 'Inventory/items/view.tt',
+        item          => $item,
+        transactions  => \@transactions,
+        all_items     => \@all_items,
+        all_suppliers => \@all_suppliers,
+        sitename      => $sitename,
+        template      => 'Inventory/items/view.tt',
     );
 }
 
@@ -355,6 +374,7 @@ sub bom_add :Path('/Inventory/bom/add') :Args(1) {
     my $schema   = $self->_schema($c);
     my $sitename = $self->_sitename($c);
     my $params   = $c->req->body_parameters;
+    my $from     = $params->{redirect_to} || 'bom';
 
     eval {
         my $parent = $schema->resultset('InventoryItem')->find($parent_id);
@@ -368,13 +388,15 @@ sub bom_add :Path('/Inventory/bom/add') :Args(1) {
         die "Cannot use an item as its own component\n"
             if $params->{component_item_id} == $parent_id;
 
+        my $scrap = ($params->{scrap_factor} || 0) / 100;
+
         $schema->resultset('InventoryItemBOM')->update_or_create({
             parent_item_id    => $parent_id,
             component_item_id => $params->{component_item_id},
-            quantity          => $params->{quantity}   || 1,
-            unit              => $params->{unit}        || 'each',
-            is_optional       => $params->{is_optional} ? 1 : 0,
-            scrap_factor      => $params->{scrap_factor} || 0,
+            quantity          => $params->{quantity}    || 1,
+            unit              => $params->{unit}         || 'each',
+            is_optional       => $params->{is_optional}  ? 1 : 0,
+            scrap_factor      => $scrap,
             sort_order        => $params->{sort_order}   || 0,
             notes             => $params->{notes}        || undef,
         }, { key => 'unique_parent_component' });
@@ -384,7 +406,11 @@ sub bom_add :Path('/Inventory/bom/add') :Args(1) {
     } else {
         $c->flash->{success_msg} = 'Component added to BOM.';
     }
-    $c->res->redirect($c->uri_for('/Inventory/item/view', [$parent_id]));
+    if ($from eq 'item') {
+        $c->res->redirect($c->uri_for('/Inventory/item/view', [$parent_id]));
+    } else {
+        $c->res->redirect($c->uri_for('/Inventory/bom', [$parent_id]));
+    }
 }
 
 sub bom_remove :Path('/Inventory/bom/remove') :Args(1) {
@@ -392,6 +418,7 @@ sub bom_remove :Path('/Inventory/bom/remove') :Args(1) {
     my $schema   = $self->_schema($c);
     my $sitename = $self->_sitename($c);
     my $parent_id;
+    my $from = $c->req->params->{from} || 'item';
 
     eval {
         my $bom = $schema->resultset('InventoryItemBOM')->find($bom_id);
@@ -407,7 +434,134 @@ sub bom_remove :Path('/Inventory/bom/remove') :Args(1) {
     } else {
         $c->flash->{success_msg} = 'Component removed from BOM.';
     }
-    $c->res->redirect($c->uri_for('/Inventory/item/view', [$parent_id || 0]));
+    if ($from eq 'bom') {
+        $c->res->redirect($c->uri_for('/Inventory/bom', [$parent_id || 0]));
+    } else {
+        $c->res->redirect($c->uri_for('/Inventory/item/view', [$parent_id || 0]));
+    }
+}
+
+sub bom_view :Path('/Inventory/bom') :Args(1) {
+    my ($self, $c, $item_id) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bom_view', "BOM view for item $item_id");
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $item;
+    eval {
+        $item = $schema->resultset('InventoryItem')->find(
+            { id => $item_id },
+            { prefetch => [
+                'inventory_account', 'income_account', 'expense_account', 'returns_account',
+                { 'bom_components' => 'component_item' },
+            ]}
+        );
+    };
+    if ($@ || !$item || $item->sitename ne $sitename) {
+        $c->flash->{error_msg} = 'Item not found';
+        $c->res->redirect($c->uri_for('/Inventory/items'));
+        return;
+    }
+    unless ($item->is_assemblable) {
+        $c->flash->{error_msg} = 'This item does not have a BOM (not marked as assemblable).';
+        $c->res->redirect($c->uri_for('/Inventory/item/view', [$item_id]));
+        return;
+    }
+
+    my @all_items;
+    eval {
+        @all_items = $schema->resultset('InventoryItem')->search(
+            { sitename => $sitename, status => 'active', id => { '!=' => $item_id } },
+            { columns => ['id','name','sku','unit_of_measure','unit_cost'], order_by => 'name' }
+        )->all;
+    };
+
+    my @assemblable_items;
+    eval {
+        @assemblable_items = $schema->resultset('InventoryItem')->search(
+            { sitename => $sitename, status => 'active', is_assemblable => 1 },
+            { columns => ['id','name','sku'], order_by => 'name' }
+        )->all;
+    };
+
+    my $assembled_cost = 0;
+    for my $comp ($item->bom_components->all) {
+        my $ci = $comp->component_item;
+        next unless $ci && $ci->unit_cost;
+        my $eff_qty = $comp->quantity * (1 + ($comp->scrap_factor || 0));
+        $assembled_cost += $ci->unit_cost * $eff_qty unless $comp->is_optional;
+    }
+
+    $c->stash(
+        item              => $item,
+        all_items         => \@all_items,
+        assemblable_items => \@assemblable_items,
+        assembled_cost    => sprintf('%.2f', $assembled_cost),
+        sitename          => $sitename,
+        template          => 'Inventory/bom/view.tt',
+    );
+}
+
+sub bom_edit_line :Path('/Inventory/bom/edit') :Args(1) {
+    my ($self, $c, $bom_id) = @_;
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $params   = $c->req->body_parameters;
+    my $parent_id;
+
+    eval {
+        my $bom = $schema->resultset('InventoryItemBOM')->find($bom_id);
+        die "BOM line not found\n" unless $bom;
+        my $parent = $schema->resultset('InventoryItem')->find($bom->parent_item_id);
+        die "Access denied\n" unless $parent && $parent->sitename eq $sitename;
+        $parent_id = $bom->parent_item_id;
+
+        $bom->update({
+            quantity     => $params->{quantity}     || $bom->quantity,
+            unit         => $params->{unit}         || $bom->unit,
+            is_optional  => $params->{is_optional}  ? 1 : 0,
+            scrap_factor => defined $params->{scrap_factor} ? $params->{scrap_factor} / 100 : $bom->scrap_factor,
+            sort_order   => $params->{sort_order}   // $bom->sort_order,
+            notes        => $params->{notes}        // $bom->notes,
+        });
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Failed to update BOM line: $@";
+    } else {
+        $c->flash->{success_msg} = 'BOM line updated.';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/bom', [$parent_id || 0]));
+}
+
+sub bom_list :Path('/Inventory/bom/list') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bom_list', 'Listing assemblable items');
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my @assemblable;
+    eval {
+        @assemblable = $schema->resultset('InventoryItem')->search(
+            { sitename => $sitename, is_assemblable => 1, status => 'active' },
+            {
+                prefetch => { 'bom_components' => 'component_item' },
+                order_by => 'name',
+            }
+        )->all;
+    };
+    push @{$c->stash->{debug_errors}}, "Error loading assemblable items: $@" if $@;
+
+    $c->stash(
+        assemblable_items => \@assemblable,
+        sitename          => $sitename,
+        template          => 'Inventory/bom/list.tt',
+    );
 }
 
 # -------------------------------------------------------------------------
@@ -561,6 +715,129 @@ sub supplier_delete :Path('/Inventory/supplier/delete') :Args(1) {
         $c->flash->{success_msg} = 'Supplier deactivated';
     }
     $c->res->redirect($c->uri_for('/Inventory/suppliers'));
+}
+
+sub supplier_view :Path('/Inventory/supplier/view') :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'supplier_view', "View supplier $id");
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $supplier;
+    eval {
+        $supplier = $schema->resultset('InventorySupplier')->find(
+            { id => $id, sitename => $sitename },
+            { prefetch => { 'item_suppliers' => 'item' } }
+        );
+    };
+    if ($@ || !$supplier) {
+        $c->flash->{error_msg} = 'Supplier not found';
+        $c->res->redirect($c->uri_for('/Inventory/suppliers'));
+        return;
+    }
+
+    $c->stash(
+        supplier => $supplier,
+        sitename => $sitename,
+        template => 'Inventory/suppliers/view.tt',
+    );
+}
+
+sub item_supplier_add :Path('/Inventory/item_supplier/add') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'item_supplier_add', 'Add item-supplier link');
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $params   = $c->req->body_parameters;
+    my $item_id  = $params->{item_id};
+
+    eval {
+        my $existing = $schema->resultset('InventoryItemSupplier')->find({
+            item_id     => $item_id,
+            supplier_id => $params->{supplier_id},
+        });
+        if ($existing) {
+            $existing->update({
+                supplier_sku => $params->{supplier_sku} || undef,
+                unit_cost    => $params->{unit_cost}    || undef,
+                notes        => $params->{notes}        || undef,
+            });
+        } else {
+            $schema->resultset('InventoryItemSupplier')->create({
+                item_id      => $item_id,
+                supplier_id  => $params->{supplier_id},
+                supplier_sku => $params->{supplier_sku} || undef,
+                unit_cost    => $params->{unit_cost}    || undef,
+                is_preferred => $params->{is_preferred} ? 1 : 0,
+                notes        => $params->{notes}        || undef,
+            });
+        }
+        if ($params->{is_preferred} && $params->{is_preferred} eq '1') {
+            $schema->resultset('InventoryItemSupplier')->search({
+                item_id    => $item_id,
+                supplier_id => { '!=' => $params->{supplier_id} },
+            })->update({ is_preferred => 0 });
+        }
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Failed to link supplier: $@";
+    } else {
+        $c->flash->{success_msg} = 'Supplier linked successfully';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/item/view', [$item_id]));
+}
+
+sub item_supplier_remove :Path('/Inventory/item_supplier/remove') :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'item_supplier_remove', "Remove item-supplier $id");
+
+    my $schema  = $self->_schema($c);
+    my $item_id;
+    eval {
+        my $link = $schema->resultset('InventoryItemSupplier')->find($id);
+        if ($link) {
+            $item_id = $link->item_id;
+            $link->delete;
+        }
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Failed to remove supplier link: $@";
+    } else {
+        $c->flash->{success_msg} = 'Supplier link removed';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/item/view', [$item_id || 0]));
+}
+
+sub item_supplier_set_preferred :Path('/Inventory/item_supplier/preferred') :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'item_supplier_set_preferred', "Set preferred supplier $id");
+
+    my $schema  = $self->_schema($c);
+    my $item_id;
+    eval {
+        my $link = $schema->resultset('InventoryItemSupplier')->find($id);
+        if ($link) {
+            $item_id = $link->item_id;
+            $schema->resultset('InventoryItemSupplier')->search({ item_id => $item_id })->update({ is_preferred => 0 });
+            $link->update({ is_preferred => 1 });
+        }
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Failed to set preferred supplier: $@";
+    } else {
+        $c->flash->{success_msg} = 'Preferred supplier updated';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/item/view', [$item_id || 0]));
 }
 
 # -------------------------------------------------------------------------
@@ -812,6 +1089,197 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
         sitename  => $sitename,
         template  => 'Inventory/stock/adjust.tt',
     );
+}
+
+# -------------------------------------------------------------------------
+# Stock Levels — per-item/per-location view
+# -------------------------------------------------------------------------
+
+sub stock_levels :Path('/Inventory/stock/levels') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'stock_levels', 'Viewing stock levels');
+
+    my $sitename   = $self->_sitename($c);
+    my $schema     = $self->_schema($c);
+    my $low_only   = $c->req->params->{low_only} || 0;
+    my $item_id    = $c->req->params->{item_id}  || '';
+    my $location_id = $c->req->params->{location_id} || '';
+
+    my (@stock_rows, @items, @locations);
+    eval {
+        @items     = $schema->resultset('InventoryItem')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
+        @locations = $schema->resultset('InventoryLocation')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
+
+        my %sl_search;
+        if ($item_id) {
+            $sl_search{'item.id'}      = $item_id;
+        } else {
+            $sl_search{'item.sitename'} = $sitename;
+        }
+        $sl_search{'me.location_id'} = $location_id if $location_id;
+
+        my @raw = $schema->resultset('InventoryStockLevel')->search(
+            \%sl_search,
+            {
+                prefetch => ['item', 'location'],
+                order_by => ['item.name', 'location.name'],
+            }
+        );
+
+        for my $sl (@raw) {
+            my $item     = $sl->item;
+            my $location = $sl->location;
+            my $reorder  = defined $item->reorder_point ? $item->reorder_point : 0;
+            my $is_low   = ($reorder > 0 && $sl->quantity_on_hand <= $reorder) ? 1 : 0;
+            next if $low_only && !$is_low;
+            push @stock_rows, {
+                sl       => $sl,
+                item     => $item,
+                location => $location,
+                is_low   => $is_low,
+            };
+        }
+    };
+    push @{$c->stash->{debug_errors}}, "Error loading stock levels: $@" if $@;
+
+    $c->stash(
+        stock_rows  => \@stock_rows,
+        items       => \@items,
+        locations   => \@locations,
+        low_only    => $low_only,
+        item_id     => $item_id,
+        location_id => $location_id,
+        sitename    => $sitename,
+        template    => 'Inventory/stock/levels.tt',
+    );
+}
+
+# -------------------------------------------------------------------------
+# Transaction Log
+# -------------------------------------------------------------------------
+
+sub stock_transactions :Path('/Inventory/stock/transactions') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'stock_transactions', 'Viewing transaction log');
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $params   = $c->req->params;
+    my $item_id  = $params->{item_id}          || '';
+    my $tx_type  = $params->{transaction_type} || '';
+    my $date_from = $params->{date_from}       || '';
+    my $date_to   = $params->{date_to}         || '';
+    my $page      = $params->{page}            || 1;
+    my $per_page  = 50;
+
+    my (@transactions, @items, $total_count);
+    eval {
+        @items = $schema->resultset('InventoryItem')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
+
+        my %search = (sitename => $sitename);
+        $search{item_id}          = $item_id if $item_id;
+        $search{transaction_type} = $tx_type if $tx_type;
+        $search{transaction_date} = { '>=' => $date_from . ' 00:00:00' } if $date_from;
+        if ($date_to) {
+            if ($search{transaction_date}) {
+                $search{transaction_date} = { '>=' => $date_from . ' 00:00:00', '<=' => $date_to . ' 23:59:59' };
+            } else {
+                $search{transaction_date} = { '<=' => $date_to . ' 23:59:59' };
+            }
+        }
+
+        $total_count = $schema->resultset('InventoryTransaction')->search(\%search)->count;
+
+        @transactions = $schema->resultset('InventoryTransaction')->search(
+            \%search,
+            {
+                prefetch => ['item', 'location'],
+                order_by => { -desc => 'transaction_date' },
+                rows     => $per_page,
+                page     => $page,
+            }
+        );
+    };
+    push @{$c->stash->{debug_errors}}, "Error loading transactions: $@" if $@;
+
+    my $total_pages = $total_count ? int(($total_count + $per_page - 1) / $per_page) : 1;
+
+    $c->stash(
+        transactions => \@transactions,
+        items        => \@items,
+        item_id      => $item_id,
+        tx_type      => $tx_type,
+        date_from    => $date_from,
+        date_to      => $date_to,
+        page         => $page,
+        per_page     => $per_page,
+        total_count  => $total_count,
+        total_pages  => $total_pages,
+        sitename     => $sitename,
+        template     => 'Inventory/stock/transactions.tt',
+    );
+}
+
+# -------------------------------------------------------------------------
+# Marketplace integration
+# -------------------------------------------------------------------------
+
+sub push_to_marketplace :Path('/Inventory/push_to_marketplace') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $item_id  = $c->req->body_parameters->{item_id};
+    my $sitename = $c->session->{SiteName} || 'CSC';
+    my $schema   = $c->model('DBEncy');
+
+    unless ($item_id) {
+        $c->flash->{error_msg} = 'No item specified';
+        $c->res->redirect($c->uri_for('/Cart/price_list'));
+        return;
+    }
+
+    my $item;
+    eval { $item = $schema->resultset('InventoryItem')->find($item_id) };
+
+    unless ($item) {
+        $c->flash->{error_msg} = 'Item not found';
+        $c->res->redirect($c->uri_for('/Cart/price_list'));
+        return;
+    }
+
+    if ($item->marketplace_listing_id) {
+        $c->flash->{success_msg} = '"' . $item->name . '" is already listed in the Marketplace';
+        $c->res->redirect($c->uri_for('/Cart/price_list'));
+        return;
+    }
+
+    my $listing;
+    eval {
+        $listing = $schema->resultset('MarketplaceListing')->create({
+            seller_username => $c->session->{username} || 'admin',
+            sitename        => $sitename,
+            title           => $item->name,
+            description     => $item->description || $item->name,
+            price           => $item->unit_price || $item->unit_cost || 0,
+            listing_type    => 'sale',
+            currency        => 'CAD',
+            accepts_points  => 0,
+            order_url       => '/Cart/price_list',
+            status          => 'active',
+        });
+        $item->update({ marketplace_listing_id => $listing->id, list_in_marketplace => 1 });
+    };
+
+    if ($@ || !$listing) {
+        $c->flash->{error_msg} = 'Failed to create marketplace listing: ' . ($@ || 'unknown error');
+    } else {
+        $c->flash->{success_msg} = '"' . $item->name . '" listed in Marketplace (#' . $listing->id . ')';
+    }
+
+    $c->res->redirect($c->uri_for('/Cart/price_list'));
 }
 
 # -------------------------------------------------------------------------
@@ -1295,6 +1763,91 @@ sub invoice_view :Path('/Inventory/invoice/view') :Args(1) {
     $c->stash(invoice => $invoice, template => 'Inventory/invoice/view.tt');
 }
 
+sub invoice_pay_points :Path('/Inventory/invoice/pay_points') :Args(1) {
+    my ($self, $c, $id) = @_;
+    return $c->res->redirect($c->uri_for('/user/login')) unless $c->session->{username};
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $invoice;
+    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find($id) };
+    unless ($invoice && $invoice->sitename eq $sitename) {
+        $c->flash->{error_msg} = 'Invoice not found';
+        return $c->res->redirect($c->uri_for('/Inventory/invoice'));
+    }
+    unless ($invoice->status eq 'outstanding') {
+        $c->flash->{error_msg} = 'Invoice is not outstanding';
+        return $c->res->redirect($c->uri_for('/Inventory/invoice/view/' . $id));
+    }
+
+    my $amount     = $invoice->total_amount;
+    my $auto_pay   = $c->req->body_parameters->{auto_pay} ? 1 : 0;
+    my $CSC_ADMIN  = 178;
+    my $err_msg;
+
+    eval {
+        my $ps = Comserv::Util::PointSystem->new(c => $c);
+        my $user_id = $c->session->{user_id};
+        my ($ok, $err) = $ps->debit(
+            user_id          => $user_id,
+            amount           => $amount,
+            transaction_type => 'hosting_payment',
+            description      => 'Invoice ' . $invoice->invoice_number . ' — CAD ' . $amount,
+            reference_type   => 'supplier_invoice',
+            reference_id     => $id,
+        );
+        if ($ok) {
+            $ps->credit(
+                user_id          => $CSC_ADMIN,
+                amount           => $amount,
+                transaction_type => 'hosting_income',
+                description      => 'Payment from ' . $sitename . ' — ' . $invoice->invoice_number,
+                reference_type   => 'supplier_invoice',
+                reference_id     => $id,
+            );
+            $invoice->update({ status => 'paid' });
+
+            if ($auto_pay) {
+                my $ha = $schema->resultset('HostingAccount')->search({ sitename => $sitename })->single;
+                $ha->update({ auto_pay => 1 }) if $ha;
+            }
+
+            # Mark paid_at on the hosting_account so CSC dashboard can show it
+            eval {
+                my $ha = $schema->resultset('HostingAccount')->search({ sitename => $sitename })->single;
+                if ($ha) {
+                    my $note = 'PAID:' . $invoice->invoice_number . ':' . DateTime->now->strftime('%Y-%m-%d');
+                    my $existing = $ha->notes || '';
+                    $ha->update({ notes => $existing ? "$existing\n$note" : $note });
+                }
+            };
+
+            # Email both CSC and the paying SiteName
+            eval {
+                my $ha = $schema->resultset('HostingAccount')->search({ sitename => $sitename })->single;
+                my $notifier = Comserv::Util::EmailNotification->new(logging => $self->logging);
+                $notifier->send_invoice_payment_notification($c,
+                    invoice_number => $invoice->invoice_number,
+                    invoice_id     => $id,
+                    sitename       => $sitename,
+                    amount         => $amount,
+                    points         => $amount,
+                    contact_email  => ($ha ? $ha->contact_email : undef),
+                );
+            };
+
+            $c->flash->{success_msg} = sprintf(
+                'Paid %s pts for invoice %s. CSC has been notified.', $amount, $invoice->invoice_number);
+        } else {
+            $err_msg = "Insufficient points: $err";
+        }
+    };
+    $err_msg ||= "Payment error: $@" if $@;
+    $c->flash->{error_msg} = $err_msg if $err_msg;
+
+    $c->res->redirect($c->uri_for('/Inventory/invoice/view/' . $id));
+}
+
 # =========================================================================
 # CUSTOMER INVOICES (AR / Sales)
 # =========================================================================
@@ -1574,6 +2127,568 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
         $c->flash->{success_msg} = 'Invoice posted. Stock updated and GL entries created.';
     }
     $c->res->redirect($c->uri_for('/Inventory/sales/view', [$id]));
+}
+
+# -------------------------------------------------------------------------
+# Print — Labels, Stock Report, BOM Sheet
+# -------------------------------------------------------------------------
+
+sub print_label :Path('/Inventory/print/label') :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'print_label', "Print label for item $id");
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+
+    my $item;
+    eval {
+        $item = $schema->resultset('InventoryItem')->find(
+            { id => $id },
+            { prefetch => 'stock_levels' }
+        );
+    };
+    if ($@ || !$item) {
+        $c->flash->{error_msg} = 'Item not found';
+        $c->res->redirect($c->uri_for('/Inventory/items'));
+        return;
+    }
+
+    my @locations;
+    eval {
+        @locations = $schema->resultset('InventoryLocation')->search(
+            { sitename => $sitename, status => 'active' },
+            { columns => ['id','name'], order_by => 'name' }
+        )->all;
+    };
+
+    my $copies = $c->req->params->{copies} || 1;
+    $copies = 1  if $copies < 1;
+    $copies = 50 if $copies > 50;
+
+    $c->stash(
+        item      => $item,
+        locations => \@locations,
+        copies    => $copies,
+        sitename  => $sitename,
+        template  => 'Inventory/print/label.tt',
+    );
+}
+
+sub print_labels_multi :Path('/Inventory/print/labels') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'print_labels_multi', 'Print labels for multiple items');
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+
+    my @item_ids = $c->req->params->get_all('item_id');
+    my @items;
+
+    if (@item_ids) {
+        eval {
+            @items = $schema->resultset('InventoryItem')->search(
+                { id => { -in => \@item_ids }, sitename => $sitename },
+                { order_by => ['category','name'] }
+            )->all;
+        };
+    } else {
+        eval {
+            @items = $schema->resultset('InventoryItem')->search(
+                { sitename => $sitename, status => 'active' },
+                { order_by => ['category','name'] }
+            )->all;
+        };
+    }
+
+    $c->stash(
+        items    => \@items,
+        sitename => $sitename,
+        template => 'Inventory/print/labels_multi.tt',
+    );
+}
+
+sub print_stock_report :Path('/Inventory/print/stock') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'print_stock_report', 'Print stock report');
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $low_only = $c->req->params->{low_only} ? 1 : 0;
+    my $category = $c->req->params->{category};
+
+    my @items;
+    eval {
+        my %search = (sitename => $sitename, status => 'active');
+        $search{category} = $category if $category;
+        @items = $schema->resultset('InventoryItem')->search(
+            \%search,
+            {
+                prefetch => 'stock_levels',
+                order_by => ['category', 'name'],
+            }
+        )->all;
+    };
+    push @{$c->stash->{debug_errors}}, "Error loading items: $@" if $@;
+
+    my @report_rows;
+    for my $item (@items) {
+        my $total_qty = 0;
+        my @sl_detail;
+        for my $sl ($item->stock_levels->all) {
+            $total_qty += $sl->quantity_on_hand;
+            push @sl_detail, $sl;
+        }
+        my $is_low = defined $item->reorder_point && $item->reorder_point > 0
+                     && $total_qty <= $item->reorder_point;
+        next if $low_only && !$is_low;
+        push @report_rows, {
+            item      => $item,
+            sl_detail => \@sl_detail,
+            total_qty => $total_qty,
+            is_low    => $is_low,
+        };
+    }
+
+    my @categories;
+    eval {
+        my @cat_rows = $schema->resultset('InventoryItem')->search(
+            { sitename => $sitename, status => 'active', category => { '!=' => undef } },
+            { columns => ['category'], distinct => 1, order_by => 'category' }
+        )->all;
+        @categories = map { $_->category } @cat_rows;
+    };
+
+    $c->stash(
+        report_rows => \@report_rows,
+        low_only    => $low_only,
+        category    => $category,
+        categories  => \@categories,
+        sitename    => $sitename,
+        print_date  => $self->_now(),
+        template    => 'Inventory/print/stock_report.tt',
+    );
+}
+
+sub print_bom :Path('/Inventory/print/bom') :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'print_bom', "Print BOM for item $id");
+
+    my $schema = $self->_schema($c);
+
+    my $item;
+    eval {
+        $item = $schema->resultset('InventoryItem')->find(
+            { id => $id },
+            { prefetch => [
+                { 'bom_components' => 'component_item' },
+            ]}
+        );
+    };
+    if ($@ || !$item) {
+        $c->flash->{error_msg} = 'Item not found';
+        $c->res->redirect($c->uri_for('/Inventory/items'));
+        return;
+    }
+
+    my $assembled_cost = 0;
+    for my $comp ($item->bom_components->all) {
+        next if $comp->is_optional;
+        my $ci = $comp->component_item;
+        next unless $ci && $ci->unit_cost;
+        my $eff_qty = $comp->quantity * (1 + ($comp->scrap_factor || 0));
+        $assembled_cost += $ci->unit_cost * $eff_qty;
+    }
+
+    $c->stash(
+        item           => $item,
+        assembled_cost => $assembled_cost,
+        print_date     => $self->_now(),
+        sitename       => $self->_sitename($c),
+        template       => 'Inventory/print/bom.tt',
+    );
+}
+
+# -------------------------------------------------------------------------
+# Point System Integration — Timesheet
+# -------------------------------------------------------------------------
+
+sub timesheet :Path('/Inventory/timesheet') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'timesheet',
+        'Entered Inventory timesheet');
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+
+    my (@todos, @recent_intervals);
+    eval {
+        my $inv_project = $schema->resultset('Project')->search(
+            { project_code => 'Inventory' },
+            { rows => 1 }
+        )->first;
+
+        if ($inv_project) {
+            @todos = $schema->resultset('Todo')->search(
+                { project_id => $inv_project->id },
+                { order_by   => [{ -asc => 'status' }, { -desc => 'priority' }] }
+            )->all;
+
+            for my $todo (@todos) {
+                my $accum = $todo->accumulative_time || '00:00:00';
+                $accum = '00:00:00' unless $accum =~ /^\d+:\d+/;
+                $todo->{_accum_display} = $accum;
+            }
+
+            @recent_intervals = $schema->resultset('TodoInterval')->search(
+                { 'todo.project_id' => $inv_project->id },
+                {
+                    join     => 'todo',
+                    prefetch => 'todo',
+                    order_by => { -desc => 'me.record_id' },
+                    rows     => 50,
+                }
+            )->all;
+        }
+    };
+    if ($@) {
+        push @{$c->stash->{debug_errors}}, "Timesheet load error: $@";
+    }
+
+    $c->stash(
+        todos            => \@todos,
+        recent_intervals => \@recent_intervals,
+        sitename         => $sitename,
+        template         => 'Inventory/timesheet.tt',
+    );
+}
+
+sub timesheet_log :Path('/Inventory/timesheet/log') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $params   = $c->req->body_parameters;
+    my $schema   = $self->_schema($c);
+    my $username = $c->session->{username} || 'admin';
+    my $user_id  = $c->session->{user_id};
+
+    my $todo_id  = $params->{todo_id}  or do {
+        $c->flash->{error_msg} = 'No todo selected.';
+        $c->res->redirect($c->uri_for('/Inventory/timesheet'));
+        return;
+    };
+
+    my $hours    = int($params->{hours}   || 0);
+    my $minutes  = int($params->{minutes} || 0);
+    my $log_date = $params->{log_date} || strftime('%Y-%m-%d', localtime);
+    my $note     = $params->{note} || '';
+
+    unless ($hours > 0 || $minutes > 0) {
+        $c->flash->{error_msg} = 'Please enter at least 1 minute of time.';
+        $c->res->redirect($c->uri_for('/Inventory/timesheet'));
+        return;
+    }
+
+    my $todo;
+    eval { $todo = $schema->resultset('Todo')->find($todo_id) };
+    unless ($todo) {
+        $c->flash->{error_msg} = 'Todo not found.';
+        $c->res->redirect($c->uri_for('/Inventory/timesheet'));
+        return;
+    }
+
+    my $elapsed_secs = $hours * 3600 + $minutes * 60;
+    my $elapsed_str  = sprintf('%02d:%02d:%02d',
+        $hours, $minutes, 0);
+
+    eval {
+        $schema->txn_do(sub {
+            $schema->resultset('TodoInterval')->create({
+                todo_record_id => $todo_id,
+                start_date     => $log_date,
+                start_time     => '00:00:00',
+                end_date       => $log_date,
+                end_time       => sprintf('%02d:%02d:00', $hours, $minutes),
+                interval_type  => 'actual',
+                status         => 'completed',
+                last_mod_by    => $username,
+                last_mod_date  => $log_date,
+            });
+
+            my $existing = $todo->accumulative_time || '00:00:00';
+            $existing = '00:00:00' unless $existing =~ /^\d+:\d+/;
+            my ($ah, $am, $as_) = split(':', $existing);
+            $ah = int($ah // 0); $am = int($am // 0); $as_ = int($as_ // 0);
+            my $total_secs = ($ah * 3600 + $am * 60 + $as_) + $elapsed_secs;
+            my $new_accum  = sprintf('%02d:%02d:%02d',
+                int($total_secs / 3600),
+                int(($total_secs % 3600) / 60),
+                $total_secs % 60);
+
+            $todo->update({
+                accumulative_time => $new_accum,
+                last_mod_by       => $username,
+                last_mod_date     => $log_date,
+            });
+        });
+    };
+
+    if ($@) {
+        $c->flash->{error_msg} = "Failed to log time: $@";
+        $c->res->redirect($c->uri_for('/Inventory/timesheet'));
+        return;
+    }
+
+    if ($todo->billable && $todo->point_rate && $todo->point_rate > 0 && $user_id) {
+        my $hours_decimal = $elapsed_secs / 3600;
+        my $points_earned = $todo->point_rate * $hours_decimal;
+        if ($points_earned >= 0.0001) {
+            eval {
+                my $ps = Comserv::Util::PointSystem->new(c => $c);
+                $ps->credit(
+                    user_id          => $user_id,
+                    amount           => $points_earned,
+                    transaction_type => 'work',
+                    description      => 'Inventory work: ' . $todo->subject
+                        . ' — ' . $hours . 'h ' . $minutes . 'm'
+                        . ($note ? " ($note)" : ''),
+                    reference_type   => 'todo',
+                    reference_id     => $todo_id,
+                );
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'timesheet_log', "Point credit failed: $@");
+            }
+        }
+    }
+
+    $c->flash->{success_msg} = sprintf(
+        'Logged %dh %dm against "%s".%s',
+        $hours, $minutes, $todo->subject,
+        ($todo->billable && $todo->point_rate && $todo->point_rate > 0 && $user_id)
+            ? ' Points credited.' : ''
+    );
+    $c->res->redirect($c->uri_for('/Inventory/timesheet'));
+}
+
+# =========================================================================
+# API — Future Accounting / External Integration
+# =========================================================================
+
+# -------------------------------------------------------------------------
+# _api_auth — shared token check for external API calls
+# Returns 1 if request is authorised (valid token OR admin session).
+# Sends 401 JSON and returns 0 if not authorised.
+# -------------------------------------------------------------------------
+
+sub _api_auth {
+    my ($self, $c) = @_;
+
+    my $roles    = $c->session->{roles} // [];
+    my $is_admin = 0;
+    if (ref($roles) eq 'ARRAY') {
+        $is_admin = grep { lc($_) eq 'admin' } @$roles;
+    } elsif (!ref($roles) && $roles) {
+        $is_admin = ($roles =~ /\badmin\b/i) ? 1 : 0;
+    }
+    $is_admin ||= 1 if ($c->session->{username} // '') eq 'Shanta';
+
+    unless ($is_admin) {
+        my $token = $c->req->header('X-API-Token')
+                 || $c->req->params->{api_token};
+        my $expected = $c->config->{api_token} || $ENV{COMSERV_API_TOKEN} || '';
+        if (!$expected || $token ne $expected) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_api_auth',
+                'API token auth failed from ' . ($c->req->address || 'unknown'));
+            $c->res->status(401);
+            $c->res->content_type('application/json');
+            $c->res->body('{"error":"Unauthorized"}');
+            $c->detach;
+            return 0;
+        }
+    }
+    return 1;
+}
+
+# -------------------------------------------------------------------------
+# POST /Inventory/api/transaction
+# Create an inventory transaction (stock adjustment) via API.
+#
+# JSON body (or form params):
+#   item_id          (required) — inventory_items.id
+#   transaction_type (required) — receive | issue | adjust_up | adjust_down |
+#                                  produce | consume | transfer | return
+#   quantity         (required) — positive number
+#   location_id      (optional) — inventory_locations.id
+#   unit_cost        (optional) — override unit cost for GL valuation
+#   reference_number (optional) — external reference (PO#, invoice#, etc.)
+#   notes            (optional)
+#   sitename         (optional) — defaults to session sitename
+#
+# Returns JSON:
+#   { "transaction_id": <id>, "gl_entry_id": <id|null>, "status": "ok" }
+# -------------------------------------------------------------------------
+
+sub api_transaction :Path('/Inventory/api/transaction') :Args(0) {
+    my ($self, $c) = @_;
+
+    return unless $self->_api_auth($c);
+
+    if ($c->req->method ne 'POST') {
+        $c->res->status(405);
+        $c->res->content_type('application/json');
+        $c->res->body('{"error":"Method not allowed — use POST"}');
+        $c->detach;
+        return;
+    }
+
+    require JSON;
+
+    my $params;
+    my $body = $c->req->body_text;
+    if ($body && $c->req->content_type =~ m{application/json}i) {
+        eval { $params = JSON::decode_json($body) };
+        if ($@) {
+            $c->res->status(400);
+            $c->res->content_type('application/json');
+            $c->res->body('{"error":"Invalid JSON body"}');
+            $c->detach;
+            return;
+        }
+    } else {
+        $params = $c->req->body_parameters;
+    }
+
+    my $item_id  = $params->{item_id};
+    my $type     = $params->{transaction_type};
+    my $qty      = $params->{quantity};
+
+    unless ($item_id && $type && defined $qty && $qty > 0) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body('{"error":"Required: item_id, transaction_type, quantity (>0)"}');
+        $c->detach;
+        return;
+    }
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $params->{sitename} || $self->_sitename($c);
+    my $loc_id   = $params->{location_id};
+    my $now      = $self->_now();
+    my $today    = substr($now, 0, 10);
+
+    my ($txn_id, $gl_entry_id, $err);
+
+    eval {
+        $schema->txn_do(sub {
+            my $stock = $schema->resultset('InventoryStockLevel')->find_or_create(
+                { item_id => $item_id, location_id => ($loc_id || \'NULL') },
+                { default => { quantity_on_hand => 0, quantity_reserved => 0, quantity_on_order => 0 } }
+            ) if $loc_id;
+
+            if ($loc_id) {
+                my $new_qty = $stock->quantity_on_hand;
+                if ($type =~ /^(receive|adjust_up|produce|harvest|return)$/) {
+                    $new_qty += $qty;
+                } else {
+                    $new_qty -= $qty;
+                }
+                $stock->update({ quantity_on_hand => $new_qty, updated_at => $now });
+            }
+
+            my $item_rec = $schema->resultset('InventoryItem')->find($item_id);
+            if ($item_rec && ($item_rec->inventory_accno_id || $item_rec->expense_accno_id)) {
+                my $unit_cost = $params->{unit_cost} || $item_rec->unit_cost || 0;
+                my $value     = $qty * $unit_cost;
+                my $ref       = 'API-TXN-' . $item_id . '-' . time();
+                my $gl = $schema->resultset('GlEntry')->create({
+                    reference   => $ref,
+                    description => ucfirst($type) . ' (API): ' . ($item_rec->name || "Item $item_id") . " x$qty",
+                    entry_type  => 'inventory',
+                    post_date   => $today,
+                    approved    => 1,
+                    currency    => 'CAD',
+                    sitename    => $sitename,
+                    entered_by  => $c->session->{user_id} || undef,
+                });
+                $gl_entry_id = $gl->id;
+
+                if ($value != 0) {
+                    my ($dr_acct, $cr_acct);
+                    if ($type =~ /^(receive|adjust_up|produce|harvest)$/) {
+                        $dr_acct = $item_rec->inventory_accno_id;
+                        $cr_acct = $item_rec->expense_accno_id || $item_rec->inventory_accno_id;
+                    } else {
+                        $dr_acct = $item_rec->expense_accno_id || $item_rec->inventory_accno_id;
+                        $cr_acct = $item_rec->inventory_accno_id;
+                    }
+                    if ($dr_acct) {
+                        $schema->resultset('GlEntryLine')->create({
+                            gl_entry_id => $gl_entry_id,
+                            account_id  => $dr_acct,
+                            amount      => $value,
+                            memo        => ucfirst($type) . " $qty units (API)",
+                            sort_order  => 1,
+                        });
+                    }
+                    if ($cr_acct && $cr_acct != ($dr_acct || 0)) {
+                        $schema->resultset('GlEntryLine')->create({
+                            gl_entry_id => $gl_entry_id,
+                            account_id  => $cr_acct,
+                            amount      => -$value,
+                            memo        => ucfirst($type) . " $qty units (API)",
+                            sort_order  => 2,
+                        });
+                    }
+                }
+            }
+
+            my $txn = $schema->resultset('InventoryTransaction')->create({
+                item_id          => $item_id,
+                location_id      => $loc_id || undef,
+                transaction_type => $type,
+                quantity         => $qty,
+                unit_cost        => $params->{unit_cost} || undef,
+                reference_number => $params->{reference_number} || undef,
+                gl_entry_id      => $gl_entry_id || undef,
+                sitename         => $sitename,
+                notes            => $params->{notes} || undef,
+                performed_by     => $c->session->{username} || 'api',
+                transaction_date => $now,
+                created_at       => $now,
+            });
+            $txn_id = $txn->id;
+        });
+    };
+    if ($@) {
+        $err = $@;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_transaction', "API transaction failed: $err");
+        $c->res->status(500);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ error => "Transaction failed: $err" }));
+        $c->detach;
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_transaction',
+        "API transaction created: id=$txn_id gl_entry_id=" . ($gl_entry_id || 'none'));
+    $c->res->status(201);
+    $c->res->content_type('application/json');
+    $c->res->body(JSON::encode_json({
+        status         => 'ok',
+        transaction_id => $txn_id,
+        gl_entry_id    => $gl_entry_id,
+    }));
+    $c->detach;
 }
 
 __PACKAGE__->meta->make_immutable;

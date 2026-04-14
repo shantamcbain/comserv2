@@ -4,7 +4,12 @@ use namespace::autoclean;
 use Try::Tiny;
 use LWP::UserAgent;
 use HTTP::Request;
-use Email::MIME;
+BEGIN {
+    eval { require Email::MIME; Email::MIME->import() };
+    if ($@) {
+        warn "Warning: Email::MIME not available — email features disabled\n";
+    }
+}
 use Encode qw(encode);
 use HTML::Entities qw(decode_entities);
 use Comserv::Util::Logging;
