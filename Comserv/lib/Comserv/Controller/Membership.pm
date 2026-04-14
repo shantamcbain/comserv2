@@ -98,7 +98,15 @@ sub index :Path :Args(0) {
             }
         }
 
-        unless ($site_is_csc) {
+    };
+    if ($@) {
+        my $err = "$@";
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index',
+            "Could not load membership plans (table may not exist yet): $err");
+    }
+
+    unless ($site_is_csc) {
+        eval {
             my $csc_site = $c->model('DBEncy')->resultset('Site')->search({ name => 'CSC' })->single;
             if ($csc_site) {
                 my @hosting = $c->model('DBEncy')->resultset('MembershipPlan')->search(
@@ -108,23 +116,20 @@ sub index :Path :Args(0) {
                 )->all;
                 $csc_hosting_plans = \@hosting;
             }
-
-            eval {
-                $hosting_account = $c->model('DBEncy')->resultset('HostingAccount')->search(
-                    { sitename => $site_name },
-                    { rows => 1 }
-                )->single;
-            };
-
-            if ($is_admin && !$hosting_account) {
-                $csc_not_registered = 1;
-            }
-        }
-    };
-    if ($@) {
-        my $err = "$@";
+        };
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index',
-            "Could not load membership plans (table may not exist yet): $err");
+            "CSC hosting plans query failed: $@") if $@;
+
+        eval {
+            $hosting_account = $c->model('DBEncy')->resultset('HostingAccount')->search(
+                { sitename => $site_name },
+                { rows => 1 }
+            )->single;
+        };
+
+        if ($is_admin && !$hosting_account) {
+            $csc_not_registered = 1;
+        }
     }
 
     my $patreon_cfg = $self->_get_patreon_config($c, $site_name);
