@@ -198,21 +198,29 @@ sub index :Path :Args(0) {
     }
     
     my $pending_hosting = 0;
+    my $outstanding_invoices = [];
     eval {
         my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
         if (lc($site_name) eq 'csc') {
             $pending_hosting = $c->model('DBEncy')->resultset('HostingAccount')->search(
                 { status => 'pending' }
             )->count;
+        } else {
+            my @inv = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search(
+                { sitename => $site_name, status => 'outstanding' },
+                { prefetch => 'supplier', order_by => { -asc => 'due_date' } }
+            )->all;
+            $outstanding_invoices = \@inv;
         }
     };
 
     $c->stash(
-        template        => 'admin/index.tt',
-        stats           => $stats,
-        recent_activity => $recent_activity,
-        notifications   => $notifications,
-        pending_hosting => $pending_hosting,
+        template             => 'admin/index.tt',
+        stats                => $stats,
+        recent_activity      => $recent_activity,
+        notifications        => $notifications,
+        pending_hosting      => $pending_hosting,
+        outstanding_invoices => $outstanding_invoices,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 

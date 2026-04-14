@@ -25,6 +25,29 @@
     </div>
     [% END %]
 
+    [%# ── Outstanding invoices (non-CSC SiteNames) ────────────────── %]
+    [% IF outstanding_invoices.size %]
+    [% FOREACH inv IN outstanding_invoices %]
+    <div style="background:#fff0f0;border:2px solid #c0392b;border-radius:8px;padding:1rem 1.4rem;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <strong style="color:#922b21;font-size:1.05rem;">&#128179; Invoice Due: [% inv.invoice_number | html %]</strong>
+        <div style="margin-top:0.25rem;color:#641e16;">
+          From <strong>[% inv.supplier.name | html %]</strong>
+          — CAD [% inv.total_amount %]
+          [% SET pts = inv.total_amount * 10 %]
+          ([% pts %] pts)
+          — Due [% inv.due_date | html %]
+          [% IF inv.notes %]<br><small>[% inv.notes | html %]</small>[% END %]
+        </div>
+      </div>
+      <a href="[% c.uri_for('/Inventory/invoice/view/' _ inv.id) %]"
+         style="white-space:nowrap;margin-left:1.5rem;background:#c0392b;color:#fff;padding:0.5rem 1.1rem;border-radius:6px;text-decoration:none;font-weight:bold;">
+        View &amp; Pay →
+      </a>
+    </div>
+    [% END %]
+    [% END %]
+
     <!-- Software Management Status - Prominent Section -->
     <div class="software-management-section theme-section">
         <div class="section-header">
