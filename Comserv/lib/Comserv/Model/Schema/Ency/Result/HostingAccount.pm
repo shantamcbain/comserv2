@@ -76,6 +76,12 @@ __PACKAGE__->add_columns(
         is_nullable => 1,
         documentation => 'WHC.ca cPanel username, if applicable',
     },
+    contact_email => {
+        data_type   => 'varchar',
+        size        => 255,
+        is_nullable => 1,
+        documentation => 'Billing contact email for this hosted SiteName',
+    },
     notes => {
         data_type   => 'text',
         is_nullable => 1,

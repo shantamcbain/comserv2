@@ -199,6 +199,7 @@ sub hosting_signup :Local :Args(0) {
                     domain_type        => $p->{domain_type} || 'subdomain',
                     parent_domain      => $p->{parent_domain},
                     referring_sitename => $p->{referring_sitename},
+                    contact_email      => $p->{contact_email},
                     notes              => $p->{notes},
                     updated_at         => \'NOW()',
                 });
@@ -210,6 +211,7 @@ sub hosting_signup :Local :Args(0) {
                     domain_type        => $p->{domain_type} || 'subdomain',
                     parent_domain      => $p->{parent_domain},
                     referring_sitename => $p->{referring_sitename} || $site_name,
+                    contact_email      => $p->{contact_email},
                     status             => 'pending',
                     monthly_cost       => 0,
                     notes              => $p->{notes},
