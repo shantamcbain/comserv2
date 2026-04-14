@@ -1167,7 +1167,10 @@ sub hosting_accounts :Local :Args(0) {
                         my $notifier = Comserv::Util::EmailNotification->new(logging => $self->logging);
                         $notifier->send_hosting_approval_notification($c, $acct);
                     };
-                    $c->flash->{success_msg} = $acct->sitename . " hosting approved and notified.";
+                    eval { $self->_create_hosting_invoice($c, $acct, $monthly) };
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'hosting_accounts',
+                        "Invoice creation error: $@") if $@;
+                    $c->flash->{success_msg} = $acct->sitename . " hosting approved, invoice created.";
                 } elsif ($action eq 'suspend') {
                     $acct->update({ status => 'suspended', updated_at => \'NOW()' });
                     $c->flash->{success_msg} = $acct->sitename . " hosting suspended.";
@@ -1194,6 +1197,176 @@ sub hosting_accounts :Local :Args(0) {
         accounts => \@accounts,
     );
     $c->forward($c->view('TT'));
+}
+
+sub _create_hosting_invoice {
+    my ($self, $c, $acct, $monthly_cost) = @_;
+    my $schema    = $c->model('DBEncy');
+    my $client_sn = $acct->sitename;
+    my $plan_slug = $acct->plan_slug || 'hosting-app';
+
+    # --- COA lookups (CSC side) ---
+    my $csc_ar     = $schema->resultset('CoaAccount')->search({ sitename => 'CSC', accno => '1100' })->single;
+    my $csc_income = $schema->resultset('CoaAccount')->search({ sitename => 'CSC', accno => '4300' })->single;
+
+    # --- COA lookups (client side) ---
+    my $cli_ap      = $schema->resultset('CoaAccount')->search({ sitename => $client_sn, accno => '2000' })->single;
+    my $cli_expense = $schema->resultset('CoaAccount')->search({ sitename => $client_sn, accno => '6300' })->single;
+
+    # --- Inventory item for this plan ---
+    my $sku  = $plan_slug eq 'hosting-subdomain' ? 'CSC-HOST-SUB' : 'CSC-HOST-APP';
+    my $item = $schema->resultset('InventoryItem')->search({ sitename => 'CSC', sku => $sku })->single;
+
+    # --- Supplier on client side (CSC as supplier for client) ---
+    my $supplier = $schema->resultset('InventorySupplier')->search(
+        { sitename => $client_sn, name => { -like => '%Computer System Consulting%' } }
+    )->single;
+
+    # Auto-create supplier if missing
+    unless ($supplier) {
+        $supplier = $schema->resultset('InventorySupplier')->create({
+            sitename     => $client_sn,
+            name         => 'Computer System Consulting (CSC)',
+            contact_name => 'CSC Admin',
+            email        => 'helpdesk@computersystemconsulting.ca',
+            website      => 'https://computersystemconsulting.ca',
+            status       => 'active',
+            notes        => 'CSC hosting provider. Invoices paid in Points (100 pts = CAD 10).',
+            created_by   => 'system',
+            created_at   => \'NOW()',
+            updated_at   => \'NOW()',
+        });
+    }
+
+    my $inv_date = DateTime->now->strftime('%Y-%m-%d');
+    my $due_date = DateTime->now->add(days => 30)->strftime('%Y-%m-%d');
+    my $inv_num  = 'CSC-HOST-' . uc($client_sn) . '-' . DateTime->now->strftime('%Y%m');
+    my $pts_rate = 10;
+    my $points_due = $monthly_cost * $pts_rate;
+
+    # --- CLIENT SIDE: SupplierInvoice (bill from CSC) ---
+    my $cli_invoice = $schema->resultset('InventorySupplierInvoice')->create({
+        sitename       => $client_sn,
+        supplier_id    => $supplier->id,
+        invoice_number => $inv_num,
+        invoice_date   => $inv_date,
+        due_date       => $due_date,
+        total_amount   => $monthly_cost,
+        status         => 'outstanding',
+        ap_account_id  => ($cli_ap ? $cli_ap->id : undef),
+        notes          => "Monthly hosting fee - $plan_slug. Pay with Points: $points_due pts = CAD $monthly_cost.",
+        created_by     => $c->session->{username} || 'system',
+        created_at     => \'NOW()',
+        updated_at     => \'NOW()',
+    });
+
+    $schema->resultset('InventorySupplierInvoiceLine')->create({
+        invoice_id  => $cli_invoice->id,
+        item_id     => ($item ? $item->id : undef),
+        description => 'Monthly Hosting — ' . uc($client_sn) . ' (' . $plan_slug . ')',
+        quantity    => 1,
+        unit_cost   => $monthly_cost,
+        line_total  => $monthly_cost,
+        account_id  => ($cli_expense ? $cli_expense->id : undef),
+    });
+
+    # --- CLIENT GL: DR Hosting Expense (+) / CR Accounts Payable (-) ---
+    if ($cli_expense && $cli_ap) {
+        my $cli_gl = $schema->resultset('GlEntry')->create({
+            sitename    => $client_sn,
+            reference   => $inv_num,
+            description => "CSC Hosting invoice $inv_num",
+            post_date   => $inv_date,
+            created_at  => \'NOW()',
+            updated_at  => \'NOW()',
+        });
+        $schema->resultset('GlEntryLine')->create({
+            gl_entry_id => $cli_gl->id,
+            account_id  => $cli_expense->id,
+            amount      => $monthly_cost,
+            memo        => 'Hosting expense — CSC',
+            created_at  => \'NOW()',
+        });
+        $schema->resultset('GlEntryLine')->create({
+            gl_entry_id => $cli_gl->id,
+            account_id  => $cli_ap->id,
+            amount      => -$monthly_cost,
+            memo        => 'AP — CSC hosting invoice',
+            created_at  => \'NOW()',
+        });
+        $cli_invoice->update({ gl_entry_id => $cli_gl->id });
+    }
+
+    # --- CSC GL: DR Accounts Receivable (+) / CR Hosting Income (-) ---
+    if ($csc_ar && $csc_income) {
+        my $csc_gl = $schema->resultset('GlEntry')->create({
+            sitename    => 'CSC',
+            reference   => $inv_num,
+            description => "Hosting invoice to $client_sn — $inv_num",
+            post_date   => $inv_date,
+            created_at  => \'NOW()',
+            updated_at  => \'NOW()',
+        });
+        $schema->resultset('GlEntryLine')->create({
+            gl_entry_id => $csc_gl->id,
+            account_id  => $csc_ar->id,
+            amount      => $monthly_cost,
+            memo        => "AR — $client_sn hosting",
+            created_at  => \'NOW()',
+        });
+        $schema->resultset('GlEntryLine')->create({
+            gl_entry_id => $csc_gl->id,
+            account_id  => $csc_income->id,
+            amount      => -$monthly_cost,
+            memo        => "Hosting income — $client_sn",
+            created_at  => \'NOW()',
+        });
+    }
+
+    # --- POINTS PAYMENT: find client admin user, transfer to CSC admin ---
+    my $CSC_ADMIN_USER_ID = 178;
+    my $pts_paid = 0;
+    eval {
+        my $client_site = $schema->resultset('Site')->search({ name => $client_sn })->single;
+        if ($client_site) {
+            my $admin_user = $schema->resultset('UserSite')->search(
+                { site_id => $client_site->id },
+                { prefetch => 'user', rows => 50 }
+            )->search_related('user', { roles => { -like => '%admin%' } })->first;
+
+            if ($admin_user) {
+                my $ps = Comserv::Util::PointSystem->new(c => $c);
+                my ($ok, $err) = $ps->debit(
+                    user_id          => $admin_user->id,
+                    amount           => $points_due,
+                    transaction_type => 'hosting_payment',
+                    description      => "Hosting invoice $inv_num — CAD $monthly_cost",
+                    reference_type   => 'hosting_account',
+                    reference_id     => $acct->id,
+                );
+                if ($ok) {
+                    $ps->credit(
+                        user_id          => $CSC_ADMIN_USER_ID,
+                        amount           => $points_due,
+                        transaction_type => 'hosting_income',
+                        description      => "Hosting payment from $client_sn — $inv_num",
+                        reference_type   => 'hosting_account',
+                        reference_id     => $acct->id,
+                    );
+                    $cli_invoice->update({ status => 'paid' });
+                    $pts_paid = $points_due;
+                } else {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_create_hosting_invoice',
+                        "Insufficient points for $client_sn ($err) — invoice left outstanding");
+                }
+            }
+        }
+    };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_create_hosting_invoice',
+        "Points transfer error: $@") if $@;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_create_hosting_invoice',
+        "Invoice $inv_num created for $client_sn (\$$monthly_cost / ${points_due}pts paid=$pts_paid)");
 }
 
 __PACKAGE__->meta->make_immutable;
