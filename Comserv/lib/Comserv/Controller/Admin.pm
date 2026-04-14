@@ -208,11 +208,15 @@ sub index :Path :Args(0) {
         } else {
             my @inv = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search(
                 { sitename => $site_name, status => 'outstanding' },
-                { prefetch => 'supplier', order_by => { -asc => 'due_date' } }
+                { join => 'supplier', prefetch => 'supplier', order_by => { -asc => 'me.due_date' } }
             )->all;
             $outstanding_invoices = \@inv;
         }
     };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index',
+            "Outstanding invoices query error: $@");
+    }
 
     $c->stash(
         template             => 'admin/index.tt',

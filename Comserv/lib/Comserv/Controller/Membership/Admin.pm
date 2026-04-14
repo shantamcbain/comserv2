@@ -1244,6 +1244,25 @@ sub _create_hosting_invoice {
     my $pts_rate = 10;
     my $points_due = $monthly_cost * $pts_rate;
 
+    # --- Link hosting item to CSC supplier on client side (for Supplier view) ---
+    if ($item && $supplier) {
+        my $existing_link = $schema->resultset('InventoryItemSupplier')->search({
+            item_id     => $item->id,
+            supplier_id => $supplier->id,
+        })->single;
+        unless ($existing_link) {
+            $schema->resultset('InventoryItemSupplier')->create({
+                item_id      => $item->id,
+                supplier_id  => $supplier->id,
+                unit_cost    => $monthly_cost,
+                is_preferred => 1,
+                notes        => 'CSC hosting service',
+                created_at   => \'NOW()',
+                updated_at   => \'NOW()',
+            });
+        }
+    }
+
     # --- CLIENT SIDE: SupplierInvoice (bill from CSC) ---
     my $cli_invoice = $schema->resultset('InventorySupplierInvoice')->create({
         sitename       => $client_sn,
