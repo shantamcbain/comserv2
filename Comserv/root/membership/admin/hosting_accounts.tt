@@ -77,6 +77,8 @@
                       onclick="return confirm('Cancel hosting for [% acct.sitename | html %]?')">Cancel</button>
                   </form>
                   [% END %]
+                  <a href="[% c.uri_for('/membership/admin/hosting_account_edit/' _ acct.id) %]"
+                     class="btn btn-sm btn-secondary" style="margin-left:0.3rem;">✏️ Edit</a>
                   [% IF acct.requested_addons %]
                   <span title="Add-ons: [% acct.requested_addons | html %]" style="cursor:help;margin-left:0.3rem;">🧩</span>
                   [% END %]

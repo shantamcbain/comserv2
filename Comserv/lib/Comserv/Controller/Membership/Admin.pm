@@ -1199,6 +1199,54 @@ sub hosting_accounts :Local :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+sub hosting_account_edit :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    return unless $self->_require_admin($c);
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    unless (lc($site_name) eq 'csc') {
+        $c->response->redirect($c->uri_for('/membership/admin'));
+        return;
+    }
+
+    my $acct = $c->model('DBEncy')->resultset('HostingAccount')->find($id);
+    unless ($acct) {
+        $c->flash->{error_msg} = 'Hosting account not found.';
+        $c->response->redirect($c->uri_for('/membership/admin/hosting_accounts'));
+        return;
+    }
+
+    if ($c->req->method eq 'POST') {
+        my $p = $c->req->body_parameters;
+        eval {
+            $acct->update({
+                plan_slug      => $p->{plan_slug}      || $acct->plan_slug,
+                domain         => $p->{domain}         // '',
+                domain_type    => $p->{domain_type}    || 'subdomain',
+                parent_domain  => $p->{parent_domain}  // '',
+                contact_email  => $p->{contact_email}  // '',
+                monthly_cost   => $p->{monthly_cost}   // $acct->monthly_cost,
+                cpanel_username => $p->{cpanel_username} // '',
+                notes          => $p->{notes}          // '',
+                updated_at     => \'NOW()',
+            });
+        };
+        if ($@) {
+            $c->flash->{error_msg} = "Update failed: $@";
+        } else {
+            $c->flash->{success_msg} = $acct->sitename . ' hosting account updated.';
+        }
+        $c->response->redirect($c->uri_for('/membership/admin/hosting_accounts'));
+        return;
+    }
+
+    $c->stash(
+        template => 'membership/admin/hosting_account_edit.tt',
+        acct     => $acct,
+    );
+    $c->forward($c->view('TT'));
+}
+
 sub _create_hosting_invoice {
     my ($self, $c, $acct, $monthly_cost) = @_;
     my $schema    = $c->model('DBEncy');
