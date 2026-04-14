@@ -60,6 +60,10 @@ sub index :Path :Args(0) {
     my $user_membership = undef;
     my $is_admin  = $self->_is_admin($c);
     my $all_members = [];
+    my $site_is_csc      = (lc($site_name) eq 'csc');
+    my $csc_hosting_plans = [];
+    my $hosting_account   = undef;
+    my $csc_not_registered = 0;
 
     eval {
         my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
@@ -93,6 +97,28 @@ sub index :Path :Args(0) {
                 $all_members = \@members;
             }
         }
+
+        unless ($site_is_csc) {
+            my $csc_site = $c->model('DBEncy')->resultset('Site')->search({ name => 'CSC' })->single;
+            if ($csc_site) {
+                my @hosting = $c->model('DBEncy')->resultset('MembershipPlan')->search(
+                    { site_id => $csc_site->id, has_hosting => 1, is_active => 1 },
+                    { order_by => 'sort_order' }
+                )->all;
+                $csc_hosting_plans = \@hosting;
+            }
+
+            eval {
+                $hosting_account = $c->model('DBEncy')->resultset('HostingAccount')->search(
+                    { sitename => $site_name },
+                    { rows => 1 }
+                )->single;
+            };
+
+            if ($is_admin && !$hosting_account) {
+                $csc_not_registered = 1;
+            }
+        }
     };
     if ($@) {
         my $err = "$@";
@@ -103,13 +129,17 @@ sub index :Path :Args(0) {
     my $patreon_cfg = $self->_get_patreon_config($c, $site_name);
 
     $c->stash(
-        template        => 'membership/Index.tt',
-        plans           => $plans,
-        user_membership => $user_membership,
-        site_name       => $site_name,
-        is_admin        => $is_admin,
-        all_members     => $all_members,
-        patreon_cfg     => $patreon_cfg,
+        template           => 'membership/Index.tt',
+        plans              => $plans,
+        user_membership    => $user_membership,
+        site_name          => $site_name,
+        is_admin           => $is_admin,
+        all_members        => $all_members,
+        patreon_cfg        => $patreon_cfg,
+        site_is_csc        => $site_is_csc,
+        csc_hosting_plans  => $csc_hosting_plans,
+        hosting_account    => $hosting_account,
+        csc_not_registered => $csc_not_registered,
     );
     $c->forward($c->view('TT'));
 }

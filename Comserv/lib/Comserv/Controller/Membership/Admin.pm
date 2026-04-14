@@ -1059,6 +1059,89 @@ sub add_cost :Local :Args(0) {
     $c->response->redirect($c->uri_for('/membership/admin/cost_tracking'));
 }
 
+sub seed_hosting_plans :Local :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_admin($c);
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    unless (lc($site_name) eq 'csc') {
+        $c->flash->{error_msg} = 'Hosting plan seeding is only available on the CSC site.';
+        $c->response->redirect($c->uri_for('/membership/admin'));
+        return;
+    }
+
+    my $db     = $c->model('DBEncy');
+    my $csc    = $db->resultset('Site')->search({ name => 'CSC' })->single;
+    unless ($csc) {
+        $c->flash->{error_msg} = 'CSC site not found in database.';
+        $c->response->redirect($c->uri_for('/membership/admin'));
+        return;
+    }
+
+    my @hosting_plans = (
+        {
+            name             => 'Subdomain Hosting',
+            slug             => 'hosting-subdomain',
+            description      => 'Get your own subdomain on any registered SiteName domain (e.g. you.forager.com). Your site runs as an app on the CSC platform — no cPanel required. Includes full access to ENCY, AI tools, and planning modules.',
+            price_monthly    => '10.00',
+            price_annual     => '100.00',
+            price_currency   => 'CAD',
+            ai_models_allowed   => '["llama3.2","mistral"]',
+            ai_requests_per_day => 20,
+            has_email        => 0, email_addresses => 0,
+            has_hosting      => 1, hosting_tier => 'app-subdomain',
+            has_subdomain    => 1, has_custom_domain => 0,
+            has_beekeeping   => 0, has_planning => 1,
+            has_currency     => 1, currency_bonus => '25.00',
+            max_services     => 3, sort_order => 10,
+            is_active        => 1, is_featured => 0,
+        },
+        {
+            name             => 'App-Only Hosting',
+            slug             => 'hosting-app',
+            description      => 'Host your own standalone application on the CSC platform. Bring your own domain or use a CSC sub-path. Ideal for co-ops, clubs, or small businesses that need a managed web presence without the overhead of a cPanel account.',
+            price_monthly    => '15.00',
+            price_annual     => '150.00',
+            price_currency   => 'CAD',
+            ai_models_allowed   => '["llama3.2","mistral","codellama"]',
+            ai_requests_per_day => 30,
+            has_email        => 0, email_addresses => 0,
+            has_hosting      => 1, hosting_tier => 'app-only',
+            has_subdomain    => 0, has_custom_domain => 1,
+            has_beekeeping   => 0, has_planning => 1,
+            has_currency     => 1, currency_bonus => '50.00',
+            max_services     => 5, sort_order => 11,
+            is_active        => 1, is_featured => 1,
+        },
+    );
+
+    my ($added, $skipped) = (0, 0);
+    eval {
+        $db->schema->txn_do(sub {
+            for my $plan (@hosting_plans) {
+                my $exists = $db->resultset('MembershipPlan')->search(
+                    { site_id => $csc->id, slug => $plan->{slug} }
+                )->single;
+                if ($exists) {
+                    $skipped++;
+                } else {
+                    $db->resultset('MembershipPlan')->create({
+                        site_id => $csc->id,
+                        %$plan,
+                    });
+                    $added++;
+                }
+            }
+        });
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Error seeding hosting plans: $@";
+    } else {
+        $c->flash->{success_msg} = "Hosting plans seeded: $added added, $skipped already existed.";
+    }
+    $c->response->redirect($c->uri_for('/membership/admin/manage_plans'));
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
