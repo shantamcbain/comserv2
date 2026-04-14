@@ -1,0 +1,120 @@
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>&#9999;&#65039; Edit Hosting Account — [% acct.sitename | html %]</h1>
+    <div class="admin-actions">
+      <a href="[% c.uri_for('/membership/admin/hosting_accounts') %]" class="btn btn-secondary">← Back</a>
+    </div>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+      <div class="content-section">
+
+        <form method="post" action="[% c.uri_for('/membership/admin/hosting_account_edit/' _ acct.id) %]">
+
+          <table class="form-table" style="width:100%;border-collapse:collapse;">
+            <tr>
+              <th style="width:200px;text-align:left;padding:0.5rem;">SiteName</th>
+              <td style="padding:0.5rem;"><strong>[% acct.sitename | html %]</strong></td>
+            </tr>
+            <tr>
+              <th style="text-align:left;padding:0.5rem;">Status</th>
+              <td style="padding:0.5rem;">
+                <span class="badge badge-[% acct.status == 'active' ? 'success' : acct.status == 'pending' ? 'warning' : 'danger' %]">
+                  [% acct.status | html %]
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <th style="text-align:left;padding:0.5rem;">Plan</th>
+              <td style="padding:0.5rem;">
+                <select name="plan_slug" class="form-control">
+                  [% FOR slug IN ['hosting-app', 'hosting-subdomain', 'pro', 'business'] %]
+                  <option value="[% slug %]"[% IF acct.plan_slug == slug %] selected[% END %]>[% slug %]</option>
+                  [% END %]
+                </select>
+              </td>
+            </tr>
+            <tr>
+              <th style="text-align:left;padding:0.5rem;">Domain Type</th>
+              <td style="padding:0.5rem;">
+                <select name="domain_type" class="form-control" id="domain_type_sel" onchange="toggleDomainFields(this.value)">
+                  <option value="subdomain"[% IF acct.domain_type == 'subdomain' %] selected[% END %]>Subdomain on existing domain</option>
+                  <option value="custom"[% IF acct.domain_type == 'custom' %] selected[% END %]>Custom domain (own domain)</option>
+                  <option value="subpath"[% IF acct.domain_type == 'subpath' %] selected[% END %]>Subpath</option>
+                </select>
+              </td>
+            </tr>
+            <tr id="row_parent_domain">
+              <th style="text-align:left;padding:0.5rem;">Parent Domain</th>
+              <td style="padding:0.5rem;">
+                <input type="text" name="parent_domain" value="[% acct.parent_domain | html %]"
+                       class="form-control" placeholder="e.g. forager.com or beemaster.ca">
+                <small style="color:#888;">The existing domain to add a subdomain under</small>
+              </td>
+            </tr>
+            <tr>
+              <th style="text-align:left;padding:0.5rem;">Domain / Subdomain</th>
+              <td style="padding:0.5rem;">
+                <input type="text" name="domain" value="[% acct.domain | html %]"
+                       class="form-control" placeholder="e.g. members.forager.com or newsite.ca">
+                <small style="color:#888;">Full domain or subdomain for this hosted site</small>
+              </td>
+            </tr>
+            <tr>
+              <th style="text-align:left;padding:0.5rem;">Contact Email</th>
+              <td style="padding:0.5rem;">
+                <input type="email" name="contact_email" value="[% acct.contact_email | html %]"
+                       class="form-control" placeholder="billing@sitename.com">
+              </td>
+            </tr>
+            <tr>
+              <th style="text-align:left;padding:0.5rem;">Monthly Cost (CAD)</th>
+              <td style="padding:0.5rem;">
+                <input type="number" name="monthly_cost" value="[% acct.monthly_cost %]"
+                       step="0.01" min="0" class="form-control" style="width:120px;">
+              </td>
+            </tr>
+            <tr>
+              <th style="text-align:left;padding:0.5rem;">cPanel Username</th>
+              <td style="padding:0.5rem;">
+                <input type="text" name="cpanel_username" value="[% acct.cpanel_username | html %]"
+                       class="form-control" placeholder="WHC.ca cPanel username">
+              </td>
+            </tr>
+            <tr>
+              <th style="text-align:left;vertical-align:top;padding:0.5rem;">Notes</th>
+              <td style="padding:0.5rem;">
+                <textarea name="notes" rows="4" class="form-control"
+                          style="width:100%;box-sizing:border-box;">[% acct.notes | html %]</textarea>
+              </td>
+            </tr>
+            [% IF acct.requested_addons %]
+            <tr>
+              <th style="text-align:left;padding:0.5rem;">Requested Add-ons</th>
+              <td style="padding:0.5rem;color:#555;">[% acct.requested_addons | html %]</td>
+            </tr>
+            [% END %]
+          </table>
+
+          <div class="form-actions" style="margin-top:1.2rem;">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="[% c.uri_for('/membership/admin/hosting_accounts') %]" class="btn btn-secondary" style="margin-left:0.5rem;">Cancel</a>
+          </div>
+
+        </form>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleDomainFields(type) {
+    document.getElementById('row_parent_domain').style.display =
+        (type === 'subdomain' || type === 'subpath') ? '' : 'none';
+}
+toggleDomainFields(document.getElementById('domain_type_sel').value);
+</script>
