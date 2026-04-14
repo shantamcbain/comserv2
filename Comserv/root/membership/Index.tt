@@ -111,7 +111,7 @@
           CSC handles domain setup, server maintenance, and billing —
           [% site_name | html %] earns a referral commission on every hosting payment.</p>
           <div style="margin-top:0.8rem;">
-            <a href="[% c.uri_for('/hosting_signup', { sitename => site_name, ref => 'membership' }) %]"
+            <a href="[% c.uri_for('/membership/hosting_signup', { plan => 'hosting-subdomain', ref => 'membership' }) %]"
                class="btn btn-primary">Register [% site_name | html %] with CSC →</a>
             <a href="[% c.uri_for('/hosting') %]" class="btn btn-secondary" style="margin-left:0.5rem;">Learn More</a>
           </div>
