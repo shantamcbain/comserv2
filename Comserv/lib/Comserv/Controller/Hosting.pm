@@ -86,6 +86,11 @@ sub auto :Private {
     return 1;
 }
 
+sub redirect_hosted        :Path('/hosted')   :Args(0) { $_[1]->response->redirect($_[1]->uri_for('/hosting'),  301); $_[1]->detach }
+sub redirect_Hosted        :Path('/Hosted')   :Args(0) { $_[1]->response->redirect($_[1]->uri_for('/hosting'),  301); $_[1]->detach }
+sub redirect_apply         :Path('/apply')    :Args(0) { $_[1]->response->redirect($_[1]->uri_for('/hosting_signup'), 301); $_[1]->detach }
+sub redirect_accounts      :Path('/accounts') :Args(0) { $_[1]->response->redirect($_[1]->uri_for('/hosting'),  301); $_[1]->detach }
+
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
