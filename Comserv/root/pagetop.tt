@@ -349,7 +349,7 @@ document.addEventListener('DOMContentLoaded', function() {
         [% INCLUDE 'Navigation/TopDropListLogin.tt' %]
         [%# Global discontinued — Mail/Jobs/Join moved to Main %]
         [% IF 0 %][% INCLUDE 'Navigation/TopDropListGlobal.tt' %][% END %]
-        [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
+        [% IF c.session.SiteName == 'CSC' %][% INCLUDE 'Navigation/TopDropListHosted.tt' %][% END %]
         [% INCLUDE 'Navigation/TopDropListMember.tt' %]
         [% INCLUDE 'Navigation/TopDropListENCY.tt' %]
         [% INCLUDE 'Navigation/TopDropListWeather.tt' %]
