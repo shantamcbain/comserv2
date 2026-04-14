@@ -45,10 +45,11 @@
                 <td style="font-size:0.85em;">[% acct.created_at | html %]</td>
                 <td class="action-cell">
                   [% IF acct.status == 'pending' %]
+                    [% SET suggested = plan_price.item(acct.plan_slug) || acct.monthly_cost || 10 %]
                     <form method="post" action="[% c.uri_for('/membership/admin/hosting_accounts') %]" style="display:inline-flex;align-items:center;gap:0.4rem;">
                       <input type="hidden" name="account_id" value="[% acct.id %]">
                       <input type="hidden" name="action" value="approve">
-                      CAD <input type="number" name="monthly_cost" value="[% acct.monthly_cost || 10 %]"
+                      CAD <input type="number" name="monthly_cost" value="[% suggested %]"
                         step="0.01" min="0" style="width:65px;">
                       <button type="submit" class="btn btn-primary btn-sm"
                         onclick="return confirm('Approve hosting for [% acct.sitename | html %] and send email notification?')">
