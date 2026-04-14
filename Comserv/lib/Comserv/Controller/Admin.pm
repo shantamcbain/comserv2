@@ -7,6 +7,7 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::UserVerification;
+use DateTime;
 use Data::Dumper;
 use JSON qw(decode_json encode_json);
 use Try::Tiny;
@@ -407,6 +408,22 @@ sub get_system_notifications {
                     type    => 'warning',
                     message => "$pending pending hosting registration(s) require CSC approval",
                     link    => $c->uri_for('/membership/admin/hosting_accounts'),
+                };
+            }
+
+            # Recently paid hosting invoices (last 48h)
+            my $cutoff = DateTime->now->subtract(hours => 48)->strftime('%Y-%m-%d %H:%M:%S');
+            my @paid = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search(
+                { sitename => { '!=' => 'CSC' }, status => 'paid',
+                  updated_at => { '>=' => $cutoff } },
+                { order_by => { -desc => 'updated_at' } }
+            )->all;
+            for my $inv (@paid) {
+                push @notifications, {
+                    type    => 'success',
+                    message => 'Payment received: ' . $inv->sitename . ' — ' . $inv->invoice_number
+                               . ' (CAD ' . $inv->total_amount . ')',
+                    link    => $c->uri_for('/Inventory/invoice/view/' . $inv->id),
                 };
             }
         }

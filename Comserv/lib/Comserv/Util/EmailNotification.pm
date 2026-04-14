@@ -631,6 +631,75 @@ This is an automated notification from the Comserv platform.
     return $self->send_email($c, $email, $smtp_config);
 }
 
+sub send_invoice_payment_notification {
+    my ($self, $c, %args) = @_;
+    # args: invoice_number, sitename (payer), amount, points, invoice_id
+
+    my $smtp_config = $self->get_smtp_config($c, 'CSC');
+    return 0 unless $smtp_config->{smtp_host};
+
+    my $timestamp   = scalar localtime;
+    my $invoice_url = $c->uri_for('/Inventory/invoice/view/' . $args{invoice_id})->as_string;
+
+    my $body = qq{
+CSC Hosting — Payment Received
+Time: $timestamp
+
+A hosting invoice has been paid.
+
+  Invoice       : $args{invoice_number}
+  Paid by       : $args{sitename}
+  Amount        : CAD $args{amount}
+  Points debited: $args{points} pts
+
+View invoice: $invoice_url
+
+This is an automated notification from the Comserv platform.
+};
+
+    my $csc_email = Email::MIME->create(
+        header_str => [
+            From    => $smtp_config->{smtp_from} || 'noreply@computersystemconsulting.ca',
+            To      => 'helpdesk@computersystemconsulting.ca',
+            Subject => "[CSC] Payment received — $args{invoice_number} from $args{sitename}",
+        ],
+        attributes => { encoding => 'quoted-printable', charset => 'UTF-8' },
+        body_str   => $body,
+    );
+    $self->send_email($c, $csc_email, $smtp_config);
+
+    # Receipt to the paying SiteName contact
+    my $contact_email = $args{contact_email};
+    if ($contact_email) {
+        my $receipt = Email::MIME->create(
+            header_str => [
+                From    => $smtp_config->{smtp_from} || 'noreply@computersystemconsulting.ca',
+                To      => $contact_email,
+                Subject => "[CSC] Payment confirmed — $args{invoice_number}",
+            ],
+            attributes => { encoding => 'quoted-printable', charset => 'UTF-8' },
+            body_str   => qq{
+CSC Hosting — Payment Confirmed
+Time: $timestamp
+
+Your hosting invoice has been paid.
+
+  Invoice       : $args{invoice_number}
+  Amount        : CAD $args{amount}
+  Points used   : $args{points} pts
+  Status        : Paid
+
+Thank you! If you have questions contact helpdesk\@computersystemconsulting.ca.
+
+This is an automated notification from the Comserv platform.
+},
+        );
+        $self->send_email($c, $receipt, $smtp_config);
+    }
+
+    return 1;
+}
+
 sub get_smtp_config {
     my ($self, $c, $sitename) = @_;
     
