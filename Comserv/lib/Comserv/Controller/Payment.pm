@@ -314,7 +314,7 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
                     if ($plan_with_item && $plan_with_item->inventory_item_id) {
                         $c->model('DBEncy')->resultset('InventoryTransaction')->create({
                             item_id          => $plan_with_item->inventory_item_id,
-                            sitename         => $site_name,
+                            sitename         => $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC',
                             transaction_type => 'sale',
                             quantity         => 1,
                             unit_cost        => $final_price,
