@@ -9,7 +9,7 @@ has 'logging' => (
 );
 BEGIN { extends 'Catalyst::Controller'; }
 
-sub index :Path('/Forager') :Args(0) {
+sub index :Path('/forager') :Args(0) {
     my ( $self, $c ) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Starting index action");
        $c->session->{MailServer} = "http://webmail.forager.com";
