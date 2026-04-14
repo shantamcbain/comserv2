@@ -1,47 +1,44 @@
-[% PageVersion = 'Inventory/items/edit.tt,v 0.02 2026/04/10 shanta Exp' %]
+[% PageVersion = 'Inventory/items/edit.tt,v 0.03 2026/04/14 shanta Exp' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
-<h1>Edit Item: [% item.name %]</h1>
+<h1>Edit Item: [% item.name | html %]</h1>
 
-[% IF error_msg %]<p class="error">[% error_msg %]</p>[% END %]
+[% IF error_msg %]<p class="error">[% error_msg | html %]</p>[% END %]
 
 <form method="POST" action="/Inventory/item/edit/[% item.id %]">
   <table>
     <tr>
       <th><label for="sku">SKU *</label></th>
-      <td><input type="text" id="sku" name="sku" required maxlength="100" value="[% item.sku %]"></td>
+      <td><input type="text" id="sku" name="sku" required maxlength="100" value="[% item.sku | html %]"></td>
     </tr>
     <tr>
       <th><label for="name">Name *</label></th>
-      <td><input type="text" id="name" name="name" required maxlength="255" value="[% item.name %]"></td>
+      <td><input type="text" id="name" name="name" required maxlength="255" value="[% item.name | html %]"></td>
     </tr>
     <tr>
       <th><label for="category">Category</label></th>
-      <td><input type="text" id="category" name="category" maxlength="100" value="[% item.category %]"></td>
+      <td><input type="text" id="category" name="category" maxlength="100" value="[% item.category | html %]"></td>
     </tr>
     <tr>
       <th><label for="item_origin">Origin / How Made</label></th>
       <td>
         <select id="item_origin" name="item_origin">
-          [% FOREACH o IN ['purchased','manufactured','crafted','grown','foraged','harvested','3d_printed','other'] %]
+          [% FOREACH o IN ['purchased','manufactured','service','crafted','grown','foraged','harvested','3d_printed','other'] %]
           <option value="[% o %]" [% IF item.item_origin == o %]selected[% END %]>[% o %]</option>
           [% END %]
         </select>
+        <small>Use <em>service</em> for provisioned accounts/hosting, <em>manufactured</em> for built goods</small>
       </td>
     </tr>
     <tr>
-      <th><label for="is_assemblable">Has BOM / Recipe?</label></th>
-      <td><input type="checkbox" id="is_assemblable" name="is_assemblable" value="1" [% IF item.is_assemblable %]checked[% END %]> Yes — this item is assembled from components</td>
-    </tr>
-    <tr>
       <th><label for="description">Description</label></th>
-      <td><textarea id="description" name="description" rows="3" cols="40">[% item.description %]</textarea></td>
+      <td><textarea id="description" name="description" rows="3" cols="40">[% item.description | html %]</textarea></td>
     </tr>
     <tr>
       <th><label for="unit_of_measure">Unit of Measure</label></th>
       <td>
         <select id="unit_of_measure" name="unit_of_measure">
-          [% FOREACH u IN ['each','g','kg','ml','L','cm','m','sheet','box','case','lb','litre','metre','hour'] %]
+          [% FOREACH u IN ['each','month','year','hour','g','kg','ml','L','cm','m','sheet','box','case','lb','litre','metre'] %]
           <option value="[% u %]" [% IF item.unit_of_measure == u %]selected[% END %]>[% u %]</option>
           [% END %]
         </select>
@@ -50,17 +47,17 @@
     <tr>
       <th><label for="unit_cost">Unit Cost</label></th>
       <td><input type="number" id="unit_cost" name="unit_cost" step="0.01" min="0" value="[% item.unit_cost %]">
-          <small>Purchase/cost price (what you pay the supplier)</small></td>
+          <small>Purchase/cost price (what you pay / your COGS)</small></td>
     </tr>
     <tr>
       <th><label for="unit_price">Selling Price</label></th>
       <td><input type="number" id="unit_price" name="unit_price" step="0.01" min="0" value="[% item.unit_price %]">
-          <small>Sale price charged to customer (used for Square sync)</small></td>
+          <small>Sale price charged to customer</small></td>
     </tr>
     <tr>
       <th><label for="barcode">Barcode</label></th>
-      <td><input type="text" id="barcode" name="barcode" maxlength="100" value="[% item.barcode %]">
-          <small>UPC / EAN / QR / Code128 — for scanning and Square catalog</small></td>
+      <td><input type="text" id="barcode" name="barcode" maxlength="100" value="[% item.barcode | html %]">
+          <small>UPC / EAN / QR / Code128</small></td>
     </tr>
     <tr>
       <th><label for="reorder_point">Reorder Point</label></th>
@@ -69,6 +66,18 @@
     <tr>
       <th><label for="reorder_quantity">Reorder Quantity</label></th>
       <td><input type="number" id="reorder_quantity" name="reorder_quantity" min="0" value="[% item.reorder_quantity %]"></td>
+    </tr>
+    <tr>
+      <th><label for="is_consumable">Consumable?</label></th>
+      <td><input type="checkbox" id="is_consumable" name="is_consumable" value="1"
+          [% IF item.is_consumable %]checked[% END %]>
+          <small>Expensed when used (filament, wax, seed, infra allocation)</small></td>
+    </tr>
+    <tr>
+      <th><label for="is_assemblable">Has BOM / Recipe?</label></th>
+      <td><input type="checkbox" id="is_assemblable" name="is_assemblable" value="1"
+          [% IF item.is_assemblable %]checked[% END %]>
+          <small>Made from other items — enables BOM editor</small></td>
     </tr>
     <tr>
       <th><label for="status">Status</label></th>
@@ -81,41 +90,19 @@
       </td>
     </tr>
     <tr>
-      <th><label for="item_origin">Item Origin</label></th>
-      <td>
-        <select id="item_origin" name="item_origin">
-          [% FOREACH o IN ['purchased','manufactured','3d_printed','grown','foraged','harvested','crafted','other'] %]
-          <option value="[% o %]" [% IF item.item_origin == o %]selected[% END %]>[% o %]</option>
-          [% END %]
-        </select>
-      </td>
-    </tr>
-    <tr>
-      <th><label for="is_consumable">Consumable?</label></th>
-      <td><input type="checkbox" id="is_consumable" name="is_consumable" value="1"
-          [% IF item.is_consumable %]checked[% END %]>
-          <small>Expensed when used (filament, wax, seed)</small></td>
-    </tr>
-    <tr>
-      <th><label for="is_assemblable">Has BOM?</label></th>
-      <td><input type="checkbox" id="is_assemblable" name="is_assemblable" value="1"
-          [% IF item.is_assemblable %]checked[% END %]>
-          <small>Made from other items (frame, box, printed part)</small></td>
-    </tr>
-    <tr>
       <th><label for="notes">Notes</label></th>
-      <td><textarea id="notes" name="notes" rows="3" cols="40">[% item.notes %]</textarea></td>
+      <td><textarea id="notes" name="notes" rows="3" cols="40">[% item.notes | html %]</textarea></td>
     </tr>
     [% IF coa_accounts.size %]
     <tr><td colspan="2"><hr><strong>Accounting (optional)</strong></td></tr>
     <tr>
-      <th><label for="inventory_accno_id">Inventory Account</label></th>
+      <th><label for="inventory_accno_id">Inventory / Asset Account</label></th>
       <td>
         <select id="inventory_accno_id" name="inventory_accno_id">
           <option value="">— none —</option>
           [% FOREACH a IN coa_accounts %]
           <option value="[% a.id %]" [% IF item.inventory_accno_id == a.id %]selected[% END %]>
-            [% a.accno %] [% a.description | html %]
+            [% a.accno %] — [% a.description | html %]
           </option>
           [% END %]
         </select>
@@ -129,11 +116,11 @@
           <option value="">— none —</option>
           [% FOREACH a IN coa_accounts %]
           <option value="[% a.id %]" [% IF item.income_accno_id == a.id %]selected[% END %]>
-            [% a.accno %] [% a.description | html %]
+            [% a.accno %] — [% a.description | html %]
           </option>
           [% END %]
         </select>
-        <small>Income account when sold (e.g. 4000 Sales, 4210 3D Print Sales)</small>
+        <small>Income account when sold (e.g. 4300 Hosting Income)</small>
       </td>
     </tr>
     <tr>
@@ -143,11 +130,11 @@
           <option value="">— none —</option>
           [% FOREACH a IN coa_accounts %]
           <option value="[% a.id %]" [% IF item.expense_accno_id == a.id %]selected[% END %]>
-            [% a.accno %] [% a.description | html %]
+            [% a.accno %] — [% a.description | html %]
           </option>
           [% END %]
         </select>
-        <small>Expense/COGS account (e.g. 5000 COGS, 6210 3D Print Materials)</small>
+        <small>Expense/COGS account (e.g. 5300 Hosting COGS)</small>
       </td>
     </tr>
     <tr>
@@ -157,7 +144,7 @@
           <option value="">— none —</option>
           [% FOREACH a IN coa_accounts %]
           <option value="[% a.id %]" [% IF item.returns_accno_id == a.id %]selected[% END %]>
-            [% a.accno %] [% a.description | html %]
+            [% a.accno %] — [% a.description | html %]
           </option>
           [% END %]
         </select>
@@ -165,32 +152,7 @@
       </td>
     </tr>
     [% END %]
-    <tr>
-      <th><label for="[% fname %]">[% label %]</label></th>
-      <td>
-        <select id="[% fname %]" name="[% fname %]">
-          <option value="">— none —</option>
-          [% FOREACH cat IN ['A','L','Q','I','E'] %]
-            [% SET cat_label = {A='Asset', L='Liability', Q='Equity', I='Income', E='Expense'} %]
-            <optgroup label="[% cat_label.$cat %]">
-            [% FOREACH acct IN coa_accounts %]
-              [% IF acct.category == cat %]
-              <option value="[% acct.id %]" [% IF acct.id == current_id %]selected[% END %]>[% acct.accno %] — [% acct.description %]</option>
-              [% END %]
-            [% END %]
-            </optgroup>
-          [% END %]
-        </select>
-        <small>[% hint %]</small>
-      </td>
-    </tr>
-    [% END %]
-    [% coa_select('inventory_accno_id', 'Stock/Asset Account',  'e.g. 1200 Inventory',   item.inventory_accno_id) %]
-    [% coa_select('income_accno_id',    'Income/Sales Account', 'e.g. 4000 Sales',        item.income_accno_id) %]
-    [% coa_select('expense_accno_id',   'COGS/Expense Account', 'e.g. 5000 COGS',         item.expense_accno_id) %]
-    [% coa_select('returns_accno_id',   'Returns Account',      'e.g. 4100 Returns',      item.returns_accno_id) %]
   </table>
-  [% END %]
 
   <p>
     <input type="submit" value="Save Changes">
@@ -200,5 +162,5 @@
 [% PROCESS 'ai/partials/ai_form_assistant.tt'
    ai_form_entity_label = 'inventory item'
    ai_form_context      = 'inventory item management'
-   ai_form_fields       = 'name, sku, description, category, item_origin, unit_of_measure, unit_cost, reorder_point, reorder_quantity, status, notes, inventory_accno_id, income_accno_id, expense_accno_id, returns_accno_id'
+   ai_form_fields       = 'name, sku, description, category, item_origin, unit_of_measure, unit_cost, unit_price, reorder_point, reorder_quantity, status, notes, inventory_accno_id, income_accno_id, expense_accno_id, returns_accno_id'
 %]
