@@ -189,7 +189,7 @@
         [% END %]
       </td>
       <th>Description:</th>
-      <td>[% item.description | html || '—' %]</td>
+      <td>[% item.description || '—' | html %]</td>
     </tr>
   </table>
 

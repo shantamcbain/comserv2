@@ -34,8 +34,7 @@
         <div style="margin-top:0.25rem;color:#641e16;">
           From <strong>[% inv.supplier.name | html %]</strong>
           — CAD [% inv.total_amount %]
-          [% SET pts = inv.total_amount * 10 %]
-          ([% pts %] pts)
+          ([% inv.total_amount %] pts)
           — Due [% inv.due_date | html %]
           [% IF inv.notes %]<br><small>[% inv.notes | html %]</small>[% END %]
         </div>
