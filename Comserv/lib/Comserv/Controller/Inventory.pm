@@ -1764,6 +1764,66 @@ sub invoice_view :Path('/Inventory/invoice/view') :Args(1) {
     $c->stash(invoice => $invoice, template => 'Inventory/invoice/view.tt');
 }
 
+sub invoice_pay_points :Path('/Inventory/invoice/pay_points') :Args(1) {
+    my ($self, $c, $id) = @_;
+    return $c->res->redirect($c->uri_for('/user/login')) unless $c->session->{username};
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $invoice;
+    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find($id) };
+    unless ($invoice && $invoice->sitename eq $sitename) {
+        $c->flash->{error_msg} = 'Invoice not found';
+        return $c->res->redirect($c->uri_for('/Inventory/invoice'));
+    }
+    unless ($invoice->status eq 'outstanding') {
+        $c->flash->{error_msg} = 'Invoice is not outstanding';
+        return $c->res->redirect($c->uri_for('/Inventory/invoice/view/' . $id));
+    }
+
+    my $amount     = $invoice->total_amount;
+    my $auto_pay   = $c->req->body_parameters->{auto_pay} ? 1 : 0;
+    my $CSC_ADMIN  = 178;
+    my $err_msg;
+
+    eval {
+        my $ps = Comserv::Util::PointSystem->new(c => $c);
+        my $user_id = $c->session->{user_id};
+        my ($ok, $err) = $ps->debit(
+            user_id          => $user_id,
+            amount           => $amount,
+            transaction_type => 'hosting_payment',
+            description      => 'Invoice ' . $invoice->invoice_number . ' — CAD ' . $amount,
+            reference_type   => 'supplier_invoice',
+            reference_id     => $id,
+        );
+        if ($ok) {
+            $ps->credit(
+                user_id          => $CSC_ADMIN,
+                amount           => $amount,
+                transaction_type => 'hosting_income',
+                description      => 'Payment from ' . $sitename . ' — ' . $invoice->invoice_number,
+                reference_type   => 'supplier_invoice',
+                reference_id     => $id,
+            );
+            $invoice->update({ status => 'paid' });
+
+            if ($auto_pay) {
+                my $ha = $schema->resultset('HostingAccount')->search({ sitename => $sitename })->single;
+                $ha->update({ auto_pay => 1 }) if $ha;
+            }
+            $c->flash->{success_msg} = sprintf(
+                'Paid %s pts for invoice %s. Status: paid.', $amount, $invoice->invoice_number);
+        } else {
+            $err_msg = "Insufficient points: $err";
+        }
+    };
+    $err_msg ||= "Payment error: $@" if $@;
+    $c->flash->{error_msg} = $err_msg if $err_msg;
+
+    $c->res->redirect($c->uri_for('/Inventory/invoice/view/' . $id));
+}
+
 # =========================================================================
 # CUSTOMER INVOICES (AR / Sales)
 # =========================================================================

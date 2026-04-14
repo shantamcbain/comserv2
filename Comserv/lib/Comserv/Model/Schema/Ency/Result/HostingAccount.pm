@@ -91,6 +91,12 @@ __PACKAGE__->add_columns(
         is_nullable   => 1,
         documentation => 'Comma-separated add-ons requested: beekeeping,planning,ai,workshops,helpdesk',
     },
+    auto_pay => {
+        data_type     => 'tinyint',
+        is_nullable   => 0,
+        default_value => 0,
+        documentation => 'Auto-debit points on renewal if 1',
+    },
     created_by => {
         data_type   => 'varchar',
         size        => 100,

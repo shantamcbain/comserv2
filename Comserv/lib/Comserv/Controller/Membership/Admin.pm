@@ -1241,7 +1241,7 @@ sub _create_hosting_invoice {
     my $inv_date = DateTime->now->strftime('%Y-%m-%d');
     my $due_date = DateTime->now->add(days => 30)->strftime('%Y-%m-%d');
     my $inv_num  = 'CSC-HOST-' . uc($client_sn) . '-' . DateTime->now->strftime('%Y%m');
-    my $pts_rate = 10;
+    my $pts_rate = 1;
     my $points_due = $monthly_cost * $pts_rate;
 
     # --- Link hosting item to CSC supplier on client side (for Supplier view) ---
@@ -1273,7 +1273,7 @@ sub _create_hosting_invoice {
         total_amount   => $monthly_cost,
         status         => 'outstanding',
         ap_account_id  => ($cli_ap ? $cli_ap->id : undef),
-        notes          => "Monthly hosting fee - $plan_slug. Pay with Points: $points_due pts = CAD $monthly_cost.",
+        notes          => "Monthly hosting fee - $plan_slug. Points: $points_due pts (1 pt = CAD 1.00).",
         created_by     => $c->session->{username} || 'system',
         created_at     => \'NOW()',
         updated_at     => \'NOW()',

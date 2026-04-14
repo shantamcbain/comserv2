@@ -256,7 +256,7 @@ function setDefaultUnit(sel) {
       <td>
         <a href="/Inventory/supplier/view/[% is.supplier_id %]">[% is.supplier.name | html %]</a>
       </td>
-      <td>[% is.supplier_sku | html || '-' %]</td>
+      <td>[% is.supplier_sku || '-' | html %]</td>
       <td>[% is.unit_cost ? is.unit_cost : '-' %]</td>
       <td style="text-align:center">
         [% IF is.is_preferred %]
@@ -268,7 +268,7 @@ function setDefaultUnit(sel) {
           </form>
         [% END %]
       </td>
-      <td>[% is.notes | html || '-' %]</td>
+      <td>[% is.notes || '-' | html %]</td>
       <td>
         <form method="POST" action="/Inventory/item_supplier/remove/[% is.id %]" style="display:inline"
               onsubmit="return confirm('Remove [% is.supplier.name | html %] from this item?')">
