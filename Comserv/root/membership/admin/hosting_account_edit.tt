@@ -91,12 +91,31 @@
                           style="width:100%;box-sizing:border-box;">[% acct.notes | html %]</textarea>
               </td>
             </tr>
-            [% IF acct.requested_addons %]
             <tr>
-              <th style="text-align:left;padding:0.5rem;">Requested Add-ons</th>
-              <td style="padding:0.5rem;color:#555;">[% acct.requested_addons | html %]</td>
+              <th style="text-align:left;vertical-align:top;padding:0.5rem;">Add-ons</th>
+              <td style="padding:0.5rem;">
+                [% SET current_addons = acct.requested_addons || '' %]
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.5rem;">
+                [% FOREACH addon IN [
+                    { key = 'beekeeping', label = '🐝 Beekeeping / Apiary' },
+                    { key = 'planning',   label = '📋 Planning Tools' },
+                    { key = 'ai',         label = '🤖 AI Models' },
+                    { key = 'workshops',  label = '🎓 Workshop Calendar' },
+                    { key = 'helpdesk',   label = '🎫 HelpDesk' },
+                    { key = 'foraging',   label = '🌿 Foraging' },
+                    { key = 'ency',       label = '📖 ENCY' },
+                    { key = 'ecommerce',  label = '🛒 Shop / Price List' },
+                    { key = 'membership', label = '👥 Membership Plans' },
+                ] %]
+                <label style="display:flex;gap:0.4rem;align-items:center;cursor:pointer;">
+                  <input type="checkbox" name="addon_[% addon.key %]" value="1"
+                    [% IF current_addons.search(addon.key) %]checked[% END %]>
+                  [% addon.label %]
+                </label>
+                [% END %]
+                </div>
+              </td>
             </tr>
-            [% END %]
           </table>
 
           <div class="form-actions" style="margin-top:1.2rem;">

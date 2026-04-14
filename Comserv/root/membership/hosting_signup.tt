@@ -121,7 +121,8 @@
                 { key = 'ai',          label = '🤖 AI Models',               hint = 'Access to AI chat and form-fill tools' },
                 { key = 'workshops',   label = '🎓 Workshop Calendar',       hint = 'Event scheduling and registration' },
                 { key = 'helpdesk',    label = '🎫 HelpDesk',               hint = 'Ticket system for your members' },
-                { key = 'foraging',    label = '🌿 Foraging / ENCY',        hint = 'Encyclopedia of biological life' },
+                { key = 'foraging',    label = '🌿 Foraging',               hint = 'Forager community tools and plant/mushroom database' },
+                { key = 'ency',        label = '📖 ENCY',                    hint = 'Encyclopedia of biological life — herbs, animals, insects' },
                 { key = 'ecommerce',   label = '🛒 Shop / Price List',       hint = 'Inventory price list and cart' },
                 { key = 'membership',  label = '👥 Membership Plans',        hint = 'Paid membership tiers for your site' },
             ] %]
