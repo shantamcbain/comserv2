@@ -1013,43 +1013,38 @@ sub fetch_and_set {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site details retrieved: " . Dumper($site));
 
             if ($site) {
-                    $value = $site->name;
-                    $c->stash->{SiteName} = $value;
-                    $c->session->{SiteName} = $value;
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "SiteName set to: $value");
+                $value = $site->name;
+                $c->stash->{SiteName} = $value;
+                $c->session->{SiteName} = $value;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "SiteName set to: $value");
 
-                    # Set ControllerName based on the site's home_view
-                    my $home_view = $site->home_view || 'Root';  # Ensure this is domain-specific
+                my $home_view = $site->home_view || 'Root';
+                my $controller_exists = 0;
+                eval {
+                    my $ctrl = $c->controller($home_view);
+                    $controller_exists = 1 if $ctrl;
+                };
 
-                    # Verify the controller exists before setting it
-                    my $controller_exists = 0;
-                    eval {
-                        my $controller = $c->controller($home_view);
-                        $controller_exists = 1 if $controller;
-                    };
-
-                    if ($controller_exists) {
-                        $c->stash->{ControllerName} = $home_view;
-                        $c->session->{ControllerName} = $home_view;
-                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "ControllerName set to: $home_view");
-                    } else {
-                        # If controller doesn't exist, fall back to Root
-                        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'fetch_and_set',
-                            "Controller '$home_view' not found or not loaded. Falling back to 'Root'.");
-                        $c->stash->{ControllerName} = 'Root';
-                        $c->session->{ControllerName} = 'Root';
-                    }
-                }
-            } else {
-                if (defined $c->session->{SiteName}) {
-                    $c->stash->{SiteName} = $c->session->{SiteName};
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Domain not in DB; using session SiteName: " . $c->session->{SiteName});
+                if ($controller_exists) {
+                    $c->stash->{ControllerName} = $home_view;
+                    $c->session->{ControllerName} = $home_view;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "ControllerName set to: $home_view");
                 } else {
-                    $c->session->{SiteName} = 'none';
-                    $c->stash->{SiteName} = 'none';
+                    $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'fetch_and_set',
+                        "Controller '$home_view' not found. Falling back to 'Root'.");
+                    $c->stash->{ControllerName} = 'Root';
                     $c->session->{ControllerName} = 'Root';
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "No site domain found, defaulting SiteName to 'none'");
                 }
+            }
+        } else {
+            if (defined $c->session->{SiteName}) {
+                $c->stash->{SiteName} = $c->session->{SiteName};
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Domain not in DB; using session SiteName: " . $c->session->{SiteName});
+            } else {
+                $c->session->{SiteName} = 'none';
+                $c->stash->{SiteName} = 'none';
+                $c->session->{ControllerName} = 'Root';
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "No site domain found, defaulting SiteName to 'none'");
             }
         }
     }
