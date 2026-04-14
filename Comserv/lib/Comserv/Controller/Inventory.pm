@@ -2036,6 +2036,193 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
     $c->res->redirect($c->uri_for('/Inventory/sales/view', [$id]));
 }
 
+# -------------------------------------------------------------------------
+# Print — Labels, Stock Report, BOM Sheet
+# -------------------------------------------------------------------------
+
+sub print_label :Path('/Inventory/print/label') :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'print_label', "Print label for item $id");
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+
+    my $item;
+    eval {
+        $item = $schema->resultset('InventoryItem')->find(
+            { id => $id },
+            { prefetch => 'stock_levels' }
+        );
+    };
+    if ($@ || !$item) {
+        $c->flash->{error_msg} = 'Item not found';
+        $c->res->redirect($c->uri_for('/Inventory/items'));
+        return;
+    }
+
+    my @locations;
+    eval {
+        @locations = $schema->resultset('InventoryLocation')->search(
+            { sitename => $sitename, status => 'active' },
+            { columns => ['id','name'], order_by => 'name' }
+        )->all;
+    };
+
+    my $copies = $c->req->params->{copies} || 1;
+    $copies = 1  if $copies < 1;
+    $copies = 50 if $copies > 50;
+
+    $c->stash(
+        item      => $item,
+        locations => \@locations,
+        copies    => $copies,
+        sitename  => $sitename,
+        template  => 'Inventory/print/label.tt',
+    );
+}
+
+sub print_labels_multi :Path('/Inventory/print/labels') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'print_labels_multi', 'Print labels for multiple items');
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+
+    my @item_ids = $c->req->params->get_all('item_id');
+    my @items;
+
+    if (@item_ids) {
+        eval {
+            @items = $schema->resultset('InventoryItem')->search(
+                { id => { -in => \@item_ids }, sitename => $sitename },
+                { order_by => ['category','name'] }
+            )->all;
+        };
+    } else {
+        eval {
+            @items = $schema->resultset('InventoryItem')->search(
+                { sitename => $sitename, status => 'active' },
+                { order_by => ['category','name'] }
+            )->all;
+        };
+    }
+
+    $c->stash(
+        items    => \@items,
+        sitename => $sitename,
+        template => 'Inventory/print/labels_multi.tt',
+    );
+}
+
+sub print_stock_report :Path('/Inventory/print/stock') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'print_stock_report', 'Print stock report');
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $low_only = $c->req->params->{low_only} ? 1 : 0;
+    my $category = $c->req->params->{category};
+
+    my @items;
+    eval {
+        my %search = (sitename => $sitename, status => 'active');
+        $search{category} = $category if $category;
+        @items = $schema->resultset('InventoryItem')->search(
+            \%search,
+            {
+                prefetch => 'stock_levels',
+                order_by => ['category', 'name'],
+            }
+        )->all;
+    };
+    push @{$c->stash->{debug_errors}}, "Error loading items: $@" if $@;
+
+    my @report_rows;
+    for my $item (@items) {
+        my $total_qty = 0;
+        my @sl_detail;
+        for my $sl ($item->stock_levels->all) {
+            $total_qty += $sl->quantity_on_hand;
+            push @sl_detail, $sl;
+        }
+        my $is_low = defined $item->reorder_point && $item->reorder_point > 0
+                     && $total_qty <= $item->reorder_point;
+        next if $low_only && !$is_low;
+        push @report_rows, {
+            item      => $item,
+            sl_detail => \@sl_detail,
+            total_qty => $total_qty,
+            is_low    => $is_low,
+        };
+    }
+
+    my @categories;
+    eval {
+        my @cat_rows = $schema->resultset('InventoryItem')->search(
+            { sitename => $sitename, status => 'active', category => { '!=' => undef } },
+            { columns => ['category'], distinct => 1, order_by => 'category' }
+        )->all;
+        @categories = map { $_->category } @cat_rows;
+    };
+
+    $c->stash(
+        report_rows => \@report_rows,
+        low_only    => $low_only,
+        category    => $category,
+        categories  => \@categories,
+        sitename    => $sitename,
+        print_date  => $self->_now(),
+        template    => 'Inventory/print/stock_report.tt',
+    );
+}
+
+sub print_bom :Path('/Inventory/print/bom') :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'print_bom', "Print BOM for item $id");
+
+    my $schema = $self->_schema($c);
+
+    my $item;
+    eval {
+        $item = $schema->resultset('InventoryItem')->find(
+            { id => $id },
+            { prefetch => [
+                { 'bom_components' => 'component_item' },
+            ]}
+        );
+    };
+    if ($@ || !$item) {
+        $c->flash->{error_msg} = 'Item not found';
+        $c->res->redirect($c->uri_for('/Inventory/items'));
+        return;
+    }
+
+    my $assembled_cost = 0;
+    for my $comp ($item->bom_components->all) {
+        next if $comp->is_optional;
+        my $ci = $comp->component_item;
+        next unless $ci && $ci->unit_cost;
+        my $eff_qty = $comp->quantity * (1 + ($comp->scrap_factor || 0));
+        $assembled_cost += $ci->unit_cost * $eff_qty;
+    }
+
+    $c->stash(
+        item           => $item,
+        assembled_cost => $assembled_cost,
+        print_date     => $self->_now(),
+        sitename       => $self->_sitename($c),
+        template       => 'Inventory/print/bom.tt',
+    );
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

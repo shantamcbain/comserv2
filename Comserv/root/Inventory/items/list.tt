@@ -15,6 +15,10 @@
   &nbsp;|&nbsp;
   <a href="/Inventory/stock/transactions">Transaction Log</a>
   &nbsp;|&nbsp;
+  <a href="/Inventory/print/labels" target="_blank">&#128438; Print All Labels</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/print/stock" target="_blank">&#128438; Print Stock Report</a>
+  &nbsp;|&nbsp;
   <a href="/Inventory">Dashboard</a>
 </div>
 

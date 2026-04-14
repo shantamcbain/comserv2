@@ -11,6 +11,8 @@
   &nbsp;|&nbsp;
   <a href="/Inventory/item/edit/[% item.id %]">Edit Item</a>
   &nbsp;|&nbsp;
+  <a href="/Inventory/print/bom/[% item.id %]" target="_blank">&#128438; Print BOM Sheet</a>
+  &nbsp;|&nbsp;
   <a href="/Inventory/bom/list">All Assemblable Items</a>
   &nbsp;|&nbsp;
   <a href="/Inventory/items">Item List</a>
