@@ -112,6 +112,7 @@ services:
     environment:
       CATALYST_ENV: production
       CATALYST_DEBUG: 0
+      COMSERV_LOG_MIN_LEVEL: WARN
       CATALYST_HOME: /opt/comserv
       WEB_PORT: 5000
       SYSTEM_IDENTIFIER: "${SYSTEM_IDENTIFIER:-production-prod}"
