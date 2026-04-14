@@ -2,6 +2,7 @@ package Comserv::Controller::Inventory;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::PointSystem;
 use POSIX qw(strftime);
 
 has 'logging' => (
@@ -2221,6 +2222,170 @@ sub print_bom :Path('/Inventory/print/bom') :Args(1) {
         sitename       => $self->_sitename($c),
         template       => 'Inventory/print/bom.tt',
     );
+}
+
+# -------------------------------------------------------------------------
+# Point System Integration — Timesheet
+# -------------------------------------------------------------------------
+
+sub timesheet :Path('/Inventory/timesheet') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'timesheet',
+        'Entered Inventory timesheet');
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+
+    my (@todos, @recent_intervals);
+    eval {
+        my $inv_project = $schema->resultset('Project')->search(
+            { project_code => 'Inventory' },
+            { rows => 1 }
+        )->first;
+
+        if ($inv_project) {
+            @todos = $schema->resultset('Todo')->search(
+                { project_id => $inv_project->id },
+                { order_by   => [{ -asc => 'status' }, { -desc => 'priority' }] }
+            )->all;
+
+            for my $todo (@todos) {
+                my $accum = $todo->accumulative_time || '00:00:00';
+                $accum = '00:00:00' unless $accum =~ /^\d+:\d+/;
+                $todo->{_accum_display} = $accum;
+            }
+
+            @recent_intervals = $schema->resultset('TodoInterval')->search(
+                { 'todo.project_id' => $inv_project->id },
+                {
+                    join     => 'todo',
+                    prefetch => 'todo',
+                    order_by => { -desc => 'me.record_id' },
+                    rows     => 50,
+                }
+            )->all;
+        }
+    };
+    if ($@) {
+        push @{$c->stash->{debug_errors}}, "Timesheet load error: $@";
+    }
+
+    $c->stash(
+        todos            => \@todos,
+        recent_intervals => \@recent_intervals,
+        sitename         => $sitename,
+        template         => 'Inventory/timesheet.tt',
+    );
+}
+
+sub timesheet_log :Path('/Inventory/timesheet/log') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $params   = $c->req->body_parameters;
+    my $schema   = $self->_schema($c);
+    my $username = $c->session->{username} || 'admin';
+    my $user_id  = $c->session->{user_id};
+
+    my $todo_id  = $params->{todo_id}  or do {
+        $c->flash->{error_msg} = 'No todo selected.';
+        $c->res->redirect($c->uri_for('/Inventory/timesheet'));
+        return;
+    };
+
+    my $hours    = int($params->{hours}   || 0);
+    my $minutes  = int($params->{minutes} || 0);
+    my $log_date = $params->{log_date} || strftime('%Y-%m-%d', localtime);
+    my $note     = $params->{note} || '';
+
+    unless ($hours > 0 || $minutes > 0) {
+        $c->flash->{error_msg} = 'Please enter at least 1 minute of time.';
+        $c->res->redirect($c->uri_for('/Inventory/timesheet'));
+        return;
+    }
+
+    my $todo;
+    eval { $todo = $schema->resultset('Todo')->find($todo_id) };
+    unless ($todo) {
+        $c->flash->{error_msg} = 'Todo not found.';
+        $c->res->redirect($c->uri_for('/Inventory/timesheet'));
+        return;
+    }
+
+    my $elapsed_secs = $hours * 3600 + $minutes * 60;
+    my $elapsed_str  = sprintf('%02d:%02d:%02d',
+        $hours, $minutes, 0);
+
+    eval {
+        $schema->txn_do(sub {
+            $schema->resultset('TodoInterval')->create({
+                todo_record_id => $todo_id,
+                start_date     => $log_date,
+                start_time     => '00:00:00',
+                end_date       => $log_date,
+                end_time       => sprintf('%02d:%02d:00', $hours, $minutes),
+                interval_type  => 'actual',
+                status         => 'completed',
+                last_mod_by    => $username,
+                last_mod_date  => $log_date,
+            });
+
+            my $existing = $todo->accumulative_time || '00:00:00';
+            $existing = '00:00:00' unless $existing =~ /^\d+:\d+/;
+            my ($ah, $am, $as_) = split(':', $existing);
+            $ah = int($ah // 0); $am = int($am // 0); $as_ = int($as_ // 0);
+            my $total_secs = ($ah * 3600 + $am * 60 + $as_) + $elapsed_secs;
+            my $new_accum  = sprintf('%02d:%02d:%02d',
+                int($total_secs / 3600),
+                int(($total_secs % 3600) / 60),
+                $total_secs % 60);
+
+            $todo->update({
+                accumulative_time => $new_accum,
+                last_mod_by       => $username,
+                last_mod_date     => $log_date,
+            });
+        });
+    };
+
+    if ($@) {
+        $c->flash->{error_msg} = "Failed to log time: $@";
+        $c->res->redirect($c->uri_for('/Inventory/timesheet'));
+        return;
+    }
+
+    if ($todo->billable && $todo->point_rate && $todo->point_rate > 0 && $user_id) {
+        my $hours_decimal = $elapsed_secs / 3600;
+        my $points_earned = $todo->point_rate * $hours_decimal;
+        if ($points_earned >= 0.0001) {
+            eval {
+                my $ps = Comserv::Util::PointSystem->new(c => $c);
+                $ps->credit(
+                    user_id          => $user_id,
+                    amount           => $points_earned,
+                    transaction_type => 'work',
+                    description      => 'Inventory work: ' . $todo->subject
+                        . ' — ' . $hours . 'h ' . $minutes . 'm'
+                        . ($note ? " ($note)" : ''),
+                    reference_type   => 'todo',
+                    reference_id     => $todo_id,
+                );
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'timesheet_log', "Point credit failed: $@");
+            }
+        }
+    }
+
+    $c->flash->{success_msg} = sprintf(
+        'Logged %dh %dm against "%s".%s',
+        $hours, $minutes, $todo->subject,
+        ($todo->billable && $todo->point_rate && $todo->point_rate > 0 && $user_id)
+            ? ' Points credited.' : ''
+    );
+    $c->res->redirect($c->uri_for('/Inventory/timesheet'));
 }
 
 __PACKAGE__->meta->make_immutable;

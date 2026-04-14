@@ -67,6 +67,13 @@
   </ul>
 </div>
 
+<div class="inventory-actions">
+  <h2>Point System &amp; Timesheets</h2>
+  <ul>
+    <li><a href="/Inventory/timesheet">Log Time / Timesheet</a></li>
+  </ul>
+</div>
+
 <div class="inventory-api-info">
   <h2>API Endpoints</h2>
   <ul>
