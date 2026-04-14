@@ -1,0 +1,112 @@
+[% PageVersion = 'Inventory/stock/levels.tt,v 0.01 2026/04/13 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Stock Levels</h1>
+<p>Site: <strong>[% sitename %]</strong></p>
+
+[% IF c.flash.success_msg %]<p class="success">[% c.flash.success_msg %]</p>[% END %]
+[% IF c.flash.error_msg %]<p class="error">[% c.flash.error_msg %]</p>[% END %]
+
+<div class="actions">
+  <a href="/Inventory/stock/adjust">Adjust Stock</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/stock/transactions">Transaction Log</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/items">Items</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory">Dashboard</a>
+</div>
+
+<form method="GET" action="/Inventory/stock/levels">
+  <label>Item:
+    <select name="item_id">
+      <option value="">-- All Items --</option>
+      [% FOREACH item IN items %]
+      <option value="[% item.id %]"[% IF item_id == item.id %] selected[% END %]>[% item.sku %] - [% item.name %]</option>
+      [% END %]
+    </select>
+  </label>
+  &nbsp;
+  <label>Location:
+    <select name="location_id">
+      <option value="">-- All Locations --</option>
+      [% FOREACH loc IN locations %]
+      <option value="[% loc.id %]"[% IF location_id == loc.id %] selected[% END %]>[% loc.name %]</option>
+      [% END %]
+    </select>
+  </label>
+  &nbsp;
+  <label>
+    <input type="checkbox" name="low_only" value="1"[% IF low_only %] checked[% END %]>
+    Low stock only
+  </label>
+  &nbsp;
+  <input type="submit" value="Filter">
+  [% IF low_only || item_id || location_id %]
+  &nbsp;<a href="/Inventory/stock/levels">Clear</a>
+  [% END %]
+</form>
+
+[% IF stock_rows.size == 0 %]
+  [% IF low_only %]
+    <p class="success">No items are below their reorder point. Stock levels look good!</p>
+  [% ELSE %]
+    <p>No stock records found. <a href="/Inventory/stock/adjust">Add a stock adjustment</a> to get started.</p>
+  [% END %]
+[% ELSE %]
+<table border="1" cellpadding="4" cellspacing="0">
+  <thead>
+    <tr>
+      <th>SKU</th>
+      <th>Item</th>
+      <th>Location</th>
+      <th>On Hand</th>
+      <th>Reserved</th>
+      <th>On Order</th>
+      <th>Available</th>
+      <th>Reorder Point</th>
+      <th>Last Count</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH row IN stock_rows %]
+    [% sl = row.sl %]
+    [% item = row.item %]
+    [% loc = row.location %]
+    [% available = sl.quantity_on_hand - sl.quantity_reserved %]
+    <tr[% IF row.is_low %] style="background:#fff3cd"[% END %]>
+      <td>[% item.sku %]</td>
+      <td><a href="/Inventory/item/view/[% item.id %]">[% item.name %]</a></td>
+      <td>[% loc ? loc.name : '-' %]</td>
+      <td><strong>[% sl.quantity_on_hand %]</strong> [% item.unit_of_measure %]</td>
+      <td>[% sl.quantity_reserved %]</td>
+      <td>[% sl.quantity_on_order %]</td>
+      <td>[% available %]</td>
+      <td>
+        [% IF item.reorder_point %]
+          [% IF row.is_low %]
+            <span style="color:red;font-weight:bold">[% item.reorder_point %] ⚠ LOW</span>
+          [% ELSE %]
+            [% item.reorder_point %]
+          [% END %]
+        [% ELSE %]
+          -
+        [% END %]
+      </td>
+      <td>[% sl.last_count_date ? sl.last_count_date : '-' %]</td>
+      <td>
+        <a href="/Inventory/stock/adjust?item_id=[% item.id %]&amp;location_id=[% sl.location_id %]">Adjust</a>
+        &nbsp;
+        <a href="/Inventory/stock/transactions?item_id=[% item.id %]">History</a>
+      </td>
+    </tr>
+  [% END %]
+  </tbody>
+</table>
+<p><em>[% stock_rows.size %] record(s) shown</em></p>
+[% END %]
+
+[% IF debug_errors && debug_errors.size > 0 %]
+<div class="debug">[% FOREACH err IN debug_errors %]<p>[% err %]</p>[% END %]</div>
+[% END %]

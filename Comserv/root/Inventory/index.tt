@@ -30,7 +30,7 @@
   <div class="stat-card [% IF low_stock > 0 %]stat-alert[% END %]">
     <h3>Low Stock Items</h3>
     <span class="stat-number">[% low_stock %]</span>
-    <a href="/Inventory/items">Review Stock</a>
+    <a href="/Inventory/stock/levels?low_only=1">Review Low Stock</a>
   </div>
 </div>
 
@@ -40,7 +40,9 @@
     <li><a href="/Inventory/item/add">Add New Item</a></li>
     <li><a href="/Inventory/supplier/add">Add Supplier</a></li>
     <li><a href="/Inventory/location/add">Add Location</a></li>
+    <li><a href="/Inventory/stock/levels">Stock Levels</a></li>
     <li><a href="/Inventory/stock/adjust">Adjust Stock</a></li>
+    <li><a href="/Inventory/stock/transactions">Transaction Log</a></li>
     <li><a href="/Inventory/bom/list">Bill of Materials (BOM)</a></li>
     <li><a href="/Inventory/invoice">Supplier Invoices (AP)</a></li>
     <li><a href="/Inventory/sales">Sales Invoices (AR)</a></li>

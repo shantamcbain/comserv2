@@ -9,7 +9,11 @@
 <div class="actions">
   <a href="/Inventory/item/add">Add Item</a>
   &nbsp;|&nbsp;
+  <a href="/Inventory/stock/levels">Stock Levels</a>
+  &nbsp;|&nbsp;
   <a href="/Inventory/stock/adjust">Adjust Stock</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/stock/transactions">Transaction Log</a>
   &nbsp;|&nbsp;
   <a href="/Inventory">Dashboard</a>
 </div>
