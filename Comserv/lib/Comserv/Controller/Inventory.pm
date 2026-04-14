@@ -355,6 +355,7 @@ sub bom_add :Path('/Inventory/bom/add') :Args(1) {
     my $schema   = $self->_schema($c);
     my $sitename = $self->_sitename($c);
     my $params   = $c->req->body_parameters;
+    my $from     = $params->{redirect_to} || 'bom';
 
     eval {
         my $parent = $schema->resultset('InventoryItem')->find($parent_id);
@@ -368,13 +369,15 @@ sub bom_add :Path('/Inventory/bom/add') :Args(1) {
         die "Cannot use an item as its own component\n"
             if $params->{component_item_id} == $parent_id;
 
+        my $scrap = ($params->{scrap_factor} || 0) / 100;
+
         $schema->resultset('InventoryItemBOM')->update_or_create({
             parent_item_id    => $parent_id,
             component_item_id => $params->{component_item_id},
-            quantity          => $params->{quantity}   || 1,
-            unit              => $params->{unit}        || 'each',
-            is_optional       => $params->{is_optional} ? 1 : 0,
-            scrap_factor      => $params->{scrap_factor} || 0,
+            quantity          => $params->{quantity}    || 1,
+            unit              => $params->{unit}         || 'each',
+            is_optional       => $params->{is_optional}  ? 1 : 0,
+            scrap_factor      => $scrap,
             sort_order        => $params->{sort_order}   || 0,
             notes             => $params->{notes}        || undef,
         }, { key => 'unique_parent_component' });
@@ -384,7 +387,11 @@ sub bom_add :Path('/Inventory/bom/add') :Args(1) {
     } else {
         $c->flash->{success_msg} = 'Component added to BOM.';
     }
-    $c->res->redirect($c->uri_for('/Inventory/item/view', [$parent_id]));
+    if ($from eq 'item') {
+        $c->res->redirect($c->uri_for('/Inventory/item/view', [$parent_id]));
+    } else {
+        $c->res->redirect($c->uri_for('/Inventory/bom', [$parent_id]));
+    }
 }
 
 sub bom_remove :Path('/Inventory/bom/remove') :Args(1) {
@@ -392,6 +399,7 @@ sub bom_remove :Path('/Inventory/bom/remove') :Args(1) {
     my $schema   = $self->_schema($c);
     my $sitename = $self->_sitename($c);
     my $parent_id;
+    my $from = $c->req->params->{from} || 'item';
 
     eval {
         my $bom = $schema->resultset('InventoryItemBOM')->find($bom_id);
@@ -407,7 +415,134 @@ sub bom_remove :Path('/Inventory/bom/remove') :Args(1) {
     } else {
         $c->flash->{success_msg} = 'Component removed from BOM.';
     }
-    $c->res->redirect($c->uri_for('/Inventory/item/view', [$parent_id || 0]));
+    if ($from eq 'bom') {
+        $c->res->redirect($c->uri_for('/Inventory/bom', [$parent_id || 0]));
+    } else {
+        $c->res->redirect($c->uri_for('/Inventory/item/view', [$parent_id || 0]));
+    }
+}
+
+sub bom_view :Path('/Inventory/bom') :Args(1) {
+    my ($self, $c, $item_id) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bom_view', "BOM view for item $item_id");
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $item;
+    eval {
+        $item = $schema->resultset('InventoryItem')->find(
+            { id => $item_id },
+            { prefetch => [
+                'inventory_account', 'income_account', 'expense_account', 'returns_account',
+                { 'bom_components' => 'component_item' },
+            ]}
+        );
+    };
+    if ($@ || !$item || $item->sitename ne $sitename) {
+        $c->flash->{error_msg} = 'Item not found';
+        $c->res->redirect($c->uri_for('/Inventory/items'));
+        return;
+    }
+    unless ($item->is_assemblable) {
+        $c->flash->{error_msg} = 'This item does not have a BOM (not marked as assemblable).';
+        $c->res->redirect($c->uri_for('/Inventory/item/view', [$item_id]));
+        return;
+    }
+
+    my @all_items;
+    eval {
+        @all_items = $schema->resultset('InventoryItem')->search(
+            { sitename => $sitename, status => 'active', id => { '!=' => $item_id } },
+            { columns => ['id','name','sku','unit_of_measure','unit_cost'], order_by => 'name' }
+        )->all;
+    };
+
+    my @assemblable_items;
+    eval {
+        @assemblable_items = $schema->resultset('InventoryItem')->search(
+            { sitename => $sitename, status => 'active', is_assemblable => 1 },
+            { columns => ['id','name','sku'], order_by => 'name' }
+        )->all;
+    };
+
+    my $assembled_cost = 0;
+    for my $comp ($item->bom_components->all) {
+        my $ci = $comp->component_item;
+        next unless $ci && $ci->unit_cost;
+        my $eff_qty = $comp->quantity * (1 + ($comp->scrap_factor || 0));
+        $assembled_cost += $ci->unit_cost * $eff_qty unless $comp->is_optional;
+    }
+
+    $c->stash(
+        item              => $item,
+        all_items         => \@all_items,
+        assemblable_items => \@assemblable_items,
+        assembled_cost    => sprintf('%.2f', $assembled_cost),
+        sitename          => $sitename,
+        template          => 'Inventory/bom/view.tt',
+    );
+}
+
+sub bom_edit_line :Path('/Inventory/bom/edit') :Args(1) {
+    my ($self, $c, $bom_id) = @_;
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $params   = $c->req->body_parameters;
+    my $parent_id;
+
+    eval {
+        my $bom = $schema->resultset('InventoryItemBOM')->find($bom_id);
+        die "BOM line not found\n" unless $bom;
+        my $parent = $schema->resultset('InventoryItem')->find($bom->parent_item_id);
+        die "Access denied\n" unless $parent && $parent->sitename eq $sitename;
+        $parent_id = $bom->parent_item_id;
+
+        $bom->update({
+            quantity     => $params->{quantity}     || $bom->quantity,
+            unit         => $params->{unit}         || $bom->unit,
+            is_optional  => $params->{is_optional}  ? 1 : 0,
+            scrap_factor => defined $params->{scrap_factor} ? $params->{scrap_factor} / 100 : $bom->scrap_factor,
+            sort_order   => $params->{sort_order}   // $bom->sort_order,
+            notes        => $params->{notes}        // $bom->notes,
+        });
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Failed to update BOM line: $@";
+    } else {
+        $c->flash->{success_msg} = 'BOM line updated.';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/bom', [$parent_id || 0]));
+}
+
+sub bom_list :Path('/Inventory/bom/list') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bom_list', 'Listing assemblable items');
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my @assemblable;
+    eval {
+        @assemblable = $schema->resultset('InventoryItem')->search(
+            { sitename => $sitename, is_assemblable => 1, status => 'active' },
+            {
+                prefetch => { 'bom_components' => 'component_item' },
+                order_by => 'name',
+            }
+        )->all;
+    };
+    push @{$c->stash->{debug_errors}}, "Error loading assemblable items: $@" if $@;
+
+    $c->stash(
+        assemblable_items => \@assemblable,
+        sitename          => $sitename,
+        template          => 'Inventory/bom/list.tt',
+    );
 }
 
 # -------------------------------------------------------------------------

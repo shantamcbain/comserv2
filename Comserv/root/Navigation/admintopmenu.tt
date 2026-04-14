@@ -193,6 +193,7 @@
                 <a href="/Inventory/item/add"><i class="icon-add"></i>Add Item</a>
                 <a href="/Inventory/suppliers"><i class="icon-supplier"></i>Suppliers</a>
                 <a href="/Inventory/locations"><i class="icon-location"></i>Locations</a>
+                <a href="/Inventory/bom/list"><i class="fas fa-sitemap"></i>Bill of Materials</a>
                 <a href="/Inventory/invoice"><i class="icon-invoice"></i>Supplier Invoices (AP)</a>
                 <a href="/Inventory/sales"><i class="icon-invoice"></i>Sales Invoices (AR)</a>
                 <div class="submenu-section">
