@@ -3,6 +3,7 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::PointSystem;
+use Comserv::Util::EmailNotification;
 use POSIX qw(strftime);
 
 has 'logging' => (
@@ -1810,8 +1811,33 @@ sub invoice_pay_points :Path('/Inventory/invoice/pay_points') :Args(1) {
                 my $ha = $schema->resultset('HostingAccount')->search({ sitename => $sitename })->single;
                 $ha->update({ auto_pay => 1 }) if $ha;
             }
+
+            # Mark paid_at on the hosting_account so CSC dashboard can show it
+            eval {
+                my $ha = $schema->resultset('HostingAccount')->search({ sitename => $sitename })->single;
+                if ($ha) {
+                    my $note = 'PAID:' . $invoice->invoice_number . ':' . DateTime->now->strftime('%Y-%m-%d');
+                    my $existing = $ha->notes || '';
+                    $ha->update({ notes => $existing ? "$existing\n$note" : $note });
+                }
+            };
+
+            # Email both CSC and the paying SiteName
+            eval {
+                my $ha = $schema->resultset('HostingAccount')->search({ sitename => $sitename })->single;
+                my $notifier = Comserv::Util::EmailNotification->new(logging => $self->logging);
+                $notifier->send_invoice_payment_notification($c,
+                    invoice_number => $invoice->invoice_number,
+                    invoice_id     => $id,
+                    sitename       => $sitename,
+                    amount         => $amount,
+                    points         => $amount,
+                    contact_email  => ($ha ? $ha->contact_email : undef),
+                );
+            };
+
             $c->flash->{success_msg} = sprintf(
-                'Paid %s pts for invoice %s. Status: paid.', $amount, $invoice->invoice_number);
+                'Paid %s pts for invoice %s. CSC has been notified.', $amount, $invoice->invoice_number);
         } else {
             $err_msg = "Insufficient points: $err";
         }
