@@ -139,15 +139,30 @@ sub check_health {
     check_disk_space('/');
     for my $mount (qw(/data/nfs /opt/comserv/logs)) {
         next unless -d $mount;
-        # Skip if same device as / (bind mount reflects host disk, already checked above)
-        my $root_dev = (stat('/'))[0];
-        my $mnt_dev  = (stat($mount))[0];
-        next if defined $root_dev && defined $mnt_dev && $root_dev == $mnt_dev;
+        # Only check separately if it is a real NFS mount.
+        # Bind mounts (ext4/overlay) reflect the host filesystem already
+        # checked above via '/' and would produce duplicate/misleading alerts.
+        next unless is_nfs_mount($mount);
         check_disk_space($mount);
     }
 
     # --- 3. Memory ---
     check_memory();
+}
+
+sub is_nfs_mount {
+    my ($path) = @_;
+    return 0 unless -f '/proc/mounts';
+    open my $fh, '<', '/proc/mounts' or return 0;
+    while (my $line = <$fh>) {
+        my (undef, $mnt, $fstype) = split /\s+/, $line;
+        if ($mnt eq $path && $fstype =~ /^nfs/) {
+            close $fh;
+            return 1;
+        }
+    }
+    close $fh;
+    return 0;
 }
 
 sub check_disk_space {
