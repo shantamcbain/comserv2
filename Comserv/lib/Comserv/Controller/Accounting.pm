@@ -26,6 +26,14 @@ sub auto :Private {
     }
     $is_admin ||= 1 if ($c->session->{username} // '') eq 'Shanta';
     unless ($is_admin) {
+        my $path = $c->req->path;
+        if ($path =~ m{/Accounting/api/}i) {
+            my $token    = $c->req->header('X-API-Token') || $c->req->params->{api_token};
+            my $expected = $c->config->{api_token} || $ENV{COMSERV_API_TOKEN} || '';
+            if ($expected && $token && $token eq $expected) {
+                return 1;
+            }
+        }
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
             'Accounting: access denied for user ' . ($c->session->{username} || 'guest'));
         $c->flash->{error_msg} = 'Accounting is restricted to administrators.';
@@ -320,6 +328,255 @@ sub seed_coa_merge :Path('/Accounting/coa/seed_merge') :Args(0) {
     }
 
     $c->res->redirect($c->uri_for('/Accounting/coa'));
+}
+
+# =========================================================================
+# API — External / Dolibarr Integration
+# =========================================================================
+
+# -------------------------------------------------------------------------
+# _api_auth — token check: valid admin session OR X-API-Token header/param
+# -------------------------------------------------------------------------
+
+sub _api_auth {
+    my ($self, $c) = @_;
+
+    my $roles    = $c->session->{roles} // [];
+    my $is_admin = 0;
+    if (ref($roles) eq 'ARRAY') {
+        $is_admin = grep { lc($_) eq 'admin' } @$roles;
+    } elsif (!ref($roles) && $roles) {
+        $is_admin = ($roles =~ /\badmin\b/i) ? 1 : 0;
+    }
+    $is_admin ||= 1 if ($c->session->{username} // '') eq 'Shanta';
+
+    unless ($is_admin) {
+        my $token    = $c->req->header('X-API-Token') || $c->req->params->{api_token};
+        my $expected = $c->config->{api_token} || $ENV{COMSERV_API_TOKEN} || '';
+        if (!$expected || $token ne $expected) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_api_auth',
+                'Accounting API token auth failed from ' . ($c->req->address || 'unknown'));
+            $c->res->status(401);
+            $c->res->content_type('application/json');
+            $c->res->body('{"error":"Unauthorized"}');
+            $c->detach;
+            return 0;
+        }
+    }
+    return 1;
+}
+
+# -------------------------------------------------------------------------
+# POST /Accounting/api/gl
+# Create a double-entry GL journal entry via API.
+#
+# JSON body:
+#   {
+#     "reference":   "ERP-12345",          (required, unique per entry_type)
+#     "description": "Purchase of supplies",
+#     "entry_type":  "purchase",            (general|inventory|point|sale|purchase|adjustment)
+#     "post_date":   "2026-04-14",          (YYYY-MM-DD, defaults to today)
+#     "currency":    "CAD",                 (defaults to CAD)
+#     "sitename":    "CSC",                 (defaults to session sitename)
+#     "lines": [
+#       { "account_id": 12, "amount":  50.00, "memo": "Inventory debit"  },
+#       { "account_id": 7,  "amount": -50.00, "memo": "AP credit"        }
+#     ]
+#   }
+#
+# All line amounts must sum to 0 (balanced double-entry).
+#
+# Returns:
+#   201  { "status": "ok", "gl_entry_id": <id> }
+#   400  { "error": "..." }   — validation failure
+#   401  { "error": "Unauthorized" }
+#   500  { "error": "..." }   — DB error
+# -------------------------------------------------------------------------
+
+sub api_gl :Path('/Accounting/api/gl') :Args(0) {
+    my ($self, $c) = @_;
+
+    return unless $self->_api_auth($c);
+
+    if ($c->req->method ne 'POST') {
+        $c->res->status(405);
+        $c->res->content_type('application/json');
+        $c->res->body('{"error":"Method not allowed — use POST"}');
+        $c->detach;
+        return;
+    }
+
+    require JSON;
+
+    my $data;
+    my $body = $c->req->body_text;
+    if ($body && $c->req->content_type =~ m{application/json}i) {
+        eval { $data = JSON::decode_json($body) };
+        if ($@) {
+            $c->res->status(400);
+            $c->res->content_type('application/json');
+            $c->res->body('{"error":"Invalid JSON body"}');
+            $c->detach;
+            return;
+        }
+    } else {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body('{"error":"Content-Type must be application/json"}');
+        $c->detach;
+        return;
+    }
+
+    my $reference = $data->{reference};
+    my $lines     = $data->{lines};
+
+    unless ($reference) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body('{"error":"Field required: reference"}');
+        $c->detach;
+        return;
+    }
+
+    unless (ref($lines) eq 'ARRAY' && @$lines >= 2) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body('{"error":"Field required: lines (array with at least 2 entries)"}');
+        $c->detach;
+        return;
+    }
+
+    my $total = 0;
+    for my $line (@$lines) {
+        unless ($line->{account_id} && defined $line->{amount}) {
+            $c->res->status(400);
+            $c->res->content_type('application/json');
+            $c->res->body('{"error":"Each line requires account_id and amount"}');
+            $c->detach;
+            return;
+        }
+        $total += $line->{amount};
+    }
+
+    if (abs($total) > 0.0001) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ error => "Lines are not balanced (sum=" . sprintf('%.4f', $total) . "); debits must equal credits" }));
+        $c->detach;
+        return;
+    }
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $data->{sitename} || $self->_sitename($c);
+    my $today    = $self->_now();
+    my $post_date = $data->{post_date} || substr($today, 0, 10);
+
+    my ($gl_entry_id, $err);
+
+    eval {
+        $schema->txn_do(sub {
+            my $gl = $schema->resultset('GlEntry')->create({
+                reference   => $reference,
+                description => $data->{description} || undef,
+                entry_type  => $data->{entry_type}  || 'general',
+                post_date   => $post_date,
+                approved    => $data->{approved} // 1,
+                currency    => $data->{currency}  || 'CAD',
+                sitename    => $sitename,
+                entered_by  => $c->session->{user_id} || undef,
+            });
+            $gl_entry_id = $gl->id;
+
+            my $sort = 1;
+            for my $line (@$lines) {
+                $schema->resultset('GlEntryLine')->create({
+                    gl_entry_id => $gl_entry_id,
+                    account_id  => $line->{account_id},
+                    amount      => $line->{amount},
+                    memo        => $line->{memo}  || undef,
+                    sort_order  => $sort++,
+                });
+            }
+        });
+    };
+    if ($@) {
+        $err = $@;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_gl', "API GL create failed: $err");
+        $c->res->status(500);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ error => "GL entry creation failed: $err" }));
+        $c->detach;
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_gl',
+        "API GL entry created: id=$gl_entry_id ref=$reference");
+    $c->res->status(201);
+    $c->res->content_type('application/json');
+    $c->res->body(JSON::encode_json({ status => 'ok', gl_entry_id => $gl_entry_id }));
+    $c->detach;
+}
+
+# -------------------------------------------------------------------------
+# GET /Accounting/api/gl/:id
+# Retrieve a single GL entry with its lines.
+#
+# Returns:
+#   200  { "id":..., "reference":..., "lines":[...] }
+#   404  { "error": "Not found" }
+# -------------------------------------------------------------------------
+
+sub api_gl_view :Path('/Accounting/api/gl') :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    return unless $self->_api_auth($c);
+
+    require JSON;
+
+    my ($entry, $err);
+    eval {
+        $entry = $self->_schema($c)->resultset('GlEntry')->find(
+            $id,
+            { prefetch => { lines => 'account' } }
+        );
+    };
+
+    unless ($entry) {
+        $c->res->status(404);
+        $c->res->content_type('application/json');
+        $c->res->body('{"error":"GL entry not found"}');
+        $c->detach;
+        return;
+    }
+
+    my @lines = map {
+        {
+            id         => $_->id,
+            account_id => $_->account_id,
+            accno      => $_->account ? $_->account->accno      : undef,
+            account    => $_->account ? $_->account->description : undef,
+            amount     => $_->amount + 0,
+            memo       => $_->memo,
+            sort_order => $_->sort_order,
+        }
+    } $entry->lines->all;
+
+    my $result = {
+        id          => $entry->id,
+        reference   => $entry->reference,
+        description => $entry->description,
+        entry_type  => $entry->entry_type,
+        post_date   => $entry->post_date . '',
+        approved    => $entry->approved + 0,
+        currency    => $entry->currency,
+        sitename    => $entry->sitename,
+        lines       => \@lines,
+    };
+
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    $c->res->body(JSON::encode_json($result));
+    $c->detach;
 }
 
 __PACKAGE__->meta->make_immutable;

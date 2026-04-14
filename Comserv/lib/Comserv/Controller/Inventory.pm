@@ -27,6 +27,14 @@ sub auto :Private {
     }
     $is_admin ||= 1 if ($c->session->{username} // '') eq 'Shanta';
     unless ($is_admin) {
+        my $path = $c->req->path;
+        if ($path =~ m{/Inventory/api/}i) {
+            my $token    = $c->req->header('X-API-Token') || $c->req->params->{api_token};
+            my $expected = $c->config->{api_token} || $ENV{COMSERV_API_TOKEN} || '';
+            if ($expected && $token && $token eq $expected) {
+                return 1;
+            }
+        }
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
             'Inventory: access denied for user ' . ($c->session->{username} || 'guest'));
         $c->flash->{error_msg} = 'Inventory management is restricted to administrators.';
@@ -2386,6 +2394,217 @@ sub timesheet_log :Path('/Inventory/timesheet/log') :Args(0) {
             ? ' Points credited.' : ''
     );
     $c->res->redirect($c->uri_for('/Inventory/timesheet'));
+}
+
+# =========================================================================
+# API — Future Accounting / External Integration
+# =========================================================================
+
+# -------------------------------------------------------------------------
+# _api_auth — shared token check for external API calls
+# Returns 1 if request is authorised (valid token OR admin session).
+# Sends 401 JSON and returns 0 if not authorised.
+# -------------------------------------------------------------------------
+
+sub _api_auth {
+    my ($self, $c) = @_;
+
+    my $roles    = $c->session->{roles} // [];
+    my $is_admin = 0;
+    if (ref($roles) eq 'ARRAY') {
+        $is_admin = grep { lc($_) eq 'admin' } @$roles;
+    } elsif (!ref($roles) && $roles) {
+        $is_admin = ($roles =~ /\badmin\b/i) ? 1 : 0;
+    }
+    $is_admin ||= 1 if ($c->session->{username} // '') eq 'Shanta';
+
+    unless ($is_admin) {
+        my $token = $c->req->header('X-API-Token')
+                 || $c->req->params->{api_token};
+        my $expected = $c->config->{api_token} || $ENV{COMSERV_API_TOKEN} || '';
+        if (!$expected || $token ne $expected) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_api_auth',
+                'API token auth failed from ' . ($c->req->address || 'unknown'));
+            $c->res->status(401);
+            $c->res->content_type('application/json');
+            $c->res->body('{"error":"Unauthorized"}');
+            $c->detach;
+            return 0;
+        }
+    }
+    return 1;
+}
+
+# -------------------------------------------------------------------------
+# POST /Inventory/api/transaction
+# Create an inventory transaction (stock adjustment) via API.
+#
+# JSON body (or form params):
+#   item_id          (required) — inventory_items.id
+#   transaction_type (required) — receive | issue | adjust_up | adjust_down |
+#                                  produce | consume | transfer | return
+#   quantity         (required) — positive number
+#   location_id      (optional) — inventory_locations.id
+#   unit_cost        (optional) — override unit cost for GL valuation
+#   reference_number (optional) — external reference (PO#, invoice#, etc.)
+#   notes            (optional)
+#   sitename         (optional) — defaults to session sitename
+#
+# Returns JSON:
+#   { "transaction_id": <id>, "gl_entry_id": <id|null>, "status": "ok" }
+# -------------------------------------------------------------------------
+
+sub api_transaction :Path('/Inventory/api/transaction') :Args(0) {
+    my ($self, $c) = @_;
+
+    return unless $self->_api_auth($c);
+
+    if ($c->req->method ne 'POST') {
+        $c->res->status(405);
+        $c->res->content_type('application/json');
+        $c->res->body('{"error":"Method not allowed — use POST"}');
+        $c->detach;
+        return;
+    }
+
+    require JSON;
+
+    my $params;
+    my $body = $c->req->body_text;
+    if ($body && $c->req->content_type =~ m{application/json}i) {
+        eval { $params = JSON::decode_json($body) };
+        if ($@) {
+            $c->res->status(400);
+            $c->res->content_type('application/json');
+            $c->res->body('{"error":"Invalid JSON body"}');
+            $c->detach;
+            return;
+        }
+    } else {
+        $params = $c->req->body_parameters;
+    }
+
+    my $item_id  = $params->{item_id};
+    my $type     = $params->{transaction_type};
+    my $qty      = $params->{quantity};
+
+    unless ($item_id && $type && defined $qty && $qty > 0) {
+        $c->res->status(400);
+        $c->res->content_type('application/json');
+        $c->res->body('{"error":"Required: item_id, transaction_type, quantity (>0)"}');
+        $c->detach;
+        return;
+    }
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $params->{sitename} || $self->_sitename($c);
+    my $loc_id   = $params->{location_id};
+    my $now      = $self->_now();
+    my $today    = substr($now, 0, 10);
+
+    my ($txn_id, $gl_entry_id, $err);
+
+    eval {
+        $schema->txn_do(sub {
+            my $stock = $schema->resultset('InventoryStockLevel')->find_or_create(
+                { item_id => $item_id, location_id => ($loc_id || \'NULL') },
+                { default => { quantity_on_hand => 0, quantity_reserved => 0, quantity_on_order => 0 } }
+            ) if $loc_id;
+
+            if ($loc_id) {
+                my $new_qty = $stock->quantity_on_hand;
+                if ($type =~ /^(receive|adjust_up|produce|harvest|return)$/) {
+                    $new_qty += $qty;
+                } else {
+                    $new_qty -= $qty;
+                }
+                $stock->update({ quantity_on_hand => $new_qty, updated_at => $now });
+            }
+
+            my $item_rec = $schema->resultset('InventoryItem')->find($item_id);
+            if ($item_rec && ($item_rec->inventory_accno_id || $item_rec->expense_accno_id)) {
+                my $unit_cost = $params->{unit_cost} || $item_rec->unit_cost || 0;
+                my $value     = $qty * $unit_cost;
+                my $ref       = 'API-TXN-' . $item_id . '-' . time();
+                my $gl = $schema->resultset('GlEntry')->create({
+                    reference   => $ref,
+                    description => ucfirst($type) . ' (API): ' . ($item_rec->name || "Item $item_id") . " x$qty",
+                    entry_type  => 'inventory',
+                    post_date   => $today,
+                    approved    => 1,
+                    currency    => 'CAD',
+                    sitename    => $sitename,
+                    entered_by  => $c->session->{user_id} || undef,
+                });
+                $gl_entry_id = $gl->id;
+
+                if ($value != 0) {
+                    my ($dr_acct, $cr_acct);
+                    if ($type =~ /^(receive|adjust_up|produce|harvest)$/) {
+                        $dr_acct = $item_rec->inventory_accno_id;
+                        $cr_acct = $item_rec->expense_accno_id || $item_rec->inventory_accno_id;
+                    } else {
+                        $dr_acct = $item_rec->expense_accno_id || $item_rec->inventory_accno_id;
+                        $cr_acct = $item_rec->inventory_accno_id;
+                    }
+                    if ($dr_acct) {
+                        $schema->resultset('GlEntryLine')->create({
+                            gl_entry_id => $gl_entry_id,
+                            account_id  => $dr_acct,
+                            amount      => $value,
+                            memo        => ucfirst($type) . " $qty units (API)",
+                            sort_order  => 1,
+                        });
+                    }
+                    if ($cr_acct && $cr_acct != ($dr_acct || 0)) {
+                        $schema->resultset('GlEntryLine')->create({
+                            gl_entry_id => $gl_entry_id,
+                            account_id  => $cr_acct,
+                            amount      => -$value,
+                            memo        => ucfirst($type) . " $qty units (API)",
+                            sort_order  => 2,
+                        });
+                    }
+                }
+            }
+
+            my $txn = $schema->resultset('InventoryTransaction')->create({
+                item_id          => $item_id,
+                location_id      => $loc_id || undef,
+                transaction_type => $type,
+                quantity         => $qty,
+                unit_cost        => $params->{unit_cost} || undef,
+                reference_number => $params->{reference_number} || undef,
+                gl_entry_id      => $gl_entry_id || undef,
+                sitename         => $sitename,
+                notes            => $params->{notes} || undef,
+                performed_by     => $c->session->{username} || 'api',
+                transaction_date => $now,
+                created_at       => $now,
+            });
+            $txn_id = $txn->id;
+        });
+    };
+    if ($@) {
+        $err = $@;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_transaction', "API transaction failed: $err");
+        $c->res->status(500);
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json({ error => "Transaction failed: $err" }));
+        $c->detach;
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_transaction',
+        "API transaction created: id=$txn_id gl_entry_id=" . ($gl_entry_id || 'none'));
+    $c->res->status(201);
+    $c->res->content_type('application/json');
+    $c->res->body(JSON::encode_json({
+        status         => 'ok',
+        transaction_id => $txn_id,
+        gl_entry_id    => $gl_entry_id,
+    }));
+    $c->detach;
 }
 
 __PACKAGE__->meta->make_immutable;
