@@ -1192,9 +1192,21 @@ sub hosting_accounts :Local :Args(0) {
         )->all;
     };
 
+    my %plan_price;
+    eval {
+        my $csc_site = $c->model('DBEncy')->resultset('Site')->search({ name => 'CSC' })->single;
+        if ($csc_site) {
+            my @plans = $c->model('DBEncy')->resultset('MembershipPlan')->search(
+                { site_id => $csc_site->id, is_active => 1 }
+            )->all;
+            %plan_price = map { $_->slug => ($_->price_monthly || 0) } @plans;
+        }
+    };
+
     $c->stash(
-        template => 'membership/admin/hosting_accounts.tt',
-        accounts => \@accounts,
+        template   => 'membership/admin/hosting_accounts.tt',
+        accounts   => \@accounts,
+        plan_price => \%plan_price,
     );
     $c->forward($c->view('TT'));
 }
