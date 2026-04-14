@@ -150,6 +150,93 @@ sub index :Path :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+sub hosting_signup :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    return $c->response->redirect($c->uri_for('/user/login'))
+        unless $c->session->{username};
+    return $c->response->redirect($c->uri_for('/membership'))
+        unless $self->_is_admin($c);
+    return $c->response->redirect($c->uri_for('/membership'))
+        if lc($site_name) eq 'csc';
+
+    my ($site, $domains, $csc_hosting_plans, $hosting_account) = (undef, [], [], undef);
+
+    eval {
+        $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
+
+        if ($site) {
+            my @d = $c->model('DBEncy')->resultset('SiteDomain')->search(
+                { site_id => $site->id },
+                { order_by => 'domain' }
+            )->all;
+            $domains = \@d;
+        }
+
+        my $csc_site = $c->model('DBEncy')->resultset('Site')->search({ name => 'CSC' })->single;
+        if ($csc_site) {
+            my @plans = $c->model('DBEncy')->resultset('MembershipPlan')->search(
+                { site_id => $csc_site->id, has_hosting => 1, is_active => 1,
+                  slug => { -like => 'hosting-%' } },
+                { order_by => 'sort_order' }
+            )->all;
+            $csc_hosting_plans = \@plans;
+        }
+
+        $hosting_account = $c->model('DBEncy')->resultset('HostingAccount')->search(
+            { sitename => $site_name }, { rows => 1 }
+        )->single;
+    };
+
+    if ($c->req->method eq 'POST') {
+        my $p = $c->req->body_parameters;
+        eval {
+            if ($hosting_account) {
+                $hosting_account->update({
+                    plan_slug          => $p->{plan_slug},
+                    domain             => $p->{domain},
+                    domain_type        => $p->{domain_type} || 'subdomain',
+                    parent_domain      => $p->{parent_domain},
+                    referring_sitename => $p->{referring_sitename},
+                    notes              => $p->{notes},
+                    updated_at         => \'NOW()',
+                });
+            } else {
+                $c->model('DBEncy')->resultset('HostingAccount')->create({
+                    sitename           => $site_name,
+                    plan_slug          => $p->{plan_slug},
+                    domain             => $p->{domain},
+                    domain_type        => $p->{domain_type} || 'subdomain',
+                    parent_domain      => $p->{parent_domain},
+                    referring_sitename => $p->{referring_sitename} || $site_name,
+                    status             => 'pending',
+                    monthly_cost       => 0,
+                    notes              => $p->{notes},
+                    created_by         => $c->session->{username},
+                });
+            }
+        };
+        if ($@) {
+            $c->stash->{error_msg} = "Registration failed: $@";
+        } else {
+            $c->flash->{success_msg} = "$site_name has been submitted for CSC hosting registration. Status: pending.";
+            return $c->response->redirect($c->uri_for('/membership'));
+        }
+    }
+
+    $c->stash(
+        template          => 'membership/hosting_signup.tt',
+        site              => $site,
+        site_name         => $site_name,
+        domains           => $domains,
+        csc_hosting_plans => $csc_hosting_plans,
+        hosting_account   => $hosting_account,
+        selected_plan     => $c->req->query_parameters->{plan} || '',
+    );
+    $c->forward($c->view('TT'));
+}
+
 sub plans :Local :Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'plans',

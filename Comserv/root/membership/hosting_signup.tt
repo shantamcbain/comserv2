@@ -1,0 +1,149 @@
+[% META
+   title = "Register with CSC Hosting"
+   TemplateType = "Application"
+%]
+
+[% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>&#127760; Register [% site_name | html %] with CSC Hosting</h1>
+    <p>Complete this form to register <strong>[% site_name | html %]</strong> as a CSC hosting partner.
+    Once approved, your members will be able to purchase hosting plans directly from this site.</p>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <form method="post" action="[% c.uri_for('/membership/hosting_signup') %]" class="form-standard">
+
+        <div class="content-section">
+          <h2>Site Information</h2>
+          <p style="color:#666;font-size:0.9rem;">Pre-filled from your site record. Edit if needed before submitting.</p>
+
+          <div class="form-row">
+            <div class="form-field">
+              <label>SiteName</label>
+              <input type="text" value="[% site_name | html %]" disabled style="background:#f5f5f5;">
+            </div>
+            <div class="form-field">
+              <label>Display Name</label>
+              <input type="text" value="[% site.site_display_name | html %]" disabled style="background:#f5f5f5;">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-field" style="flex:2;">
+              <label>Description</label>
+              <input type="text" value="[% site.description | html %]" disabled style="background:#f5f5f5;">
+            </div>
+            <div class="form-field">
+              <label>Admin Email</label>
+              <input type="text" value="[% site.mail_to_admin | html %]" disabled style="background:#f5f5f5;">
+            </div>
+          </div>
+
+          [% IF domains.size %]
+          <div class="form-field">
+            <label>Registered Domains</label>
+            <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:4px;padding:0.5rem 0.75rem;font-family:monospace;font-size:0.9rem;">
+              [% FOREACH d IN domains %][% d.domain | html %][% UNLESS loop.last %],  [% END %][% END %]
+            </div>
+          </div>
+          [% END %]
+        </div>
+
+        <div class="content-section">
+          <h2>Hosting Plan</h2>
+
+          [% FOREACH hplan IN csc_hosting_plans %]
+          <label style="display:flex;align-items:flex-start;gap:0.75rem;border:1px solid #c8e6c9;border-radius:6px;padding:1rem;margin-bottom:0.75rem;cursor:pointer;background:[% IF selected_plan == hplan.slug OR (loop.first AND !selected_plan) %]#f0f9ec[% ELSE %]#fff[% END %]">
+            <input type="radio" name="plan_slug" value="[% hplan.slug | html %]"
+              [% IF selected_plan == hplan.slug OR (loop.first AND !selected_plan) %]checked[% END %]
+              style="margin-top:0.2rem;">
+            <div>
+              <strong>[% hplan.name | html %]</strong>
+              — [% hplan.price_currency | html %] [% hplan.price_monthly %]/mo
+              [% IF hplan.price_annual %]<span style="color:#888;font-size:0.85em;">(or [% hplan.price_currency | html %] [% hplan.price_annual %]/yr)</span>[% END %]<br>
+              <span style="font-size:0.88rem;color:#555;">[% hplan.description | html %]</span>
+            </div>
+          </label>
+          [% END %]
+        </div>
+
+        <div class="content-section">
+          <h2>Domain Setup</h2>
+
+          <div class="form-row">
+            <div class="form-field">
+              <label for="domain_type">Domain Type</label>
+              <select name="domain_type" id="domain_type" onchange="toggleDomainFields(this.value)">
+                <option value="subdomain">Subdomain on a CSC partner domain (e.g. you.forager.com)</option>
+                <option value="custom">Custom domain (bring your own)</option>
+                <option value="subpath">CSC sub-path (e.g. csc.ca/yoursite)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row" id="row_parent_domain">
+            <div class="form-field">
+              <label for="parent_domain">Parent Domain <span style="color:#888;font-size:0.85em;">(the domain your subdomain will live under)</span></label>
+              <select name="parent_domain" id="parent_domain">
+                [% FOREACH d IN domains %]
+                <option value="[% d.domain | html %]">[% d.domain | html %]</option>
+                [% END %]
+                <option value="">— or type below —</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-field">
+              <label for="domain" id="label_domain">Desired Subdomain / Domain</label>
+              <input type="text" name="domain" id="domain"
+                placeholder="e.g. bmast.forager.com or beemaster.ca"
+                value="[% hosting_account.domain | html %]">
+              <small style="color:#888;">Enter the full domain or subdomain you want to use for this hosted site.</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="content-section">
+          <h2>Additional Information</h2>
+          <div class="form-field">
+            <label for="notes">Notes for CSC Admin <span style="color:#888;font-size:0.85em;">(optional)</span></label>
+            <textarea name="notes" id="notes" rows="3" style="width:100%;box-sizing:border-box;"
+              placeholder="Any special requirements, existing domains to point, or questions for the CSC team.">[% hosting_account.notes | html %]</textarea>
+          </div>
+          <input type="hidden" name="referring_sitename" value="[% site_name | html %]">
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Submit Registration →</button>
+          <a href="[% c.uri_for('/membership') %]" class="btn btn-secondary">Cancel</a>
+        </div>
+
+      </form>
+
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleDomainFields(type) {
+    var rowParent = document.getElementById('row_parent_domain');
+    var labelDomain = document.getElementById('label_domain');
+    if (type === 'subdomain') {
+        rowParent.style.display = '';
+        labelDomain.textContent = 'Desired Subdomain (prefix only, e.g. bmast)';
+    } else if (type === 'custom') {
+        rowParent.style.display = 'none';
+        labelDomain.textContent = 'Your Custom Domain (e.g. beemaster.ca)';
+    } else {
+        rowParent.style.display = 'none';
+        labelDomain.textContent = 'Desired Sub-path (e.g. beemaster)';
+    }
+}
+toggleDomainFields('subdomain');
+</script>
