@@ -111,8 +111,7 @@ sub index :Path :Args(0) {
             my $csc_site = $c->model('DBEncy')->resultset('Site')->search({ name => 'CSC' })->single;
             if ($csc_site) {
                 my @hosting = $c->model('DBEncy')->resultset('MembershipPlan')->search(
-                    { site_id => $csc_site->id, has_hosting => 1, is_active => 1,
-                      slug => { -like => 'hosting-%' } },
+                    { site_id => $csc_site->id, has_hosting => 1, is_active => 1 },
                     { order_by => 'sort_order' }
                 )->all;
                 $csc_hosting_plans = \@hosting;
@@ -178,8 +177,7 @@ sub hosting_signup :Local :Args(0) {
         my $csc_site = $c->model('DBEncy')->resultset('Site')->search({ name => 'CSC' })->single;
         if ($csc_site) {
             my @plans = $c->model('DBEncy')->resultset('MembershipPlan')->search(
-                { site_id => $csc_site->id, has_hosting => 1, is_active => 1,
-                  slug => { -like => 'hosting-%' } },
+                { site_id => $csc_site->id, has_hosting => 1, is_active => 1 },
                 { order_by => 'sort_order' }
             )->all;
             $csc_hosting_plans = \@plans;
