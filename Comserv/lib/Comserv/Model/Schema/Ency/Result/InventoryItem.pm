@@ -143,6 +143,15 @@ __PACKAGE__->add_columns(
         size        => 255,
         is_nullable => 1,
     },
+    marketplace_listing_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
+    list_in_marketplace => {
+        data_type     => 'tinyint',
+        is_nullable   => 0,
+        default_value => 0,
+    },
     created_at => {
         data_type     => 'datetime',
         is_nullable   => 1,
@@ -158,6 +167,13 @@ __PACKAGE__->add_columns(
 
 __PACKAGE__->set_primary_key('id');
 __PACKAGE__->add_unique_constraint(unique_sku => ['sku']);
+
+__PACKAGE__->belongs_to(
+    'marketplace_listing',
+    'Comserv::Model::Schema::Ency::Result::MarketplaceListing',
+    { 'foreign.id' => 'self.marketplace_listing_id' },
+    { join_type => 'LEFT', on_delete => 'SET NULL' }
+);
 
 __PACKAGE__->has_many(
     'stock_levels' => 'Comserv::Model::Schema::Ency::Result::InventoryStockLevel',

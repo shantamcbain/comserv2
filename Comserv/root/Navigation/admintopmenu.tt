@@ -193,9 +193,15 @@
                 <a href="/Inventory/item/add"><i class="icon-add"></i>Add Item</a>
                 <a href="/Inventory/suppliers"><i class="icon-supplier"></i>Suppliers</a>
                 <a href="/Inventory/locations"><i class="icon-location"></i>Locations</a>
+                <a href="/Inventory/bom/list"><i class="fas fa-sitemap"></i>Bill of Materials</a>
                 <a href="/Inventory/invoice"><i class="icon-invoice"></i>Supplier Invoices (AP)</a>
                 <a href="/Inventory/sales"><i class="icon-invoice"></i>Sales Invoices (AR)</a>
-                <a href="/CustomerOrder"><i class="icon-cart"></i>Customer Orders</a>
+                <div class="submenu-section">
+                    <span class="submenu-section-title">Shop / Orders</span>
+                    <a href="/Cart/price_list"><i class="fas fa-store"></i>Price List / Shop</a>
+                    <a href="/Cart/orders"><i class="fas fa-shopping-cart"></i>Cart Orders</a>
+                    <a href="/CustomerOrder"><i class="icon-cart"></i>Customer Orders</a>
+                </div>
                 <div class="submenu-section">
                     <span class="submenu-section-title">Accounting</span>
                     <a href="/Accounting"><i class="icon-accounting"></i>Accounting Dashboard</a>

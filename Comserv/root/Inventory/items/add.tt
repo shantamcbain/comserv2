@@ -1,4 +1,4 @@
-[% PageVersion = 'Inventory/items/add.tt,v 0.01 2026/03/30 shanta Exp' %]
+[% PageVersion = 'Inventory/items/add.tt,v 0.02 2026/04/10 shanta Exp' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <h1>Add Inventory Item</h1>
@@ -17,7 +17,21 @@
     </tr>
     <tr>
       <th><label for="category">Category</label></th>
-      <td><input type="text" id="category" name="category" maxlength="100"></td>
+      <td><input type="text" id="category" name="category" maxlength="100" placeholder="Apiary, Garden, Hardware, 3D Print, Craft…"></td>
+    </tr>
+    <tr>
+      <th><label for="item_origin">Origin / How Made</label></th>
+      <td>
+        <select id="item_origin" name="item_origin">
+          [% FOREACH o IN ['purchased','manufactured','crafted','grown','foraged','harvested','3d_printed','other'] %]
+          <option value="[% o %]">[% o %]</option>
+          [% END %]
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="is_assemblable">Has BOM / Recipe?</label></th>
+      <td><input type="checkbox" id="is_assemblable" name="is_assemblable" value="1"> Yes — this item is assembled from components</td>
     </tr>
     <tr>
       <th><label for="description">Description</label></th>
@@ -27,14 +41,9 @@
       <th><label for="unit_of_measure">Unit of Measure</label></th>
       <td>
         <select id="unit_of_measure" name="unit_of_measure">
-          <option value="each">Each</option>
-          <option value="box">Box</option>
-          <option value="case">Case</option>
-          <option value="kg">kg</option>
-          <option value="lb">lb</option>
-          <option value="litre">Litre</option>
-          <option value="metre">Metre</option>
-          <option value="hour">Hour</option>
+          [% FOREACH u IN ['each','g','kg','ml','L','cm','m','sheet','box','case','lb','litre','metre','hour'] %]
+          <option value="[% u %]">[% u %]</option>
+          [% END %]
         </select>
       </td>
     </tr>
@@ -65,9 +74,9 @@
       <th><label for="status">Status</label></th>
       <td>
         <select id="status" name="status">
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="discontinued">Discontinued</option>
+          [% FOREACH s IN ['active','inactive','discontinued'] %]
+          <option value="[% s %]">[% s %]</option>
+          [% END %]
         </select>
       </td>
     </tr>
@@ -161,7 +170,18 @@
         [% END %]
       </td>
     </tr>
+    [% END %]
+    [% coa_select('inventory_accno_id', 'Stock/Asset Account',  'e.g. 1200 Inventory — value of stock on hand') %]
+    [% coa_select('income_accno_id',    'Income/Sales Account', 'e.g. 4000 Sales Revenue — when sold') %]
+    [% coa_select('expense_accno_id',   'COGS/Expense Account', 'e.g. 5000 Cost of Goods Sold — when consumed') %]
+    [% coa_select('returns_accno_id',   'Returns Account',      'e.g. 4100 Sales Returns — contra account') %]
   </table>
+  [% END %]
+
+  <p>
+    <input type="submit" value="Create Item">
+    <a href="/Inventory/items">Cancel</a>
+  </p>
 </form>
 [% IF is_popup %]
 <script>

@@ -1,0 +1,302 @@
+[% PageVersion = 'Inventory/bom/view.tt,v 0.01 2026/04/14 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Bill of Materials: [% item.name | html %]</h1>
+
+[% IF c.flash.success_msg %]<p class="success">[% c.flash.success_msg %]</p>[% END %]
+[% IF c.flash.error_msg %]<p class="error">[% c.flash.error_msg %]</p>[% END %]
+
+<div class="actions">
+  <a href="/Inventory/item/view/[% item.id %]">&#8592; Back to Item</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/item/edit/[% item.id %]">Edit Item</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/print/bom/[% item.id %]" target="_blank">&#128438; Print BOM Sheet</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/bom/list">All Assemblable Items</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/items">Item List</a>
+</div>
+
+<table border="0" cellpadding="4" style="margin-bottom:12px;">
+  <tr>
+    <th style="text-align:left">SKU</th>
+    <td>[% item.sku %]</td>
+    <th style="text-align:left;padding-left:20px;">Origin</th>
+    <td>[% item.item_origin || '-' %]</td>
+  </tr>
+  <tr>
+    <th style="text-align:left">Category</th>
+    <td>[% item.category || '-' %]</td>
+    <th style="text-align:left;padding-left:20px;">Unit</th>
+    <td>[% item.unit_of_measure %]</td>
+  </tr>
+  <tr>
+    <th style="text-align:left">Listed Unit Cost</th>
+    <td>[% item.unit_cost ? item.unit_cost : '—' %]</td>
+    <th style="text-align:left;padding-left:20px;">Assembled Cost (required only)</th>
+    <td>
+      <strong>[% assembled_cost > 0 ? assembled_cost : '—' %]</strong>
+      [% IF assembled_cost > 0 && item.unit_cost %]
+        [% IF assembled_cost > item.unit_cost %]
+          <span style="color:#dc3545;font-size:0.85em;">&#9650; over listed cost</span>
+        [% ELSE %]
+          <span style="color:#28a745;font-size:0.85em;">&#9660; under listed cost</span>
+        [% END %]
+      [% END %]
+    </td>
+  </tr>
+</table>
+
+[% SET bom_rows = item.bom_components %]
+
+<h2>Components</h2>
+
+[% IF bom_rows.size %]
+
+<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%;margin-bottom:18px;">
+  <thead style="background:#f0f0f0;">
+    <tr>
+      <th>#</th>
+      <th>Component Item</th>
+      <th>Unit Cost</th>
+      <th>Qty</th>
+      <th>Unit</th>
+      <th>Waste %</th>
+      <th>Eff. Qty</th>
+      <th>Line Cost</th>
+      <th>Optional?</th>
+      <th>Notes</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% total_required = 0 %]
+  [% total_optional = 0 %]
+  [% row_num = 0 %]
+  [% FOREACH comp IN bom_rows %]
+    [% row_num = row_num + 1 %]
+    [% ci = comp.component_item %]
+    [% eff_qty = comp.quantity * (1 + (comp.scrap_factor || 0)) %]
+    [% line_cost = ci && ci.unit_cost ? (ci.unit_cost * eff_qty) : 0 %]
+    [% IF !comp.is_optional %][% total_required = total_required + line_cost %][% END %]
+    [% IF comp.is_optional %][% total_optional = total_optional + line_cost %][% END %]
+    <tr style="[% comp.is_optional ? 'color:#888;font-style:italic;' : '' %]">
+      <td style="text-align:center">[% row_num %]</td>
+      <td>
+        [% IF ci %]
+          <a href="/Inventory/item/view/[% ci.id %]">[% ci.name | html %]</a>
+          <br><small style="color:#888">[% ci.sku %]</small>
+        [% ELSE %]
+          <em style="color:#999">#[% comp.component_item_id %] (missing)</em>
+        [% END %]
+      </td>
+      <td style="text-align:right">[% ci && ci.unit_cost ? ci.unit_cost : '—' %]</td>
+      <td style="text-align:right">[% comp.quantity %]</td>
+      <td>[% comp.unit %]</td>
+      <td style="text-align:right">[% comp.scrap_factor ? (comp.scrap_factor * 100) _ '%' : '0%' %]</td>
+      <td style="text-align:right">[% eff_qty %]</td>
+      <td style="text-align:right;[% comp.is_optional ? '' : 'font-weight:bold;' %]">
+        [% line_cost > 0 ? line_cost : '—' %]
+      </td>
+      <td style="text-align:center">[% comp.is_optional ? 'Yes' : '' %]</td>
+      <td>[% comp.notes | html %]</td>
+      <td style="white-space:nowrap;">
+        <button type="button"
+                onclick="toggleEditRow([% comp.id %])"
+                style="font-size:0.8em;padding:2px 6px;cursor:pointer;">Edit</button>
+        <form method="POST" action="/Inventory/bom/remove/[% comp.id %]"
+              onsubmit="return confirm('Remove [% ci ? (ci.name | html) : 'this component' %] from BOM?');"
+              style="display:inline;">
+          <input type="hidden" name="from" value="bom">
+          <input type="submit" value="Remove"
+                 style="background:#dc3545;color:white;border:none;padding:2px 6px;border-radius:3px;cursor:pointer;font-size:0.8em;">
+        </form>
+      </td>
+    </tr>
+    <tr id="edit-row-[% comp.id %]" style="display:none;background:#fffbe6;">
+      <td colspan="11">
+        <form method="POST" action="/Inventory/bom/edit/[% comp.id %]"
+              style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:6px;">
+          <label>Qty:
+            <input type="number" name="quantity" value="[% comp.quantity %]"
+                   min="0.0001" step="0.0001" style="width:70px;" required>
+          </label>
+          <label>Unit:
+            <select name="unit">
+              [% FOREACH u IN ['each','g','kg','ml','L','cm','m','sheet','hour','kWh','litre'] %]
+              <option value="[% u %]" [% comp.unit == u ? 'selected' : '' %]>[% u %]</option>
+              [% END %]
+            </select>
+          </label>
+          <label>Waste %:
+            <input type="number" name="scrap_factor"
+                   value="[% comp.scrap_factor ? (comp.scrap_factor * 100) : 0 %]"
+                   min="0" max="100" step="0.1" style="width:60px;">
+          </label>
+          <label>Sort:
+            <input type="number" name="sort_order" value="[% comp.sort_order || 0 %]"
+                   style="width:50px;">
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;">
+            <input type="checkbox" name="is_optional" value="1"
+                   [% comp.is_optional ? 'checked' : '' %]>
+            Optional
+          </label>
+          <label>Notes:
+            <input type="text" name="notes" value="[% comp.notes | html %]" style="width:180px;">
+          </label>
+          <input type="submit" value="Save"
+                 style="background:#28a745;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;">
+          <button type="button" onclick="toggleEditRow([% comp.id %])"
+                  style="padding:4px 10px;cursor:pointer;">Cancel</button>
+        </form>
+      </td>
+    </tr>
+  [% END %]
+  </tbody>
+  <tfoot style="background:#f8f8f8;font-weight:bold;">
+    <tr>
+      <td colspan="7" style="text-align:right;padding-right:8px;">Required components total:</td>
+      <td style="text-align:right;">[% total_required > 0 ? total_required : '—' %]</td>
+      <td colspan="3"></td>
+    </tr>
+    [% IF total_optional > 0 %]
+    <tr style="color:#888;">
+      <td colspan="7" style="text-align:right;padding-right:8px;">Optional components total:</td>
+      <td style="text-align:right;">[% total_optional %]</td>
+      <td colspan="3"></td>
+    </tr>
+    <tr>
+      <td colspan="7" style="text-align:right;padding-right:8px;">Grand total (required + optional):</td>
+      <td style="text-align:right;">[% total_required + total_optional %]</td>
+      <td colspan="3"></td>
+    </tr>
+    [% END %]
+  </tfoot>
+</table>
+
+[% ELSE %]
+<p><em>No components defined yet. Add the first component below.</em></p>
+[% END %]
+
+<h2>Add Component</h2>
+
+[% IF all_items.size %]
+<form method="POST" action="/Inventory/bom/add/[% item.id %]"
+      onsubmit="patchRedirectToBom(this)">
+  <input type="hidden" name="redirect_to" value="bom">
+  <table cellpadding="4" style="border:1px solid #ccc;background:#fafafa;padding:8px;">
+    <tr>
+      <th><label for="component_item_id">Component Item *</label></th>
+      <td>
+        <select id="component_item_id" name="component_item_id" required style="max-width:320px;"
+                onchange="setDefaultUnit(this)">
+          <option value="">— select component —</option>
+          [% FOREACH ci IN all_items %]
+          <option value="[% ci.id %]" data-uom="[% ci.unit_of_measure %]" data-cost="[% ci.unit_cost || '' %]">
+            [% ci.name | html %] [[% ci.sku %]][% ci.unit_cost ? ' — $' _ ci.unit_cost : '' %]
+          </option>
+          [% END %]
+        </select>
+        <span id="cost-preview" style="margin-left:8px;color:#555;font-size:0.9em;"></span>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="quantity">Quantity *</label></th>
+      <td><input type="number" id="quantity" name="quantity" value="1" min="0.0001" step="0.0001"
+                 style="width:80px;" required></td>
+    </tr>
+    <tr>
+      <th><label for="unit">Unit</label></th>
+      <td>
+        <select id="unit" name="unit">
+          <option value="each">each</option>
+          <option value="g">g</option>
+          <option value="kg">kg</option>
+          <option value="ml">ml</option>
+          <option value="L">L</option>
+          <option value="cm">cm</option>
+          <option value="m">m</option>
+          <option value="sheet">sheet</option>
+          <option value="hour">hour</option>
+          <option value="kWh">kWh</option>
+          <option value="litre">litre</option>
+        </select>
+        <small>(auto-set from item; change if needed)</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="is_optional">Optional?</label></th>
+      <td><input type="checkbox" id="is_optional" name="is_optional" value="1">
+          <small>e.g. foundation in a frame, paint on a box</small></td>
+    </tr>
+    <tr>
+      <th><label for="scrap_factor">Waste/Scrap %</label></th>
+      <td><input type="number" id="scrap_factor" name="scrap_factor" value="0"
+                 min="0" max="100" step="0.1" style="width:70px;">
+          <small>e.g. 5 = 5% extra material for waste</small></td>
+    </tr>
+    <tr>
+      <th><label for="sort_order">Sort Order</label></th>
+      <td><input type="number" id="sort_order" name="sort_order" value="0" style="width:60px;"></td>
+    </tr>
+    <tr>
+      <th><label for="notes">Notes</label></th>
+      <td><input type="text" id="notes" name="notes" style="width:280px;"
+                 placeholder="e.g. 30cm length, pre-drilled, natural latex"></td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <input type="submit" value="Add to BOM"
+               style="background:#28a745;color:white;padding:5px 14px;border:none;border-radius:4px;cursor:pointer;">
+      </td>
+    </tr>
+  </table>
+</form>
+[% ELSE %]
+<p><em>No other active items in this site to use as components.
+   <a href="/Inventory/item/add">Add items</a> first.</em></p>
+[% END %]
+
+[% IF debug_errors && debug_errors.size > 0 %]
+<div class="debug">
+  [% FOREACH err IN debug_errors %]<p>[% err %]</p>[% END %]
+</div>
+[% END %]
+
+<script>
+var uomMap = {
+[% FOREACH ci IN all_items %]
+  [% ci.id %]: { uom: "[% ci.unit_of_measure %]", cost: "[% ci.unit_cost || '' %]" }[% ',' UNLESS loop.last %]
+[% END %]
+};
+
+var unitSel = document.getElementById('unit');
+var costPreview = document.getElementById('cost-preview');
+
+function setDefaultUnit(sel) {
+  var data = uomMap[sel.value] || {};
+  var uom = data.uom || 'each';
+  for (var i = 0; i < unitSel.options.length; i++) {
+    if (unitSel.options[i].value === uom) { unitSel.selectedIndex = i; break; }
+  }
+  if (data.cost) {
+    costPreview.textContent = 'Unit cost: $' + data.cost;
+  } else {
+    costPreview.textContent = '';
+  }
+}
+
+function toggleEditRow(bomId) {
+  var row = document.getElementById('edit-row-' + bomId);
+  if (row) {
+    row.style.display = (row.style.display === 'none') ? 'table-row' : 'none';
+  }
+}
+
+function patchRedirectToBom(form) {
+  var action = form.getAttribute('action');
+  return true;
+}
+</script>
