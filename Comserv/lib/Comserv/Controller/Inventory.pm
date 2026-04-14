@@ -194,12 +194,21 @@ sub item_view :Path('/Inventory/item/view') :Args(1) {
         )->all;
     };
 
+    my @all_suppliers;
+    eval {
+        @all_suppliers = $schema->resultset('InventorySupplier')->search(
+            { sitename => $sitename, status => 'active' },
+            { columns => ['id','name'], order_by => 'name' }
+        )->all;
+    };
+
     $c->stash(
-        item         => $item,
-        transactions => \@transactions,
-        all_items    => \@all_items,
-        sitename     => $sitename,
-        template     => 'Inventory/items/view.tt',
+        item          => $item,
+        transactions  => \@transactions,
+        all_items     => \@all_items,
+        all_suppliers => \@all_suppliers,
+        sitename      => $sitename,
+        template      => 'Inventory/items/view.tt',
     );
 }
 
@@ -696,6 +705,129 @@ sub supplier_delete :Path('/Inventory/supplier/delete') :Args(1) {
         $c->flash->{success_msg} = 'Supplier deactivated';
     }
     $c->res->redirect($c->uri_for('/Inventory/suppliers'));
+}
+
+sub supplier_view :Path('/Inventory/supplier/view') :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'supplier_view', "View supplier $id");
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $supplier;
+    eval {
+        $supplier = $schema->resultset('InventorySupplier')->find(
+            { id => $id, sitename => $sitename },
+            { prefetch => { 'item_suppliers' => 'item' } }
+        );
+    };
+    if ($@ || !$supplier) {
+        $c->flash->{error_msg} = 'Supplier not found';
+        $c->res->redirect($c->uri_for('/Inventory/suppliers'));
+        return;
+    }
+
+    $c->stash(
+        supplier => $supplier,
+        sitename => $sitename,
+        template => 'Inventory/suppliers/view.tt',
+    );
+}
+
+sub item_supplier_add :Path('/Inventory/item_supplier/add') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'item_supplier_add', 'Add item-supplier link');
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $params   = $c->req->body_parameters;
+    my $item_id  = $params->{item_id};
+
+    eval {
+        my $existing = $schema->resultset('InventoryItemSupplier')->find({
+            item_id     => $item_id,
+            supplier_id => $params->{supplier_id},
+        });
+        if ($existing) {
+            $existing->update({
+                supplier_sku => $params->{supplier_sku} || undef,
+                unit_cost    => $params->{unit_cost}    || undef,
+                notes        => $params->{notes}        || undef,
+            });
+        } else {
+            $schema->resultset('InventoryItemSupplier')->create({
+                item_id      => $item_id,
+                supplier_id  => $params->{supplier_id},
+                supplier_sku => $params->{supplier_sku} || undef,
+                unit_cost    => $params->{unit_cost}    || undef,
+                is_preferred => $params->{is_preferred} ? 1 : 0,
+                notes        => $params->{notes}        || undef,
+            });
+        }
+        if ($params->{is_preferred} && $params->{is_preferred} eq '1') {
+            $schema->resultset('InventoryItemSupplier')->search({
+                item_id    => $item_id,
+                supplier_id => { '!=' => $params->{supplier_id} },
+            })->update({ is_preferred => 0 });
+        }
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Failed to link supplier: $@";
+    } else {
+        $c->flash->{success_msg} = 'Supplier linked successfully';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/item/view', [$item_id]));
+}
+
+sub item_supplier_remove :Path('/Inventory/item_supplier/remove') :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'item_supplier_remove', "Remove item-supplier $id");
+
+    my $schema  = $self->_schema($c);
+    my $item_id;
+    eval {
+        my $link = $schema->resultset('InventoryItemSupplier')->find($id);
+        if ($link) {
+            $item_id = $link->item_id;
+            $link->delete;
+        }
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Failed to remove supplier link: $@";
+    } else {
+        $c->flash->{success_msg} = 'Supplier link removed';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/item/view', [$item_id || 0]));
+}
+
+sub item_supplier_set_preferred :Path('/Inventory/item_supplier/preferred') :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'item_supplier_set_preferred', "Set preferred supplier $id");
+
+    my $schema  = $self->_schema($c);
+    my $item_id;
+    eval {
+        my $link = $schema->resultset('InventoryItemSupplier')->find($id);
+        if ($link) {
+            $item_id = $link->item_id;
+            $schema->resultset('InventoryItemSupplier')->search({ item_id => $item_id })->update({ is_preferred => 0 });
+            $link->update({ is_preferred => 1 });
+        }
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Failed to set preferred supplier: $@";
+    } else {
+        $c->flash->{success_msg} = 'Preferred supplier updated';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/item/view', [$item_id || 0]));
 }
 
 # -------------------------------------------------------------------------

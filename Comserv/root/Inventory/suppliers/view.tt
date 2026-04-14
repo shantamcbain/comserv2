@@ -1,0 +1,61 @@
+[% PageVersion = 'Inventory/suppliers/view.tt,v 0.01 2026/04/13 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Supplier: [% supplier.name | html %]</h1>
+
+[% IF c.flash.success_msg %]<p class="success">[% c.flash.success_msg %]</p>[% END %]
+[% IF c.flash.error_msg %]<p class="error">[% c.flash.error_msg %]</p>[% END %]
+
+<div class="actions">
+  <a href="/Inventory/supplier/edit/[% supplier.id %]">Edit</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/suppliers">Back to Suppliers</a>
+</div>
+
+<h2>Details</h2>
+<table border="1" cellpadding="4">
+  <tr><th>Name</th><td>[% supplier.name | html %]</td></tr>
+  <tr><th>Contact</th><td>[% supplier.contact_name | html || '-' %]</td></tr>
+  <tr><th>Email</th>
+    <td>[% IF supplier.email %]<a href="mailto:[% supplier.email %]">[% supplier.email | html %]</a>[% ELSE %]-[% END %]</td>
+  </tr>
+  <tr><th>Phone</th><td>[% supplier.phone | html || '-' %]</td></tr>
+  <tr><th>Website</th>
+    <td>[% IF supplier.website %]<a href="[% supplier.website | html %]" target="_blank">[% supplier.website | html %]</a>[% ELSE %]-[% END %]</td>
+  </tr>
+  <tr><th>Address</th><td><pre style="margin:0;font-family:inherit">[% supplier.address | html || '-' %]</pre></td></tr>
+  <tr><th>Lead Time</th><td>[% supplier.lead_time_days %] day(s)</td></tr>
+  <tr><th>Status</th><td>[% supplier.status %]</td></tr>
+  <tr><th>Notes</th><td>[% supplier.notes | html || '-' %]</td></tr>
+</table>
+
+<h2>Linked Items</h2>
+[% SET links = supplier.item_suppliers %]
+[% IF links.count == 0 %]
+  <p>No items linked to this supplier yet.</p>
+[% ELSE %]
+<table border="1" cellpadding="4">
+  <thead>
+    <tr>
+      <th>Item</th>
+      <th>SKU</th>
+      <th>Supplier SKU</th>
+      <th>Unit Cost</th>
+      <th>Preferred</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH link IN links %]
+    <tr [% IF link.is_preferred %]style="background:#f0fff0"[% END %]>
+      <td><a href="/Inventory/item/view/[% link.item_id %]">[% link.item.name | html %]</a></td>
+      <td>[% link.item.sku | html %]</td>
+      <td>[% link.supplier_sku | html || '-' %]</td>
+      <td>[% link.unit_cost ? link.unit_cost : '-' %]</td>
+      <td style="text-align:center">[% link.is_preferred ? '<strong style="color:green">&#9733;</strong>' : '' %]</td>
+      <td>[% link.notes | html || '-' %]</td>
+    </tr>
+  [% END %]
+  </tbody>
+</table>
+[% END %]
