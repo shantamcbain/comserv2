@@ -1230,8 +1230,6 @@ sub stock_transactions :Path('/Inventory/stock/transactions') :Args(0) {
 sub push_to_marketplace :Path('/Inventory/push_to_marketplace') :Args(0) {
     my ($self, $c) = @_;
 
-    $self->_require_admin($c) or return;
-
     my $item_id  = $c->req->body_parameters->{item_id};
     my $sitename = $c->session->{SiteName} || 'CSC';
     my $schema   = $c->model('DBEncy');
