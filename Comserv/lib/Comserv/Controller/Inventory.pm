@@ -950,6 +950,139 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
 }
 
 # -------------------------------------------------------------------------
+# Stock Levels — per-item/per-location view
+# -------------------------------------------------------------------------
+
+sub stock_levels :Path('/Inventory/stock/levels') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'stock_levels', 'Viewing stock levels');
+
+    my $sitename   = $self->_sitename($c);
+    my $schema     = $self->_schema($c);
+    my $low_only   = $c->req->params->{low_only} || 0;
+    my $item_id    = $c->req->params->{item_id}  || '';
+    my $location_id = $c->req->params->{location_id} || '';
+
+    my (@stock_rows, @items, @locations);
+    eval {
+        @items     = $schema->resultset('InventoryItem')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
+        @locations = $schema->resultset('InventoryLocation')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
+
+        my %sl_search;
+        if ($item_id) {
+            $sl_search{'item.id'}      = $item_id;
+        } else {
+            $sl_search{'item.sitename'} = $sitename;
+        }
+        $sl_search{'me.location_id'} = $location_id if $location_id;
+
+        my @raw = $schema->resultset('InventoryStockLevel')->search(
+            \%sl_search,
+            {
+                prefetch => ['item', 'location'],
+                order_by => ['item.name', 'location.name'],
+            }
+        );
+
+        for my $sl (@raw) {
+            my $item     = $sl->item;
+            my $location = $sl->location;
+            my $reorder  = defined $item->reorder_point ? $item->reorder_point : 0;
+            my $is_low   = ($reorder > 0 && $sl->quantity_on_hand <= $reorder) ? 1 : 0;
+            next if $low_only && !$is_low;
+            push @stock_rows, {
+                sl       => $sl,
+                item     => $item,
+                location => $location,
+                is_low   => $is_low,
+            };
+        }
+    };
+    push @{$c->stash->{debug_errors}}, "Error loading stock levels: $@" if $@;
+
+    $c->stash(
+        stock_rows  => \@stock_rows,
+        items       => \@items,
+        locations   => \@locations,
+        low_only    => $low_only,
+        item_id     => $item_id,
+        location_id => $location_id,
+        sitename    => $sitename,
+        template    => 'Inventory/stock/levels.tt',
+    );
+}
+
+# -------------------------------------------------------------------------
+# Transaction Log
+# -------------------------------------------------------------------------
+
+sub stock_transactions :Path('/Inventory/stock/transactions') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'stock_transactions', 'Viewing transaction log');
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $params   = $c->req->params;
+    my $item_id  = $params->{item_id}          || '';
+    my $tx_type  = $params->{transaction_type} || '';
+    my $date_from = $params->{date_from}       || '';
+    my $date_to   = $params->{date_to}         || '';
+    my $page      = $params->{page}            || 1;
+    my $per_page  = 50;
+
+    my (@transactions, @items, $total_count);
+    eval {
+        @items = $schema->resultset('InventoryItem')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
+
+        my %search = (sitename => $sitename);
+        $search{item_id}          = $item_id if $item_id;
+        $search{transaction_type} = $tx_type if $tx_type;
+        $search{transaction_date} = { '>=' => $date_from . ' 00:00:00' } if $date_from;
+        if ($date_to) {
+            if ($search{transaction_date}) {
+                $search{transaction_date} = { '>=' => $date_from . ' 00:00:00', '<=' => $date_to . ' 23:59:59' };
+            } else {
+                $search{transaction_date} = { '<=' => $date_to . ' 23:59:59' };
+            }
+        }
+
+        $total_count = $schema->resultset('InventoryTransaction')->search(\%search)->count;
+
+        @transactions = $schema->resultset('InventoryTransaction')->search(
+            \%search,
+            {
+                prefetch => ['item', 'location'],
+                order_by => { -desc => 'transaction_date' },
+                rows     => $per_page,
+                page     => $page,
+            }
+        );
+    };
+    push @{$c->stash->{debug_errors}}, "Error loading transactions: $@" if $@;
+
+    my $total_pages = $total_count ? int(($total_count + $per_page - 1) / $per_page) : 1;
+
+    $c->stash(
+        transactions => \@transactions,
+        items        => \@items,
+        item_id      => $item_id,
+        tx_type      => $tx_type,
+        date_from    => $date_from,
+        date_to      => $date_to,
+        page         => $page,
+        per_page     => $per_page,
+        total_count  => $total_count,
+        total_pages  => $total_pages,
+        sitename     => $sitename,
+        template     => 'Inventory/stock/transactions.tt',
+    );
+}
+
+# -------------------------------------------------------------------------
 # Marketplace integration
 # -------------------------------------------------------------------------
 
