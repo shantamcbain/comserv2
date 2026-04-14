@@ -226,6 +226,11 @@ function setDefaultUnit(sel) {
 [% END %][%# end is_assemblable %]
 
 <h2>Suppliers</h2>
+
+[% IF c.flash.success_msg %]<p class="success">[% c.flash.success_msg %]</p>[% END %]
+[% IF c.flash.error_msg %]<p class="error">[% c.flash.error_msg %]</p>[% END %]
+
+[% SET linked_supplier_ids = {} %]
 [% IF item.item_suppliers.count == 0 %]
   <p>No suppliers linked.</p>
 [% ELSE %]
@@ -236,19 +241,90 @@ function setDefaultUnit(sel) {
       <th>Supplier SKU</th>
       <th>Unit Cost</th>
       <th>Preferred</th>
+      <th>Notes</th>
+      <th>Actions</th>
     </tr>
   </thead>
   <tbody>
   [% FOREACH is IN item.item_suppliers %]
-    <tr>
-      <td>[% is.supplier.name %]</td>
-      <td>[% is.supplier_sku || '-' %]</td>
-      <td>[% is.unit_cost || '-' %]</td>
-      <td>[% is.is_preferred ? 'Yes' : 'No' %]</td>
+    [% linked_supplier_ids.${is.supplier_id} = 1 %]
+    <tr [% IF is.is_preferred %]style="background:#f0fff0"[% END %]>
+      <td>
+        <a href="/Inventory/supplier/view/[% is.supplier_id %]">[% is.supplier.name | html %]</a>
+      </td>
+      <td>[% is.supplier_sku | html || '-' %]</td>
+      <td>[% is.unit_cost ? is.unit_cost : '-' %]</td>
+      <td style="text-align:center">
+        [% IF is.is_preferred %]
+          <strong style="color:green">&#9733; Preferred</strong>
+        [% ELSE %]
+          <form method="POST" action="/Inventory/item_supplier/preferred/[% is.id %]" style="display:inline">
+            <input type="submit" value="Set Preferred"
+                   style="font-size:0.8em;padding:2px 6px;cursor:pointer;">
+          </form>
+        [% END %]
+      </td>
+      <td>[% is.notes | html || '-' %]</td>
+      <td>
+        <form method="POST" action="/Inventory/item_supplier/remove/[% is.id %]" style="display:inline"
+              onsubmit="return confirm('Remove [% is.supplier.name | html %] from this item?')">
+          <input type="submit" value="Remove"
+                 style="background:#dc3545;color:white;border:none;padding:2px 8px;border-radius:3px;cursor:pointer;font-size:0.85em;">
+        </form>
+      </td>
     </tr>
   [% END %]
   </tbody>
 </table>
+[% END %]
+
+[% IF all_suppliers.size %]
+<h3>Link a Supplier</h3>
+<form method="POST" action="/Inventory/item_supplier/add">
+  <input type="hidden" name="item_id" value="[% item.id %]">
+  <table cellpadding="4">
+    <tr>
+      <th><label for="supplier_id">Supplier *</label></th>
+      <td>
+        <select id="supplier_id" name="supplier_id" required>
+          <option value="">— select supplier —</option>
+          [% FOREACH s IN all_suppliers %]
+          <option value="[% s.id %]">[% s.name | html %]</option>
+          [% END %]
+        </select>
+        <small><a href="/Inventory/supplier/add" target="_blank">Add new supplier</a></small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="supplier_sku">Supplier SKU</label></th>
+      <td><input type="text" id="supplier_sku" name="supplier_sku" maxlength="100"
+                 placeholder="Supplier's part number"></td>
+    </tr>
+    <tr>
+      <th><label for="unit_cost">Unit Cost</label></th>
+      <td><input type="number" id="unit_cost" name="unit_cost" step="0.01" min="0"
+                 placeholder="Cost from this supplier"></td>
+    </tr>
+    <tr>
+      <th><label for="is_preferred">Preferred?</label></th>
+      <td><input type="checkbox" id="is_preferred" name="is_preferred" value="1">
+          <small>Mark as the default/preferred supplier</small></td>
+    </tr>
+    <tr>
+      <th><label for="notes">Notes</label></th>
+      <td><input type="text" id="notes" name="notes" style="width:260px;"
+                 placeholder="e.g. minimum order qty, lead time notes"></td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <input type="submit" value="Link Supplier"
+               style="background:#007bff;color:white;padding:5px 14px;border:none;border-radius:4px;cursor:pointer;">
+      </td>
+    </tr>
+  </table>
+</form>
+[% ELSE %]
+<p><em>No active suppliers in this site. <a href="/Inventory/supplier/add">Add a supplier</a> first.</em></p>
 [% END %]
 
 <h2>Recent Transactions</h2>
