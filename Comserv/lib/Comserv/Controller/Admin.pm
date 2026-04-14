@@ -373,6 +373,23 @@ sub get_system_notifications {
         }
     };
     
+    # Check for pending CSC hosting registrations (CSC site only)
+    eval {
+        my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+        if (lc($site_name) eq 'csc') {
+            my $pending = $c->model('DBEncy')->resultset('HostingAccount')->search(
+                { status => 'pending' }
+            )->count;
+            if ($pending > 0) {
+                push @notifications, {
+                    type    => 'warning',
+                    message => "$pending pending hosting registration(s) require CSC approval",
+                    link    => $c->uri_for('/membership/admin/hosting_accounts'),
+                };
+            }
+        }
+    };
+
     return \@notifications;
 }
 

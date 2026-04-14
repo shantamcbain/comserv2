@@ -5,6 +5,7 @@ use Try::Tiny;
 use JSON;
 use Comserv::Util::Logging;
 use Comserv::Util::PointSystem;
+use Comserv::Util::EmailNotification;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -1140,6 +1141,59 @@ sub seed_hosting_plans :Local :Args(0) {
         $c->flash->{success_msg} = "Hosting plans seeded: $added added, $skipped already existed.";
     }
     $c->response->redirect($c->uri_for('/membership/admin/manage_plans'));
+}
+
+sub hosting_accounts :Local :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_admin($c);
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    unless (lc($site_name) eq 'csc') {
+        $c->flash->{error_msg} = 'Hosting account management is only available on the CSC site.';
+        $c->response->redirect($c->uri_for('/membership/admin'));
+        return;
+    }
+
+    if ($c->req->method eq 'POST') {
+        my $id     = $c->req->body_parameters->{account_id};
+        my $action = $c->req->body_parameters->{action};
+        eval {
+            my $acct = $c->model('DBEncy')->resultset('HostingAccount')->find($id);
+            if ($acct) {
+                if ($action eq 'approve') {
+                    my $monthly = $c->req->body_parameters->{monthly_cost} || $acct->monthly_cost || 0;
+                    $acct->update({ status => 'active', monthly_cost => $monthly, updated_at => \'NOW()' });
+                    eval {
+                        my $notifier = Comserv::Util::EmailNotification->new(logging => $self->logging);
+                        $notifier->send_hosting_approval_notification($c, $acct);
+                    };
+                    $c->flash->{success_msg} = $acct->sitename . " hosting approved and notified.";
+                } elsif ($action eq 'suspend') {
+                    $acct->update({ status => 'suspended', updated_at => \'NOW()' });
+                    $c->flash->{success_msg} = $acct->sitename . " hosting suspended.";
+                } elsif ($action eq 'cancel') {
+                    $acct->update({ status => 'cancelled', updated_at => \'NOW()' });
+                    $c->flash->{success_msg} = $acct->sitename . " hosting cancelled.";
+                }
+            }
+        };
+        $c->flash->{error_msg} = "Action failed: $@" if $@;
+        $c->response->redirect($c->uri_for('/membership/admin/hosting_accounts'));
+        return;
+    }
+
+    my @accounts = eval {
+        $c->model('DBEncy')->resultset('HostingAccount')->search(
+            {},
+            { order_by => [{ -asc => 'status' }, { -asc => 'sitename' }] }
+        )->all;
+    };
+
+    $c->stash(
+        template => 'membership/admin/hosting_accounts.tt',
+        accounts => \@accounts,
+    );
+    $c->forward($c->view('TT'));
 }
 
 __PACKAGE__->meta->make_immutable;

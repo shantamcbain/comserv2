@@ -3,6 +3,7 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::PointSystem;
+use Comserv::Util::EmailNotification;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -223,6 +224,13 @@ sub hosting_signup :Local :Args(0) {
             $c->stash->{error_msg} = "Registration failed: $@";
         } else {
             $c->flash->{success_msg} = "$site_name has been submitted for CSC hosting registration. Status: pending.";
+            my $new_account = $c->model('DBEncy')->resultset('HostingAccount')->search(
+                { sitename => $site_name }, { rows => 1 }
+            )->single;
+            eval {
+                my $notifier = Comserv::Util::EmailNotification->new(logging => $self->logging);
+                $notifier->send_hosting_signup_notification($c, $new_account);
+            };
             return $c->response->redirect($c->uri_for('/membership'));
         }
     }

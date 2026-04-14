@@ -26,6 +26,9 @@
       <a href="[% c.uri_for('/membership/admin/manage_plans') %]" class="btn btn-secondary">Manage Plans</a>
       <a href="[% c.uri_for('/membership/admin/subscribers') %]" class="btn btn-secondary">All Subscribers</a>
       <a href="[% c.uri_for('/membership/admin/cost_tracking') %]" class="btn btn-secondary">Cost Tracking</a>
+      [% IF c.session.SiteName == 'CSC' %]
+      <a href="[% c.uri_for('/membership/admin/hosting_accounts') %]" class="btn btn-secondary">&#127760; Hosting Accounts</a>
+      [% END %]
     </div>
     [% END %]
   </div>
@@ -103,6 +106,21 @@
       [% IF is_admin AND !site_is_csc %]
       <div class="content-section" style="border:1px solid #b0c4de;border-radius:8px;padding:1.2rem 1.4rem;background:#f4f8ff;">
         <h2 style="margin-top:0;">&#127760; [% site_name | html %] — CSC Hosting Registration</h2>
+
+        [% IF hosting_account AND hosting_account.status == 'active' AND !hosting_account.alert_dismissed %]
+        <div style="border:2px solid #27ae60;border-radius:6px;padding:1rem 1.2rem;background:#f0fdf4;margin-bottom:1rem;">
+          <strong style="color:#27ae60;">&#10003; CSC Hosting Active for [% site_name | html %]</strong>
+          <p style="margin:0.4rem 0 0;">Your site is registered and active with CSC hosting.
+          Members can now purchase hosting plans.
+          Monthly cost: <strong>CAD [% hosting_account.monthly_cost %]/mo</strong>.</p>
+        </div>
+        [% ELSIF hosting_account AND hosting_account.status == 'pending' %]
+        <div style="border:2px solid #e67e22;border-radius:6px;padding:1rem 1.2rem;background:#fff8f0;margin-bottom:1rem;">
+          <strong style="color:#e67e22;">&#8987; CSC Hosting Registration Pending</strong>
+          <p style="margin:0.4rem 0 0;">Your registration was submitted and is awaiting CSC approval.
+          You will receive an email at <strong>[% hosting_account.contact_email | html %]</strong> when approved.</p>
+        </div>
+        [% END %]
 
         [% IF csc_not_registered %]
         <div style="border:2px solid #e67e22;border-radius:6px;padding:1rem 1.2rem;background:#fff8f0;margin-bottom:1rem;">
