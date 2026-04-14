@@ -71,7 +71,7 @@ sub index :Path :Args(0) {
         if ($site) {
             my @rows = $c->model('DBEncy')->resultset('MembershipPlan')->search(
                 { site_id => $site->id, is_active => 1 },
-                { order_by => 'sort_order' }
+                { order_by => 'sort_order', prefetch => 'inventory_item' }
             )->all;
             $plans = \@rows;
 

@@ -196,13 +196,22 @@
                 <td>
                   <strong>[% plan.name | html %]</strong>
                   [% IF plan.is_featured %]<span class="badge">Popular</span>[% END %]
+                  [% IF plan.inventory_item %]
+                  <br><small style="color:#888;">SKU: [% plan.inventory_item.sku | html %]</small>
+                  [% END %]
                   [% IF plan.description %]<br><small>[% plan.description | html %]</small>[% END %]
+                  [%# BOM optional add-ons %]
+                  [% IF plan.inventory_item AND plan.inventory_item.is_assemblable %]
+                  <br><small style="color:#4a8c3f;font-weight:bold;">+ Optional add-ons available</small>
+                  [% END %]
                 </td>
+                [%# Price: pull from inventory item unit_price if linked, else plan price %]
+                [% SET display_price = plan.inventory_item ? plan.inventory_item.unit_price : plan.price_monthly %]
                 <td>
-                  [% IF plan.price_monthly == 0 %]
+                  [% IF display_price == 0 %]
                     Free
                   [% ELSE %]
-                    [% plan.price_currency | html %] [% plan.price_monthly %]/mo
+                    [% plan.price_currency | html %] [% display_price %]/mo
                   [% END %]
                 </td>
                 <td>

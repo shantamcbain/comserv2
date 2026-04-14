@@ -306,6 +306,28 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
                         . ($promo ? ' [promo: ' . $promo->code . ']' : ''),
                     ip_address   => $c->req->address,
                 });
+
+                eval {
+                    my $plan_with_item = $c->model('DBEncy')->resultset('MembershipPlan')->find(
+                        $plan->id, { prefetch => 'inventory_item' }
+                    );
+                    if ($plan_with_item && $plan_with_item->inventory_item_id) {
+                        $c->model('DBEncy')->resultset('InventoryTransaction')->create({
+                            item_id          => $plan_with_item->inventory_item_id,
+                            sitename         => $site_name,
+                            transaction_type => 'sale',
+                            quantity         => 1,
+                            unit_cost        => $final_price,
+                            reference_number => 'MBR-' . $plan->slug . '-' . $c->session->{user_id},
+                            performed_by     => $c->session->{username} || 'system',
+                            notes            => 'Membership subscription: ' . $plan->name
+                                               . ' (' . $billing_cycle . ')'
+                                               . ' user=' . ($c->session->{username} || $c->session->{user_id}),
+                            transaction_date => \'NOW()',
+                            created_at       => \'NOW()',
+                        });
+                    }
+                };
             });
         };
         if ($@) {
