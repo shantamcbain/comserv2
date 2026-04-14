@@ -1,0 +1,105 @@
+[% META title = "CSC Hosting Accounts" TemplateType = "Application" %]
+
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>&#127760; CSC Hosting Accounts</h1>
+    <div class="admin-actions">
+      <a href="[% c.uri_for('/membership/admin') %]" class="btn btn-secondary">← Membership Admin</a>
+    </div>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+      <div class="content-section">
+        [% IF accounts.size %]
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>SiteName</th>
+                <th>Plan</th>
+                <th>Domain</th>
+                <th>Contact Email</th>
+                <th>Monthly</th>
+                <th>Status</th>
+                <th>Submitted</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              [% FOREACH acct IN accounts %]
+              <tr>
+                <td><strong>[% acct.sitename | html %]</strong></td>
+                <td>[% acct.plan_slug | html %]</td>
+                <td>[% acct.domain | html %][% IF acct.domain_type %] <small style="color:#888;">([% acct.domain_type | html %])</small>[% END %]</td>
+                <td>[% acct.contact_email | html %]</td>
+                <td>
+                  [% IF acct.status == 'pending' %]
+                  <form method="post" action="[% c.uri_for('/membership/admin/hosting_accounts') %]" style="display:inline;">
+                    <input type="hidden" name="account_id" value="[% acct.id %]">
+                    <input type="hidden" name="action" value="approve">
+                    CAD <input type="number" name="monthly_cost" value="[% acct.monthly_cost || 10 %]"
+                      step="0.01" min="0" style="width:70px;">
+                  [% ELSE %]
+                  CAD [% acct.monthly_cost %]
+                  [% END %]
+                </td>
+                <td>
+                  <span class="badge badge-[% acct.status == 'active' ? 'success' : acct.status == 'pending' ? 'warning' : 'danger' %]">
+                    [% acct.status | html %]
+                  </span>
+                </td>
+                <td style="font-size:0.85em;">[% acct.created_at | html %]</td>
+                <td class="action-cell">
+                  [% IF acct.status == 'pending' %]
+                    <button type="submit" form="form_[% acct.id %]" class="btn btn-primary btn-sm"
+                      onclick="return confirm('Approve hosting for [% acct.sitename | html %] and send email notification?')">
+                      ✓ Approve</button>
+                    <form id="form_[% acct.id %]" method="post"
+                      action="[% c.uri_for('/membership/admin/hosting_accounts') %]" style="display:none;">
+                      <input type="hidden" name="account_id" value="[% acct.id %]">
+                      <input type="hidden" name="action" value="approve">
+                      <input type="hidden" name="monthly_cost" value="[% acct.monthly_cost || 10 %]">
+                    </form>
+                  [% ELSIF acct.status == 'active' %]
+                    <form method="post" action="[% c.uri_for('/membership/admin/hosting_accounts') %]" style="display:inline;">
+                      <input type="hidden" name="account_id" value="[% acct.id %]">
+                      <input type="hidden" name="action" value="suspend">
+                      <button type="submit" class="btn btn-sm btn-secondary"
+                        onclick="return confirm('Suspend hosting for [% acct.sitename | html %]?')">Suspend</button>
+                    </form>
+                  [% ELSIF acct.status == 'suspended' %]
+                    <form method="post" action="[% c.uri_for('/membership/admin/hosting_accounts') %]" style="display:inline;">
+                      <input type="hidden" name="account_id" value="[% acct.id %]">
+                      <input type="hidden" name="action" value="approve">
+                      <input type="hidden" name="monthly_cost" value="[% acct.monthly_cost %]">
+                      <button type="submit" class="btn btn-sm btn-primary">Reactivate</button>
+                    </form>
+                  [% END %]
+                  [% UNLESS acct.status == 'cancelled' %]
+                  <form method="post" action="[% c.uri_for('/membership/admin/hosting_accounts') %]" style="display:inline;">
+                    <input type="hidden" name="account_id" value="[% acct.id %]">
+                    <input type="hidden" name="action" value="cancel">
+                    <button type="submit" class="btn btn-sm btn-danger"
+                      onclick="return confirm('Cancel hosting for [% acct.sitename | html %]?')">Cancel</button>
+                  </form>
+                  [% END %]
+                  [% IF acct.notes %]
+                  <span title="[% acct.notes | html %]" style="cursor:help;margin-left:0.3rem;">📝</span>
+                  [% END %]
+                </td>
+              </tr>
+              [% END %]
+            </tbody>
+          </table>
+        </div>
+        [% ELSE %]
+        <p class="empty-state">No hosting account registrations yet.</p>
+        [% END %]
+      </div>
+    </div>
+  </div>
+</div>
