@@ -55,17 +55,62 @@ sub index :Path('/Accounting') :Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Accounting dashboard');
 
-    my $schema = $self->_schema($c);
-    my ($acct_count, $entry_count);
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+
+    my ($acct_count, $entry_count, $ap_outstanding, $ar_outstanding,
+        $item_count, $supplier_count, $location_count, $low_stock) = (0) x 8;
+
+    eval { $acct_count    = $schema->resultset('CoaAccount')->search({ obsolete => 0 })->count };
+    eval { $entry_count   = $schema->resultset('GlEntry')->count };
     eval {
-        $acct_count  = $schema->resultset('CoaAccount')->search({ obsolete => 0 })->count;
-        $entry_count = $schema->resultset('GlEntry')->count;
+        $ap_outstanding = $schema->resultset('InventorySupplierInvoice')->search(
+            { sitename => $sitename, status => 'outstanding' }
+        )->count;
+    };
+    eval {
+        $ar_outstanding = $schema->resultset('InventoryCustomerOrder')->search(
+            { sitename => $sitename, status => { -not_in => [qw(paid cancelled)] } }
+        )->count;
+    };
+    eval {
+        $item_count = $schema->resultset('InventoryItem')->search(
+            { sitename => $sitename, status => 'active' }
+        )->count;
+    };
+    eval {
+        $supplier_count = $schema->resultset('InventorySupplier')->search(
+            { sitename => $sitename }
+        )->count;
+    };
+    eval {
+        $location_count = $schema->resultset('InventoryLocation')->search(
+            { sitename => $sitename }
+        )->count;
+    };
+    eval {
+        my @items = $schema->resultset('InventoryItem')->search(
+            { sitename => $sitename, status => 'active', reorder_point => { '>' => 0 } }
+        )->all;
+        for my $item (@items) {
+            my $stock = $schema->resultset('InventoryStockLevel')->search(
+                { item_id => $item->id }
+            )->get_column('quantity')->sum // 0;
+            $low_stock++ if $stock <= $item->reorder_point;
+        }
     };
 
     $c->stash(
-        acct_count  => $acct_count  || 0,
-        entry_count => $entry_count || 0,
-        template    => 'Accounting/index.tt',
+        acct_count      => $acct_count,
+        entry_count     => $entry_count,
+        ap_outstanding  => $ap_outstanding,
+        ar_outstanding  => $ar_outstanding,
+        item_count      => $item_count,
+        supplier_count  => $supplier_count,
+        location_count  => $location_count,
+        low_stock       => $low_stock,
+        sitename        => $sitename,
+        template        => 'Accounting/index.tt',
     );
 }
 
