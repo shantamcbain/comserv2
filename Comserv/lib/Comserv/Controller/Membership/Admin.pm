@@ -1159,18 +1159,24 @@ sub backfill_hosting_invoices :Local :Args(0) {
     my @active = $schema->resultset('HostingAccount')->search({ status => 'active' })->all;
 
     my ($created, $skipped) = (0, 0);
+    my @log;
     for my $acct (@active) {
         my $client_sn = $acct->sitename;
         my $plan_slug = $acct->plan_slug || 'hosting-app';
         my $monthly   = $acct->monthly_cost || 0;
 
-        # Skip if CSC customer invoice already exists for this account
-        my $csc_inv_exists = $schema->resultset('InventoryCustomerInvoice')->search({
+        # Find any existing CSC customer invoice (no notes filter — cast wide)
+        my @existing_csc = $schema->resultset('InventoryCustomerInvoice')->search({
             sitename      => 'CSC',
             customer_name => $client_sn,
-            notes         => { -like => "%$plan_slug%" },
-        })->count;
-        if ($csc_inv_exists) { $skipped++; next; }
+        })->all;
+
+        if (@existing_csc) {
+            my $ids = join(', ', map { '#' . $_->id . ' date=' . ($_->invoice_date || 'NULL') . ' status=' . ($_->status || '?') } @existing_csc);
+            push @log, "$client_sn: SKIPPED — found CSC invoice(s): $ids";
+            $skipped++;
+            next;
+        }
 
         # Check if client already has a supplier invoice from CSC
         my $cli_inv_exists = $schema->resultset('InventorySupplierInvoice')->search({
@@ -1180,23 +1186,25 @@ sub backfill_hosting_invoices :Local :Args(0) {
 
         eval {
             if ($cli_inv_exists) {
-                # Client AP already exists — only create the missing CSC AR invoice
                 $self->_backfill_csc_ar_only($c, $acct, $monthly);
             } else {
-                # Nothing exists — create everything
                 $self->_create_hosting_invoice($c, $acct, $monthly);
             }
         };
         if ($@) {
+            my $err = "$@";
+            $err =~ s/\n.*//s;
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'backfill_hosting_invoices',
                 "Error for $client_sn: $@");
+            push @log, "$client_sn: ERROR — $err";
             $skipped++;
         } else {
+            push @log, "$client_sn: CREATED";
             $created++;
         }
     }
 
-    $c->flash->{success_msg} = "Backfill complete: $created CSC sales invoices created, $skipped skipped.";
+    $c->flash->{success_msg} = "Backfill: $created created, $skipped skipped. " . join(' | ', @log);
     $c->response->redirect($c->uri_for('/membership/admin/hosting_accounts'));
 }
 
