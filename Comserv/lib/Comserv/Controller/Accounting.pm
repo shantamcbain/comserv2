@@ -186,19 +186,21 @@ sub gl_list :Path('/Accounting/gl') :Args(0) {
     my %search = (sitename => $sitename);
     $search{entry_type} = $type if $type;
 
-    my @entries;
+    my (@entries, $gl_error);
     eval {
         @entries = $schema->resultset('GlEntry')->search(
             \%search,
             { order_by => { -desc => 'post_date' }, rows => 100 }
         )->all;
     };
+    $gl_error = $@ if $@;
 
     $c->stash(
-        entries  => \@entries,
-        sitename => $sitename,
-        type     => $type,
-        template => 'Accounting/gl/list.tt',
+        entries   => \@entries,
+        gl_error  => $gl_error,
+        sitename  => $sitename,
+        type      => $type,
+        template  => 'Accounting/gl/list.tt',
     );
 }
 

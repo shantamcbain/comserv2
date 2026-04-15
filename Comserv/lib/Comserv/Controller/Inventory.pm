@@ -1715,10 +1715,11 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
             if ($invoice->ap_account_id && $invoice->total_amount > 0) {
                 my $gl = $schema->resultset('GlEntry')->create({
                     sitename    => $sitename,
+                    reference   => 'AP-' . ($invoice->invoice_number || $invoice->id),
                     entry_type  => 'AP',
                     description => 'Supplier Invoice ' . ($invoice->invoice_number || ''),
                     post_date   => $invoice->invoice_date,
-                    created_by  => $c->session->{username} || 'system',
+                    approved    => 1,
                 });
 
                 $gl->create_related('lines', {

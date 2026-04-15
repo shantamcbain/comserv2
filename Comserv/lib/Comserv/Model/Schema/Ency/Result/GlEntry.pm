@@ -115,12 +115,6 @@ __PACKAGE__->has_many(
 );
 
 __PACKAGE__->has_many(
-    'inventory_transactions',
-    'Comserv::Model::Schema::Ency::Result::InventoryTransaction',
-    { 'foreign.gl_entry_id' => 'self.id' }
-);
-
-__PACKAGE__->has_many(
     'point_ledger_entries',
     'Comserv::Model::Schema::Ency::Result::PointLedger',
     { 'foreign.gl_entry_id' => 'self.id' }
