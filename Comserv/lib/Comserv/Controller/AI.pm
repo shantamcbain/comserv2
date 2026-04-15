@@ -157,9 +157,9 @@ sub index :Path :Args(0) {
                         push @external_models, { name => $id, provider => 'grok', label => $label };
                     }
                 } else {
-                    push @external_models, { name => 'grok-4-0709',               provider => 'grok', label => 'Grok 4 (xAI)' };
-                    push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
-                    push @external_models, { name => 'grok-code-fast-1',          provider => 'grok', label => 'Grok Code Fast (xAI)' };
+                    push @external_models, { name => 'grok-3',          provider => 'grok', label => 'Grok 3 (xAI)' };
+                    push @external_models, { name => 'grok-3-mini',     provider => 'grok', label => 'Grok 3 Mini (xAI)' };
+                    push @external_models, { name => 'grok-3-fast',     provider => 'grok', label => 'Grok 3 Fast (xAI)' };
                 }
             }
         } catch {
@@ -452,7 +452,7 @@ sub generate :Local :Args(0) {
     # Normalize agent_type to database enum values
     # Normalize agent_type for dynamic storage (was database enum)
     my $normalized_agent_type = $agent_id || 'general';
-    if ($agent_id && $agent_id =~ /^(documentation|helpdesk|ency|beekeeping|hamradio|chat|cleanup|cleanup-agent|docker|master-plan-updater|daily-audit|daily-plan-automator|master-plan-manager|daily-plans-generator|daily-plans|documentation-sync|main|MainAgent|planning|3dprint|prompt-logging|general)$/i) {
+    if ($agent_id && $agent_id =~ /^(documentation|helpdesk|ency|beekeeping|hamradio|chat|cleanup|cleanup-agent|docker|master-plan-updater|daily-audit|daily-plan-automator|master-plan-manager|daily-plans-generator|daily-plans|documentation-sync|main|MainAgent|planning|3dprint|accounting|prompt-logging|general)$/i) {
         $normalized_agent_type = lc($agent_id);
         # Special case for MainAgent which is camelcase in enum
         $normalized_agent_type = 'MainAgent' if lc($agent_id) eq 'mainagent';
@@ -496,6 +496,12 @@ sub generate :Local :Args(0) {
         $system = $self->_build_3dprint_system_prompt($c);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
             'generate', "3DPrint agent: injected system prompt");
+    }
+
+    if (lc($normalized_agent_type) eq 'accounting' && !$system) {
+        $system = $self->_build_accounting_system_prompt($c);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'generate', "Accounting agent: injected system prompt");
     }
 
     # Require login for external AI models (Grok etc.) before entering try block
@@ -545,6 +551,9 @@ sub generate :Local :Args(0) {
     my $inject_prompt = $prompt;
     if ($normalized_agent_type =~ /^(planning|ency|bmaster)$/i) {
         $inject_prompt = "project todo $prompt";
+    }
+    if ($normalized_agent_type =~ /^accounting$/i) {
+        $inject_prompt = "inventory accounting gl coa invoice $prompt";
     }
     my $module_data_gen = $self->_get_module_data($c, $inject_prompt, $agent_id);
     if ($module_data_gen) {
@@ -625,8 +634,19 @@ sub generate :Local :Args(0) {
                 die "Failed to load Grok model";
             }
             $grok->api_key($grok_api_key);
+            # Hardcoded list of known-dead Grok models (410 Gone) — always substitute regardless of DB state
+            my %GROK_DEAD = map { $_ => 'grok-3' } qw(
+                grok-code-fast-1
+                grok-4-0709
+                grok-4-fast-non-reasoning
+            );
+            if ($model && $GROK_DEAD{$model}) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'generate', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD{$model}'");
+                $model = $GROK_DEAD{$model};
+            }
             if ($model) {
-                # Pre-flight: if the requested model is known deprecated, use last_working_model instead
+                # Pre-flight: if the requested model is known deprecated in DB, use last_working_model instead
                 eval {
                     my $schema  = $c->model('DBEncy')->schema;
                     my $key_obj = $schema->resultset('UserApiKeys')->search(
@@ -637,7 +657,7 @@ sub generate :Local :Args(0) {
                         my $deprecated = $meta->{deprecated_models} || {};
                         if ($deprecated->{$model}) {
                             my $replacement = $meta->{last_working_model} || '';
-                            if ($replacement && $replacement ne $model) {
+                            if ($replacement && $replacement ne $model && !$GROK_DEAD{$replacement}) {
                                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                                     'generate', "Requested model '$model' is deprecated; using '$replacement' instead");
                                 $model = $replacement;
@@ -947,8 +967,8 @@ sub generate :Local :Args(0) {
             # Pass 1: trim history messages.  Pass 1.5: drop oldest history pairs.
             # Pass 2: strip page_content from system.  Pass 3: hard-cap system prompt.
             # Planning/ENCY/BMaster agents have large injected system prompts — raise limits.
-            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint)) ? 16_000 : 8_000;
-            my $SYS_MAX_CHARS = $normalized_agent_type eq 'planning' ? 12_000 : 6_000;
+            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint accounting)) ? 16_000 : 8_000;
+            my $SYS_MAX_CHARS = ($normalized_agent_type =~ /^(planning|accounting)$/) ? 12_000 : 6_000;
             my $raw_total_gen = 0;
             $raw_total_gen += length($_->{content} || '') for @ollama_msgs;
             if ($raw_total_gen > $BUDGET_CHARS) {
@@ -1851,6 +1871,10 @@ sub chat :Local :Args(0) {
         $chat_agent_system = $self->_build_3dprint_system_prompt($c);
     }
 
+    if (lc($chat_agent_id) eq 'accounting' && !$chat_agent_system) {
+        $chat_agent_system = $self->_build_accounting_system_prompt($c);
+    }
+
     # Build combined system prompt: agent-specific prompt + role prompt + live module data + shared KB
     my @system_parts;
     push @system_parts, $chat_agent_system if $chat_agent_system;
@@ -1965,6 +1989,17 @@ sub chat :Local :Args(0) {
             }
 
             $grok->api_key($grok_api_key);
+            # Hardcoded known-dead Grok models — substitute before any API call
+            my %GROK_DEAD_CHAT = map { $_ => 'grok-3' } qw(
+                grok-code-fast-1
+                grok-4-0709
+                grok-4-fast-non-reasoning
+            );
+            if ($model && $GROK_DEAD_CHAT{$model}) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'chat', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD_CHAT{$model}'");
+                $model = $GROK_DEAD_CHAT{$model};
+            }
             $grok->model($model) if $model;
 
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
@@ -3143,7 +3178,10 @@ sub unload_model :Local :Args(0) {
     }
 
     my $json_data  = {};
-    my $body_text  = $c->request->content || '';
+    my $body_text;
+    if ($c->req->can('content')) { $body_text = $c->req->content }
+    else { my $b = $c->req->body; $body_text = ref($b) ? do { seek($b,0,0); local $/; <$b> } : $b; }
+    $body_text //= '';
     eval { $json_data = decode_json($body_text) if $body_text; };
 
     my $model_name  = $json_data->{model}  || '';
@@ -4251,6 +4289,14 @@ sub _build_navigation_command_guide {
             [ 'Projects home',              '/project'                  ],
             [ 'Add a project',              '/project/addproject'       ],
         ]],
+        [ 'Marketplace', 'guest', [
+            [ 'Marketplace / buy and sell', '/marketplace'              ],
+            [ 'Browse listings',            '/marketplace/browse'       ],
+        ]],
+        [ 'Marketplace (logged in)', 'user', [
+            [ 'Post a listing / sell item', '/marketplace/add'          ],
+            [ 'My listings',                '/marketplace/my_listings'  ],
+        ]],
         [ 'User account', 'guest', [
             [ 'Login',                      '/user/login'               ],
             [ 'Create account',             '/user/create_account'      ],
@@ -4281,6 +4327,24 @@ sub _build_navigation_command_guide {
             [ 'Add a domain to a site',     '/site/add_domain'          ],
             [ 'Site details',               '/site/details'             ],
             [ 'Modify site',                '/site/modify'              ],
+        ]],
+        [ 'Accounting', 'admin', [
+            [ 'Accounting dashboard',       '/Accounting'               ],
+            [ 'Chart of accounts',          '/Accounting/coa'           ],
+            [ 'Seed / import COA',          '/Accounting/coa/seed'      ],
+            [ 'Merge COA seed',             '/Accounting/coa/seed_merge'],
+            [ 'General ledger',             '/Accounting/gl'            ],
+        ]],
+        [ 'Inventory', 'admin', [
+            [ 'Inventory dashboard',        '/Inventory'                ],
+            [ 'Inventory items',            '/Inventory/items'          ],
+            [ 'Add inventory item',         '/Inventory/item/add'       ],
+            [ 'Suppliers',                  '/Inventory/suppliers'      ],
+            [ 'Add supplier',               '/Inventory/supplier/add'   ],
+            [ 'Supplier invoices',          '/Inventory/invoice'        ],
+            [ 'New supplier invoice',       '/Inventory/invoice/new'    ],
+            [ 'Stock transactions',         '/Inventory/stock/transactions' ],
+            [ 'Customer sales',             '/Inventory/sales'          ],
         ]],
     );
 
@@ -5685,9 +5749,9 @@ sub get_user_providers :Local :Args(0) {
                 # Fallback to hardcoded Grok models if none stored in metadata
                 if (!@$models && $key->service eq 'grok') {
                     $models = [
-                        { id => 'grok-4-0709' },
-                        { id => 'grok-4-fast-non-reasoning' },
-                        { id => 'grok-code-fast-1' },
+                        { id => 'grok-3' },
+                        { id => 'grok-3-mini' },
+                        { id => 'grok-3-fast' },
                     ];
                 }
 
@@ -6467,9 +6531,20 @@ sub action :Local :Args(0) {
     }
 
     # Parse JSON body
-    my $body_text = $c->request->content;
+    my $body_text;
+    if ($c->req->can('content')) {
+        $body_text = $c->req->content;
+    } else {
+        my $body = $c->req->body;
+        if (ref($body) && $body->can('seek')) {
+            seek($body, 0, 0);
+            $body_text = do { local $/; <$body> };
+        } else {
+            $body_text = $body;
+        }
+    }
     my $req;
-    eval { $req = decode_json($body_text) };
+    eval { $req = decode_json($body_text) } if $body_text;
     if ($@ || !ref $req) {
         $c->response->status(400);
         $c->response->body(encode_json({ success => JSON::false, error => 'Invalid JSON body' }));
@@ -7569,6 +7644,125 @@ NAVIGATION URLS (use ONLY these relative URLs):
 - Filament inventory: /3dprint/filament
 - Printer status:     /3dprint/printers
 - Add print job:      /3dprint/add_job
+$editor_section
+The current user is: $username
+END_PROMPT
+}
+
+=head2 _build_accounting_system_prompt
+
+Agent for admin/accounting users working with the Inventory accounting integration,
+Chart of Accounts, General Ledger, supplier invoices, and inventory-GL linkage.
+
+=cut
+
+sub _build_accounting_system_prompt {
+    my ($self, $c) = @_;
+    my $username = $c->session->{username} || 'unknown';
+    my $editor_section = $self->_build_ai_editor_section($c);
+
+    return <<END_PROMPT;
+You are the Accounting Agent for the Comserv application.  You help admin and
+accounting users manage the Chart of Accounts, General Ledger, supplier invoices,
+inventory-accounting integration, and the Points Ledger.
+
+## YOUR ROLE
+- Answer questions about double-entry bookkeeping as it applies to this system.
+- Guide users through creating / editing COA accounts, posting GL entries, and
+  reconciling inventory movements with the ledger.
+- Explain how inventory items link to COA accounts (inventory, income, COGS, returns).
+- Help interpret GL entries generated by stock receives, adjustments, and point transactions.
+- Assist with supplier invoice entry and approval workflow.
+- Suggest correct account numbers for new items or categories.
+
+## DOUBLE-ENTRY BASICS (for context injection)
+Every financial event creates one gl_entries header + two or more gl_entry_lines
+whose amounts sum to zero (debit = positive, credit = negative).
+
+account categories:
+  A = Asset      (1xxx — Cash, Inventory, AR)
+  L = Liability  (2xxx — AP, GST/HST Payable)
+  Q = Equity     (3xxx — Retained Earnings)
+  I = Income     (4xxx — Sales, Point Income)
+  E = Expense    (5xxx/6xxx — COGS, Operating Expenses)
+
+## DATABASE SCHEMA
+
+### coa_accounts
+  id, accno (varchar 30), description, category (A/L/Q/I/E),
+  heading_id → coa_account_headings, is_contra (0/1), is_tax (0/1),
+  obsolete (0/1), link (varchar — comma-separated module tags)
+
+### coa_account_headings
+  id, accno, description, category
+
+### gl_entries
+  id, reference (unique per entry_type), description, entry_type
+  (general|inventory|point|sale|purchase|adjustment),
+  post_date, approved (0/1), is_template (0/1), currency (CAD),
+  created_by (user_id), notes
+
+### gl_entry_lines
+  id, gl_entry_id → gl_entries, account_id → coa_accounts,
+  amount (decimal — positive=debit, negative=credit),
+  memo, reconciled (0/1)
+
+### inventory_items (accounting-relevant columns)
+  id, sitename, sku, name, category,
+  inventory_accno_id → coa_accounts (asset account for stock value),
+  income_accno_id    → coa_accounts (income when sold),
+  expense_accno_id   → coa_accounts (COGS / expense when consumed),
+  returns_accno_id   → coa_accounts (contra-income for returns),
+  unit_cost, unit_price, is_consumable, is_assemblable
+
+### inventory_transactions
+  id, sitename, item_id → inventory_items,
+  transaction_type (receive|consume|adjust|transfer|assemble|disassemble),
+  quantity, unit_cost, total_cost, location_id, reference_id, notes,
+  gl_entry_id → gl_entries, created_at, created_by
+
+### inventory_supplier_invoices
+  id, sitename, supplier_id, invoice_number, invoice_date, due_date,
+  subtotal, tax_amount, shipping_amount, discount_amount, total_amount,
+  status (draft|approved|paid|voided), notes, created_at, created_by
+
+### inventory_supplier_invoice_lines
+  id, invoice_id, item_id, description, quantity, unit_cost, total_cost,
+  account_id → coa_accounts, location_id
+
+### point_ledger (Points System)
+  id, account_id → point_accounts, entry_type (earn|spend|adjust|expire),
+  points, description, reference_id, gl_entry_id → gl_entries, created_at
+
+## NAVIGATION URLS (use ONLY these relative URLs)
+- Accounting dashboard:       /Accounting
+- Chart of Accounts list:     /Accounting/coa
+- View COA account:           /Accounting/coa/view/<id>
+- Seed / import COA:          /Accounting/coa/seed
+- Merge COA seed:             /Accounting/coa/seed_merge
+- GL journal list:            /Accounting/gl
+- View GL entry:              /Accounting/gl/view/<id>
+- GL API (JSON):              /Accounting/api/gl
+- Inventory items list:       /Inventory/items
+- Add inventory item:         /Inventory/item/add
+- Edit inventory item:        /Inventory/item/edit/<id>
+- Inventory transactions:     /Inventory/stock/transactions
+- Stock adjustment:           /Inventory/stock/adjust/<id>
+- Supplier invoice list:      /Inventory/invoice
+- New supplier invoice:       /Inventory/invoice/new
+- Customer sales list:        /Inventory/sales
+- Suppliers list:             /Inventory/suppliers
+- Add supplier:               /Inventory/supplier/add
+
+## ACTIONS YOU CAN PERFORM
+When the user asks you to create or update data, respond with a JSON action block:
+
+To post a manual GL entry:
+{"action":"create_gl_entry","reference":"ADJ-2026-001","description":"Manual adjustment","post_date":"2026-04-15","lines":[{"account_id":1,"amount":100.00,"memo":"Debit inventory"},{"account_id":5,"amount":-100.00,"memo":"Credit equity"}]}
+
+Only use actions when the user explicitly requests a data change.  Always confirm
+the details before executing.
+
 $editor_section
 The current user is: $username
 END_PROMPT
