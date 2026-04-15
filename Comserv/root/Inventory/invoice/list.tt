@@ -3,6 +3,7 @@
 <h1>Supplier Invoices</h1>
 <p>
   <a href="/Inventory/invoice/new" style="background:#007bff;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">+ New Invoice</a>
+  <a href="/Inventory/stock/receive" style="margin-left:0.75em;background:#28a745;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">&#x2B07; Receive Stock</a>
   <a href="/Inventory/invoice/process_auto_pay" style="margin-left:1em;background:#fd7e14;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">&#x23F0; Auto-Pay Due</a>
   <a href="/Inventory" style="margin-left:1em;">← Inventory</a>
 </p>

@@ -8,6 +8,8 @@
 [% IF c.flash.error_msg %]<p class="error">[% c.flash.error_msg %]</p>[% END %]
 
 <div class="actions">
+  <a href="/Inventory/stock/receive" style="background:#28a745;color:white;padding:4px 12px;border-radius:4px;text-decoration:none;">&#x2B07; Receive Stock</a>
+  &nbsp;|&nbsp;
   <a href="/Inventory/stock/adjust">Adjust Stock</a>
   &nbsp;|&nbsp;
   <a href="/Inventory/stock/transactions">Transaction Log</a>
