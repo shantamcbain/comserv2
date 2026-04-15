@@ -1208,6 +1208,59 @@ sub backfill_hosting_invoices :Local :Args(0) {
     $c->response->redirect($c->uri_for('/membership/admin/hosting_accounts'));
 }
 
+sub sync_invoice_payments :Local :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_admin($c);
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    unless (lc($site_name) eq 'csc') {
+        $c->flash->{error_msg} = 'Only available on CSC.';
+        $c->response->redirect($c->uri_for('/membership/admin/hosting_accounts'));
+        return;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my ($synced, $skipped) = (0, 0);
+    my @log;
+
+    my @csc_invoices = $schema->resultset('InventoryCustomerInvoice')->search({
+        sitename       => 'CSC',
+        payment_status => { '!=' => 'paid' },
+    })->all;
+
+    for my $csc_inv (@csc_invoices) {
+        my $inv_num = $csc_inv->invoice_number;
+        next unless $inv_num;
+
+        my $client_inv = $schema->resultset('InventorySupplierInvoice')->search({
+            invoice_number => $inv_num,
+        })->single;
+
+        unless ($client_inv) {
+            push @log, "$inv_num: no client invoice found";
+            $skipped++;
+            next;
+        }
+
+        if ($client_inv->status eq 'paid') {
+            my $amount = $csc_inv->total_amount || 0;
+            $csc_inv->update({
+                payment_status  => 'paid',
+                amount_paid     => $amount,
+                points_redeemed => $amount,
+            });
+            push @log, "$inv_num: synced to paid";
+            $synced++;
+        } else {
+            push @log, "$inv_num: client invoice status=" . ($client_inv->status || '?') . ", skipped";
+            $skipped++;
+        }
+    }
+
+    $c->flash->{success_msg} = "Payment sync: $synced updated, $skipped skipped. " . join(' | ', @log);
+    $c->response->redirect($c->uri_for('/membership/admin/hosting_accounts'));
+}
+
 sub _backfill_csc_ar_only {
     my ($self, $c, $acct, $monthly_cost) = @_;
     my $schema    = $c->model('DBEncy');

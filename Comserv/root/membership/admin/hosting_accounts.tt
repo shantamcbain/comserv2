@@ -12,7 +12,12 @@
       <a href="[% c.uri_for('/membership/admin/backfill_hosting_invoices') %]"
          class="btn btn-warning"
          onclick="return confirm('Create missing CSC sales invoices for all active hosting accounts?');">
-        🔄 Backfill Missing Invoices
+        &#x1F504; Backfill Missing Invoices
+      </a>
+      <a href="[% c.uri_for('/membership/admin/sync_invoice_payments') %]"
+         class="btn btn-info"
+         onclick="return confirm('Sync payment status from client invoices to CSC sales invoices?');">
+        &#x2714; Sync Payments
       </a>
     </div>
   </div>
