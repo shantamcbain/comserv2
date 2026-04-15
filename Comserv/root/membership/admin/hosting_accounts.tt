@@ -8,6 +8,12 @@
     <h1>&#127760; CSC Hosting Accounts</h1>
     <div class="admin-actions">
       <a href="[% c.uri_for('/membership/admin') %]" class="btn btn-secondary">← Membership Admin</a>
+      <a href="/Inventory/sales" class="btn btn-secondary">Sales Invoices (AR)</a>
+      <a href="[% c.uri_for('/membership/admin/backfill_hosting_invoices') %]"
+         class="btn btn-warning"
+         onclick="return confirm('Create missing CSC sales invoices for all active hosting accounts?');">
+        🔄 Backfill Missing Invoices
+      </a>
     </div>
   </div>
 
