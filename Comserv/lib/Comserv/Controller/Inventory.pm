@@ -152,10 +152,11 @@ sub items :Path('/Inventory/items') :Args(0) {
 
 sub _load_coa_accounts {
     my ($self, $c) = @_;
+    my $sitename = $self->_sitename($c);
     my @accounts;
     eval {
         @accounts = $self->_schema($c)->resultset('CoaAccount')->search(
-            { obsolete => 0 },
+            { sitename => $sitename, obsolete => 0 },
             { order_by => 'accno' }
         )->all;
     };
