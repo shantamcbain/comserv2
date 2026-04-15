@@ -1807,6 +1807,21 @@ sub invoice_pay_points :Path('/Inventory/invoice/pay_points') :Args(1) {
             );
             $invoice->update({ status => 'paid' });
 
+            # Update the corresponding CSC customer invoice (AR) to paid
+            eval {
+                my $csc_inv = $schema->resultset('InventoryCustomerInvoice')->search({
+                    sitename       => 'CSC',
+                    invoice_number => $invoice->invoice_number,
+                })->single;
+                if ($csc_inv) {
+                    $csc_inv->update({
+                        payment_status  => 'paid',
+                        amount_paid     => $amount,
+                        points_redeemed => $amount,
+                    });
+                }
+            };
+
             if ($auto_pay) {
                 my $ha = $schema->resultset('HostingAccount')->search({ sitename => $sitename })->single;
                 $ha->update({ auto_pay => 1 }) if $ha;
