@@ -466,8 +466,8 @@ function addLine(prefill) {
   row.innerHTML = '<td>' + (idx + 1) + '</td>'
     + '<td>' + buildItemSelect('item_id_' + idx, 'itemChanged(this,' + idx + ')', prefill.item_id) + '</td>'
     + '<td><input type="text" name="description_' + idx + '" size="20" value="' + (prefill.description || '') + '"></td>'
-    + '<td><input type="number" name="quantity_' + idx + '" value="' + (prefill.quantity || '1') + '" min="0.0001" step="any" size="6" oninput="calcLine(' + idx + ')"></td>'
-    + '<td><input type="number" name="unit_cost_' + idx + '" value="' + (prefill.unit_cost || '0.00') + '" min="0" step="0.01" size="10" oninput="calcLine(' + idx + ')"></td>'
+    + '<td><input type="number" name="quantity_' + idx + '" value="' + (prefill.quantity || '1') + '" min="0.0001" step="any" size="6" oninput="calcLine(' + idx + ')" onchange="calcLine(' + idx + ')"></td>'
+    + '<td><input type="number" name="unit_cost_' + idx + '" value="' + (prefill.unit_cost || '0.00') + '" min="0" step="0.01" size="10" oninput="calcLine(' + idx + ')" onchange="calcLine(' + idx + ')"></td>'
     + '<td id="total-' + idx + '" style="text-align:right">$' + (prefill.line_total || '0.00') + '</td>'
     + (hasCoa ? '<td id="acct-cell-' + idx + '">' + buildAccountSelect('account_id_' + idx, prefill.account_id) + '</td>' : '')
     + '<td>' + buildLocationSelect('location_id_' + idx, prefill.location_id) + '</td>'
@@ -476,29 +476,43 @@ function addLine(prefill) {
 }
 
 function itemChanged(sel, idx) {
-  var opt = sel.options[sel.selectedIndex];
-  var cost      = opt ? (opt.getAttribute('data-cost')    || 0)  : 0;
-  var expenseId = opt ? (opt.getAttribute('data-expense') || '') : '';
-  var itemName  = opt ? (opt.getAttribute('data-name')    || '') : '';
+  var opt       = sel.options[sel.selectedIndex];
+  var itemId    = opt ? opt.value : '';
+  var cost      = (opt && itemId) ? (opt.getAttribute('data-cost')    || '') : '';
+  var expenseId = (opt && itemId) ? (opt.getAttribute('data-expense') || '') : '';
+  var itemName  = (opt && itemId) ? (opt.getAttribute('data-name')    || '') : '';
+
   var costField = document.querySelector('[name="unit_cost_' + idx + '"]');
-  if (costField && cost) costField.value = parseFloat(cost).toFixed(2);
+  if (costField && cost !== '') costField.value = parseFloat(cost).toFixed(2);
+
   var descField = document.querySelector('[name="description_' + idx + '"]');
   if (descField && itemName && !descField.value) descField.value = itemName;
-  if (expenseId) {
-    var acctSel = document.querySelector('[name="account_id_' + idx + '"]');
-    if (acctSel) {
+
+  // Auto-select the expense account from the item's configured account
+  var acctSel = document.querySelector('[name="account_id_' + idx + '"]');
+  if (acctSel) {
+    if (expenseId) {
       for (var i = 0; i < acctSel.options.length; i++) {
-        if (acctSel.options[i].value == expenseId) { acctSel.selectedIndex = i; break; }
+        if (String(acctSel.options[i].value) === String(expenseId)) {
+          acctSel.selectedIndex = i;
+          break;
+        }
       }
+    } else {
+      acctSel.selectedIndex = 0;
     }
   }
   calcLine(idx);
 }
 
 function calcLine(idx) {
-  var qty  = parseFloat(document.querySelector('[name="quantity_' + idx + '"]').value)  || 0;
-  var cost = parseFloat(document.querySelector('[name="unit_cost_' + idx + '"]').value) || 0;
-  document.getElementById('total-' + idx).textContent = '$' + (qty * cost).toFixed(2);
+  var qtyEl  = document.querySelector('[name="quantity_' + idx + '"]');
+  var costEl = document.querySelector('[name="unit_cost_' + idx + '"]');
+  var totEl  = document.getElementById('total-' + idx);
+  if (!qtyEl || !costEl || !totEl) return;
+  var qty  = parseFloat(qtyEl.value)  || 0;
+  var cost = parseFloat(costEl.value) || 0;
+  totEl.textContent = '$' + (qty * cost).toFixed(2);
   calcTotal();
 }
 

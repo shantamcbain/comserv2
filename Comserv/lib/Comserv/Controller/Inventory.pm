@@ -1511,8 +1511,14 @@ sub invoice_new :Path('/Inventory/invoice/new') :Args(0) {
     }
 
     my @suppliers;
-    eval { @suppliers = $schema->resultset('InventorySupplier')->search(
-        { sitename => $sitename }, { order_by => 'name' })->all };
+    eval {
+        my %seen_sup;
+        @suppliers = grep { !$seen_sup{ lc($_->name) }++ }
+            $schema->resultset('InventorySupplier')->search(
+                { sitename => $sitename, status => 'active' },
+                { order_by => 'name' }
+            )->all;
+    };
 
     my @items;
     eval { @items = $schema->resultset('InventoryItem')->search(
