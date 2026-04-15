@@ -1423,10 +1423,12 @@ sub invoice_list :Path('/Inventory/invoice') :Args(0) {
         )->all;
     };
     $list_error = $@ if $@;
+    my $today = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
     $c->stash(
         invoices   => \@invoices,
         error_msg  => $list_error,
         sitename   => $sitename,
+        today      => $today,
         template   => 'Inventory/invoice/list.tt',
     );
 }
@@ -1472,6 +1474,8 @@ sub invoice_new :Path('/Inventory/invoice/new') :Args(0) {
                     discount_account_id  => $params->{discount_account_id} || undef,
                     status               => 'draft',
                     notes                => $params->{notes},
+                    auto_pay             => $params->{auto_pay}            ? 1 : 0,
+                    auto_pay_method      => $params->{auto_pay_method}     || undef,
                     created_by           => $c->session->{username} || 'system',
                     created_at           => $now,
                     updated_at           => $now,
@@ -1868,6 +1872,67 @@ sub invoice_pay_points :Path('/Inventory/invoice/pay_points') :Args(1) {
     $c->flash->{error_msg} = $err_msg if $err_msg;
 
     $c->res->redirect($c->uri_for('/Inventory/invoice/view/' . $id));
+}
+
+sub process_auto_pay :Path('/Inventory/invoice/process_auto_pay') :Args(0) {
+    my ($self, $c) = @_;
+    return $c->res->redirect($c->uri_for('/user/login')) unless $c->session->{username};
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+    my $confirmed_id = $c->req->body_parameters->{invoice_id};
+
+    if ($confirmed_id) {
+        my $inv;
+        eval { $inv = $schema->resultset('InventorySupplierInvoice')->find($confirmed_id) };
+        if ($inv && $inv->sitename eq $sitename && $inv->auto_pay && $inv->status ne 'paid') {
+            eval {
+                $inv->update({ status => 'paid', updated_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S') });
+
+                my $csc_inv = $schema->resultset('InventoryCustomerInvoice')->search({
+                    sitename       => 'CSC',
+                    invoice_number => $inv->invoice_number,
+                })->single;
+                if ($csc_inv) {
+                    $csc_inv->update({
+                        payment_status => 'paid',
+                        amount_paid    => $inv->total_amount,
+                    });
+                }
+            };
+            if ($@) {
+                $c->flash->{error_msg} = "Error confirming auto-pay: $@";
+            } else {
+                $c->flash->{success_msg} = 'Auto-pay confirmed for invoice ' . $inv->invoice_number . '.';
+            }
+        } else {
+            $c->flash->{error_msg} = 'Invoice not found or not eligible for auto-pay confirmation.';
+        }
+        $c->res->redirect($c->uri_for('/Inventory/invoice'));
+        return;
+    }
+
+    # Show list of auto-pay invoices needing confirmation (past due date)
+    my @due_invoices;
+    eval {
+        @due_invoices = $schema->resultset('InventorySupplierInvoice')->search(
+            {
+                sitename => $sitename,
+                auto_pay => 1,
+                status   => { '!=' => 'paid' },
+                due_date => { '<=' => $today },
+            },
+            { prefetch => 'supplier', order_by => 'due_date' }
+        )->all;
+    };
+
+    $c->stash(
+        auto_pay_invoices => \@due_invoices,
+        sitename          => $sitename,
+        today             => $today,
+        template          => 'Inventory/invoice/auto_pay_confirm.tt',
+    );
 }
 
 # =========================================================================

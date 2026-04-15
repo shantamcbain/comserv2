@@ -3,6 +3,7 @@
 <h1>Supplier Invoices</h1>
 <p>
   <a href="/Inventory/invoice/new" style="background:#007bff;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">+ New Invoice</a>
+  <a href="/Inventory/invoice/process_auto_pay" style="margin-left:1em;background:#fd7e14;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">&#x23F0; Auto-Pay Due</a>
   <a href="/Inventory" style="margin-left:1em;">← Inventory</a>
 </p>
 
@@ -25,21 +26,42 @@
   </thead>
   <tbody>
   [% FOREACH inv IN invoices %]
-  <tr>
-    <td><a href="/Inventory/invoice/view/[% inv.id %]">[% inv.invoice_number || inv.id %]</a></td>
+  [% SET today_str = today %]
+  [% SET is_overdue = (inv.due_date && inv.due_date < today_str && inv.status != 'paid') %]
+  <tr[% IF is_overdue %] style="background:#fff3cd;"[% END %]>
+    <td>
+      <a href="/Inventory/invoice/view/[% inv.id %]">[% inv.invoice_number || inv.id %]</a>
+      [% IF inv.auto_pay %]
+        <span style="background:#fd7e14;color:white;font-size:0.75em;padding:1px 5px;border-radius:3px;margin-left:4px;"
+              title="[% inv.auto_pay_method | html %]">AUTO</span>
+      [% END %]
+      [% IF is_overdue %]
+        <span style="color:#dc3545;font-size:0.8em;margin-left:4px;">&#9888; Overdue</span>
+      [% END %]
+    </td>
     <td>[% inv.supplier.name | html %]</td>
     <td>[% inv.invoice_date %]</td>
     <td>[% inv.due_date || '' %]</td>
     <td style="text-align:right">$[% inv.total_amount %]</td>
     <td>
       [% IF inv.status == 'draft' %]<span style="background:#ffc107;color:#333;padding:1px 7px;border-radius:3px;font-size:0.85em;">draft</span>
-      [% ELSIF inv.status == 'posted' %]<span style="background:#28a745;color:white;padding:1px 7px;border-radius:3px;font-size:0.85em;">posted</span>
+      [% ELSIF inv.status == 'outstanding' %]<span style="background:#17a2b8;color:white;padding:1px 7px;border-radius:3px;font-size:0.85em;">outstanding</span>
+      [% ELSIF inv.status == 'paid' %]<span style="background:#28a745;color:white;padding:1px 7px;border-radius:3px;font-size:0.85em;">paid</span>
       [% ELSE %][% inv.status | html %][% END %]
     </td>
     <td>
       <a href="/Inventory/invoice/view/[% inv.id %]">View</a>
       [% IF inv.status == 'draft' %]
       | <a href="/Inventory/invoice/edit/[% inv.id %]">Edit</a>
+      [% END %]
+      [% IF inv.auto_pay && inv.status != 'paid' && inv.due_date && inv.due_date <= today_str %]
+      | <form method="post" action="/Inventory/invoice/process_auto_pay" style="display:inline;">
+          <input type="hidden" name="invoice_id" value="[% inv.id %]">
+          <button type="submit" style="background:#28a745;color:white;border:none;padding:2px 8px;border-radius:3px;cursor:pointer;"
+                  onclick="return confirm('Confirm auto-pay charge posted for [% inv.invoice_number | html %]?')">
+            ✓ Confirm Paid
+          </button>
+        </form>
       [% END %]
     </td>
   </tr>

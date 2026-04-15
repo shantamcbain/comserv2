@@ -445,6 +445,25 @@ sub get_system_notifications {
                 };
             }
         }
+
+        # Auto-pay overdue alert — shown to any site admin for their own invoices
+        eval {
+            my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+            my $today_str = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+            my $auto_due  = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search({
+                sitename => $site_name,
+                auto_pay => 1,
+                status   => { '!=' => 'paid' },
+                due_date => { '<=' => $today_str },
+            })->count;
+            if ($auto_due > 0) {
+                push @notifications, {
+                    type    => 'warning',
+                    message => "$auto_due auto-pay invoice(s) past due — confirm the charge has posted.",
+                    link    => '/Inventory/invoice/process_auto_pay',
+                };
+            }
+        };
     };
 
     return \@notifications;
