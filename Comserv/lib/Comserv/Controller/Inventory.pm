@@ -1871,7 +1871,7 @@ sub customer_invoice_list :Path('/Inventory/sales') :Args(0) {
     eval {
         @invoices = $self->_schema($c)->resultset('InventoryCustomerInvoice')->search(
             { 'me.sitename' => $sitename },
-            { prefetch => 'customer_order', order_by => { -desc => 'me.invoice_date' } }
+            { prefetch => ['lines'], order_by => { -desc => 'me.invoice_date' } }
         )->all;
     };
     $err = $@ if $@;
