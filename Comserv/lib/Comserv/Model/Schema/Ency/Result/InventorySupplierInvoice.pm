@@ -104,6 +104,24 @@ __PACKAGE__->add_columns(
         set_on_create => 1,
         set_on_update => 1,
     },
+    currency => {
+        data_type     => 'char',
+        size          => 3,
+        is_nullable   => 0,
+        default_value => 'CAD',
+    },
+    exchange_rate => {
+        data_type     => 'decimal',
+        size          => [12, 6],
+        is_nullable   => 1,
+        default_value => '1.000000',
+    },
+    functional_amount => {
+        data_type     => 'decimal',
+        size          => [12, 2],
+        is_nullable   => 1,
+        default_value => '0.00',
+    },
 );
 
 __PACKAGE__->set_primary_key('id');
