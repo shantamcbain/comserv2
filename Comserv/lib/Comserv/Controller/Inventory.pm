@@ -967,6 +967,126 @@ sub location_edit :Path('/Inventory/location/edit') :Args(1) {
 # Stock Adjustments
 # -------------------------------------------------------------------------
 
+sub stock_receive :Path('/Inventory/stock/receive') :Args(0) {
+    my ($self, $c) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my (@items, @suppliers, @coa_accounts);
+    eval { @items     = $schema->resultset('InventoryItem')->search(
+        { sitename => $sitename, status => 'active' }, { order_by => 'name' })->all };
+    eval { @suppliers = $schema->resultset('InventorySupplier')->search(
+        { sitename => $sitename }, { order_by => 'name' })->all };
+    eval { @coa_accounts = $schema->resultset('CoaAccount')->search(
+        { obsolete => 0 }, { order_by => 'accno' })->all };
+
+    if ($c->req->method eq 'POST') {
+        my $params      = $c->req->body_parameters;
+        my $supplier_id = $params->{supplier_id};
+        my $inv_number  = $params->{invoice_number} || ('RCV-' . time());
+        my $inv_date    = $params->{invoice_date}   || substr($self->_now(), 0, 10);
+        my $due_date    = $params->{due_date}        || '';
+        my $ap_id       = $params->{ap_account_id};
+        my $notes       = $params->{notes}           || '';
+
+        unless ($supplier_id) {
+            $c->stash->{error_msg} = 'Please select a supplier.';
+            $c->stash(items => \@items, suppliers => \@suppliers,
+                coa_accounts => \@coa_accounts, sitename => $sitename,
+                params => $params, template => 'Inventory/stock/receive.tt');
+            return;
+        }
+
+        my (@lines_data);
+        for my $item (@items) {
+            my $qty  = $params->{'qty_'  . $item->id} || 0;
+            my $cost = $params->{'cost_' . $item->id} || 0;
+            next unless $qty > 0;
+            push @lines_data, {
+                item_id     => $item->id,
+                item_name   => $item->name,
+                sku         => $item->sku,
+                quantity    => $qty,
+                unit_cost   => $cost,
+                line_total  => $qty * $cost,
+                account_id  => $item->expense_accno_id || undef,
+                description => 'Received: ' . $item->name,
+            };
+        }
+
+        unless (@lines_data) {
+            $c->stash->{error_msg} = 'No items entered. Add at least one quantity.';
+            $c->stash(items => \@items, suppliers => \@suppliers,
+                coa_accounts => \@coa_accounts, sitename => $sitename,
+                params => $params, template => 'Inventory/stock/receive.tt');
+            return;
+        }
+
+        my $total = 0;
+        $total += $_->{line_total} for @lines_data;
+
+        eval {
+            $schema->txn_do(sub {
+                my $invoice = $schema->resultset('InventorySupplierInvoice')->create({
+                    sitename       => $sitename,
+                    supplier_id    => $supplier_id,
+                    invoice_number => $inv_number,
+                    invoice_date   => $inv_date,
+                    ($due_date ? (due_date => $due_date) : ()),
+                    total_amount   => $total,
+                    status         => 'draft',
+                    ($ap_id ? (ap_account_id => $ap_id) : ()),
+                    notes          => $notes,
+                    created_by     => $c->session->{username} || 'system',
+                    created_at     => $self->_now(),
+                    updated_at     => $self->_now(),
+                });
+
+                for my $ln (@lines_data) {
+                    $schema->resultset('InventorySupplierInvoiceLine')->create({
+                        invoice_id  => $invoice->id,
+                        item_id     => $ln->{item_id},
+                        description => $ln->{description},
+                        quantity    => $ln->{quantity},
+                        unit_cost   => $ln->{unit_cost},
+                        line_total  => $ln->{line_total},
+                        ($ln->{account_id} ? (account_id => $ln->{account_id}) : ()),
+                    });
+
+                    # Also update item unit_cost if currently blank
+                    if ($ln->{unit_cost} > 0) {
+                        my $it = $schema->resultset('InventoryItem')->find($ln->{item_id});
+                        if ($it && !($it->unit_cost && $it->unit_cost > 0)) {
+                            $it->update({ unit_cost => $ln->{unit_cost}, updated_at => $self->_now() });
+                        }
+                    }
+                }
+
+                $c->flash->{success_msg} = "Draft receiving invoice #$inv_number created with "
+                    . scalar(@lines_data) . " line(s) totalling \$$total. Review and post to update stock.";
+                $c->res->redirect($c->uri_for('/Inventory/invoice/view', [$invoice->id]));
+            });
+        };
+        if ($@) {
+            $c->stash->{error_msg} = "Failed to create receiving invoice: $@";
+            $c->stash(items => \@items, suppliers => \@suppliers,
+                coa_accounts => \@coa_accounts, sitename => $sitename,
+                params => $params, template => 'Inventory/stock/receive.tt');
+            return;
+        }
+        return;
+    }
+
+    $c->stash(
+        items        => \@items,
+        suppliers    => \@suppliers,
+        coa_accounts => \@coa_accounts,
+        sitename     => $sitename,
+        inv_date     => substr($self->_now(), 0, 10),
+        template     => 'Inventory/stock/receive.tt',
+    );
+}
+
 sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
     my ($self, $c) = @_;
 
