@@ -1168,10 +1168,15 @@ sub hosting_accounts :Local :Args(0) {
                         my $notifier = Comserv::Util::EmailNotification->new(logging => $self->logging);
                         $notifier->send_hosting_approval_notification($c, $acct);
                     };
+                    my $inv_err;
                     eval { $self->_create_hosting_invoice($c, $acct, $monthly) };
-                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'hosting_accounts',
-                        "Invoice creation error: $@") if $@;
-                    $c->flash->{success_msg} = $acct->sitename . " hosting approved, invoice created.";
+                    if ($@) {
+                        $inv_err = "$@";
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'hosting_accounts',
+                            "Invoice creation error: $inv_err");
+                    }
+                    $c->flash->{success_msg} = $acct->sitename . " hosting approved"
+                        . ($inv_err ? " (invoice error: $inv_err)" : ", invoice created and emailed.");
                 } elsif ($action eq 'suspend') {
                     $acct->update({ status => 'suspended', updated_at => \'NOW()' });
                     $c->flash->{success_msg} = $acct->sitename . " hosting suspended.";
@@ -1295,16 +1300,17 @@ sub _create_hosting_invoice {
             email        => 'helpdesk@computersystemconsulting.ca',
             website      => 'https://computersystemconsulting.ca',
             status       => 'active',
-            notes        => 'CSC hosting provider. Invoices paid in Points (100 pts = CAD 10).',
+            notes        => 'CSC hosting provider. Invoices paid in Points (1 pt = CAD 1.00).',
             created_by   => 'system',
             created_at   => \'NOW()',
             updated_at   => \'NOW()',
         });
     }
 
-    my $inv_date = DateTime->now->strftime('%Y-%m-%d');
+    my $now_dt   = DateTime->now;
+    my $inv_date = $now_dt->strftime('%Y-%m-%d');
     my $due_date = DateTime->now->add(days => 30)->strftime('%Y-%m-%d');
-    my $inv_num  = 'CSC-HOST-' . uc($client_sn) . '-' . DateTime->now->strftime('%Y%m');
+    my $inv_num  = 'CSC-HOST-' . uc($client_sn) . '-' . $now_dt->strftime('%Y%m%d%H%M%S');
     my $pts_rate = 1;
     my $points_due = $monthly_cost * $pts_rate;
 
@@ -1447,6 +1453,26 @@ sub _create_hosting_invoice {
     };
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_create_hosting_invoice',
         "Points transfer error: $@") if $@;
+
+    # --- Email invoice to client contact ---
+    eval {
+        my $contact_email = $acct->contact_email;
+        if ($contact_email) {
+            my $notifier = Comserv::Util::EmailNotification->new(logging => $self->logging);
+            $notifier->send_hosting_invoice_notification($c,
+                invoice_number => $inv_num,
+                invoice_id     => $cli_invoice->id,
+                sitename       => $client_sn,
+                plan_slug      => $plan_slug,
+                amount         => $monthly_cost,
+                due_date       => $due_date,
+                contact_email  => $contact_email,
+                pts_paid       => $pts_paid,
+            );
+        }
+    };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_create_hosting_invoice',
+        "Invoice email error: $@") if $@;
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_create_hosting_invoice',
         "Invoice $inv_num created for $client_sn (\$$monthly_cost / ${points_due}pts paid=$pts_paid)");
