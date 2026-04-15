@@ -1481,8 +1481,6 @@ sub _create_hosting_invoice {
                 unit_cost    => $monthly_cost,
                 is_preferred => 1,
                 notes        => 'CSC hosting service',
-                created_at   => \'NOW()',
-                updated_at   => \'NOW()',
             });
         }
     }
