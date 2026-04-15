@@ -401,28 +401,35 @@ sub get_system_notifications {
         }
     };
     
-    # Check for pending CSC hosting registrations — visible to admin/accounting on ANY server
+    # Check for pending CSC hosting registrations — only for CSC-level admin/accounting users
     eval {
-        my $user_roles = $c->session->{roles} || '';
-        my $is_admin_or_accounting = ($user_roles =~ /admin|accounting/i);
-        if ($is_admin_or_accounting) {
+        my $user_id = $c->session->{user_id};
+        my $is_csc_admin = 0;
+        if ($user_id) {
+            my $user_obj = $c->model('DBEncy')->resultset('User')->find($user_id,
+                { columns => ['roles'] });
+            if ($user_obj) {
+                my $global_roles = $user_obj->roles || '';
+                $is_csc_admin = ($global_roles =~ /admin|accounting/i) ? 1 : 0;
+            }
+        }
+
+        if ($is_csc_admin) {
             my $pending = $c->model('DBEncy')->resultset('HostingAccount')->search(
                 { status => 'pending' }
             )->count;
             if ($pending > 0) {
-                # Always link to canonical CSC URL so admin can reach approval page from any server
-                my $approve_url = 'https://computersystemconsulting.ca/membership/admin/hosting_accounts';
+                my $msg = "$pending pending CSC hosting registration(s) require approval."
+                    . " Note: new accounts without prior setup must be added manually to the"
+                    . " system after payment is confirmed.";
                 push @notifications, {
                     type    => 'warning',
-                    message => "$pending pending CSC hosting registration(s) require approval",
-                    link    => $approve_url,
+                    message => $msg,
+                    link    => 'https://computersystemconsulting.ca/membership/admin/hosting_accounts',
                 };
             }
-        }
 
-        # Recently paid hosting invoices (last 48h) — CSC site or admin/accounting users
-        my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
-        if (lc($site_name) eq 'csc' || ($user_roles =~ /admin|accounting/i)) {
+            # Recently paid hosting invoices (last 48h)
             my $cutoff = DateTime->now->subtract(hours => 48)->strftime('%Y-%m-%d %H:%M:%S');
             my @paid = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search(
                 { sitename => { '!=' => 'CSC' }, status => 'paid',

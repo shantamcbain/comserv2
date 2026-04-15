@@ -527,19 +527,27 @@ A SiteName admin has submitted a hosting registration request:
 ACTION: Review and approve this request at:
   $approve_url
 
+NOTE: If this SiteName does not yet have a full CSC account setup (supplier,
+COA accounts, billing), these must be added manually in CSC after payment
+is confirmed.
+
 This is an automated notification from the Comserv platform.
 };
 
-    # Collect all recipient emails: CSC admin + all users with admin or accounting role
+    # Collect recipients: CSC admin email + all users whose global roles include admin or accounting
+    # (global roles = users.roles column; site-specific roles are in user_site_roles and not checked here)
     my %seen_emails = ($csc_email => 1);
     my @recipients  = ($csc_email);
     eval {
-        my @admin_users = $c->model('DBEncy')->resultset('User')->search([
-            { roles => { -like => '%admin%' } },
-            { roles => { -like => '%accounting%' } },
-        ], { columns => ['email', 'email_notifications'] })->all;
+        my @admin_users = $c->model('DBEncy')->resultset('User')->search(
+            [
+                { roles => { -like => '%admin%'      }, status => 'active', email_notifications => 1 },
+                { roles => { -like => '%accounting%' }, status => 'active', email_notifications => 1 },
+            ],
+            { columns => ['email'] }
+        )->all;
         for my $u (@admin_users) {
-            next unless $u->email && $u->email_notifications;
+            next unless $u->email;
             next if $seen_emails{ $u->email }++;
             push @recipients, $u->email;
         }
