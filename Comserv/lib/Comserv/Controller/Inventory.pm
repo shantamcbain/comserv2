@@ -1009,9 +1009,15 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
 
                 $stock->update({ quantity_on_hand => $new_qty, updated_at => $now });
 
+                # Update item unit_cost if provided and item cost is blank
+                my $item_rec = $schema->resultset('InventoryItem')->find($item_id);
+                if ($item_rec && $params->{unit_cost} && $params->{unit_cost} > 0) {
+                    $item_rec->update({ unit_cost => $params->{unit_cost}, updated_at => $now })
+                        unless $item_rec->unit_cost && $item_rec->unit_cost > 0;
+                }
+
                 # Generate GL entry if item has COA accounts linked
                 my $gl_entry_id;
-                my $item_rec = $schema->resultset('InventoryItem')->find($item_id);
                 if ($item_rec && ($item_rec->inventory_accno_id || $item_rec->expense_accno_id)) {
                     my $unit_cost  = $params->{unit_cost} || $item_rec->unit_cost || 0;
                     my $value      = $qty * $unit_cost;
