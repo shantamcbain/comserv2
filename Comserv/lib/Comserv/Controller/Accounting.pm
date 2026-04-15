@@ -64,7 +64,7 @@ sub index :Path('/Accounting') :Args(0) {
         $item_count, $supplier_count, $location_count, $low_stock) = (0) x 8;
 
     eval { $acct_count    = $schema->resultset('CoaAccount')->search({ obsolete => 0 })->count };
-    eval { $entry_count   = $schema->resultset('GlEntry')->count };
+    eval { $entry_count   = $schema->resultset('GlEntry')->search({ sitename => $sitename })->count };
     eval {
         $ap_outstanding = $schema->resultset('InventorySupplierInvoice')->search(
             { sitename => $sitename, status => 'outstanding' }
