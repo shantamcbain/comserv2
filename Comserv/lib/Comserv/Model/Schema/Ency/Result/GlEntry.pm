@@ -45,8 +45,9 @@ __PACKAGE__->add_columns(
         comment       => 'general | inventory | point | sale | purchase | adjustment',
     },
     post_date => {
-        data_type   => 'date',
-        is_nullable => 0,
+        data_type        => 'date',
+        is_nullable      => 0,
+        inflate_datetime => 0,
     },
     approved => {
         data_type     => 'tinyint',

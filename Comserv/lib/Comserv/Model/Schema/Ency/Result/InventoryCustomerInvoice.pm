@@ -38,12 +38,14 @@ __PACKAGE__->add_columns(
         is_nullable => 1,
     },
     invoice_date => {
-        data_type   => 'date',
-        is_nullable => 0,
+        data_type        => 'date',
+        is_nullable      => 0,
+        inflate_datetime => 0,
     },
     due_date => {
-        data_type   => 'date',
-        is_nullable => 1,
+        data_type        => 'date',
+        is_nullable      => 1,
+        inflate_datetime => 0,
     },
     total_amount => {
         data_type     => 'decimal',

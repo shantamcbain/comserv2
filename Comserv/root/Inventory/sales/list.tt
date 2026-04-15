@@ -32,8 +32,8 @@
     <tr style="background:[% row_bg %]">
       <td><a href="/Inventory/sales/view/[% inv.id %]">[% inv.invoice_number | html %]</a></td>
       <td>[% inv.customer_name | html %]</td>
-      <td>[% inv.invoice_date.ymd IF inv.invoice_date %]</td>
-      <td>[% inv.due_date.ymd IF inv.due_date; '—' UNLESS inv.due_date %]</td>
+      <td>[% inv.invoice_date | html %]</td>
+      <td>[% inv.due_date || '—' %]</td>
       <td style="text-align:right">$[% inv.total_amount %]</td>
       <td>
         [% IF inv.status == 'posted' %]<span style="color:green;font-weight:bold">Posted</span>
