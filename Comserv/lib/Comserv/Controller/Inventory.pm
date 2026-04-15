@@ -2482,8 +2482,11 @@ sub print_bom :Path('/Inventory/print/bom') :Args(1) {
 sub seed_filaments :Path('/Inventory/seed_filaments') :Args(0) {
     my ($self, $c) = @_;
     return $c->res->redirect($c->uri_for('/user/login')) unless $c->session->{username};
-    my $role = $c->session->{role} || '';
-    unless ($role =~ /admin/i) {
+    my $roles    = $c->session->{roles} // [];
+    my $is_admin = ref($roles) eq 'ARRAY'
+        ? (grep { /admin/i } @$roles)
+        : ($roles =~ /admin/i);
+    unless ($is_admin) {
         $c->flash->{error_msg} = 'Admin access required.';
         return $c->res->redirect($c->uri_for('/Inventory'));
     }
@@ -2532,11 +2535,10 @@ sub seed_filaments :Path('/Inventory/seed_filaments') :Args(0) {
             next;
         }
         eval {
-            $schema->resultset('InventoryItem')->create({
+            my %row = (
                 sitename        => $target_site,
                 sku             => $f->{sku},
                 name            => $f->{name},
-                description     => $f->{brand} . ' filament for 3D printing. 1kg spool.',
                 item_origin     => 'purchased',
                 is_consumable   => 1,
                 is_reusable     => 0,
@@ -2546,7 +2548,9 @@ sub seed_filaments :Path('/Inventory/seed_filaments') :Args(0) {
                 updated_by      => $by,
                 created_at      => $now,
                 updated_at      => $now,
-            });
+            );
+            eval { $row{description} = $f->{brand} . ' filament for 3D printing. 1kg spool.' };
+            $schema->resultset('InventoryItem')->create(\%row);
         };
         if ($@) {
             push @log, "$f->{sku}: ERROR — $@";
@@ -2556,9 +2560,13 @@ sub seed_filaments :Path('/Inventory/seed_filaments') :Args(0) {
         }
     }
 
-    $c->flash->{success_msg} = "Filament seed complete: $created created, $skipped skipped. "
-        . join(' | ', @log);
-    $c->res->redirect($c->uri_for('/Inventory/items'));
+    my $summary = "Filament seed complete for sitename=$target_site: $created created, $skipped skipped.";
+    $c->stash(
+        seed_log  => \@log,
+        summary   => $summary,
+        sitename  => $target_site,
+        template  => 'Inventory/seed_result.tt',
+    );
 }
 
 sub timesheet :Path('/Inventory/timesheet') :Args(0) {
