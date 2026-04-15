@@ -1850,6 +1850,119 @@ sub invoice_reprocess_stock :Path('/Inventory/invoice/reprocess_stock') :Args(1)
     $c->res->redirect($c->uri_for('/Inventory/invoice/view', [$id]));
 }
 
+sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $invoice;
+    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find(
+        $id, { prefetch => { lines => 'item' } }) };
+
+    unless ($invoice && $invoice->sitename eq $sitename) {
+        $c->flash->{error_msg} = 'Invoice not found.';
+        return $c->res->redirect($c->uri_for('/Inventory/invoice'));
+    }
+    if ($invoice->gl_entry_id) {
+        $c->flash->{error_msg} = 'GL entry already exists for this invoice (GL #' . $invoice->gl_entry_id . ').';
+        return $c->res->redirect($c->uri_for('/Inventory/invoice/view', [$id]));
+    }
+
+    # Find AP account: prefer invoice's own, fall back to first COA account starting with '2'
+    my $ap_acct_id = $invoice->ap_account_id;
+    unless ($ap_acct_id) {
+        my $ap = eval { $schema->resultset('CoaAccount')->search(
+            { accno => { -like => '2%' }, obsolete => 0 },
+            { order_by => 'accno', rows => 1 }
+        )->single };
+        $ap_acct_id = $ap->id if $ap;
+    }
+
+    unless ($ap_acct_id) {
+        $c->flash->{error_msg} = 'No Accounts Payable account found. Please seed COA accounts first.';
+        return $c->res->redirect($c->uri_for('/Inventory/invoice/view', [$id]));
+    }
+
+    eval {
+        $schema->txn_do(sub {
+            my $gl = $schema->resultset('GlEntry')->create({
+                sitename    => $sitename,
+                reference   => 'AP-' . ($invoice->invoice_number || $invoice->id),
+                entry_type  => 'AP',
+                description => 'Supplier Invoice ' . ($invoice->invoice_number || ''),
+                post_date   => $invoice->invoice_date,
+                approved    => 1,
+            });
+
+            $gl->create_related('lines', {
+                account_id => $ap_acct_id,
+                amount     => -$invoice->total_amount,
+                memo       => 'AP ' . ($invoice->invoice_number || ''),
+                sort_order => 1,
+            });
+
+            my $sort = 2;
+            for my $line ($invoice->lines->all) {
+                my $acct_id = $line->account_id;
+                unless ($acct_id) {
+                    my $exp = eval { $schema->resultset('CoaAccount')->search(
+                        { accno => { -like => '5%' }, obsolete => 0 },
+                        { order_by => 'accno', rows => 1 }
+                    )->single };
+                    $acct_id = $exp->id if $exp;
+                }
+                next unless $acct_id;
+                $gl->create_related('lines', {
+                    account_id => $acct_id,
+                    amount     => $line->line_total,
+                    memo       => $line->description || 'Invoice line',
+                    sort_order => $sort++,
+                });
+            }
+
+            $invoice->update({ gl_entry_id => $gl->id });
+
+            # Payment GL: if invoice is paid, also record DR AP / CR clearing
+            if (($invoice->status || '') eq 'paid' && $invoice->total_amount > 0) {
+                my $pay_gl = $schema->resultset('GlEntry')->create({
+                    sitename    => $sitename,
+                    reference   => 'PAY-' . ($invoice->invoice_number || $invoice->id),
+                    entry_type  => 'general',
+                    description => 'Payment: ' . ($invoice->invoice_number || '') . ' (via points)',
+                    post_date   => $invoice->invoice_date,
+                    approved    => 1,
+                });
+                $pay_gl->create_related('lines', {
+                    account_id => $ap_acct_id,
+                    amount     => $invoice->total_amount,
+                    memo       => 'Clear AP — payment received',
+                    sort_order => 1,
+                });
+                # CR side: find Points/Equity clearing account (3xxx) or use AP account as memo-only
+                my $pts_acct = eval { $schema->resultset('CoaAccount')->search(
+                    { accno => { -like => '3%' }, obsolete => 0 },
+                    { order_by => 'accno', rows => 1 }
+                )->single };
+                if ($pts_acct) {
+                    $pay_gl->create_related('lines', {
+                        account_id => $pts_acct->id,
+                        amount     => -$invoice->total_amount,
+                        memo       => 'Points payment clearing',
+                        sort_order => 2,
+                    });
+                }
+            }
+        });
+    };
+
+    if ($@) {
+        $c->flash->{error_msg} = "GL creation failed: $@";
+    } else {
+        $c->flash->{success_msg} = 'GL entry created successfully.';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/invoice/view', [$id]));
+}
+
 sub invoice_view :Path('/Inventory/invoice/view') :Args(1) {
     my ($self, $c, $id) = @_;
     my $invoice;
