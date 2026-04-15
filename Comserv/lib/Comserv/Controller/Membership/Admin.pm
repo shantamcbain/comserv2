@@ -1155,30 +1155,139 @@ sub backfill_hosting_invoices :Local :Args(0) {
         return;
     }
 
-    my @active = $c->model('DBEncy')->resultset('HostingAccount')->search(
-        { status => 'active' }
-    )->all;
+    my $schema = $c->model('DBEncy');
+    my @active = $schema->resultset('HostingAccount')->search({ status => 'active' })->all;
 
     my ($created, $skipped) = (0, 0);
     for my $acct (@active) {
-        my $existing = $c->model('DBEncy')->resultset('InventoryCustomerInvoice')->search({
-            sitename  => 'CSC',
-            customer_name => $acct->sitename,
-            notes     => { -like => '%' . $acct->plan_slug . '%' },
+        my $client_sn = $acct->sitename;
+        my $plan_slug = $acct->plan_slug || 'hosting-app';
+        my $monthly   = $acct->monthly_cost || 0;
+
+        # Skip if CSC customer invoice already exists for this account
+        my $csc_inv_exists = $schema->resultset('InventoryCustomerInvoice')->search({
+            sitename      => 'CSC',
+            customer_name => $client_sn,
+            notes         => { -like => "%$plan_slug%" },
         })->count;
-        if ($existing) { $skipped++; next; }
-        eval { $self->_create_hosting_invoice($c, $acct, $acct->monthly_cost || 0) };
+        if ($csc_inv_exists) { $skipped++; next; }
+
+        # Check if client already has a supplier invoice from CSC
+        my $cli_inv_exists = $schema->resultset('InventorySupplierInvoice')->search({
+            sitename => $client_sn,
+            notes    => { -like => "%$plan_slug%" },
+        })->count;
+
+        eval {
+            if ($cli_inv_exists) {
+                # Client AP already exists — only create the missing CSC AR invoice
+                $self->_backfill_csc_ar_only($c, $acct, $monthly);
+            } else {
+                # Nothing exists — create everything
+                $self->_create_hosting_invoice($c, $acct, $monthly);
+            }
+        };
         if ($@) {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'backfill_hosting_invoices',
-                "Error for " . $acct->sitename . ": $@");
+                "Error for $client_sn: $@");
             $skipped++;
         } else {
             $created++;
         }
     }
 
-    $c->flash->{success_msg} = "Backfill complete: $created invoices created, $skipped skipped.";
+    $c->flash->{success_msg} = "Backfill complete: $created CSC sales invoices created, $skipped skipped.";
     $c->response->redirect($c->uri_for('/membership/admin/hosting_accounts'));
+}
+
+sub _backfill_csc_ar_only {
+    my ($self, $c, $acct, $monthly_cost) = @_;
+    my $schema    = $c->model('DBEncy');
+    my $client_sn = $acct->sitename;
+    my $plan_slug = $acct->plan_slug || 'hosting-app';
+
+    my $csc_ar     = $schema->resultset('CoaAccount')->search({ sitename => 'CSC', accno => '1100' })->single;
+    my $csc_income = $schema->resultset('CoaAccount')->search({ sitename => 'CSC', accno => '4300' })->single;
+    my $sku        = $plan_slug eq 'hosting-subdomain' ? 'CSC-HOST-SUB' : 'CSC-HOST-APP';
+    my $item       = $schema->resultset('InventoryItem')->search({ sitename => 'CSC', sku => $sku })->single;
+
+    # Find the existing client supplier invoice to reuse its invoice number
+    my $cli_inv = $schema->resultset('InventorySupplierInvoice')->search(
+        { sitename => $client_sn, notes => { -like => "%$plan_slug%" } },
+        { order_by => { -desc => 'id' }, rows => 1 }
+    )->single;
+
+    my $now_dt   = DateTime->now;
+    my $inv_date = $now_dt->strftime('%Y-%m-%d');
+    my $due_date = DateTime->now->add(days => 30)->strftime('%Y-%m-%d');
+    my $inv_num  = $cli_inv ? $cli_inv->invoice_number
+                             : 'CSC-HOST-' . uc($client_sn) . '-' . $now_dt->strftime('%Y%m%d%H%M%S');
+
+    my $paid = $cli_inv && $cli_inv->status eq 'paid';
+
+    my $csc_invoice = $schema->resultset('InventoryCustomerInvoice')->create({
+        sitename          => 'CSC',
+        customer_name     => $client_sn,
+        customer_email    => $acct->contact_email || '',
+        invoice_number    => $inv_num,
+        invoice_date      => $cli_inv ? $cli_inv->invoice_date : $inv_date,
+        due_date          => $cli_inv ? $cli_inv->due_date      : $due_date,
+        total_amount      => $monthly_cost,
+        tax_amount        => 0,
+        status            => $paid ? 'paid' : 'posted',
+        ar_account_id     => ($csc_ar     ? $csc_ar->id     : undef),
+        income_account_id => ($csc_income ? $csc_income->id : undef),
+        notes             => "Hosting — $plan_slug — $client_sn",
+        created_by        => $c->session->{username} || 'system',
+        payment_status    => $paid ? 'paid' : 'pending',
+        amount_paid       => $paid ? $monthly_cost : 0,
+        points_redeemed   => $paid ? $monthly_cost : 0,
+        created_at        => \'NOW()',
+        updated_at        => \'NOW()',
+    });
+
+    $csc_invoice->create_related('lines', {
+        item_id     => ($item ? $item->id   : undef),
+        item_name   => ($item ? $item->name : "Hosting $plan_slug"),
+        sku         => ($item ? $item->sku  : $sku),
+        quantity    => 1,
+        unit_price  => $monthly_cost,
+        line_total  => $monthly_cost,
+        description => "Monthly Hosting — $client_sn ($plan_slug)",
+        sort_order  => 1,
+    });
+
+    # Create GL entry if COA accounts exist and we don't already have one
+    if ($csc_ar && $csc_income) {
+        my $existing_gl = $schema->resultset('GlEntry')->search(
+            { sitename => 'CSC', reference => $inv_num }
+        )->single;
+        unless ($existing_gl) {
+            my $csc_gl = $schema->resultset('GlEntry')->create({
+                sitename    => 'CSC',
+                reference   => $inv_num . '-BF',
+                description => "Hosting invoice (backfill) $client_sn",
+                post_date   => $inv_date,
+                created_at  => \'NOW()',
+                updated_at  => \'NOW()',
+            });
+            $schema->resultset('GlEntryLine')->create({
+                gl_entry_id => $csc_gl->id,
+                account_id  => $csc_ar->id,
+                amount      => $monthly_cost,
+                memo        => "AR — $client_sn hosting",
+                created_at  => \'NOW()',
+            });
+            $schema->resultset('GlEntryLine')->create({
+                gl_entry_id => $csc_gl->id,
+                account_id  => $csc_income->id,
+                amount      => -$monthly_cost,
+                memo        => "Hosting income — $client_sn",
+                created_at  => \'NOW()',
+            });
+            $csc_invoice->update({ gl_entry_id => $csc_gl->id });
+        }
+    }
 }
 
 sub hosting_accounts :Local :Args(0) {
