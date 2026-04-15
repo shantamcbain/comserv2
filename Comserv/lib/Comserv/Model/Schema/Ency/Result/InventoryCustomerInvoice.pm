@@ -6,8 +6,7 @@ use base 'DBIx::Class::Core';
 __PACKAGE__->load_components('InflateColumn::DateTime', 'TimeStamp');
 __PACKAGE__->table('inventory_customer_invoices');
 
-__PACKAGE__->add_columns(
-    id => {
+__PACKAGE__->add_columns(id => {
         data_type         => 'integer',
         is_auto_increment => 1,
         is_nullable       => 0,
@@ -132,6 +131,11 @@ __PACKAGE__->add_columns(
         set_on_create => 1,
         set_on_update => 1,
     },
+    ar_account_id => {
+        data_type => 'int(11)',
+        size => 11,
+        is_nullable => 1,
+    }
 );
 
 __PACKAGE__->set_primary_key('id');
