@@ -99,14 +99,18 @@
             '  invoice_date (YYYY-MM-DD),',
             '  due_date (YYYY-MM-DD),',
             '  notes (brief description e.g. "Phone service 250-549-0126 Apr 2026"),',
+            '  ap_accno (string — AP account number, almost always "2000"),',
             '  tax_amount (decimal number — total of GST+PST+HST, not individual amounts),',
+            '  tax_accno (string — account number for input tax credits, e.g. "1310" or "2310"),',
             '  shipping_amount (decimal if any),',
             '  discount_amount (decimal if any — positive number, will be subtracted),',
             '  lines (array of objects, one per billing line item, each with:',
-            '    description (string), quantity (number, default 1), unit_cost (decimal — use negative for discounts/credits))',
+            '    description (string), quantity (number, default 1), unit_cost (decimal — use negative for discounts/credits),',
+            '    expense_accno (string — COA account number for this line, e.g. "6500" for phone/telecom, "6100" for utilities, "6200" for office supplies, "5000" for inventory/COGS))',
             'Do not include markdown, code fences, or commentary. Return pure JSON only.',
-            'For phone bills: group base plan separately from add-ons and discounts.',
+            'For phone bills: group base plan separately from add-ons and discounts. expense_accno for all phone lines is "6500".',
             'Tax lines (GST/PST/HST) go in tax_amount, NOT in lines array.',
+            'Common expense_accno mappings: phone/telecom=6500, utilities=6100, office supplies=6200, inventory=5000, shipping=6400.',
         ].join(' ');
 
         var timeoutMs = provider === 'grok' ? 45000 : 120000;
@@ -161,10 +165,26 @@
                 }
             }
 
-            function setFieldByName(name, val) {
-                var el = document.querySelector('[name="' + name + '"]');
-                if (el && val !== undefined && val !== null && String(val).trim() !== '') {
-                    el.value = val; filled++;
+            // Look up a COA account ID by accno prefix (e.g. "6500" matches "6500 Telephone & Internet")
+            function findCoaId(accno) {
+                if (!accno) return null;
+                var s = String(accno).trim();
+                for (var i = 0; i < coaAccounts.length; i++) {
+                    if (coaAccounts[i].label.indexOf(s) === 0 || coaAccounts[i].label.split(' ')[0] === s) {
+                        return coaAccounts[i].id;
+                    }
+                }
+                return null;
+            }
+
+            // Select a <select> option by COA account ID
+            function selectCoaField(selId, accno) {
+                var acctId = findCoaId(accno);
+                if (!acctId) return;
+                var sel = document.getElementById(selId);
+                if (!sel) return;
+                for (var i = 0; i < sel.options.length; i++) {
+                    if (sel.options[i].value == acctId) { sel.selectedIndex = i; filled++; break; }
                 }
             }
 
@@ -195,6 +215,13 @@
             setField('shipping_amount', inv.shipping_amount);
             setField('discount_amount', inv.discount_amount);
 
+            // AP account
+            if (inv.ap_accno) selectCoaField('ap_account_id', inv.ap_accno);
+            else selectCoaField('ap_account_id', '2000');
+
+            // Tax account
+            if (inv.tax_accno) selectCoaField('tax_account_id', inv.tax_accno);
+
             // Line items
             if (inv.lines && inv.lines.length) {
                 // Clear existing blank first line if it exists
@@ -209,12 +236,14 @@
                 }
 
                 inv.lines.forEach(function(line) {
+                    var acctId = findCoaId(line.expense_accno) || null;
                     addLine({
                         description: line.description || '',
                         quantity:    line.quantity    || 1,
                         unit_cost:   typeof line.unit_cost === 'number'
                                         ? line.unit_cost.toFixed(2)
-                                        : (line.unit_cost || '0.00')
+                                        : (line.unit_cost || '0.00'),
+                        account_id:  acctId
                     });
                 });
                 filled += inv.lines.length;
