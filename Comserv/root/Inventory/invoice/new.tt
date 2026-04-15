@@ -362,6 +362,7 @@
 
 <p>
   <button type="button" onclick="addLine()">+ Add Line</button>
+  <button type="button" onclick="recalcAllLines()" style="margin-left:8px;background:#6c757d;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;" title="Recalculate all line totals (useful after pasting or AI fill)">&#x21BB; Recalculate Totals</button>
 </p>
 
 <table cellpadding="5" style="margin-top:8px;">
@@ -486,8 +487,8 @@ function addLine(prefill) {
   row.innerHTML = '<td>' + (idx + 1) + '</td>'
     + '<td>' + buildItemSelect('item_id_' + idx, 'itemChanged(this,' + idx + ')', prefill.item_id) + '</td>'
     + '<td><input type="text" name="description_' + idx + '" size="20" value="' + (prefill.description || '') + '"></td>'
-    + '<td><input type="number" name="quantity_' + idx + '" value="' + (prefill.quantity || '1') + '" min="0.0001" step="any" size="6" oninput="calcLine(' + idx + ')" onchange="calcLine(' + idx + ')"></td>'
-    + '<td><input type="number" name="unit_cost_' + idx + '" value="' + (prefill.unit_cost || '0.00') + '" min="0" step="0.01" size="10" oninput="calcLine(' + idx + ')" onchange="calcLine(' + idx + ')"></td>'
+    + '<td><input type="number" name="quantity_' + idx + '" value="' + (prefill.quantity || '1') + '" step="any" size="6" oninput="calcLine(' + idx + ')" onchange="calcLine(' + idx + ')"></td>'
+    + '<td><input type="number" name="unit_cost_' + idx + '" value="' + (prefill.unit_cost || '0.00') + '" step="0.01" size="10" oninput="calcLine(' + idx + ')" onchange="calcLine(' + idx + ')"></td>'
     + '<td id="total-' + idx + '" style="text-align:right">$' + (prefill.line_total || '0.00') + '</td>'
     + (hasCoa ? '<td id="acct-cell-' + idx + '">' + buildAccountSelect('account_id_' + idx, prefill.account_id) + '</td>' : '')
     + '<td>' + buildLocationSelect('location_id_' + idx, prefill.location_id) + '</td>'
@@ -558,6 +559,13 @@ function removeLine(idx) {
   var row = document.getElementById('line-' + idx);
   if (row) row.remove();
   calcTotal();
+}
+
+function recalcAllLines() {
+  document.querySelectorAll('[name^="quantity_"]').forEach(function(el) {
+    var m = el.name.match(/^quantity_(\d+)$/);
+    if (m) calcLine(parseInt(m[1], 10));
+  });
 }
 
 // -----------------------------------------------------------------------
@@ -639,7 +647,7 @@ var submittedLines = [% IF submitted %][% SET max_idx = -1 %][% FOREACH key IN s
 
 if (submittedLines.length) {
   submittedLines.forEach(function(ln) { addLine(ln); });
-  calcTotal();
+  recalcAllLines();
 } else {
   addLine();
   calcTotal();
