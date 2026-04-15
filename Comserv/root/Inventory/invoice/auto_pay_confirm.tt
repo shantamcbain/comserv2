@@ -32,7 +32,7 @@
     <td>[% inv.supplier.name | html %]</td>
     <td>[% inv.due_date %]</td>
     <td style="text-align:right">$[% inv.total_amount %]</td>
-    <td>[% inv.auto_pay_method | html || '—' %]</td>
+    <td>[% inv.auto_pay_method || '—' | html %]</td>
     <td>
       <form method="post" action="/Inventory/invoice/process_auto_pay" style="display:inline;">
         <input type="hidden" name="invoice_id" value="[% inv.id %]">

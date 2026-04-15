@@ -170,16 +170,22 @@ sub send_email {
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
             "SMTP MAIL FROM accepted");
 
-        # RCPT TO
+        # RCPT TO — split comma-separated addresses and issue one RCPT TO per address
+        my @rcpt_list = map { s/^\s+|\s+$//gr }
+                        grep { /\@/ }
+                        split(/\s*,\s*/, $to);
+        @rcpt_list = ($to) unless @rcpt_list;  # fallback: treat $to as single address
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
-            "SMTP RCPT TO: <$to>");
-        $smtp->to($to) or do {
-            my $msg_detail = $smtp->message() || 'no response';
-            $smtp->quit();
-            die "RCPT TO failed for [$to]: $msg_detail";
-        };
+            "SMTP RCPT TO: " . join(', ', map { "<$_>" } @rcpt_list));
+        for my $rcpt (@rcpt_list) {
+            $smtp->to($rcpt) or do {
+                my $msg_detail = $smtp->message() || 'no response';
+                $smtp->quit();
+                die "RCPT TO failed for [$rcpt]: $msg_detail";
+            };
+        }
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-            "SMTP RCPT TO accepted for <$to>");
+            "SMTP RCPT TO accepted for " . scalar(@rcpt_list) . " recipient(s)");
 
         # DATA
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
