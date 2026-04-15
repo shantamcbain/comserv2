@@ -149,6 +149,11 @@
                         <option value="coding">Coding</option>
                         <option value="editor">Editor</option>
                         <option value="documentation">Documentation</option>
+                        <option value="planning">Planning</option>
+                        <option value="3dprint">3D Print</option>
+                        <option value="accounting">Accounting</option>
+                        <option value="inventory">Inventory</option>
+                        <option value="bmaster">BMaster / Beekeeping</option>
                     </select>
                 </div>
             </div>
