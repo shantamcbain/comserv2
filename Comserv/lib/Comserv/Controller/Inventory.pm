@@ -1770,6 +1770,81 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
     $c->res->redirect($c->uri_for('/Inventory/invoice/view', [$id]));
 }
 
+sub invoice_reprocess_stock :Path('/Inventory/invoice/reprocess_stock') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $invoice;
+    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find(
+        $id, { prefetch => { lines => ['item'] } }) };
+
+    unless ($invoice && $invoice->sitename eq $sitename) {
+        $c->flash->{error_msg} = 'Invoice not found.';
+        return $c->res->redirect($c->uri_for('/Inventory/invoice'));
+    }
+
+    my $ref = 'INV-' . ($invoice->invoice_number || $invoice->id);
+    my ($added, $skipped, @log);
+
+    eval {
+        $schema->txn_do(sub {
+            my $default_loc = $schema->resultset('InventoryLocation')->find_or_create(
+                { sitename => $sitename, name => 'Default' },
+                { key => 'sitename_name' }
+            );
+
+            for my $line ($invoice->lines->all) {
+                next unless $line->item_id;
+                my $loc_id  = $line->location_id || $default_loc->id;
+                my $item_nm = $line->item ? $line->item->name : "item #${\$line->item_id}";
+
+                # Skip if a 'receive' transaction already exists for this item+invoice
+                my $already = $schema->resultset('InventoryTransaction')->search({
+                    item_id          => $line->item_id,
+                    location_id      => $loc_id,
+                    transaction_type => 'receive',
+                    reference        => $ref,
+                })->count;
+
+                if ($already) {
+                    push @log, "$item_nm: skipped (transaction already exists)";
+                    $skipped++;
+                    next;
+                }
+
+                my $sl = $schema->resultset('InventoryStockLevel')->find_or_create(
+                    { item_id => $line->item_id, location_id => $loc_id },
+                    { key => 'item_id_location_id' }
+                );
+                $sl->update({ quantity_on_hand => ($sl->quantity_on_hand || 0) + $line->quantity });
+
+                $schema->resultset('InventoryTransaction')->create({
+                    item_id          => $line->item_id,
+                    location_id      => $loc_id,
+                    transaction_type => 'receive',
+                    quantity         => $line->quantity,
+                    unit_cost        => $line->unit_cost,
+                    reference        => $ref,
+                    transaction_date => $invoice->invoice_date,
+                    created_by       => $c->session->{username} || 'system',
+                });
+
+                push @log, "$item_nm: +${\$line->quantity} @ location $loc_id";
+                $added++;
+            }
+        });
+    };
+
+    if ($@) {
+        $c->flash->{error_msg} = "Stock reprocess failed: $@";
+    } else {
+        $c->flash->{success_msg} = "Stock reprocessed: $added lines added, $skipped skipped. "
+            . join(' | ', @log);
+    }
+    $c->res->redirect($c->uri_for('/Inventory/invoice/view', [$id]));
+}
+
 sub invoice_view :Path('/Inventory/invoice/view') :Args(1) {
     my ($self, $c, $id) = @_;
     my $invoice;

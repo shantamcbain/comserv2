@@ -15,6 +15,12 @@
      onclick="return confirm('Post this invoice? Stock will be updated and a GL entry created. This cannot be undone.');"
      style="background:#28a745;color:white;padding:4px 12px;border-radius:3px;text-decoration:none;">Post Invoice</a>
   [% END %]
+  [% IF invoice.status == 'posted' %]
+  &nbsp;|&nbsp;
+  <a href="/Inventory/invoice/reprocess_stock/[% invoice.id %]"
+     onclick="return confirm('Reprocess stock from this invoice? Already-recorded lines will be skipped. Safe to run on posted invoices where stock was not updated.');"
+     style="background:#fd7e14;color:white;padding:4px 12px;border-radius:3px;text-decoration:none;">&#x21BB; Reprocess Stock</a>
+  [% END %]
 </p>
 
 <table cellpadding="6">
