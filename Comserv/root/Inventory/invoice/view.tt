@@ -21,6 +21,15 @@
      onclick="return confirm('Reprocess stock from this invoice? Already-recorded lines will be skipped. Safe to run on posted invoices where stock was not updated.');"
      style="background:#fd7e14;color:white;padding:4px 12px;border-radius:3px;text-decoration:none;">&#x21BB; Reprocess Stock</a>
   [% END %]
+  [% IF !invoice.gl_entry_id && (invoice.status == 'posted' || invoice.status == 'paid' || invoice.status == 'outstanding') %]
+  &nbsp;|&nbsp;
+  <a href="/Inventory/invoice/create_gl/[% invoice.id %]"
+     onclick="return confirm('Create GL (double-entry) journal entries for this invoice? For paid invoices this also records the payment clearing entry.');"
+     style="background:#6f42c1;color:white;padding:4px 12px;border-radius:3px;text-decoration:none;">&#x2295; Create GL Entry</a>
+  [% END %]
+  [% IF invoice.gl_entry_id %]
+  &nbsp;|&nbsp;<small style="color:#6c757d;">GL #[% invoice.gl_entry_id %]</small>
+  [% END %]
 </p>
 
 <table cellpadding="6">
