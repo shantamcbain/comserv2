@@ -644,4 +644,19 @@ if (submittedLines.length) {
   addLine();
   calcTotal();
 }
+
+// Event delegation — catches input/change on dynamically created qty/cost fields
+// even if inline oninput/onchange handlers silently fail
+(function() {
+  function handleLineInput(e) {
+    var name = (e.target && e.target.name) || '';
+    var m = name.match(/^(quantity|unit_cost)_(\d+)$/);
+    if (m) calcLine(parseInt(m[2], 10));
+  }
+  var body = document.getElementById('lines-body');
+  if (body) {
+    body.addEventListener('input',  handleLineInput);
+    body.addEventListener('change', handleLineInput);
+  }
+})();
 </script>
