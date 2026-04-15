@@ -1870,6 +1870,12 @@ sub reset_session :Global {
 sub begin :Private {
     my ($self, $c) = @_;
     
+    # Skip all site/session setup for health check endpoints.
+    # Health checks run every 30s from Docker — no DB, no session, no logging needed.
+    if ($c->req->path =~ m{^/health(?:/|$)}) {
+        return;
+    }
+
     # Store request start time for timing analysis
     $c->stash->{_request_start_time} = time();
     $c->stash->{_request_start_hires} = [gettimeofday()];
