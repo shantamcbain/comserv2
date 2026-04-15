@@ -3,6 +3,8 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 use POSIX qw(strftime);
+use LWP::UserAgent;
+use JSON;
 
 has 'logging' => (
     is      => 'ro',
@@ -622,6 +624,90 @@ sub api_gl_view :Path('/Accounting/api/gl') :Args(1) {
     $c->res->content_type('application/json');
     $c->res->body(JSON::encode_json($result));
     $c->detach;
+}
+
+
+# -------------------------------------------------------------------------
+# GET /Accounting/api/exchange_rates?base=CAD
+# Returns live exchange rates from open.er-api.com (no key required).
+# Response: { base, rates: { USD: 0.72, EUR: 0.66, ... }, updated }
+# Cached in stash for 1 hour via session.
+# -------------------------------------------------------------------------
+sub api_exchange_rates :Path('/Accounting/api/exchange_rates') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $base = $c->req->params->{base} || 'CAD';
+    $base = uc($base);
+    $base =~ s/[^A-Z]//g;
+
+    my $cache_key = "fx_rates_$base";
+    my $cached    = $c->session->{$cache_key};
+    my $cache_age = $c->session->{"${cache_key}_ts"} || 0;
+    my $now       = time();
+
+    if ($cached && ($now - $cache_age) < 3600) {
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json($cached));
+        $c->detach;
+        return;
+    }
+
+    my $ua  = LWP::UserAgent->new(timeout => 8);
+    my $url = "https://open.er-api.com/v6/latest/$base";
+    my $resp = eval { $ua->get($url) };
+
+    my $result;
+    if ($resp && $resp->is_success) {
+        my $data = eval { JSON::decode_json($resp->decoded_content) };
+        if ($data && $data->{result} eq 'success') {
+            $result = {
+                base    => $data->{base_code},
+                rates   => $data->{rates},
+                updated => $data->{time_last_update_utc},
+            };
+            $c->session->{$cache_key}         = $result;
+            $c->session->{"${cache_key}_ts"}  = $now;
+        }
+    }
+
+    unless ($result) {
+        $result = { error => 'Could not fetch exchange rates', base => $base, rates => {} };
+        $c->res->status(503);
+    }
+
+    $c->res->content_type('application/json');
+    $c->res->body(JSON::encode_json($result));
+    $c->detach;
+}
+
+# -------------------------------------------------------------------------
+# Helper: fetch a single exchange rate  base→target  (returns decimal or 1)
+# Used by invoice save actions to compute functional_amount.
+# -------------------------------------------------------------------------
+sub _fetch_rate {
+    my ($self, $c, $from, $to) = @_;
+    return 1 if !$from || !$to || uc($from) eq uc($to);
+
+    my $base  = uc($from);
+    my $cache_key = "fx_rates_$base";
+    my $cached    = $c->session->{$cache_key};
+    my $cache_age = $c->session->{"${cache_key}_ts"} || 0;
+
+    unless ($cached && (time() - $cache_age) < 3600) {
+        my $ua   = LWP::UserAgent->new(timeout => 8);
+        my $resp = eval { $ua->get("https://open.er-api.com/v6/latest/$base") };
+        if ($resp && $resp->is_success) {
+            my $data = eval { JSON::decode_json($resp->decoded_content) };
+            if ($data && $data->{result} eq 'success') {
+                $cached = { base => $data->{base_code}, rates => $data->{rates} };
+                $c->session->{$cache_key}        = $cached;
+                $c->session->{"${cache_key}_ts"} = time();
+            }
+        }
+    }
+
+    return 1 unless $cached && $cached->{rates};
+    return $cached->{rates}{ uc($to) } // 1;
 }
 
 __PACKAGE__->meta->make_immutable;

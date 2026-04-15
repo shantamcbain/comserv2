@@ -64,6 +64,17 @@ __PACKAGE__->add_columns(
         is_nullable   => 0,
         default_value => 'CAD',
     },
+    exchange_rate => {
+        data_type     => 'decimal',
+        size          => [12, 6],
+        is_nullable   => 1,
+        default_value => '1.000000',
+    },
+    functional_amount => {
+        data_type     => 'decimal',
+        size          => [12, 2],
+        is_nullable   => 1,
+    },
     sitename => {
         data_type   => 'varchar',
         size        => 100,
