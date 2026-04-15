@@ -501,13 +501,15 @@ sub send_hosting_signup_notification {
     my $smtp_config = $self->get_smtp_config($c, 'CSC');
     return 0 unless $smtp_config->{smtp_host};
 
-    my $csc_site    = $c->model('DBEncy')->resultset('Site')->search({ name => 'CSC' })->single;
-    my $csc_email   = ($csc_site && $csc_site->mail_to_admin)
+    my $csc_site  = $c->model('DBEncy')->resultset('Site')->search({ name => 'CSC' })->single;
+    my $csc_email = ($csc_site && $csc_site->mail_to_admin)
         ? $csc_site->mail_to_admin
         : 'helpdesk@computersystemconsulting.ca';
 
-    my $timestamp   = scalar localtime;
-    my $approve_url = $c->uri_for('/membership/admin/hosting_accounts')->as_string;
+    # Always use the canonical CSC URL — not the submitting server's URL
+    my $approve_url = 'https://computersystemconsulting.ca/membership/admin/hosting_accounts';
+
+    my $timestamp = scalar localtime;
 
     my $body = qq{
 CSC Hosting Registration Request
@@ -528,10 +530,27 @@ ACTION: Review and approve this request at:
 This is an automated notification from the Comserv platform.
 };
 
+    # Collect all recipient emails: CSC admin + all users with admin or accounting role
+    my %seen_emails = ($csc_email => 1);
+    my @recipients  = ($csc_email);
+    eval {
+        my @admin_users = $c->model('DBEncy')->resultset('User')->search([
+            { roles => { -like => '%admin%' } },
+            { roles => { -like => '%accounting%' } },
+        ], { columns => ['email', 'email_notifications'] })->all;
+        for my $u (@admin_users) {
+            next unless $u->email && $u->email_notifications;
+            next if $seen_emails{ $u->email }++;
+            push @recipients, $u->email;
+        }
+    };
+
+    my $to_header = join(', ', @recipients);
+
     my $email = Email::MIME->create(
         header_str => [
             From    => $smtp_config->{smtp_from} || 'noreply@computersystemconsulting.ca',
-            To      => $csc_email,
+            To      => $to_header,
             Subject => "[CSC] Hosting registration request: " . $account->sitename,
         ],
         attributes => { encoding => 'quoted-printable', charset => 'UTF-8' },

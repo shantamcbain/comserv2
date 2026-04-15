@@ -401,22 +401,28 @@ sub get_system_notifications {
         }
     };
     
-    # Check for pending CSC hosting registrations (CSC site only)
+    # Check for pending CSC hosting registrations — visible to admin/accounting on ANY server
     eval {
-        my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
-        if (lc($site_name) eq 'csc') {
+        my $user_roles = $c->session->{roles} || '';
+        my $is_admin_or_accounting = ($user_roles =~ /admin|accounting/i);
+        if ($is_admin_or_accounting) {
             my $pending = $c->model('DBEncy')->resultset('HostingAccount')->search(
                 { status => 'pending' }
             )->count;
             if ($pending > 0) {
+                # Always link to canonical CSC URL so admin can reach approval page from any server
+                my $approve_url = 'https://computersystemconsulting.ca/membership/admin/hosting_accounts';
                 push @notifications, {
                     type    => 'warning',
-                    message => "$pending pending hosting registration(s) require CSC approval",
-                    link    => $c->uri_for('/membership/admin/hosting_accounts'),
+                    message => "$pending pending CSC hosting registration(s) require approval",
+                    link    => $approve_url,
                 };
             }
+        }
 
-            # Recently paid hosting invoices (last 48h)
+        # Recently paid hosting invoices (last 48h) — CSC site or admin/accounting users
+        my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+        if (lc($site_name) eq 'csc' || ($user_roles =~ /admin|accounting/i)) {
             my $cutoff = DateTime->now->subtract(hours => 48)->strftime('%Y-%m-%d %H:%M:%S');
             my @paid = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search(
                 { sitename => { '!=' => 'CSC' }, status => 'paid',
@@ -428,7 +434,7 @@ sub get_system_notifications {
                     type    => 'success',
                     message => 'Payment received: ' . $inv->sitename . ' — ' . $inv->invoice_number
                                . ' (CAD ' . $inv->total_amount . ')',
-                    link    => $c->uri_for('/Inventory/invoice/view/' . $inv->id),
+                    link    => 'https://computersystemconsulting.ca/Inventory/sales',
                 };
             }
         }
