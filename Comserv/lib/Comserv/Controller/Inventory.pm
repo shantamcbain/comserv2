@@ -1066,7 +1066,6 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
                     unit_cost        => $params->{unit_cost} || undef,
                     reference_number => $params->{reference_number},
                     todo_id          => $params->{todo_id} || undef,
-                    gl_entry_id      => $gl_entry_id || undef,
                     sitename         => $sitename,
                     notes            => $params->{notes},
                     performed_by     => $c->session->{username} || 'system',
@@ -1703,11 +1702,14 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
                         transaction_type => 'receive',
                         quantity         => $line->quantity,
                         unit_cost        => $line->unit_cost,
-                        reference        => $ref,
+                        reference_number => $ref,
+                        sitename         => $sitename,
+                        performed_by     => $c->session->{username} || 'system',
                         transaction_date => $invoice->invoice_date,
-                        created_by       => $c->session->{username} || 'system',
+                        created_at       => $self->_now(),
                     });
                 };
+                warn "InventoryTransaction create error: $@" if $@;
             }
 
             if ($invoice->ap_account_id && $invoice->total_amount > 0) {
@@ -1804,7 +1806,7 @@ sub invoice_reprocess_stock :Path('/Inventory/invoice/reprocess_stock') :Args(1)
                     item_id          => $line->item_id,
                     location_id      => $loc_id,
                     transaction_type => 'receive',
-                    reference        => $ref,
+                    reference_number => $ref,
                 })->count;
 
                 if ($already) {
@@ -1825,9 +1827,11 @@ sub invoice_reprocess_stock :Path('/Inventory/invoice/reprocess_stock') :Args(1)
                     transaction_type => 'receive',
                     quantity         => $line->quantity,
                     unit_cost        => $line->unit_cost,
-                    reference        => $ref,
+                    reference_number => $ref,
+                    sitename         => $sitename,
+                    performed_by     => $c->session->{username} || 'system',
                     transaction_date => $invoice->invoice_date,
-                    created_by       => $c->session->{username} || 'system',
+                    created_at       => $self->_now(),
                 });
 
                 push @log, "$item_nm: +${\$line->quantity} @ location $loc_id";
