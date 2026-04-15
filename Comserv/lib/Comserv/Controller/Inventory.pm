@@ -1235,37 +1235,42 @@ sub stock_levels :Path('/Inventory/stock/levels') :Args(0) {
 
     my (@stock_rows, @items, @locations);
     eval {
-        @items     = $schema->resultset('InventoryItem')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
-        @locations = $schema->resultset('InventoryLocation')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
+        my %item_search = (sitename => $sitename, status => 'active');
+        $item_search{id} = $item_id if $item_id;
 
-        my %sl_search;
-        if ($item_id) {
-            $sl_search{'item.id'}      = $item_id;
-        } else {
-            $sl_search{'item.sitename'} = $sitename;
-        }
-        $sl_search{'me.location_id'} = $location_id if $location_id;
+        @items     = $schema->resultset('InventoryItem')->search(\%item_search, { order_by => 'name' })->all;
+        @locations = $schema->resultset('InventoryLocation')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' })->all;
 
-        my @raw = $schema->resultset('InventoryStockLevel')->search(
-            \%sl_search,
-            {
-                prefetch => ['item', 'location'],
-                order_by => ['item.name', 'location.name'],
+        for my $item (@items) {
+            my %sl_search = (item_id => $item->id);
+            $sl_search{location_id} = $location_id if $location_id;
+
+            my @sls = $schema->resultset('InventoryStockLevel')->search(
+                \%sl_search,
+                { prefetch => 'location', order_by => 'location.name' }
+            )->all;
+
+            if (@sls) {
+                for my $sl (@sls) {
+                    my $reorder = defined $item->reorder_point ? $item->reorder_point : 0;
+                    my $is_low  = ($reorder > 0 && $sl->quantity_on_hand <= $reorder) ? 1 : 0;
+                    next if $low_only && !$is_low;
+                    push @stock_rows, {
+                        sl       => $sl,
+                        item     => $item,
+                        location => $sl->location,
+                        is_low   => $is_low,
+                    };
+                }
+            } else {
+                next if $low_only;
+                push @stock_rows, {
+                    sl       => undef,
+                    item     => $item,
+                    location => undef,
+                    is_low   => 0,
+                };
             }
-        );
-
-        for my $sl (@raw) {
-            my $item     = $sl->item;
-            my $location = $sl->location;
-            my $reorder  = defined $item->reorder_point ? $item->reorder_point : 0;
-            my $is_low   = ($reorder > 0 && $sl->quantity_on_hand <= $reorder) ? 1 : 0;
-            next if $low_only && !$is_low;
-            push @stock_rows, {
-                sl       => $sl,
-                item     => $item,
-                location => $location,
-                is_low   => $is_low,
-            };
         }
     };
     push @{$c->stash->{debug_errors}}, "Error loading stock levels: $@" if $@;
