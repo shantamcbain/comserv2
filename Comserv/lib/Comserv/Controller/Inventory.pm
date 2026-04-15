@@ -2479,6 +2479,88 @@ sub print_bom :Path('/Inventory/print/bom') :Args(1) {
 # Point System Integration — Timesheet
 # -------------------------------------------------------------------------
 
+sub seed_filaments :Path('/Inventory/seed_filaments') :Args(0) {
+    my ($self, $c) = @_;
+    return $c->res->redirect($c->uri_for('/user/login')) unless $c->session->{username};
+    my $role = $c->session->{role} || '';
+    unless ($role =~ /admin/i) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        return $c->res->redirect($c->uri_for('/Inventory'));
+    }
+
+    my $target_site = $c->req->query_parameters->{sitename} || '3d';
+    my $schema = $self->_schema($c);
+    my $now    = $self->_now();
+    my $by     = $c->session->{username} || 'system';
+
+    my @filaments = (
+        { sku => 'MAT3D-NYLON-WHT',  name => 'Nylon White Filament 1kg',                brand => 'Mater3D' },
+        { sku => 'MAT3D-PETG-BLU',   name => 'PET-G Blue Filament 1kg',                 brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-YEL',    name => 'PLA Yellow Filament 1kg',                  brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-BLK',    name => 'PLA Black Filament 1kg',                   brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-RED',    name => 'PLA Red Filament 1kg',                     brand => 'Mater3D' },
+        { sku => 'MAT3D-PETG-RED',   name => 'PET-G Red Filament 1kg',                   brand => 'Mater3D' },
+        { sku => 'MAT3D-PETG-TRNBR', name => 'PET-G Transparent Brown Filament 1kg',     brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-NTR',    name => 'PLA Neutral Filament 1kg',                 brand => 'Mater3D' },
+        { sku => 'MAT3D-BAMB-CHBR',  name => 'PLA Bamboo Chocolate Brown Filament 1kg',  brand => 'Mater3D' },
+        { sku => 'MAT3D-BAMB-SLGR',  name => 'PLA Bamboo Slate Gray Filament 1kg',       brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-WD',     name => 'PLA Wood Filament 1kg',                    brand => 'Mater3D' },
+        { sku => 'MAT3D-PETG-CLR',   name => 'PET-G Clear Filament 1kg',                 brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-GRN',    name => 'PLA Green Filament 1kg',                   brand => 'Mater3D' },
+        { sku => 'MAT3D-BAMB-WHT',   name => 'Bamboo PLA White Filament 1kg',            brand => 'Mater3D' },
+        { sku => 'MAT3D-BAMB-BLU',   name => 'Bamboo PLA Blue Filament 1kg',             brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-SPGR',   name => 'PLA Space Gray Filament 1kg',              brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-BRN',    name => 'PLA Brown Filament 1kg',                   brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-GRY',    name => 'PLA Gray Filament 1kg',                    brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-LTBR',   name => 'PLA Light Brown Filament 1kg',             brand => 'Mater3D' },
+        { sku => 'PM-TPU90',         name => 'Polly Maker TPU90 Filament 1kg',            brand => 'Polymaker' },
+        { sku => 'KEXL-LTBR',        name => 'Kexcllish Light Brown Filament 1kg',       brand => 'Kexcllish' },
+    );
+
+    my ($created, $skipped) = (0, 0);
+    my @log;
+    for my $f (@filaments) {
+        my $exists = eval {
+            $schema->resultset('InventoryItem')->search({
+                sitename => $target_site,
+                sku      => $f->{sku},
+            })->count;
+        };
+        if ($exists) {
+            push @log, "$f->{sku}: skipped (exists)";
+            $skipped++;
+            next;
+        }
+        eval {
+            $schema->resultset('InventoryItem')->create({
+                sitename        => $target_site,
+                sku             => $f->{sku},
+                name            => $f->{name},
+                description     => $f->{brand} . ' filament for 3D printing. 1kg spool.',
+                item_origin     => 'purchased',
+                is_consumable   => 1,
+                is_reusable     => 0,
+                unit_of_measure => 'spool',
+                status          => 'active',
+                created_by      => $by,
+                updated_by      => $by,
+                created_at      => $now,
+                updated_at      => $now,
+            });
+        };
+        if ($@) {
+            push @log, "$f->{sku}: ERROR — $@";
+        } else {
+            push @log, "$f->{sku}: created";
+            $created++;
+        }
+    }
+
+    $c->flash->{success_msg} = "Filament seed complete: $created created, $skipped skipped. "
+        . join(' | ', @log);
+    $c->res->redirect($c->uri_for('/Inventory/items'));
+}
+
 sub timesheet :Path('/Inventory/timesheet') :Args(0) {
     my ($self, $c) = @_;
 
