@@ -33,13 +33,8 @@ __PACKAGE__->add_columns(
         size        => 255,
         is_nullable => 1,
     },
-    customer_phone => {
-        data_type   => 'varchar',
-        size        => 50,
-        is_nullable => 1,
-    },
-    customer_address => {
-        data_type   => 'text',
+    invoice_date => {
+        data_type   => 'date',
         is_nullable => 1,
     },
     user_id => {
