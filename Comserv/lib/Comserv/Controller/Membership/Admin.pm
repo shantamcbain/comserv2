@@ -1084,8 +1084,8 @@ sub seed_hosting_plans :Local :Args(0) {
             name             => 'Subdomain Hosting',
             slug             => 'hosting-subdomain',
             description      => 'Get your own subdomain on any registered SiteName domain (e.g. you.forager.com). Your site runs as an app on the CSC platform — no cPanel required. Includes full access to ENCY, AI tools, and planning modules.',
-            price_monthly    => '10.00',
-            price_annual     => '100.00',
+            price_monthly    => '6.00',
+            price_annual     => '60.00',
             price_currency   => 'CAD',
             ai_models_allowed   => '["llama3.2","mistral"]',
             ai_requests_per_day => 20,
@@ -1124,6 +1124,7 @@ sub seed_hosting_plans :Local :Args(0) {
                     { site_id => $csc->id, slug => $plan->{slug} }
                 )->single;
                 if ($exists) {
+                    $exists->update({ %$plan });
                     $skipped++;
                 } else {
                     $db->resultset('MembershipPlan')->create({
