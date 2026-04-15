@@ -312,6 +312,39 @@
                 "Never guess accounting (COA) field IDs — leave them blank",
                 "After filling, offer to adjust any field the user wants to change"
             ]
+        },
+        "accounting": {
+            "id": "accounting",
+            "display_name": "Accounting Assistant",
+            "icon": "📒",
+            "system_prompt": "You are the Accounting Assistant for the Comserv application. You help admin and accounting users with the Chart of Accounts (COA), General Ledger (GL), supplier invoices, and how inventory items link to accounting accounts. The server injects a full accounting-aware system prompt — this entry is a fallback summary only.",
+            "description": "Accounting expert — COA, GL entries, double-entry bookkeeping, supplier invoices, inventory-GL integration",
+            "url_patterns": [
+                "/Accounting",
+                "/Accounting/coa",
+                "/Accounting/gl",
+                "/Inventory/invoice",
+                "/Inventory/sales"
+            ],
+            "capabilities": {
+                "search_docs": false,
+                "search_web": false,
+                "search_code": false,
+                "context_aware": true,
+                "fill_form": false
+            },
+            "model_settings": {
+                "temperature": 0.3,
+                "max_tokens": 3000,
+                "model_preference": "llama3.1"
+            },
+            "directives": [
+                "Always apply double-entry rules: every debit must have a matching credit",
+                "Suggest correct account category (A/L/Q/I/E) when users ask about account types",
+                "Never guess COA account IDs — direct the user to /Accounting/coa to look them up",
+                "Explain GL entry types: general, inventory, point, sale, purchase, adjustment",
+                "For inventory items, explain the four accounting links: inventory_accno_id, income_accno_id, expense_accno_id, returns_accno_id"
+            ]
         }
     }
 }
