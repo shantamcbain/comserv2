@@ -5,6 +5,237 @@
 
 [% IF error_msg %]<p style="color:red;font-weight:bold">[% error_msg %]</p>[% END %]
 
+[% IF is_admin || c.stash.is_admin || c.session.is_admin %]
+<div id="ai-invoice-parser"
+     style="margin:0 0 1.4em;padding:1em;border:1px solid #acd;background:#f0f7ff;border-radius:6px;">
+  <strong style="font-size:1.05em;">📄 AI Invoice Parser</strong>
+  <span style="font-size:0.85em;color:#555;margin-left:0.5em;">
+    Paste any invoice text — AI will extract and fill the form fields automatically.
+  </span>
+
+  <div style="margin-top:0.7em;">
+    <textarea id="invoice-paste-text" rows="7"
+      placeholder="Paste your invoice text here (e.g. Freedom Mobile bill, hydro statement, supplier receipt)…"
+      style="width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;font-size:0.85em;resize:vertical;box-sizing:border-box;"></textarea>
+  </div>
+
+  <div style="margin-top:0.5em;display:flex;flex-wrap:wrap;gap:0.5em;align-items:center;">
+    <select id="invoice-ai-model"
+            style="font-size:0.9em;padding:3px 5px;border:1px solid #ccc;border-radius:4px;">
+      <option value="">Loading models…</option>
+    </select>
+    <button type="button" id="invoice-parse-btn"
+            style="padding:5px 14px;background:#0077cc;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">
+      Parse Invoice with AI
+    </button>
+    <span id="invoice-parse-status" style="color:#555;font-style:italic;font-size:0.9em;"></span>
+  </div>
+
+  <div id="invoice-parse-raw" style="display:none;margin-top:0.6em;">
+    <strong style="font-size:0.85em;">AI Raw Response:</strong>
+    <pre id="invoice-parse-raw-text"
+         style="background:#eee;padding:0.5em;max-height:140px;overflow:auto;font-size:0.82em;white-space:pre-wrap;"></pre>
+  </div>
+</div>
+
+<script>
+(function() {
+    function loadInvoiceModels() {
+        var sel = document.getElementById('invoice-ai-model');
+        if (!sel) return;
+        fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var opts = [];
+                if (data.providers) {
+                    data.providers.forEach(function(p) {
+                        if (p.service === 'ollama' && p.models) {
+                            p.models.filter(function(m){ return m.id && !m.id.match(/embed|rerank/i); })
+                                .forEach(function(m){ opts.push({ val: m.id+'|ollama', label: m.id+' (Ollama)' }); });
+                        }
+                        if (p.service === 'grok' && p.models) {
+                            p.models.filter(function(m){ return m.id && !m.id.match(/imagine|video/i); })
+                                .forEach(function(m){
+                                    var lbl = m.id.replace(/-/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
+                                    opts.push({ val: m.id+'|grok', label: lbl+' (Grok/xAI)' });
+                                });
+                        }
+                    });
+                }
+                if (!opts.length) opts = [{ val: 'mistral:latest|ollama', label: 'mistral:latest (Ollama)' }];
+                sel.innerHTML = '';
+                opts.forEach(function(o, i) {
+                    var opt = document.createElement('option');
+                    opt.value = o.val; opt.textContent = o.label;
+                    if (i === 0) opt.selected = true;
+                    sel.appendChild(opt);
+                });
+            })
+            .catch(function() {
+                sel.innerHTML = '<option value="mistral:latest|ollama">mistral:latest (Ollama)</option>';
+            });
+    }
+    loadInvoiceModels();
+
+    document.getElementById('invoice-parse-btn').addEventListener('click', function() {
+        var text = (document.getElementById('invoice-paste-text').value || '').trim();
+        if (!text) { alert('Please paste the invoice text first.'); return; }
+
+        var sel   = document.getElementById('invoice-ai-model');
+        var parts = (sel && sel.value) ? sel.value.split('|') : ['mistral:latest', 'ollama'];
+        var model = parts[0], provider = parts[1] || 'ollama';
+
+        var btn      = document.getElementById('invoice-parse-btn');
+        var statusEl = document.getElementById('invoice-parse-status');
+        btn.disabled = true;
+        statusEl.textContent = 'Parsing with ' + model + '…';
+        document.getElementById('invoice-parse-raw').style.display = 'none';
+
+        var SYSTEM = [
+            'You are an accounting assistant that parses invoice/bill text and extracts structured data.',
+            'Return ONLY a raw JSON object with these fields (omit any you cannot find):',
+            '  supplier_name (string — exact company name on the bill),',
+            '  invoice_number (string),',
+            '  invoice_date (YYYY-MM-DD),',
+            '  due_date (YYYY-MM-DD),',
+            '  notes (brief description e.g. "Phone service 250-549-0126 Apr 2026"),',
+            '  tax_amount (decimal number — total of GST+PST+HST, not individual amounts),',
+            '  shipping_amount (decimal if any),',
+            '  discount_amount (decimal if any — positive number, will be subtracted),',
+            '  lines (array of objects, one per billing line item, each with:',
+            '    description (string), quantity (number, default 1), unit_cost (decimal — use negative for discounts/credits))',
+            'Do not include markdown, code fences, or commentary. Return pure JSON only.',
+            'For phone bills: group base plan separately from add-ons and discounts.',
+            'Tax lines (GST/PST/HST) go in tax_amount, NOT in lines array.',
+        ].join(' ');
+
+        var timeoutMs = provider === 'grok' ? 45000 : 120000;
+        var ctrl = new AbortController();
+        var tid  = setTimeout(function() { ctrl.abort(); }, timeoutMs);
+
+        fetch('/ai/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            signal: ctrl.signal,
+            body: JSON.stringify({
+                prompt:     'Parse this invoice and return structured JSON:\n\n' + text,
+                system:     SYSTEM,
+                provider:   provider,
+                model:      model,
+                agent_id:   'accounting',
+                page_path:  window.location.pathname,
+                page_title: document.title
+            })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            clearTimeout(tid);
+            btn.disabled = false;
+            var rawEl = document.getElementById('invoice-parse-raw-text');
+            var raw   = (data.response || '').trim();
+            rawEl.textContent = raw;
+            document.getElementById('invoice-parse-raw').style.display = '';
+
+            if (!data.success) {
+                statusEl.textContent = 'AI error: ' + (data.error || 'unknown');
+                return;
+            }
+
+            var js = raw.indexOf('{'), je = raw.lastIndexOf('}');
+            if (js === -1 || je === -1) {
+                statusEl.textContent = 'AI did not return JSON. See raw response.';
+                return;
+            }
+
+            var inv;
+            try { inv = JSON.parse(raw.substring(js, je + 1)); }
+            catch(e) { statusEl.textContent = 'Could not parse JSON: ' + e.message; return; }
+
+            var filled = 0, warnings = [];
+
+            function setField(id, val) {
+                var el = document.getElementById(id);
+                if (el && val !== undefined && val !== null && String(val).trim() !== '') {
+                    el.value = val; filled++;
+                }
+            }
+
+            function setFieldByName(name, val) {
+                var el = document.querySelector('[name="' + name + '"]');
+                if (el && val !== undefined && val !== null && String(val).trim() !== '') {
+                    el.value = val; filled++;
+                }
+            }
+
+            // Supplier — try to match by name in dropdown
+            if (inv.supplier_name) {
+                var supSel = document.getElementById('supplier_id');
+                if (supSel) {
+                    var matched = false;
+                    var nameLC  = inv.supplier_name.toLowerCase();
+                    for (var i = 0; i < supSel.options.length; i++) {
+                        if (supSel.options[i].text.toLowerCase().indexOf(nameLC) !== -1 ||
+                            nameLC.indexOf(supSel.options[i].text.toLowerCase()) !== -1) {
+                            supSel.selectedIndex = i; matched = true; filled++; break;
+                        }
+                    }
+                    if (!matched) {
+                        warnings.push('Supplier "' + inv.supplier_name + '" not found — '
+                            + '<a href="/Inventory/supplier/add" target="_blank">add supplier</a> then refresh.');
+                    }
+                }
+            }
+
+            setField('invoice_number', inv.invoice_number);
+            setField('invoice_date',   inv.invoice_date);
+            setField('due_date',       inv.due_date);
+            setField('notes',          inv.notes);
+            setField('tax_amount',     inv.tax_amount);
+            setField('shipping_amount', inv.shipping_amount);
+            setField('discount_amount', inv.discount_amount);
+
+            // Line items
+            if (inv.lines && inv.lines.length) {
+                // Clear existing blank first line if it exists
+                var existingRows = document.querySelectorAll('#lines-body tr');
+                var allBlank = true;
+                existingRows.forEach(function(row) {
+                    var desc = row.querySelector('[name^="description_"]');
+                    if (desc && desc.value.trim()) allBlank = false;
+                });
+                if (allBlank) {
+                    existingRows.forEach(function(r) { r.remove(); });
+                }
+
+                inv.lines.forEach(function(line) {
+                    addLine({
+                        description: line.description || '',
+                        quantity:    line.quantity    || 1,
+                        unit_cost:   typeof line.unit_cost === 'number'
+                                        ? line.unit_cost.toFixed(2)
+                                        : (line.unit_cost || '0.00')
+                    });
+                });
+                filled += inv.lines.length;
+                calcTotal();
+            }
+
+            var msg = '✓ Filled ' + filled + ' fields.';
+            if (warnings.length) msg += ' ⚠ ' + warnings.join(' ');
+            statusEl.innerHTML = msg;
+        })
+        .catch(function(err) {
+            clearTimeout(tid);
+            document.getElementById('invoice-parse-btn').disabled = false;
+            document.getElementById('invoice-parse-status').textContent =
+                err.name === 'AbortError' ? 'Timed out — try a faster model.' : 'Error: ' + err.message;
+        });
+    });
+})();
+</script>
+[% END %]
+
 <form method="POST" action="/Inventory/invoice/new" id="invoice-form">
 
 <table cellpadding="6">
