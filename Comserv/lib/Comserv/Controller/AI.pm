@@ -452,7 +452,7 @@ sub generate :Local :Args(0) {
     # Normalize agent_type to database enum values
     # Normalize agent_type for dynamic storage (was database enum)
     my $normalized_agent_type = $agent_id || 'general';
-    if ($agent_id && $agent_id =~ /^(documentation|helpdesk|ency|beekeeping|hamradio|chat|cleanup|cleanup-agent|docker|master-plan-updater|daily-audit|daily-plan-automator|master-plan-manager|daily-plans-generator|daily-plans|documentation-sync|main|MainAgent|planning|3dprint|prompt-logging|general)$/i) {
+    if ($agent_id && $agent_id =~ /^(documentation|helpdesk|ency|beekeeping|hamradio|chat|cleanup|cleanup-agent|docker|master-plan-updater|daily-audit|daily-plan-automator|master-plan-manager|daily-plans-generator|daily-plans|documentation-sync|main|MainAgent|planning|3dprint|accounting|prompt-logging|general)$/i) {
         $normalized_agent_type = lc($agent_id);
         # Special case for MainAgent which is camelcase in enum
         $normalized_agent_type = 'MainAgent' if lc($agent_id) eq 'mainagent';
@@ -496,6 +496,12 @@ sub generate :Local :Args(0) {
         $system = $self->_build_3dprint_system_prompt($c);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
             'generate', "3DPrint agent: injected system prompt");
+    }
+
+    if (lc($normalized_agent_type) eq 'accounting' && !$system) {
+        $system = $self->_build_accounting_system_prompt($c);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'generate', "Accounting agent: injected system prompt");
     }
 
     # Require login for external AI models (Grok etc.) before entering try block
@@ -545,6 +551,9 @@ sub generate :Local :Args(0) {
     my $inject_prompt = $prompt;
     if ($normalized_agent_type =~ /^(planning|ency|bmaster)$/i) {
         $inject_prompt = "project todo $prompt";
+    }
+    if ($normalized_agent_type =~ /^accounting$/i) {
+        $inject_prompt = "inventory accounting gl coa invoice $prompt";
     }
     my $module_data_gen = $self->_get_module_data($c, $inject_prompt, $agent_id);
     if ($module_data_gen) {
@@ -958,8 +967,8 @@ sub generate :Local :Args(0) {
             # Pass 1: trim history messages.  Pass 1.5: drop oldest history pairs.
             # Pass 2: strip page_content from system.  Pass 3: hard-cap system prompt.
             # Planning/ENCY/BMaster agents have large injected system prompts — raise limits.
-            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint)) ? 16_000 : 8_000;
-            my $SYS_MAX_CHARS = $normalized_agent_type eq 'planning' ? 12_000 : 6_000;
+            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint accounting)) ? 16_000 : 8_000;
+            my $SYS_MAX_CHARS = ($normalized_agent_type =~ /^(planning|accounting)$/) ? 12_000 : 6_000;
             my $raw_total_gen = 0;
             $raw_total_gen += length($_->{content} || '') for @ollama_msgs;
             if ($raw_total_gen > $BUDGET_CHARS) {
@@ -1860,6 +1869,10 @@ sub chat :Local :Args(0) {
 
     if (lc($chat_agent_id) eq '3dprint' && !$chat_agent_system) {
         $chat_agent_system = $self->_build_3dprint_system_prompt($c);
+    }
+
+    if (lc($chat_agent_id) eq 'accounting' && !$chat_agent_system) {
+        $chat_agent_system = $self->_build_accounting_system_prompt($c);
     }
 
     # Build combined system prompt: agent-specific prompt + role prompt + live module data + shared KB
@@ -4314,6 +4327,24 @@ sub _build_navigation_command_guide {
             [ 'Add a domain to a site',     '/site/add_domain'          ],
             [ 'Site details',               '/site/details'             ],
             [ 'Modify site',                '/site/modify'              ],
+        ]],
+        [ 'Accounting', 'admin', [
+            [ 'Accounting dashboard',       '/Accounting'               ],
+            [ 'Chart of accounts',          '/Accounting/coa'           ],
+            [ 'Seed / import COA',          '/Accounting/coa/seed'      ],
+            [ 'Merge COA seed',             '/Accounting/coa/seed_merge'],
+            [ 'General ledger',             '/Accounting/gl'            ],
+        ]],
+        [ 'Inventory', 'admin', [
+            [ 'Inventory dashboard',        '/Inventory'                ],
+            [ 'Inventory items',            '/Inventory/items'          ],
+            [ 'Add inventory item',         '/Inventory/item/add'       ],
+            [ 'Suppliers',                  '/Inventory/suppliers'      ],
+            [ 'Add supplier',               '/Inventory/supplier/add'   ],
+            [ 'Supplier invoices',          '/Inventory/invoice'        ],
+            [ 'New supplier invoice',       '/Inventory/invoice/new'    ],
+            [ 'Stock transactions',         '/Inventory/stock/transactions' ],
+            [ 'Customer sales',             '/Inventory/sales'          ],
         ]],
     );
 
@@ -7613,6 +7644,125 @@ NAVIGATION URLS (use ONLY these relative URLs):
 - Filament inventory: /3dprint/filament
 - Printer status:     /3dprint/printers
 - Add print job:      /3dprint/add_job
+$editor_section
+The current user is: $username
+END_PROMPT
+}
+
+=head2 _build_accounting_system_prompt
+
+Agent for admin/accounting users working with the Inventory accounting integration,
+Chart of Accounts, General Ledger, supplier invoices, and inventory-GL linkage.
+
+=cut
+
+sub _build_accounting_system_prompt {
+    my ($self, $c) = @_;
+    my $username = $c->session->{username} || 'unknown';
+    my $editor_section = $self->_build_ai_editor_section($c);
+
+    return <<END_PROMPT;
+You are the Accounting Agent for the Comserv application.  You help admin and
+accounting users manage the Chart of Accounts, General Ledger, supplier invoices,
+inventory-accounting integration, and the Points Ledger.
+
+## YOUR ROLE
+- Answer questions about double-entry bookkeeping as it applies to this system.
+- Guide users through creating / editing COA accounts, posting GL entries, and
+  reconciling inventory movements with the ledger.
+- Explain how inventory items link to COA accounts (inventory, income, COGS, returns).
+- Help interpret GL entries generated by stock receives, adjustments, and point transactions.
+- Assist with supplier invoice entry and approval workflow.
+- Suggest correct account numbers for new items or categories.
+
+## DOUBLE-ENTRY BASICS (for context injection)
+Every financial event creates one gl_entries header + two or more gl_entry_lines
+whose amounts sum to zero (debit = positive, credit = negative).
+
+account categories:
+  A = Asset      (1xxx — Cash, Inventory, AR)
+  L = Liability  (2xxx — AP, GST/HST Payable)
+  Q = Equity     (3xxx — Retained Earnings)
+  I = Income     (4xxx — Sales, Point Income)
+  E = Expense    (5xxx/6xxx — COGS, Operating Expenses)
+
+## DATABASE SCHEMA
+
+### coa_accounts
+  id, accno (varchar 30), description, category (A/L/Q/I/E),
+  heading_id → coa_account_headings, is_contra (0/1), is_tax (0/1),
+  obsolete (0/1), link (varchar — comma-separated module tags)
+
+### coa_account_headings
+  id, accno, description, category
+
+### gl_entries
+  id, reference (unique per entry_type), description, entry_type
+  (general|inventory|point|sale|purchase|adjustment),
+  post_date, approved (0/1), is_template (0/1), currency (CAD),
+  created_by (user_id), notes
+
+### gl_entry_lines
+  id, gl_entry_id → gl_entries, account_id → coa_accounts,
+  amount (decimal — positive=debit, negative=credit),
+  memo, reconciled (0/1)
+
+### inventory_items (accounting-relevant columns)
+  id, sitename, sku, name, category,
+  inventory_accno_id → coa_accounts (asset account for stock value),
+  income_accno_id    → coa_accounts (income when sold),
+  expense_accno_id   → coa_accounts (COGS / expense when consumed),
+  returns_accno_id   → coa_accounts (contra-income for returns),
+  unit_cost, unit_price, is_consumable, is_assemblable
+
+### inventory_transactions
+  id, sitename, item_id → inventory_items,
+  transaction_type (receive|consume|adjust|transfer|assemble|disassemble),
+  quantity, unit_cost, total_cost, location_id, reference_id, notes,
+  gl_entry_id → gl_entries, created_at, created_by
+
+### inventory_supplier_invoices
+  id, sitename, supplier_id, invoice_number, invoice_date, due_date,
+  subtotal, tax_amount, shipping_amount, discount_amount, total_amount,
+  status (draft|approved|paid|voided), notes, created_at, created_by
+
+### inventory_supplier_invoice_lines
+  id, invoice_id, item_id, description, quantity, unit_cost, total_cost,
+  account_id → coa_accounts, location_id
+
+### point_ledger (Points System)
+  id, account_id → point_accounts, entry_type (earn|spend|adjust|expire),
+  points, description, reference_id, gl_entry_id → gl_entries, created_at
+
+## NAVIGATION URLS (use ONLY these relative URLs)
+- Accounting dashboard:       /Accounting
+- Chart of Accounts list:     /Accounting/coa
+- View COA account:           /Accounting/coa/view/<id>
+- Seed / import COA:          /Accounting/coa/seed
+- Merge COA seed:             /Accounting/coa/seed_merge
+- GL journal list:            /Accounting/gl
+- View GL entry:              /Accounting/gl/view/<id>
+- GL API (JSON):              /Accounting/api/gl
+- Inventory items list:       /Inventory/items
+- Add inventory item:         /Inventory/item/add
+- Edit inventory item:        /Inventory/item/edit/<id>
+- Inventory transactions:     /Inventory/stock/transactions
+- Stock adjustment:           /Inventory/stock/adjust/<id>
+- Supplier invoice list:      /Inventory/invoice
+- New supplier invoice:       /Inventory/invoice/new
+- Customer sales list:        /Inventory/sales
+- Suppliers list:             /Inventory/suppliers
+- Add supplier:               /Inventory/supplier/add
+
+## ACTIONS YOU CAN PERFORM
+When the user asks you to create or update data, respond with a JSON action block:
+
+To post a manual GL entry:
+{"action":"create_gl_entry","reference":"ADJ-2026-001","description":"Manual adjustment","post_date":"2026-04-15","lines":[{"account_id":1,"amount":100.00,"memo":"Debit inventory"},{"account_id":5,"amount":-100.00,"memo":"Credit equity"}]}
+
+Only use actions when the user explicitly requests a data change.  Always confirm
+the details before executing.
+
 $editor_section
 The current user is: $username
 END_PROMPT
