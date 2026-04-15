@@ -15,7 +15,12 @@
       <div>
         <strong style="color:#b45309;font-size:1.05rem;">&#9888; [% pending_hosting %] Hosting Registration[% IF pending_hosting > 1 %]s[% END %] Awaiting Approval</strong>
         <div style="margin-top:0.25rem;color:#78350f;">
-          A SiteName admin has submitted a CSC hosting registration request and is waiting for your approval.
+          [% FOREACH pa IN pending_hosting_sites %]
+            <span style="display:inline-block;background:#fde68a;border:1px solid #d97706;border-radius:4px;padding:0.1rem 0.5rem;margin:0.15rem 0.2rem 0.15rem 0;font-weight:bold;">
+              [% pa.sitename | html %]
+            </span>
+          [% END %]
+          [% IF pending_hosting == 1 %]has[% ELSE %]have[% END %] submitted a CSC hosting registration request and [% IF pending_hosting == 1 %]is[% ELSE %]are[% END %] waiting for your approval.
         </div>
       </div>
       <a href="[% c.uri_for('/membership/admin/hosting_accounts') %]"

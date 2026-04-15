@@ -199,13 +199,17 @@ sub index :Path :Args(0) {
     }
     
     my $pending_hosting = 0;
+    my $pending_hosting_sites = [];
     my $outstanding_invoices = [];
     eval {
         my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
         if (lc($site_name) eq 'csc') {
-            $pending_hosting = $c->model('DBEncy')->resultset('HostingAccount')->search(
-                { status => 'pending' }
-            )->count;
+            my @pending = $c->model('DBEncy')->resultset('HostingAccount')->search(
+                { status => 'pending' },
+                { order_by => { -asc => 'sitename' } }
+            )->all;
+            $pending_hosting = scalar @pending;
+            $pending_hosting_sites = \@pending;
         } else {
             my @inv = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search(
                 { sitename => $site_name, status => 'outstanding' },
@@ -224,8 +228,9 @@ sub index :Path :Args(0) {
         stats                => $stats,
         recent_activity      => $recent_activity,
         notifications        => $notifications,
-        pending_hosting      => $pending_hosting,
-        outstanding_invoices => $outstanding_invoices,
+        pending_hosting       => $pending_hosting,
+        pending_hosting_sites => $pending_hosting_sites,
+        outstanding_invoices  => $outstanding_invoices,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
