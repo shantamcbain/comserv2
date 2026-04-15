@@ -1676,17 +1676,30 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
         $schema->txn_do(sub {
             my $ref = 'INV-' . ($invoice->invoice_number || $invoice->id);
 
+            # Ensure a default location exists for this site so stock always posts
+            my $default_loc = $schema->resultset('InventoryLocation')->find_or_create(
+                { sitename => $sitename, name => 'Default' },
+                { key => 'sitename_name' }
+            );
+
             for my $line ($invoice->lines->all) {
-                if ($line->item_id && $line->location_id) {
-                    my $sl = $schema->resultset('InventoryStockLevel')->find_or_create(
-                        { item_id => $line->item_id, location_id => $line->location_id },
+                next unless $line->item_id;
+                my $loc_id = $line->location_id || $default_loc->id;
+
+                my $sl = eval {
+                    $schema->resultset('InventoryStockLevel')->find_or_create(
+                        { item_id => $line->item_id, location_id => $loc_id },
                         { key => 'item_id_location_id' }
                     );
+                };
+                if ($sl) {
                     $sl->update({ quantity_on_hand => ($sl->quantity_on_hand || 0) + $line->quantity });
+                }
 
+                eval {
                     $schema->resultset('InventoryTransaction')->create({
                         item_id          => $line->item_id,
-                        location_id      => $line->location_id,
+                        location_id      => $loc_id,
                         transaction_type => 'receive',
                         quantity         => $line->quantity,
                         unit_cost        => $line->unit_cost,
@@ -1694,7 +1707,7 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
                         transaction_date => $invoice->invoice_date,
                         created_by       => $c->session->{username} || 'system',
                     });
-                }
+                };
             }
 
             if ($invoice->ap_account_id && $invoice->total_amount > 0) {
