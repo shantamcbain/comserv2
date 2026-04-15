@@ -124,6 +124,17 @@ __PACKAGE__->add_columns(
         is_nullable   => 1,
         default_value => '0.00',
     },
+    auto_pay => {
+        data_type     => 'tinyint',
+        size          => 1,
+        is_nullable   => 0,
+        default_value => 0,
+    },
+    auto_pay_method => {
+        data_type   => 'varchar',
+        size        => 255,
+        is_nullable => 1,
+    },
 );
 
 __PACKAGE__->set_primary_key('id');
