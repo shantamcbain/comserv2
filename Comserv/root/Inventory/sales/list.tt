@@ -21,6 +21,7 @@
       <th>Due</th>
       <th>Total</th>
       <th>Status</th>
+      <th>Paid</th>
       <th>Order</th>
       <th></th>
     </tr>
@@ -31,13 +32,22 @@
     <tr style="background:[% row_bg %]">
       <td><a href="/Inventory/sales/view/[% inv.id %]">[% inv.invoice_number | html %]</a></td>
       <td>[% inv.customer_name | html %]</td>
-      <td>[% inv.invoice_date %]</td>
-      <td>[% inv.due_date || '—' %]</td>
+      <td>[% inv.invoice_date.ymd IF inv.invoice_date %]</td>
+      <td>[% inv.due_date.ymd IF inv.due_date; '—' UNLESS inv.due_date %]</td>
       <td style="text-align:right">$[% inv.total_amount %]</td>
       <td>
         [% IF inv.status == 'posted' %]<span style="color:green;font-weight:bold">Posted</span>
         [% ELSIF inv.status == 'void' %]<span style="color:red">Void</span>
         [% ELSE %]<span style="color:#666">Draft</span>
+        [% END %]
+      </td>
+      <td style="text-align:center">
+        [% IF inv.payment_status == 'paid' %]
+          <span style="color:green;font-weight:bold">&#10003; Paid</span>
+        [% ELSIF inv.amount_paid > 0 %]
+          <span style="color:#b45309">Partial $[% inv.amount_paid %]</span>
+        [% ELSE %]
+          <span style="color:#dc2626">Unpaid</span>
         [% END %]
       </td>
       <td>
