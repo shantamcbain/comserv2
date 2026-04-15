@@ -63,6 +63,8 @@
       <th>Item</th>
       <th>Location</th>
       <th>On Hand</th>
+      <th>Unit Cost</th>
+      <th>Total Value</th>
       <th>Reserved</th>
       <th>On Order</th>
       <th>Available</th>
@@ -82,6 +84,9 @@
       <td><a href="/Inventory/item/view/[% item.id %]">[% item.name %]</a></td>
       <td>[% loc ? loc.name : '-' %]</td>
       <td><strong>[% sl.quantity_on_hand %]</strong> [% item.unit_of_measure %]</td>
+      <td style="text-align:right">[% item.unit_cost ? '$' _ item.unit_cost : '—' %]</td>
+      [% SET total_val = sl.quantity_on_hand * (item.unit_cost || 0) %]
+      <td style="text-align:right">[% IF item.unit_cost %]$[% total_val | format("%.2f") %][% ELSE %]—[% END %]</td>
       <td>[% sl.quantity_reserved %]</td>
       <td>[% sl.quantity_on_order %]</td>
       <td>[% available %]</td>
