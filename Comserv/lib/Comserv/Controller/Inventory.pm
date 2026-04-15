@@ -1681,18 +1681,32 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
                 { key => 'sitename_name' }
             );
 
+            my (@stock_log, $stock_updated, $stock_skipped);
             for my $line ($invoice->lines->all) {
-                next unless $line->item_id;
+                my $item_nm = $line->description || 'line #' . ($line->id || '?');
+                unless ($line->item_id) {
+                    push @stock_log, "$item_nm: skipped (no item_id — link item in invoice edit)";
+                    $stock_skipped++;
+                    next;
+                }
                 my $loc_id = $line->location_id || $default_loc->id;
 
-                my $sl = eval {
-                    $schema->resultset('InventoryStockLevel')->find_or_create(
+                my ($sl, $sl_err);
+                eval {
+                    $sl = $schema->resultset('InventoryStockLevel')->find_or_create(
                         { item_id => $line->item_id, location_id => $loc_id },
                         { key => 'item_id_location_id' }
                     );
                 };
+                $sl_err = $@ if $@;
                 if ($sl) {
-                    $sl->update({ quantity_on_hand => ($sl->quantity_on_hand || 0) + $line->quantity });
+                    my $old_qty = $sl->quantity_on_hand || 0;
+                    $sl->update({ quantity_on_hand => $old_qty + $line->quantity });
+                    push @stock_log, "$item_nm: $old_qty → " . ($old_qty + $line->quantity);
+                    $stock_updated++;
+                } else {
+                    push @stock_log, "$item_nm: STOCK ERROR — $sl_err";
+                    $stock_skipped++;
                 }
 
                 eval {
@@ -1711,6 +1725,9 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
                 };
                 warn "InventoryTransaction create error: $@" if $@;
             }
+            $c->stash->{_stock_log}     = \@stock_log;
+            $c->stash->{_stock_updated} = $stock_updated || 0;
+            $c->stash->{_stock_skipped} = $stock_skipped || 0;
 
             if ($invoice->ap_account_id && $invoice->total_amount > 0) {
                 my $gl = $schema->resultset('GlEntry')->create({
@@ -1768,7 +1785,11 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
     if ($@) {
         $c->flash->{error_msg} = "Failed to post invoice: $@";
     } else {
-        $c->flash->{success_msg} = 'Invoice posted. Stock updated and GL entry created.';
+        my $upd  = $c->stash->{_stock_updated} || 0;
+        my $skip = $c->stash->{_stock_skipped} || 0;
+        my $log  = join(' | ', @{ $c->stash->{_stock_log} || [] });
+        $c->flash->{success_msg} = "Invoice posted. Stock: $upd item(s) updated, $skip skipped."
+            . ($log ? " Detail: $log" : '');
     }
     $c->res->redirect($c->uri_for('/Inventory/invoice/view', [$id]));
 }
