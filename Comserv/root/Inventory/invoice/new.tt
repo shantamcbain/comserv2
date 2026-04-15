@@ -102,8 +102,8 @@
             '  ap_accno (string — AP account number, almost always "2000"),',
             '  tax_amount (decimal number — total of GST+PST+HST, not individual amounts),',
             '  tax_accno (string — account number for input tax credits, e.g. "1310" or "2310"),',
-            '  shipping_amount (decimal if any),',
-            '  discount_amount (decimal if any — positive number, will be subtracted),',
+            '  shipping_amount (decimal — ONLY include if the bill explicitly shows a shipping or freight charge; omit entirely if not present),',
+            '  discount_amount (decimal — ONLY include if the bill shows a lump-sum invoice-level discount; omit if discounts are already captured as negative unit_cost lines),',
             '  lines (array of objects, one per billing line item, each with:',
             '    description (string), quantity (number, default 1), unit_cost (decimal — use negative for discounts/credits),',
             '    expense_accno (string — COA account number for this line, e.g. "6500" for phone/telecom, "6100" for utilities, "6200" for office supplies, "5000" for inventory/COGS))',
@@ -308,6 +308,26 @@
     </td>
   </tr>
   [% END %]
+  <tr>
+    <th><label for="auto_pay">Auto-Pay</label></th>
+    <td>
+      <label>
+        <input type="checkbox" id="auto_pay" name="auto_pay" value="1"
+          [% IF submitted.auto_pay %]checked[% END %]
+          onchange="document.getElementById('auto_pay_row').style.display=this.checked?'':'none'">
+        This bill is automatically charged on the due date (debit/credit card, bank auto-debit)
+      </label>
+      <div id="auto_pay_row" style="margin-top:4px;[% UNLESS submitted.auto_pay %]display:none[% END %]">
+        <input type="text" id="auto_pay_method" name="auto_pay_method"
+          placeholder="e.g. RBC Debit card auto-pay, Visa ending 4321…"
+          value="[% submitted.auto_pay_method | html %]"
+          style="width:100%;max-width:420px;">
+        <small style="display:block;color:#666;margin-top:2px;">
+          The system will alert you when the due date passes so you can confirm the charge posted.
+        </small>
+      </div>
+    </td>
+  </tr>
   <tr>
     <th><label for="notes">Notes</label></th>
     <td><textarea id="notes" name="notes" rows="2" cols="50">[% submitted.notes | html %]</textarea></td>
