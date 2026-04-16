@@ -1,0 +1,150 @@
+[% PageVersion = 'Shop/admin.tt v0.01 2026/04/16 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5em;margin-bottom:var(--spacing-medium)">
+  <h1 style="margin:0;color:var(--text-color);font-family:var(--header-font)">
+    <i class="fas fa-store-alt"></i> Shop Management — [% sitename %]
+  </h1>
+  <div style="display:flex;gap:0.5em;flex-wrap:wrap">
+    <a href="/shop" style="padding:6px 14px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font)">
+      <i class="fas fa-eye"></i> View Store
+    </a>
+    <a href="/shop/setup" style="padding:6px 14px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font)">
+      <i class="fas fa-cog"></i> eCommerce Settings
+    </a>
+    <a href="/Inventory" style="padding:6px 14px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font)">
+      <i class="fas fa-boxes"></i> Inventory
+    </a>
+    <a href="/Cart/orders" style="padding:6px 14px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font)">
+      <i class="fas fa-shopping-cart"></i> Orders
+    </a>
+  </div>
+</div>
+
+[% IF c.flash.success_msg %]
+<div style="background:var(--success-color,#d4edda);color:#155724;border:1px solid #c3e6cb;border-radius:4px;padding:0.6em 1em;margin-bottom:1em">[% c.flash.success_msg %]</div>
+[% END %]
+[% IF c.flash.error_msg || error_msg %]
+<div style="background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:4px;padding:0.6em 1em;margin-bottom:1em">[% c.flash.error_msg || error_msg %]</div>
+[% END %]
+
+[% IF !is_ecommerce %]
+<div style="background:var(--schema-alert-warning-bg,#fff3cd);border:1px solid #ffc107;border-radius:4px;padding:0.8em 1em;margin-bottom:1em;font-family:var(--body-font)">
+  <i class="fas fa-exclamation-triangle"></i>
+  eCommerce is not enabled for <strong>[% sitename %]</strong>.
+  The public store will not be visible in the navigation menu.
+  <a href="/shop/setup" style="color:var(--primary-color);font-weight:bold;margin-left:0.5em">Enable Now &rarr;</a>
+</div>
+[% END %]
+
+<div class="content-container">
+
+<!-- Filter by status -->
+<form method="GET" action="/shop/admin" style="margin-bottom:var(--spacing-medium);display:flex;gap:0.5em;align-items:center;font-family:var(--body-font)">
+  <label style="color:var(--text-color)">Status:</label>
+  <select name="status" onchange="this.form.submit()" style="padding:5px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+    <option value="all"      [% IF filter_status == 'all'      %]selected[% END %]>All</option>
+    <option value="active"   [% IF filter_status == 'active'   %]selected[% END %]>Active</option>
+    <option value="inactive" [% IF filter_status == 'inactive' %]selected[% END %]>Inactive</option>
+  </select>
+</form>
+
+[% IF items.size == 0 %]
+<p style="color:var(--text-muted-color);font-family:var(--body-font)">No items found.
+  <a href="/Inventory/items/add" style="color:var(--primary-color)">Add an inventory item</a> first, then set a price to make it appear in the store.
+</p>
+[% ELSE %]
+
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:0.9rem">
+  <thead>
+    <tr style="border-bottom:2px solid var(--border-color);background:var(--secondary-color)">
+      <th style="padding:8px 12px;text-align:left;color:var(--text-color)">Image</th>
+      <th style="padding:8px 12px;text-align:left;color:var(--text-color)">Name / SKU</th>
+      <th style="padding:8px 12px;text-align:left;color:var(--text-color)">Category</th>
+      <th style="padding:8px 12px;text-align:right;color:var(--text-color)">Price</th>
+      <th style="padding:8px 12px;text-align:right;color:var(--text-color)">Discount</th>
+      <th style="padding:8px 12px;text-align:center;color:var(--text-color)">Status</th>
+      <th style="padding:8px 12px;text-align:center;color:var(--text-color)">Marketplace</th>
+      <th style="padding:8px 12px;text-align:center;color:var(--text-color)">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH item IN items %]
+    [% display_price = item.unit_price || item.unit_cost || 0 %]
+    <tr style="border-bottom:1px solid var(--border-color);[% IF item.status != 'active' %]opacity:0.6[% END %]">
+      <td style="padding:8px 12px">
+        [% IF item.image_path %]
+        <img src="[% item.image_path | html %]" alt=""
+             style="width:50px;height:50px;object-fit:cover;border-radius:4px;border:1px solid var(--border-color)">
+        [% ELSE %]
+        <div style="width:50px;height:50px;background:var(--secondary-color);border-radius:4px;border:1px solid var(--border-color);display:flex;align-items:center;justify-content:center">
+          <i class="fas fa-box" style="color:var(--text-muted-color)"></i>
+        </div>
+        [% END %]
+      </td>
+      <td style="padding:8px 12px;color:var(--text-color)">
+        <strong>[% item.name | html %]</strong>
+        [% IF item.sku %]<br><small style="color:var(--text-muted-color)">SKU: [% item.sku | html %]</small>[% END %]
+      </td>
+      <td style="padding:8px 12px;color:var(--text-muted-color)">[% item.category || '—' %]</td>
+      <td style="padding:8px 12px;text-align:right;color:var(--text-color)">
+        [% IF display_price > 0 %]$[% display_price | format('%.2f') %][% ELSE %]<em style="color:var(--text-muted-color)">None</em>[% END %]
+      </td>
+      <td style="padding:8px 12px;text-align:right;color:var(--text-color)">
+        [% IF item.discount_percent > 0 %][% item.discount_percent %]%[% ELSE %]—[% END %]
+      </td>
+      <td style="padding:8px 12px;text-align:center">
+        [% IF item.status == 'active' %]
+        <span style="background:#d4edda;color:#155724;border-radius:3px;padding:2px 8px;font-size:0.8rem">Active</span>
+        [% ELSE %]
+        <span style="background:#f8d7da;color:#721c24;border-radius:3px;padding:2px 8px;font-size:0.8rem">[% item.status | html %]</span>
+        [% END %]
+      </td>
+      <td style="padding:8px 12px;text-align:center">
+        [% IF item.list_in_marketplace %]
+        <a href="/marketplace/view/[% item.marketplace_listing_id %]" title="View in Marketplace" style="color:var(--primary-color)">
+          <i class="fas fa-check-circle"></i>
+        </a>
+        [% ELSE %]
+        <form method="POST" action="/Inventory/push_to_marketplace" style="display:inline">
+          <input type="hidden" name="item_id" value="[% item.id %]">
+          <button type="submit" title="Push to Marketplace" style="background:none;border:none;cursor:pointer;color:var(--text-muted-color);padding:0">
+            <i class="fas fa-share-alt"></i>
+          </button>
+        </form>
+        [% END %]
+      </td>
+      <td style="padding:8px 12px;text-align:center">
+        <a href="/shop/admin/edit/[% item.id %]" style="color:var(--primary-color)" title="Edit shop listing">
+          <i class="fas fa-edit"></i>
+        </a>
+        &nbsp;
+        <a href="/shop/item/[% item.id %]" style="color:var(--text-muted-color)" title="View in store">
+          <i class="fas fa-eye"></i>
+        </a>
+        &nbsp;
+        <a href="/Inventory/item/[% item.id %]" style="color:var(--text-muted-color)" title="Inventory record">
+          <i class="fas fa-boxes"></i>
+        </a>
+      </td>
+    </tr>
+  [% END %]
+  </tbody>
+</table>
+</div>
+
+[% END %]
+
+<div style="margin-top:var(--spacing-large);font-family:var(--body-font);font-size:0.9rem;color:var(--text-muted-color)">
+  <p><i class="fas fa-info-circle"></i>
+    To add a new item to the store, first
+    <a href="/Inventory/items/add" style="color:var(--primary-color)">add it to inventory</a>,
+    set a unit price, then it will appear here. Use the Edit button to add images, discounts, and product options.
+  </p>
+</div>
+
+</div>
+</div>
