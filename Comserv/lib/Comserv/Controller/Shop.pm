@@ -59,7 +59,15 @@ sub index :Path('/shop') :Args(0) {
     my $search   = $params->{q}        || '';
     my $sort     = $params->{sort}     || 'name';
 
-    my %where = (sitename => $sitename, status => 'active', show_in_shop => 1);
+    my %where = (
+        sitename     => $sitename,
+        status       => 'active',
+        show_in_shop => 1,
+        -and => [
+            -or => [ category => undef, category => { '!=' => 'Cost Centre' } ],
+            item_origin => { 'not like' => '%overhead%' },
+        ],
+    );
     $where{category} = $category if $category;
     if ($search) {
         $where{-or} = [
