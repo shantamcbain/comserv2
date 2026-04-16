@@ -1222,7 +1222,10 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
             $c->stash->{error_msg} = "Stock adjustment failed: $@";
         } else {
             $c->flash->{success_msg} = 'Stock adjustment recorded';
-            $c->res->redirect($c->uri_for('/Inventory/items'));
+            my $redirect = $c->req->body_parameters->{redirect_to}
+                        || $c->req->params->{redirect_to}
+                        || '/Inventory/items';
+            $c->res->redirect($redirect);
             return;
         }
     }
