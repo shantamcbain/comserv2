@@ -3825,6 +3825,32 @@ sub consignment_view :Path('/Inventory/consignment/view') :Args(1) {
     );
 }
 
+sub consignment_delete :Path('/Inventory/consignment/delete') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    unless ($c->req->method eq 'POST') {
+        $c->res->redirect($c->uri_for('/Inventory/consignment'));
+        $c->detach;
+    }
+
+    eval {
+        my $con = $schema->resultset('InventoryConsignment')->find(
+            { 'me.id' => $id, 'me.sitename' => $sitename }
+        ) or die "Not found\n";
+        die "Cannot delete a settled consignment\n" if $con->status eq 'settled';
+        $con->delete;
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Delete failed: $@";
+    } else {
+        $c->flash->{success_msg} = 'Consignment deleted.';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/consignment'));
+    $c->detach;
+}
+
 sub consignment_settle :Path('/Inventory/consignment/settle') :Args(1) {
     my ($self, $c, $id) = @_;
     my $sitename = $self->_sitename($c);

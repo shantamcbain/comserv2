@@ -71,8 +71,14 @@
         <span style="background:#f5f5f5;color:#555;border-radius:3px;padding:2px 8px;font-size:0.8rem">[% con.status | html %]</span>
       [% END %]
     </td>
-    <td style="padding:7px 10px;text-align:center">
+    <td style="padding:7px 10px;text-align:center;white-space:nowrap">
       <a href="/Inventory/consignment/view/[% con.id %]" style="color:var(--primary-color);font-size:0.85rem">View</a>
+      [% IF con.status != 'settled' %]
+      <form method="POST" action="/Inventory/consignment/delete/[% con.id %]" style="display:inline"
+            onsubmit="return confirm('Delete this consignment? This cannot be undone.')">
+        <button type="submit" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:0.85rem;padding:0 0 0 8px">Delete</button>
+      </form>
+      [% END %]
     </td>
   </tr>
   [% END %]
