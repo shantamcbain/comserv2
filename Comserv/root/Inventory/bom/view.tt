@@ -325,6 +325,100 @@
 </div>
 [% END %]
 
+[% IF printers && printers.size > 0 %]
+<hr style="margin:24px 0;border:none;border-top:2px solid #e0e0e0;">
+<h2>3D Print Wizard <small style="font-weight:normal;font-size:0.8em;color:#666">(auto-add filament, electricity &amp; depreciation to BOM)</small></h2>
+<div style="background:#fff8e1;border:1px solid #ffe082;border-radius:4px;padding:10px 14px;margin-bottom:12px;font-size:0.88em;color:#333">
+  <strong>How it works:</strong> Enter slicer output (grams &amp; print time). The wizard adds filament (cost placeholder),
+  electricity (based on printer wattage), and printer depreciation as BOM lines automatically.
+  Actual colour stock deduction happens when you fulfil the order.
+</div>
+<form method="POST" action="/Inventory/bom/print_wizard/[% item.id %]" id="print-wizard-form">
+  <table cellpadding="4" style="border:1px solid #ffe082;background:#fffdf0;padding:8px;width:100%;max-width:680px">
+    <tr>
+      <th style="text-align:left;width:200px"><label for="pw_printer">Printer *</label></th>
+      <td>
+        <select id="pw_printer" name="printer_id" required onchange="pwUpdatePrinter(this)"
+                style="width:280px">
+          <option value="">— select printer —</option>
+          [% FOREACH p IN printers %]
+          <option value="[% p.id %]"
+                  data-wattage="[% p.wattage || 0 %]"
+                  data-depr="[% p.depreciation_per_hour || 0 %]">[% p.name | html %][% IF p.sku %] ([% p.sku | html %])[% END %]</option>
+          [% END %]
+        </select>
+        <span id="pw-printer-info" style="margin-left:8px;font-size:0.85em;color:#555"></span>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="pw_hours">Print Time (hours) *</label></th>
+      <td>
+        <input type="number" id="pw_hours" name="print_hours" step="0.01" min="0.01" required
+               style="width:90px" placeholder="12.02" oninput="pwCalc()">
+        <small style="color:#777"> e.g. 12h 1m = 12.017</small>
+      </td>
+    </tr>
+    [% IF filament_items && filament_items.size > 0 %]
+    <tr>
+      <th><label for="pw_filament_item">Filament Item</label></th>
+      <td>
+        <select id="pw_filament_item" name="filament_item_id" style="width:280px">
+          <option value="">— none (add manually) —</option>
+          [% FOREACH f IN filament_items %]
+          <option value="[% f.id %]">[% f.name | html %][% IF f.sku %] ([% f.sku | html %])[% END %] — $[% f.unit_cost || '?' %]/g</option>
+          [% END %]
+        </select>
+      </td>
+    </tr>
+    [% END %]
+    <tr>
+      <th><label for="pw_filament_g">Filament (grams)</label></th>
+      <td>
+        <input type="number" id="pw_filament_g" name="filament_g" step="0.01" min="0"
+               style="width:90px" placeholder="407.73" oninput="pwCalc()">
+        <small style="color:#777"> from slicer</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="pw_filament_scrap">Filament Scrap %</label></th>
+      <td>
+        <input type="number" id="pw_filament_scrap" name="filament_scrap" step="0.1" min="0" value="2"
+               style="width:70px">
+        <small style="color:#777"> purge &amp; waste factor</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="pw_kwh_rate">Hydro Rate ($/kWh)</label></th>
+      <td>
+        <input type="number" id="pw_kwh_rate" name="kwh_rate" step="0.001" min="0" value="0.17"
+               style="width:80px" oninput="pwCalc()">
+        <small style="color:#777"> BC Hydro step 1 ≈ $0.1002; step 2 ≈ $0.1502; avg ~$0.17</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="pw_avg_watt_pct">Avg Power % of Rated</label></th>
+      <td>
+        <input type="number" id="pw_avg_watt_pct" name="avg_watt_pct" step="1" min="1" max="100" value="50"
+               style="width:70px" oninput="pwCalc()">
+        <small style="color:#777"> typical FDM printers run ~50% of rated wattage</small>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2" style="padding-top:8px">
+        <div id="pw-cost-preview" style="background:#f0f7ff;border:1px solid #b8d4f0;border-radius:4px;padding:8px 12px;margin-bottom:8px;font-size:0.9em;display:none"></div>
+        <input type="submit" value="Add Print Costs to BOM"
+               style="background:#e65100;color:white;padding:6px 16px;border:none;border-radius:4px;cursor:pointer;font-size:1em">
+      </td>
+    </tr>
+  </table>
+</form>
+[% ELSE %]
+<div style="background:#f5f5f5;border:1px solid #ccc;border-radius:4px;padding:10px 14px;margin:16px 0;font-size:0.88em;color:#555">
+  <strong>3D Print Wizard:</strong> No printer items found. Add an item with "printer" in its name, category, or origin — and set its Wattage and Depreciation/hr — to enable the wizard.
+  <a href="/Inventory/item/add">Add item</a>
+</div>
+[% END %]
+
 [% PROCESS 'ai/partials/ai_form_assistant.tt'
    ai_form_entity_label = 'BOM component'
    ai_form_context      = 'Bill of Materials for a 3D printed item — adding material components (filament in grams) and overhead costs (electricity in kWh, printer depreciation per hour)'
@@ -382,4 +476,58 @@ function patchRedirectToBom(form) {
   if (qtyEl) qtyEl.addEventListener('input', updateCostPreview);
   if (ucEl)  ucEl.addEventListener('input',  updateCostPreview);
 })();
+
+var pwPrinterWattage = 0;
+var pwPrinterDepr    = 0;
+
+function pwUpdatePrinter(sel) {
+  var opt = sel.options[sel.selectedIndex];
+  pwPrinterWattage = parseFloat(opt.getAttribute('data-wattage')) || 0;
+  pwPrinterDepr    = parseFloat(opt.getAttribute('data-depr'))    || 0;
+  var info = document.getElementById('pw-printer-info');
+  if (info) {
+    if (pwPrinterWattage > 0 || pwPrinterDepr > 0) {
+      info.textContent = pwPrinterWattage + 'W rated · $' + pwPrinterDepr.toFixed(4) + '/hr depreciation';
+    } else {
+      info.textContent = 'No wattage or depreciation set — edit item to add.';
+    }
+  }
+  pwCalc();
+}
+
+function pwCalc() {
+  var hours      = parseFloat(document.getElementById('pw_hours')       && document.getElementById('pw_hours').value)       || 0;
+  var grams      = parseFloat(document.getElementById('pw_filament_g')  && document.getElementById('pw_filament_g').value)  || 0;
+  var kwhRate    = parseFloat(document.getElementById('pw_kwh_rate')     && document.getElementById('pw_kwh_rate').value)    || 0.17;
+  var wattPct    = parseFloat(document.getElementById('pw_avg_watt_pct') && document.getElementById('pw_avg_watt_pct').value) || 50;
+  var preview    = document.getElementById('pw-cost-preview');
+  if (!preview) return;
+
+  var lines = [];
+  var total  = 0;
+
+  if (grams > 0) {
+    lines.push('Filament: ' + grams.toFixed(2) + 'g (cost depends on filament item cost/g)');
+  }
+  if (hours > 0 && pwPrinterWattage > 0) {
+    var avgW = pwPrinterWattage * (wattPct / 100);
+    var kwh  = avgW * hours / 1000;
+    var elecCost = kwh * kwhRate;
+    lines.push('Electricity: ' + kwh.toFixed(4) + ' kWh = $' + elecCost.toFixed(4) + ' (' + avgW.toFixed(0) + 'W avg × ' + hours.toFixed(3) + 'h × $' + kwhRate + '/kWh)');
+    total += elecCost;
+  }
+  if (hours > 0 && pwPrinterDepr > 0) {
+    var deprCost = hours * pwPrinterDepr;
+    lines.push('Depreciation: ' + hours.toFixed(3) + 'h × $' + pwPrinterDepr.toFixed(4) + '/hr = $' + deprCost.toFixed(4));
+    total += deprCost;
+  }
+
+  if (lines.length > 0) {
+    preview.innerHTML = lines.map(function(l){ return '<div>· ' + l + '</div>'; }).join('') +
+      (total > 0 ? '<div style="margin-top:4px;font-weight:bold">Overhead total: $' + total.toFixed(4) + '</div>' : '');
+    preview.style.display = '';
+  } else {
+    preview.style.display = 'none';
+  }
+}
 </script>
