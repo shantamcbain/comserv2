@@ -227,13 +227,16 @@ sub admin :Path('/shop/admin') :Args(0) {
         $c->detach;
     }
 
-    my $sitename = $self->_sitename($c);
-    my $schema   = $self->_schema($c);
-    my $params   = $c->req->query_parameters;
-    my $status   = $params->{status} || 'all';
+    my $sitename   = $self->_sitename($c);
+    my $schema     = $self->_schema($c);
+    my $params     = $c->req->query_parameters;
+    my $status     = $params->{status}     || 'all';
+    my $visibility = $params->{visibility} || 'all';
 
     my %where = (sitename => $sitename);
-    $where{status} = $status if $status && $status ne 'all';
+    $where{status}       = $status     if $status     && $status     ne 'all';
+    $where{show_in_shop} = 1           if $visibility eq 'visible';
+    $where{show_in_shop} = 0           if $visibility eq 'hidden';
 
     my @items;
     eval {
@@ -249,11 +252,12 @@ sub admin :Path('/shop/admin') :Args(0) {
     }
 
     $c->stash(
-        items        => \@items,
-        sitename     => $sitename,
-        filter_status => $status,
-        is_ecommerce => $self->_ecommerce_enabled($c),
-        template     => 'Shop/admin.tt',
+        items            => \@items,
+        sitename         => $sitename,
+        filter_status    => $status,
+        filter_visibility => $visibility,
+        is_ecommerce     => $self->_ecommerce_enabled($c),
+        template         => 'Shop/admin.tt',
     );
 }
 
