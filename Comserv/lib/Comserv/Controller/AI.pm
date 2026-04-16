@@ -1131,10 +1131,6 @@ sub generate :Local :Args(0) {
         my $response_length = length($response->{response} || '');
         $model_used = $response->{model} || $model_used;
         my $ai_response = $response->{response} || '';
-        # Capture token usage: Grok returns usage.total_tokens; Ollama returns eval_count
-        my $tokens_used_count = $response->{usage}{total_tokens}
-                             || $response->{eval_count}
-                             || 0;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
             'generate', "Query successful for user '$username' - Model: $model_used, Response length: $response_length chars");
         
@@ -1247,8 +1243,7 @@ sub generate :Local :Args(0) {
                     model_used => $model_used,
                     metadata => encode_json($user_metadata),
                     ip_address => $c->request->address,
-                    user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user',
-                    tokens_used => 0,
+                    user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
                 });
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
                     'generate', $user_msg
@@ -1281,8 +1276,7 @@ sub generate :Local :Args(0) {
                 model_used => $model_used,
                 metadata => encode_json($ai_metadata),
                 ip_address => $c->request->address,
-                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user',
-                tokens_used => $tokens_used_count,
+                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
             });
             
             unless ($ai_msg) {
@@ -2333,9 +2327,6 @@ sub chat :Local :Args(0) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
                 'chat', "Chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars");
         }
-        my $chat_tokens_used = $response->{usage}{total_tokens}
-                            || $response_eval_count
-                            || 0;
 
         # Save conversation to database
         my $final_conversation_id = $conversation_id;
@@ -2415,7 +2406,7 @@ sub chat :Local :Args(0) {
                 user_id => $user_id,
                 role => 'user',
                 content => $prompt,
-                agent_type => $chat_agent_id || 'general',
+                agent_type => 'documentation',
                 model_used => $model_used,
                 metadata => encode_json({
                     system_prompt => '',
@@ -2424,8 +2415,7 @@ sub chat :Local :Args(0) {
                     guest_session_id => $guest_session_id
                 }),
                 ip_address => $c->request->address,
-                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal',
-                tokens_used => 0,
+                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
             });
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -2445,7 +2435,7 @@ sub chat :Local :Args(0) {
                 user_id => $user_id,
                 role => 'assistant',
                 content => $ai_response,
-                agent_type => $chat_agent_id || 'general',
+                agent_type => 'documentation',
                 model_used => $model_used,
                 metadata => encode_json({
                     total_duration   => $response_total_duration,
@@ -2455,8 +2445,7 @@ sub chat :Local :Args(0) {
                     thinking_trace   => \@chat_trace,
                 }),
                 ip_address => $c->request->address,
-                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal',
-                tokens_used => $chat_tokens_used,
+                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
             });
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -7764,37 +7753,6 @@ account categories:
 - Customer sales list:        /Inventory/sales
 - Suppliers list:             /Inventory/suppliers
 - Add supplier:               /Inventory/supplier/add
-- AI usage cost allocation:   /Accounting/ai_usage
-
-## INVOICE PARSING (AI Invoice Parser on /Inventory/invoice/new)
-When the user pastes an invoice or bill on the new invoice form, extract and return
-ONLY a raw JSON object with these keys (omit any you cannot find):
-  supplier_name   — exact company name as printed on the bill
-  invoice_number  — bill/invoice number
-  invoice_date    — YYYY-MM-DD
-  due_date        — YYYY-MM-DD
-  notes           — brief description e.g. "Phone service 250-549-0126 Apr 2026"
-  tax_amount      — total GST+PST+HST (decimal, NOT individual lines)
-  shipping_amount — decimal if applicable
-  discount_amount — positive decimal (will be subtracted from total)
-  lines           — array of line objects: [{description, quantity, unit_cost}]
-                    Use negative unit_cost for credits/discounts applied per-line.
-                    Do NOT include tax lines here — they go in tax_amount.
-
-For phone bills: each plan charge, add-on, and promotional discount is a separate line.
-For utility bills: each service component is a separate line.
-
-If the supplier is not in the system, note it in your plain-text response and suggest
-the user open /Inventory/supplier/add to add them first.
-
-## CHART OF ACCOUNTS — COMMON MAPPINGS
-Phone/telecom bills → 6500 Telephone & Internet (Expense)
-Utilities (hydro, gas, water) → 6100 Utilities (Expense)
-Office supplies → 6200 Office Supplies (Expense)
-Purchased inventory stock → 1200 Inventory Asset (Asset) / 5000 COGS (Expense when sold)
-AP (amounts owed to suppliers) → 2000 Accounts Payable (Liability)
-GST/HST paid → 2310 GST/HST Payable or 1310 Input Tax Credits (Asset)
-PST paid → 2320 PST Payable
 
 ## ACTIONS YOU CAN PERFORM
 When the user asks you to create or update data, respond with a JSON action block:
