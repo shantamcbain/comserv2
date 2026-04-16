@@ -1131,6 +1131,10 @@ sub generate :Local :Args(0) {
         my $response_length = length($response->{response} || '');
         $model_used = $response->{model} || $model_used;
         my $ai_response = $response->{response} || '';
+        # Capture token usage: Grok returns usage.total_tokens; Ollama returns eval_count
+        my $tokens_used_count = $response->{usage}{total_tokens}
+                             || $response->{eval_count}
+                             || 0;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
             'generate', "Query successful for user '$username' - Model: $model_used, Response length: $response_length chars");
         
@@ -1243,7 +1247,8 @@ sub generate :Local :Args(0) {
                     model_used => $model_used,
                     metadata => encode_json($user_metadata),
                     ip_address => $c->request->address,
-                    user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
+                    user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user',
+                    tokens_used => 0,
                 });
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
                     'generate', $user_msg
@@ -1276,7 +1281,8 @@ sub generate :Local :Args(0) {
                 model_used => $model_used,
                 metadata => encode_json($ai_metadata),
                 ip_address => $c->request->address,
-                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
+                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user',
+                tokens_used => $tokens_used_count,
             });
             
             unless ($ai_msg) {
@@ -2327,6 +2333,9 @@ sub chat :Local :Args(0) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
                 'chat', "Chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars");
         }
+        my $chat_tokens_used = $response->{usage}{total_tokens}
+                            || $response_eval_count
+                            || 0;
 
         # Save conversation to database
         my $final_conversation_id = $conversation_id;
@@ -2406,7 +2415,7 @@ sub chat :Local :Args(0) {
                 user_id => $user_id,
                 role => 'user',
                 content => $prompt,
-                agent_type => 'documentation',
+                agent_type => $chat_agent_id || 'general',
                 model_used => $model_used,
                 metadata => encode_json({
                     system_prompt => '',
@@ -2415,7 +2424,8 @@ sub chat :Local :Args(0) {
                     guest_session_id => $guest_session_id
                 }),
                 ip_address => $c->request->address,
-                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
+                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal',
+                tokens_used => 0,
             });
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -2435,7 +2445,7 @@ sub chat :Local :Args(0) {
                 user_id => $user_id,
                 role => 'assistant',
                 content => $ai_response,
-                agent_type => 'documentation',
+                agent_type => $chat_agent_id || 'general',
                 model_used => $model_used,
                 metadata => encode_json({
                     total_duration   => $response_total_duration,
@@ -2445,7 +2455,8 @@ sub chat :Local :Args(0) {
                     thinking_trace   => \@chat_trace,
                 }),
                 ip_address => $c->request->address,
-                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
+                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal',
+                tokens_used => $chat_tokens_used,
             });
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -7753,6 +7764,7 @@ account categories:
 - Customer sales list:        /Inventory/sales
 - Suppliers list:             /Inventory/suppliers
 - Add supplier:               /Inventory/supplier/add
+- AI usage cost allocation:   /Accounting/ai_usage
 
 ## INVOICE PARSING (AI Invoice Parser on /Inventory/invoice/new)
 When the user pastes an invoice or bill on the new invoice form, extract and return

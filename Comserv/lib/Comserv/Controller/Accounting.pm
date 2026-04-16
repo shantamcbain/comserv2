@@ -579,5 +579,108 @@ sub api_gl_view :Path('/Accounting/api/gl') :Args(1) {
     $c->detach;
 }
 
+
+# =========================================================================
+# AI Usage Cost Allocation
+# GET  /Accounting/ai_usage        — report for a billing period
+# POST /Accounting/ai_usage        — generate point charges for a period
+# =========================================================================
+
+sub ai_usage :Path('/Accounting/ai_usage') :Args(0) {
+    my ($self, $c) = @_;
+
+    return unless $self->_api_auth($c);
+
+    my $schema   = $self->_schema($c);
+    my $dbh      = $schema->schema->storage->dbh;
+    my $sitename = $self->_sitename($c);
+
+    my $params      = $c->req->body_parameters || {};
+    my $period_from = $params->{period_from} || $c->req->params->{period_from} || '';
+    my $period_to   = $params->{period_to}   || $c->req->params->{period_to}   || '';
+    my $invoice_amt = $params->{invoice_amount} || $c->req->params->{invoice_amount} || 0;
+    my $invoice_id  = $params->{invoice_id}     || $c->req->params->{invoice_id}     || '';
+    my $provider_filter = $params->{provider} || $c->req->params->{provider} || 'grok';
+
+    # Default to previous calendar month
+    unless ($period_from && $period_to) {
+        my @t = localtime(time);
+        my $y = $t[5] + 1900;
+        my $m = $t[4];           # 0-indexed, so $m == previous month
+        if ($m == 0) { $m = 12; $y--; }
+        $period_from = sprintf('%04d-%02d-01', $y, $m);
+        # last day of month
+        my @days = (0,31,28,31,30,31,30,31,31,30,31,30,31);
+        $days[2] = 29 if ($y % 4 == 0 && ($y % 100 != 0 || $y % 400 == 0));
+        $period_to = sprintf('%04d-%02d-%02d', $y, $m, $days[$m]);
+    }
+
+    # Query: API calls (assistant messages from external provider) per user
+    my $sql = q{
+        SELECT am.user_id,
+               COALESCE(u.username, CONCAT('user_', am.user_id)) AS username,
+               u.email,
+               COUNT(*) AS api_calls,
+               SUM(COALESCE(am.tokens_used, 0)) AS total_tokens
+          FROM ai_messages am
+          LEFT JOIN users u ON u.id = am.user_id
+         WHERE am.role = 'assistant'
+           AND am.created_at >= ?
+           AND am.created_at <= ?
+           AND am.model_used LIKE ?
+         GROUP BY am.user_id, u.username, u.email
+         ORDER BY total_tokens DESC, api_calls DESC
+    };
+    my $like_filter = '%' . lc($provider_filter) . '%';
+    my $rows = $dbh->selectall_arrayref($sql, { Slice => {} },
+        $period_from . ' 00:00:00',
+        $period_to   . ' 23:59:59',
+        $like_filter);
+
+    # Calculate totals and percentages
+    my $grand_calls  = 0;
+    my $grand_tokens = 0;
+    for my $r (@$rows) { $grand_calls += $r->{api_calls}; $grand_tokens += $r->{total_tokens}; }
+
+    my @usage;
+    for my $r (@$rows) {
+        my $pct = $grand_calls > 0 ? ($r->{api_calls} / $grand_calls * 100) : 0;
+        my $tok_pct = $grand_tokens > 0 ? ($r->{total_tokens} / $grand_tokens * 100) : 0;
+        my $allocated = $invoice_amt > 0
+            ? sprintf('%.4f', $invoice_amt * ($grand_tokens > 0 ? $tok_pct / 100 : $pct / 100))
+            : 0;
+        push @usage, {
+            %$r,
+            call_pct    => sprintf('%.1f', $pct),
+            token_pct   => sprintf('%.1f', $tok_pct),
+            allocated   => $allocated,
+        };
+    }
+
+    # Also pull a summary of all models used in the period
+    my $model_sql = q{
+        SELECT model_used, COUNT(*) AS calls, SUM(COALESCE(tokens_used,0)) AS tokens
+          FROM ai_messages
+         WHERE role = 'assistant'
+           AND created_at >= ? AND created_at <= ?
+         GROUP BY model_used ORDER BY calls DESC
+    };
+    my $models = $dbh->selectall_arrayref($model_sql, { Slice => {} },
+        $period_from . ' 00:00:00', $period_to . ' 23:59:59');
+
+    $c->stash(
+        template     => 'Accounting/ai_usage.tt',
+        usage        => \@usage,
+        models       => $models,
+        grand_calls  => $grand_calls,
+        grand_tokens => $grand_tokens,
+        period_from  => $period_from,
+        period_to    => $period_to,
+        invoice_amt  => $invoice_amt,
+        invoice_id   => $invoice_id,
+        provider     => $provider_filter,
+    );
+}
+
 __PACKAGE__->meta->make_immutable;
 1;

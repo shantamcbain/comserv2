@@ -15,4 +15,9 @@
     <td>[% entry_count %] journal entries</td>
     <td><a href="/Accounting/gl">Browse GL</a></td>
   </tr>
+  <tr>
+    <th>AI Usage &amp; Cost Allocation</th>
+    <td>Allocate API costs by usage %</td>
+    <td><a href="/Accounting/ai_usage">AI Usage Report</a></td>
+  </tr>
 </table>
