@@ -383,5 +383,49 @@ sub toggle_shop :Path('/shop/admin/toggle') :Args(1) {
     $c->detach;
 }
 
+# -------------------------------------------------------------------------
+# Image file picker popup — GET /shop/file_picker
+# Opens in a popup; selected path is sent back to the parent window.
+# target_field param: name of the input field to populate (default: image_path)
+# -------------------------------------------------------------------------
+sub file_picker :Path('/shop/file_picker') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($self->_is_admin($c)) {
+        $c->res->body('Access denied');
+        $c->res->status(403);
+        $c->detach;
+    }
+
+    my $sitename     = $self->_sitename($c);
+    my $target_field = $c->req->param('target_field') || 'image_path';
+    my $search       = $c->req->param('q') || '';
+
+    my $static_dir  = $c->config->{home} . '/root/static/shop_images/' . $sitename;
+    my @local_images;
+    if (-d $static_dir) {
+        opendir my $dh, $static_dir or ();
+        while (my $f = readdir $dh) {
+            next if $f =~ /^\./;
+            next unless $f =~ /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i;
+            next if $search && $f !~ /\Q$search\E/i;
+            push @local_images, {
+                filename => $f,
+                url      => "/static/shop_images/$sitename/$f",
+            };
+        }
+        closedir $dh;
+        @local_images = sort { $a->{filename} cmp $b->{filename} } @local_images;
+    }
+
+    $c->stash(
+        local_images => \@local_images,
+        sitename     => $sitename,
+        target_field => $target_field,
+        search       => $search,
+        template     => 'Shop/file_picker.tt',
+    );
+}
+
 __PACKAGE__->meta->make_immutable;
 1;
