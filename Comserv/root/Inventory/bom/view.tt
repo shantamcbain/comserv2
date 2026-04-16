@@ -106,7 +106,7 @@
                 onclick="toggleEditRow([% comp.id %])"
                 style="font-size:0.8em;padding:2px 6px;cursor:pointer;">Edit</button>
         <form method="POST" action="/Inventory/bom/remove/[% comp.id %]"
-              onsubmit="return confirm('Remove [% ci ? (ci.name | html) : 'this component' %] from BOM?');"
+              onsubmit="return confirm('Remove [% IF ci %][% ci.name | html %][% ELSE %]this component[% END %] from BOM?');"
               style="display:inline;">
           <input type="hidden" name="from" value="bom">
           <input type="submit" value="Remove"
