@@ -84,6 +84,21 @@ __PACKAGE__->add_columns(
         size        => 100,
         is_nullable => 1,
     },
+    image_path => {
+        data_type   => 'varchar',
+        size        => 500,
+        is_nullable => 1,
+    },
+    discount_percent => {
+        data_type     => 'decimal',
+        size          => [5, 2],
+        is_nullable   => 1,
+        default_value => 0,
+    },
+    shop_options => {
+        data_type   => 'text',
+        is_nullable => 1,
+    },
     reorder_point => {
         data_type     => 'integer',
         is_nullable   => 1,
