@@ -139,6 +139,39 @@ sub item :Path('/shop/item') :Args(1) {
         eval { @options = @{ decode_json($item->shop_options) } };
     }
 
+    for my $opt (@options) {
+        next unless ($opt->{type} // '') eq 'filament_stock';
+        my @filament_values;
+        eval {
+            my @filaments = $schema->resultset('InventoryItem')->search(
+                {
+                    'me.sitename' => $sitename,
+                    'me.status'   => 'active',
+                    -or => [
+                        'me.category'    => { -like => '%filament%' },
+                        'me.item_origin' => { -like => '%filament%' },
+                    ],
+                },
+                {
+                    prefetch => 'stock_levels',
+                    order_by => 'me.name',
+                }
+            )->all;
+            for my $f (@filaments) {
+                my $qty = 0;
+                $qty += ($_->quantity_on_hand || 0) for $f->stock_levels->all;
+                next unless $qty > 0;
+                my $label = $f->name;
+                $label .= ' (' . $f->sku . ')' if $f->sku;
+                push @filament_values, $label;
+            }
+        };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'item',
+            "Filament stock query failed: $@") if $@;
+        $opt->{values} = \@filament_values if @filament_values;
+        $opt->{dynamic} = 1;
+    }
+
     my $total_stock = 0;
     for my $sl ($item->stock_levels->all) {
         $total_stock += $sl->quantity_on_hand || 0;
