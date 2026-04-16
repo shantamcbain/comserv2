@@ -319,20 +319,18 @@ sub item_edit :Path('/Inventory/item/edit') :Args(1) {
                 item_origin        => $params->{item_origin} || 'purchased',
                 is_assemblable     => $params->{is_assemblable} ? 1 : 0,
                 unit_of_measure    => $params->{unit_of_measure} || 'each',
-                unit_cost                => $params->{unit_cost}  || undef,
-                unit_price               => $params->{unit_price} || undef,
-                barcode                  => $params->{barcode}    || undef,
-                wattage                  => $params->{wattage}                  || undef,
-                depreciation_per_hour    => $params->{depreciation_per_hour}    || undef,
-                reorder_point            => $params->{reorder_point} || 0,
-                reorder_quantity         => $params->{reorder_quantity} || 0,
-                status                   => $params->{status} || 'active',
-                notes                    => $params->{notes},
-                inventory_accno_id       => $params->{inventory_accno_id} || undef,
-                income_accno_id          => $params->{income_accno_id}    || undef,
-                expense_accno_id         => $params->{expense_accno_id}   || undef,
-                returns_accno_id         => $params->{returns_accno_id}   || undef,
-                updated_at               => $self->_now(),
+                unit_cost          => $params->{unit_cost}  || undef,
+                unit_price         => $params->{unit_price} || undef,
+                barcode            => $params->{barcode}    || undef,
+                reorder_point      => $params->{reorder_point} || 0,
+                reorder_quantity   => $params->{reorder_quantity} || 0,
+                status             => $params->{status} || 'active',
+                notes              => $params->{notes},
+                inventory_accno_id => $params->{inventory_accno_id} || undef,
+                income_accno_id    => $params->{income_accno_id}    || undef,
+                expense_accno_id   => $params->{expense_accno_id}   || undef,
+                returns_accno_id   => $params->{returns_accno_id}   || undef,
+                updated_at         => $self->_now(),
             });
         };
         if ($@) {
@@ -387,6 +385,68 @@ sub item_delete :Path('/Inventory/item/delete') :Args(1) {
         $c->flash->{success_msg} = 'Item deleted';
     }
     $c->res->redirect($c->uri_for('/Inventory/items'));
+}
+
+# -------------------------------------------------------------------------
+# Equipment Details — /Inventory/equipment/:item_id
+# -------------------------------------------------------------------------
+sub equipment_edit :Path('/Inventory/equipment') :Args(1) {
+    my ($self, $c, $item_id) = @_;
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+
+    my $item;
+    eval {
+        $item = $schema->resultset('InventoryItem')->find(
+            { id => $item_id },
+            { prefetch => 'equipment' }
+        );
+    };
+
+    unless ($item && $item->sitename eq $sitename) {
+        $c->flash->{error_msg} = 'Item not found.';
+        $c->res->redirect($c->uri_for('/Inventory/items'));
+        $c->detach;
+    }
+
+    if ($c->req->method eq 'POST') {
+        my $p = $c->req->body_parameters;
+        my $now = $self->_now();
+        eval {
+            $schema->resultset('InventoryEquipment')->update_or_create(
+                {
+                    item_id               => $item_id,
+                    wattage               => $p->{wattage}               || undef,
+                    depreciation_per_hour => $p->{depreciation_per_hour} || undef,
+                    serial_number         => $p->{serial_number}         || undef,
+                    purchase_price        => $p->{purchase_price}        || undef,
+                    lease_from_sitename   => $p->{lease_from_sitename}   || undef,
+                    lease_term_months     => $p->{lease_term_months}     || undef,
+                    voltage               => $p->{voltage}               || undef,
+                    notes                 => $p->{notes}                 || undef,
+                    updated_at            => $now,
+                },
+                { key => 'inventory_equipment_item_id' }
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'equipment_edit', "Equipment save failed: $@");
+            $c->stash(error_msg => "Failed to save equipment details: $@",
+                      item => $item, template => 'Inventory/equipment/edit.tt');
+            return;
+        }
+        $c->flash->{success_msg} = 'Equipment details saved.';
+        $c->res->redirect($c->uri_for('/Inventory/item/view', [$item_id]));
+        $c->detach;
+    }
+
+    $c->stash(
+        item     => $item,
+        sitename => $sitename,
+        template => 'Inventory/equipment/edit.tt',
+    );
 }
 
 # -------------------------------------------------------------------------
@@ -485,8 +545,9 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
             }
         }
 
-        if ($print_hours > 0 && $printer->wattage) {
-            my $avg_watts = $printer->wattage * ($avg_watt_pct / 100);
+        my $equip = $printer->equipment;
+        if ($print_hours > 0 && $equip && $equip->wattage) {
+            my $avg_watts = $equip->wattage * ($avg_watt_pct / 100);
             my $kwh       = sprintf('%.4f', $avg_watts * $print_hours / 1000);
             my $elec_sku  = 'COST-ELEC-' . uc($printer->sku || 'PRINTER');
             $elec_sku =~ s/[^A-Z0-9-]/-/g;
@@ -521,7 +582,7 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
             }, { key => 'unique_parent_component' });
         }
 
-        if ($print_hours > 0 && $printer->depreciation_per_hour) {
+        if ($print_hours > 0 && $equip && $equip->depreciation_per_hour) {
             my $depr_sku = 'COST-DEPR-' . uc($printer->sku || 'PRINTER');
             $depr_sku =~ s/[^A-Z0-9-]/-/g;
             $depr_sku = substr($depr_sku, 0, 50);
@@ -533,7 +594,7 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
                     category            => 'Cost Centre',
                     item_origin         => 'overhead',
                     unit_of_measure     => 'hour',
-                    unit_cost           => $printer->depreciation_per_hour,
+                    unit_cost           => $equip->depreciation_per_hour,
                     status              => 'active',
                     show_in_shop        => 0,
                     hide_stock_count    => 1,
@@ -542,7 +603,7 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
                     created_at          => $now,
                     updated_at          => $now,
                 });
-            $depr_item->update({ unit_cost => $printer->depreciation_per_hour, updated_at => $now });
+            $depr_item->update({ unit_cost => $equip->depreciation_per_hour, updated_at => $now });
             $schema->resultset('InventoryItemBOM')->update_or_create({
                 parent_item_id    => $parent_id,
                 component_item_id => $depr_item->id,
@@ -717,7 +778,7 @@ sub bom_view :Path('/Inventory/bom') :Args(1) {
                     'me.name'        => { -like => '%printer%' },
                 ],
             },
-            { columns => ['id','name','sku','wattage','depreciation_per_hour'], order_by => 'me.name' }
+            { prefetch => 'equipment', order_by => 'me.name' }
         )->all;
     };
 

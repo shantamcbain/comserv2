@@ -62,16 +62,6 @@
           <small>UPC / EAN / QR / Code128</small></td>
     </tr>
     <tr>
-      <th><label for="wattage">Wattage (W)</label></th>
-      <td><input type="number" id="wattage" name="wattage" min="0" step="1" value="[% item.wattage %]">
-          <small>Rated power in watts (for printers/equipment — used in BOM cost wizard)</small></td>
-    </tr>
-    <tr>
-      <th><label for="depreciation_per_hour">Depreciation ($/hr)</label></th>
-      <td><input type="number" id="depreciation_per_hour" name="depreciation_per_hour" min="0" step="0.000001" value="[% item.depreciation_per_hour %]">
-          <small>Cost per operating hour — e.g. $500 ÷ (3yr × 2000hr) = $0.083333</small></td>
-    </tr>
-    <tr>
       <th><label for="reorder_point">Reorder Point</label></th>
       <td><input type="number" id="reorder_point" name="reorder_point" min="0" value="[% item.reorder_point %]"></td>
     </tr>

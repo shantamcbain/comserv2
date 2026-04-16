@@ -342,9 +342,10 @@
                 style="width:280px">
           <option value="">— select printer —</option>
           [% FOREACH p IN printers %]
+          [% SET peq = p.equipment %]
           <option value="[% p.id %]"
-                  data-wattage="[% p.wattage || 0 %]"
-                  data-depr="[% p.depreciation_per_hour || 0 %]">[% p.name | html %][% IF p.sku %] ([% p.sku | html %])[% END %]</option>
+                  data-wattage="[% peq.wattage IF peq %][% '0' UNLESS peq && peq.wattage %]"
+                  data-depr="[% peq.depreciation_per_hour IF peq %][% '0' UNLESS peq && peq.depreciation_per_hour %]">[% p.name | html %][% IF p.sku %] ([% p.sku | html %])[% END %][% IF peq && peq.wattage %] — [% peq.wattage %]W[% END %]</option>
           [% END %]
         </select>
         <span id="pw-printer-info" style="margin-left:8px;font-size:0.85em;color:#555"></span>
