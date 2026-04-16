@@ -3619,7 +3619,6 @@ sub api_transaction :Path('/Inventory/api/transaction') :Args(0) {
 
 sub consignment_partners :Path('/Inventory/consignment/partners') :Args(0) {
     my ($self, $c) = @_;
-    $self->_require_admin($c);
     my $sitename = $self->_sitename($c);
     my $schema   = $self->_schema($c);
 
@@ -3682,7 +3681,6 @@ sub consignment_partners :Path('/Inventory/consignment/partners') :Args(0) {
 
 sub consignment_list :Path('/Inventory/consignment') :Args(0) {
     my ($self, $c) = @_;
-    $self->_require_admin($c);
     my $sitename = $self->_sitename($c);
     my $schema   = $self->_schema($c);
     my $status   = $c->req->params->{status} || 'all';
@@ -3709,7 +3707,6 @@ sub consignment_list :Path('/Inventory/consignment') :Args(0) {
 
 sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
     my ($self, $c) = @_;
-    $self->_require_admin($c);
     my $sitename = $self->_sitename($c);
     my $schema   = $self->_schema($c);
     my $now      = $self->_now();
@@ -3786,7 +3783,6 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
 
 sub consignment_view :Path('/Inventory/consignment/view') :Args(1) {
     my ($self, $c, $id) = @_;
-    $self->_require_admin($c);
     my $sitename = $self->_sitename($c);
     my $schema   = $self->_schema($c);
 
@@ -3812,7 +3808,6 @@ sub consignment_view :Path('/Inventory/consignment/view') :Args(1) {
 
 sub consignment_settle :Path('/Inventory/consignment/settle') :Args(1) {
     my ($self, $c, $id) = @_;
-    $self->_require_admin($c);
     my $sitename = $self->_sitename($c);
     my $schema   = $self->_schema($c);
     my $now      = $self->_now();
