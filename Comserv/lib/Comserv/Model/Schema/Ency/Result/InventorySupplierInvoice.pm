@@ -27,12 +27,14 @@ __PACKAGE__->add_columns(
         is_nullable => 1,
     },
     invoice_date => {
-        data_type   => 'date',
-        is_nullable => 0,
+        data_type        => 'date',
+        is_nullable      => 0,
+        inflate_datetime => 0,
     },
     due_date => {
-        data_type   => 'date',
-        is_nullable => 1,
+        data_type        => 'date',
+        is_nullable      => 1,
+        inflate_datetime => 0,
     },
     total_amount => {
         data_type     => 'decimal',
@@ -103,6 +105,35 @@ __PACKAGE__->add_columns(
         is_nullable   => 1,
         set_on_create => 1,
         set_on_update => 1,
+    },
+    currency => {
+        data_type     => 'char',
+        size          => 3,
+        is_nullable   => 0,
+        default_value => 'CAD',
+    },
+    exchange_rate => {
+        data_type     => 'decimal',
+        size          => [12, 6],
+        is_nullable   => 1,
+        default_value => '1.000000',
+    },
+    functional_amount => {
+        data_type     => 'decimal',
+        size          => [12, 2],
+        is_nullable   => 1,
+        default_value => '0.00',
+    },
+    auto_pay => {
+        data_type     => 'tinyint',
+        size          => 1,
+        is_nullable   => 0,
+        default_value => 0,
+    },
+    auto_pay_method => {
+        data_type   => 'varchar',
+        size        => 255,
+        is_nullable => 1,
     },
 );
 

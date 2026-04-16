@@ -501,13 +501,15 @@ sub send_hosting_signup_notification {
     my $smtp_config = $self->get_smtp_config($c, 'CSC');
     return 0 unless $smtp_config->{smtp_host};
 
-    my $csc_site    = $c->model('DBEncy')->resultset('Site')->search({ name => 'CSC' })->single;
-    my $csc_email   = ($csc_site && $csc_site->mail_to_admin)
+    my $csc_site  = $c->model('DBEncy')->resultset('Site')->search({ name => 'CSC' })->single;
+    my $csc_email = ($csc_site && $csc_site->mail_to_admin)
         ? $csc_site->mail_to_admin
         : 'helpdesk@computersystemconsulting.ca';
 
-    my $timestamp   = scalar localtime;
-    my $approve_url = $c->uri_for('/membership/admin/hosting_accounts')->as_string;
+    # Always use the canonical CSC URL — not the submitting server's URL
+    my $approve_url = 'https://computersystemconsulting.ca/membership/admin/hosting_accounts';
+
+    my $timestamp = scalar localtime;
 
     my $body = qq{
 CSC Hosting Registration Request
@@ -525,13 +527,38 @@ A SiteName admin has submitted a hosting registration request:
 ACTION: Review and approve this request at:
   $approve_url
 
+NOTE: If this SiteName does not yet have a full CSC account setup (supplier,
+COA accounts, billing), these must be added manually in CSC after payment
+is confirmed.
+
 This is an automated notification from the Comserv platform.
 };
+
+    # Collect recipients: CSC admin email + all users whose global roles include admin or accounting
+    # (global roles = users.roles column; site-specific roles are in user_site_roles and not checked here)
+    my %seen_emails = ($csc_email => 1);
+    my @recipients  = ($csc_email);
+    eval {
+        my @admin_users = $c->model('DBEncy')->resultset('User')->search(
+            [
+                { roles => { -like => '%admin%'      }, status => 'active', email_notifications => 1 },
+                { roles => { -like => '%accounting%' }, status => 'active', email_notifications => 1 },
+            ],
+            { columns => ['email'] }
+        )->all;
+        for my $u (@admin_users) {
+            next unless $u->email;
+            next if $seen_emails{ $u->email }++;
+            push @recipients, $u->email;
+        }
+    };
+
+    my $to_header = join(', ', @recipients);
 
     my $email = Email::MIME->create(
         header_str => [
             From    => $smtp_config->{smtp_from} || 'noreply@computersystemconsulting.ca',
-            To      => $csc_email,
+            To      => $to_header,
             Subject => "[CSC] Hosting registration request: " . $account->sitename,
         ],
         attributes => { encoding => 'quoted-printable', charset => 'UTF-8' },
@@ -629,6 +656,63 @@ This is an automated notification from the Comserv platform.
     );
 
     return $self->send_email($c, $email, $smtp_config);
+}
+
+sub send_hosting_invoice_notification {
+    my ($self, $c, %args) = @_;
+    my $smtp_config = $self->get_smtp_config($c, 'CSC');
+    return 0 unless $smtp_config->{smtp_host} && $args{contact_email};
+
+    my $timestamp   = scalar localtime;
+    my $invoice_url = $c->uri_for('/Inventory/invoice/view/' . $args{invoice_id})->as_string;
+    my $status_line = $args{pts_paid}
+        ? "PAID — $args{pts_paid} pts debited automatically"
+        : "OUTSTANDING — please pay at the link below";
+
+    my $body = qq{
+CSC Hosting — Invoice
+Time: $timestamp
+
+A hosting invoice has been created for $args{sitename}.
+
+  Invoice       : $args{invoice_number}
+  Plan          : $args{plan_slug}
+  Amount        : CAD $args{amount}/mo
+  Due Date      : $args{due_date}
+  Status        : $status_line
+
+View and pay invoice:
+  $invoice_url
+
+Payment can be made with Points (1 pt = CAD 1.00) from your Inventory → Supplier Invoices page.
+
+If you have questions contact helpdesk\@computersystemconsulting.ca.
+
+This is an automated notification from the Comserv platform.
+};
+
+    my $email = Email::MIME->create(
+        header_str => [
+            From    => $smtp_config->{smtp_from} || 'noreply@computersystemconsulting.ca',
+            To      => $args{contact_email},
+            Subject => "[CSC] Hosting Invoice $args{invoice_number} — CAD $args{amount}",
+        ],
+        attributes => { encoding => 'quoted-printable', charset => 'UTF-8' },
+        body_str   => $body,
+    );
+    $self->send_email($c, $email, $smtp_config);
+
+    # CC to CSC helpdesk
+    my $cc = Email::MIME->create(
+        header_str => [
+            From    => $smtp_config->{smtp_from} || 'noreply@computersystemconsulting.ca',
+            To      => 'helpdesk@computersystemconsulting.ca',
+            Subject => "[CSC] Invoice issued — $args{invoice_number} to $args{sitename}",
+        ],
+        attributes => { encoding => 'quoted-printable', charset => 'UTF-8' },
+        body_str   => $body,
+    );
+    return $self->send_email($c, $cc, $smtp_config);
 }
 
 sub send_invoice_payment_notification {

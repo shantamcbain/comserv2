@@ -22,9 +22,10 @@
     <tr>
       <th><label for="item_origin">Origin / How Made</label></th>
       <td>
+        [% SET origin_opts = ['purchased','manufactured','service','crafted','grown','foraged','harvested','3d_printed','other'] %]
         <select id="item_origin" name="item_origin">
-          [% FOREACH o IN ['purchased','manufactured','service','crafted','grown','foraged','harvested','3d_printed','other'] %]
-          <option value="[% o %]" [% IF item.item_origin == o %]selected[% END %]>[% o %]</option>
+          [% FOREACH o IN origin_opts %]
+          <option value="[% o %]"[% IF item.item_origin == o %] selected[% END %]>[% o %]</option>
           [% END %]
         </select>
         <small>Use <em>service</em> for provisioned accounts/hosting, <em>manufactured</em> for built goods</small>
@@ -37,9 +38,10 @@
     <tr>
       <th><label for="unit_of_measure">Unit of Measure</label></th>
       <td>
+        [% SET uom_opts = ['each','month','year','hour','g','kg','ml','L','cm','m','sheet','box','case','lb','litre','metre'] %]
         <select id="unit_of_measure" name="unit_of_measure">
-          [% FOREACH u IN ['each','month','year','hour','g','kg','ml','L','cm','m','sheet','box','case','lb','litre','metre'] %]
-          <option value="[% u %]" [% IF item.unit_of_measure == u %]selected[% END %]>[% u %]</option>
+          [% FOREACH u IN uom_opts %]
+          <option value="[% u %]"[% IF item.unit_of_measure == u %] selected[% END %]>[% u %]</option>
           [% END %]
         </select>
       </td>
@@ -82,9 +84,10 @@
     <tr>
       <th><label for="status">Status</label></th>
       <td>
+        [% SET status_opts = ['active','inactive','discontinued'] %]
         <select id="status" name="status">
-          [% FOREACH s IN ['active','inactive','discontinued'] %]
-          <option value="[% s %]" [% IF item.status == s %]selected[% END %]>[% s %]</option>
+          [% FOREACH s IN status_opts %]
+          <option value="[% s %]"[% IF item.status == s %] selected[% END %]>[% s %]</option>
           [% END %]
         </select>
       </td>
@@ -156,8 +159,88 @@
 
   <p>
     <input type="submit" value="Save Changes">
+    &nbsp;
     <a href="/Inventory/item/view/[% item.id %]">Cancel</a>
   </p>
+</form>
+
+<hr>
+<h2 style="margin-top:1.5rem;">Current Stock</h2>
+
+[% IF stock_levels.size %]
+<table border="1" cellpadding="5" cellspacing="0" style="margin-bottom:1rem;border-collapse:collapse;">
+  <thead style="background:#f0f0f0;">
+    <tr>
+      <th>Location</th>
+      <th>On Hand</th>
+      <th>Reserved</th>
+      <th>Available</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH sl IN stock_levels %]
+  <tr>
+    <td>[% sl.location ? sl.location.name : 'Default' %]</td>
+    <td><strong>[% sl.quantity_on_hand %]</strong> [% item.unit_of_measure %]</td>
+    <td>[% sl.quantity_reserved %]</td>
+    <td>[% sl.quantity_on_hand - sl.quantity_reserved %]</td>
+  </tr>
+  [% END %]
+  </tbody>
+</table>
+[% END %]
+
+<form method="post" action="/Inventory/stock/adjust"
+      style="background:#f8f8f8;border:1px solid #ddd;border-radius:6px;padding:1rem;max-width:580px;margin-top:0.5rem;">
+  <input type="hidden" name="item_id" value="[% item.id %]">
+  <input type="hidden" name="redirect_to" value="/Inventory/item/edit/[% item.id %]">
+  <table cellpadding="4">
+    <tr>
+      <th align="right"><label for="sq_location_id">Location</label></th>
+      <td>
+        <select name="location_id" id="sq_location_id">
+          [% FOREACH loc IN locations %]
+          <option value="[% loc.id %]">[% loc.name | html %]</option>
+          [% END %]
+          [% IF !locations.size %]<option value="">— no locations yet —</option>[% END %]
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th align="right"><label for="sq_type">Type</label></th>
+      <td>
+        <select name="transaction_type" id="sq_type">
+          <option value="receive">Receive (add to stock)</option>
+          <option value="adjust_up">Adjust Up</option>
+          <option value="adjust_down">Adjust Down / Use</option>
+          <option value="consume">Consume</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th align="right"><label for="sq_qty">Quantity *</label></th>
+      <td><input type="number" name="quantity" id="sq_qty" min="0.001" step="any"
+                 style="width:90px;" required> [% item.unit_of_measure %]</td>
+    </tr>
+    <tr>
+      <th align="right"><label for="sq_cost">Unit Cost</label></th>
+      <td><input type="number" name="unit_cost" id="sq_cost" min="0" step="0.01"
+                 style="width:90px;" value="[% item.unit_cost %]">
+          <small style="color:#666"> leave blank to keep existing</small></td>
+    </tr>
+    <tr>
+      <th align="right"><label for="sq_notes">Notes</label></th>
+      <td><input type="text" name="notes" id="sq_notes" size="35"
+                 placeholder="e.g. initial stock, counted on hand"></td>
+    </tr>
+  </table>
+  <button type="submit"
+          style="margin-top:0.5rem;background:#17a2b8;color:white;border:none;padding:6px 18px;border-radius:4px;cursor:pointer;font-size:0.95rem;">
+    Record Stock
+  </button>
+  &nbsp;
+  <a href="/Inventory/stock/receive"
+     style="font-size:0.9em;color:#555;">⬇ Receive via Supplier Invoice instead</a>
 </form>
 [% PROCESS 'ai/partials/ai_form_assistant.tt'
    ai_form_entity_label = 'inventory item'

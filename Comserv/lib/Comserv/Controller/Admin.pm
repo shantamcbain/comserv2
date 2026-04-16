@@ -199,13 +199,17 @@ sub index :Path :Args(0) {
     }
     
     my $pending_hosting = 0;
+    my $pending_hosting_sites = [];
     my $outstanding_invoices = [];
     eval {
         my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
         if (lc($site_name) eq 'csc') {
-            $pending_hosting = $c->model('DBEncy')->resultset('HostingAccount')->search(
-                { status => 'pending' }
-            )->count;
+            my @pending = $c->model('DBEncy')->resultset('HostingAccount')->search(
+                { status => 'pending' },
+                { order_by => { -asc => 'sitename' } }
+            )->all;
+            $pending_hosting = scalar @pending;
+            $pending_hosting_sites = \@pending;
         } else {
             my @inv = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search(
                 { sitename => $site_name, status => 'outstanding' },
@@ -224,8 +228,9 @@ sub index :Path :Args(0) {
         stats                => $stats,
         recent_activity      => $recent_activity,
         notifications        => $notifications,
-        pending_hosting      => $pending_hosting,
-        outstanding_invoices => $outstanding_invoices,
+        pending_hosting       => $pending_hosting,
+        pending_hosting_sites => $pending_hosting_sites,
+        outstanding_invoices  => $outstanding_invoices,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
@@ -396,18 +401,31 @@ sub get_system_notifications {
         }
     };
     
-    # Check for pending CSC hosting registrations (CSC site only)
+    # Check for pending CSC hosting registrations — only for CSC-level admin/accounting users
     eval {
-        my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
-        if (lc($site_name) eq 'csc') {
+        my $user_id = $c->session->{user_id};
+        my $is_csc_admin = 0;
+        if ($user_id) {
+            my $user_obj = $c->model('DBEncy')->resultset('User')->find($user_id,
+                { columns => ['roles'] });
+            if ($user_obj) {
+                my $global_roles = $user_obj->roles || '';
+                $is_csc_admin = ($global_roles =~ /admin|accounting/i) ? 1 : 0;
+            }
+        }
+
+        if ($is_csc_admin) {
             my $pending = $c->model('DBEncy')->resultset('HostingAccount')->search(
                 { status => 'pending' }
             )->count;
             if ($pending > 0) {
+                my $msg = "$pending pending CSC hosting registration(s) require approval."
+                    . " Note: new accounts without prior setup must be added manually to the"
+                    . " system after payment is confirmed.";
                 push @notifications, {
                     type    => 'warning',
-                    message => "$pending pending hosting registration(s) require CSC approval",
-                    link    => $c->uri_for('/membership/admin/hosting_accounts'),
+                    message => $msg,
+                    link    => 'https://computersystemconsulting.ca/membership/admin/hosting_accounts',
                 };
             }
 
@@ -423,10 +441,29 @@ sub get_system_notifications {
                     type    => 'success',
                     message => 'Payment received: ' . $inv->sitename . ' — ' . $inv->invoice_number
                                . ' (CAD ' . $inv->total_amount . ')',
-                    link    => $c->uri_for('/Inventory/invoice/view/' . $inv->id),
+                    link    => 'https://computersystemconsulting.ca/Inventory/sales',
                 };
             }
         }
+
+        # Auto-pay overdue alert — shown to any site admin for their own invoices
+        eval {
+            my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+            my $today_str = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+            my $auto_due  = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search({
+                sitename => $site_name,
+                auto_pay => 1,
+                status   => { '!=' => 'paid' },
+                due_date => { '<=' => $today_str },
+            })->count;
+            if ($auto_due > 0) {
+                push @notifications, {
+                    type    => 'warning',
+                    message => "$auto_due auto-pay invoice(s) past due — confirm the charge has posted.",
+                    link    => '/Inventory/invoice/process_auto_pay',
+                };
+            }
+        };
     };
 
     return \@notifications;
