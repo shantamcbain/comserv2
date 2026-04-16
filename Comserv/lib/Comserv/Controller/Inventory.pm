@@ -3727,27 +3727,34 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
                 created_by       => $c->session->{username} || 'admin',
             });
 
-            my @item_ids = $c->req->params->get_all('item_id');
-            my @qtys     = $c->req->params->get_all('quantity');
-            my @prices   = $c->req->params->get_all('retail_price');
-            my @notes_l  = $c->req->params->get_all('line_notes');
+            my %lines_by_idx;
+            for my $key (keys %$p) {
+                if ($key =~ /^(item_id|quantity|retail_price|line_notes)_(\d+)$/) {
+                    $lines_by_idx{$2}{$1} = $p->{$key};
+                }
+            }
 
-            for my $i (0 .. $#item_ids) {
-                next unless $item_ids[$i] && ($qtys[$i] || 0) > 0;
+            for my $i (sort { $a <=> $b } keys %lines_by_idx) {
+                my $l = $lines_by_idx{$i};
+                next unless $l->{item_id} && ($l->{quantity} || 0) > 0;
+                my $item_id      = $l->{item_id};
+                my $qty          = $l->{quantity};
+                my $retail_price = $l->{retail_price};
+                my $line_note    = $l->{line_notes};
                 $schema->resultset('InventoryConsignmentLine')->create({
-                    consignment_id => $consignment->id,
-                    item_id        => $item_ids[$i],
-                    quantity_sent  => $qtys[$i],
-                    quantity_sold  => 0,
+                    consignment_id    => $consignment->id,
+                    item_id           => $item_id,
+                    quantity_sent     => $qty,
+                    quantity_sold     => 0,
                     quantity_returned => 0,
-                    retail_price   => $prices[$i] || undef,
-                    notes          => $notes_l[$i] || undef,
+                    retail_price      => $retail_price || undef,
+                    notes             => $line_note    || undef,
                 });
                 $schema->resultset('InventoryTransaction')->create({
                     sitename         => $sitename,
-                    item_id          => $item_ids[$i],
+                    item_id          => $item_id,
                     transaction_type => 'consignment_out',
-                    quantity         => -($qtys[$i]),
+                    quantity         => -($qty),
                     reference_number => 'CONSIGN-' . $consignment->id,
                     notes            => 'Consigned to ' . ($consignment->partner->name // ''),
                     performed_by     => $c->session->{username} || 'admin',
