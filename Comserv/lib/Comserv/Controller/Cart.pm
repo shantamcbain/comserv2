@@ -87,7 +87,7 @@ sub price_list :Path('/Cart/price_list') :Args(0) {
     my $schema   = $self->_schema($c);
     my $category = $c->req->params->{category};
 
-    my $is_admin = $self->_is_admin($c);
+    my $is_admin = $self->_require_admin($c);
     my %search = (sitename => $sitename, status => 'active');
     $search{show_in_shop} = 1 unless $is_admin;
     $search{category} = $category if $category;
