@@ -99,6 +99,16 @@ __PACKAGE__->add_columns(
         data_type   => 'text',
         is_nullable => 1,
     },
+    show_in_shop => {
+        data_type     => 'tinyint',
+        is_nullable   => 0,
+        default_value => 0,
+    },
+    hide_stock_count => {
+        data_type     => 'tinyint',
+        is_nullable   => 0,
+        default_value => 0,
+    },
     reorder_point => {
         data_type     => 'integer',
         is_nullable   => 1,

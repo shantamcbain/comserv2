@@ -7,7 +7,10 @@
   <a href="/shop" style="color:var(--primary-color);text-decoration:none"><i class="fas fa-store"></i> Shop</a>
   [% IF item.category %] &rsaquo; <a href="/shop?category=[% item.category | uri %]" style="color:var(--primary-color);text-decoration:none">[% item.category | html %]</a>[% END %]
   &rsaquo; <span style="color:var(--text-muted-color)">[% item.name | html %]</span>
-  <span style="float:right">
+  <span style="float:right;display:flex;gap:0.8em;align-items:center">
+    [% IF c.stash.is_admin %]
+    <a href="/shop/admin" style="color:var(--text-muted-color);font-size:0.85rem"><i class="fas fa-store-alt"></i> Admin</a>
+    [% END %]
     [% IF cart_count > 0 %]
     <a href="/Cart" style="color:var(--primary-color)"><i class="fas fa-shopping-cart"></i> Cart ([% cart_count %])</a>
     [% END %]
@@ -61,7 +64,9 @@
 
     <!-- Stock -->
     <p style="font-family:var(--body-font);font-size:var(--font-size-small,0.9rem);margin:0 0 1em">
-      [% IF total_stock > 0 %]
+      [% IF item.hide_stock_count %]
+      <span style="color:var(--success-color,green)"><i class="fas fa-check-circle"></i> Available to order</span>
+      [% ELSIF total_stock > 0 %]
       <span style="color:var(--success-color,green)"><i class="fas fa-check-circle"></i> [% total_stock %] in stock</span>
       [% ELSE %]
       <span style="color:var(--text-muted-color)"><i class="fas fa-times-circle"></i> Out of stock</span>
@@ -99,9 +104,9 @@
           <input type="number" name="quantity" value="1" min="1" [% IF total_stock > 0 %]max="[% total_stock %]"[% END %]
                  style="width:65px;padding:6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);margin-left:0.3em">
         </label>
-        [% IF total_stock > 0 %]
+        [% IF total_stock > 0 || item.hide_stock_count %]
         <button type="submit" style="padding:8px 20px;background:var(--primary-color);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--body-font);font-size:1rem">
-          <i class="fas fa-cart-plus"></i> Add to Cart
+          <i class="fas fa-cart-plus"></i> [% IF item.hide_stock_count %]Place Order[% ELSE %]Add to Cart[% END %]
         </button>
         [% ELSE %]
         <button type="button" disabled style="padding:8px 20px;background:var(--border-color);color:var(--text-muted-color);border:none;border-radius:4px;font-family:var(--body-font);font-size:1rem;cursor:not-allowed">

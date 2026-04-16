@@ -16,6 +16,11 @@
     <a href="/marketplace" style="padding:6px 14px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font)">
       <i class="fas fa-globe"></i> Marketplace
     </a>
+    [% IF c.stash.is_admin %]
+    <a href="/shop/admin" style="padding:6px 14px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font)">
+      <i class="fas fa-store-alt"></i> Admin
+    </a>
+    [% END %]
   </div>
 </div>
 
@@ -123,8 +128,8 @@
           <em style="color:var(--text-muted-color);font-size:0.9rem;font-family:var(--body-font)">Contact for price</em>
           [% END %]
         </div>
-        <span style="font-size:var(--font-size-small,0.8rem);color:[% IF total_stock > 0 %]var(--success-color,green)[% ELSE %]var(--text-muted-color)[% END %]">
-          [% IF total_stock > 0 %]&#10003; In stock[% ELSE %]Out of stock[% END %]
+        <span style="font-size:var(--font-size-small,0.8rem);color:[% IF total_stock > 0 || item.hide_stock_count %]var(--success-color,green)[% ELSE %]var(--text-muted-color)[% END %]">
+          [% IF item.hide_stock_count %]&#10003; Available to order[% ELSIF total_stock > 0 %]&#10003; [% total_stock %] in stock[% ELSE %]Out of stock[% END %]
         </span>
       </div>
     </div>
@@ -134,11 +139,11 @@
         <a href="/shop/item/[% item.id %]" style="font-size:var(--font-size-small,0.85rem);color:var(--primary-color);font-family:var(--body-font)">
           View Details →
         </a>
-        [% IF display_price > 0 && total_stock > 0 %]
+        [% IF display_price > 0 && (total_stock > 0 || item.hide_stock_count) %]
         <form method="POST" action="/Cart/add" style="margin-left:auto">
           <input type="hidden" name="item_id" value="[% item.id %]">
           <button type="submit" style="padding:3px 10px;background:var(--primary-color);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--body-font);font-size:var(--font-size-small,0.85rem)">
-            <i class="fas fa-cart-plus"></i> Add to Cart
+            <i class="fas fa-cart-plus"></i> [% IF item.hide_stock_count %]Order[% ELSE %]Add to Cart[% END %]
           </button>
         </form>
         [% END %]

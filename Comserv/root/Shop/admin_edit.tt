@@ -48,6 +48,28 @@
           <option value="archived" [% IF item.status == 'archived' %]selected[% END %]>Archived</option>
         </select>
       </div>
+
+      <div style="margin-bottom:0.8em;padding:0.8em;border:1px solid var(--border-color);border-radius:4px;background:var(--secondary-color)">
+        <label style="display:flex;align-items:center;gap:0.5em;cursor:pointer;font-family:var(--body-font);color:var(--text-color);font-weight:bold">
+          <input type="checkbox" name="show_in_shop" value="1" [% IF item.show_in_shop %]checked[% END %]
+                 style="width:16px;height:16px">
+          Show in public store
+        </label>
+        <small style="display:block;margin-top:0.3em;color:var(--text-muted-color);font-family:var(--body-font)">
+          When unchecked, this item is hidden from the customer-facing store (e.g. filament for internal 3D production).
+        </small>
+      </div>
+
+      <div style="margin-bottom:0.8em;padding:0.8em;border:1px solid var(--border-color);border-radius:4px;background:var(--secondary-color)">
+        <label style="display:flex;align-items:center;gap:0.5em;cursor:pointer;font-family:var(--body-font);color:var(--text-color);font-weight:bold">
+          <input type="checkbox" name="hide_stock_count" value="1" [% IF item.hide_stock_count %]checked[% END %]
+                 style="width:16px;height:16px">
+          Hide stock quantity from customers
+        </label>
+        <small style="display:block;margin-top:0.3em;color:var(--text-muted-color);font-family:var(--body-font)">
+          Show item as available without displaying the quantity — ideal for made-to-order items (3D prints, custom orders, services).
+        </small>
+      </div>
     </div>
 
     <div>

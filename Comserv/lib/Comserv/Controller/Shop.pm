@@ -59,7 +59,7 @@ sub index :Path('/shop') :Args(0) {
     my $search   = $params->{q}        || '';
     my $sort     = $params->{sort}     || 'name';
 
-    my %where = (sitename => $sitename, status => 'active', unit_price => { '>' => 0 });
+    my %where = (sitename => $sitename, status => 'active', show_in_shop => 1);
     $where{category} = $category if $category;
     if ($search) {
         $where{-or} = [
@@ -80,7 +80,7 @@ sub index :Path('/shop') :Args(0) {
             { prefetch => 'stock_levels', order_by => $order_by }
         )->all;
         @categories = $schema->resultset('InventoryItem')->search(
-            { sitename => $sitename, status => 'active', category => { '!=' => undef }, unit_price => { '>' => 0 } },
+            { sitename => $sitename, status => 'active', show_in_shop => 1, category => { '!=' => undef } },
             { columns => ['category'], distinct => 1, order_by => 'category' }
         )->all;
     };
@@ -115,9 +115,13 @@ sub item :Path('/shop/item') :Args(1) {
     my $item;
     eval {
         $item = $schema->resultset('InventoryItem')->find(
-            { id => $id, sitename => $sitename, status => 'active' },
+            { id => $id, sitename => $sitename, status => 'active', show_in_shop => 1 },
             { prefetch => 'stock_levels' }
         );
+        $item ||= $schema->resultset('InventoryItem')->find(
+            { id => $id, sitename => $sitename },
+            { prefetch => 'stock_levels' }
+        ) if $self->_is_admin($c);
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'item',
@@ -235,6 +239,8 @@ sub admin_edit :Path('/shop/admin/edit') :Args(1) {
             shop_options     => $p->{shop_options}     || undef,
             status           => $p->{status}           || 'active',
             description      => $p->{description}      || undef,
+            show_in_shop     => ($p->{show_in_shop}     ? 1 : 0),
+            hide_stock_count => ($p->{hide_stock_count} ? 1 : 0),
         );
 
         if ($p->{upload_image} && $c->req->upload('upload_image')) {
@@ -334,6 +340,47 @@ sub setup :Path('/shop/setup') :Args(0) {
         all_sites          => \@all_sites,
         template           => 'Shop/setup.tt',
     );
+}
+
+# -------------------------------------------------------------------------
+# Admin — quick-toggle show_in_shop — POST /shop/admin/toggle/:id
+# -------------------------------------------------------------------------
+sub toggle_shop :Path('/shop/admin/toggle') :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    unless ($self->_is_admin($c)) {
+        $c->res->redirect($c->uri_for('/user/login'));
+        $c->detach;
+    }
+
+    unless ($c->req->method eq 'POST') {
+        $c->res->redirect($c->uri_for('/shop/admin'));
+        $c->detach;
+    }
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+
+    eval {
+        my $item = $schema->resultset('InventoryItem')->find(
+            { id => $id, sitename => $sitename }
+        );
+        if ($item) {
+            my $new_val = $item->show_in_shop ? 0 : 1;
+            $item->update({ show_in_shop => $new_val });
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'toggle_shop',
+                "Item $id show_in_shop set to $new_val by " . ($c->session->{username} || 'admin'));
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'toggle_shop',
+            "Toggle failed for item $id: $@");
+        $c->flash->{error_msg} = 'Toggle failed.';
+    }
+
+    my $return_to = $c->req->body_parameters->{return_to} || '/shop/admin';
+    $c->res->redirect($c->uri_for($return_to));
+    $c->detach;
 }
 
 __PACKAGE__->meta->make_immutable;
