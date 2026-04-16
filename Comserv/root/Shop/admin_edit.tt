@@ -149,7 +149,8 @@
     <small style="color:var(--text-muted-color);font-family:var(--body-font)">
       Use the preset buttons above, or copy-paste an example:<br>
       <code>[{"label":"Filament","type":"filament_stock"}]</code><br>
-      <code>[{"label":"Colour","type":"select","values":["Red","Blue","Green"]}]</code>
+      <code>[{"label":"Colour","type":"select","values":["Red","Blue","Green"]}]</code><br>
+      <code>[{"label":"Custom Text","type":"text","placeholder":"Your text here"}]</code>
     </small>
   </div>
 
