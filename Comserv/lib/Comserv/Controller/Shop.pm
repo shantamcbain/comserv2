@@ -150,20 +150,13 @@ sub item :Path('/shop/item') :Args(1) {
                     -or => [
                         'me.category'    => { -like => '%filament%' },
                         'me.item_origin' => { -like => '%filament%' },
+                        'me.name'        => { -like => '%filament%' },
                     ],
                 },
-                {
-                    prefetch => 'stock_levels',
-                    order_by => 'me.name',
-                }
+                { columns => ['id','name','sku'], order_by => 'me.name' }
             )->all;
             for my $f (@filaments) {
-                my $qty = 0;
-                $qty += ($_->quantity_on_hand || 0) for $f->stock_levels->all;
-                next unless $qty > 0;
-                my $label = $f->name;
-                $label .= ' (' . $f->sku . ')' if $f->sku;
-                push @filament_values, $label;
+                push @filament_values, $f->name;
             }
         };
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'item',
