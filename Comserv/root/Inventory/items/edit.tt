@@ -156,9 +156,53 @@
 
   <p>
     <input type="submit" value="Save Changes">
+    &nbsp;
     <a href="/Inventory/item/view/[% item.id %]">Cancel</a>
   </p>
 </form>
+
+<hr>
+<h2 style="margin-top:1.5rem;">Current Stock</h2>
+
+[% IF stock_levels.size %]
+<table border="1" cellpadding="5" cellspacing="0" style="margin-bottom:1rem;border-collapse:collapse;">
+  <thead style="background:#f0f0f0;">
+    <tr>
+      <th>Location</th>
+      <th>On Hand</th>
+      <th>Reserved</th>
+      <th>Available</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH sl IN stock_levels %]
+  <tr>
+    <td>[% sl.location ? sl.location.name : 'Default' %]</td>
+    <td><strong>[% sl.quantity_on_hand %]</strong> [% item.unit_of_measure %]</td>
+    <td>[% sl.quantity_reserved %]</td>
+    <td>[% sl.quantity_on_hand - sl.quantity_reserved %]</td>
+    <td>
+      <a href="/Inventory/stock/adjust?item_id=[% item.id %]&location_id=[% sl.location_id %]"
+         style="font-size:0.85em;">Adjust</a>
+    </td>
+  </tr>
+  [% END %]
+  </tbody>
+</table>
+[% ELSE %]
+<p style="color:#888;">No stock records yet for this item.</p>
+[% END %]
+
+<a href="/Inventory/stock/adjust?item_id=[% item.id %]"
+   style="background:#17a2b8;color:white;padding:5px 14px;border-radius:4px;text-decoration:none;font-size:0.9em;">
+  + Add / Adjust Stock
+</a>
+&nbsp;
+<a href="/Inventory/stock/receive"
+   style="background:#28a745;color:white;padding:5px 14px;border-radius:4px;text-decoration:none;font-size:0.9em;">
+  ⬇ Receive via Invoice
+</a>
 [% PROCESS 'ai/partials/ai_form_assistant.tt'
    ai_form_entity_label = 'inventory item'
    ai_form_context      = 'inventory item management'
