@@ -1,0 +1,201 @@
+<div class="app-container">
+<div class="content-container">
+
+[% SET con = consignment %]
+[% SET comm_pct = con.partner.commission_percent || 0 %]
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em;flex-wrap:wrap;gap:0.5em">
+  <h1 style="font-family:var(--header-font);color:var(--text-color);margin:0">
+    Consignment — [% con.partner.name | html %]
+  </h1>
+  <a href="/Inventory/consignment" style="padding:6px 14px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font)">&larr; All Consignments</a>
+</div>
+
+[% IF c.flash.success_msg %]<div style="background:#d4edda;color:#155724;border:1px solid #c3e6cb;border-radius:4px;padding:0.6em 1em;margin-bottom:1em">[% c.flash.success_msg %]</div>[% END %]
+[% IF c.flash.error_msg %]<div style="background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:4px;padding:0.6em 1em;margin-bottom:1em">[% c.flash.error_msg %]</div>[% END %]
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1em;margin-bottom:1.5em">
+  <table style="font-family:var(--body-font);font-size:0.9rem;border-collapse:collapse">
+    <tr><th style="text-align:left;padding:4px 10px 4px 0;color:var(--text-muted-color)">Partner</th>
+        <td style="padding:4px 0"><strong>[% con.partner.name | html %]</strong></td></tr>
+    <tr><th style="text-align:left;padding:4px 10px 4px 0;color:var(--text-muted-color)">Commission</th>
+        <td style="padding:4px 0"><strong>[% comm_pct %]%</strong></td></tr>
+    <tr><th style="text-align:left;padding:4px 10px 4px 0;color:var(--text-muted-color)">Date Sent</th>
+        <td style="padding:4px 0">[% con.date_sent %]</td></tr>
+    <tr><th style="text-align:left;padding:4px 10px 4px 0;color:var(--text-muted-color)">Reference #</th>
+        <td style="padding:4px 0">[% con.reference_number || ('C-' _ con.id) %]</td></tr>
+    <tr><th style="text-align:left;padding:4px 10px 4px 0;color:var(--text-muted-color)">Status</th>
+        <td style="padding:4px 0">
+          [% IF con.status == 'open' %]<span style="background:#fff3e0;color:#e65100;border-radius:3px;padding:2px 8px">Open</span>
+          [% ELSIF con.status == 'partially_settled' %]<span style="background:#e3f2fd;color:#1565c0;border-radius:3px;padding:2px 8px">Partially Settled</span>
+          [% ELSIF con.status == 'settled' %]<span style="background:#d4edda;color:#155724;border-radius:3px;padding:2px 8px">Settled</span>
+          [% ELSE %]<span style="background:#f5f5f5;color:#555;border-radius:3px;padding:2px 8px">[% con.status | html %]</span>[% END %]
+        </td></tr>
+    [% IF con.notes %]
+    <tr><th style="text-align:left;padding:4px 10px 4px 0;color:var(--text-muted-color);vertical-align:top">Notes</th>
+        <td style="padding:4px 0">[% con.notes | html %]</td></tr>
+    [% END %]
+  </table>
+  <div>
+    [% IF con.partner.phone %]<p style="margin:0 0 0.3em;font-family:var(--body-font);font-size:0.85rem"><i class="fas fa-phone"></i> [% con.partner.phone | html %]</p>[% END %]
+    [% IF con.partner.email %]<p style="margin:0 0 0.3em;font-family:var(--body-font);font-size:0.85rem"><i class="fas fa-envelope"></i> <a href="mailto:[% con.partner.email | html %]">[% con.partner.email | html %]</a></p>[% END %]
+    [% IF con.partner.address %]<p style="margin:0 0 0.3em;font-family:var(--body-font);font-size:0.85rem;white-space:pre-line"><i class="fas fa-map-marker-alt"></i> [% con.partner.address | html %]</p>[% END %]
+    [% IF con.partner.payment_terms %]<p style="margin:0;font-family:var(--body-font);font-size:0.85rem;color:var(--text-muted-color)">Payment: [% con.partner.payment_terms | html %]</p>[% END %]
+  </div>
+</div>
+
+<h2 style="font-family:var(--header-font);color:var(--text-color)">Items</h2>
+[% SET grand_gross = 0; SET grand_net = 0; SET grand_comm = 0 %]
+<table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:0.9rem;margin-bottom:1.5em">
+  <thead>
+    <tr style="border-bottom:2px solid var(--border-color);background:var(--secondary-color)">
+      <th style="padding:8px 10px;text-align:left">Item</th>
+      <th style="padding:8px 10px;text-align:right">Sent</th>
+      <th style="padding:8px 10px;text-align:right">Sold</th>
+      <th style="padding:8px 10px;text-align:right">Returned</th>
+      <th style="padding:8px 10px;text-align:right">Outstanding</th>
+      <th style="padding:8px 10px;text-align:right">Retail $</th>
+      <th style="padding:8px 10px;text-align:right">Gross</th>
+      <th style="padding:8px 10px;text-align:right">Commission</th>
+      <th style="padding:8px 10px;text-align:right">Our Net</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH line IN con.lines %]
+  [% SET outstanding = line.quantity_sent - line.quantity_sold - line.quantity_returned %]
+  [% SET gross   = line.quantity_sold * (line.retail_price || 0) %]
+  [% SET comm    = gross * comm_pct / 100 %]
+  [% SET net     = gross - comm %]
+  [% grand_gross = grand_gross + gross %]
+  [% grand_net   = grand_net   + net   %]
+  [% grand_comm  = grand_comm  + comm  %]
+  <tr style="border-bottom:1px solid var(--border-color)">
+    <td style="padding:7px 10px;color:var(--text-color)"><strong>[% line.item.name | html %]</strong>
+      [% IF line.item.sku %]<br><small style="color:var(--text-muted-color)">[% line.item.sku | html %]</small>[% END %]
+      [% IF line.notes %]<br><small style="color:var(--text-muted-color)">[% line.notes | html %]</small>[% END %]
+    </td>
+    <td style="padding:7px 10px;text-align:right">[% line.quantity_sent %]</td>
+    <td style="padding:7px 10px;text-align:right;color:#155724">[% line.quantity_sold %]</td>
+    <td style="padding:7px 10px;text-align:right;color:var(--text-muted-color)">[% line.quantity_returned %]</td>
+    <td style="padding:7px 10px;text-align:right;color:[% outstanding > 0 ? '#e65100' : '#155724' %];font-weight:bold">[% outstanding %]</td>
+    <td style="padding:7px 10px;text-align:right">[% IF line.retail_price %]$[% line.retail_price | format('%.2f') %][% ELSE %]—[% END %]</td>
+    <td style="padding:7px 10px;text-align:right">[% IF gross > 0 %]$[% gross | format('%.2f') %][% ELSE %]—[% END %]</td>
+    <td style="padding:7px 10px;text-align:right;color:#c62828">[% IF comm > 0 %]$[% comm | format('%.2f') %][% ELSE %]—[% END %]</td>
+    <td style="padding:7px 10px;text-align:right;color:#155724;font-weight:bold">[% IF net > 0 %]$[% net | format('%.2f') %][% ELSE %]—[% END %]</td>
+  </tr>
+  [% END %]
+  </tbody>
+  [% IF grand_gross > 0 %]
+  <tfoot>
+    <tr style="border-top:2px solid var(--border-color);background:var(--secondary-color)">
+      <td colspan="6" style="padding:8px 10px;font-family:var(--body-font);font-weight:bold">Totals</td>
+      <td style="padding:8px 10px;text-align:right;font-weight:bold">$[% grand_gross | format('%.2f') %]</td>
+      <td style="padding:8px 10px;text-align:right;font-weight:bold;color:#c62828">$[% grand_comm | format('%.2f') %]</td>
+      <td style="padding:8px 10px;text-align:right;font-weight:bold;color:#155724">$[% grand_net | format('%.2f') %]</td>
+    </tr>
+  </tfoot>
+  [% END %]
+</table>
+
+[% IF con.status != 'settled' %]
+<hr style="border:none;border-top:2px solid var(--border-color);margin:1.5em 0">
+<h2 style="font-family:var(--header-font);color:var(--text-color)">Record Settlement</h2>
+<div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:4px;padding:8px 14px;margin-bottom:1em;font-size:0.85em;color:#1b5e20">
+  Enter quantities sold and/or returned by the partner. Leave blank (0) for no change.
+  Check "Create GL entry" to post the accounting double-entry.
+</div>
+
+<form method="POST" action="/Inventory/consignment/settle/[% con.id %]">
+  <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:0.9rem;margin-bottom:1em">
+    <thead>
+      <tr style="border-bottom:2px solid var(--border-color);background:var(--secondary-color)">
+        <th style="padding:8px 10px;text-align:left">Item</th>
+        <th style="padding:8px 10px;text-align:right">Outstanding</th>
+        <th style="padding:8px 10px;text-align:right">Retail $</th>
+        <th style="padding:8px 10px;text-align:right">Qty Sold This Settlement</th>
+        <th style="padding:8px 10px;text-align:right">Qty Returned</th>
+        <th style="padding:8px 10px;text-align:right">This Net</th>
+      </tr>
+    </thead>
+    <tbody>
+    [% FOREACH line IN con.lines %]
+    [% SET outstanding = line.quantity_sent - line.quantity_sold - line.quantity_returned %]
+    [% IF outstanding > 0 %]
+    <tr style="border-bottom:1px solid var(--border-color)" id="settle-row-[% line.id %]">
+      <td style="padding:7px 10px;color:var(--text-color)">[% line.item.name | html %]</td>
+      <td style="padding:7px 10px;text-align:right;font-weight:bold;color:#e65100">[% outstanding %]</td>
+      <td style="padding:7px 10px;text-align:right">[% IF line.retail_price %]$[% line.retail_price | format('%.2f') %][% ELSE %]—[% END %]</td>
+      <td style="padding:7px 10px;text-align:right">
+        <input type="hidden" name="line_id" value="[% line.id %]">
+        <input type="number" name="qty_sold" min="0" max="[% outstanding %]" step="0.01" value="0"
+               style="width:80px;padding:4px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);text-align:right"
+               oninput="calcNet([% line.id %], [% line.retail_price || 0 %], [% comm_pct %])">
+      </td>
+      <td style="padding:7px 10px;text-align:right">
+        <input type="number" name="qty_return" min="0" max="[% outstanding %]" step="0.01" value="0"
+               style="width:80px;padding:4px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);text-align:right">
+      </td>
+      <td style="padding:7px 10px;text-align:right;font-weight:bold;color:#155724" id="net-[% line.id %]">$0.00</td>
+    </tr>
+    [% END %]
+    [% END %]
+    </tbody>
+  </table>
+
+  <div style="background:var(--secondary-color);border:1px solid var(--border-color);border-radius:4px;padding:1em;margin-bottom:1em;max-width:500px">
+    <label style="display:flex;align-items:center;gap:0.5em;font-family:var(--body-font);cursor:pointer;margin-bottom:0.8em">
+      <input type="checkbox" name="create_gl" value="1" id="create-gl-chk" onchange="toggleGl(this.checked)">
+      Create GL accounting entry
+    </label>
+    <div id="gl-fields" style="display:none">
+      <p style="margin:0 0 0.5em;font-size:0.85em;color:var(--text-muted-color)">Enter COA account IDs (optional — set up accounts in Accounting first)</p>
+      <table cellpadding="4">
+        <tr><td><label style="font-size:0.85em">Income account ID:</label></td>
+            <td><input type="number" name="income_account_id" style="width:80px;padding:3px 6px;border:1px solid var(--border-color);border-radius:4px"></td></tr>
+        <tr><td><label style="font-size:0.85em">AR / Bank account ID:</label></td>
+            <td><input type="number" name="ar_account_id" style="width:80px;padding:3px 6px;border:1px solid var(--border-color);border-radius:4px"></td></tr>
+        <tr><td><label style="font-size:0.85em">Commission expense ID:</label></td>
+            <td><input type="number" name="comm_account_id" style="width:80px;padding:3px 6px;border:1px solid var(--border-color);border-radius:4px"></td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div id="settle-total" style="font-family:var(--body-font);font-size:1rem;margin-bottom:1em;color:var(--text-color)"></div>
+
+  <button type="submit" style="padding:8px 22px;background:#2e7d32;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--body-font);font-size:1rem">
+    Record Settlement
+  </button>
+  <a href="/Inventory/consignment" style="margin-left:1em;color:var(--text-muted-color);font-family:var(--body-font)">Cancel</a>
+</form>
+
+<script>
+var settleTotals = {};
+function calcNet(lineId, retailPrice, commPct) {
+  var inp = document.querySelector('#settle-row-' + lineId + ' input[name="qty_sold"]');
+  var qty = parseFloat(inp ? inp.value : 0) || 0;
+  var gross = qty * retailPrice;
+  var net   = gross * (1 - commPct / 100);
+  var comm  = gross * (commPct / 100);
+  settleTotals[lineId] = { gross: gross, net: net, comm: comm };
+  var el = document.getElementById('net-' + lineId);
+  if (el) el.textContent = '$' + net.toFixed(2);
+  updateSettleTotal();
+}
+function updateSettleTotal() {
+  var tg = 0, tn = 0, tc = 0;
+  Object.values(settleTotals).forEach(function(v){ tg += v.gross; tn += v.net; tc += v.comm; });
+  var el = document.getElementById('settle-total');
+  if (el && tg > 0) {
+    el.innerHTML = '<strong>This settlement:</strong> Gross $' + tg.toFixed(2)
+      + ' &minus; Commission $' + tc.toFixed(2)
+      + ' = <strong style="color:#155724">Net $' + tn.toFixed(2) + '</strong>';
+  } else if (el) { el.innerHTML = ''; }
+}
+function toggleGl(show) {
+  document.getElementById('gl-fields').style.display = show ? '' : 'none';
+}
+</script>
+[% END %]
+
+</div>
+</div>
