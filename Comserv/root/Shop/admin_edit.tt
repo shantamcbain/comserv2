@@ -118,13 +118,37 @@
 
   <div style="margin-top:var(--spacing-medium)">
     <h3 style="font-family:var(--header-font);color:var(--text-color)">Product Options <small style="font-weight:normal;font-size:0.85rem">(JSON array)</small></h3>
+
+    <div style="margin-bottom:0.5em;display:flex;flex-wrap:wrap;gap:0.4em">
+      <span style="font-size:0.8rem;color:var(--text-muted-color);font-family:var(--body-font);align-self:center">Insert preset:</span>
+      <button type="button" onclick="soInsert('filament')"
+              style="padding:3px 10px;font-size:0.8rem;border:1px solid var(--border-color);border-radius:3px;background:var(--secondary-color);color:var(--text-color);cursor:pointer;font-family:var(--body-font)">
+        Filament (live stock)
+      </button>
+      <button type="button" onclick="soInsert('colour')"
+              style="padding:3px 10px;font-size:0.8rem;border:1px solid var(--border-color);border-radius:3px;background:var(--secondary-color);color:var(--text-color);cursor:pointer;font-family:var(--body-font)">
+        Colour
+      </button>
+      <button type="button" onclick="soInsert('size')"
+              style="padding:3px 10px;font-size:0.8rem;border:1px solid var(--border-color);border-radius:3px;background:var(--secondary-color);color:var(--text-color);cursor:pointer;font-family:var(--body-font)">
+        Size
+      </button>
+      <button type="button" onclick="soInsert('text')"
+              style="padding:3px 10px;font-size:0.8rem;border:1px solid var(--border-color);border-radius:3px;background:var(--secondary-color);color:var(--text-color);cursor:pointer;font-family:var(--body-font)">
+        Custom text field
+      </button>
+      <button type="button" onclick="soInsert('clear')"
+              style="padding:3px 10px;font-size:0.8rem;border:1px solid #e57373;border-radius:3px;background:var(--secondary-color);color:#c62828;cursor:pointer;font-family:var(--body-font)">
+        Clear
+      </button>
+    </div>
+
     <textarea name="shop_options" rows="5" id="shop_options"
-              placeholder='[{"label":"Colour","type":"select","values":["Red","Blue","Green"]},{"label":"Size","type":"select","values":["S","M","L","XL"]}]'
+              placeholder='[{"label":"Colour","type":"select","values":["Red","Blue","Green"]}]'
               style="width:100%;padding:6px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-family:monospace;font-size:0.85rem;resize:vertical">[% item.shop_options | html %]</textarea>
     <small style="color:var(--text-muted-color);font-family:var(--body-font)">
-      JSON array of option groups. Each: <code>{"label":"Colour","type":"select","values":["Red","Blue"]}</code>
-      or <code>{"label":"Custom text","type":"text","placeholder":"Your text here"}</code><br>
-      <strong>Dynamic:</strong> use <code>{"label":"Filament","type":"filament_stock"}</code> to auto-populate from filaments in stock (items with category or origin containing "filament").
+      Must be a <strong>JSON array</strong> <code>[...]</code> — even for a single option.
+      Use the preset buttons above to build it. Multiple options: separate with commas inside the <code>[...]</code>.
     </small>
   </div>
 
@@ -152,6 +176,30 @@
 </div>
 
 <script>
+var SO_PRESETS = {
+    filament: '{"label":"Filament","type":"filament_stock"}',
+    colour:   '{"label":"Colour","type":"select","values":["Black","White","Red","Blue","Green","Yellow","Orange","Purple","Pink","Grey"]}',
+    size:     '{"label":"Size","type":"select","values":["Small","Medium","Large","XL"]}',
+    text:     '{"label":"Custom Text","type":"text","placeholder":"Enter your text here"}'
+};
+
+function soInsert(preset) {
+    var ta = document.getElementById('shop_options');
+    if (!ta) return;
+    if (preset === 'clear') { ta.value = ''; return; }
+    var chunk = SO_PRESETS[preset];
+    if (!chunk) return;
+    var cur = ta.value.trim();
+    if (!cur || cur === '[]') {
+        ta.value = '[' + chunk + ']';
+    } else if (cur.startsWith('[') && cur.endsWith(']')) {
+        var inner = cur.slice(1, -1).trim();
+        ta.value = '[' + (inner ? inner + ',\n' : '') + chunk + ']';
+    } else {
+        ta.value = '[' + chunk + ']';
+    }
+}
+
 function openImagePicker() {
     var itemId = '[% item.id %]';
     var url = '/shop/file_picker?target_field=image_path';
