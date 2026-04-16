@@ -379,7 +379,8 @@ sub toggle_shop :Path('/shop/admin/toggle') :Args(1) {
     }
 
     my $return_to = $c->req->body_parameters->{return_to} || '/shop/admin';
-    $c->res->redirect($c->uri_for($return_to));
+    $return_to =~ s{[^/a-zA-Z0-9_.~:@!$&'()*+,;=?#%-]}{}g;
+    $c->res->redirect($return_to);
     $c->detach;
 }
 
