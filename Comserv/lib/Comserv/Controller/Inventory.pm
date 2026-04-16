@@ -339,10 +339,28 @@ sub item_edit :Path('/Inventory/item/edit') :Args(1) {
         }
     }
 
+    my @stock_levels;
+    eval {
+        @stock_levels = $schema->resultset('InventoryStockLevel')->search(
+            { item_id => $item->id },
+            { prefetch => 'location', order_by => 'location.name' }
+        )->all;
+    };
+
+    my @locations;
+    eval {
+        @locations = $schema->resultset('InventoryLocation')->search(
+            { sitename => $sitename },
+            { order_by => 'name' }
+        )->all;
+    };
+
     $c->stash(
         item         => $item,
         sitename     => $sitename,
         coa_accounts => $self->_load_coa_accounts($c),
+        stock_levels => \@stock_levels,
+        locations    => \@locations,
         template     => 'Inventory/items/edit.tt',
     );
 }
