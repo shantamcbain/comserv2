@@ -567,10 +567,10 @@ sub bom_list :Path('/Inventory/bom/list') :Args(0) {
     my @assemblable;
     eval {
         @assemblable = $schema->resultset('InventoryItem')->search(
-            { sitename => $sitename, is_assemblable => 1, status => 'active' },
+            { 'me.sitename' => $sitename, 'me.is_assemblable' => 1, 'me.status' => 'active' },
             {
                 prefetch => { 'bom_components' => 'component_item' },
-                order_by => 'name',
+                order_by => 'me.name',
             }
         )->all;
     };
