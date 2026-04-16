@@ -159,12 +159,18 @@ sub item :Path('/shop/item') :Args(1) {
                 }
             )->all;
             for my $f (@filaments) {
-                my $label = join ' ', grep { $_ }
-                    $f->category,
-                    $f->name;
                 my ($pref_sup) = grep { $_->is_preferred } $f->item_suppliers->all;
                 $pref_sup ||= ($f->item_suppliers->all)[0];
-                $label .= ' — ' . $pref_sup->supplier->name if $pref_sup;
+                my $sup_name = $pref_sup ? $pref_sup->supplier->name : '';
+
+                my $label = $f->name;
+                $label =~ s/\Q$sup_name\E//gi if $sup_name;
+                $label =~ s/\bfilaments?\b//gi;
+                $label =~ s/\b\d+\s*(?:kg|g)\b//gi;
+                $label =~ s/\s{2,}/ /g;
+                $label =~ s/^\s+|\s+$//g;
+
+                $label .= ' ' . $sup_name if $sup_name;
                 push @filament_values, $label;
             }
         };
