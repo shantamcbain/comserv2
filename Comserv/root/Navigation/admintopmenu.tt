@@ -203,6 +203,7 @@
                     <a href="/Cart/price_list"><i class="fas fa-print"></i>Price List (Printable)</a>
                     <a href="/Cart/orders"><i class="fas fa-shopping-cart"></i>Cart Orders</a>
                     <a href="/CustomerOrder"><i class="icon-cart"></i>Customer Orders</a>
+                    <a href="/Inventory/consignment"><i class="fas fa-handshake"></i>Consignments</a>
                 </div>
                 <div class="submenu-section">
                     <span class="submenu-section-title">Accounting</span>
