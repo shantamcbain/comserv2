@@ -153,10 +153,19 @@ sub item :Path('/shop/item') :Args(1) {
                         'me.name'        => { -like => '%filament%' },
                     ],
                 },
-                { columns => ['id','name','sku'], order_by => 'me.name' }
+                {
+                    prefetch => { 'item_suppliers' => 'supplier' },
+                    order_by => ['me.category', 'me.name'],
+                }
             )->all;
             for my $f (@filaments) {
-                push @filament_values, $f->name;
+                my $label = join ' ', grep { $_ }
+                    $f->category,
+                    $f->name;
+                my ($pref_sup) = grep { $_->is_preferred } $f->item_suppliers->all;
+                $pref_sup ||= ($f->item_suppliers->all)[0];
+                $label .= ' — ' . $pref_sup->supplier->name if $pref_sup;
+                push @filament_values, $label;
             }
         };
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'item',
