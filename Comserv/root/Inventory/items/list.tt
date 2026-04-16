@@ -46,7 +46,8 @@
       <th>Name</th>
       <th>Category</th>
       <th>Unit</th>
-      <th>Unit Cost</th>
+      <th>Cost</th>
+      <th>Sale Price</th>
       <th>Stock (on hand)</th>
       <th>Reorder Point</th>
       <th>Status</th>
@@ -65,12 +66,16 @@
       <td>[% item.category || '-' %]</td>
       <td>[% item.unit_of_measure %]</td>
       <td>[% item.unit_cost ? item.unit_cost : '-' %]</td>
+      <td>[% item.unit_price ? item.unit_price : '-' %]</td>
       <td>[% total_stock %]</td>
       <td>[% item.reorder_point || '0' %]</td>
       <td>[% item.status %]</td>
       <td>
         <a href="/Inventory/item/view/[% item.id %]">View</a>
         <a href="/Inventory/item/edit/[% item.id %]">Edit</a>
+        [% IF item.is_assemblable %]
+        <a href="/Inventory/bom/[% item.id %]">BOM</a>
+        [% END %]
         [% IF c.session.roles.grep('admin').size %]
         <form method="POST" action="/Inventory/item/delete/[% item.id %]" style="display:inline"
               onsubmit="return confirm('Delete this item?')">
