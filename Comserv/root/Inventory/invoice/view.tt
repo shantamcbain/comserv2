@@ -41,6 +41,35 @@
   [% END %]
 </table>
 
+[% IF (is_admin || c.stash.is_admin) && invoice.status != 'paid' && invoice.status != 'voided' %]
+<div style="margin:1.5rem 0;padding:1rem 1.5rem;background:#e8f5e9;border:2px solid #4caf50;border-radius:8px;max-width:520px;">
+  <h3 style="margin:0 0 0.5rem;color:#1b5e20;">✅ Mark Paid by Shanta (Admin)</h3>
+  <p style="margin:0 0 0.5rem;font-size:0.9em;color:#333;">
+    Use when Shanta paid this invoice personally (debit card, cash, etc.).<br>
+    Marks it paid and credits Shanta's point account as compensation.
+  </p>
+  <form method="post" action="/Inventory/invoice/paid_by_shanta/[% invoice.id %]"
+        onsubmit="return confirm('Mark invoice [% invoice.invoice_number | html %] as paid by Shanta and credit his point account $[% invoice.total_amount %]?')">
+    <div style="margin-bottom:0.5em;">
+      <label style="font-size:0.85em;">Payment method / note (optional):</label><br>
+      <input type="text" name="payment_note" placeholder="e.g. RBC debit card, PayPal personal"
+             style="width:100%;padding:4px;border:1px solid #ccc;border-radius:3px;">
+    </div>
+    <div style="margin-bottom:0.5em;">
+      <label style="font-size:0.85em;">
+        <input type="checkbox" name="pre_point_system" value="1">
+        Pre-point-system invoice — mark paid only, do <strong>not</strong> credit points
+        (Shanta already credited at system start)
+      </label>
+    </div>
+    <button type="submit"
+            style="background:#388e3c;color:white;border:none;padding:0.5rem 1.4rem;border-radius:6px;font-size:1rem;cursor:pointer;font-weight:bold;">
+      Mark Paid by Shanta
+    </button>
+  </form>
+</div>
+[% END %]
+
 [% IF invoice.status == 'outstanding' %]
 <div style="margin:1.5rem 0;padding:1.2rem 1.5rem;background:#fff8e1;border:2px solid #f59e0b;border-radius:8px;max-width:520px;">
   <h3 style="margin:0 0 0.75rem;color:#92400e;">&#127970; Pay with Points</h3>
