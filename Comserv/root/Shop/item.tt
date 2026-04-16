@@ -83,14 +83,17 @@
         [% FOREACH opt IN options %]
         <div style="margin-bottom:0.5em">
           <label style="display:block;font-weight:bold;font-family:var(--body-font);font-size:0.9rem;margin-bottom:0.3em;color:var(--text-color)">[% opt.label | html %]:</label>
-          [% IF opt.type == 'select' %]
-          <select name="options" style="padding:6px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-family:var(--body-font)">
+          [% IF opt.values && opt.values.size > 0 %]
+          <select name="option_[% loop.index %]" style="padding:6px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-family:var(--body-font)">
             [% FOREACH v IN opt.values %]
             <option value="[% v | html %]">[% v | html %]</option>
             [% END %]
           </select>
+          [% IF opt.dynamic %]
+          <small style="color:var(--text-muted-color);font-family:var(--body-font);margin-left:0.3em">Live stock</small>
+          [% END %]
           [% ELSE %]
-          <input type="text" name="options" placeholder="[% opt.placeholder || opt.label | html %]"
+          <input type="text" name="option_[% loop.index %]" placeholder="[% opt.placeholder || opt.label | html %]"
                  style="padding:6px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-family:var(--body-font)">
           [% END %]
         </div>
