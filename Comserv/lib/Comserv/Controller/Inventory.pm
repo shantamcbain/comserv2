@@ -319,18 +319,20 @@ sub item_edit :Path('/Inventory/item/edit') :Args(1) {
                 item_origin        => $params->{item_origin} || 'purchased',
                 is_assemblable     => $params->{is_assemblable} ? 1 : 0,
                 unit_of_measure    => $params->{unit_of_measure} || 'each',
-                unit_cost          => $params->{unit_cost}  || undef,
-                unit_price         => $params->{unit_price} || undef,
-                barcode            => $params->{barcode}    || undef,
-                reorder_point      => $params->{reorder_point} || 0,
-                reorder_quantity   => $params->{reorder_quantity} || 0,
-                status             => $params->{status} || 'active',
-                notes              => $params->{notes},
-                inventory_accno_id => $params->{inventory_accno_id} || undef,
-                income_accno_id    => $params->{income_accno_id}    || undef,
-                expense_accno_id   => $params->{expense_accno_id}   || undef,
-                returns_accno_id   => $params->{returns_accno_id}   || undef,
-                updated_at         => $self->_now(),
+                unit_cost                => $params->{unit_cost}  || undef,
+                unit_price               => $params->{unit_price} || undef,
+                barcode                  => $params->{barcode}    || undef,
+                wattage                  => $params->{wattage}                  || undef,
+                depreciation_per_hour    => $params->{depreciation_per_hour}    || undef,
+                reorder_point            => $params->{reorder_point} || 0,
+                reorder_quantity         => $params->{reorder_quantity} || 0,
+                status                   => $params->{status} || 'active',
+                notes                    => $params->{notes},
+                inventory_accno_id       => $params->{inventory_accno_id} || undef,
+                income_accno_id          => $params->{income_accno_id}    || undef,
+                expense_accno_id         => $params->{expense_accno_id}   || undef,
+                returns_accno_id         => $params->{returns_accno_id}   || undef,
+                updated_at               => $self->_now(),
             });
         };
         if ($@) {
@@ -433,6 +435,132 @@ sub bom_add :Path('/Inventory/bom/add') :Args(1) {
     } else {
         $c->res->redirect($c->uri_for('/Inventory/bom', [$parent_id]));
     }
+}
+
+sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
+    my ($self, $c, $parent_id) = @_;
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $params   = $c->req->body_parameters;
+
+    unless ($c->req->method eq 'POST') {
+        $c->res->redirect($c->uri_for('/Inventory/bom', [$parent_id]));
+        $c->detach;
+    }
+
+    my $printer_id    = $params->{printer_id}    or do {
+        $c->flash->{error_msg} = 'No printer selected.';
+        $c->res->redirect($c->uri_for('/Inventory/bom', [$parent_id]));
+        $c->detach;
+    };
+    my $print_hours   = $params->{print_hours}   || 0;
+    my $filament_g    = $params->{filament_g}    || 0;
+    my $kwh_rate      = $params->{kwh_rate}      || 0.17;
+    my $avg_watt_pct  = $params->{avg_watt_pct}  || 50;
+
+    eval {
+        my $parent = $schema->resultset('InventoryItem')->find($parent_id);
+        die "Item not found\n" unless $parent && $parent->sitename eq $sitename;
+        die "Not assemblable\n" unless $parent->is_assemblable;
+
+        my $printer = $schema->resultset('InventoryItem')->find($printer_id);
+        die "Printer not found\n" unless $printer;
+
+        my $now = $self->_now();
+
+        if ($filament_g > 0) {
+            my $filament_item_id = $params->{filament_item_id};
+            if ($filament_item_id) {
+                my $scrap = ($params->{filament_scrap} || 2) / 100;
+                $schema->resultset('InventoryItemBOM')->update_or_create({
+                    parent_item_id    => $parent_id,
+                    component_item_id => $filament_item_id,
+                    quantity          => $filament_g,
+                    unit              => 'g',
+                    is_optional       => 0,
+                    scrap_factor      => $scrap,
+                    sort_order        => 1,
+                    notes             => 'Slicer: ' . $filament_g . 'g',
+                }, { key => 'unique_parent_component' });
+            }
+        }
+
+        if ($print_hours > 0 && $printer->wattage) {
+            my $avg_watts = $printer->wattage * ($avg_watt_pct / 100);
+            my $kwh       = sprintf('%.4f', $avg_watts * $print_hours / 1000);
+            my $elec_sku  = 'COST-ELEC-' . uc($printer->sku || 'PRINTER');
+            $elec_sku =~ s/[^A-Z0-9-]/-/g;
+            $elec_sku = substr($elec_sku, 0, 50);
+            my $elec_item = $schema->resultset('InventoryItem')->find({ sku => $elec_sku })
+                || $schema->resultset('InventoryItem')->create({
+                    sitename            => $sitename,
+                    sku                 => $elec_sku,
+                    name                => $printer->name . ' — Electricity',
+                    category            => 'Cost Centre',
+                    item_origin         => 'overhead',
+                    unit_of_measure     => 'kWh',
+                    unit_cost           => $kwh_rate,
+                    status              => 'active',
+                    show_in_shop        => 0,
+                    hide_stock_count    => 1,
+                    list_in_marketplace => 0,
+                    created_by          => $c->session->{username} || 'system',
+                    created_at          => $now,
+                    updated_at          => $now,
+                });
+            $elec_item->update({ unit_cost => $kwh_rate, updated_at => $now });
+            $schema->resultset('InventoryItemBOM')->update_or_create({
+                parent_item_id    => $parent_id,
+                component_item_id => $elec_item->id,
+                quantity          => $kwh,
+                unit              => 'kWh',
+                is_optional       => 0,
+                scrap_factor      => 0,
+                sort_order        => 10,
+                notes             => sprintf('%dW avg × %.3fh = %.4f kWh', $avg_watts, $print_hours, $kwh),
+            }, { key => 'unique_parent_component' });
+        }
+
+        if ($print_hours > 0 && $printer->depreciation_per_hour) {
+            my $depr_sku = 'COST-DEPR-' . uc($printer->sku || 'PRINTER');
+            $depr_sku =~ s/[^A-Z0-9-]/-/g;
+            $depr_sku = substr($depr_sku, 0, 50);
+            my $depr_item = $schema->resultset('InventoryItem')->find({ sku => $depr_sku })
+                || $schema->resultset('InventoryItem')->create({
+                    sitename            => $sitename,
+                    sku                 => $depr_sku,
+                    name                => $printer->name . ' — Depreciation',
+                    category            => 'Cost Centre',
+                    item_origin         => 'overhead',
+                    unit_of_measure     => 'hour',
+                    unit_cost           => $printer->depreciation_per_hour,
+                    status              => 'active',
+                    show_in_shop        => 0,
+                    hide_stock_count    => 1,
+                    list_in_marketplace => 0,
+                    created_by          => $c->session->{username} || 'system',
+                    created_at          => $now,
+                    updated_at          => $now,
+                });
+            $depr_item->update({ unit_cost => $printer->depreciation_per_hour, updated_at => $now });
+            $schema->resultset('InventoryItemBOM')->update_or_create({
+                parent_item_id    => $parent_id,
+                component_item_id => $depr_item->id,
+                quantity          => $print_hours,
+                unit              => 'hour',
+                is_optional       => 0,
+                scrap_factor      => 0,
+                sort_order        => 11,
+                notes             => sprintf('%.3fh on %s', $print_hours, $printer->name),
+            }, { key => 'unique_parent_component' });
+        }
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Wizard failed: $@";
+    } else {
+        $c->flash->{success_msg} = 'Print job costs added to BOM.';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/bom', [$parent_id]));
 }
 
 sub bom_add_direct_cost :Path('/Inventory/bom/add_cost') :Args(1) {
@@ -577,6 +705,38 @@ sub bom_view :Path('/Inventory/bom') :Args(1) {
         )->all;
     };
 
+    my @printers;
+    eval {
+        @printers = $schema->resultset('InventoryItem')->search(
+            {
+                'me.sitename' => $sitename,
+                'me.status'   => 'active',
+                -or => [
+                    'me.category'    => { -like => '%printer%' },
+                    'me.item_origin' => { -like => '%printer%' },
+                    'me.name'        => { -like => '%printer%' },
+                ],
+            },
+            { columns => ['id','name','sku','wattage','depreciation_per_hour'], order_by => 'me.name' }
+        )->all;
+    };
+
+    my @filament_items;
+    eval {
+        @filament_items = $schema->resultset('InventoryItem')->search(
+            {
+                'me.sitename' => $sitename,
+                'me.status'   => 'active',
+                -or => [
+                    'me.category'    => { -like => '%filament%' },
+                    'me.item_origin' => { -like => '%filament%' },
+                    'me.name'        => { -like => '%filament%' },
+                ],
+            },
+            { columns => ['id','name','sku','unit_cost'], order_by => 'me.name' }
+        )->all;
+    };
+
     my $assembled_cost = 0;
     for my $comp ($item->bom_components->all) {
         my $ci = $comp->component_item;
@@ -589,6 +749,8 @@ sub bom_view :Path('/Inventory/bom') :Args(1) {
         item              => $item,
         all_items         => \@all_items,
         assemblable_items => \@assemblable_items,
+        printers          => \@printers,
+        filament_items    => \@filament_items,
         assembled_cost    => sprintf('%.2f', $assembled_cost),
         sitename          => $sitename,
         template          => 'Inventory/bom/view.tt',
