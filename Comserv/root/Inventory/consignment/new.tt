@@ -58,7 +58,7 @@
 
   <div id="consign-lines">
     <div class="consign-line" style="display:flex;gap:0.6em;align-items:center;margin-bottom:0.5em;flex-wrap:wrap;background:var(--secondary-color);padding:8px 10px;border-radius:4px;border:1px solid var(--border-color)">
-      <select name="item_id" style="flex:2;min-width:200px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+      <select name="item_id" onchange="fillPrice(this)" style="flex:2;min-width:200px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
         <option value="">— select item —</option>
         [% FOREACH item IN items %]
         <option value="[% item.id %]" data-price="[% item.unit_price || item.unit_cost || '' %]">
@@ -106,6 +106,16 @@ function updateCommission(sel) {
   if (info && comm) info.textContent = comm + '% commission';
 }
 
+function fillPrice(sel) {
+  var opt = sel.options[sel.selectedIndex];
+  var price = opt.getAttribute('data-price');
+  if (price) {
+    var line = sel.closest('.consign-line');
+    var priceInput = line && line.querySelector('input[name="retail_price"]');
+    if (priceInput && !priceInput.value) priceInput.value = parseFloat(price).toFixed(2);
+  }
+}
+
 var itemOptionsHTML = document.querySelector('#consign-lines .consign-line select[name="item_id"]').innerHTML;
 
 function addLine() {
@@ -113,9 +123,9 @@ function addLine() {
   var div = document.createElement('div');
   div.className = 'consign-line';
   div.style.cssText = 'display:flex;gap:0.6em;align-items:center;margin-bottom:0.5em;flex-wrap:wrap;background:var(--secondary-color);padding:8px 10px;border-radius:4px;border:1px solid var(--border-color)';
-  div.innerHTML = '<select name="item_id" style="flex:2;min-width:200px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">' + itemOptionsHTML + '</select>'
+  div.innerHTML = '<select name="item_id" onchange="fillPrice(this)" style="flex:2;min-width:200px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">' + itemOptionsHTML + '</select>'
     + '<label style="font-size:0.85rem">Qty: <input type="number" name="quantity" min="0.01" step="0.01" placeholder="1" style="width:70px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)"></label>'
-    + '<label style="font-size:0.85rem">Retail $: <input type="number" name="retail_price" min="0" step="0.01" placeholder="20.00" style="width:80px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)"></label>'
+    + '<label style="font-size:0.85rem">Retail $: <input type="number" name="retail_price" min="0" step="0.01" placeholder="0.00" style="width:80px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)"></label>'
     + '<input type="text" name="line_notes" placeholder="Notes" maxlength="255" style="flex:1;min-width:100px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">'
     + '<button type="button" onclick="this.closest(\'.consign-line\').remove()" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:1.1rem;padding:0 4px">&times;</button>';
   container.appendChild(div);
