@@ -1,14 +1,63 @@
+<style>
+@media print {
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  .app-container, .content-container { box-shadow: none; border: none; margin: 0; padding: 0; }
+  body { margin: 12mm; font-size: 10pt; }
+  table { font-size: 9pt; }
+}
+.print-only { display: none; }
+</style>
+
 <div class="app-container">
 <div class="content-container">
 
 [% SET con = consignment %]
 [% SET comm_pct = con.partner.commission_percent || 0 %]
 
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em;flex-wrap:wrap;gap:0.5em">
+<div class="print-only" style="margin-bottom:1.5em;border-bottom:2px solid #333;padding-bottom:1em">
+  <table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:10pt">
+    <tr>
+      <td style="width:50%;vertical-align:top">
+        <strong style="font-size:13pt">[% site_info.display_name || sitename | html %]</strong><br>
+        [% IF site_info.business_address %][% site_info.business_address | html %]<br>[% END %]
+        [% IF site_info.business_phone %]Tel: [% site_info.business_phone | html %]<br>[% END %]
+        [% IF site_info.email %][% site_info.email | html %][% END %]
+      </td>
+      <td style="width:50%;vertical-align:top;text-align:right">
+        <strong style="font-size:13pt">CONSIGNMENT SLIP</strong><br>
+        Ref: <strong>[% con.reference_number || ('C-' _ con.id) | html %]</strong><br>
+        Date: [% con.date_sent %]<br>
+        Status: [% con.status | html %]
+      </td>
+    </tr>
+  </table>
+  <table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:10pt;margin-top:1em">
+    <tr>
+      <td style="width:50%;vertical-align:top;padding:6px 8px;border:1px solid #999">
+        <strong>From:</strong><br>
+        [% site_info.display_name || sitename | html %]
+      </td>
+      <td style="width:50%;vertical-align:top;padding:6px 8px;border:1px solid #999;border-left:none">
+        <strong>To (Consignment Partner):</strong><br>
+        [% con.partner.name | html %]<br>
+        [% IF con.partner.address %][% con.partner.address | html %][% END %]
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em;flex-wrap:wrap;gap:0.5em" class="no-print">
   <h1 style="font-family:var(--header-font);color:var(--text-color);margin:0">
     Consignment — [% con.partner.name | html %]
   </h1>
-  <a href="/Inventory/consignment" style="padding:6px 14px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font)">&larr; All Consignments</a>
+  <div style="display:flex;gap:0.5em">
+    <button onclick="window.print()"
+            style="padding:6px 14px;background:#1565c0;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--body-font)">
+      <i class="fas fa-print"></i> Print Slip
+    </button>
+    <a href="/Inventory/consignment" style="padding:6px 14px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font)">&larr; All Consignments</a>
+  </div>
 </div>
 
 [% IF c.flash.success_msg %]<div style="background:#d4edda;color:#155724;border:1px solid #c3e6cb;border-radius:4px;padding:0.6em 1em;margin-bottom:1em">[% c.flash.success_msg %]</div>[% END %]
@@ -97,15 +146,30 @@
   [% END %]
 </table>
 
+<div class="print-only" style="margin-top:2em;font-family:Arial,sans-serif;font-size:9pt">
+  <p style="margin:0 0 0.4em;color:#555">Commission rate: [% comm_pct %]% — Items remain property of [% site_info.display_name || sitename | html %] until sold.</p>
+  <table style="width:100%;border-collapse:collapse;margin-top:1.5em">
+    <tr>
+      <td style="width:48%;padding-top:2em;border-top:1px solid #333;text-align:center">
+        Received by (Partner)<br><small>[% con.partner.name | html %]</small>
+      </td>
+      <td style="width:4%"></td>
+      <td style="width:48%;padding-top:2em;border-top:1px solid #333;text-align:center">
+        Released by ([% site_info.display_name || sitename | html %])<br><small>Date: [% con.date_sent %]</small>
+      </td>
+    </tr>
+  </table>
+</div>
+
 [% IF con.status != 'settled' %]
-<hr style="border:none;border-top:2px solid var(--border-color);margin:1.5em 0">
-<h2 style="font-family:var(--header-font);color:var(--text-color)">Record Settlement</h2>
+<hr style="border:none;border-top:2px solid var(--border-color);margin:1.5em 0" class="no-print">
+<h2 style="font-family:var(--header-font);color:var(--text-color)" class="no-print">Record Settlement</h2>
 <div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:4px;padding:8px 14px;margin-bottom:1em;font-size:0.85em;color:#1b5e20">
   Enter quantities sold and/or returned by the partner. Leave blank (0) for no change.
   Check "Create GL entry" to post the accounting double-entry.
 </div>
 
-<form method="POST" action="/Inventory/consignment/settle/[% con.id %]">
+<form method="POST" action="/Inventory/consignment/settle/[% con.id %]" class="no-print">
   <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:0.9rem;margin-bottom:1em">
     <thead>
       <tr style="border-bottom:2px solid var(--border-color);background:var(--secondary-color)">

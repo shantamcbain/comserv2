@@ -3799,9 +3799,21 @@ sub consignment_view :Path('/Inventory/consignment/view') :Args(1) {
         $c->detach;
     }
 
+    my %site_info;
+    eval {
+        my $site = $schema->resultset('Site')->search({ name => $sitename })->first;
+        if ($site) {
+            my @cfgs = $schema->resultset('SiteConfig')->search({ site_id => $site->id })->all;
+            %site_info = map { $_->config_key => $_->config_value } @cfgs;
+            $site_info{display_name} ||= $site->site_display_name || $sitename;
+            $site_info{email}        ||= $site->mail_from || '';
+        }
+    };
+
     $c->stash(
         consignment => $consignment,
         sitename    => $sitename,
+        site_info   => \%site_info,
         template    => 'Inventory/consignment/view.tt',
     );
 }
