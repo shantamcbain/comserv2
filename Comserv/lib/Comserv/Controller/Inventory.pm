@@ -3727,10 +3727,10 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
                 created_by       => $c->session->{username} || 'admin',
             });
 
-            my @item_ids = ref($p->{item_id}) eq 'ARRAY' ? @{$p->{item_id}} : ($p->{item_id});
-            my @qtys     = ref($p->{quantity}) eq 'ARRAY' ? @{$p->{quantity}} : ($p->{quantity});
-            my @prices   = ref($p->{retail_price}) eq 'ARRAY' ? @{$p->{retail_price}} : ($p->{retail_price});
-            my @notes_l  = ref($p->{line_notes}) eq 'ARRAY' ? @{$p->{line_notes}} : ($p->{line_notes});
+            my @item_ids = $c->req->params->get_all('item_id');
+            my @qtys     = $c->req->params->get_all('quantity');
+            my @prices   = $c->req->params->get_all('retail_price');
+            my @notes_l  = $c->req->params->get_all('line_notes');
 
             for my $i (0 .. $#item_ids) {
                 next unless $item_ids[$i] && ($qtys[$i] || 0) > 0;
@@ -3844,9 +3844,9 @@ sub consignment_settle :Path('/Inventory/consignment/settle') :Args(1) {
         my $total_net      = 0;
         my $total_comm     = 0;
 
-        my @line_ids    = ref($p->{line_id})   eq 'ARRAY' ? @{$p->{line_id}}   : ($p->{line_id});
-        my @qty_solds   = ref($p->{qty_sold})  eq 'ARRAY' ? @{$p->{qty_sold}}  : ($p->{qty_sold});
-        my @qty_returns = ref($p->{qty_return}) eq 'ARRAY' ? @{$p->{qty_return}} : ($p->{qty_return});
+        my @line_ids    = $c->req->params->get_all('line_id');
+        my @qty_solds   = $c->req->params->get_all('qty_sold');
+        my @qty_returns = $c->req->params->get_all('qty_return');
 
         for my $i (0 .. $#line_ids) {
             my $line = $schema->resultset('InventoryConsignmentLine')->find($line_ids[$i]);
