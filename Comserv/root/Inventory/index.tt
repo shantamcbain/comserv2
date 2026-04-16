@@ -66,7 +66,7 @@
       <ul style="list-style:none;padding:0;margin:0;">
         <li style="padding:0.35rem 0;border-bottom:1px solid #f0f0f0;"><a href="/Inventory/print/labels" target="_blank">Print All Labels</a></li>
         <li style="padding:0.35rem 0;border-bottom:1px solid #f0f0f0;"><a href="/Inventory/print/stock" target="_blank">Stock Report</a></li>
-        <li style="padding:0.35rem 0;border-bottom:1px solid #f0f0f0;"><a href="/Cart/price_list">Price List / Shop</a></li>
+        <li style="padding:0.35rem 0;border-bottom:1px solid #f0f0f0;"><a href="/shop">Online Store</a> | <a href="/Cart/price_list">Price List</a></li>
         <li style="padding:0.35rem 0;"><a href="/Cart/orders">Customer Orders</a></li>
       </ul>
     </div>

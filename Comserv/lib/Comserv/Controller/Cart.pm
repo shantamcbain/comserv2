@@ -87,7 +87,9 @@ sub price_list :Path('/Cart/price_list') :Args(0) {
     my $schema   = $self->_schema($c);
     my $category = $c->req->params->{category};
 
+    my $is_admin = $self->_is_admin($c);
     my %search = (sitename => $sitename, status => 'active');
+    $search{show_in_shop} = 1 unless $is_admin;
     $search{category} = $category if $category;
 
     my (@items, @categories, @workshops);
@@ -119,6 +121,7 @@ sub price_list :Path('/Cart/price_list') :Args(0) {
         workshops  => \@workshops,
         category   => $category,
         sitename   => $sitename,
+        is_admin   => $is_admin,
         cart_count => $self->_cart_count($c),
         template   => 'Cart/price_list.tt',
     );

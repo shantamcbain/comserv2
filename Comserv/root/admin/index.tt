@@ -229,9 +229,13 @@
                         <i class="fas fa-shopping-cart"></i>
                         <span>Cart Orders</span>
                     </a>
-                    <a href="[% c.uri_for('/Cart/price_list') %]" class="admin-link">
+                    <a href="[% c.uri_for('/shop') %]" class="admin-link">
                         <i class="fas fa-store"></i>
-                        <span>Price List / Shop</span>
+                        <span>Online Store</span>
+                    </a>
+                    <a href="[% c.uri_for('/Cart/price_list') %]" class="admin-link">
+                        <i class="fas fa-print"></i>
+                        <span>Price List</span>
                     </a>
                 </div>
             </div>
