@@ -44,24 +44,32 @@
 <div class="content-container">
 
 <!-- Filter bar -->
-<form method="GET" action="/shop/admin" style="margin-bottom:var(--spacing-medium);display:flex;gap:0.5em;align-items:center;font-family:var(--body-font)">
-  <label style="color:var(--text-color)">Filter:</label>
-  <select name="status" onchange="this.form.submit()" style="padding:5px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
-    <option value="all"      [% IF filter_status == 'all'      %]selected[% END %]>All items</option>
-    <option value="active"   [% IF filter_status == 'active'   %]selected[% END %]>Active only</option>
-    <option value="inactive" [% IF filter_status == 'inactive' %]selected[% END %]>Inactive only</option>
-  </select>
+<div style="margin-bottom:var(--spacing-medium);display:flex;gap:0.5em;align-items:center;font-family:var(--body-font);flex-wrap:wrap">
+  <form method="GET" action="/shop/admin" style="display:contents">
+    <label style="color:var(--text-color)">Status:</label>
+    <select name="status" onchange="this.form.submit()" style="padding:5px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+      <option value="all"      [% IF filter_status == 'all'      %]selected[% END %]>All</option>
+      <option value="active"   [% IF filter_status == 'active'   %]selected[% END %]>Active</option>
+      <option value="inactive" [% IF filter_status == 'inactive' %]selected[% END %]>Inactive</option>
+    </select>
+    <label style="color:var(--text-color);margin-left:0.4em">Visibility:</label>
+    <select name="visibility" onchange="this.form.submit()" style="padding:5px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+      <option value="all"     [% IF filter_visibility == 'all'     %]selected[% END %]>All</option>
+      <option value="visible" [% IF filter_visibility == 'visible' %]selected[% END %]>Visible in shop</option>
+      <option value="hidden"  [% IF filter_visibility == 'hidden'  %]selected[% END %]>Hidden</option>
+    </select>
+  </form>
   <span style="margin-left:auto;color:var(--text-muted-color);font-size:0.85rem">
-    [% items.size %] item(s) — click <strong>In Shop</strong> toggle to show/hide in the public store
+    [% items.size %] item(s)
   </span>
-  <form method="POST" action="/shop/admin/reset_visibility" style="margin:0"
+  <form method="POST" action="/shop/admin/reset_visibility"
         onsubmit="return confirm('Hide ALL items from the shop? You can re-enable them one by one.')">
     <button type="submit"
             style="padding:5px 12px;background:#b71c1c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--body-font);font-size:0.85rem">
       Hide All
     </button>
   </form>
-</form>
+</div>
 
 [% IF items.size == 0 %]
 <div style="text-align:center;padding:40px 20px;color:var(--text-muted-color,#666);font-family:var(--body-font)">
@@ -120,7 +128,7 @@
       <!-- In Shop toggle -->
       <td style="padding:6px 10px;text-align:center">
         <form method="POST" action="/shop/admin/toggle/[% item.id %]" style="display:inline">
-          <input type="hidden" name="return_to" value="/shop/admin?status=[% filter_status %]">
+          <input type="hidden" name="return_to" value="/shop/admin">
           [% IF item.show_in_shop %]
           <button type="submit" title="Click to hide from store"
                   style="padding:3px 10px;background:#d4edda;color:#155724;border:1px solid #c3e6cb;border-radius:4px;cursor:pointer;font-family:var(--body-font);font-size:0.8rem;white-space:nowrap">
