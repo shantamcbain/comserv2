@@ -27,7 +27,7 @@
   [% END %]
 </p>
 <p style="font-family:var(--body-font)">
-  <a href="/Cart/price_list" class="menu-item" style="color:var(--primary-color);font-weight:bold"><i class="fas fa-store"></i> Browse Products &amp; Services →</a>
+  <a href="/shop" class="menu-item" style="color:var(--primary-color);font-weight:bold"><i class="fas fa-store"></i> Browse Products &amp; Services →</a>
 </p>
 
 <!-- ===== EXPLORE ===== -->
