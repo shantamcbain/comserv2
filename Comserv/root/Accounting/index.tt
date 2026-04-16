@@ -1,23 +1,213 @@
-[% PageVersion = 'Accounting/index.tt,v 0.01 2026/04/10 shanta Exp' %]
+[% PageVersion = 'Accounting/index.tt,v 0.02 2026/04/15 shanta Exp' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
-<h1>Accounting</h1>
-<p>General Ledger and Chart of Accounts — modeled on SQL-Ledger/LedgerSMB.</p>
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
 
-<table border="1" cellpadding="8">
-  <tr>
-    <th>Chart of Accounts</th>
-    <td>[% acct_count %] active accounts</td>
-    <td><a href="/Accounting/coa">Browse COA</a></td>
-  </tr>
-  <tr>
-    <th>General Ledger</th>
-    <td>[% entry_count %] journal entries</td>
-    <td><a href="/Accounting/gl">Browse GL</a></td>
-  </tr>
-  <tr>
-    <th>AI Usage &amp; Cost Allocation</th>
-    <td>Allocate API costs by usage %</td>
-    <td><a href="/Accounting/ai_usage">AI Usage Report</a></td>
-  </tr>
-</table>
+<div class="app-container">
+  <div class="page-header">
+    <h1>&#128200; Accounting &amp; Inventory — [% sitename | html %]</h1>
+  </div>
+
+  [%# ── Summary stat bar ──────────────────────────────────────────── %]
+  <div style="display:flex;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.5rem;">
+
+    <div style="flex:1;min-width:120px;background:#fff;border:1px solid #ddd;border-radius:8px;padding:0.9rem 1rem;text-align:center;">
+      <div style="font-size:1.8rem;font-weight:bold;color:#2563eb;">[% acct_count %]</div>
+      <div style="font-size:0.8rem;color:#555;">COA Accounts</div>
+    </div>
+
+    <div style="flex:1;min-width:120px;background:#fff;border:1px solid #ddd;border-radius:8px;padding:0.9rem 1rem;text-align:center;">
+      <div style="font-size:1.8rem;font-weight:bold;color:#6d28d9;">[% entry_count %]</div>
+      <div style="font-size:0.8rem;color:#555;">GL Entries</div>
+    </div>
+
+    <a href="/Inventory/invoice?status=outstanding" style="flex:1;min-width:120px;background:[% ap_outstanding > 0 ? '#fff7ed' : '#fff' %];border:1px solid [% ap_outstanding > 0 ? '#f97316' : '#ddd' %];border-radius:8px;padding:0.9rem 1rem;text-align:center;text-decoration:none;">
+      <div style="font-size:1.8rem;font-weight:bold;color:[% ap_outstanding > 0 ? '#c2410c' : '#059669' %];">[% ap_outstanding %]</div>
+      <div style="font-size:0.8rem;color:#555;">AP Outstanding</div>
+    </a>
+
+    <a href="/Inventory/sales" style="flex:1;min-width:120px;background:[% ar_outstanding > 0 ? '#fefce8' : '#fff' %];border:1px solid [% ar_outstanding > 0 ? '#ca8a04' : '#ddd' %];border-radius:8px;padding:0.9rem 1rem;text-align:center;text-decoration:none;">
+      <div style="font-size:1.8rem;font-weight:bold;color:[% ar_outstanding > 0 ? '#92400e' : '#059669' %];">[% ar_outstanding %]</div>
+      <div style="font-size:0.8rem;color:#555;">AR Outstanding</div>
+    </a>
+
+    <a href="/Inventory/items" style="flex:1;min-width:120px;background:#fff;border:1px solid #ddd;border-radius:8px;padding:0.9rem 1rem;text-align:center;text-decoration:none;">
+      <div style="font-size:1.8rem;font-weight:bold;color:#1e40af;">[% item_count %]</div>
+      <div style="font-size:0.8rem;color:#555;">Active Items</div>
+    </a>
+
+    <a href="/Inventory/stock/levels?low_only=1" style="flex:1;min-width:120px;background:[% low_stock > 0 ? '#fef2f2' : '#fff' %];border:1px solid [% low_stock > 0 ? '#ef4444' : '#ddd' %];border-radius:8px;padding:0.9rem 1rem;text-align:center;text-decoration:none;">
+      <div style="font-size:1.8rem;font-weight:bold;color:[% low_stock > 0 ? '#b91c1c' : '#059669' %];">[% low_stock %]</div>
+      <div style="font-size:0.8rem;color:#555;">Low Stock</div>
+    </a>
+
+  </div>
+
+  [%# ── Main grid ──────────────────────────────────────────────────── %]
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.2rem;">
+
+    [%# ── Accounts Receivable (AR) ───────────────────────────────── %]
+    <div class="content-section" style="margin:0;">
+      <h2 style="margin-top:0;color:#065f46;border-bottom:2px solid #6ee7b7;padding-bottom:0.4rem;">
+        &#128176; Accounts Receivable (AR)
+      </h2>
+      <ul style="list-style:none;padding:0;margin:0;">
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Inventory/sales" style="font-weight:bold;">Sales Invoices</a>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Inventory/sales/new">+ New Sales Invoice</a>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Cart/orders">Customer Orders</a>
+        </li>
+        <li style="padding:0.4rem 0;">
+          <a href="/Cart/price_list">Price List / Shop</a>
+        </li>
+      </ul>
+    </div>
+
+    [%# ── Accounts Payable (AP) ──────────────────────────────────── %]
+    <div class="content-section" style="margin:0;">
+      <h2 style="margin-top:0;color:#7c3aed;border-bottom:2px solid #c4b5fd;padding-bottom:0.4rem;">
+        &#128230; Accounts Payable (AP)
+      </h2>
+      <ul style="list-style:none;padding:0;margin:0;">
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Inventory/invoice" style="font-weight:bold;">
+            Supplier Invoices
+            [% IF ap_outstanding > 0 %]
+            <span style="background:#f97316;color:#fff;font-size:0.75rem;padding:0.1rem 0.45rem;border-radius:10px;margin-left:0.3rem;">[% ap_outstanding %] due</span>
+            [% END %]
+          </a>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Inventory/invoice/new">+ New Supplier Invoice</a>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Inventory/suppliers" style="font-weight:bold;">Suppliers ([% supplier_count %])</a>
+        </li>
+        <li style="padding:0.4rem 0;">
+          <a href="/Inventory/supplier/add">+ Add Supplier</a>
+        </li>
+      </ul>
+    </div>
+
+    [%# ── General Ledger ─────────────────────────────────────────── %]
+    <div class="content-section" style="margin:0;">
+      <h2 style="margin-top:0;color:#1e40af;border-bottom:2px solid #93c5fd;padding-bottom:0.4rem;">
+        &#128211; General Ledger
+      </h2>
+      <ul style="list-style:none;padding:0;margin:0;">
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Accounting/gl" style="font-weight:bold;">Browse GL ([% entry_count %] entries)</a>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Accounting/coa" style="font-weight:bold;">Chart of Accounts ([% acct_count %])</a>
+        </li>
+        [% IF acct_count == 0 %]
+        <li style="padding:0.4rem 0;background:#fef9c3;border-radius:4px;padding:0.5rem;">
+          <a href="/Accounting/coa/seed" style="color:#92400e;font-weight:bold;">
+            &#9888; Seed Default COA Accounts
+          </a>
+          <div style="font-size:0.8rem;color:#78350f;">No accounts yet — click to seed standard double-entry accounts</div>
+        </li>
+        [% ELSE %]
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Accounting/coa/seed_merge">Update / Merge COA</a>
+        </li>
+        [% END %]
+      </ul>
+    </div>
+
+    [%# ── Inventory ──────────────────────────────────────────────── %]
+    <div class="content-section" style="margin:0;">
+      <h2 style="margin-top:0;color:#047857;border-bottom:2px solid #6ee7b7;padding-bottom:0.4rem;">
+        &#128230; Inventory
+      </h2>
+      <ul style="list-style:none;padding:0;margin:0;">
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Inventory/items" style="font-weight:bold;">Items / SKUs ([% item_count %] active)</a>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Inventory/item/add">+ Add Item</a>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Inventory/stock/levels" style="font-weight:bold;">
+            Stock Levels
+            [% IF low_stock > 0 %]
+            <span style="background:#ef4444;color:#fff;font-size:0.75rem;padding:0.1rem 0.45rem;border-radius:10px;margin-left:0.3rem;">[% low_stock %] low</span>
+            [% END %]
+          </a>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Inventory/stock/adjust">Adjust Stock</a>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Inventory/stock/transactions">Transaction Log</a>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Inventory/bom/list">Bill of Materials (BOM)</a>
+        </li>
+        <li style="padding:0.4rem 0;">
+          <a href="/Inventory/locations">Locations ([% location_count %])</a>
+        </li>
+      </ul>
+    </div>
+
+    [%# ── Print & Reports ────────────────────────────────────────── %]
+    <div class="content-section" style="margin:0;">
+      <h2 style="margin-top:0;color:#374151;border-bottom:2px solid #d1d5db;padding-bottom:0.4rem;">
+        &#128424; Print &amp; Reports
+      </h2>
+      <ul style="list-style:none;padding:0;margin:0;">
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Inventory/print/stock" target="_blank">Stock Level Report</a>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Inventory/print/stock?low_only=1" target="_blank">Low-Stock Report</a>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Inventory/print/labels" target="_blank">All Item Labels</a>
+        </li>
+      </ul>
+    </div>
+
+    [%# ── Admin Tools ────────────────────────────────────────────── %]
+    <div class="content-section" style="margin:0;background:#f8fafc;border:1px solid #cbd5e1;">
+      <h2 style="margin-top:0;color:#475569;border-bottom:2px solid #94a3b8;padding-bottom:0.4rem;">
+        &#128295; Admin Tools
+      </h2>
+      <ul style="list-style:none;padding:0;margin:0;">
+        [% IF acct_count == 0 %]
+        <li style="padding:0.5rem;margin-bottom:0.4rem;background:#fef9c3;border:1px solid #fbbf24;border-radius:6px;">
+          <a href="/Accounting/coa/seed" style="font-weight:bold;color:#92400e;">
+            &#9888; Seed Default COA Accounts
+          </a>
+          <div style="font-size:0.8rem;color:#78350f;">Required before creating invoices or GL entries</div>
+        </li>
+        [% ELSE %]
+        <li style="padding:0.4rem 0;border-bottom:1px solid #e2e8f0;">
+          <a href="/Accounting/coa/seed_merge">Update / Merge COA Accounts</a>
+        </li>
+        [% END %]
+        <li style="padding:0.4rem 0;border-bottom:1px solid #e2e8f0;">
+          <a href="/Inventory/timesheet">&#9200; Timesheet / Log Time</a>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid #e2e8f0;">
+          <a href="/admin/schema_compare">Schema Compare / DB Sync</a>
+        </li>
+        [% IF c.stash.SiteName == 'CSC' OR c.session.SiteName == 'CSC' %]
+        <li style="padding:0.4rem 0;border-bottom:1px solid #e2e8f0;">
+          <a href="/membership/admin/manage_plans">&#127760; Membership Plans (incl. Seed Hosting Plans)</a>
+        </li>
+        <li style="padding:0.4rem 0;">
+          <a href="/membership/admin/hosting_accounts">&#127760; Hosting Accounts</a>
+        </li>
+        [% END %]
+      </ul>
+    </div>
+
+  </div>
+</div>

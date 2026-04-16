@@ -152,10 +152,11 @@ sub items :Path('/Inventory/items') :Args(0) {
 
 sub _load_coa_accounts {
     my ($self, $c) = @_;
+    my $sitename = $self->_sitename($c);
     my @accounts;
     eval {
         @accounts = $self->_schema($c)->resultset('CoaAccount')->search(
-            { obsolete => 0 },
+            { sitename => $sitename, obsolete => 0 },
             { order_by => 'accno' }
         )->all;
     };
@@ -338,10 +339,28 @@ sub item_edit :Path('/Inventory/item/edit') :Args(1) {
         }
     }
 
+    my @stock_levels;
+    eval {
+        @stock_levels = $schema->resultset('InventoryStockLevel')->search(
+            { item_id => $item->id },
+            { prefetch => 'location', order_by => 'location.name' }
+        )->all;
+    };
+
+    my @locations;
+    eval {
+        @locations = $schema->resultset('InventoryLocation')->search(
+            { sitename => $sitename },
+            { order_by => 'name' }
+        )->all;
+    };
+
     $c->stash(
         item         => $item,
         sitename     => $sitename,
         coa_accounts => $self->_load_coa_accounts($c),
+        stock_levels => \@stock_levels,
+        locations    => \@locations,
         template     => 'Inventory/items/edit.tt',
     );
 }
@@ -966,6 +985,126 @@ sub location_edit :Path('/Inventory/location/edit') :Args(1) {
 # Stock Adjustments
 # -------------------------------------------------------------------------
 
+sub stock_receive :Path('/Inventory/stock/receive') :Args(0) {
+    my ($self, $c) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my (@items, @suppliers, @coa_accounts);
+    eval { @items     = $schema->resultset('InventoryItem')->search(
+        { sitename => $sitename, status => 'active' }, { order_by => 'name' })->all };
+    eval { @suppliers = $schema->resultset('InventorySupplier')->search(
+        { sitename => $sitename }, { order_by => 'name' })->all };
+    eval { @coa_accounts = $schema->resultset('CoaAccount')->search(
+        { obsolete => 0 }, { order_by => 'accno' })->all };
+
+    if ($c->req->method eq 'POST') {
+        my $params      = $c->req->body_parameters;
+        my $supplier_id = $params->{supplier_id};
+        my $inv_number  = $params->{invoice_number} || ('RCV-' . time());
+        my $inv_date    = $params->{invoice_date}   || substr($self->_now(), 0, 10);
+        my $due_date    = $params->{due_date}        || '';
+        my $ap_id       = $params->{ap_account_id};
+        my $notes       = $params->{notes}           || '';
+
+        unless ($supplier_id) {
+            $c->stash->{error_msg} = 'Please select a supplier.';
+            $c->stash(items => \@items, suppliers => \@suppliers,
+                coa_accounts => \@coa_accounts, sitename => $sitename,
+                params => $params, template => 'Inventory/stock/receive.tt');
+            return;
+        }
+
+        my (@lines_data);
+        for my $item (@items) {
+            my $qty  = $params->{'qty_'  . $item->id} || 0;
+            my $cost = $params->{'cost_' . $item->id} || 0;
+            next unless $qty > 0;
+            push @lines_data, {
+                item_id     => $item->id,
+                item_name   => $item->name,
+                sku         => $item->sku,
+                quantity    => $qty,
+                unit_cost   => $cost,
+                line_total  => $qty * $cost,
+                account_id  => $item->expense_accno_id || undef,
+                description => 'Received: ' . $item->name,
+            };
+        }
+
+        unless (@lines_data) {
+            $c->stash->{error_msg} = 'No items entered. Add at least one quantity.';
+            $c->stash(items => \@items, suppliers => \@suppliers,
+                coa_accounts => \@coa_accounts, sitename => $sitename,
+                params => $params, template => 'Inventory/stock/receive.tt');
+            return;
+        }
+
+        my $total = 0;
+        $total += $_->{line_total} for @lines_data;
+
+        eval {
+            $schema->txn_do(sub {
+                my $invoice = $schema->resultset('InventorySupplierInvoice')->create({
+                    sitename       => $sitename,
+                    supplier_id    => $supplier_id,
+                    invoice_number => $inv_number,
+                    invoice_date   => $inv_date,
+                    ($due_date ? (due_date => $due_date) : ()),
+                    total_amount   => $total,
+                    status         => 'draft',
+                    ($ap_id ? (ap_account_id => $ap_id) : ()),
+                    notes          => $notes,
+                    created_by     => $c->session->{username} || 'system',
+                    created_at     => $self->_now(),
+                    updated_at     => $self->_now(),
+                });
+
+                for my $ln (@lines_data) {
+                    $schema->resultset('InventorySupplierInvoiceLine')->create({
+                        invoice_id  => $invoice->id,
+                        item_id     => $ln->{item_id},
+                        description => $ln->{description},
+                        quantity    => $ln->{quantity},
+                        unit_cost   => $ln->{unit_cost},
+                        line_total  => $ln->{line_total},
+                        ($ln->{account_id} ? (account_id => $ln->{account_id}) : ()),
+                    });
+
+                    # Also update item unit_cost if currently blank
+                    if ($ln->{unit_cost} > 0) {
+                        my $it = $schema->resultset('InventoryItem')->find($ln->{item_id});
+                        if ($it && !($it->unit_cost && $it->unit_cost > 0)) {
+                            $it->update({ unit_cost => $ln->{unit_cost}, updated_at => $self->_now() });
+                        }
+                    }
+                }
+
+                $c->flash->{success_msg} = "Draft receiving invoice #$inv_number created with "
+                    . scalar(@lines_data) . " line(s) totalling \$$total. Review and post to update stock.";
+                $c->res->redirect($c->uri_for('/Inventory/invoice/view', [$invoice->id]));
+            });
+        };
+        if ($@) {
+            $c->stash->{error_msg} = "Failed to create receiving invoice: $@";
+            $c->stash(items => \@items, suppliers => \@suppliers,
+                coa_accounts => \@coa_accounts, sitename => $sitename,
+                params => $params, template => 'Inventory/stock/receive.tt');
+            return;
+        }
+        return;
+    }
+
+    $c->stash(
+        items        => \@items,
+        suppliers    => \@suppliers,
+        coa_accounts => \@coa_accounts,
+        sitename     => $sitename,
+        inv_date     => substr($self->_now(), 0, 10),
+        template     => 'Inventory/stock/receive.tt',
+    );
+}
+
 sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
     my ($self, $c) = @_;
 
@@ -1008,9 +1147,15 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
 
                 $stock->update({ quantity_on_hand => $new_qty, updated_at => $now });
 
+                # Update item unit_cost if provided and item cost is blank
+                my $item_rec = $schema->resultset('InventoryItem')->find($item_id);
+                if ($item_rec && $params->{unit_cost} && $params->{unit_cost} > 0) {
+                    $item_rec->update({ unit_cost => $params->{unit_cost}, updated_at => $now })
+                        unless $item_rec->unit_cost && $item_rec->unit_cost > 0;
+                }
+
                 # Generate GL entry if item has COA accounts linked
                 my $gl_entry_id;
-                my $item_rec = $schema->resultset('InventoryItem')->find($item_id);
                 if ($item_rec && ($item_rec->inventory_accno_id || $item_rec->expense_accno_id)) {
                     my $unit_cost  = $params->{unit_cost} || $item_rec->unit_cost || 0;
                     my $value      = $qty * $unit_cost;
@@ -1065,7 +1210,6 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
                     unit_cost        => $params->{unit_cost} || undef,
                     reference_number => $params->{reference_number},
                     todo_id          => $params->{todo_id} || undef,
-                    gl_entry_id      => $gl_entry_id || undef,
                     sitename         => $sitename,
                     notes            => $params->{notes},
                     performed_by     => $c->session->{username} || 'system',
@@ -1078,7 +1222,10 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
             $c->stash->{error_msg} = "Stock adjustment failed: $@";
         } else {
             $c->flash->{success_msg} = 'Stock adjustment recorded';
-            $c->res->redirect($c->uri_for('/Inventory/items'));
+            my $redirect = $c->req->body_parameters->{redirect_to}
+                        || $c->req->params->{redirect_to}
+                        || '/Inventory/items';
+            $c->res->redirect($redirect);
             return;
         }
     }
@@ -1109,37 +1256,42 @@ sub stock_levels :Path('/Inventory/stock/levels') :Args(0) {
 
     my (@stock_rows, @items, @locations);
     eval {
-        @items     = $schema->resultset('InventoryItem')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
-        @locations = $schema->resultset('InventoryLocation')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
+        my %item_search = (sitename => $sitename, status => 'active');
+        $item_search{id} = $item_id if $item_id;
 
-        my %sl_search;
-        if ($item_id) {
-            $sl_search{'item.id'}      = $item_id;
-        } else {
-            $sl_search{'item.sitename'} = $sitename;
-        }
-        $sl_search{'me.location_id'} = $location_id if $location_id;
+        @items     = $schema->resultset('InventoryItem')->search(\%item_search, { order_by => 'name' })->all;
+        @locations = $schema->resultset('InventoryLocation')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' })->all;
 
-        my @raw = $schema->resultset('InventoryStockLevel')->search(
-            \%sl_search,
-            {
-                prefetch => ['item', 'location'],
-                order_by => ['item.name', 'location.name'],
+        for my $item (@items) {
+            my %sl_search = (item_id => $item->id);
+            $sl_search{location_id} = $location_id if $location_id;
+
+            my @sls = $schema->resultset('InventoryStockLevel')->search(
+                \%sl_search,
+                { prefetch => 'location', order_by => 'location.name' }
+            )->all;
+
+            if (@sls) {
+                for my $sl (@sls) {
+                    my $reorder = defined $item->reorder_point ? $item->reorder_point : 0;
+                    my $is_low  = ($reorder > 0 && $sl->quantity_on_hand <= $reorder) ? 1 : 0;
+                    next if $low_only && !$is_low;
+                    push @stock_rows, {
+                        sl       => $sl,
+                        item     => $item,
+                        location => $sl->location,
+                        is_low   => $is_low,
+                    };
+                }
+            } else {
+                next if $low_only;
+                push @stock_rows, {
+                    sl       => undef,
+                    item     => $item,
+                    location => undef,
+                    is_low   => 0,
+                };
             }
-        );
-
-        for my $sl (@raw) {
-            my $item     = $sl->item;
-            my $location = $sl->location;
-            my $reorder  = defined $item->reorder_point ? $item->reorder_point : 0;
-            my $is_low   = ($reorder > 0 && $sl->quantity_on_hand <= $reorder) ? 1 : 0;
-            next if $low_only && !$is_low;
-            push @stock_rows, {
-                sl       => $sl,
-                item     => $item,
-                location => $location,
-                is_low   => $is_low,
-            };
         }
     };
     push @{$c->stash->{debug_errors}}, "Error loading stock levels: $@" if $@;
@@ -1422,10 +1574,12 @@ sub invoice_list :Path('/Inventory/invoice') :Args(0) {
         )->all;
     };
     $list_error = $@ if $@;
+    my $today = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
     $c->stash(
         invoices   => \@invoices,
         error_msg  => $list_error,
         sitename   => $sitename,
+        today      => $today,
         template   => 'Inventory/invoice/list.tt',
     );
 }
@@ -1471,6 +1625,8 @@ sub invoice_new :Path('/Inventory/invoice/new') :Args(0) {
                     discount_account_id  => $params->{discount_account_id} || undef,
                     status               => 'draft',
                     notes                => $params->{notes},
+                    auto_pay             => $params->{auto_pay}            ? 1 : 0,
+                    auto_pay_method      => $params->{auto_pay_method}     || undef,
                     created_by           => $c->session->{username} || 'system',
                     created_at           => $now,
                     updated_at           => $now,
@@ -1510,8 +1666,14 @@ sub invoice_new :Path('/Inventory/invoice/new') :Args(0) {
     }
 
     my @suppliers;
-    eval { @suppliers = $schema->resultset('InventorySupplier')->search(
-        { sitename => $sitename }, { order_by => 'name' })->all };
+    eval {
+        my %seen_sup;
+        @suppliers = grep { !$seen_sup{ lc($_->name) }++ }
+            $schema->resultset('InventorySupplier')->search(
+                { sitename => $sitename, status => 'active' },
+                { order_by => 'name' }
+            )->all;
+    };
 
     my @items;
     eval { @items = $schema->resultset('InventoryItem')->search(
@@ -1665,34 +1827,68 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
         $schema->txn_do(sub {
             my $ref = 'INV-' . ($invoice->invoice_number || $invoice->id);
 
+            # Ensure a default location exists for this site so stock always posts
+            my $default_loc = $schema->resultset('InventoryLocation')->find_or_create(
+                { sitename => $sitename, name => 'Default' },
+                { key => 'sitename_name' }
+            );
+
+            my (@stock_log, $stock_updated, $stock_skipped);
             for my $line ($invoice->lines->all) {
-                if ($line->item_id && $line->location_id) {
-                    my $sl = $schema->resultset('InventoryStockLevel')->find_or_create(
-                        { item_id => $line->item_id, location_id => $line->location_id },
+                my $item_nm = $line->description || 'line #' . ($line->id || '?');
+                unless ($line->item_id) {
+                    push @stock_log, "$item_nm: skipped (no item_id — link item in invoice edit)";
+                    $stock_skipped++;
+                    next;
+                }
+                my $loc_id = $line->location_id || $default_loc->id;
+
+                my ($sl, $sl_err);
+                eval {
+                    $sl = $schema->resultset('InventoryStockLevel')->find_or_create(
+                        { item_id => $line->item_id, location_id => $loc_id },
                         { key => 'item_id_location_id' }
                     );
-                    $sl->update({ quantity_on_hand => ($sl->quantity_on_hand || 0) + $line->quantity });
+                };
+                $sl_err = $@ if $@;
+                if ($sl) {
+                    my $old_qty = $sl->quantity_on_hand || 0;
+                    $sl->update({ quantity_on_hand => $old_qty + $line->quantity });
+                    push @stock_log, "$item_nm: $old_qty → " . ($old_qty + $line->quantity);
+                    $stock_updated++;
+                } else {
+                    push @stock_log, "$item_nm: STOCK ERROR — $sl_err";
+                    $stock_skipped++;
+                }
 
+                eval {
                     $schema->resultset('InventoryTransaction')->create({
                         item_id          => $line->item_id,
-                        location_id      => $line->location_id,
+                        location_id      => $loc_id,
                         transaction_type => 'receive',
                         quantity         => $line->quantity,
                         unit_cost        => $line->unit_cost,
-                        reference        => $ref,
+                        reference_number => $ref,
+                        sitename         => $sitename,
+                        performed_by     => $c->session->{username} || 'system',
                         transaction_date => $invoice->invoice_date,
-                        created_by       => $c->session->{username} || 'system',
+                        created_at       => $self->_now(),
                     });
-                }
+                };
+                warn "InventoryTransaction create error: $@" if $@;
             }
+            $c->stash->{_stock_log}     = \@stock_log;
+            $c->stash->{_stock_updated} = $stock_updated || 0;
+            $c->stash->{_stock_skipped} = $stock_skipped || 0;
 
             if ($invoice->ap_account_id && $invoice->total_amount > 0) {
                 my $gl = $schema->resultset('GlEntry')->create({
                     sitename    => $sitename,
+                    reference   => 'AP-' . ($invoice->invoice_number || $invoice->id),
                     entry_type  => 'AP',
                     description => 'Supplier Invoice ' . ($invoice->invoice_number || ''),
                     post_date   => $invoice->invoice_date,
-                    created_by  => $c->session->{username} || 'system',
+                    approved    => 1,
                 });
 
                 $gl->create_related('lines', {
@@ -1741,7 +1937,201 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
     if ($@) {
         $c->flash->{error_msg} = "Failed to post invoice: $@";
     } else {
-        $c->flash->{success_msg} = 'Invoice posted. Stock updated and GL entry created.';
+        my $upd  = $c->stash->{_stock_updated} || 0;
+        my $skip = $c->stash->{_stock_skipped} || 0;
+        my $log  = join(' | ', @{ $c->stash->{_stock_log} || [] });
+        $c->flash->{success_msg} = "Invoice posted. Stock: $upd item(s) updated, $skip skipped."
+            . ($log ? " Detail: $log" : '');
+    }
+    $c->res->redirect($c->uri_for('/Inventory/invoice/view', [$id]));
+}
+
+sub invoice_reprocess_stock :Path('/Inventory/invoice/reprocess_stock') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $invoice;
+    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find(
+        $id, { prefetch => { lines => ['item'] } }) };
+
+    unless ($invoice && $invoice->sitename eq $sitename) {
+        $c->flash->{error_msg} = 'Invoice not found.';
+        return $c->res->redirect($c->uri_for('/Inventory/invoice'));
+    }
+
+    my $ref = 'INV-' . ($invoice->invoice_number || $invoice->id);
+    my ($added, $skipped, @log);
+
+    eval {
+        $schema->txn_do(sub {
+            my $default_loc = $schema->resultset('InventoryLocation')->find_or_create(
+                { sitename => $sitename, name => 'Default' },
+                { key => 'sitename_name' }
+            );
+
+            for my $line ($invoice->lines->all) {
+                next unless $line->item_id;
+                my $loc_id  = $line->location_id || $default_loc->id;
+                my $item_nm = $line->item ? $line->item->name : "item #${\$line->item_id}";
+
+                # Skip if a 'receive' transaction already exists for this item+invoice
+                my $already = $schema->resultset('InventoryTransaction')->search({
+                    item_id          => $line->item_id,
+                    location_id      => $loc_id,
+                    transaction_type => 'receive',
+                    reference_number => $ref,
+                })->count;
+
+                if ($already) {
+                    push @log, "$item_nm: skipped (transaction already exists)";
+                    $skipped++;
+                    next;
+                }
+
+                my $sl = $schema->resultset('InventoryStockLevel')->find_or_create(
+                    { item_id => $line->item_id, location_id => $loc_id },
+                    { key => 'item_id_location_id' }
+                );
+                $sl->update({ quantity_on_hand => ($sl->quantity_on_hand || 0) + $line->quantity });
+
+                $schema->resultset('InventoryTransaction')->create({
+                    item_id          => $line->item_id,
+                    location_id      => $loc_id,
+                    transaction_type => 'receive',
+                    quantity         => $line->quantity,
+                    unit_cost        => $line->unit_cost,
+                    reference_number => $ref,
+                    sitename         => $sitename,
+                    performed_by     => $c->session->{username} || 'system',
+                    transaction_date => $invoice->invoice_date,
+                    created_at       => $self->_now(),
+                });
+
+                push @log, "$item_nm: +${\$line->quantity} @ location $loc_id";
+                $added++;
+            }
+        });
+    };
+
+    if ($@) {
+        $c->flash->{error_msg} = "Stock reprocess failed: $@";
+    } else {
+        $c->flash->{success_msg} = "Stock reprocessed: $added lines added, $skipped skipped. "
+            . join(' | ', @log);
+    }
+    $c->res->redirect($c->uri_for('/Inventory/invoice/view', [$id]));
+}
+
+sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $invoice;
+    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find(
+        $id, { prefetch => { lines => 'item' } }) };
+
+    unless ($invoice && $invoice->sitename eq $sitename) {
+        $c->flash->{error_msg} = 'Invoice not found.';
+        return $c->res->redirect($c->uri_for('/Inventory/invoice'));
+    }
+    if ($invoice->gl_entry_id) {
+        $c->flash->{error_msg} = 'GL entry already exists for this invoice (GL #' . $invoice->gl_entry_id . ').';
+        return $c->res->redirect($c->uri_for('/Inventory/invoice/view', [$id]));
+    }
+
+    # Find AP account: prefer invoice's own, fall back to first COA account starting with '2'
+    my $ap_acct_id = $invoice->ap_account_id;
+    unless ($ap_acct_id) {
+        my $ap = eval { $schema->resultset('CoaAccount')->search(
+            { accno => { -like => '2%' }, obsolete => 0 },
+            { order_by => 'accno', rows => 1 }
+        )->single };
+        $ap_acct_id = $ap->id if $ap;
+    }
+
+    unless ($ap_acct_id) {
+        $c->flash->{error_msg} = 'No Accounts Payable account found. Please seed COA accounts first.';
+        return $c->res->redirect($c->uri_for('/Inventory/invoice/view', [$id]));
+    }
+
+    eval {
+        $schema->txn_do(sub {
+            my $gl = $schema->resultset('GlEntry')->create({
+                sitename    => $sitename,
+                reference   => 'AP-' . ($invoice->invoice_number || $invoice->id),
+                entry_type  => 'AP',
+                description => 'Supplier Invoice ' . ($invoice->invoice_number || ''),
+                post_date   => $invoice->invoice_date,
+                approved    => 1,
+            });
+
+            $gl->create_related('lines', {
+                account_id => $ap_acct_id,
+                amount     => -$invoice->total_amount,
+                memo       => 'AP ' . ($invoice->invoice_number || ''),
+                sort_order => 1,
+            });
+
+            my $sort = 2;
+            for my $line ($invoice->lines->all) {
+                my $acct_id = $line->account_id;
+                unless ($acct_id) {
+                    my $exp = eval { $schema->resultset('CoaAccount')->search(
+                        { accno => { -like => '5%' }, obsolete => 0 },
+                        { order_by => 'accno', rows => 1 }
+                    )->single };
+                    $acct_id = $exp->id if $exp;
+                }
+                next unless $acct_id;
+                $gl->create_related('lines', {
+                    account_id => $acct_id,
+                    amount     => $line->line_total,
+                    memo       => $line->description || 'Invoice line',
+                    sort_order => $sort++,
+                });
+            }
+
+            $invoice->update({ gl_entry_id => $gl->id });
+
+            # Payment GL: if invoice is paid, also record DR AP / CR clearing
+            if (($invoice->status || '') eq 'paid' && $invoice->total_amount > 0) {
+                my $pay_gl = $schema->resultset('GlEntry')->create({
+                    sitename    => $sitename,
+                    reference   => 'PAY-' . ($invoice->invoice_number || $invoice->id),
+                    entry_type  => 'general',
+                    description => 'Payment: ' . ($invoice->invoice_number || '') . ' (via points)',
+                    post_date   => $invoice->invoice_date,
+                    approved    => 1,
+                });
+                $pay_gl->create_related('lines', {
+                    account_id => $ap_acct_id,
+                    amount     => $invoice->total_amount,
+                    memo       => 'Clear AP — payment received',
+                    sort_order => 1,
+                });
+                # CR side: find Points/Equity clearing account (3xxx) or use AP account as memo-only
+                my $pts_acct = eval { $schema->resultset('CoaAccount')->search(
+                    { accno => { -like => '3%' }, obsolete => 0 },
+                    { order_by => 'accno', rows => 1 }
+                )->single };
+                if ($pts_acct) {
+                    $pay_gl->create_related('lines', {
+                        account_id => $pts_acct->id,
+                        amount     => -$invoice->total_amount,
+                        memo       => 'Points payment clearing',
+                        sort_order => 2,
+                    });
+                }
+            }
+        });
+    };
+
+    if ($@) {
+        $c->flash->{error_msg} = "GL creation failed: $@";
+    } else {
+        $c->flash->{success_msg} = 'GL entry created successfully.';
     }
     $c->res->redirect($c->uri_for('/Inventory/invoice/view', [$id]));
 }
@@ -1807,6 +2197,23 @@ sub invoice_pay_points :Path('/Inventory/invoice/pay_points') :Args(1) {
             );
             $invoice->update({ status => 'paid' });
 
+            # Update the corresponding CSC customer invoice (AR) to paid
+            eval {
+                my $csc_inv = $schema->resultset('InventoryCustomerInvoice')->search({
+                    sitename       => 'CSC',
+                    invoice_number => $invoice->invoice_number,
+                })->single;
+                if ($csc_inv) {
+                    my %upd = (
+                        payment_status => 'paid',
+                        amount_paid    => $amount,
+                    );
+                    eval { $upd{points_redeemed} = $amount };
+                    $csc_inv->update(\%upd);
+                }
+            };
+            $c->log->warn("CSC AR invoice update failed: $@") if $@;
+
             if ($auto_pay) {
                 my $ha = $schema->resultset('HostingAccount')->search({ sitename => $sitename })->single;
                 $ha->update({ auto_pay => 1 }) if $ha;
@@ -1844,6 +2251,137 @@ sub invoice_pay_points :Path('/Inventory/invoice/pay_points') :Args(1) {
     };
     $err_msg ||= "Payment error: $@" if $@;
     $c->flash->{error_msg} = $err_msg if $err_msg;
+
+    $c->res->redirect($c->uri_for('/Inventory/invoice/view/' . $id));
+}
+
+sub process_auto_pay :Path('/Inventory/invoice/process_auto_pay') :Args(0) {
+    my ($self, $c) = @_;
+    return $c->res->redirect($c->uri_for('/user/login')) unless $c->session->{username};
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+    my $confirmed_id = $c->req->body_parameters->{invoice_id};
+
+    if ($confirmed_id) {
+        my $inv;
+        eval { $inv = $schema->resultset('InventorySupplierInvoice')->find($confirmed_id) };
+        if ($inv && $inv->sitename eq $sitename && $inv->auto_pay && $inv->status ne 'paid') {
+            eval {
+                $inv->update({ status => 'paid', updated_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S') });
+
+                my $csc_inv = $schema->resultset('InventoryCustomerInvoice')->search({
+                    sitename       => 'CSC',
+                    invoice_number => $inv->invoice_number,
+                })->single;
+                if ($csc_inv) {
+                    $csc_inv->update({
+                        payment_status => 'paid',
+                        amount_paid    => $inv->total_amount,
+                    });
+                }
+            };
+            if ($@) {
+                $c->flash->{error_msg} = "Error confirming auto-pay: $@";
+            } else {
+                $c->flash->{success_msg} = 'Auto-pay confirmed for invoice ' . $inv->invoice_number . '.';
+            }
+        } else {
+            $c->flash->{error_msg} = 'Invoice not found or not eligible for auto-pay confirmation.';
+        }
+        $c->res->redirect($c->uri_for('/Inventory/invoice'));
+        return;
+    }
+
+    # Show list of auto-pay invoices needing confirmation (past due date)
+    my @due_invoices;
+    eval {
+        @due_invoices = $schema->resultset('InventorySupplierInvoice')->search(
+            {
+                sitename => $sitename,
+                auto_pay => 1,
+                status   => { '!=' => 'paid' },
+                due_date => { '<=' => $today },
+            },
+            { prefetch => 'supplier', order_by => 'due_date' }
+        )->all;
+    };
+
+    $c->stash(
+        auto_pay_invoices => \@due_invoices,
+        sitename          => $sitename,
+        today             => $today,
+        template          => 'Inventory/invoice/auto_pay_confirm.tt',
+    );
+}
+
+# =========================================================================
+# Mark Paid by Shanta — admin marks a supplier invoice as paid by Shanta
+# personally (debit card, cash, etc.) and credits Shanta's point account
+# as compensation.  For pre-point-system invoices: mark paid only.
+# =========================================================================
+
+sub invoice_paid_by_shanta :Path('/Inventory/invoice/paid_by_shanta') :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    unless ($c->session->{is_admin}) {
+        $c->flash->{error_msg} = 'Admin access required';
+        return $c->res->redirect($c->uri_for('/Inventory/invoice/view/' . $id));
+    }
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $invoice;
+    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find($id) };
+    unless ($invoice) {
+        $c->flash->{error_msg} = 'Invoice not found';
+        return $c->res->redirect($c->uri_for('/Inventory/invoice'));
+    }
+
+    my $params         = $c->req->body_parameters;
+    my $payment_note   = $params->{payment_note}   || '';
+    my $pre_point      = $params->{pre_point_system} ? 1 : 0;
+    my $amount         = $invoice->total_amount + 0;
+    my $SHANTA_USER_ID = 178;
+
+    my $notes_suffix = ' — Paid by Shanta';
+    $notes_suffix   .= " ($payment_note)" if $payment_note;
+    $notes_suffix   .= ' [pre-point-system: no point credit]' if $pre_point;
+    my $existing_notes = $invoice->notes || '';
+
+    eval {
+        $schema->txn_do(sub {
+            $invoice->update({
+                status => 'paid',
+                notes  => $existing_notes
+                        ? "$existing_notes\n$notes_suffix"
+                        : $notes_suffix,
+            });
+
+            unless ($pre_point) {
+                require Comserv::Util::PointSystem;
+                my $ps = Comserv::Util::PointSystem->new(c => $c);
+                $ps->credit(
+                    user_id          => $SHANTA_USER_ID,
+                    amount           => $amount,
+                    transaction_type => 'infrastructure_reimbursement',
+                    description      => 'Reimbursement: invoice ' . ($invoice->invoice_number || $id)
+                                      . ' paid by Shanta'
+                                      . ($payment_note ? " ($payment_note)" : ''),
+                    reference_type   => 'supplier_invoice',
+                    reference_id     => $id,
+                );
+            }
+        });
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Error marking paid: $@";
+    } else {
+        $c->flash->{success_msg} = $pre_point
+            ? "Invoice marked paid (pre-point-system — no point credit)."
+            : sprintf("Invoice marked paid. Shanta credited %.2f pts.", $amount);
+    }
 
     $c->res->redirect($c->uri_for('/Inventory/invoice/view/' . $id));
 }
@@ -1941,7 +2479,7 @@ sub customer_invoice_list :Path('/Inventory/sales') :Args(0) {
     eval {
         @invoices = $self->_schema($c)->resultset('InventoryCustomerInvoice')->search(
             { 'me.sitename' => $sitename },
-            { prefetch => 'customer_order', order_by => { -desc => 'me.invoice_date' } }
+            { prefetch => ['lines'], order_by => { -desc => 'me.invoice_date' } }
         )->all;
     };
     $err = $@ if $@;
@@ -2389,6 +2927,96 @@ sub print_bom :Path('/Inventory/print/bom') :Args(1) {
 # -------------------------------------------------------------------------
 # Point System Integration — Timesheet
 # -------------------------------------------------------------------------
+
+sub seed_filaments :Path('/Inventory/seed_filaments') :Args(0) {
+    my ($self, $c) = @_;
+    return $c->res->redirect($c->uri_for('/user/login')) unless $c->session->{username};
+    my $roles    = $c->session->{roles} // [];
+    my $is_admin = ref($roles) eq 'ARRAY'
+        ? (grep { /admin/i } @$roles)
+        : ($roles =~ /admin/i);
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        return $c->res->redirect($c->uri_for('/Inventory'));
+    }
+
+    my $target_site = $c->req->query_parameters->{sitename} || '3d';
+    my $schema = $self->_schema($c);
+    my $now    = $self->_now();
+    my $by     = $c->session->{username} || 'system';
+
+    my @filaments = (
+        { sku => 'MAT3D-NYLON-WHT',  name => 'Nylon White Filament 1kg',                brand => 'Mater3D' },
+        { sku => 'MAT3D-PETG-BLU',   name => 'PET-G Blue Filament 1kg',                 brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-YEL',    name => 'PLA Yellow Filament 1kg',                  brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-BLK',    name => 'PLA Black Filament 1kg',                   brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-RED',    name => 'PLA Red Filament 1kg',                     brand => 'Mater3D' },
+        { sku => 'MAT3D-PETG-RED',   name => 'PET-G Red Filament 1kg',                   brand => 'Mater3D' },
+        { sku => 'MAT3D-PETG-TRNBR', name => 'PET-G Transparent Brown Filament 1kg',     brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-NTR',    name => 'PLA Neutral Filament 1kg',                 brand => 'Mater3D' },
+        { sku => 'MAT3D-BAMB-CHBR',  name => 'PLA Bamboo Chocolate Brown Filament 1kg',  brand => 'Mater3D' },
+        { sku => 'MAT3D-BAMB-SLGR',  name => 'PLA Bamboo Slate Gray Filament 1kg',       brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-WD',     name => 'PLA Wood Filament 1kg',                    brand => 'Mater3D' },
+        { sku => 'MAT3D-PETG-CLR',   name => 'PET-G Clear Filament 1kg',                 brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-GRN',    name => 'PLA Green Filament 1kg',                   brand => 'Mater3D' },
+        { sku => 'MAT3D-BAMB-WHT',   name => 'Bamboo PLA White Filament 1kg',            brand => 'Mater3D' },
+        { sku => 'MAT3D-BAMB-BLU',   name => 'Bamboo PLA Blue Filament 1kg',             brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-SPGR',   name => 'PLA Space Gray Filament 1kg',              brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-BRN',    name => 'PLA Brown Filament 1kg',                   brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-GRY',    name => 'PLA Gray Filament 1kg',                    brand => 'Mater3D' },
+        { sku => 'MAT3D-PLA-LTBR',   name => 'PLA Light Brown Filament 1kg',             brand => 'Mater3D' },
+        { sku => 'PM-TPU90',         name => 'Polly Maker TPU90 Filament 1kg',            brand => 'Polymaker' },
+        { sku => 'KEXL-LTBR',        name => 'Kexcllish Light Brown Filament 1kg',       brand => 'Kexcllish' },
+    );
+
+    my ($created, $skipped) = (0, 0);
+    my @log;
+    for my $f (@filaments) {
+        my $exists = eval {
+            $schema->resultset('InventoryItem')->search({
+                sitename => $target_site,
+                sku      => $f->{sku},
+            })->count;
+        };
+        if ($exists) {
+            push @log, "$f->{sku}: skipped (exists)";
+            $skipped++;
+            next;
+        }
+        eval {
+            my %row = (
+                sitename        => $target_site,
+                sku             => $f->{sku},
+                name            => $f->{name},
+                item_origin     => 'purchased',
+                is_consumable   => 1,
+                is_reusable     => 0,
+                unit_of_measure => 'spool',
+                status          => 'active',
+                created_by      => $by,
+                updated_by      => $by,
+                created_at      => $now,
+                updated_at      => $now,
+            );
+            eval { $row{description} = $f->{brand} . ' filament for 3D printing. 1kg spool.' };
+            $schema->resultset('InventoryItem')->create(\%row);
+        };
+        if ($@) {
+            push @log, "$f->{sku}: ERROR — $@";
+        } else {
+            push @log, "$f->{sku}: created";
+            $created++;
+        }
+    }
+
+    my $summary = "Filament seed complete for sitename=$target_site: $created created, $skipped skipped.";
+    $c->stash(
+        seed_log  => \@log,
+        summary   => $summary,
+        sitename  => $target_site,
+        template  => 'Inventory/seed_result.tt',
+    );
+}
 
 sub timesheet :Path('/Inventory/timesheet') :Args(0) {
     my ($self, $c) = @_;

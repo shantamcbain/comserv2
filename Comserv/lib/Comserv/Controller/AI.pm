@@ -7754,6 +7754,36 @@ account categories:
 - Suppliers list:             /Inventory/suppliers
 - Add supplier:               /Inventory/supplier/add
 
+## INVOICE PARSING (AI Invoice Parser on /Inventory/invoice/new)
+When the user pastes an invoice or bill on the new invoice form, extract and return
+ONLY a raw JSON object with these keys (omit any you cannot find):
+  supplier_name   — exact company name as printed on the bill
+  invoice_number  — bill/invoice number
+  invoice_date    — YYYY-MM-DD
+  due_date        — YYYY-MM-DD
+  notes           — brief description e.g. "Phone service 250-549-0126 Apr 2026"
+  tax_amount      — total GST+PST+HST (decimal, NOT individual lines)
+  shipping_amount — decimal if applicable
+  discount_amount — positive decimal (will be subtracted from total)
+  lines           — array of line objects: [{description, quantity, unit_cost}]
+                    Use negative unit_cost for credits/discounts applied per-line.
+                    Do NOT include tax lines here — they go in tax_amount.
+
+For phone bills: each plan charge, add-on, and promotional discount is a separate line.
+For utility bills: each service component is a separate line.
+
+If the supplier is not in the system, note it in your plain-text response and suggest
+the user open /Inventory/supplier/add to add them first.
+
+## CHART OF ACCOUNTS — COMMON MAPPINGS
+Phone/telecom bills → 6500 Telephone & Internet (Expense)
+Utilities (hydro, gas, water) → 6100 Utilities (Expense)
+Office supplies → 6200 Office Supplies (Expense)
+Purchased inventory stock → 1200 Inventory Asset (Asset) / 5000 COGS (Expense when sold)
+AP (amounts owed to suppliers) → 2000 Accounts Payable (Liability)
+GST/HST paid → 2310 GST/HST Payable or 1310 Input Tax Credits (Asset)
+PST paid → 2320 PST Payable
+
 ## ACTIONS YOU CAN PERFORM
 When the user asks you to create or update data, respond with a JSON action block:
 

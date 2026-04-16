@@ -17,74 +17,35 @@ __PACKAGE__->add_columns(
         size        => 255,
         is_nullable => 0,
     },
-    invoice_number => {
-        data_type   => 'varchar',
-        size        => 50,
-        is_nullable => 0,
-        comment     => 'Auto-generated: CUST-YYYYMMDD-NNNN',
+    customer_order_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
     },
     customer_name => {
         data_type   => 'varchar',
         size        => 255,
-        is_nullable => 1,
+        is_nullable => 0,
+        default_value => '',
     },
     customer_email => {
         data_type   => 'varchar',
         size        => 255,
         is_nullable => 1,
     },
-    customer_phone => {
+    invoice_number => {
         data_type   => 'varchar',
-        size        => 50,
+        size        => 100,
         is_nullable => 1,
     },
-    customer_address => {
-        data_type   => 'text',
-        is_nullable => 1,
+    invoice_date => {
+        data_type        => 'date',
+        is_nullable      => 0,
+        inflate_datetime => 0,
     },
-    user_id => {
-        data_type   => 'integer',
-        is_nullable => 1,
-        comment     => 'FK to users table if customer was logged in',
-    },
-    session_id => {
-        data_type   => 'varchar',
-        size        => 255,
-        is_nullable => 1,
-        comment     => 'Catalyst session ID for guest carts',
-    },
-    payment_method => {
-        data_type     => 'varchar',
-        size          => 50,
-        is_nullable   => 0,
-        default_value => 'cash',
-        comment       => 'cash | points | ap',
-    },
-    payment_status => {
-        data_type     => 'varchar',
-        size          => 50,
-        is_nullable   => 0,
-        default_value => 'pending',
-        comment       => 'pending | paid | partial | refunded | cancelled',
-    },
-    subtotal => {
-        data_type     => 'decimal',
-        size          => [12, 2],
-        is_nullable   => 0,
-        default_value => '0.00',
-    },
-    tax_rate => {
-        data_type     => 'decimal',
-        size          => [5, 4],
-        is_nullable   => 1,
-        default_value => '0.0000',
-        comment       => 'Tax rate as decimal e.g. 0.1300 = 13%',
-    },
-    tax_amount => {
-        data_type     => 'decimal',
-        size          => [12, 2],
-        is_nullable   => 0,
-        default_value => '0.00',
+    due_date => {
+        data_type        => 'date',
+        is_nullable      => 1,
+        inflate_datetime => 0,
     },
     total_amount => {
         data_type     => 'decimal',
@@ -92,39 +53,42 @@ __PACKAGE__->add_columns(
         is_nullable   => 0,
         default_value => '0.00',
     },
-    points_redeemed => {
-        data_type     => 'integer',
-        is_nullable   => 1,
-        default_value => 0,
-        comment       => 'Number of points applied to this invoice',
-    },
-    amount_paid => {
+    tax_amount => {
         data_type     => 'decimal',
         size          => [12, 2],
         is_nullable   => 1,
         default_value => '0.00',
     },
+    status => {
+        data_type     => 'varchar',
+        size          => 20,
+        is_nullable   => 0,
+        default_value => 'draft',
+    },
+    ar_account_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
+    income_account_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
+    tax_account_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
     gl_entry_id => {
         data_type   => 'integer',
         is_nullable => 1,
-        comment     => 'FK to gl_entries — AR/Income double-entry on checkout',
-    },
-    status => {
-        data_type     => 'varchar',
-        size          => 50,
-        is_nullable   => 0,
-        default_value => 'new',
-        comment       => 'new | processing | fulfilled | cancelled',
     },
     notes => {
         data_type   => 'text',
         is_nullable => 1,
     },
-    ordered_by => {
+    created_by => {
         data_type   => 'varchar',
         size        => 255,
         is_nullable => 1,
-        comment     => 'Username if logged in, otherwise guest identifier',
     },
     created_at => {
         data_type     => 'datetime',
@@ -137,10 +101,48 @@ __PACKAGE__->add_columns(
         set_on_create => 1,
         set_on_update => 1,
     },
+    amount_paid => {
+        data_type     => 'decimal',
+        size          => [10, 0],
+        is_nullable   => 1,
+        default_value => '0',
+    },
+    payment_status => {
+        data_type     => 'varchar',
+        size          => 50,
+        is_nullable   => 0,
+        default_value => 'pending',
+    },
+    points_redeemed => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
+    session_id => {
+        data_type   => 'varchar',
+        size        => 255,
+        is_nullable => 1,
+    },
+    currency => {
+        data_type     => 'char',
+        size          => 3,
+        is_nullable   => 0,
+        default_value => 'CAD',
+    },
+    exchange_rate => {
+        data_type     => 'decimal',
+        size          => [12, 6],
+        is_nullable   => 1,
+        default_value => '1.000000',
+    },
+    functional_amount => {
+        data_type     => 'decimal',
+        size          => [12, 2],
+        is_nullable   => 1,
+        default_value => '0.00',
+    },
 );
 
 __PACKAGE__->set_primary_key('id');
-__PACKAGE__->add_unique_constraint(unique_invoice_number => ['invoice_number']);
 
 __PACKAGE__->has_many(
     'lines' => 'Comserv::Model::Schema::Ency::Result::InventoryCustomerInvoiceLine',
@@ -151,6 +153,12 @@ __PACKAGE__->has_many(
 __PACKAGE__->belongs_to(
     'gl_entry' => 'Comserv::Model::Schema::Ency::Result::GlEntry',
     { 'foreign.id' => 'self.gl_entry_id' },
+    { join_type => 'LEFT', on_delete => 'SET NULL' }
+);
+
+__PACKAGE__->belongs_to(
+    'customer_order' => 'Comserv::Model::Schema::Ency::Result::InventoryCustomerOrder',
+    { 'foreign.id' => 'self.customer_order_id' },
     { join_type => 'LEFT', on_delete => 'SET NULL' }
 );
 

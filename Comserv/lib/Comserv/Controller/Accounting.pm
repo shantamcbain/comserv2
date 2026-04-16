@@ -3,6 +3,8 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 use POSIX qw(strftime);
+use LWP::UserAgent;
+use JSON;
 
 has 'logging' => (
     is      => 'ro',
@@ -55,17 +57,62 @@ sub index :Path('/Accounting') :Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Accounting dashboard');
 
-    my $schema = $self->_schema($c);
-    my ($acct_count, $entry_count);
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+
+    my ($acct_count, $entry_count, $ap_outstanding, $ar_outstanding,
+        $item_count, $supplier_count, $location_count, $low_stock) = (0) x 8;
+
+    eval { $acct_count    = $schema->resultset('CoaAccount')->search({ obsolete => 0 })->count };
+    eval { $entry_count   = $schema->resultset('GlEntry')->search({ sitename => $sitename })->count };
     eval {
-        $acct_count  = $schema->resultset('CoaAccount')->search({ obsolete => 0 })->count;
-        $entry_count = $schema->resultset('GlEntry')->count;
+        $ap_outstanding = $schema->resultset('InventorySupplierInvoice')->search(
+            { sitename => $sitename, status => 'outstanding' }
+        )->count;
+    };
+    eval {
+        $ar_outstanding = $schema->resultset('InventoryCustomerOrder')->search(
+            { sitename => $sitename, status => { -not_in => [qw(paid cancelled)] } }
+        )->count;
+    };
+    eval {
+        $item_count = $schema->resultset('InventoryItem')->search(
+            { sitename => $sitename, status => 'active' }
+        )->count;
+    };
+    eval {
+        $supplier_count = $schema->resultset('InventorySupplier')->search(
+            { sitename => $sitename }
+        )->count;
+    };
+    eval {
+        $location_count = $schema->resultset('InventoryLocation')->search(
+            { sitename => $sitename }
+        )->count;
+    };
+    eval {
+        my @items = $schema->resultset('InventoryItem')->search(
+            { sitename => $sitename, status => 'active', reorder_point => { '>' => 0 } }
+        )->all;
+        for my $item (@items) {
+            my $stock = $schema->resultset('InventoryStockLevel')->search(
+                { item_id => $item->id }
+            )->get_column('quantity')->sum // 0;
+            $low_stock++ if $stock <= $item->reorder_point;
+        }
     };
 
     $c->stash(
-        acct_count  => $acct_count  || 0,
-        entry_count => $entry_count || 0,
-        template    => 'Accounting/index.tt',
+        acct_count      => $acct_count,
+        entry_count     => $entry_count,
+        ap_outstanding  => $ap_outstanding,
+        ar_outstanding  => $ar_outstanding,
+        item_count      => $item_count,
+        supplier_count  => $supplier_count,
+        location_count  => $location_count,
+        low_stock       => $low_stock,
+        sitename        => $sitename,
+        template        => 'Accounting/index.tt',
     );
 }
 
@@ -139,19 +186,21 @@ sub gl_list :Path('/Accounting/gl') :Args(0) {
     my %search = (sitename => $sitename);
     $search{entry_type} = $type if $type;
 
-    my @entries;
+    my (@entries, $gl_error);
     eval {
         @entries = $schema->resultset('GlEntry')->search(
             \%search,
             { order_by => { -desc => 'post_date' }, rows => 100 }
         )->all;
     };
+    $gl_error = $@ if $@;
 
     $c->stash(
-        entries  => \@entries,
-        sitename => $sitename,
-        type     => $type,
-        template => 'Accounting/gl/list.tt',
+        entries   => \@entries,
+        gl_error  => $gl_error,
+        sitename  => $sitename,
+        type      => $type,
+        template  => 'Accounting/gl/list.tt',
     );
 }
 
@@ -580,106 +629,87 @@ sub api_gl_view :Path('/Accounting/api/gl') :Args(1) {
 }
 
 
-# =========================================================================
-# AI Usage Cost Allocation
-# GET  /Accounting/ai_usage        — report for a billing period
-# POST /Accounting/ai_usage        — generate point charges for a period
-# =========================================================================
-
-sub ai_usage :Path('/Accounting/ai_usage') :Args(0) {
+# -------------------------------------------------------------------------
+# GET /Accounting/api/exchange_rates?base=CAD
+# Returns live exchange rates from open.er-api.com (no key required).
+# Response: { base, rates: { USD: 0.72, EUR: 0.66, ... }, updated }
+# Cached in stash for 1 hour via session.
+# -------------------------------------------------------------------------
+sub api_exchange_rates :Path('/Accounting/api/exchange_rates') :Args(0) {
     my ($self, $c) = @_;
 
-    return unless $self->_api_auth($c);
+    my $base = $c->req->params->{base} || 'CAD';
+    $base = uc($base);
+    $base =~ s/[^A-Z]//g;
 
-    my $schema   = $self->_schema($c);
-    my $dbh      = $schema->schema->storage->dbh;
-    my $sitename = $self->_sitename($c);
+    my $cache_key = "fx_rates_$base";
+    my $cached    = $c->session->{$cache_key};
+    my $cache_age = $c->session->{"${cache_key}_ts"} || 0;
+    my $now       = time();
 
-    my $params      = $c->req->body_parameters || {};
-    my $period_from = $params->{period_from} || $c->req->params->{period_from} || '';
-    my $period_to   = $params->{period_to}   || $c->req->params->{period_to}   || '';
-    my $invoice_amt = $params->{invoice_amount} || $c->req->params->{invoice_amount} || 0;
-    my $invoice_id  = $params->{invoice_id}     || $c->req->params->{invoice_id}     || '';
-    my $provider_filter = $params->{provider} || $c->req->params->{provider} || 'grok';
-
-    # Default to previous calendar month
-    unless ($period_from && $period_to) {
-        my @t = localtime(time);
-        my $y = $t[5] + 1900;
-        my $m = $t[4];           # 0-indexed, so $m == previous month
-        if ($m == 0) { $m = 12; $y--; }
-        $period_from = sprintf('%04d-%02d-01', $y, $m);
-        # last day of month
-        my @days = (0,31,28,31,30,31,30,31,31,30,31,30,31);
-        $days[2] = 29 if ($y % 4 == 0 && ($y % 100 != 0 || $y % 400 == 0));
-        $period_to = sprintf('%04d-%02d-%02d', $y, $m, $days[$m]);
+    if ($cached && ($now - $cache_age) < 3600) {
+        $c->res->content_type('application/json');
+        $c->res->body(JSON::encode_json($cached));
+        $c->detach;
+        return;
     }
 
-    # Query: API calls (assistant messages from external provider) per user
-    my $sql = q{
-        SELECT am.user_id,
-               COALESCE(u.username, CONCAT('user_', am.user_id)) AS username,
-               u.email,
-               COUNT(*) AS api_calls,
-               SUM(COALESCE(am.tokens_used, 0)) AS total_tokens
-          FROM ai_messages am
-          LEFT JOIN users u ON u.id = am.user_id
-         WHERE am.role = 'assistant'
-           AND am.created_at >= ?
-           AND am.created_at <= ?
-           AND am.model_used LIKE ?
-         GROUP BY am.user_id, u.username, u.email
-         ORDER BY total_tokens DESC, api_calls DESC
-    };
-    my $like_filter = '%' . lc($provider_filter) . '%';
-    my $rows = $dbh->selectall_arrayref($sql, { Slice => {} },
-        $period_from . ' 00:00:00',
-        $period_to   . ' 23:59:59',
-        $like_filter);
+    my $ua  = LWP::UserAgent->new(timeout => 8);
+    my $url = "https://open.er-api.com/v6/latest/$base";
+    my $resp = eval { $ua->get($url) };
 
-    # Calculate totals and percentages
-    my $grand_calls  = 0;
-    my $grand_tokens = 0;
-    for my $r (@$rows) { $grand_calls += $r->{api_calls}; $grand_tokens += $r->{total_tokens}; }
-
-    my @usage;
-    for my $r (@$rows) {
-        my $pct = $grand_calls > 0 ? ($r->{api_calls} / $grand_calls * 100) : 0;
-        my $tok_pct = $grand_tokens > 0 ? ($r->{total_tokens} / $grand_tokens * 100) : 0;
-        my $allocated = $invoice_amt > 0
-            ? sprintf('%.4f', $invoice_amt * ($grand_tokens > 0 ? $tok_pct / 100 : $pct / 100))
-            : 0;
-        push @usage, {
-            %$r,
-            call_pct    => sprintf('%.1f', $pct),
-            token_pct   => sprintf('%.1f', $tok_pct),
-            allocated   => $allocated,
-        };
+    my $result;
+    if ($resp && $resp->is_success) {
+        my $data = eval { JSON::decode_json($resp->decoded_content) };
+        if ($data && $data->{result} eq 'success') {
+            $result = {
+                base    => $data->{base_code},
+                rates   => $data->{rates},
+                updated => $data->{time_last_update_utc},
+            };
+            $c->session->{$cache_key}         = $result;
+            $c->session->{"${cache_key}_ts"}  = $now;
+        }
     }
 
-    # Also pull a summary of all models used in the period
-    my $model_sql = q{
-        SELECT model_used, COUNT(*) AS calls, SUM(COALESCE(tokens_used,0)) AS tokens
-          FROM ai_messages
-         WHERE role = 'assistant'
-           AND created_at >= ? AND created_at <= ?
-         GROUP BY model_used ORDER BY calls DESC
-    };
-    my $models = $dbh->selectall_arrayref($model_sql, { Slice => {} },
-        $period_from . ' 00:00:00', $period_to . ' 23:59:59');
+    unless ($result) {
+        $result = { error => 'Could not fetch exchange rates', base => $base, rates => {} };
+        $c->res->status(503);
+    }
 
-    $c->stash(
-        template     => 'Accounting/ai_usage.tt',
-        usage        => \@usage,
-        models       => $models,
-        grand_calls  => $grand_calls,
-        grand_tokens => $grand_tokens,
-        period_from  => $period_from,
-        period_to    => $period_to,
-        invoice_amt  => $invoice_amt,
-        invoice_id   => $invoice_id,
-        provider     => $provider_filter,
-    );
+    $c->res->content_type('application/json');
+    $c->res->body(JSON::encode_json($result));
+    $c->detach;
+}
+
+# -------------------------------------------------------------------------
+# Helper: fetch a single exchange rate  base→target  (returns decimal or 1)
+# Used by invoice save actions to compute functional_amount.
+# -------------------------------------------------------------------------
+sub _fetch_rate {
+    my ($self, $c, $from, $to) = @_;
+    return 1 if !$from || !$to || uc($from) eq uc($to);
+
+    my $base  = uc($from);
+    my $cache_key = "fx_rates_$base";
+    my $cached    = $c->session->{$cache_key};
+    my $cache_age = $c->session->{"${cache_key}_ts"} || 0;
+
+    unless ($cached && (time() - $cache_age) < 3600) {
+        my $ua   = LWP::UserAgent->new(timeout => 8);
+        my $resp = eval { $ua->get("https://open.er-api.com/v6/latest/$base") };
+        if ($resp && $resp->is_success) {
+            my $data = eval { JSON::decode_json($resp->decoded_content) };
+            if ($data && $data->{result} eq 'success') {
+                $cached = { base => $data->{base_code}, rates => $data->{rates} };
+                $c->session->{$cache_key}        = $cached;
+                $c->session->{"${cache_key}_ts"} = time();
+            }
+        }
+    }
+
+    return 1 unless $cached && $cached->{rates};
+    return $cached->{rates}{ uc($to) } // 1;
 }
 
 __PACKAGE__->meta->make_immutable;
