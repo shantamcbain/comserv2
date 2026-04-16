@@ -147,11 +147,9 @@
               placeholder='[{"label":"Colour","type":"select","values":["Red","Blue","Green"]}]'
               style="width:100%;padding:6px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-family:monospace;font-size:0.85rem;resize:vertical">[% item.shop_options | html %]</textarea>
     <small style="color:var(--text-muted-color);font-family:var(--body-font)">
-      Must be a <strong>JSON array</strong> <code>[...]</code> — even for a single option.<br>
-      Static list: <code>{"label":"Colour","type":"select","values":["Red","Blue","Green"]}</code><br>
-      Free text: <code>{"label":"Custom text","type":"text","placeholder":"Your text here"}</code><br>
-      <strong>Dynamic filament stock:</strong> <code>{"label":"Filament","type":"filament_stock"}</code> — auto-populates from items with category or origin containing "filament" that have stock &gt; 0.<br>
-      Multiple options: separate with commas inside the <code>[...]</code> — use the preset buttons above to build without typing JSON.
+      Use the preset buttons above, or copy-paste an example:<br>
+      <code>[{"label":"Filament","type":"filament_stock"}]</code><br>
+      <code>[{"label":"Colour","type":"select","values":["Red","Blue","Green"]}]</code>
     </small>
   </div>
 
