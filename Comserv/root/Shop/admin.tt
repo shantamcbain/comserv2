@@ -54,6 +54,13 @@
   <span style="margin-left:auto;color:var(--text-muted-color);font-size:0.85rem">
     [% items.size %] item(s) — click <strong>In Shop</strong> toggle to show/hide in the public store
   </span>
+  <form method="POST" action="/shop/admin/reset_visibility" style="margin:0"
+        onsubmit="return confirm('Hide ALL items from the shop? You can re-enable them one by one.')">
+    <button type="submit"
+            style="padding:5px 12px;background:#b71c1c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--body-font);font-size:0.85rem">
+      Hide All
+    </button>
+  </form>
 </form>
 
 [% IF items.size == 0 %]

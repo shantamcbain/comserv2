@@ -64,8 +64,11 @@ sub index :Path('/shop') :Args(0) {
         status       => 'active',
         show_in_shop => 1,
         -and => [
-            -or => [ category => undef, category => { '!=' => 'Cost Centre' } ],
-            item_origin => { 'not like' => '%overhead%' },
+            -or => [
+                category => undef,
+                category => { -not_in => ['Cost Centre', 'Equipment'] },
+            ],
+            item_origin => { -not_in => ['overhead', '3d_printer', 'purchased_equipment'] },
         ],
     );
     $where{category} = $category if $category;
@@ -438,6 +441,31 @@ sub toggle_shop :Path('/shop/admin/toggle') :Args(1) {
 # Opens in a popup; selected path is sent back to the parent window.
 # target_field param: name of the input field to populate (default: image_path)
 # -------------------------------------------------------------------------
+sub reset_visibility :Path('/shop/admin/reset_visibility') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($self->_is_admin($c) && $c->req->method eq 'POST') {
+        $c->res->redirect($c->uri_for('/shop/admin'));
+        $c->detach;
+    }
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $count    = 0;
+    eval {
+        $count = $schema->resultset('InventoryItem')->search(
+            { sitename => $sitename }
+        )->update({ show_in_shop => 0 });
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Reset failed: $@";
+    } else {
+        $c->flash->{success_msg} = "All $count items hidden from shop. Enable items individually using the toggle.";
+    }
+    $c->res->redirect($c->uri_for('/shop/admin'));
+    $c->detach;
+}
+
 sub file_picker :Path('/shop/file_picker') :Args(0) {
     my ($self, $c) = @_;
 
