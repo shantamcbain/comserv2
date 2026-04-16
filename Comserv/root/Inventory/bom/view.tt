@@ -259,11 +259,77 @@
    <a href="/Inventory/item/add">Add items</a> first.</em></p>
 [% END %]
 
+<hr style="margin:24px 0;border:none;border-top:2px solid #e0e0e0;">
+
+<h2>Add Direct Cost <small style="font-weight:normal;font-size:0.8em;color:#666">(electricity, printer depreciation, labour — no stock item needed)</small></h2>
+
+<div style="background:#f0f7ff;border:1px solid #b8d4f0;border-radius:4px;padding:10px 14px;margin-bottom:12px;font-size:0.88em;color:#333">
+  <strong>Filament note:</strong> Add filament using <em>Add Component</em> above — select your filament item, qty = grams used (e.g. 407.73), unit = g.
+  The filament is a placeholder for cost calculation; actual stock of the chosen colour is deducted manually when you fulfil the order.
+</div>
+
+<form method="POST" action="/Inventory/bom/add_cost/[% item.id %]" id="direct-cost-form">
+  <table cellpadding="4" style="border:1px solid #b8d4f0;background:#f5faff;padding:8px;">
+    <tr>
+      <th><label for="cost_label">Cost Label *</label></th>
+      <td>
+        <input type="text" id="cost_label" name="cost_label" required style="width:220px;"
+               placeholder="e.g. Electricity, Printer Depreciation, Labour">
+        <small>Creates/updates a Cost Centre inventory item automatically</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="cost_qty">Quantity *</label></th>
+      <td><input type="number" id="cost_qty" name="cost_qty" step="0.001" min="0.001" required
+                 style="width:90px;" placeholder="12.017"></td>
+    </tr>
+    <tr>
+      <th><label for="cost_unit">Unit *</label></th>
+      <td>
+        <select id="cost_unit" name="cost_unit">
+          <option value="hour">hour</option>
+          <option value="kWh">kWh</option>
+          <option value="each">each</option>
+          <option value="g">g</option>
+          <option value="kg">kg</option>
+          <option value="ml">ml</option>
+          <option value="m">m</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="cost_unit_cost">Unit Cost ($/unit) *</label></th>
+      <td>
+        <input type="number" id="cost_unit_cost" name="cost_unit_cost" step="0.0001" min="0.0001"
+               required style="width:90px;" placeholder="0.17">
+        <span id="cost-line-preview" style="margin-left:10px;color:#555;font-size:0.9em;"></span>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="cost_notes">Notes</label></th>
+      <td><input type="text" id="cost_notes" name="cost_notes" style="width:280px;"
+                 placeholder="e.g. 200W printer × 12h, rate from utility bill"></td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <input type="submit" value="Add Cost to BOM"
+               style="background:#1565c0;color:white;padding:5px 14px;border:none;border-radius:4px;cursor:pointer;">
+      </td>
+    </tr>
+  </table>
+</form>
+
 [% IF debug_errors && debug_errors.size > 0 %]
 <div class="debug">
   [% FOREACH err IN debug_errors %]<p>[% err %]</p>[% END %]
 </div>
 [% END %]
+
+[% PROCESS 'ai/partials/ai_form_assistant.tt'
+   ai_form_entity_label = 'BOM component'
+   ai_form_context      = 'Bill of Materials for a 3D printed item — adding material components (filament in grams) and overhead costs (electricity in kWh, printer depreciation per hour)'
+   ai_form_fields       = 'component_item_id, quantity, unit, scrap_factor, notes, cost_label, cost_qty, cost_unit, cost_unit_cost, cost_notes'
+%]
 
 <script>
 var uomMap = {
@@ -299,4 +365,21 @@ function patchRedirectToBom(form) {
   var action = form.getAttribute('action');
   return true;
 }
+
+(function() {
+  var qtyEl  = document.getElementById('cost_qty');
+  var ucEl   = document.getElementById('cost_unit_cost');
+  var prev   = document.getElementById('cost-line-preview');
+  function updateCostPreview() {
+    var q = parseFloat(qtyEl && qtyEl.value) || 0;
+    var u = parseFloat(ucEl  && ucEl.value)  || 0;
+    if (q > 0 && u > 0 && prev) {
+      prev.textContent = '→ Line cost: $' + (q * u).toFixed(4);
+    } else if (prev) {
+      prev.textContent = '';
+    }
+  }
+  if (qtyEl) qtyEl.addEventListener('input', updateCostPreview);
+  if (ucEl)  ucEl.addEventListener('input',  updateCostPreview);
+})();
 </script>

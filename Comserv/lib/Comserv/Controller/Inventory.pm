@@ -435,6 +435,74 @@ sub bom_add :Path('/Inventory/bom/add') :Args(1) {
     }
 }
 
+sub bom_add_direct_cost :Path('/Inventory/bom/add_cost') :Args(1) {
+    my ($self, $c, $parent_id) = @_;
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $params   = $c->req->body_parameters;
+
+    eval {
+        my $parent = $schema->resultset('InventoryItem')->find($parent_id);
+        unless ($parent && $parent->sitename eq $sitename) {
+            die "Item not found\n";
+        }
+        die "Item is not marked as assemblable\n" unless $parent->is_assemblable;
+
+        my $label     = $params->{cost_label}    or die "Cost label required\n";
+        my $qty       = $params->{cost_qty}       or die "Quantity required\n";
+        my $unit      = $params->{cost_unit}      || 'each';
+        my $unit_cost = $params->{cost_unit_cost} or die "Unit cost required\n";
+        my $notes     = $params->{cost_notes}     || '';
+        my $sku       = 'COST-' . uc($label);
+        $sku =~ s/[^A-Z0-9-]/-/g;
+        $sku =~ s/-+/-/g;
+        $sku = substr($sku, 0, 50);
+
+        my $now = $self->_now();
+
+        my $cost_item = $schema->resultset('InventoryItem')->find({ sku => $sku })
+            || $schema->resultset('InventoryItem')->create({
+                sitename            => $sitename,
+                sku                 => $sku,
+                name                => $label,
+                category            => 'Cost Centre',
+                item_origin         => 'overhead',
+                unit_of_measure     => $unit,
+                unit_cost           => $unit_cost,
+                status              => 'active',
+                show_in_shop        => 0,
+                hide_stock_count    => 1,
+                list_in_marketplace => 0,
+                created_by          => $c->session->{username} || 'system',
+                created_at          => $now,
+                updated_at          => $now,
+            });
+        $cost_item->update({
+            name            => $label,
+            unit_of_measure => $unit,
+            unit_cost       => $unit_cost,
+            updated_at      => $now,
+        });
+
+        $schema->resultset('InventoryItemBOM')->update_or_create({
+            parent_item_id    => $parent_id,
+            component_item_id => $cost_item->id,
+            quantity          => $qty,
+            unit              => $unit,
+            is_optional       => 0,
+            scrap_factor      => 0,
+            sort_order        => $params->{cost_sort} || 99,
+            notes             => $notes || undef,
+        }, { key => 'unique_parent_component' });
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Failed to add cost: $@";
+    } else {
+        $c->flash->{success_msg} = 'Cost entry added to BOM.';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/bom', [$parent_id]));
+}
+
 sub bom_remove :Path('/Inventory/bom/remove') :Args(1) {
     my ($self, $c, $bom_id) = @_;
     my $schema   = $self->_schema($c);
