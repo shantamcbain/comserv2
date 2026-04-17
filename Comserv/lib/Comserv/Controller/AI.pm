@@ -511,6 +511,23 @@ sub generate :Local :Args(0) {
             'generate', "Accounting agent: injected system prompt");
     }
 
+    if (lc($normalized_agent_type) eq 'coding') {
+        unless ($self->_is_dev_mode($c)) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => 'The Coding Assistant is only available in development mode.',
+            }));
+            $c->response->content_type('application/json');
+            $c->response->status(403);
+            return;
+        }
+        if (!$system) {
+            $system = $self->_build_coding_system_prompt($c);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'generate', "Coding agent: injected system prompt (dev mode)");
+        }
+    }
+
     # Require login for external AI models (Grok etc.) before entering try block
     if (lc($provider) eq 'grok' && $is_guest) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
@@ -1912,6 +1929,19 @@ sub chat :Local :Args(0) {
 
     if (lc($chat_agent_id) eq 'accounting' && !$chat_agent_system) {
         $chat_agent_system = $self->_build_accounting_system_prompt($c);
+    }
+
+    if (lc($chat_agent_id) eq 'coding') {
+        unless ($self->_is_dev_mode($c)) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => 'The Coding Assistant is only available in development mode.',
+            }));
+            $c->response->content_type('application/json');
+            $c->response->status(403);
+            return;
+        }
+        $chat_agent_system = $self->_build_coding_system_prompt($c) unless $chat_agent_system;
     }
 
     # Build combined system prompt: agent-specific prompt + role prompt + live module data + shared KB
@@ -5355,6 +5385,7 @@ sub session_details :Local :Args(0) {
         conversation_id => $conversation_id,
         hostname => $hostname,
         roles => $c->session->{roles} || [],
+        is_dev => $self->_is_dev_mode($c) ? JSON::true : JSON::false,
     }));
 }
 
@@ -6039,6 +6070,7 @@ sub get_user_providers :Local :Args(0) {
         is_guest           => $is_guest  ? JSON::true : JSON::false,
         is_admin           => $is_admin  ? JSON::true : JSON::false,
         can_access_history => $is_admin  ? JSON::true : JSON::false,
+        is_dev             => $self->_is_dev_mode($c) ? JSON::true : JSON::false,
     }));
 }
 
@@ -8115,6 +8147,69 @@ the details before executing.
 
 $editor_section
 The current user is: $username
+END_PROMPT
+}
+
+# ── _is_dev_mode ──────────────────────────────────────────────────────────────
+# Returns true when running on a developer/local machine.
+# Checks (in order):
+#   1. comserv.conf developer_mode flag
+#   2. CATALYST_DEBUG env var
+#   3. Hostname contains 'workstation' or 'localhost'
+# Production servers should have none of these.
+# ──────────────────────────────────────────────────────────────────────────────
+sub _is_dev_mode {
+    my ($self, $c) = @_;
+    return 1 if $c->config->{developer_mode};
+    return 1 if $ENV{CATALYST_DEBUG};
+    my $hostname = eval { require Comserv::Util::SystemInfo;
+                          Comserv::Util::SystemInfo::get_server_hostname() } || '';
+    return 1 if $hostname =~ /workstation|localhost/i;
+    return 0;
+}
+
+# ── _build_coding_system_prompt ───────────────────────────────────────────────
+# Coding assistant — available only in dev mode.
+# ──────────────────────────────────────────────────────────────────────────────
+sub _build_coding_system_prompt {
+    my ($self, $c) = @_;
+    my $username = $c->session->{username} || 'developer';
+
+    return <<END_PROMPT;
+You are a Coding Assistant for the Comserv2 Catalyst/Perl web application.
+Developer: $username
+
+TECH STACK:
+- Backend : Perl 5, Catalyst MVC, DBIx::Class ORM, Template Toolkit (TT2)
+- Database: MariaDB via DBIx::Class schema (Comserv::Model::Schema::Ency)
+- Frontend: HTML/CSS, vanilla JavaScript (no framework), some jQuery
+- AI layer: Comserv::Model::Ollama (local), Comserv::Model::Grok (xAI cloud)
+- Config  : comserv.conf (Catalyst), db_config.json (database connections)
+
+DIRECTORY LAYOUT:
+  lib/Comserv/Controller/              — Catalyst controllers
+  lib/Comserv/Model/                   — Models (DBEncy, Ollama, Grok, …)
+  lib/Comserv/Model/Schema/Ency/Result — DBIx::Class result classes
+  root/                                — TT2 templates
+  root/static/js/                      — JavaScript (local-chat.js, etc.)
+  root/static/config/agents.json       — agent definitions
+  sql/migrations/                      — DB migration SQL files
+
+CONVENTIONS (follow exactly):
+- Controllers: Try::Tiny try/catch; \$self->logging->log_with_details(\$c,…)
+- DB access  : \$c->model('DBEncy')->schema->resultset('ClassName')
+- New columns: Result class update + sql/migrations/NNN_description.sql
+- TT2 tags   : [% ... %]; wrapper at root/wrapper.tt
+- Agent prompts: private _build_X_system_prompt() methods in AI.pm
+- No code comments unless explicitly requested
+
+YOUR ROLE:
+- Explain, fix, refactor, and write Perl/Catalyst, TT2, SQL, JavaScript
+- Spot security issues: SQL injection, XSS, CSRF, auth gaps
+- When suggesting DB changes, always provide both Result class and migration SQL
+- Point out when something will break production before committing
+
+RESTRICTION: This agent is DEVELOPMENT ONLY. Never available on production.
 END_PROMPT
 }
 
