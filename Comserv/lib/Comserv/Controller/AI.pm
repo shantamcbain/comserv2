@@ -6856,7 +6856,11 @@ sub action :Local :Args(0) {
                 group_of_poster    => $group,
                 date_time_posted   => $today,
                 developer_name     => $current_user,
-                record_id          => 0,
+                record_id           => 0,
+                project_size        => 0,
+                estimated_man_hours => 0,
+                client_name         => '',
+                comments            => '',
                 ($parent_id ? (parent_id => $parent_id) : ()),
             });
         };
