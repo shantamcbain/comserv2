@@ -2324,10 +2324,10 @@ sub add_drug : Path('/ENCY/Drug/add') : Args(0) {
 
         my ($ok, $msg, $new_id) = $c->model('ENCYModel')->add_drug($c, $data);
         $self->logging->log_with_details($c, $ok ? 'info' : 'error', __FILE__, __LINE__, 'add_drug',
-            ($ok ? "Drug added: " : "Drug add FAILED: ") . ($data->{brand_name} || $data->{generic_name}));
+            ($ok ? "Drug added: " : "Drug add FAILED: ") . ($data->{brand_name} || $data->{generic_name}) . ($ok ? '' : " — $msg"));
         unless ($ok) {
             $c->stash(
-                error_msg => "Could not save drug: $msg",
+                error_msg => "Could not save drug. Please check the form and try again.",
                 drug      => $data,
                 edit_mode => 1,
                 ency_ai_prompt => q{brand_name, generic_name},
