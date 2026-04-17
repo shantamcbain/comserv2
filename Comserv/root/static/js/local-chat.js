@@ -189,6 +189,52 @@
             });
     }
     
+    // Populate the agent picker dropdown from agentsConfig, respecting local_only + isDevMode
+    function populateAgentPicker() {
+        var sel = document.getElementById('ai-agent-select');
+        if (!sel || !state.agentsConfig || !state.agentsConfig.agents) return;
+        var agents = state.agentsConfig.agents;
+        // Keep the Auto option, then add one per eligible agent
+        sel.innerHTML = '<option value="auto">⚡ Auto</option>';
+        Object.entries(agents).forEach(function([key, agent]) {
+            if (agent.local_only && !state.isDevMode) return;
+            var opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = (agent.icon || '') + ' ' + (agent.display_name || key);
+            sel.appendChild(opt);
+        });
+        // Restore previously saved agent selection
+        var saved = localStorage.getItem('ai_widget_agent');
+        if (saved && sel.querySelector('option[value="' + saved + '"]')) {
+            sel.value = saved;
+            if (saved !== 'auto') _applyAgentOverride(saved);
+        }
+        sel.addEventListener('change', function() {
+            var chosen = sel.value;
+            localStorage.setItem('ai_widget_agent', chosen);
+            if (chosen === 'auto') {
+                state.agentOverride = null;
+                state.pageContext = detectPageContext();
+            } else {
+                _applyAgentOverride(chosen);
+            }
+        });
+        sel.dataset.populated = '1';
+    }
+
+    function _applyAgentOverride(agentKey) {
+        if (!state.agentsConfig || !state.agentsConfig.agents) return;
+        var agent = state.agentsConfig.agents[agentKey];
+        if (!agent) return;
+        state.agentOverride = agentKey;
+        // Re-build pageContext using the chosen agent regardless of URL
+        var ctx = detectPageContext() || {};
+        ctx.agent_id   = agent.id;
+        ctx.agent_name = agent.display_name;
+        if (agent.system_prompt) ctx.system_prompt = agent.system_prompt;
+        state.pageContext = ctx;
+    }
+
     // Match page URL against agent patterns and select appropriate agent
     function selectAgentForPage() {
         const pathname = window.location.pathname;
@@ -444,7 +490,11 @@
         const providerSelector = document.createElement('div');
         providerSelector.className = 'provider-selector';
         providerSelector.innerHTML =
-            '<label for="ai-provider">AI Model:</label>' +
+            '<label for="ai-agent-select" style="font-size:0.82em;color:#555;">Agent:</label>' +
+            '<select id="ai-agent-select" title="Select AI agent / assistant" style="font-size:0.82em;max-width:110px;">' +
+              '<option value="auto">⚡ Auto</option>' +
+            '</select>' +
+            '<label for="ai-provider">Model:</label>' +
             '<select id="ai-provider"><option value="ollama">Ollama (Local)</option></select>' +
             '<span id="web-search-toggle" style="display:none;margin-left:6px;" title="Enable Grok web search (uses API credits)">' +
               '<label style="cursor:pointer;font-size:0.85em;user-select:none;">' +
@@ -467,7 +517,7 @@
             '<div style="display:flex;gap:3px;align-items:stretch;">' +
             '<textarea id="message-input" style="flex:1;" placeholder="Type your message… (Ctrl+V to paste image)"></textarea>' +
             '<div style="display:flex;flex-direction:column;gap:3px;">' +
-            '<label id="attach-image-btn" title="Attach image (or paste with Ctrl+V)" style="cursor:pointer;padding:4px 8px;background:var(--secondary-bg,#f0f0f0);border:1px solid #ccc;border-radius:4px;font-size:1.2em;user-select:none;text-align:center;">📎<input type="file" id="image-file-input" accept="image/*" style="display:none;"></label>' +
+            '<label id="attach-image-btn" title="Attach image (or paste with Ctrl+V)" style="display:none;cursor:pointer;padding:4px 8px;background:var(--secondary-bg,#f0f0f0);border:1px solid #ccc;border-radius:4px;font-size:1.2em;user-select:none;text-align:center;">📎<input type="file" id="image-file-input" accept="image/*" style="display:none;"></label>' +
             '<button id="send-message" style="flex:1;">Send</button>' +
             '</div></div>';
 
@@ -586,6 +636,19 @@
                 _firePreload();
                 // Re-fire every 110 minutes to keep model warm (keep_alive is 2h)
                 state._preloadTimer = setInterval(_firePreload, 110 * 60 * 1000);
+
+                // Populate agent picker now that is_dev is known
+                if (state.agentsConfig) {
+                    populateAgentPicker();
+                } else {
+                    loadAgentsConfig().then(function() { populateAgentPicker(); });
+                }
+
+                // Show/hide image attach based on admin role
+                var attachBtn = document.getElementById('attach-image-btn');
+                if (attachBtn) {
+                    attachBtn.style.display = state.isAdmin ? '' : 'none';
+                }
             })
             .catch(function() {});
 
@@ -740,6 +803,7 @@
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
         });
         document.getElementById('message-input').addEventListener('paste', function(e) {
+            if (!state.isAdmin) return;
             const items = (e.clipboardData || window.clipboardData).items;
             for (var i = 0; i < items.length; i++) {
                 if (items[i].type.indexOf('image') !== -1) {
