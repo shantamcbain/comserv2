@@ -4399,6 +4399,8 @@ Supported actions:
 - Mark a todo done:      [ACTION: {"action": "update_todo_status", "params": {"todo_id": N, "status": 3}}]
 - Mark todo in-progress: [ACTION: {"action": "update_todo_status", "params": {"todo_id": N, "status": 2}}]
 - Reschedule a todo:     [ACTION: {"action": "reschedule_todo",    "params": {"todo_id": N, "due_date": "YYYY-MM-DD"}}]
+- Edit todo content:     [ACTION: {"action": "update_todo", "params": {"todo_id": N, "subject": "new title", "description": "new body", "comments": "optional notes"}}]
+  (Include only the fields you want to change. subject, description, and comments are all optional.)
 - Add a comment:         [ACTION: {"action": "add_todo_comment",   "params": {"todo_id": N, "comment": "text"}}]
 - Create a log entry:    [ACTION: {"action": "create_log_entry",   "params": {"todo_id": N, "abstract": "title", "details": "description"}}]
 - Create a new todo:     [ACTION: {"action": "create_todo", "params": {"subject": "title", "description": "details", "project_id": N, "due_date": "YYYY-MM-DD", "priority": 3}}]
@@ -6862,6 +6864,45 @@ sub action :Local :Args(0) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
             "AI action update_todo_status: todo=$todo_id status=$new_status by=$current_user");
         $c->response->body(encode_json({ success => JSON::true, message => "Todo #$todo_id status updated to $new_status" }));
+        return;
+    }
+
+    # ── update_todo ───────────────────────────────────────────────────────────
+    if ($action_name eq 'update_todo') {
+        my $todo_id = $params->{todo_id} or do {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'todo_id required' }));
+            return;
+        };
+        my $todo = eval { $schema->resultset('Todo')->find($todo_id) };
+        unless ($todo) {
+            $c->response->status(404);
+            $c->response->body(encode_json({ success => JSON::false, error => "Todo #$todo_id not found" }));
+            return;
+        }
+        my %changes = (last_mod_by => $current_user, last_mod_date => $today);
+        $changes{subject}     = $params->{subject}     if defined $params->{subject}     && $params->{subject}     ne '';
+        $changes{description} = $params->{description} if defined $params->{description};
+        $changes{comments}    = $params->{comments}    if defined $params->{comments};
+        $changes{due_date}    = $params->{due_date}    if defined $params->{due_date}    && $params->{due_date} =~ /^\d{4}-\d{2}-\d{2}$/;
+        $changes{priority}    = $params->{priority}    if defined $params->{priority}    && $params->{priority} =~ /^\d+$/;
+
+        if (keys(%changes) <= 2) {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'No updatable fields provided (subject, description, comments, due_date, priority)' }));
+            return;
+        }
+        eval { $todo->update(\%changes) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'action', "update_todo failed: $@");
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Update failed' }));
+            return;
+        }
+        my @updated = grep { $_ ne 'last_mod_by' && $_ ne 'last_mod_date' } keys %changes;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
+            "AI action update_todo: todo=$todo_id fields=@updated by=$current_user");
+        $c->response->body(encode_json({ success => JSON::true, message => "Todo #$todo_id updated (" . join(', ', @updated) . ")" }));
         return;
     }
 
