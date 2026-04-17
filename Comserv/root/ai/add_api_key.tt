@@ -168,6 +168,7 @@
                 <select id="service" name="service" required [% IF key_id %]disabled[% END %]>
                     <option value="">Select a service...</option>
                     <option value="grok" [% IF service == 'grok' %]selected[% END %]>Grok (X.AI)</option>
+                    <option value="ollama" [% IF service == 'ollama' %]selected[% END %]>Ollama (ollama.com — web search)</option>
                     <option value="openai" [% IF service == 'openai' %]selected[% END %]>OpenAI</option>
                     <option value="claude" [% IF service == 'claude' %]selected[% END %]>Claude (Anthropic)</option>
                     <option value="gemini" [% IF service == 'gemini' %]selected[% END %]>Gemini (Google)</option>
