@@ -7753,6 +7753,83 @@ account categories:
 - Customer sales list:        /Inventory/sales
 - Suppliers list:             /Inventory/suppliers
 - Add supplier:               /Inventory/supplier/add
+- AI usage cost allocation:   /Accounting/ai_usage
+- Accounting docs overview:   /Documentation/Accounting
+- COA documentation:          /Documentation/Accounting/coa
+- GL documentation:           /Documentation/Accounting/gl
+- Supplier invoices docs:     /Documentation/Accounting/invoices
+
+## ACCOUNTING SYSTEM DOCUMENTATION
+
+### Overview
+The Comserv Accounting system is a double-entry bookkeeping engine modelled on SQL-Ledger/LedgerSMB.
+Each site has its own Chart of Accounts (COA) and General Ledger (GL). Only admin users can access /Accounting.
+The system is tightly integrated with Inventory: supplier invoices auto-post GL entries; each inventory
+item carries four COA account links (inventory_accno, income_accno, expense_accno, returns_accno).
+
+### First-Time Setup
+1. Go to /Accounting
+2. Click "Seed Default Accounts" — creates a standard COA (idempotent, safe to re-run)
+3. Review accounts at /Accounting/coa
+4. Edit inventory items at /Inventory/item/edit/<id> to assign the 4 COA fields per item
+5. Record supplier invoices at /Inventory/invoice/new — GL entries post automatically on save
+
+### Account Number Ranges
+1000–1999 Assets:      Cash/Bank=1000, AR=1100, Prepaid=1200, Inventory Asset=1300, Equipment=1400, Accum Depr=1500
+2000–2999 Liabilities: AP=2000, GST/Sales Tax Payable=2100, Credit Card Payable=2200
+3000–3999 Equity:      Owner/Member Equity=3000, Retained Earnings=3100
+4000–4999 Income:      Sales Revenue=4000, Sales Returns=4100, Service Revenue=4200
+5000–5999 COGS/Exp:    COGS=5000, Office Supplies=5100, Printing/Materials=5200, Electricity/Utilities=5300,
+                       Depreciation=5400, Shipping/Freight=5500, Commission=5600, Bank Fees=5700
+Debit increases Assets and Expenses; Credit increases Liabilities, Equity, Income.
+
+### Inventory Item COA Fields (4 fields per item, assign on item edit form)
+- inventory_accno → Asset (1300 Inventory Asset) — tracks stock value on balance sheet
+- income_accno    → Income (4000 Sales Revenue) — credited when item is sold
+- expense_accno   → Expense/COGS (5000 COGS) — debited on supplier invoice purchase
+- returns_accno   → Contra-income (4100 Sales Returns) — debited on customer returns
+Warning: system does not enforce correct account type — admin must choose correctly.
+
+### Automatic GL Posting
+- Supplier invoice saved → DR expense/inventory accounts + DR tax + DR shipping; CR AP (fully automatic)
+- Consignment settlement → DR AR + commission expense; CR sales revenue (optional checkbox on settlement form)
+Example: $100 item + $5 GST + $8 shipping, AP=2000:
+  DR 5000 COGS $100, DR 2100 GST $5, DR 5500 Shipping $8 / CR 2000 AP $113
+
+### Common Journal Entry Examples
+Purchase on credit:    DR 5000 COGS / CR 2000 AP
+Pay supplier by bank:  DR 2000 AP / CR 1000 Bank
+Sale on account:       DR 1100 AR / CR 4000 Sales Revenue; also DR 5000 COGS / CR 1300 Inventory Asset
+Consignment:           DR 1100 AR + DR 5600 Commission / CR 4000 Sales Revenue
+Depreciation:          DR 5400 Depreciation / CR 1500 Accumulated Depreciation
+Shanta pays invoice:   DR 2000 AP / CR 3000 Owner Equity (or Points Payable)
+GST remittance:        DR 2100 GST Payable / CR 1000 Bank
+
+### Manual GL Entry
+Go to /Accounting/gl/new. Enter date, description, reference, then add debit and credit lines.
+System validates debits = credits before saving. Use for bank payments, payroll, corrections.
+
+### Supplier Invoice Form Fields (/Inventory/invoice/new)
+Supplier (required), Invoice Number (required), Invoice Date (required), Due Date,
+AP Account (required — select liability, typically 2000), Tax Amount + Account,
+Shipping Amount + Account, Notes.
+Line items: Item selector (description + unit cost auto-fill), Qty, Unit Cost, Expense Account, Location.
+Tax and shipping are entered at invoice-header level, not per line.
+Popup buttons: "+ Add Supplier" and "+ Add Item" — create without leaving the form.
+AI Invoice Parser panel: paste bill text → AI parses → auto-fills all fields including account selection.
+
+### Reconciliation Tips
+- AP balance: GL credits to 2000 minus debits should equal total outstanding unpaid invoices.
+- Inventory asset: 1300 balance should match total stock value (qty × unit_cost) from /Inventory/stock.
+- Bank reconciliation: compare 1000 Bank GL entries to bank statement monthly.
+- Monthly close: enter all supplier invoices, post consignment settlements, record depreciation.
+
+### Troubleshooting
+- "No accounts in dropdown" → run Seed Default Accounts at /Accounting
+- "GL entry not posted" → check that AP Account was selected on the invoice
+- "Stock not updated after invoice" → ensure line items have a Location selected
+- "Debits ≠ Credits error on manual entry" → verify all lines balance before saving
+- "Unknown column auto_pay" → run migration sql/migrations/007_inventory_supplier_invoice_autopay.sql
 
 ## INVOICE PARSING (AI Invoice Parser on /Inventory/invoice/new)
 When the user pastes an invoice or bill on the new invoice form, extract and return
