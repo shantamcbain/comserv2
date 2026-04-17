@@ -6842,6 +6842,11 @@ sub action :Local :Args(0) {
         $project_code    =~ s/[^a-z0-9]+/_/g;
         $project_code    = substr($project_code, 0, 40);
 
+        my $next_record_id = eval {
+            my ($row) = $schema->storage->dbh->selectrow_array('SELECT COALESCE(MAX(record_id),0)+1 FROM projects');
+            $row || 1;
+        } || 1;
+
         my $new_project;
         eval {
             $new_project = $schema->resultset('Project')->create({
@@ -6856,6 +6861,7 @@ sub action :Local :Args(0) {
                 group_of_poster    => $group,
                 date_time_posted   => $today,
                 developer_name     => $current_user,
+                record_id          => $next_record_id,
                 ($parent_id ? (parent_id => $parent_id) : ()),
             });
         };
