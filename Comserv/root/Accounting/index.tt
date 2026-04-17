@@ -63,7 +63,7 @@
           <a href="/Cart/orders">Customer Orders</a>
         </li>
         <li style="padding:0.4rem 0;">
-          <a href="/Cart/price_list">Price List / Shop</a>
+          <a href="/shop">Online Store</a> | <a href="/Cart/price_list">Price List</a>
         </li>
       </ul>
     </div>

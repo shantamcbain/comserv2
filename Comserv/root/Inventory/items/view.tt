@@ -16,6 +16,8 @@
   <a href="/Inventory/print/bom/[% item.id %]" target="_blank">&#128438; Print BOM</a>
   [% END %]
   &nbsp;|&nbsp;
+  <a href="/Inventory/equipment/[% item.id %]">Equipment Details</a>
+  &nbsp;|&nbsp;
   <a href="/Inventory/print/label/[% item.id %]" target="_blank">&#128438; Print Label</a>
   &nbsp;|&nbsp;
   <a href="/Inventory/items">Back to List</a>

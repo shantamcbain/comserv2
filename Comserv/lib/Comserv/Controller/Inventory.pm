@@ -258,6 +258,9 @@ sub item_add :Path('/Inventory/item/add') :Args(0) {
                 income_accno_id     => $params->{income_accno_id}    || undef,
                 expense_accno_id    => $params->{expense_accno_id}   || undef,
                 returns_accno_id    => $params->{returns_accno_id}   || undef,
+                show_in_shop        => 0,
+                hide_stock_count    => 0,
+                list_in_marketplace => 0,
                 created_by          => $c->session->{username} || 'system',
                 created_at          => $now,
                 updated_at          => $now,
@@ -385,6 +388,68 @@ sub item_delete :Path('/Inventory/item/delete') :Args(1) {
 }
 
 # -------------------------------------------------------------------------
+# Equipment Details — /Inventory/equipment/:item_id
+# -------------------------------------------------------------------------
+sub equipment_edit :Path('/Inventory/equipment') :Args(1) {
+    my ($self, $c, $item_id) = @_;
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+
+    my $item;
+    eval {
+        $item = $schema->resultset('InventoryItem')->find(
+            { id => $item_id },
+            { prefetch => 'equipment' }
+        );
+    };
+
+    unless ($item && $item->sitename eq $sitename) {
+        $c->flash->{error_msg} = 'Item not found.';
+        $c->res->redirect($c->uri_for('/Inventory/items'));
+        $c->detach;
+    }
+
+    if ($c->req->method eq 'POST') {
+        my $p = $c->req->body_parameters;
+        my $now = $self->_now();
+        eval {
+            $schema->resultset('InventoryEquipment')->update_or_create(
+                {
+                    item_id               => $item_id,
+                    wattage               => $p->{wattage}               || undef,
+                    depreciation_per_hour => $p->{depreciation_per_hour} || undef,
+                    serial_number         => $p->{serial_number}         || undef,
+                    purchase_price        => $p->{purchase_price}        || undef,
+                    lease_from_sitename   => $p->{lease_from_sitename}   || undef,
+                    lease_term_months     => $p->{lease_term_months}     || undef,
+                    voltage               => $p->{voltage}               || undef,
+                    notes                 => $p->{notes}                 || undef,
+                    updated_at            => $now,
+                },
+                { key => 'inventory_equipment_item_id' }
+            );
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'equipment_edit', "Equipment save failed: $@");
+            $c->stash(error_msg => "Failed to save equipment details: $@",
+                      item => $item, template => 'Inventory/equipment/edit.tt');
+            return;
+        }
+        $c->flash->{success_msg} = 'Equipment details saved.';
+        $c->res->redirect($c->uri_for('/Inventory/item/view', [$item_id]));
+        $c->detach;
+    }
+
+    $c->stash(
+        item     => $item,
+        sitename => $sitename,
+        template => 'Inventory/equipment/edit.tt',
+    );
+}
+
+# -------------------------------------------------------------------------
 # BOM (Bill of Materials)
 # -------------------------------------------------------------------------
 
@@ -430,6 +495,201 @@ sub bom_add :Path('/Inventory/bom/add') :Args(1) {
     } else {
         $c->res->redirect($c->uri_for('/Inventory/bom', [$parent_id]));
     }
+}
+
+sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
+    my ($self, $c, $parent_id) = @_;
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $params   = $c->req->body_parameters;
+
+    unless ($c->req->method eq 'POST') {
+        $c->res->redirect($c->uri_for('/Inventory/bom', [$parent_id]));
+        $c->detach;
+    }
+
+    my $printer_id    = $params->{printer_id}    or do {
+        $c->flash->{error_msg} = 'No printer selected.';
+        $c->res->redirect($c->uri_for('/Inventory/bom', [$parent_id]));
+        $c->detach;
+    };
+    my $print_hours   = $params->{print_hours}   || 0;
+    my $filament_g    = $params->{filament_g}    || 0;
+    my $kwh_rate      = $params->{kwh_rate}      || 0.17;
+    my $avg_watt_pct  = $params->{avg_watt_pct}  || 50;
+
+    eval {
+        my $parent = $schema->resultset('InventoryItem')->find($parent_id);
+        die "Item not found\n" unless $parent && $parent->sitename eq $sitename;
+        die "Not assemblable\n" unless $parent->is_assemblable;
+
+        my $printer = $schema->resultset('InventoryItem')->find($printer_id);
+        die "Printer not found\n" unless $printer;
+
+        my $now = $self->_now();
+
+        if ($filament_g > 0) {
+            my $filament_item_id = $params->{filament_item_id};
+            if ($filament_item_id) {
+                my $scrap = ($params->{filament_scrap} || 2) / 100;
+                $schema->resultset('InventoryItemBOM')->update_or_create({
+                    parent_item_id    => $parent_id,
+                    component_item_id => $filament_item_id,
+                    quantity          => $filament_g,
+                    unit              => 'g',
+                    is_optional       => 0,
+                    scrap_factor      => $scrap,
+                    sort_order        => 1,
+                    notes             => 'Slicer: ' . $filament_g . 'g',
+                }, { key => 'unique_parent_component' });
+            }
+        }
+
+        my $equip = $printer->equipment;
+        if ($print_hours > 0 && $equip && $equip->wattage) {
+            my $avg_watts = $equip->wattage * ($avg_watt_pct / 100);
+            my $kwh       = sprintf('%.4f', $avg_watts * $print_hours / 1000);
+            my $elec_sku  = 'COST-ELEC-' . uc($printer->sku || 'PRINTER');
+            $elec_sku =~ s/[^A-Z0-9-]/-/g;
+            $elec_sku = substr($elec_sku, 0, 50);
+            my $elec_item = $schema->resultset('InventoryItem')->find({ sku => $elec_sku })
+                || $schema->resultset('InventoryItem')->create({
+                    sitename            => $sitename,
+                    sku                 => $elec_sku,
+                    name                => $printer->name . ' — Electricity',
+                    category            => 'Cost Centre',
+                    item_origin         => 'overhead',
+                    unit_of_measure     => 'kWh',
+                    unit_cost           => $kwh_rate,
+                    status              => 'active',
+                    show_in_shop        => 0,
+                    hide_stock_count    => 1,
+                    list_in_marketplace => 0,
+                    created_by          => $c->session->{username} || 'system',
+                    created_at          => $now,
+                    updated_at          => $now,
+                });
+            $elec_item->update({ unit_cost => $kwh_rate, updated_at => $now });
+            $schema->resultset('InventoryItemBOM')->update_or_create({
+                parent_item_id    => $parent_id,
+                component_item_id => $elec_item->id,
+                quantity          => $kwh,
+                unit              => 'kWh',
+                is_optional       => 0,
+                scrap_factor      => 0,
+                sort_order        => 10,
+                notes             => sprintf('%dW avg × %.3fh = %.4f kWh', $avg_watts, $print_hours, $kwh),
+            }, { key => 'unique_parent_component' });
+        }
+
+        if ($print_hours > 0 && $equip && $equip->depreciation_per_hour) {
+            my $depr_sku = 'COST-DEPR-' . uc($printer->sku || 'PRINTER');
+            $depr_sku =~ s/[^A-Z0-9-]/-/g;
+            $depr_sku = substr($depr_sku, 0, 50);
+            my $depr_item = $schema->resultset('InventoryItem')->find({ sku => $depr_sku })
+                || $schema->resultset('InventoryItem')->create({
+                    sitename            => $sitename,
+                    sku                 => $depr_sku,
+                    name                => $printer->name . ' — Depreciation',
+                    category            => 'Cost Centre',
+                    item_origin         => 'overhead',
+                    unit_of_measure     => 'hour',
+                    unit_cost           => $equip->depreciation_per_hour,
+                    status              => 'active',
+                    show_in_shop        => 0,
+                    hide_stock_count    => 1,
+                    list_in_marketplace => 0,
+                    created_by          => $c->session->{username} || 'system',
+                    created_at          => $now,
+                    updated_at          => $now,
+                });
+            $depr_item->update({ unit_cost => $equip->depreciation_per_hour, updated_at => $now });
+            $schema->resultset('InventoryItemBOM')->update_or_create({
+                parent_item_id    => $parent_id,
+                component_item_id => $depr_item->id,
+                quantity          => $print_hours,
+                unit              => 'hour',
+                is_optional       => 0,
+                scrap_factor      => 0,
+                sort_order        => 11,
+                notes             => sprintf('%.3fh on %s', $print_hours, $printer->name),
+            }, { key => 'unique_parent_component' });
+        }
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Wizard failed: $@";
+    } else {
+        $c->flash->{success_msg} = 'Print job costs added to BOM.';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/bom', [$parent_id]));
+}
+
+sub bom_add_direct_cost :Path('/Inventory/bom/add_cost') :Args(1) {
+    my ($self, $c, $parent_id) = @_;
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $params   = $c->req->body_parameters;
+
+    eval {
+        my $parent = $schema->resultset('InventoryItem')->find($parent_id);
+        unless ($parent && $parent->sitename eq $sitename) {
+            die "Item not found\n";
+        }
+        die "Item is not marked as assemblable\n" unless $parent->is_assemblable;
+
+        my $label     = $params->{cost_label}    or die "Cost label required\n";
+        my $qty       = $params->{cost_qty}       or die "Quantity required\n";
+        my $unit      = $params->{cost_unit}      || 'each';
+        my $unit_cost = $params->{cost_unit_cost} or die "Unit cost required\n";
+        my $notes     = $params->{cost_notes}     || '';
+        my $sku       = 'COST-' . uc($label);
+        $sku =~ s/[^A-Z0-9-]/-/g;
+        $sku =~ s/-+/-/g;
+        $sku = substr($sku, 0, 50);
+
+        my $now = $self->_now();
+
+        my $cost_item = $schema->resultset('InventoryItem')->find({ sku => $sku })
+            || $schema->resultset('InventoryItem')->create({
+                sitename            => $sitename,
+                sku                 => $sku,
+                name                => $label,
+                category            => 'Cost Centre',
+                item_origin         => 'overhead',
+                unit_of_measure     => $unit,
+                unit_cost           => $unit_cost,
+                status              => 'active',
+                show_in_shop        => 0,
+                hide_stock_count    => 1,
+                list_in_marketplace => 0,
+                created_by          => $c->session->{username} || 'system',
+                created_at          => $now,
+                updated_at          => $now,
+            });
+        $cost_item->update({
+            name            => $label,
+            unit_of_measure => $unit,
+            unit_cost       => $unit_cost,
+            updated_at      => $now,
+        });
+
+        $schema->resultset('InventoryItemBOM')->update_or_create({
+            parent_item_id    => $parent_id,
+            component_item_id => $cost_item->id,
+            quantity          => $qty,
+            unit              => $unit,
+            is_optional       => 0,
+            scrap_factor      => 0,
+            sort_order        => $params->{cost_sort} || 99,
+            notes             => $notes || undef,
+        }, { key => 'unique_parent_component' });
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Failed to add cost: $@";
+    } else {
+        $c->flash->{success_msg} = 'Cost entry added to BOM.';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/bom', [$parent_id]));
 }
 
 sub bom_remove :Path('/Inventory/bom/remove') :Args(1) {
@@ -506,6 +766,38 @@ sub bom_view :Path('/Inventory/bom') :Args(1) {
         )->all;
     };
 
+    my @printers;
+    eval {
+        @printers = $schema->resultset('InventoryItem')->search(
+            {
+                'me.sitename' => $sitename,
+                'me.status'   => 'active',
+                -or => [
+                    'me.category'    => { -like => '%printer%' },
+                    'me.item_origin' => { -like => '%printer%' },
+                    'me.name'        => { -like => '%printer%' },
+                ],
+            },
+            { prefetch => 'equipment', order_by => 'me.name' }
+        )->all;
+    };
+
+    my @filament_items;
+    eval {
+        @filament_items = $schema->resultset('InventoryItem')->search(
+            {
+                'me.sitename' => $sitename,
+                'me.status'   => 'active',
+                -or => [
+                    'me.category'    => { -like => '%filament%' },
+                    'me.item_origin' => { -like => '%filament%' },
+                    'me.name'        => { -like => '%filament%' },
+                ],
+            },
+            { columns => ['id','name','sku','unit_cost'], order_by => 'me.name' }
+        )->all;
+    };
+
     my $assembled_cost = 0;
     for my $comp ($item->bom_components->all) {
         my $ci = $comp->component_item;
@@ -518,6 +810,8 @@ sub bom_view :Path('/Inventory/bom') :Args(1) {
         item              => $item,
         all_items         => \@all_items,
         assemblable_items => \@assemblable_items,
+        printers          => \@printers,
+        filament_items    => \@filament_items,
         assembled_cost    => sprintf('%.2f', $assembled_cost),
         sitename          => $sitename,
         template          => 'Inventory/bom/view.tt',
@@ -567,10 +861,10 @@ sub bom_list :Path('/Inventory/bom/list') :Args(0) {
     my @assemblable;
     eval {
         @assemblable = $schema->resultset('InventoryItem')->search(
-            { sitename => $sitename, is_assemblable => 1, status => 'active' },
+            { 'me.sitename' => $sitename, 'me.is_assemblable' => 1, 'me.status' => 'active' },
             {
                 prefetch => { 'bom_components' => 'component_item' },
-                order_by => 'name',
+                order_by => 'me.name',
             }
         )->all;
     };
@@ -3386,6 +3680,372 @@ sub api_transaction :Path('/Inventory/api/transaction') :Args(0) {
         transaction_id => $txn_id,
         gl_entry_id    => $gl_entry_id,
     }));
+    $c->detach;
+}
+
+# -------------------------------------------------------------------------
+# Consignment
+# -------------------------------------------------------------------------
+
+sub consignment_partners :Path('/Inventory/consignment/partners') :Args(0) {
+    my ($self, $c) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    if ($c->req->method eq 'POST') {
+        my $p = $c->req->body_parameters;
+        my $action = $p->{action} || 'create';
+
+        if ($action eq 'delete') {
+            eval {
+                my $partner = $schema->resultset('InventoryConsignmentPartner')->find($p->{partner_id});
+                $partner->delete if $partner && $partner->sitename eq $sitename;
+            };
+            $c->flash->{error_msg} = "Delete failed: $@" if $@;
+            $c->flash->{success_msg} = 'Partner deleted.' unless $@;
+        } else {
+            my $id = $p->{partner_id};
+            eval {
+                my %data = (
+                    sitename           => $sitename,
+                    name               => $p->{name} || die("Name required\n"),
+                    contact_name       => $p->{contact_name}   || undef,
+                    phone              => $p->{phone}           || undef,
+                    email              => $p->{email}           || undef,
+                    address            => $p->{address}         || undef,
+                    commission_percent => $p->{commission_percent} || 0,
+                    payment_terms      => $p->{payment_terms}   || undef,
+                    notes              => $p->{notes}           || undef,
+                    status             => $p->{status}          || 'active',
+                    created_by         => $c->session->{username} || 'admin',
+                );
+                if ($id) {
+                    my $partner = $schema->resultset('InventoryConsignmentPartner')->find($id);
+                    $partner->update(\%data) if $partner && $partner->sitename eq $sitename;
+                } else {
+                    $schema->resultset('InventoryConsignmentPartner')->create(\%data);
+                }
+            };
+            $c->flash->{error_msg}   = "Save failed: $@" if $@;
+            $c->flash->{success_msg} = 'Partner saved.'  unless $@;
+        }
+        $c->res->redirect($c->uri_for('/Inventory/consignment/partners'));
+        $c->detach;
+    }
+
+    my (@partners, $edit_partner);
+    eval { @partners = $schema->resultset('InventoryConsignmentPartner')->search(
+        { sitename => $sitename }, { order_by => 'name' })->all };
+    my $edit_id = $c->req->params->{edit};
+    if ($edit_id) {
+        ($edit_partner) = grep { $_->id == $edit_id } @partners;
+    }
+
+    $c->stash(
+        partners      => \@partners,
+        edit_partner  => $edit_partner,
+        sitename      => $sitename,
+        template      => 'Inventory/consignment/partners.tt',
+    );
+}
+
+sub consignment_list :Path('/Inventory/consignment') :Args(0) {
+    my ($self, $c) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $status   = $c->req->params->{status} || 'all';
+
+    my %where = ('me.sitename' => $sitename);
+    $where{'me.status'} = $status if $status ne 'all';
+
+    my @consignments;
+    eval {
+        @consignments = $schema->resultset('InventoryConsignment')->search(
+            \%where,
+            { prefetch => ['partner', { 'lines' => 'item' }], order_by => { -desc => 'me.date_sent' } }
+        )->all;
+    };
+    push @{$c->stash->{debug_errors}}, "Consignment list error: $@" if $@;
+
+    $c->stash(
+        consignments  => \@consignments,
+        filter_status => $status,
+        sitename      => $sitename,
+        template      => 'Inventory/consignment/list.tt',
+    );
+}
+
+sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
+    my ($self, $c) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $now      = $self->_now();
+
+    if ($c->req->method eq 'POST') {
+        my $p = $c->req->body_parameters;
+        eval {
+            die "Partner required\n" unless $p->{partner_id};
+            die "Date sent required\n" unless $p->{date_sent};
+
+            my $consignment = $schema->resultset('InventoryConsignment')->create({
+                sitename         => $sitename,
+                partner_id       => $p->{partner_id},
+                reference_number => $p->{reference_number} || undef,
+                date_sent        => $p->{date_sent},
+                status           => 'open',
+                notes            => $p->{notes} || undef,
+                created_by       => $c->session->{username} || 'admin',
+            });
+
+            my %lines_by_idx;
+            for my $key (keys %$p) {
+                if ($key =~ /^(item_id|quantity|retail_price|line_notes)_(\d+)$/) {
+                    $lines_by_idx{$2}{$1} = $p->{$key};
+                }
+            }
+
+            for my $i (sort { $a <=> $b } keys %lines_by_idx) {
+                my $l = $lines_by_idx{$i};
+                next unless $l->{item_id} && ($l->{quantity} || 0) > 0;
+                my $item_id      = $l->{item_id};
+                my $qty          = $l->{quantity};
+                my $retail_price = $l->{retail_price};
+                my $line_note    = $l->{line_notes};
+                $schema->resultset('InventoryConsignmentLine')->create({
+                    consignment_id    => $consignment->id,
+                    item_id           => $item_id,
+                    quantity_sent     => $qty,
+                    quantity_sold     => 0,
+                    quantity_returned => 0,
+                    retail_price      => $retail_price || undef,
+                    notes             => $line_note    || undef,
+                });
+                $schema->resultset('InventoryTransaction')->create({
+                    sitename         => $sitename,
+                    item_id          => $item_id,
+                    transaction_type => 'consignment_out',
+                    quantity         => -($qty),
+                    reference_number => 'CONSIGN-' . $consignment->id,
+                    notes            => 'Consigned to ' . ($consignment->partner->name // ''),
+                    performed_by     => $c->session->{username} || 'admin',
+                    transaction_date => $now,
+                });
+            }
+        };
+        if ($@) {
+            $c->stash(error_msg => "Failed: $@");
+        } else {
+            $c->flash->{success_msg} = 'Consignment created.';
+            $c->res->redirect($c->uri_for('/Inventory/consignment'));
+            $c->detach;
+        }
+    }
+
+    my (@partners, @items);
+    eval {
+        @partners = $schema->resultset('InventoryConsignmentPartner')->search(
+            { sitename => $sitename, status => 'active' }, { order_by => 'name' })->all;
+        @items = $schema->resultset('InventoryItem')->search(
+            { sitename => $sitename, status => 'active', show_in_shop => 1 },
+            { columns => ['id','name','sku','unit_price','unit_cost'], order_by => 'name' })->all;
+    };
+
+    $c->stash(
+        partners => \@partners,
+        items    => \@items,
+        sitename => $sitename,
+        template => 'Inventory/consignment/new.tt',
+    );
+}
+
+sub consignment_view :Path('/Inventory/consignment/view') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $consignment;
+    eval {
+        $consignment = $schema->resultset('InventoryConsignment')->find(
+            { 'me.id' => $id, 'me.sitename' => $sitename },
+            { prefetch => ['partner', { 'lines' => 'item' }] }
+        );
+    };
+    unless ($consignment) {
+        $c->flash->{error_msg} = 'Consignment not found.';
+        $c->res->redirect($c->uri_for('/Inventory/consignment'));
+        $c->detach;
+    }
+
+    my %site_info;
+    eval {
+        my $site = $schema->resultset('Site')->search({ name => $sitename })->first;
+        if ($site) {
+            my @cfgs = $schema->resultset('SiteConfig')->search({ site_id => $site->id })->all;
+            %site_info = map { $_->config_key => $_->config_value } @cfgs;
+            $site_info{display_name} ||= $site->site_display_name || $sitename;
+            $site_info{email}        ||= $site->mail_from || '';
+        }
+    };
+
+    $c->stash(
+        consignment => $consignment,
+        sitename    => $sitename,
+        site_info   => \%site_info,
+        template    => 'Inventory/consignment/view.tt',
+    );
+}
+
+sub consignment_delete :Path('/Inventory/consignment/delete') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    unless ($c->req->method eq 'POST') {
+        $c->res->redirect($c->uri_for('/Inventory/consignment'));
+        $c->detach;
+    }
+
+    eval {
+        my $con = $schema->resultset('InventoryConsignment')->find(
+            { 'me.id' => $id, 'me.sitename' => $sitename }
+        ) or die "Not found\n";
+        die "Cannot delete a settled consignment\n" if $con->status eq 'settled';
+        $con->delete;
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Delete failed: $@";
+    } else {
+        $c->flash->{success_msg} = 'Consignment deleted.';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/consignment'));
+    $c->detach;
+}
+
+sub consignment_settle :Path('/Inventory/consignment/settle') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $now      = $self->_now();
+
+    unless ($c->req->method eq 'POST') {
+        $c->res->redirect($c->uri_for('/Inventory/consignment/view', [$id]));
+        $c->detach;
+    }
+
+    my $p = $c->req->body_parameters;
+
+    eval {
+        my $consignment = $schema->resultset('InventoryConsignment')->find(
+            { 'me.id' => $id, 'me.sitename' => $sitename },
+            { prefetch => ['partner', 'lines'] }
+        ) or die "Consignment not found\n";
+
+        die "Already settled\n" if $consignment->status eq 'settled';
+
+        my $commission_pct = $consignment->partner->commission_percent || 0;
+        my $total_gross    = 0;
+        my $total_net      = 0;
+        my $total_comm     = 0;
+
+        my @line_ids    = $c->req->params->get_all('line_id');
+        my @qty_solds   = $c->req->params->get_all('qty_sold');
+        my @qty_returns = $c->req->params->get_all('qty_return');
+
+        for my $i (0 .. $#line_ids) {
+            my $line = $schema->resultset('InventoryConsignmentLine')->find($line_ids[$i]);
+            next unless $line && $line->consignment_id == $id;
+
+            my $new_sold   = ($qty_solds[$i]   || 0) + ($line->quantity_sold     || 0);
+            my $new_return = ($qty_returns[$i]  || 0) + ($line->quantity_returned || 0);
+            $line->update({ quantity_sold => $new_sold, quantity_returned => $new_return });
+
+            my $this_sold = $qty_solds[$i] || 0;
+            if ($this_sold > 0 && $line->retail_price) {
+                my $gross = $this_sold * $line->retail_price;
+                $total_gross += $gross;
+                $total_net   += $gross * (1 - $commission_pct / 100);
+                $total_comm  += $gross * ($commission_pct / 100);
+
+                $schema->resultset('InventoryTransaction')->create({
+                    sitename         => $sitename,
+                    item_id          => $line->item_id,
+                    transaction_type => 'consignment_sold',
+                    quantity         => -$this_sold,
+                    unit_cost        => $line->retail_price * (1 - $commission_pct / 100),
+                    reference_number => 'CONSIGN-' . $id . '-SETTLE',
+                    notes            => 'Settled with ' . $consignment->partner->name
+                                        . sprintf(' (%.0f%% comm, net $%.2f)', $commission_pct, $gross * (1 - $commission_pct/100)),
+                    performed_by     => $c->session->{username} || 'admin',
+                    transaction_date => $now,
+                });
+            }
+            if (($qty_returns[$i] || 0) > 0) {
+                $schema->resultset('InventoryTransaction')->create({
+                    sitename         => $sitename,
+                    item_id          => $line->item_id,
+                    transaction_type => 'consignment_return',
+                    quantity         => $qty_returns[$i],
+                    reference_number => 'CONSIGN-' . $id . '-RETURN',
+                    notes            => 'Returned from ' . $consignment->partner->name,
+                    performed_by     => $c->session->{username} || 'admin',
+                    transaction_date => $now,
+                });
+            }
+        }
+
+        my $all_lines  = [$consignment->lines->all];
+        my $all_done   = 1;
+        my $any_sold   = 0;
+        for my $l (@$all_lines) {
+            $l->discard_changes;
+            my $outstanding = $l->quantity_sent - $l->quantity_sold - $l->quantity_returned;
+            $all_done = 0 if $outstanding > 0;
+            $any_sold = 1 if $l->quantity_sold > 0;
+        }
+        my $new_status = $all_done ? 'settled' : ($any_sold ? 'partially_settled' : 'open');
+        $consignment->update({ status => $new_status });
+
+        if ($total_gross > 0 && $p->{create_gl}) {
+            my $income_account_id = $p->{income_account_id} || undef;
+            my $ar_account_id     = $p->{ar_account_id}     || undef;
+            my $comm_account_id   = $p->{comm_account_id}   || undef;
+
+            if ($income_account_id && $ar_account_id) {
+                my $gl = $schema->resultset('GlEntry')->create({
+                    sitename    => $sitename,
+                    entry_date  => $now,
+                    description => sprintf('Consignment settlement — %s (%.0f%% commission)',
+                                    $consignment->partner->name, $commission_pct),
+                    reference   => 'CONSIGN-' . $id . '-GL',
+                    created_by  => $c->session->{username} || 'admin',
+                    created_at  => $now,
+                });
+                $schema->resultset('GlEntryLine')->create({
+                    gl_entry_id => $gl->id, account_id => $ar_account_id,
+                    debit => sprintf('%.2f', $total_net), credit => 0,
+                    description => 'Consignment net receivable',
+                });
+                if ($comm_account_id && $total_comm > 0) {
+                    $schema->resultset('GlEntryLine')->create({
+                        gl_entry_id => $gl->id, account_id => $comm_account_id,
+                        debit => sprintf('%.2f', $total_comm), credit => 0,
+                        description => 'Consignment commission expense',
+                    });
+                }
+                $schema->resultset('GlEntryLine')->create({
+                    gl_entry_id => $gl->id, account_id => $income_account_id,
+                    debit => 0, credit => sprintf('%.2f', $total_gross),
+                    description => 'Consignment sales revenue',
+                });
+            }
+        }
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Settlement failed: $@";
+    } else {
+        $c->flash->{success_msg} = 'Settlement recorded.';
+    }
+    $c->res->redirect($c->uri_for('/Inventory/consignment/view', [$id]));
     $c->detach;
 }
 

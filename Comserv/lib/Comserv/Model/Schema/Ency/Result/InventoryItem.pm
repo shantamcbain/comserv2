@@ -84,6 +84,31 @@ __PACKAGE__->add_columns(
         size        => 100,
         is_nullable => 1,
     },
+    image_path => {
+        data_type   => 'varchar',
+        size        => 500,
+        is_nullable => 1,
+    },
+    discount_percent => {
+        data_type     => 'decimal',
+        size          => [5, 2],
+        is_nullable   => 1,
+        default_value => 0,
+    },
+    shop_options => {
+        data_type   => 'text',
+        is_nullable => 1,
+    },
+    show_in_shop => {
+        data_type     => 'tinyint',
+        is_nullable   => 0,
+        default_value => 0,
+    },
+    hide_stock_count => {
+        data_type     => 'tinyint',
+        is_nullable   => 0,
+        default_value => 0,
+    },
     reorder_point => {
         data_type     => 'integer',
         is_nullable   => 1,
@@ -229,6 +254,13 @@ __PACKAGE__->belongs_to(
     'Comserv::Model::Schema::Ency::Result::CoaAccount',
     { 'foreign.id' => 'self.returns_accno_id' },
     { join_type => 'LEFT', on_delete => 'SET NULL' }
+);
+
+__PACKAGE__->might_have(
+    'equipment',
+    'Comserv::Model::Schema::Ency::Result::InventoryEquipment',
+    { 'foreign.item_id' => 'self.id' },
+    { cascade_delete => 1 }
 );
 
 __PACKAGE__->has_many(
