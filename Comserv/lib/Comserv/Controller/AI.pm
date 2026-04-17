@@ -1043,54 +1043,16 @@ sub generate :Local :Args(0) {
                 'generate', "Pre-request: model=$use_model msgs=" . scalar(@ollama_msgs) .
                 " chars=$total_chars est_tokens=$est_tokens timeout=300s host=$current_host");
 
-            # ── Ollama web search injection (when use_search=1 for Ollama provider) ──
+            # ── Web search injection (when use_search=1 for Ollama provider) ──
             if ($use_search) {
-                my $ollama_api_key = '';
-                eval {
-                    my $schema = $c->model('DBEncy')->schema;
-                    my $key_obj = $schema->resultset('UserApiKeys')->search(
-                        { service => 'ollama', is_active => '1' }
-                    )->first;
-                    $ollama_api_key = $key_obj->get_api_key() if $key_obj;
-                };
-                if ($ollama_api_key) {
-                    eval {
-                        require LWP::UserAgent;
-                        require HTTP::Request;
-                        require JSON;
-                        my $ua  = LWP::UserAgent->new(timeout => 10);
-                        my $req = HTTP::Request->new(POST => 'https://ollama.com/api/web_search');
-                        $req->header('Authorization' => "Bearer $ollama_api_key");
-                        $req->header('Content-Type'  => 'application/json');
-                        $req->content(JSON::encode_json({ query => $prompt, max_results => 5 }));
-                        my $resp = $ua->request($req);
-                        if ($resp->is_success) {
-                            my $data = JSON::decode_json($resp->decoded_content);
-                            my @results = @{ $data->{results} || [] };
-                            if (@results) {
-                                my $search_ctx = "Web search results for: \"$prompt\"\n";
-                                for my $r (@results) {
-                                    $search_ctx .= "\n## " . ($r->{title}||'') . "\n"
-                                               .  "URL: " . ($r->{url}||'') . "\n"
-                                               .  ($r->{content}||'') . "\n";
-                                }
-                                $search_ctx .= "\nUse the above search results to answer accurately.\n";
-                                # Prepend to the last user message in ollama_msgs
-                                if (@ollama_msgs && $ollama_msgs[-1]{role} eq 'user') {
-                                    $ollama_msgs[-1]{content} = $search_ctx . "\n" . $ollama_msgs[-1]{content};
-                                } else {
-                                    push @ollama_msgs, { role => 'user', content => $search_ctx };
-                                }
-                                push @trace, sprintf("🌐 Ollama web search: %d results injected (%d chars)",
-                                    scalar(@results), length($search_ctx));
-                            }
-                        } else {
-                            push @trace, "⚠️ Ollama web search failed: HTTP " . $resp->code . " — " . $resp->message;
-                        }
-                    };
-                    push @trace, "⚠️ Ollama web search error: $@" if $@;
-                } else {
-                    push @trace, "⚠️ Ollama web search requested but no Ollama API key found — add at /ai/manage_api_keys (service: ollama)";
+                my ($search_ctx, $search_provider) = $self->_do_web_search($c, $prompt, $agent_id, \@trace);
+                if ($search_ctx) {
+                    if (@ollama_msgs && $ollama_msgs[-1]{role} eq 'user') {
+                        $ollama_msgs[-1]{content} = $search_ctx . "\n" . $ollama_msgs[-1]{content};
+                    } else {
+                        push @ollama_msgs, { role => 'user', content => $search_ctx };
+                    }
+                    push @trace, sprintf("🌐 Web search (%s): injected %d chars", $search_provider, length($search_ctx));
                 }
             }
 
@@ -4079,6 +4041,198 @@ Given the installed models list, return (small_model, large_model).
 Small = tinyllama or smallest by name; Large = llama3.1 or largest by name.
 
 =cut
+
+# ── _do_web_search ─────────────────────────────────────────────────────────────
+# Unified web search helper.  Tries providers in priority order and returns
+# a formatted context string ready to inject into the model prompt.
+#
+# Provider priority (per agent):
+#   ency / bmaster  →  brave (if key) → searxng (if configured) → ddg
+#   all others      →  ollama-cloud (if key) → ddg → brave → searxng
+#
+# Returns: (context_string, provider_used) or ('', '') on failure.
+# ──────────────────────────────────────────────────────────────────────────────
+sub _do_web_search {
+    my ($self, $c, $query, $agent_id, $trace_ref) = @_;
+    $trace_ref //= [];
+
+    require LWP::UserAgent;
+    require HTTP::Request;
+    require JSON;
+
+    my $ua = LWP::UserAgent->new(timeout => 10);
+    $ua->agent('Comserv/2.0');
+
+    # ── helper: format result list into context string ──
+    my $format_results = sub {
+        my ($results, $provider) = @_;
+        return ('', '') unless @$results;
+        my $ctx = "Web search results ($provider) for: \"$query\"\n";
+        for my $r (@$results) {
+            $ctx .= "\n## " . ($r->{title}   || '') . "\n"
+                 .  "URL: " . ($r->{url}     || '') . "\n"
+                 .  ($r->{snippet} || $r->{content} || $r->{description} || '') . "\n";
+        }
+        $ctx .= "\nUse the above search results to answer accurately.\n";
+        return ($ctx, $provider);
+    };
+
+    # ── load all stored API keys once ──
+    my (%keys);
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my $rows = $schema->resultset('UserApiKeys')->search({ is_active => '1' });
+        while (my $k = $rows->next) {
+            $keys{$k->service} = $k->get_api_key() unless $keys{$k->service};
+        }
+    };
+
+    # ── determine provider order ──
+    my $is_precise_agent = ($agent_id && $agent_id =~ /^(ency|bmaster|bmast|usbm|accounting)$/i) ? 1 : 0;
+    my @order = $is_precise_agent
+        ? ('brave', 'searxng', 'ollama_cloud', 'ddg')
+        : ('ollama_cloud', 'ddg', 'brave', 'searxng');
+
+    for my $provider (@order) {
+
+        # ── Brave Search ───────────────────────────────────────────────────
+        if ($provider eq 'brave' && $keys{brave}) {
+            eval {
+                my $url  = 'https://api.search.brave.com/res/v1/web/search?q='
+                         . URI::Escape::uri_escape($query) . '&count=5';
+                my $req  = HTTP::Request->new(GET => $url);
+                $req->header('Accept'               => 'application/json');
+                $req->header('Accept-Encoding'      => 'gzip');
+                $req->header('X-Subscription-Token' => $keys{brave});
+                my $resp = $ua->request($req);
+                if ($resp->is_success) {
+                    my $data    = JSON::decode_json($resp->decoded_content);
+                    my @results = map { {
+                        title   => $_->{title}       || '',
+                        url     => $_->{url}          || '',
+                        snippet => $_->{description}  || '',
+                    } } @{ $data->{web}{results} || [] };
+                    if (@results) {
+                        push @$trace_ref, sprintf("🌐 Brave search: %d results", scalar @results);
+                        my ($ctx, $p) = $format_results->(\@results, 'Brave');
+                        return ($ctx, $p);
+                    }
+                } else {
+                    push @$trace_ref, "⚠️ Brave search HTTP " . $resp->code;
+                }
+            };
+            push @$trace_ref, "⚠️ Brave search error: $@" if $@;
+            next;
+        }
+
+        # ── SearXNG ────────────────────────────────────────────────────────
+        if ($provider eq 'searxng') {
+            my $cfg      = $c->config->{SearXNG} || {};
+            my $host     = $cfg->{host} || '';
+            next unless $host;
+            eval {
+                require URI::Escape;
+                my $url  = "$host/search?q=" . URI::Escape::uri_escape($query)
+                         . '&format=json&categories=general&language=en';
+                my $req  = HTTP::Request->new(GET => $url);
+                my $resp = $ua->request($req);
+                if ($resp->is_success) {
+                    my $data    = JSON::decode_json($resp->decoded_content);
+                    my @results = map { {
+                        title   => $_->{title}   || '',
+                        url     => $_->{url}     || '',
+                        snippet => $_->{content} || '',
+                    } } @{ $data->{results} || [] }[0..4];
+                    if (@results) {
+                        push @$trace_ref, sprintf("🌐 SearXNG: %d results", scalar @results);
+                        my ($ctx, $p) = $format_results->(\@results, 'SearXNG');
+                        return ($ctx, $p);
+                    }
+                } else {
+                    push @$trace_ref, "⚠️ SearXNG HTTP " . $resp->code;
+                }
+            };
+            push @$trace_ref, "⚠️ SearXNG error: $@" if $@;
+            next;
+        }
+
+        # ── Ollama cloud web search ────────────────────────────────────────
+        if ($provider eq 'ollama_cloud' && $keys{ollama}) {
+            eval {
+                my $req = HTTP::Request->new(POST => 'https://ollama.com/api/web_search');
+                $req->header('Authorization' => "Bearer $keys{ollama}");
+                $req->header('Content-Type'  => 'application/json');
+                $req->content(JSON::encode_json({ query => $query, max_results => 5 }));
+                my $resp = $ua->request($req);
+                if ($resp->is_success) {
+                    my $data    = JSON::decode_json($resp->decoded_content);
+                    my @results = map { {
+                        title   => $_->{title}   || '',
+                        url     => $_->{url}     || '',
+                        snippet => $_->{content} || '',
+                    } } @{ $data->{results} || [] };
+                    if (@results) {
+                        push @$trace_ref, sprintf("🌐 Ollama cloud search: %d results", scalar @results);
+                        my ($ctx, $p) = $format_results->(\@results, 'Ollama');
+                        return ($ctx, $p);
+                    }
+                } else {
+                    push @$trace_ref, "⚠️ Ollama cloud search HTTP " . $resp->code;
+                }
+            };
+            push @$trace_ref, "⚠️ Ollama cloud search error: $@" if $@;
+            next;
+        }
+
+        # ── DuckDuckGo Instant Answer (free, no key) ───────────────────────
+        if ($provider eq 'ddg') {
+            eval {
+                require URI::Escape;
+                my $url  = 'https://api.duckduckgo.com/?q='
+                         . URI::Escape::uri_escape($query)
+                         . '&format=json&no_html=1&skip_disambig=1';
+                my $req  = HTTP::Request->new(GET => $url);
+                my $resp = $ua->request($req);
+                if ($resp->is_success) {
+                    my $data    = JSON::decode_json($resp->decoded_content);
+                    my @results;
+                    # Abstract (best single result)
+                    if ($data->{AbstractText} && $data->{AbstractURL}) {
+                        push @results, {
+                            title   => $data->{Heading} || $query,
+                            url     => $data->{AbstractURL},
+                            snippet => $data->{AbstractText},
+                        };
+                    }
+                    # Related topics
+                    for my $t (@{ $data->{RelatedTopics} || [] }) {
+                        next unless ref($t) eq 'HASH' && $t->{Text} && $t->{FirstURL};
+                        push @results, {
+                            title   => $t->{Text},
+                            url     => $t->{FirstURL},
+                            snippet => $t->{Text},
+                        };
+                        last if @results >= 5;
+                    }
+                    if (@results) {
+                        push @$trace_ref, sprintf("🌐 DuckDuckGo: %d results", scalar @results);
+                        my ($ctx, $p) = $format_results->(\@results, 'DuckDuckGo');
+                        return ($ctx, $p);
+                    } else {
+                        push @$trace_ref, "⚠️ DuckDuckGo: no results for this query (instant-answer API only)";
+                    }
+                } else {
+                    push @$trace_ref, "⚠️ DuckDuckGo HTTP " . $resp->code;
+                }
+            };
+            push @$trace_ref, "⚠️ DuckDuckGo error: $@" if $@;
+            next;
+        }
+    }
+
+    push @$trace_ref, "⚠️ All web search providers exhausted — no results";
+    return ('', '');
+}
 
 sub _pick_ollama_tier {
     my ($self, $installed_models, $default_model, $agent_id, $page_context) = @_;
