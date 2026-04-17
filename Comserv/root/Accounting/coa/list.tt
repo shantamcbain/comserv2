@@ -1,4 +1,4 @@
-[% PageVersion = 'Accounting/coa/list.tt,v 0.01 2026/04/10 shanta Exp' %]
+[% PageVersion = 'Accounting/coa/list.tt,v 0.03 2026/04/11 shanta Exp' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <h1>Chart of Accounts</h1>
@@ -7,34 +7,45 @@
 [% IF flash.success_msg %]<p style="color:green;font-weight:bold">[% flash.success_msg %]</p>[% END %]
 [% IF flash.info_msg %]<p style="color:#888">[% flash.info_msg %]</p>[% END %]
 [% IF flash.error_msg %]<p style="color:red">[% flash.error_msg %]</p>[% END %]
+[% IF list_error %]<p style="color:red"><strong>Query error:</strong> [% list_error %]</p>[% END %]
 
-[% IF accounts.size == 0 %]
-<p><strong>No accounts found.</strong>
-  <a href="/Accounting/coa/seed" style="background:#007bff;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">
+<p>
+[% IF accounts.size == 0 && !list_error %]
+  <a href="/Accounting/coa/seed"
+     style="background:#007bff;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">
     Seed Default Chart of Accounts
   </a>
-</p>
+[% ELSE %]
+  <a href="/Accounting/coa/seed_merge"
+     style="background:#28a745;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;"
+     onclick="return confirm('Add any missing standard accounts to your COA?')">
+    Add Missing Accounts
+  </a>
 [% END %]
+</p>
 
-[% SET cat_labels = {A='Asset', L='Liability', Q='Equity', I='Income', E='Expense'} %]
-[% FOREACH cat IN ['A','L','Q','I','E'] %]
-  [% SET cat_accounts = accounts.grep(item => item.category == cat) %]
-  [% IF cat_accounts.size %]
-  <h2>[% cat_labels.$cat %]</h2>
-  <table border="1" cellpadding="4">
-    <thead>
-      <tr><th>Account #</th><th>Description</th><th>Section</th><th>Contra</th></tr>
-    </thead>
-    <tbody>
-    [% FOREACH acct IN cat_accounts %]
-      <tr>
-        <td><a href="/Accounting/coa/view/[% acct.id %]">[% acct.accno %]</a></td>
-        <td>[% acct.description %]</td>
-        <td>[% acct.heading ? acct.heading.description : '-' %]</td>
-        <td>[% acct.is_contra ? 'Yes' : '' %]</td>
-      </tr>
-    [% END %]
-    </tbody>
-  </table>
+[% IF accounts.size %]
+[% SET cat_labels = {A = 'Asset', L = 'Liability', Q = 'Equity', I = 'Income', E = 'Expense'} %]
+[% SET current_cat = '' %]
+[% SET in_table = 0 %]
+
+[% FOREACH acct IN accounts %]
+  [% IF acct.category != current_cat %]
+    [% IF in_table %]</tbody></table>[% END %]
+    [% SET current_cat = acct.category %]
+    [% SET in_table = 1 %]
+    <h2>[% cat_labels.${acct.category} || acct.category %]</h2>
+    <table border="1" cellpadding="4" style="width:100%;margin-bottom:1em;">
+      <thead>
+        <tr><th>Account #</th><th>Description</th><th>Contra</th></tr>
+      </thead>
+      <tbody>
   [% END %]
+  <tr>
+    <td><a href="/Accounting/coa/view/[% acct.id %]">[% acct.accno | html %]</a></td>
+    <td>[% acct.description | html %]</td>
+    <td>[% acct.is_contra ? 'Yes' : '' %]</td>
+  </tr>
+[% END %]
+[% IF in_table %]</tbody></table>[% END %]
 [% END %]

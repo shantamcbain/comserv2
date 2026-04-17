@@ -5,11 +5,62 @@ EMAIL="csc@computersystemconsulting.ca"
 COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.server.yml"
 IMAGE="shantamcsbain/comserv-web-prod:latest"
 CONTAINER="comserv2-web-prod"
-LOG="/var/log/comserv-deploy.log"
+DEPLOY_LOG="/var/log/comserv-deploy.log"
 HOSTNAME_VAL=$(hostname)
 
 echo "=== Comserv Production Deploy Check at $(date) ==="
 
+# ── Disk space report ────────────────────────────────────────────────────────
+DISK_BEFORE=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
+echo "Disk before: $DISK_BEFORE"
+
+# ── Routine cleanup (runs every time, not just on deploy) ────────────────────
+echo "Running routine Docker cleanup..."
+docker container prune -f  --filter "until=1h"  2>&1 | grep -v "^$" || true
+docker image prune -f                                   2>&1 | grep -v "^$" || true
+docker builder prune -f    --keep-storage 2GB           2>&1 | grep -v "^$" || true
+
+DISK_AFTER_CLEANUP=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
+echo "Disk after cleanup: $DISK_AFTER_CLEANUP"
+
+# ── Disk space alert (warn at 85%) ───────────────────────────────────────────
+DISK_PCT=$(df / | awk 'NR==2 {gsub(/%/,"",$5); print $5}')
+if [ "$DISK_PCT" -ge 85 ] && command -v mail >/dev/null 2>&1; then
+    DISK_DETAIL=$(df -h / | awk 'NR==2 {print $3 " used of " $2 " (" $5 " full)"}')
+    DOCKER_USAGE=$(docker system df 2>/dev/null || echo "unavailable")
+    echo "WARNING: Disk at ${DISK_PCT}% — sending alert"
+    echo -e "Production server disk space alert\n\nServer : $HOSTNAME_VAL\nTime   : $(date)\nDisk   : $DISK_DETAIL\n\nDocker usage:\n$DOCKER_USAGE" \
+        | mail -s "⚠️  Disk ${DISK_PCT}% full on $HOSTNAME_VAL" "$EMAIL"
+fi
+
+# ── Deploy log rotation (keep last 5000 lines) ───────────────────────────────
+if [ -f "$DEPLOY_LOG" ] && [ $(wc -l < "$DEPLOY_LOG") -gt 6000 ]; then
+    tail -5000 "$DEPLOY_LOG" > "${DEPLOY_LOG}.tmp" && mv "${DEPLOY_LOG}.tmp" "$DEPLOY_LOG"
+    echo "Deploy log rotated (kept last 5000 lines)"
+fi
+
+# ── Container log trimming (runs every cron tick for ALL comserv containers) ──
+# Caps each container log at LOG_TRIM_THRESHOLD_MB; trims to LOG_TRIM_TARGET_MB.
+LOG_TRIM_THRESHOLD_MB=50
+LOG_TRIM_TARGET_BYTES=10485760   # 10 MB kept after trim
+
+echo "Checking container log sizes..."
+for CNAME in $(docker ps --format '{{.Names}}' 2>/dev/null); do
+    LOG_FILE=$(docker inspect --format='{{.LogPath}}' "$CNAME" 2>/dev/null || true)
+    [ -z "$LOG_FILE" ] || [ ! -f "$LOG_FILE" ] && continue
+    LOG_SIZE_MB=$(du -m "$LOG_FILE" 2>/dev/null | cut -f1)
+    LOG_SIZE_MB=${LOG_SIZE_MB:-0}
+    echo "  $CNAME: ${LOG_SIZE_MB}MB"
+    if [ "$LOG_SIZE_MB" -gt "$LOG_TRIM_THRESHOLD_MB" ]; then
+        echo "  => Trimming $CNAME log (${LOG_SIZE_MB}MB -> 10MB)..."
+        tail -c "$LOG_TRIM_TARGET_BYTES" "$LOG_FILE" > "${LOG_FILE}.tmp" \
+            && mv "${LOG_FILE}.tmp" "$LOG_FILE" \
+            && echo "  => Done." \
+            || echo "  => WARNING: trim failed for $CNAME"
+    fi
+done
+
+# ── Check for compose file ───────────────────────────────────────────────────
 if [ ! -f "$COMPOSE_FILE" ]; then
     echo "ERROR: $COMPOSE_FILE not found. Aborting." >&2
     exit 1
@@ -17,6 +68,7 @@ fi
 
 cd "$(dirname "$COMPOSE_FILE")"
 
+# ── Version check ────────────────────────────────────────────────────────────
 echo "Checking for new image on Docker Hub..."
 
 LOCAL_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE" 2>/dev/null || echo "none")
@@ -27,7 +79,8 @@ echo "  Local : ${LOCAL_DIGEST:0:72}..."
 echo "  Remote: ${REMOTE_DIGEST:0:72}..."
 
 if [ "$LOCAL_DIGEST" = "$REMOTE_DIGEST" ] && [ "$LOCAL_DIGEST" != "none" ]; then
-    echo "No new version available. Skipping deployment."
+    DISK_FINAL=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
+    echo "No new version. Disk: $DISK_FINAL"
     echo "=== Finished at $(date) ==="
     exit 0
 fi
@@ -44,7 +97,7 @@ fi
 echo "   Version: $VERSION_INFO"
 
 echo "2. Stopping and removing old container..."
-docker stop "$CONTAINER" 2>/dev/null || true
+docker stop "$CONTAINER"  2>/dev/null || true
 docker rm -f "$CONTAINER" 2>/dev/null || true
 docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
 
@@ -65,8 +118,13 @@ while [ $ATTEMPT -lt 45 ]; do
     [ $((ATTEMPT % 5)) -eq 0 ] && echo "  ...waiting ($((ATTEMPT * 2))s)"
 done
 
-echo "5. Cleaning up old images..."
-docker image prune -f
+echo "5. Post-deploy cleanup (remove now-dangling old image layers)..."
+docker image prune -f 2>&1 | grep -v "^$" || true
+
+DISK_FINAL=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
+echo "Disk after deploy: $DISK_FINAL"
+
+docker ps --filter "name=$CONTAINER" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
 if [ $HEALTHY -eq 1 ]; then
     echo "=== Deployment Successful at $(date) ==="
@@ -78,10 +136,8 @@ else
     SUBJECT="Comserv Production Deployed - Health Check Timeout"
 fi
 
-docker ps --filter "name=$CONTAINER" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-
 if command -v mail >/dev/null 2>&1; then
-    echo -e "Comserv Production Deployment Report\n\nServer    : $HOSTNAME_VAL\nTime      : $(date)\nImage     : $IMAGE\nContainer : $CONTAINER\nStatus    : $STATUS_MSG\nVersion   : $VERSION_INFO\nNew digest: ${REMOTE_DIGEST:0:72}" \
+    echo -e "Comserv Production Deployment Report\n\nServer    : $HOSTNAME_VAL\nTime      : $(date)\nImage     : $IMAGE\nContainer : $CONTAINER\nStatus    : $STATUS_MSG\nVersion   : $VERSION_INFO\nNew digest: ${REMOTE_DIGEST:0:72}\nDisk      : $DISK_FINAL" \
         | mail -s "$SUBJECT" "$EMAIL"
     echo "Notification sent to $EMAIL"
 fi

@@ -40,6 +40,20 @@
                     </label>
                 </div>
 
+                [% IF mailing_lists.size %]
+                <div style="margin-top:8px;padding:10px;background:#f0f4ff;border:1px solid #c5d0e8;border-radius:4px;">
+                    <strong style="display:block;margin-bottom:4px;">Named Mailing Lists <small style="font-weight:normal;color:#666;">(check any to add their members)</small>:</strong>
+                    [% FOREACH list IN mailing_lists %]
+                    <div class="form-group" style="margin:4px 0;">
+                        <label><input type="checkbox" name="list_ids" value="[% list.id %]" onchange="updateListCount()"> 
+                            [% list.name | html %] <strong>([% list.count %])</strong>
+                            <small style="color:#666;"> — named mailing list subscribers</small>
+                        </label>
+                    </div>
+                    [% END %]
+                </div>
+                [% END %]
+
                 <div class="form-group" style="margin-top:12px;">
                     <label for="custom_addresses">Additional / Custom Addresses:</label>
                     <textarea name="custom_addresses" id="custom_addresses" rows="3"
@@ -50,6 +64,11 @@
             </div>
 
             <div class="form-section" style="margin-top:20px;">
+                [% PROCESS 'ai/partials/ai_form_assistant.tt'
+                   ai_form_entity_label = 'mass email'
+                   ai_form_context      = 'mass email / mailout composition for site users'
+                   ai_form_fields       = 'subject, body'
+                %]
                 <h3>Message</h3>
                 <div class="form-group">
                     <label for="subject">Subject <span style="color:red;">*</span></label>
@@ -57,13 +76,65 @@
                            style="width:100%;padding:6px;" placeholder="Your subject line">
                 </div>
                 <div class="form-group" style="margin-top:10px;">
-                    <label for="body">Message Body <span style="color:red;">*</span></label>
-                    <textarea name="body" id="body" rows="14" required
-                              style="width:100%;padding:6px;"
-                              placeholder="Write your message here..."></textarea>
-                    <small style="color:#666;">
+                    <label>Message Body <span style="color:red;">*</span></label>
+
+                    <div style="border:1px solid #ccc;border-radius:4px;overflow:hidden;">
+                        <!-- Tab bar -->
+                        <div style="display:flex;background:#f5f5f5;border-bottom:1px solid #ccc;">
+                            <button type="button" id="tab-visual" onclick="switchTab('visual')"
+                                style="padding:6px 14px;border:none;border-bottom:2px solid #0d6efd;background:#fff;font-weight:bold;cursor:pointer;">
+                                Visual
+                            </button>
+                            <button type="button" id="tab-source" onclick="switchTab('source')"
+                                style="padding:6px 14px;border:none;border-bottom:2px solid transparent;background:transparent;cursor:pointer;">
+                                HTML Source
+                            </button>
+                            <span style="flex:1"></span>
+                            <!-- Rich-text toolbar (visual tab only) -->
+                            <span id="rich-toolbar" style="display:flex;gap:3px;align-items:center;padding:3px 6px;">
+                                <button type="button" onclick="fmt('bold')" title="Bold" style="font-weight:bold;min-width:26px;padding:2px 4px;">B</button>
+                                <button type="button" onclick="fmt('italic')" title="Italic" style="font-style:italic;min-width:26px;padding:2px 4px;">I</button>
+                                <button type="button" onclick="fmt('underline')" title="Underline" style="text-decoration:underline;min-width:26px;padding:2px 4px;">U</button>
+                                <span style="border-left:1px solid #ccc;margin:0 2px;height:18px;display:inline-block;"></span>
+                                <button type="button" onclick="fmtBlock('h2')" title="Heading 2" style="min-width:30px;padding:2px 4px;">H2</button>
+                                <button type="button" onclick="fmtBlock('h3')" title="Heading 3" style="min-width:30px;padding:2px 4px;">H3</button>
+                                <button type="button" onclick="fmtBlock('p')" title="Paragraph" style="min-width:26px;padding:2px 4px;">P</button>
+                                <span style="border-left:1px solid #ccc;margin:0 2px;height:18px;display:inline-block;"></span>
+                                <button type="button" onclick="fmt('insertUnorderedList')" title="Bullet list" style="min-width:26px;padding:2px 4px;">&#8226;</button>
+                                <button type="button" onclick="fmt('insertOrderedList')" title="Numbered list" style="min-width:26px;padding:2px 4px;">1.</button>
+                                <button type="button" onclick="insertLink()" title="Insert link" style="min-width:26px;padding:2px 4px;">&#128279;</button>
+                                <button type="button" onclick="fmt('removeFormat')" title="Clear formatting" style="padding:2px 6px;font-size:11px;">Clear</button>
+                            </span>
+                        </div>
+
+                        <!-- Visual editor panel -->
+                        <div id="panel-visual">
+                            <div id="body-editor" contenteditable="true"
+                                 style="min-height:280px;padding:10px;background:#fff;outline:none;overflow-y:auto;font-family:Arial,sans-serif;font-size:14px;line-height:1.5;"></div>
+                        </div>
+
+                        <!-- HTML source panel -->
+                        <div id="panel-source" style="display:none;">
+                            <div style="padding:6px;background:#fffde7;border-bottom:1px solid #eee;font-size:12px;color:#666;">
+                                Paste or type raw HTML here, then click <strong>Apply HTML</strong> to render it in the visual editor.
+                            </div>
+                            <textarea id="source-editor"
+                                style="width:100%;min-height:280px;padding:10px;border:none;outline:none;font-family:monospace;font-size:12px;line-height:1.4;box-sizing:border-box;resize:vertical;"
+                                placeholder="Paste your HTML email source here..."></textarea>
+                            <div style="padding:6px;background:#f5f5f5;border-top:1px solid #eee;display:flex;gap:8px;">
+                                <button type="button" onclick="applySource()" class="btn btn-primary" style="padding:4px 16px;">
+                                    Apply HTML &#10003;
+                                </button>
+                                <button type="button" onclick="switchTab('visual')" style="padding:4px 12px;">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <input type="hidden" name="body" id="body-hidden">
+                    <small style="color:#666;margin-top:4px;display:block;">
                         Personalisation tags: <code>[FIRST_NAME]</code> <code>[LAST_NAME]</code>
                         <code>[EMAIL]</code> <code>[USERNAME]</code> — replaced per recipient.
+                        Use <strong>HTML Source</strong> tab to paste a full HTML email template.
                     </small>
                 </div>
             </div>
@@ -78,9 +149,13 @@
                 </label>
             </div>
 
-            <div class="form-actions" style="margin-top:16px;">
+            <div class="form-actions" style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
                 <button type="submit" id="send-btn" class="btn btn-primary btn-lg" disabled>
                     Send Mailout
+                </button>
+                <button type="button" id="test-btn" class="btn btn-secondary"
+                        onclick="sendTestPreview()" style="background:#6c757d;color:#fff;">
+                    Send Test to Me
                 </button>
                 <a href="[% c.uri_for('/mail/lists') %]" class="btn btn-secondary">Cancel</a>
             </div>
@@ -111,19 +186,110 @@
 <script>
 var counts = { all: [% user_count %], paid: [% paid_count %], custom: 0 };
 
+// ── Editor tab switching ──────────────────────────────────────
+function switchTab(tab) {
+    var isVisual = tab === 'visual';
+    document.getElementById('panel-visual').style.display = isVisual ? '' : 'none';
+    document.getElementById('panel-source').style.display = isVisual ? 'none' : '';
+    document.getElementById('rich-toolbar').style.display  = isVisual ? 'flex' : 'none';
+    document.getElementById('tab-visual').style.borderBottom = isVisual ? '2px solid #0d6efd' : '2px solid transparent';
+    document.getElementById('tab-visual').style.background   = isVisual ? '#fff' : 'transparent';
+    document.getElementById('tab-visual').style.fontWeight   = isVisual ? 'bold' : 'normal';
+    document.getElementById('tab-source').style.borderBottom = isVisual ? '2px solid transparent' : '2px solid #0d6efd';
+    document.getElementById('tab-source').style.background   = isVisual ? 'transparent' : '#fff';
+    document.getElementById('tab-source').style.fontWeight   = isVisual ? 'normal' : 'bold';
+    if (!isVisual) {
+        // Mirror current visual content into source textarea when switching to source
+        document.getElementById('source-editor').value =
+            document.getElementById('body-hidden').value;
+    }
+}
+
+// Apply raw HTML from source textarea → render in visual editor
+function applySource() {
+    var src = document.getElementById('source-editor').value.trim();
+    if (src) {
+        setBodyHtml(src);
+    }
+    switchTab('visual');
+}
+
+// ── Inline HTML editor helpers ────────────────────────────────
+function fmt(cmd) {
+    document.getElementById('body-editor').focus();
+    document.execCommand(cmd, false, null);
+}
+function fmtBlock(tag) {
+    document.getElementById('body-editor').focus();
+    document.execCommand('formatBlock', false, tag);
+}
+function insertLink() {
+    var url = prompt('Enter URL:', 'https://');
+    if (url) {
+        document.getElementById('body-editor').focus();
+        document.execCommand('createLink', false, url);
+    }
+}
+function syncBody() {
+    document.getElementById('body-hidden').value =
+        document.getElementById('body-editor').innerHTML;
+}
+document.getElementById('body-editor').addEventListener('input', syncBody);
+
+// Allow external code (e.g. AI assistant) to set the editor content as rendered HTML
+function setBodyHtml(html) {
+    // Strip full document wrapper if present — email clients only need inner HTML
+    html = html.replace(/^[\s\S]*?<body[^>]*>/i, '').replace(/<\/body>[\s\S]*$/i, '');
+    // Strip <!DOCTYPE> and <html> lines that may remain
+    html = html.replace(/<!DOCTYPE[^>]*>/gi, '').replace(/<\/?html[^>]*>/gi, '')
+               .replace(/<head>[\s\S]*?<\/head>/gi, '').trim();
+    document.getElementById('body-editor').innerHTML = html;
+    syncBody();
+}
+
+// Watch for changes to the hidden body field (AI assistant writes here) and mirror to editor
+var _bodyHiddenLast = '';
+setInterval(function() {
+    var hidden = document.getElementById('body-hidden');
+    if (hidden && hidden.value !== _bodyHiddenLast) {
+        _bodyHiddenLast = hidden.value;
+        var editor = document.getElementById('body-editor');
+        if (editor.innerHTML !== hidden.value) {
+            editor.innerHTML = hidden.value;
+        }
+    }
+}, 300);
+
+// ── Recipient count ───────────────────────────────────────────
 function updateCount(radio) {
     var n = counts[radio.value] !== undefined ? counts[radio.value] : '?';
     document.getElementById('recipient-count').textContent = n;
+    updateListCount();
+}
+function updateListCount() {
+    var base = 0;
+    var selected = document.querySelector('input[name="group"]:checked');
+    if (selected) {
+        base = counts[selected.value] !== undefined ? parseInt(counts[selected.value]) : 0;
+    }
+    var extra = 0;
+    document.querySelectorAll('input[name="list_ids"]:checked').forEach(function(cb) {
+        extra += parseInt(cb.parentElement.querySelector('strong').textContent.replace(/[()]/g, '')) || 0;
+    });
+    document.getElementById('recipient-count').textContent = base + extra;
 }
 
+// ── Confirm checkbox enables Send button ──────────────────────
 document.getElementById('confirm_send').addEventListener('change', function() {
     document.getElementById('send-btn').disabled = !this.checked;
 });
 
+// ── Main form submit ──────────────────────────────────────────
 document.getElementById('mailout-form').addEventListener('submit', function(e) {
-    var subject = document.getElementById('subject').value.trim();
-    var body    = document.getElementById('body').value.trim();
-    if (!subject || !body) {
+    syncBody();
+    var subject  = document.getElementById('subject').value.trim();
+    var bodyText = document.getElementById('body-editor').innerText.trim();
+    if (!subject || !bodyText) {
         e.preventDefault();
         alert('Please fill in subject and message.');
         return false;
@@ -136,4 +302,51 @@ document.getElementById('mailout-form').addEventListener('submit', function(e) {
     document.getElementById('send-btn').textContent = 'Sending…';
     document.getElementById('send-btn').disabled = true;
 });
+
+// ── Test preview send ─────────────────────────────────────────
+function sendTestPreview() {
+    syncBody();
+    var subject  = document.getElementById('subject').value.trim();
+    var body     = document.getElementById('body-hidden').value;
+    var bodyText = document.getElementById('body-editor').innerText.trim();
+    if (!bodyText) {
+        alert('Please write a message body before sending a test.');
+        return;
+    }
+    var btn = document.getElementById('test-btn');
+    btn.textContent = 'Sending…';
+    btn.disabled = true;
+
+    var data = new URLSearchParams();
+    data.append('subject', subject || '(no subject)');
+    data.append('body', body);
+
+    fetch('[% c.uri_for('/mail/send_mailout_test') %]', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: data.toString()
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+        btn.textContent = 'Send Test to Me';
+        btn.disabled = false;
+        if (json.ok) {
+            var box = document.querySelector('.alert.alert-success');
+            if (!box) {
+                box = document.createElement('div');
+                box.className = 'alert alert-success';
+                document.querySelector('.admin-card').insertAdjacentElement('beforebegin', box);
+            }
+            box.textContent = json.msg;
+            box.style.display = '';
+        } else {
+            alert('Test send failed: ' + json.msg);
+        }
+    })
+    .catch(function(err) {
+        btn.textContent = 'Send Test to Me';
+        btn.disabled = false;
+        alert('Test send error: ' + err);
+    });
+}
 </script>

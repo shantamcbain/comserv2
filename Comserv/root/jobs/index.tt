@@ -1,74 +1,88 @@
-[% META title = 'Jobs & Employment'
-        description = 'Job postings and employment opportunities'
-        roles = 'public'
-        TemplateType = 'Public'
-        category = 'Jobs'
-        page_version = '0.01'
-        last_updated = '2026-04-04' %]
-[% PageVersion = 'jobs/index.tt,v 0.01 2026/04/04 shanta Exp shanta' %]
+[% META
+   title = "Jobs & Employment"
+   description = "Browse open job postings"
+   roles = "any"
+   TemplateType = "Application"
+   category = "Jobs"
+   page_version = "0.02"
+   last_updated = "2026-04-04"
+%]
+[% PageVersion = 'jobs/index.tt,v 0.02 2026/04/04 shanta Exp shanta' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[% IF c.flash.error_msg %]<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="alert alert-success">[% c.flash.success_msg | html %]</div>[% END %]
 
-[% IF c.flash.success_msg %]
-<div class="alert alert-success">[% c.flash.success_msg | html %]</div>
-[% END %]
-[% IF c.flash.error_msg %]
-<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
-[% END %]
+<div class="app-container">
+  <div class="page-header">
+    <h1><i class="fas fa-briefcase"></i> Jobs &amp; Employment</h1>
+    <div class="header-actions">
+      <a href="[% c.uri_for('/jobs/post') %]" class="btn btn-primary">Post a Job</a>
+    </div>
+  </div>
 
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-md-12">
-            <h1><i class="fas fa-briefcase"></i> Jobs &amp; Employment</h1>
-            <p class="lead">Employment opportunities and job postings within our network.</p>
-        </div>
+  <div class="content-container">
+    <div class="content-primary">
+
+      [% IF jobs && jobs.size %]
+      <table class="data-table" style="width:100%">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Location</th>
+            <th>Payment</th>
+            <th>Posted</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          [% FOREACH job IN jobs %]
+          <tr>
+            <td>
+              <a href="[% c.uri_for('/jobs/view', [job.id]) %]"><strong>[% job.title | html %]</strong></a>
+              [% IF job.remote %]<span class="badge badge-info" style="margin-left:0.5em">Remote</span>[% END %]
+            </td>
+            <td>[% IF job.location %][% job.location | html %][% ELSE %]&mdash;[% END %]</td>
+            <td>
+              [% IF job.payment_type == 'points' %]
+                <span class="badge badge-success">Points ([% job.point_rate | format('%.0f') %]/hr)</span>
+              [% ELSIF job.payment_type == 'hybrid' %]
+                <span class="badge badge-warning">Hybrid</span>
+              [% ELSE %]
+                <span class="badge">Cash</span>
+              [% END %]
+              [% IF job.accept_points_payment %]
+                <span class="badge badge-success" title="Poster accepts paying via points" style="margin-left:0.25em">&#9670; Points OK</span>
+              [% END %]
+            </td>
+            <td style="font-size:0.85em;white-space:nowrap">[% job.created_at | html %]</td>
+            <td>
+              <a href="[% c.uri_for('/jobs/apply', [job.id]) %]" class="btn btn-sm btn-primary">Apply</a>
+            </td>
+          </tr>
+          [% END %]
+        </tbody>
+      </table>
+      [% ELSE %]
+      <div class="content-section">
+        <p class="text-muted">No job postings at this time. <a href="[% c.uri_for('/jobs/post') %]">Post one</a>.</p>
+      </div>
+      [% END %]
+
     </div>
 
-    <div class="row mt-4">
-        <div class="col-md-8">
-            <div class="card mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h4><i class="fas fa-list"></i> Current Openings</h4>
-                </div>
-                <div class="card-body">
-                    [% IF job_postings && job_postings.size %]
-                        [% FOREACH job IN job_postings %]
-                        <div class="job-posting border-bottom pb-3 mb-3">
-                            <h5>[% job.title | html %]</h5>
-                            <p class="text-muted"><i class="fas fa-map-marker-alt"></i> [% job.location | html %] &nbsp;|&nbsp; <i class="fas fa-clock"></i> [% job.type | html %]</p>
-                            <p>[% job.description | html %]</p>
-                            <a href="[% c.uri_for('/jobs/' _ job.id) %]" class="btn btn-sm btn-outline-primary">View Details</a>
-                        </div>
-                        [% END %]
-                    [% ELSE %]
-                        <p class="text-muted">No job postings at this time. Check back soon or submit your resume below.</p>
-                    [% END %]
-                </div>
-            </div>
+    <div class="content-sidebar">
+      <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+          <h4><i class="fas fa-envelope"></i> Submit Your Resume</h4>
         </div>
-
-        <div class="col-md-4">
-            <div class="card mb-4">
-                <div class="card-header bg-secondary text-white">
-                    <h4><i class="fas fa-envelope"></i> Submit Your Resume</h4>
-                </div>
-                <div class="card-body">
-                    <p>Interested in working with us? Send your resume to:</p>
-                    <p><a href="mailto:helpdesk@computersystemconsulting.ca"><i class="fas fa-envelope"></i> helpdesk@computersystemconsulting.ca</a></p>
-                    <hr>
-                    <p class="text-muted small">Include the position you are applying for in the subject line.</p>
-                </div>
-            </div>
-
-            [% IF c.session.roles && c.session.roles.grep('admin').size %]
-            <div class="card mb-4">
-                <div class="card-header bg-warning">
-                    <h4><i class="fas fa-cog"></i> Admin</h4>
-                </div>
-                <div class="card-body">
-                    <a href="/HelpDesk/ticket/new?category=jobs" class="btn btn-sm btn-warning">Post a Job</a>
-                </div>
-            </div>
-            [% END %]
+        <div class="card-body">
+          <p>Interested in working with us? Send your resume to:</p>
+          <p><a href="mailto:helpdesk@computersystemconsulting.ca"><i class="fas fa-envelope"></i> helpdesk@computersystemconsulting.ca</a></p>
+          <hr>
+          <p class="text-muted small">Include the position you are applying for in the subject line.</p>
         </div>
+      </div>
     </div>
+
+  </div>
 </div>

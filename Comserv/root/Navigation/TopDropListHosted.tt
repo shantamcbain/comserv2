@@ -7,12 +7,12 @@
 
 <!-- Hosted menu -->
 <li class="horizontal-dropdown">
-    <a href="/hosted" class="dropbtn"><i class="icon-hosted"></i>Hosted</a>
+    <a href="/hosting" class="dropbtn"><i class="icon-hosted"></i>Hosted</a>
     <div class="dropdown-content">
         <!-- Core Hosted Services -->
-        <a href="/hosted" class="menu-item"><i class="icon-home"></i>Hosted Services</a>
-        <a href="/apply" class="menu-item"><i class="icon-apply"></i>Apply for Hosted Account</a>
-        <a href="/accounts" class="menu-item"><i class="icon-accounts"></i>Hosted Accounts</a>
+        <a href="/hosting" class="menu-item"><i class="icon-home"></i>Hosted Services</a>
+        <a href="/hosting_signup" class="menu-item"><i class="icon-apply"></i>Apply for Hosted Account</a>
+        <a href="/hosting" class="menu-item"><i class="icon-accounts"></i>Hosted Accounts</a>
         
         [% IF c.session.username %]
         <div class="dropdown-divider"></div>

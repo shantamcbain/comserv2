@@ -1,0 +1,128 @@
+[%
+   title = "User Module Overrides"
+   roles = "admin"
+   PageVersion = 'admin/site_modules/user_overrides.tt v1.0 2026/04/10 Per-user module access overrides'
+%]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.sm-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding-bottom:10px; border-bottom:2px solid var(--primary-color); }
+.sm-header h1 { margin:0; font-size:1.4em; }
+.sm-table { width:100%; border-collapse:collapse; font-size:0.9em; }
+.sm-table th { background:var(--bg-secondary); padding:8px 12px; text-align:left; border-bottom:2px solid var(--border-color); }
+.sm-table td { padding:8px 12px; border-bottom:1px solid var(--border-color); vertical-align:middle; }
+.sm-table tr:hover td { background:var(--bg-secondary); }
+.badge-granted { display:inline-block; padding:2px 8px; border-radius:3px; background:#28a745; color:#fff; font-size:0.78em; font-weight:bold; }
+.badge-revoked { display:inline-block; padding:2px 8px; border-radius:3px; background:#dc3545; color:#fff; font-size:0.78em; font-weight:bold; }
+.btn-sm { padding:3px 10px; font-size:0.82em; border:none; border-radius:3px; cursor:pointer; text-decoration:none; }
+.btn-primary   { background:var(--primary-color); color:#fff; }
+.btn-secondary { background:var(--bg-secondary); color:var(--text-color); border:1px solid var(--border-color); }
+.btn-danger    { background:#dc3545; color:#fff; }
+.add-form { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:6px; padding:16px; margin-top:24px; }
+.add-form h2 { margin-top:0; font-size:1.1em; }
+.add-form label { display:inline-block; width:120px; font-size:0.9em; }
+.add-form input, .add-form select { padding:4px 8px; border:1px solid var(--border-color); border-radius:3px; background:var(--bg-color); color:var(--text-color); }
+.filter-bar { display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+.tab-bar { display:flex; gap:8px; margin-bottom:16px; }
+.tab-bar a { padding:6px 16px; border-radius:4px; text-decoration:none; background:var(--bg-secondary); color:var(--text-color); border:1px solid var(--border-color); font-size:0.9em; }
+.tab-bar a.active { background:var(--primary-color); color:#fff; border-color:var(--primary-color); }
+</style>
+
+<div class="container">
+<div class="sm-header">
+    <h1>User Module Overrides</h1>
+    <span style="font-size:0.85em; color:var(--text-muted-color);">Per-user access grants / revocations</span>
+</div>
+
+<div class="tab-bar">
+    <a href="/admin/site_modules">Site Modules</a>
+    <a href="/admin/site_modules/user_overrides" class="active">User Overrides</a>
+</div>
+
+[% IF error %]
+<div style="background:#fee; border:1px solid #f88; padding:10px; border-radius:4px; margin-bottom:16px; color:#c00;">[% error %]</div>
+[% END %]
+
+<form method="get" action="/admin/site_modules/user_overrides" class="filter-bar">
+    <label style="font-size:0.9em;">Username:</label>
+    <input type="text" name="username" value="[% filter_user %]" style="padding:4px 8px; border:1px solid var(--border-color); border-radius:3px; background:var(--bg-color); color:var(--text-color);">
+    <label style="font-size:0.9em;">SiteName:</label>
+    <select name="sitename" style="padding:4px 8px; border:1px solid var(--border-color); border-radius:3px; background:var(--bg-color); color:var(--text-color);">
+        <option value="">All Sites</option>
+        [% FOREACH s IN sitenames %]
+        <option value="[% s %]" [% IF filter_site == s %]selected[% END %]>[% s %]</option>
+        [% END %]
+    </select>
+    <button type="submit" class="btn-sm btn-secondary">Filter</button>
+    <a href="/admin/site_modules/user_overrides" class="btn-sm btn-secondary">Clear</a>
+</form>
+
+<table class="sm-table">
+<thead>
+<tr>
+    <th>Username</th>
+    <th>SiteName</th>
+    <th>Module</th>
+    <th>Access</th>
+    <th>Granted By</th>
+    <th>Actions</th>
+</tr>
+</thead>
+<tbody>
+[% IF overrides.size %]
+[% FOREACH o IN overrides %]
+<tr>
+    <td><strong>[% o.username %]</strong></td>
+    <td>[% o.sitename %]</td>
+    <td>[% o.module_name %]</td>
+    <td>
+        [% IF o.granted %]
+            <span class="badge-granted">GRANTED</span>
+        [% ELSE %]
+            <span class="badge-revoked">REVOKED</span>
+        [% END %]
+    </td>
+    <td style="font-size:0.82em; color:var(--text-muted-color);">[% o.granted_by || '—' %]</td>
+    <td>
+        <a href="/admin/site_modules/revoke_user/[% o.id %]" class="btn-sm btn-danger"
+           onclick="return confirm('Remove this override?')">Remove</a>
+    </td>
+</tr>
+[% END %]
+[% ELSE %]
+<tr><td colspan="6" style="text-align:center; color:var(--text-muted-color); padding:24px;">No overrides found.</td></tr>
+[% END %]
+</tbody>
+</table>
+
+<div class="add-form">
+    <h2>Add User Override</h2>
+    <form method="post" action="/admin/site_modules/grant_user">
+        <p>
+            <label>Username:</label>
+            <input type="text" name="username" placeholder="username" required style="width:200px;">
+        </p>
+        <p>
+            <label>SiteName:</label>
+            <select name="sitename">
+                [% FOREACH s IN sitenames %]
+                <option value="[% s %]">[% s %]</option>
+                [% END %]
+            </select>
+        </p>
+        <p>
+            <label>Module:</label>
+            <input type="text" name="module_name" placeholder="planning, apiary…" required style="width:200px;">
+        </p>
+        <p>
+            <label>Access:</label>
+            <select name="granted">
+                <option value="1">Grant access</option>
+                <option value="0">Revoke access</option>
+            </select>
+        </p>
+        <button type="submit" class="btn-sm btn-primary">Save Override</button>
+    </form>
+</div>
+
+</div>

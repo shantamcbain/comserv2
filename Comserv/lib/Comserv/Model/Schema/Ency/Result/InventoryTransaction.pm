@@ -89,4 +89,9 @@ __PACKAGE__->belongs_to(
     { join_type => 'LEFT' }
 );
 
+sub total_value {
+    my $self = shift;
+    return ($self->quantity || 0) * ($self->unit_cost || 0);
+}
+
 1;

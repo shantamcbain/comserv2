@@ -74,6 +74,41 @@ __PACKAGE__->add_columns(
         size        => [10, 2],
         is_nullable => 1,
     },
+    unit_price => {
+        data_type   => 'decimal',
+        size        => [10, 2],
+        is_nullable => 1,
+    },
+    barcode => {
+        data_type   => 'varchar',
+        size        => 100,
+        is_nullable => 1,
+    },
+    image_path => {
+        data_type   => 'varchar',
+        size        => 500,
+        is_nullable => 1,
+    },
+    discount_percent => {
+        data_type     => 'decimal',
+        size          => [5, 2],
+        is_nullable   => 1,
+        default_value => 0,
+    },
+    shop_options => {
+        data_type   => 'text',
+        is_nullable => 1,
+    },
+    show_in_shop => {
+        data_type     => 'tinyint',
+        is_nullable   => 0,
+        default_value => 0,
+    },
+    hide_stock_count => {
+        data_type     => 'tinyint',
+        is_nullable   => 0,
+        default_value => 0,
+    },
     reorder_point => {
         data_type     => 'integer',
         is_nullable   => 1,
@@ -133,6 +168,15 @@ __PACKAGE__->add_columns(
         size        => 255,
         is_nullable => 1,
     },
+    marketplace_listing_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
+    list_in_marketplace => {
+        data_type     => 'tinyint',
+        is_nullable   => 0,
+        default_value => 0,
+    },
     created_at => {
         data_type     => 'datetime',
         is_nullable   => 1,
@@ -148,6 +192,13 @@ __PACKAGE__->add_columns(
 
 __PACKAGE__->set_primary_key('id');
 __PACKAGE__->add_unique_constraint(unique_sku => ['sku']);
+
+__PACKAGE__->belongs_to(
+    'marketplace_listing',
+    'Comserv::Model::Schema::Ency::Result::MarketplaceListing',
+    { 'foreign.id' => 'self.marketplace_listing_id' },
+    { join_type => 'LEFT', on_delete => 'SET NULL' }
+);
 
 __PACKAGE__->has_many(
     'stock_levels' => 'Comserv::Model::Schema::Ency::Result::InventoryStockLevel',
@@ -175,6 +226,41 @@ __PACKAGE__->has_many(
 
 __PACKAGE__->many_to_many(
     'suppliers' => 'item_suppliers', 'supplier'
+);
+
+__PACKAGE__->belongs_to(
+    'inventory_account',
+    'Comserv::Model::Schema::Ency::Result::CoaAccount',
+    { 'foreign.id' => 'self.inventory_accno_id' },
+    { join_type => 'LEFT', on_delete => 'SET NULL' }
+);
+
+__PACKAGE__->belongs_to(
+    'income_account',
+    'Comserv::Model::Schema::Ency::Result::CoaAccount',
+    { 'foreign.id' => 'self.income_accno_id' },
+    { join_type => 'LEFT', on_delete => 'SET NULL' }
+);
+
+__PACKAGE__->belongs_to(
+    'expense_account',
+    'Comserv::Model::Schema::Ency::Result::CoaAccount',
+    { 'foreign.id' => 'self.expense_accno_id' },
+    { join_type => 'LEFT', on_delete => 'SET NULL' }
+);
+
+__PACKAGE__->belongs_to(
+    'returns_account',
+    'Comserv::Model::Schema::Ency::Result::CoaAccount',
+    { 'foreign.id' => 'self.returns_accno_id' },
+    { join_type => 'LEFT', on_delete => 'SET NULL' }
+);
+
+__PACKAGE__->might_have(
+    'equipment',
+    'Comserv::Model::Schema::Ency::Result::InventoryEquipment',
+    { 'foreign.item_id' => 'self.id' },
+    { cascade_delete => 1 }
 );
 
 __PACKAGE__->has_many(

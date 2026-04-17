@@ -456,6 +456,136 @@ sub ledger_for_user {
     );
 }
 
+# ---------------------------------------------------------------------------
+# DEFAULT_POINT_RATE — system-wide fallback billing rate in points per hour.
+# 60 pts/hr  =  60 CAD/hr  (since 1 pt = 1 CAD).
+# Override per-todo via todo.point_rate or per-session via log.point_rate.
+# ---------------------------------------------------------------------------
+use constant DEFAULT_POINT_RATE => 60;
+
+# ---------------------------------------------------------------------------
+# bill_time_log($log_row) -> ($ok, $error_message)
+#
+# Called when a log entry is closed (status=3/DONE).
+# Calculates the points owed from log.time (HH:MM:SS), then:
+#   1. Debits the customer  (todo.user_id)        — billing
+#   2. Credits the developer (log.username → user) — payment
+#
+# Idempotent: skips silently if log.points_processed is already 1.
+# Skips billing  if todo.billable == 0 or todo has no user_id.
+# Skips paying   if the developer username can't be resolved to a user row.
+# If the customer has insufficient points the developer is still credited and
+# a warning is logged — the customer debt is NOT currently enforced as a hard
+# block (can be made a hard block by setting $allow_debt = 0 below).
+#
+# Returns ($ok, $err):  $ok=1 means points were moved; $ok=0 means skipped or
+# failed (check $err for the reason).
+# ---------------------------------------------------------------------------
+sub bill_time_log {
+    my ($self, $log_row) = @_;
+
+    return (0, 'already processed') if $log_row->points_processed;
+
+    my $time_str = $log_row->time // '00:00:00';
+    my ($hh, $mm, $ss) = split /:/, $time_str;
+    my $minutes = (int($hh || 0) * 60) + int($mm || 0);
+
+    if ($minutes <= 0) {
+        $log_row->update({ points_processed => 1 });
+        return (0, 'zero duration — nothing to bill');
+    }
+
+    my $schema = $self->_schema;
+
+    my $todo = $log_row->todo;
+
+    my $rate = $log_row->point_rate
+            // ($todo ? $todo->point_rate : undef)
+            // DEFAULT_POINT_RATE;
+
+    my $points = sprintf('%.4f', ($minutes / 60) * $rate);
+
+    my $dev_user = $schema->resultset('User')
+        ->find({ username => $log_row->username });
+
+    my $customer_user_id = $todo ? $todo->user_id : undef;
+    my $billable         = $todo ? ($todo->billable // 1) : 0;
+
+    my $desc_base = sprintf(
+        'Log #%d — %s — %.2f hrs @ %.2f pts/hr',
+        $log_row->record_id,
+        $log_row->abstract // 'work session',
+        $minutes / 60,
+        $rate,
+    );
+
+    my ($ok, $err) = (1, undef);
+
+    eval {
+        $schema->txn_do(sub {
+
+            if ($dev_user) {
+                $self->credit(
+                    user_id          => $dev_user->id,
+                    amount           => $points,
+                    transaction_type => 'time_log_earn',
+                    description      => "Earned: $desc_base",
+                    reference_type   => 'log',
+                    reference_id     => $log_row->record_id,
+                );
+            }
+
+            if ($billable && $customer_user_id) {
+                my $acct = $schema->resultset('PointAccount')
+                    ->find({ user_id => $customer_user_id });
+
+                if ($acct && $acct->balance >= $points) {
+                    $self->debit(
+                        user_id          => $customer_user_id,
+                        amount           => $points,
+                        transaction_type => 'time_log_bill',
+                        description      => "Billed: $desc_base",
+                        reference_type   => 'log',
+                        reference_id     => $log_row->record_id,
+                    );
+                } else {
+                    $self->_log->log_with_details(
+                        $self->_c, 'warn', __FILE__, __LINE__, 'bill_time_log',
+                        "Customer user_id=$customer_user_id has insufficient points "
+                        . "($points pts required) for log #" . $log_row->record_id
+                        . " — billing skipped, developer still credited"
+                    );
+                }
+            }
+
+            $log_row->update({ points_processed => 1 });
+        });
+    };
+
+    if ($@) {
+        $err = $@;
+        $err =~ s/\s+$//;
+        $ok  = 0;
+        $self->_log->log_with_details(
+            $self->_c, 'error', __FILE__, __LINE__, 'bill_time_log',
+            "Error processing log #" . $log_row->record_id . ": $err"
+        );
+    } else {
+        $self->_log->log_with_details(
+            $self->_c, 'info', __FILE__, __LINE__, 'bill_time_log',
+            sprintf(
+                "Processed log #%d: %.4f pts — dev=%s customer=%s",
+                $log_row->record_id,
+                $points,
+                $dev_user ? $dev_user->username : '(unknown)',
+                $customer_user_id // '(none)',
+            )
+        );
+    }
+
+    return ($ok, $err);
+}
+
 1;
 
 __END__

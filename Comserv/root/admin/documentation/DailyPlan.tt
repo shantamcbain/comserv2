@@ -181,7 +181,7 @@
             <details style="margin-bottom:12px;font-size:0.83em;">
                 <summary style="cursor:pointer;color:var(--text-muted-color);padding:5px 0;list-style:none;display:flex;align-items:center;gap:6px;">
                     <span style="padding:1px 6px;border-radius:3px;background:#6f42c1;color:#fff;font-size:0.85em;">🔗 [% active_blockers.size %]</span>
-                    <span>cross-project dependencies — priority order affected (<span style="color:#6f42c1;">purple badges ↓</span>)</span>
+                    <span>cross-project dependencies — priority order affected (<span style="color:#6f42c1;">purple badges ↓</span>)[% IF dep_auto_resolved %] — <span style="color:#28a745;">✓ [% dep_auto_resolved %] auto-resolved this load</span>[% END %][% IF dep_auto_detected %] — <span style="color:#17a2b8;">+ [% dep_auto_detected %] new auto-detected</span>[% END %]</span>
                 </summary>
                 <div style="margin-top:6px;padding:8px 10px;background:var(--bg-secondary);border-radius:4px;border-left:3px solid #6f42c1;">
                     [% FOREACH ab IN active_blockers %]
@@ -193,7 +193,7 @@
                     </div>
                     [% END %]
                     <div style="margin-top:5px;text-align:right;">
-                        <a href="/project/dependency_form" style="font-size:0.85em;color:#6f42c1;">Manage dependencies →</a>
+                        <a href="/project/dependency_form" style="font-size:0.85em;color:#6f42c1;">+ Manage Dependencies</a>
                     </div>
                 </div>
             </details>
@@ -496,7 +496,9 @@
             'api-bc05'                                 => 4018,
             'bmaster-f0fd'                             => 4019,
             'aichatsystem-planning-system-int-f187'    => 4020,
-            'inventory-system'                         => 4021,
+            'inventory-system-104a'                    => 4021,
+            '3dprinting-use-this-as-the-branc-41f3'    => 4030,
+            'developer-time-logging-points-ba-542a'    => 4022,
         } %]
 
         [%# All known branch servers for the overview panel %]
@@ -522,7 +524,9 @@
             { name => 'api-bc05',                              port => 4018, label => 'APISystem',            url => '/Documentation/DailyPlan' },
             { name => 'bmaster-f0fd',                          port => 4019, label => 'BMaster',              url => '/Documentation/DailyPlan' },
             { name => 'aichatsystem-planning-system-int-f187', port => 4020, label => 'AIChatPlanInt',        url => '/Documentation/DailyPlan' },
-            { name => 'inventory-system',                      port => 4021, label => 'Inventory',            url => '/Documentation/DailyPlan' },
+            { name => 'inventory-system-104a',                 port => 4021, label => 'InventorySystem',      url => '/Inventory' },
+            { name => '3dprinting-use-this-as-the-branc-41f3', port => 4030, label => '3DPrinting',           url => '/Documentation/DailyPlan' },
+            { name => 'developer-time-logging-points-ba-542a', port => 4022, label => 'DevTimeLogging',       url => '/Documentation/DailyPlan' },
         ] %]
 
         <details style="margin-bottom:14px;border:1px solid #fd7e14;border-radius:6px;font-size:0.85em;">
@@ -816,6 +820,12 @@
         </div>
         <div style="font-size:0.8em;color:var(--text-muted-color);margin-bottom:10px;">
             Projects that cannot proceed until their dependency delivers. Resolve blockers in order.
+            [% IF dep_auto_resolved %]
+            <span style="margin-left:10px;padding:1px 7px;border-radius:3px;background:#28a745;color:#fff;">✓ [% dep_auto_resolved %] auto-resolved</span>
+            [% END %]
+            [% IF dep_auto_detected %]
+            <span style="margin-left:6px;padding:1px 7px;border-radius:3px;background:#17a2b8;color:#fff;">+ [% dep_auto_detected %] auto-detected</span>
+            [% END %]
         </div>
         <table style="width:100%;border-collapse:collapse;font-size:0.85em;">
             <thead>
