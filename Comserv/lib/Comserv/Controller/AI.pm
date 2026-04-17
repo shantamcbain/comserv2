@@ -1023,6 +1023,57 @@ sub generate :Local :Args(0) {
                 'generate', "Pre-request: model=$use_model msgs=" . scalar(@ollama_msgs) .
                 " chars=$total_chars est_tokens=$est_tokens timeout=300s host=$current_host");
 
+            # ── Ollama web search injection (when use_search=1 for Ollama provider) ──
+            if ($use_search) {
+                my $ollama_api_key = '';
+                eval {
+                    my $schema = $c->model('DBEncy')->schema;
+                    my $key_obj = $schema->resultset('UserApiKeys')->search(
+                        { service => 'ollama', is_active => '1' }
+                    )->first;
+                    $ollama_api_key = $key_obj->get_api_key() if $key_obj;
+                };
+                if ($ollama_api_key) {
+                    eval {
+                        require LWP::UserAgent;
+                        require HTTP::Request;
+                        require JSON;
+                        my $ua  = LWP::UserAgent->new(timeout => 10);
+                        my $req = HTTP::Request->new(POST => 'https://ollama.com/api/web_search');
+                        $req->header('Authorization' => "Bearer $ollama_api_key");
+                        $req->header('Content-Type'  => 'application/json');
+                        $req->content(JSON::encode_json({ query => $prompt, max_results => 5 }));
+                        my $resp = $ua->request($req);
+                        if ($resp->is_success) {
+                            my $data = JSON::decode_json($resp->decoded_content);
+                            my @results = @{ $data->{results} || [] };
+                            if (@results) {
+                                my $search_ctx = "Web search results for: \"$prompt\"\n";
+                                for my $r (@results) {
+                                    $search_ctx .= "\n## " . ($r->{title}||'') . "\n"
+                                               .  "URL: " . ($r->{url}||'') . "\n"
+                                               .  ($r->{content}||'') . "\n";
+                                }
+                                $search_ctx .= "\nUse the above search results to answer accurately.\n";
+                                # Prepend to the last user message in ollama_msgs
+                                if (@ollama_msgs && $ollama_msgs[-1]{role} eq 'user') {
+                                    $ollama_msgs[-1]{content} = $search_ctx . "\n" . $ollama_msgs[-1]{content};
+                                } else {
+                                    push @ollama_msgs, { role => 'user', content => $search_ctx };
+                                }
+                                push @trace, sprintf("🌐 Ollama web search: %d results injected (%d chars)",
+                                    scalar(@results), length($search_ctx));
+                            }
+                        } else {
+                            push @trace, "⚠️ Ollama web search failed: HTTP " . $resp->code . " — " . $resp->message;
+                        }
+                    };
+                    push @trace, "⚠️ Ollama web search error: $@" if $@;
+                } else {
+                    push @trace, "⚠️ Ollama web search requested but no Ollama API key found — add at /ai/manage_api_keys (service: ollama)";
+                }
+            }
+
             # ── Tier 1 query ─────────────────────────────────────────────────
             my $query_start = time();
             if (@$history_items || $system) {
