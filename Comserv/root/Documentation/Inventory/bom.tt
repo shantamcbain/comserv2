@@ -1,0 +1,197 @@
+[% META
+    title = "Bill of Materials (BOM)"
+    description = "Admin guide to creating and managing Bills of Materials for assemblable items"
+    roles = "admin"
+    TemplateType = "Documentation"
+    category = "Inventory"
+    page_version = "1.00"
+    last_updated = "2026-04-17"
+    site_specific = "false"
+%]
+[% PageVersion = 'Documentation/Inventory/bom.tt v1.00 2026-04-17' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    <h1 style="color:var(--text-color);font-family:var(--header-font)">Bill of Materials (BOM)</h1>
+    <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-04-17 | Version: 1.00 | Audience: Site Administrators</div>
+
+    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:var(--light-color);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:0">Quick Navigation</h2>
+            <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-small)">
+                <a href="#overview"    style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Overview</a>
+                <a href="#enabling"   style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Enabling BOM</a>
+                <a href="#fields"     style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">BOM Fields</a>
+                <a href="#cost"       style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Cost Calculation</a>
+                <a href="#equipment"  style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Equipment Costs</a>
+                <a href="#wizard"     style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Print Wizard</a>
+                <a href="#print"      style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Print BOM Sheet</a>
+                <a href="#troubleshoot" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Troubleshooting</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="overview" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">1. Overview</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                A <strong>Bill of Materials (BOM)</strong> links an assemblable parent item to its component materials and cost inputs.
+                The BOM allows the system to calculate the total cost of producing one unit of the parent item.
+            </p>
+            <p style="color:var(--text-color);font-family:var(--body-font)">Use cases:</p>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li><strong>3D prints</strong> — filament (g), electricity (kWh), printer depreciation (hr)</li>
+                <li><strong>Assembled kits</strong> — frame + box + foundation</li>
+                <li><strong>Honey products</strong> — bulk honey + jar + label + lid</li>
+                <li><strong>Garden gifts</strong> — seeds + pot + soil + label</li>
+            </ul>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="enabling" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">2. Enabling BOM for an Item</h2>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Go to <a href="/Inventory/items" style="color:var(--link-color)">/Inventory/items</a> → click the item → Edit</li>
+                <li>Check the <strong>Is Assemblable</strong> checkbox</li>
+                <li>Save the item</li>
+                <li>A <strong>BOM</strong> link now appears on the item view page</li>
+                <li>Click BOM to open <code>/Inventory/bom/{id}</code> and add components</li>
+            </ol>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="fields" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">3. BOM Component Fields</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Field</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Description</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Example</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">Component Item</td><td style="border:1px solid var(--border-color);padding:6px 10px">The inventory item used as a component. Must be active status.</td><td style="border:1px solid var(--border-color);padding:6px 10px">PLA Blue 1kg Spool</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">Quantity</td><td style="border:1px solid var(--border-color);padding:6px 10px">How much of the component is used per one unit of the parent item.</td><td style="border:1px solid var(--border-color);padding:6px 10px">407.73</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">Unit</td><td style="border:1px solid var(--border-color);padding:6px 10px">Unit for this component usage: g, kg, kWh, hr, each, m, etc.</td><td style="border:1px solid var(--border-color);padding:6px 10px">g</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">Optional</td><td style="border:1px solid var(--border-color);padding:6px 10px">If checked, this component is not required in every build (e.g. optional colour insert).</td><td style="border:1px solid var(--border-color);padding:6px 10px">No</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">Scrap Factor %</td><td style="border:1px solid var(--border-color);padding:6px 10px">Expected waste percentage. E.g. 5% means 5% more material is consumed than the nominal quantity.</td><td style="border:1px solid var(--border-color);padding:6px 10px">5</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">Sort Order</td><td style="border:1px solid var(--border-color);padding:6px 10px">Display order on BOM view (lower numbers first).</td><td style="border:1px solid var(--border-color);padding:6px 10px">10</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">Notes</td><td style="border:1px solid var(--border-color);padding:6px 10px">Any component-specific notes for production staff.</td><td style="border:1px solid var(--border-color);padding:6px 10px">Check slicer for exact gram weight</td></tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="cost" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">4. Cost Calculation</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                The BOM view shows the <strong>assembled cost</strong> = sum of (component quantity × component unit_cost) for all required components.
+                Compare this to your <em>unit_price</em> (selling price) to verify your margin.
+            </p>
+            <div style="background-color:var(--light-color);border-left:4px solid var(--primary-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small)">
+                <strong>Example — Bee Hotel 3D Print:</strong><br>
+                407.73 g PLA @ $0.028/g = $11.42<br>
+                12.02 kWh electricity @ $0.12/kWh = $1.44<br>
+                12.02 hr Kobra 3 depreciation @ $0.019/hr = $0.23<br>
+                <strong>Total assembled cost: $13.09 | Selling price: $20.00 | Margin: $6.91</strong>
+            </div>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="equipment" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">5. Equipment Costs as BOM Components</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Electricity and printer depreciation are tracked as special inventory items (category: <em>Cost Centre</em>):
+            </p>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li><strong>Electricity — kWh</strong>: unit = kWh, unit_cost = your BC Hydro rate (e.g. $0.12/kWh). Add to BOM with quantity = (printer wattage × print hours / 1000).</li>
+                <li><strong>Printer Depreciation — {printer name}</strong>: unit = hr, unit_cost = (purchase price / expected life hours). Add to BOM with quantity = print hours. This is auto-generated when you set up the printer in <a href="/Inventory/equipment" style="color:var(--link-color)">/Inventory/equipment</a>.</li>
+            </ul>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                For the <strong>Kobra 3</strong>: purchase cost $500, 3-year life = ~26,280 hr → depreciation $0.019/hr.
+                Wattage 300W printing + 230W ACE bed = 530W. 12 hr print = 6.36 kWh.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="wizard" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">6. BOM Print Wizard</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                For a quick per-job cost calculation without entering a full BOM, use the
+                <a href="/Inventory/bom_print_wizard" style="color:var(--link-color)">BOM Print Wizard</a>.
+                Enter the item, grams of filament, and print hours.
+                The wizard calculates total cost for this specific job using the item's BOM rates.
+                Useful for pricing one-off or custom print jobs before adding them as formal BOM components.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="print" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">7. Print BOM Sheet</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                From the BOM view, click <strong>Print BOM</strong> or go to
+                <a href="/Inventory/print/bom/{id}" style="color:var(--link-color)">/Inventory/print/bom/{id}</a>.
+                The printable sheet includes: item details, full component table with quantities and costs,
+                calculated assembled cost, and a signature block for production sign-off.
+                Use your browser's Print function (Ctrl+P) — print CSS is applied automatically.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="troubleshoot" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">8. Troubleshooting</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Issue</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Fix</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">"is_assemblable ambiguous" error</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Fixed in current version. The query now uses <code>me.is_assemblable</code> to avoid column name conflicts with BOM join.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Component doesn't appear in dropdown</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Component item must have status = active. Check in /Inventory/items.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">BOM cost shows $0</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Component items must have unit_cost set. Edit each component item and enter the purchase cost per unit.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">BOM link not visible on item</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Is Assemblable must be checked on the item. Edit the item and save with the checkbox enabled.</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="see-also" style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--success-color);padding:var(--spacing-medium);border-radius:4px;margin:var(--spacing-medium) 0">
+        <h2 style="color:var(--success-color);font-family:var(--header-font);margin-top:0">See Also</h2>
+        <ul style="color:var(--text-color);font-family:var(--body-font)">
+            <li><a href="/Documentation/Inventory/index" style="color:var(--link-color)">Inventory System Overview</a></li>
+            <li><a href="/Documentation/Inventory/items" style="color:var(--link-color)">Managing Inventory Items</a></li>
+            <li><a href="/Documentation/Inventory/stock" style="color:var(--link-color)">Stock Level Management</a></li>
+            <li><a href="/Inventory/bom_print_wizard" style="color:var(--link-color)">BOM Print Wizard</a></li>
+        </ul>
+    </div>
+</div>

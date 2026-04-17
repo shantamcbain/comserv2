@@ -1,0 +1,97 @@
+[% META
+    title = "Consignment Tracking"
+    description = "How to track items sent to partner stores and settle commissions."
+    roles = "admin"
+    TemplateType = "Documentation"
+    category = "Inventory"
+    page_version = "1.00"
+    last_updated = "2026-04-17"
+    site_specific = "false"
+%]
+[% PageVersion = 'Documentation/Inventory/consignment.tt v1.00 2026-04-17' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    <h1 style="color:var(--text-color);font-family:var(--header-font)">Consignment Tracking</h1>
+    <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-04-17 | Version: 1.00 | Audience: Site Administrators</div>
+
+    <!-- TOC -->
+    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:var(--light-color);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:0">Quick Navigation</h2>
+            <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-small)">
+                <a href="#overview" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Overview</a>
+                <a href="#setup" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Setup Partners</a>
+                <a href="#batches" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Creating Batches</a>
+                <a href="#settlement" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Settlement</a>
+                <a href="#accounting" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Accounting</a>
+                <a href="#troubleshooting" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Troubleshooting</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="overview" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">Overview</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">Consignment involves sending items to partner stores (e.g., Monashee Arts Council or Monashee Coop) who sell them on your behalf for a commission. You retain ownership of the items until they are sold.</p>
+        </div>
+    </div>
+    <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+
+    <div id="setup" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">Partner Setup</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">Add consignment partners at <code>/Inventory/consignment/partners</code>. Required details include name, contact info, commission percentage (standard is 30%), and payment terms.</p>
+        </div>
+    </div>
+    <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+
+    <div id="batches" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">Creating a Batch</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">Navigate to <code>/Inventory/consignment/new</code> to create a batch. Select the partner and add items. Note that only items with <code>show_in_shop = 1</code> are available. On save, stock is reduced using the <code>consignment_out</code> transaction type. You can print a consignment slip to give to the partner.</p>
+        </div>
+    </div>
+    <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+
+    <div id="settlement" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">Recording Settlement</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">When a partner reports sales, open the batch at <code>/Inventory/consignment/view/:id</code> and click <strong>"Record Settlement"</strong>. Enter the quantities sold and returned. The system calculates the gross sales, partner commission, and your net revenue.</p>
+        </div>
+    </div>
+    <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+
+    <div id="accounting" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">Accounting & GL Entries</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">Optionally check <strong>"Create GL entry"</strong> during settlement. The system will post:</p>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li><strong>DR:</strong> Accounts Receivable (Net Revenue)</li>
+                <li><strong>DR:</strong> Commission Expense</li>
+                <li><strong>CR:</strong> Sales Revenue (Gross Sales)</li>
+            </ul>
+        </div>
+    </div>
+    <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+
+    <div id="troubleshooting" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">Troubleshooting</h2>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li><strong>Price not auto-filling:</strong> Ensure the item has a <code>unit_price</code> set.</li>
+                <li><strong>Multiple lines not saving:</strong> Fixed in current version using indexed field names.</li>
+            </ul>
+        </div>
+    </div>
+    <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+
+    <!-- SEE ALSO at bottom -->
+    <div id="see-also" style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--success-color);padding:var(--spacing-medium);border-radius:4px;margin:var(--spacing-medium) 0">
+        <h2 style="color:var(--success-color);font-family:var(--header-font);margin-top:0">See Also</h2>
+        <ul style="color:var(--text-color);font-family:var(--body-font)">
+            <li><a href="/Documentation/Inventory/items" style="color:var(--link-color)">Managing Inventory Items</a></li>
+            <li><a href="/Documentation/Inventory/stock" style="color:var(--link-color)">Stock Level Management</a></li>
+        </ul>
+    </div>
+</div>
