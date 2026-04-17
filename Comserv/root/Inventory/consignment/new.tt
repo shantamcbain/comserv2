@@ -1,0 +1,146 @@
+<div class="app-container">
+<div class="content-container">
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em">
+  <h1 style="font-family:var(--header-font);color:var(--text-color);margin:0">New Consignment</h1>
+  <a href="/Inventory/consignment" style="padding:6px 14px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font)">&larr; Back</a>
+</div>
+
+[% IF error_msg %]<div style="background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:4px;padding:0.6em 1em;margin-bottom:1em">[% error_msg | html %]</div>[% END %]
+
+[% IF partners.size == 0 %]
+<div style="background:#fff3e0;border:1px solid #ffe082;border-radius:4px;padding:1em;margin-bottom:1em">
+  No consignment partners set up yet. <a href="/Inventory/consignment/partners?edit=new">Add a partner first</a>.
+</div>
+[% ELSE %]
+
+<form method="POST" action="/Inventory/consignment/new">
+  <table cellpadding="5" style="border-collapse:collapse;width:100%;max-width:700px;margin-bottom:1.5em">
+    <tr>
+      <th style="text-align:left;width:180px;padding:6px 8px;background:var(--secondary-color)"><label>Partner *</label></th>
+      <td style="padding:6px 8px">
+        <select name="partner_id" required id="partner_sel" onchange="updateCommission(this)"
+                style="width:280px;padding:4px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+          <option value="">— select partner —</option>
+          [% FOREACH p IN partners %]
+          <option value="[% p.id %]" data-comm="[% p.commission_percent %]">[% p.name | html %] ([% p.commission_percent %]% commission)</option>
+          [% END %]
+        </select>
+        <span id="comm-info" style="margin-left:0.5em;color:var(--text-muted-color);font-size:0.85rem"></span>
+      </td>
+    </tr>
+    <tr>
+      <th style="text-align:left;padding:6px 8px;background:var(--secondary-color)"><label>Date Sent *</label></th>
+      <td style="padding:6px 8px">
+        <input type="date" name="date_sent" required value="[% USE date; date.format(date.now, '%Y-%m-%d') %]"
+               style="padding:4px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+      </td>
+    </tr>
+    <tr>
+      <th style="text-align:left;padding:6px 8px;background:var(--secondary-color)"><label>Reference #</label></th>
+      <td style="padding:6px 8px">
+        <input type="text" name="reference_number" maxlength="100" placeholder="Optional consignment note #"
+               style="width:220px;padding:4px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+      </td>
+    </tr>
+    <tr>
+      <th style="text-align:left;padding:6px 8px;background:var(--secondary-color);vertical-align:top"><label>Notes</label></th>
+      <td style="padding:6px 8px">
+        <textarea name="notes" rows="2" style="width:100%;max-width:380px;padding:4px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)"></textarea>
+      </td>
+    </tr>
+  </table>
+
+  <h2 style="font-family:var(--header-font);color:var(--text-color);margin-bottom:0.5em">Items to Consign</h2>
+  <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:4px;padding:8px 14px;margin-bottom:0.8em;font-size:0.85em;color:#5d4037">
+    Only items with "Show in Shop" enabled are listed. Set a retail price per item (what the partner will charge customers).
+  </div>
+
+  <div id="consign-lines">
+    <div class="consign-line" style="display:flex;gap:0.6em;align-items:center;margin-bottom:0.5em;flex-wrap:wrap;background:var(--secondary-color);padding:8px 10px;border-radius:4px;border:1px solid var(--border-color)">
+      <select name="item_id_0" onchange="fillPrice(this)" style="flex:2;min-width:200px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+        <option value="">— select item —</option>
+        [% FOREACH item IN items %]
+        <option value="[% item.id %]" data-price="[% item.unit_price || item.unit_cost || '' %]" data-unit="[% item.unit_of_measure | html %]">
+          [% item.name | html %][% IF item.sku %] ([% item.sku | html %])[% END %]
+          [% IF item.unit_price %] — $[% item.unit_price %][% END %]
+        </option>
+        [% END %]
+      </select>
+      <label style="font-family:var(--body-font);font-size:0.85rem;color:var(--text-color)">Qty:
+        <input type="number" name="quantity_0" min="1" step="1" value="1"
+               style="width:70px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+      </label>
+      <label style="font-family:var(--body-font);font-size:0.85rem;color:var(--text-color)">Retail $:
+        <input type="number" name="retail_price_0" min="0" step="0.01" placeholder="0.00"
+               style="width:80px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+      </label>
+      <input type="text" name="line_notes_0" placeholder="Notes" maxlength="255"
+             style="flex:1;min-width:100px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+    </div>
+  </div>
+
+  <button type="button" onclick="addLine()"
+          style="margin-bottom:1.2em;padding:5px 14px;border:1px dashed var(--border-color);background:var(--secondary-color);color:var(--text-color);border-radius:4px;cursor:pointer;font-family:var(--body-font)">
+    + Add Another Item
+  </button>
+
+  <div>
+    <button type="submit" style="padding:8px 22px;background:var(--primary-color);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--body-font);font-size:1rem">
+      Create Consignment
+    </button>
+    <a href="/Inventory/consignment" style="margin-left:1em;color:var(--text-muted-color);font-family:var(--body-font)">Cancel</a>
+  </div>
+</form>
+
+[% END %]
+
+</div>
+</div>
+
+<script>
+function updateCommission(sel) {
+  var opt = sel.options[sel.selectedIndex];
+  var comm = opt.getAttribute('data-comm');
+  var info = document.getElementById('comm-info');
+  if (info && comm) info.textContent = comm + '% commission';
+}
+
+function unitStep(unit) {
+  unit = (unit || '').toLowerCase();
+  if (unit === 'g' || unit === 'gram' || unit === 'grams') return { step: '0.1', min: '0.1' };
+  if (unit === 'kg' || unit === 'kilogram') return { step: '0.001', min: '0.001' };
+  if (unit === 'ml' || unit === 'l' || unit === 'litre' || unit === 'liter') return { step: '0.01', min: '0.01' };
+  if (unit === 'm' || unit === 'cm' || unit === 'mm') return { step: '0.01', min: '0.01' };
+  return { step: '1', min: '1' };
+}
+
+function fillPrice(sel) {
+  var opt = sel.options[sel.selectedIndex];
+  var line = sel.closest('.consign-line');
+  var price = opt.getAttribute('data-price');
+  var unit  = opt.getAttribute('data-unit') || '';
+  var s = unitStep(unit);
+  var qtyInput   = line && line.querySelector('input[name^="quantity"]');
+  var priceInput = line && line.querySelector('input[name^="retail_price"]');
+  if (qtyInput) { qtyInput.step = s.step; qtyInput.min = s.min; if (!qtyInput.value || qtyInput.value == '0') qtyInput.value = s.min; }
+  if (priceInput && price && !priceInput.value) priceInput.value = parseFloat(price).toFixed(2);
+}
+
+var itemOptionsHTML = document.querySelector('#consign-lines .consign-line select').innerHTML;
+var lineCount = 1;
+
+function addLine() {
+  var idx = lineCount++;
+  var container = document.getElementById('consign-lines');
+  var div = document.createElement('div');
+  div.className = 'consign-line';
+  div.style.cssText = 'display:flex;gap:0.6em;align-items:center;margin-bottom:0.5em;flex-wrap:wrap;background:var(--secondary-color);padding:8px 10px;border-radius:4px;border:1px solid var(--border-color)';
+  div.innerHTML = '<select name="item_id_' + idx + '" onchange="fillPrice(this)" style="flex:2;min-width:200px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">' + itemOptionsHTML + '</select>'
+    + '<label style="font-size:0.85rem">Qty: <input type="number" name="quantity_' + idx + '" min="1" step="1" value="1" style="width:70px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)"></label>'
+    + '<label style="font-size:0.85rem">Retail $: <input type="number" name="retail_price_' + idx + '" min="0" step="0.01" placeholder="0.00" style="width:80px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)"></label>'
+    + '<input type="text" name="line_notes_' + idx + '" placeholder="Notes" maxlength="255" style="flex:1;min-width:100px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">'
+    + '<button type="button" onclick="this.closest(\'.consign-line\').remove()" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:1.1rem;padding:0 4px">&times;</button>';
+  container.appendChild(div);
+}
+</script>

@@ -18,7 +18,7 @@
 [% cart_keys = cart.keys %]
 [% IF cart_keys.size == 0 %]
   <p style="color:var(--text-muted-color);font-family:var(--body-font)">
-    Your cart is empty. <a href="/Cart/price_list" style="color:var(--primary-color)">Browse the shop</a>.
+    Your cart is empty. <a href="/shop" style="color:var(--primary-color)">Browse the shop</a>.
   </p>
 [% ELSE %]
 
@@ -72,7 +72,7 @@
 </form>
 
 <div style="margin-top:var(--spacing-medium);display:flex;gap:var(--spacing-medium);flex-wrap:wrap;align-items:center">
-  <a href="/Cart/price_list" style="color:var(--primary-color);font-family:var(--body-font)">← Continue Shopping</a>
+  <a href="/shop" style="color:var(--primary-color);font-family:var(--body-font)">← Continue Shopping</a>
   <a href="/Cart/checkout" style="display:inline-block;padding:0.5em 1.4em;background:var(--primary-color);color:var(--text-color);border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-family:var(--body-font);font-weight:bold">Proceed to Checkout →</a>
 </div>
 

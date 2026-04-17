@@ -468,9 +468,9 @@ sub auto :Private {
         eval {
             my $shop_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'none';
             my $shop_count = $c->model('DBEncy')->resultset('InventoryItem')->search({
-                sitename => $shop_site,
-                status   => 'active',
-                unit_price => { '>' => 0 },
+                sitename     => $shop_site,
+                status       => 'active',
+                show_in_shop => 1,
             }, { rows => 1 })->count;
             $c->stash->{site_has_shop} = $shop_count ? 1 : 0;
         };

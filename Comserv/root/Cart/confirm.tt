@@ -100,6 +100,6 @@
   [% END %]
 
   <div style="margin-top:2em;text-align:center">
-    <a href="/Cart/price_list">← Continue Shopping</a>
+    <a href="/shop">← Continue Shopping</a>
   </div>
 </div>

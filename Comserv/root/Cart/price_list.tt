@@ -1,14 +1,47 @@
-[% PageVersion = 'Cart/price_list.tt v0.02 2026/04/13 shanta Exp' %]
+[% PageVersion = 'Cart/price_list.tt v0.03 2026/04/16 shanta Exp' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+@media print {
+  .no-print { display: none !important; }
+  .app-container { margin: 0; padding: 0; }
+  .content-container { box-shadow: none; border: none; }
+  a { color: inherit; text-decoration: none; }
+}
+</style>
 
 <div class="app-container">
 
-<div class="page-header">
-  <h1 style="color:var(--text-color);font-family:var(--header-font)"><i class="fas fa-store"></i> Shop — [% sitename %]</h1>
-  [% IF cart_count > 0 %]
-  <p><a href="/Cart" style="color:var(--primary-color)"><i class="fas fa-shopping-cart"></i> View Cart ([% cart_count %] items)</a></p>
-  [% END %]
+<div class="page-header no-print" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5em;margin-bottom:var(--spacing-medium)">
+  <h1 style="margin:0;color:var(--text-color);font-family:var(--header-font)">
+    <i class="fas fa-list"></i> [% sitename %] Price List
+  </h1>
+  <div style="display:flex;gap:0.5em;align-items:center;flex-wrap:wrap">
+    <a href="/shop" style="padding:5px 12px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font);font-size:0.9rem">
+      <i class="fas fa-store"></i> Browse Shop
+    </a>
+    [% IF cart_count > 0 %]
+    <a href="/Cart" style="padding:5px 12px;background:var(--primary-color);color:#fff;border-radius:4px;text-decoration:none;font-family:var(--body-font);font-size:0.9rem">
+      <i class="fas fa-shopping-cart"></i> Cart ([% cart_count %])
+    </a>
+    [% END %]
+    [% IF is_admin %]
+    <a href="/shop/admin" style="padding:5px 12px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font);font-size:0.9rem">
+      <i class="fas fa-store-alt"></i> Manage Store
+    </a>
+    [% END %]
+    <button onclick="window.print()"
+            style="padding:5px 12px;background:#1565c0;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--body-font);font-size:0.9rem">
+      <i class="fas fa-print"></i> Print / PDF
+    </button>
+  </div>
 </div>
+
+<div class="print-header" style="display:none">
+  <h1 style="font-family:var(--header-font)">[% sitename %] — Price List</h1>
+  <p style="color:#666;font-size:0.85em">Prices in CAD. Subject to change without notice.</p>
+</div>
+<style>@media print { .print-header { display: block !important; } }</style>
 
 [% IF c.flash.success_msg %]
   <div style="background:var(--success-color,#d4edda);color:#155724;border:1px solid #c3e6cb;border-radius:4px;padding:0.6em 1em;margin-bottom:1em">[% c.flash.success_msg %]</div>
@@ -19,7 +52,7 @@
 
 <div class="content-container">
 
-<form method="GET" action="/Cart/price_list" style="margin-bottom:var(--spacing-medium)">
+<form method="GET" action="/Cart/price_list" class="no-print" style="margin-bottom:var(--spacing-medium)">
   <label style="color:var(--text-color);font-family:var(--body-font)">Filter by Category:
     <select name="category" onchange="this.form.submit()" style="padding:4px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
       <option value="">— All Categories —</option>
@@ -32,7 +65,9 @@
 </form>
 
 [% IF items.size == 0 %]
-  <p style="color:var(--text-muted-color);font-family:var(--body-font)">No items are currently available. Please check back later.</p>
+  <p style="color:var(--text-muted-color);font-family:var(--body-font)">
+    No items are currently listed. <a href="/shop" style="color:var(--primary-color)">Browse the shop</a>[% IF is_admin %] or <a href="/shop/admin" style="color:var(--primary-color)">enable items in the store manager</a>[% END %].
+  </p>
 [% ELSE %]
 
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:var(--spacing-medium)">
@@ -137,7 +172,7 @@
 [% END %]
 
 [% IF cart_count > 0 %]
-<div style="margin-top:var(--spacing-large);text-align:right">
+<div class="no-print" style="margin-top:var(--spacing-large);text-align:right">
   <a href="/Cart" style="display:inline-block;padding:0.5em 1.4em;background:var(--primary-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font);border:1px solid var(--border-color)">
     <i class="fas fa-shopping-cart"></i> View Cart ([% cart_count %] items) →
   </a>
