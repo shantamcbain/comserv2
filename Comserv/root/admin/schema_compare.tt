@@ -290,7 +290,10 @@
                                 <div class="table-comparison-actions">
                                     [% IF table_comparison.sync_status == 'needs_sync' %]
                                         <button class="sync-btn" onclick="syncTable('[% table_comparison.table_name | html %]', 'ency'); event.stopPropagation();">
-                                            <i class="fas fa-sync"></i> Sync
+                                            <i class="fas fa-sync"></i> Sync Fields
+                                        </button>
+                                        <button class="recreate-btn" title="Drop and recreate table from Result file (empty tables only)" style="background:#fd7e14;color:white;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;" onclick="recreateTableFromResult('[% table_comparison.result_name || table_comparison.table_name | html %]', 'ency'); event.stopPropagation();">
+                                            <i class="fas fa-redo"></i> Recreate
                                         </button>
                                     [% END %]
                                     <i class="fas fa-chevron-right expand-icon"></i>
@@ -988,12 +991,12 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
                 const hasDifferences = !resultMissing && (
                     formatDataType(tableField.data_type) !== formatDataType(resultField.data_type) ||
                     formatSize(tableField.data_type, tableField.size) !== formatSize(resultField.data_type, resultField.size) ||
-                    tableField.is_nullable !== resultField.is_nullable ||
-                    tableField.is_auto_increment !== resultField.is_auto_increment ||
-                    tableField.is_primary_key !== resultField.is_primary_key ||
-                    tableField.is_foreign_key !== resultField.is_foreign_key ||
-                    tableField.default_value !== resultField.default_value ||
-                    tableField.extra !== resultField.extra
+                    !!tableField.is_nullable !== !!resultField.is_nullable ||
+                    !!tableField.is_auto_increment !== !!resultField.is_auto_increment ||
+                    !!tableField.is_primary_key !== !!resultField.is_primary_key ||
+                    !!tableField.is_foreign_key !== !!resultField.is_foreign_key ||
+                    String(tableField.default_value ?? '') !== String(resultField.default_value ?? '') ||
+                    String(tableField.extra ?? '') !== String(resultField.extra ?? '')
                 );
                 
                 html += '<tr class="table-row' + (hasDifferences ? ' has-differences' : '') + '">';
@@ -1003,12 +1006,12 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
                 // Add difference highlighting to individual cells
                 const dataTypeDiff = !resultMissing && formatDataType(tableField.data_type) !== formatDataType(resultField.data_type);
                 const sizeDiff = !resultMissing && formatSize(tableField.data_type, tableField.size) !== formatSize(resultField.data_type, resultField.size);
-                const nullableDiff = !resultMissing && tableField.is_nullable !== resultField.is_nullable;
-                const autoIncDiff = !resultMissing && tableField.is_auto_increment !== resultField.is_auto_increment;
-                const pkDiff = !resultMissing && tableField.is_primary_key !== resultField.is_primary_key;
-                const fkDiff = !resultMissing && tableField.is_foreign_key !== resultField.is_foreign_key;
-                const defaultDiff = !resultMissing && tableField.default_value !== resultField.default_value;
-                const extraDiff = !resultMissing && tableField.extra !== resultField.extra;
+                const nullableDiff = !resultMissing && !!tableField.is_nullable !== !!resultField.is_nullable;
+                const autoIncDiff = !resultMissing && !!tableField.is_auto_increment !== !!resultField.is_auto_increment;
+                const pkDiff = !resultMissing && !!tableField.is_primary_key !== !!resultField.is_primary_key;
+                const fkDiff = !resultMissing && !!tableField.is_foreign_key !== !!resultField.is_foreign_key;
+                const defaultDiff = !resultMissing && String(tableField.default_value ?? '') !== String(resultField.default_value ?? '');
+                const extraDiff = !resultMissing && String(tableField.extra ?? '') !== String(resultField.extra ?? '');
                 
                 html += '<td class="data-type-column' + (dataTypeDiff ? ' field-different' : '') + '">' + formatDataType(tableField.data_type) + '</td>';
                 html += '<td class="size-column' + (sizeDiff ? ' field-different' : '') + '">' + formatSize(tableField.data_type, tableField.size) + '</td>';
@@ -1041,12 +1044,12 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
                 const hasDifferences = tableMissing || (
                     formatDataType(tableField.data_type) !== formatDataType(resultField.data_type) ||
                     formatSize(tableField.data_type, tableField.size) !== formatSize(resultField.data_type, resultField.size) ||
-                    tableField.is_nullable !== resultField.is_nullable ||
-                    tableField.is_auto_increment !== resultField.is_auto_increment ||
-                    tableField.is_primary_key !== resultField.is_primary_key ||
-                    tableField.is_foreign_key !== resultField.is_foreign_key ||
-                    tableField.default_value !== resultField.default_value ||
-                    tableField.extra !== resultField.extra
+                    !!tableField.is_nullable !== !!resultField.is_nullable ||
+                    !!tableField.is_auto_increment !== !!resultField.is_auto_increment ||
+                    !!tableField.is_primary_key !== !!resultField.is_primary_key ||
+                    !!tableField.is_foreign_key !== !!resultField.is_foreign_key ||
+                    String(tableField.default_value ?? '') !== String(resultField.default_value ?? '') ||
+                    String(tableField.extra ?? '') !== String(resultField.extra ?? '')
                 );
                 
                 html += '<tr class="result-row' + (hasDifferences ? ' has-differences' : '') + '">';
@@ -1056,12 +1059,12 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
                 // Add difference highlighting to individual cells
                 const dataTypeDiff = !tableMissing && formatDataType(tableField.data_type) !== formatDataType(resultField.data_type);
                 const sizeDiff = !tableMissing && formatSize(tableField.data_type, tableField.size) !== formatSize(resultField.data_type, resultField.size);
-                const nullableDiff = !tableMissing && tableField.is_nullable !== resultField.is_nullable;
-                const autoIncDiff = !tableMissing && tableField.is_auto_increment !== resultField.is_auto_increment;
-                const pkDiff = !tableMissing && tableField.is_primary_key !== resultField.is_primary_key;
-                const fkDiff = !tableMissing && tableField.is_foreign_key !== resultField.is_foreign_key;
-                const defaultDiff = !tableMissing && tableField.default_value !== resultField.default_value;
-                const extraDiff = !tableMissing && tableField.extra !== resultField.extra;
+                const nullableDiff = !tableMissing && !!tableField.is_nullable !== !!resultField.is_nullable;
+                const autoIncDiff = !tableMissing && !!tableField.is_auto_increment !== !!resultField.is_auto_increment;
+                const pkDiff = !tableMissing && !!tableField.is_primary_key !== !!resultField.is_primary_key;
+                const fkDiff = !tableMissing && !!tableField.is_foreign_key !== !!resultField.is_foreign_key;
+                const defaultDiff = !tableMissing && String(tableField.default_value ?? '') !== String(resultField.default_value ?? '');
+                const extraDiff = !tableMissing && String(tableField.extra ?? '') !== String(resultField.extra ?? '');
                 
                 html += '<td class="data-type-column' + (dataTypeDiff ? ' field-different' : '') + '">' + formatDataType(resultField.data_type) + '</td>';
                 html += '<td class="size-column' + (sizeDiff ? ' field-different' : '') + '">' + formatSize(resultField.data_type, resultField.size) + '</td>';
@@ -1506,6 +1509,47 @@ function refreshFieldComparison(tableName, database) {
         content.innerHTML = '<div class="loading-indicator"><i class="fas fa-spinner fa-spin"></i><span>Loading field comparison...</span></div>';
         loadFieldComparison(content, tableName, database);
     }
+}
+
+// syncTable: expand the detail card so the user can use field-level sync buttons
+function syncTable(tableName, database) {
+    const card = document.querySelector('.table-comparison-card[data-table="' + tableName + '"][data-database="' + database + '"]');
+    if (!card) { alert('Table card not found: ' + tableName); return; }
+    if (card.classList.contains('collapsed')) {
+        const header = card.querySelector('.table-comparison-header');
+        if (header) header.click();
+    }
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// recreateTableFromResult: drop and recreate a table from its Result file (empty tables only)
+function recreateTableFromResult(resultName, database) {
+    if (!confirm('WARNING: This will DROP the existing "' + resultName + '" table and recreate it from the Result file.\n\nThis is only safe when the table is empty.\n\nContinue?')) {
+        return;
+    }
+
+    fetch('[% c.uri_for("/schema-comparison/create_table_from_result") %]', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            result_name: resultName,
+            database: database,
+            force_recreate: true
+        })
+    })
+    .then(handleFetchResponse)
+    .then(data => {
+        if (data.success) {
+            alert('Table recreated successfully from Result file!');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        if (error.message && error.message.includes('auth')) return;
+        alert('Failed to recreate table. See server log for details.');
+    });
 }
 
 // Batch sync all fields for a table

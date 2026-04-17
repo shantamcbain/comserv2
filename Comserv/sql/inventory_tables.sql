@@ -9,7 +9,11 @@ CREATE TABLE IF NOT EXISTS `inventory_items` (
   `sku` VARCHAR(100) NOT NULL,
   `name` VARCHAR(255) NOT NULL,
   `description` TEXT,
-  `category` VARCHAR(100),
+  `category` VARCHAR(100) COMMENT 'Free-text: Apiary, Garden, Hardware, 3D Print, Craft, etc.',
+  `item_origin` VARCHAR(50) NOT NULL DEFAULT 'purchased'
+    COMMENT 'purchased | grown | foraged | manufactured | 3d_printed | harvested | crafted | other',
+  `is_assemblable` TINYINT(1) NOT NULL DEFAULT 0
+    COMMENT '1 if this item has a BOM (made from other items)',
   `unit_of_measure` VARCHAR(50) NOT NULL DEFAULT 'each',
   `unit_cost` DECIMAL(10,2),
   `reorder_point` INT DEFAULT 0,
@@ -154,4 +158,33 @@ CREATE TABLE IF NOT EXISTS `inventory_assignments` (
   CONSTRAINT `fk_assign_item` FOREIGN KEY (`item_id`) REFERENCES `inventory_items` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `fk_assign_location` FOREIGN KEY (`location_id`) REFERENCES `inventory_locations` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_assign_todo` FOREIGN KEY (`todo_id`) REFERENCES `todo` (`record_id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Generic Bill of Materials / Recipe table
+-- Links any finished/assembled item to its component items with quantities.
+-- Works for: frames, boxes, honey jars, wooden cabinets, 3D prints,
+--            herb bundles, tractor parts, potato bags, crafted art, etc.
+CREATE TABLE IF NOT EXISTS `inventory_item_bom` (
+  `id`                INT NOT NULL AUTO_INCREMENT,
+  `parent_item_id`    INT NOT NULL COMMENT 'The finished/assembled item',
+  `component_item_id` INT NOT NULL COMMENT 'The raw material or sub-component',
+  `quantity`          DECIMAL(12,4) NOT NULL DEFAULT 1.0000
+    COMMENT 'Amount of component per ONE unit of parent',
+  `unit`              VARCHAR(30) NOT NULL DEFAULT 'each'
+    COMMENT 'each | g | kg | ml | L | cm | m | sheet | hour',
+  `is_optional`       TINYINT(1) NOT NULL DEFAULT 0,
+  `scrap_factor`      DECIMAL(5,4) DEFAULT 0.0000
+    COMMENT 'Extra fraction for waste (0.05 = 5%)',
+  `sort_order`        INT DEFAULT 0,
+  `notes`             TEXT,
+  `created_at`        DATETIME,
+  `updated_at`        DATETIME,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_parent_component` (`parent_item_id`, `component_item_id`),
+  KEY `idx_bom_parent` (`parent_item_id`),
+  KEY `idx_bom_component` (`component_item_id`),
+  CONSTRAINT `fk_bom_parent`
+    FOREIGN KEY (`parent_item_id`) REFERENCES `inventory_items` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_bom_component`
+    FOREIGN KEY (`component_item_id`) REFERENCES `inventory_items` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

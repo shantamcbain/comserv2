@@ -213,3 +213,8 @@
         <input type="submit" value="Add Todo" class="btn btn-primary">
     </div>
 </form>
+[% PROCESS 'ai/partials/ai_form_assistant.tt'
+   ai_form_entity_label = 'todo task'
+   ai_form_context      = 'project todo task management'
+   ai_form_fields       = 'subject, description, priority, due_date, status'
+%]

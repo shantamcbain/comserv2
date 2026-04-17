@@ -45,8 +45,9 @@ __PACKAGE__->add_columns(
         comment       => 'general | inventory | point | sale | purchase | adjustment',
     },
     post_date => {
-        data_type   => 'date',
-        is_nullable => 0,
+        data_type        => 'date',
+        is_nullable      => 0,
+        inflate_datetime => 0,
     },
     approved => {
         data_type     => 'tinyint',
@@ -63,6 +64,17 @@ __PACKAGE__->add_columns(
         size          => 3,
         is_nullable   => 0,
         default_value => 'CAD',
+    },
+    exchange_rate => {
+        data_type     => 'decimal',
+        size          => [12, 6],
+        is_nullable   => 1,
+        default_value => '1.000000',
+    },
+    functional_amount => {
+        data_type     => 'decimal',
+        size          => [12, 2],
+        is_nullable   => 1,
     },
     sitename => {
         data_type   => 'varchar',
@@ -100,12 +112,6 @@ __PACKAGE__->has_many(
     'Comserv::Model::Schema::Ency::Result::GlEntryLine',
     { 'foreign.gl_entry_id' => 'self.id' },
     { cascade_delete => 1, order_by => 'sort_order' }
-);
-
-__PACKAGE__->has_many(
-    'inventory_transactions',
-    'Comserv::Model::Schema::Ency::Result::InventoryTransaction',
-    { 'foreign.gl_entry_id' => 'self.id' }
 );
 
 __PACKAGE__->has_many(

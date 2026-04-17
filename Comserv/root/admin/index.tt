@@ -9,6 +9,49 @@
         [% END %]
     </div>
 
+    [%# ── Persistent action-required banners ──────────────────────── %]
+    [% IF pending_hosting > 0 %]
+    <div style="background:#fff3cd;border:2px solid #e67e22;border-radius:8px;padding:1rem 1.4rem;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <strong style="color:#b45309;font-size:1.05rem;">&#9888; [% pending_hosting %] Hosting Registration[% IF pending_hosting > 1 %]s[% END %] Awaiting Approval</strong>
+        <div style="margin-top:0.25rem;color:#78350f;">
+          [% FOREACH pa IN pending_hosting_sites %]
+            <span style="display:inline-block;background:#fde68a;border:1px solid #d97706;border-radius:4px;padding:0.1rem 0.5rem;margin:0.15rem 0.2rem 0.15rem 0;font-weight:bold;">
+              [% pa.sitename | html %]
+            </span>
+          [% END %]
+          [% IF pending_hosting == 1 %]has[% ELSE %]have[% END %] submitted a CSC hosting registration request and [% IF pending_hosting == 1 %]is[% ELSE %]are[% END %] waiting for your approval.
+        </div>
+      </div>
+      <a href="[% c.uri_for('/membership/admin/hosting_accounts') %]"
+         style="white-space:nowrap;margin-left:1.5rem;background:#e67e22;color:#fff;padding:0.5rem 1.1rem;border-radius:6px;text-decoration:none;font-weight:bold;">
+        Review &amp; Approve →
+      </a>
+    </div>
+    [% END %]
+
+    [%# ── Outstanding invoices (non-CSC SiteNames) ────────────────── %]
+    [% IF outstanding_invoices.size %]
+    [% FOREACH inv IN outstanding_invoices %]
+    <div style="background:#fff0f0;border:2px solid #c0392b;border-radius:8px;padding:1rem 1.4rem;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <strong style="color:#922b21;font-size:1.05rem;">&#128179; Invoice Due: [% inv.invoice_number | html %]</strong>
+        <div style="margin-top:0.25rem;color:#641e16;">
+          From <strong>[% inv.supplier.name | html %]</strong>
+          — CAD [% inv.total_amount %]
+          ([% inv.total_amount %] pts)
+          — Due [% inv.due_date | html %]
+          [% IF inv.notes %]<br><small>[% inv.notes | html %]</small>[% END %]
+        </div>
+      </div>
+      <a href="[% c.uri_for('/Inventory/invoice/view/' _ inv.id) %]"
+         style="white-space:nowrap;margin-left:1.5rem;background:#c0392b;color:#fff;padding:0.5rem 1.1rem;border-radius:6px;text-decoration:none;font-weight:bold;">
+        View &amp; Pay →
+      </a>
+    </div>
+    [% END %]
+    [% END %]
+
     <!-- Software Management Status - Prominent Section -->
     <div class="software-management-section theme-section">
         <div class="section-header">
@@ -136,6 +179,124 @@
 
     <!-- Traditional Admin Sections -->
     <div class="admin-sections">
+        <div class="admin-section theme-section">
+            <div class="section-header">
+                <h3><i class="fas fa-boxes"></i> Inventory &amp; Accounting</h3>
+            </div>
+            <div class="section-content">
+                <div class="admin-links">
+                    <a href="[% c.uri_for('/Inventory') %]" class="admin-link">
+                        <i class="fas fa-warehouse"></i>
+                        <span>Inventory Dashboard</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/items') %]" class="admin-link">
+                        <i class="fas fa-list"></i>
+                        <span>Items / SKUs</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/suppliers') %]" class="admin-link">
+                        <i class="fas fa-truck"></i>
+                        <span>Suppliers</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/locations') %]" class="admin-link">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span>Locations</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/bom/list') %]" class="admin-link">
+                        <i class="fas fa-sitemap"></i>
+                        <span>Bill of Materials</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/invoice') %]" class="admin-link">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                        <span>Supplier Invoices</span>
+                    </a>
+                    <a href="[% c.uri_for('/Accounting') %]" class="admin-link">
+                        <i class="fas fa-book"></i>
+                        <span>Accounting Dashboard</span>
+                    </a>
+                    <a href="[% c.uri_for('/Accounting/coa') %]" class="admin-link">
+                        <i class="fas fa-list-ol"></i>
+                        <span>Chart of Accounts</span>
+                    </a>
+                    <a href="[% c.uri_for('/Accounting/gl') %]" class="admin-link">
+                        <i class="fas fa-balance-scale"></i>
+                        <span>General Ledger</span>
+                    </a>
+                    <a href="[% c.uri_for('/CustomerOrder') %]" class="admin-link">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span>Customer Orders</span>
+                    </a>
+                    <a href="[% c.uri_for('/Cart/orders') %]" class="admin-link">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span>Cart Orders</span>
+                    </a>
+                    <a href="[% c.uri_for('/shop') %]" class="admin-link">
+                        <i class="fas fa-store"></i>
+                        <span>Online Store</span>
+                    </a>
+                    <a href="[% c.uri_for('/Cart/price_list') %]" class="admin-link">
+                        <i class="fas fa-print"></i>
+                        <span>Price List</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-section theme-section">
+            <div class="section-header">
+                <h3><i class="fas fa-shopping-bag"></i> Shop &amp; eCommerce</h3>
+            </div>
+            <div class="section-content">
+                <div class="admin-links">
+                    <a href="[% c.uri_for('/shop') %]" class="admin-link">
+                        <i class="fas fa-store"></i>
+                        <span>View Storefront</span>
+                    </a>
+                    <a href="[% c.uri_for('/shop/admin') %]" class="admin-link">
+                        <i class="fas fa-store-alt"></i>
+                        <span>Manage Store Items</span>
+                    </a>
+                    <a href="[% c.uri_for('/shop/setup') %]" class="admin-link">
+                        <i class="fas fa-cog"></i>
+                        <span>eCommerce Settings</span>
+                    </a>
+                    <a href="[% c.uri_for('/Cart/orders') %]" class="admin-link">
+                        <i class="fas fa-receipt"></i>
+                        <span>Store Orders</span>
+                    </a>
+                    <a href="[% c.uri_for('/marketplace') %]" class="admin-link">
+                        <i class="fas fa-globe"></i>
+                        <span>Marketplace</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-section theme-section">
+            <div class="section-header">
+                <h3><i class="fas fa-store"></i> Marketplace</h3>
+            </div>
+            <div class="section-content">
+                <div class="admin-links">
+                    <a href="[% c.uri_for('/marketplace') %]" class="admin-link">
+                        <i class="fas fa-store"></i>
+                        <span>Browse Listings</span>
+                    </a>
+                    <a href="[% c.uri_for('/marketplace/add') %]" class="admin-link">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Add Listing</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/marketplace') %]" class="admin-link">
+                        <i class="fas fa-tasks"></i>
+                        <span>Manage Listings</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/marketplace/categories') %]" class="admin-link">
+                        <i class="fas fa-folder-open"></i>
+                        <span>Manage Categories</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
         <div class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-database"></i> Database Management</h3>
@@ -354,12 +515,11 @@
 </div>
 
 <style>
-/* Theme-compatible base styles */
 .admin-dashboard {
     max-width: 1400px;
     margin: 0 auto;
     padding: 20px;
-    font-family: var(--theme-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+    font-family: var(--body-font, sans-serif);
 }
 
 .dashboard-header {
@@ -368,34 +528,33 @@
 }
 
 .dashboard-header h1 {
-    color: var(--theme-primary-color, #2c3e50);
+    color: var(--header-color, #333);
     margin-bottom: 10px;
 }
 
 .debug-info {
     font-size: 12px;
-    color: var(--theme-muted-color, #6c757d);
+    color: var(--text-color, #666);
+    opacity: 0.7;
 }
 
-/* Theme-compatible sections */
 .theme-section {
-    background: var(--theme-card-background, #ffffff);
-    border: 1px solid var(--theme-border-color, #dee2e6);
-    border-radius: var(--theme-border-radius, 8px);
-    box-shadow: var(--theme-card-shadow, 0 2px 4px rgba(0,0,0,0.1));
+    background: rgba(255,255,255,0.15);
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
     margin-bottom: 25px;
-    overflow: hidden;
 }
 
 .section-header {
-    background: var(--theme-header-background, #f8f9fa);
+    background: var(--nav-bg, rgba(255,255,255,0.2));
     padding: 15px 20px;
-    border-bottom: 1px solid var(--theme-border-color, #dee2e6);
+    border-bottom: 1px solid var(--border-color, #ccc);
 }
 
 .section-header h2, .section-header h3 {
     margin: 0;
-    color: var(--theme-heading-color, #2c3e50);
+    color: var(--nav-text, var(--header-color, #333));
     display: flex;
     align-items: center;
     gap: 10px;
@@ -403,25 +562,23 @@
 
 .section-subtitle {
     font-size: 14px;
-    color: var(--theme-muted-color, #6c757d);
+    color: var(--text-color, #555);
     margin-top: 5px;
+    opacity: 0.85;
 }
 
-/* Software Management Section - Prominent */
 .software-management-section {
-    border: 2px solid var(--theme-primary-color, #007bff);
+    border: 2px solid var(--accent-color, var(--primary-color, #007bff));
 }
 
 .software-management-section .section-header {
-    background: linear-gradient(135deg, var(--theme-primary-color, #007bff), var(--theme-secondary-color, #6c757d));
-    color: white;
+    background: var(--nav-bg, rgba(0,0,0,0.15));
 }
 
 .software-management-section .section-header h2 {
-    color: white;
+    color: var(--nav-text, #fff);
 }
 
-/* Status Cards */
 .status-cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -430,25 +587,25 @@
 }
 
 .status-card {
-    background: var(--theme-card-background, #ffffff);
-    border: 1px solid var(--theme-border-color, #dee2e6);
-    border-radius: var(--theme-border-radius, 6px);
+    background: rgba(255,255,255,0.1);
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 6px;
     overflow: hidden;
 }
 
 .status-card .card-header {
-    background: var(--theme-secondary-background, #f8f9fa);
+    background: rgba(255,255,255,0.15);
     padding: 12px 15px;
     display: flex;
     align-items: center;
     gap: 10px;
-    border-bottom: 1px solid var(--theme-border-color, #dee2e6);
+    border-bottom: 1px solid var(--border-color, #ccc);
 }
 
 .status-card .card-header h3 {
     margin: 0;
     font-size: 16px;
-    color: var(--theme-heading-color, #2c3e50);
+    color: var(--header-color, #333);
 }
 
 .card-content {
@@ -460,7 +617,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 8px 0;
-    border-bottom: 1px solid var(--theme-light-border, #f1f3f4);
+    border-bottom: 1px solid var(--border-color, #eee);
 }
 
 .status-item:last-child {
@@ -469,40 +626,40 @@
 
 .status-item label {
     font-weight: 600;
-    color: var(--theme-text-color, #495057);
+    color: var(--text-color, #333);
 }
 
 .status-item .value {
-    font-family: var(--theme-mono-font, 'Courier New', monospace);
+    font-family: 'Courier New', monospace;
     font-size: 13px;
+    color: var(--text-color, #333);
 }
 
 .status-item.warning .value {
-    color: var(--theme-warning-color, #ffc107);
+    color: var(--warning-color, #cc6600);
     font-weight: bold;
 }
 
 .status-item.info .value {
-    color: var(--theme-info-color, #17a2b8);
+    color: var(--accent-color, #17a2b8);
     font-weight: bold;
 }
 
 .service-indicator.success {
-    color: var(--theme-success-color, #28a745);
+    color: var(--success-color, #28a745);
     font-weight: bold;
 }
 
 .service-indicator.danger {
-    color: var(--theme-danger-color, #dc3545);
+    color: #dc3545;
     font-weight: bold;
 }
 
-/* Action Buttons */
 .action-buttons {
     display: flex;
     gap: 15px;
     padding: 20px;
-    background: var(--theme-light-background, #f8f9fa);
+    background: rgba(255,255,255,0.08);
     flex-wrap: wrap;
 }
 
@@ -512,7 +669,7 @@
     gap: 12px;
     padding: 15px 20px;
     border: none;
-    border-radius: var(--theme-border-radius, 6px);
+    border-radius: 6px;
     text-decoration: none;
     font-weight: 600;
     transition: all 0.3s ease;
@@ -525,31 +682,40 @@
 }
 
 .btn-primary {
-    background: var(--theme-primary-color, #007bff);
-    color: white;
+    background: var(--button-bg, var(--primary-color, #007bff));
+    color: var(--button-text, #fff);
 }
 
 .btn-primary:hover {
-    background: var(--theme-primary-hover, #0056b3);
+    background: var(--button-hover-bg, #0056b3);
     transform: translateY(-2px);
 }
 
 .btn-secondary {
-    background: var(--theme-secondary-color, #6c757d);
-    color: white;
+    background: var(--secondary-color, #6c757d);
+    color: #fff;
 }
 
 .btn-secondary:hover {
-    background: var(--theme-secondary-hover, #545b62);
+    background: var(--button-hover-bg, #545b62);
 }
 
 .btn-warning {
-    background: var(--theme-warning-color, #ffc107);
-    color: var(--theme-dark-text, #212529);
+    background: var(--accent-color, #e67e00);
+    color: var(--button-text, #fff);
 }
 
 .btn-warning:hover {
-    background: var(--theme-warning-hover, #e0a800);
+    background: var(--button-hover-bg, #cc6000);
+}
+
+.btn-info {
+    background: #17a2b8;
+    color: #fff;
+}
+
+.btn-info:hover {
+    background: #138496;
 }
 
 .btn-content {
@@ -565,20 +731,19 @@
 
 .btn-subtitle {
     font-size: 12px;
-    opacity: 0.8;
+    opacity: 0.85;
     margin-top: 2px;
 }
 
-/* Recommendations */
 .recommendations {
     padding: 20px;
-    background: var(--theme-light-background, #f8f9fa);
-    border-top: 1px solid var(--theme-border-color, #dee2e6);
+    background: rgba(255,255,255,0.08);
+    border-top: 1px solid var(--border-color, #ccc);
 }
 
 .recommendations h3 {
     margin: 0 0 15px 0;
-    color: var(--theme-heading-color, #2c3e50);
+    color: var(--header-color, #333);
     display: flex;
     align-items: center;
     gap: 8px;
@@ -590,28 +755,28 @@
     gap: 15px;
     padding: 12px;
     margin-bottom: 10px;
-    border-radius: var(--theme-border-radius, 4px);
+    border-radius: 4px;
     border-left: 4px solid;
 }
 
 .recommendation.success {
-    background: var(--theme-success-light, #d4edda);
-    border-left-color: var(--theme-success-color, #28a745);
+    background: rgba(40,167,69,0.15);
+    border-left-color: var(--success-color, #28a745);
 }
 
 .recommendation.warning {
-    background: var(--theme-warning-light, #fff3cd);
-    border-left-color: var(--theme-warning-color, #ffc107);
+    background: rgba(230,126,0,0.15);
+    border-left-color: var(--warning-color, #cc6600);
 }
 
 .recommendation.danger {
-    background: var(--theme-danger-light, #f8d7da);
-    border-left-color: var(--theme-danger-color, #dc3545);
+    background: rgba(220,53,69,0.15);
+    border-left-color: #dc3545;
 }
 
 .recommendation.info {
-    background: var(--theme-info-light, #d1ecf1);
-    border-left-color: var(--theme-info-color, #17a2b8);
+    background: rgba(23,162,184,0.15);
+    border-left-color: var(--accent-color, #17a2b8);
 }
 
 .rec-icon {
@@ -620,9 +785,7 @@
     text-align: center;
 }
 
-.rec-content {
-    flex: 1;
-}
+.rec-content { flex: 1; }
 
 .rec-message {
     font-weight: 600;
@@ -640,53 +803,42 @@
     min-width: auto;
 }
 
-/* Traditional Admin Sections */
 .admin-sections {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
     gap: 20px;
 }
 
-.section-content {
-    padding: 20px;
-}
+.section-content { padding: 20px; }
 
-.admin-links {
-    display: grid;
-    gap: 10px;
-}
+.admin-links { display: grid; gap: 10px; }
 
 .admin-link {
     display: flex;
     align-items: center;
     gap: 12px;
     padding: 12px 15px;
-    background: var(--theme-link-background, #ffffff);
-    border: 1px solid var(--theme-border-color, #dee2e6);
-    border-radius: var(--theme-border-radius, 4px);
+    background: rgba(255,255,255,0.1);
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 4px;
     text-decoration: none;
-    color: var(--theme-text-color, #495057);
+    color: var(--text-color, #333);
     transition: all 0.2s ease;
 }
 
 .admin-link:hover {
-    background: var(--theme-hover-background, #f8f9fa);
-    border-color: var(--theme-primary-color, #007bff);
-    color: var(--theme-primary-color, #007bff);
+    background: var(--nav-hover-bg, rgba(255,255,255,0.25));
+    border-color: var(--accent-color, var(--primary-color, #007bff));
+    color: var(--nav-text, var(--text-color, #333));
     transform: translateX(5px);
 }
 
 .admin-link i {
     width: 20px;
     text-align: center;
-    color: var(--theme-icon-color, #6c757d);
+    color: var(--text-color, #555);
 }
 
-.admin-link:hover i {
-    color: var(--theme-primary-color, #007bff);
-}
-
-/* System Stats */
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -697,43 +849,30 @@
 .stat-item {
     text-align: center;
     padding: 20px;
-    background: var(--theme-stat-background, #ffffff);
-    border: 1px solid var(--theme-border-color, #dee2e6);
-    border-radius: var(--theme-border-radius, 6px);
+    background: rgba(255,255,255,0.1);
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 6px;
 }
 
 .stat-value {
     font-size: 24px;
     font-weight: bold;
-    color: var(--theme-primary-color, #007bff);
+    color: var(--accent-color, var(--primary-color, #007bff));
     margin-bottom: 8px;
 }
 
 .stat-label {
     font-size: 14px;
-    color: var(--theme-muted-color, #6c757d);
+    color: var(--text-color, #555);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
-/* Responsive Design */
 @media (max-width: 768px) {
-    .action-buttons {
-        flex-direction: column;
-    }
-    
-    .btn {
-        min-width: 100%;
-        justify-content: center;
-    }
-    
-    .admin-sections {
-        grid-template-columns: 1fr;
-    }
-    
-    .status-cards {
-        grid-template-columns: 1fr;
-    }
+    .action-buttons { flex-direction: column; }
+    .btn { min-width: 100%; justify-content: center; }
+    .admin-sections { grid-template-columns: 1fr; }
+    .status-cards { grid-template-columns: 1fr; }
 }
 </style>
 

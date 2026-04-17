@@ -1,0 +1,74 @@
+[% META title = 'Admin — Marketplace Listings' %]
+
+<div class="container" style="max-width:1100px;margin:0 auto;padding:20px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <h1 style="margin:0;"><i class="fas fa-tasks"></i> Manage Marketplace</h1>
+    <div style="display:flex;gap:10px;">
+      <a href="/marketplace" style="padding:7px 14px;border:1px solid #ccc;border-radius:5px;text-decoration:none;color:var(--text-color,#333);">Public View</a>
+      <a href="/admin/marketplace/categories" style="padding:7px 14px;background:#6c757d;color:#fff;border-radius:5px;text-decoration:none;">Manage Categories</a>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <form method="GET" action="/admin/marketplace" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;">
+    <select name="status" style="padding:7px 12px;border:1px solid #ccc;border-radius:5px;">
+      <option value="">All Statuses</option>
+      [% FOR s IN ['active','sold','expired','draft'] %]
+        <option value="[% s %]" [% IF filter_status == s %]selected[% END %]>[% s | ucfirst %]</option>
+      [% END %]
+    </select>
+    <input type="text" name="sitename" value="[% filter_site | html %]" placeholder="Filter by SiteName..."
+           style="padding:7px 12px;border:1px solid #ccc;border-radius:5px;">
+    <button type="submit" style="padding:7px 14px;background:var(--primary-color,#007bff);color:#fff;border:none;border-radius:5px;cursor:pointer;">Filter</button>
+    <a href="/admin/marketplace" style="padding:7px 14px;border:1px solid #ccc;border-radius:5px;text-decoration:none;color:var(--text-color,#333);">Clear</a>
+  </form>
+
+  [% IF listings.size %]
+  <table style="width:100%;border-collapse:collapse;background:var(--bg-color,#fff);">
+    <thead>
+      <tr style="background:var(--bg-secondary,#f8f9fa);border-bottom:2px solid #dee2e6;">
+        <th style="padding:10px;text-align:left;">ID</th>
+        <th style="padding:10px;text-align:left;">Title</th>
+        <th style="padding:10px;text-align:left;">Seller</th>
+        <th style="padding:10px;text-align:left;">Site</th>
+        <th style="padding:10px;text-align:right;">Price</th>
+        <th style="padding:10px;text-align:center;">Points</th>
+        <th style="padding:10px;text-align:center;">Status</th>
+        <th style="padding:10px;text-align:center;">Views</th>
+        <th style="padding:10px;text-align:center;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      [% FOREACH l IN listings %]
+      <tr style="border-bottom:1px solid #dee2e6;">
+        <td style="padding:9px 10px;color:#999;font-size:0.85rem;">[% l.id %]</td>
+        <td style="padding:9px 10px;">
+          <a href="/marketplace/view/[% l.id %]" style="color:var(--primary-color,#007bff);text-decoration:none;">[% l.title | html %]</a>
+        </td>
+        <td style="padding:9px 10px;">[% l.seller_username | html %]</td>
+        <td style="padding:9px 10px;font-size:0.85rem;">[% l.sitename | html %]</td>
+        <td style="padding:9px 10px;text-align:right;">[% l.price %] [% l.currency %]</td>
+        <td style="padding:9px 10px;text-align:center;">[% IF l.accepts_points %]★[% END %]</td>
+        <td style="padding:9px 10px;text-align:center;">
+          <span style="padding:2px 8px;border-radius:4px;font-size:0.8rem;
+            [% IF l.status == 'active' %]background:#d4edda;color:#155724;
+            [% ELSIF l.status == 'sold' %]background:#f8d7da;color:#721c24;
+            [% ELSE %]background:#e2e3e5;color:#383d41;[% END %]">
+            [% l.status %]
+          </span>
+        </td>
+        <td style="padding:9px 10px;text-align:center;">[% l.views %]</td>
+        <td style="padding:9px 10px;text-align:center;">
+          <form method="POST" action="/marketplace/delete/[% l.id %]" style="display:inline;"
+                onsubmit="return confirm('Delete listing [% l.id %]?')">
+            <button type="submit" style="padding:3px 8px;background:#dc3545;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.8rem;">Delete</button>
+          </form>
+        </td>
+      </tr>
+      [% END %]
+    </tbody>
+  </table>
+  [% ELSE %]
+  <p style="color:#666;text-align:center;padding:40px;">No listings found.</p>
+  [% END %]
+</div>

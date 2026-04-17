@@ -157,6 +157,12 @@ sub get_site_domain {
 
     return unless defined $domain;
 
+    # Short-circuit for loopback/internal addresses — these are never in the SiteDomain
+    # table and hitting the DB for every Docker health check causes 15s timeout errors.
+    if ($domain =~ /^(localhost|127\.\d+\.\d+\.\d+|::1)(?::\d+)?$/) {
+        return;
+    }
+
     $self->logging->log_with_details(
         $c, 'info', __FILE__, __LINE__, 'get_site_domain',
         "Looking up domain: $domain"

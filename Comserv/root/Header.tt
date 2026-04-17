@@ -50,7 +50,8 @@
     [% END %]
 
     <!-- Base CSS with variables -->
-    <link rel="stylesheet" type="text/css" href="/static/css/base.css">
+    [% cv = c.stash.css_v || '20260412' %]
+    <link rel="stylesheet" type="text/css" href="/static/css/base.css?v=[% cv %]">
 
     <!-- Theme CSS - using JSON-based theme system -->
     [%
@@ -81,10 +82,10 @@
         END;
     %]
     <!-- Theme CSS: [% theme_name %] -->
-    <link rel="stylesheet" type="text/css" href="/static/css/themes/[% theme_name %].css">
+    <link rel="stylesheet" type="text/css" href="/static/css/themes/[% theme_name %].css?v=[% cv %]">
 
     <!-- Theme overrides to ensure proper application -->
-    <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css">
+    <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css?v=[% cv %]">
 
     <!-- Add theme class to body -->
     <script>
@@ -98,11 +99,11 @@
     [% END %]
 
     <!-- Menu CSS (part of theme system) -->
-    <link rel="stylesheet" type="text/css" href="/static/css/menu-theme.css">
+    <link rel="stylesheet" type="text/css" href="/static/css/menu-theme.css?v=[% cv %]">
 
     <!-- Site-specific CSS (background images, site branding) -->
     [% IF css_view_name %]
-    <link rel="stylesheet" type="text/css" href="[% css_view_name %]">
+    <link rel="stylesheet" type="text/css" href="[% css_view_name %]?v=[% cv %]">
     [% END %]
 
     <!-- Local SVG icon solution (no external dependencies) -->

@@ -1,0 +1,140 @@
+[% META
+   title = "Subscriber Details"
+   description = "View and manage a membership subscriber's details and service access"
+   roles = "admin,site_admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-04-03"
+%]
+[% PageVersion = 'membership/admin/SubscriberDetails.tt,v 0.01 2026/04/03' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Subscriber Details</h1>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <a href="[% c.uri_for('/membership/admin/subscribers') %]" class="btn btn-secondary">← Back to Subscribers</a>
+      </div>
+
+      <div class="content-section">
+        <h2>Membership Record</h2>
+        <table class="data-table">
+          <tr><th>Membership ID</th><td>[% membership.id %]</td></tr>
+          <tr><th>User</th><td>
+            [% membership.user.username | html %]
+            [% IF membership.user.email %]
+              &lt;[% membership.user.email | html %]&gt;
+            [% END %]
+          </td></tr>
+          <tr><th>Site</th><td>[% membership.site.name | html %]</td></tr>
+          <tr><th>Plan</th><td>[% membership.plan.name | html %] ([% membership.plan.slug | html %])</td></tr>
+          <tr><th>Status</th><td><span class="status-[% membership.status | html %]">[% membership.status | html %]</span></td></tr>
+          <tr><th>Payment Provider</th><td>[% membership.payment_provider | html %]</td></tr>
+          <tr><th>Payment Reference</th><td>[% membership.payment_reference | html %]</td></tr>
+          <tr><th>Price Paid</th><td>
+            [% IF membership.price_paid %]
+              [% membership.currency_paid | html %] [% membership.price_paid %]
+            [% ELSE %]
+              Free
+            [% END %]
+          </td></tr>
+          <tr><th>Billing Cycle</th><td>[% membership.billing_cycle | html %]</td></tr>
+          <tr><th>Region</th><td>[% membership.region_code | html %]</td></tr>
+          <tr><th>Started</th><td>[% membership.started_at | html %]</td></tr>
+          <tr><th>Expires</th><td>[% membership.expires_at || 'Never' | html %]</td></tr>
+          <tr><th>Grace Period Ends</th><td>[% membership.grace_ends_at || '—' | html %]</td></tr>
+          [% IF membership.cancelled_at %]
+          <tr><th>Cancelled</th><td>[% membership.cancelled_at | html %]</td></tr>
+          <tr><th>Cancellation Reason</th><td>[% membership.cancellation_reason | html %]</td></tr>
+          [% END %]
+          [% IF membership.notes %]
+          <tr><th>Notes</th><td>[% membership.notes | html %]</td></tr>
+          [% END %]
+        </table>
+      </div>
+
+      <div class="content-section">
+        <h2>Service Access</h2>
+        [% IF service_access.size %]
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>Granted By</th>
+                <th>Active</th>
+                <th>Granted At</th>
+                <th>Expires</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              [% FOREACH sa IN service_access %]
+              <tr>
+                <td><strong>[% sa.service_name | html %]</strong></td>
+                <td>[% sa.granted_by | html %]</td>
+                <td>[% sa.is_active ? 'Yes' : 'No' %]</td>
+                <td>[% sa.granted_at | html %]</td>
+                <td>[% sa.expires_at || 'Never' | html %]</td>
+                <td>
+                  [% IF sa.is_active %]
+                  <form method="post" action="[% c.uri_for('/membership/admin/revoke_access') %]" style="display:inline">
+                    <input type="hidden" name="access_id" value="[% sa.id %]">
+                    <input type="hidden" name="membership_id" value="[% membership.id %]">
+                    <button type="submit" class="btn btn-small btn-warning"
+                            onclick="return confirm('Revoke access to [% sa.service_name | html %]?')">Revoke</button>
+                  </form>
+                  [% END %]
+                </td>
+              </tr>
+              [% END %]
+            </tbody>
+          </table>
+        </div>
+        [% ELSE %]
+        <p class="empty-state">No service access records for this member.</p>
+        [% END %]
+      </div>
+
+      <div class="content-section">
+        <h2>Grant Service Access</h2>
+        <form method="post" action="[% c.uri_for('/membership/admin/grant_access') %]">
+          <input type="hidden" name="user_id" value="[% membership.user_id %]">
+          <input type="hidden" name="site_id" value="[% membership.site_id %]">
+          <input type="hidden" name="membership_id" value="[% membership.id %]">
+          <div class="form-row">
+            <div class="form-field">
+              <label for="service_name">Service *</label>
+              <select id="service_name" name="service_name" required>
+                <option value="">-- Select Service --</option>
+                <option value="beekeeping">Beekeeping (Apiary)</option>
+                <option value="planning">Planning System</option>
+                <option value="ai_models">AI Models</option>
+                <option value="email">Email Addresses</option>
+                <option value="hosting">Web Hosting</option>
+                <option value="subdomain">Subdomain</option>
+                <option value="custom_domain">Custom Domain</option>
+                <option value="currency">Internal Currency</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="expires_at">Expires (leave blank = never)</label>
+              <input type="datetime-local" id="expires_at" name="expires_at">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">Grant Access</button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</div>

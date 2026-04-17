@@ -1,0 +1,28 @@
+[% META
+   title = "Payment Successful"
+   description = "Payment completed successfully"
+   roles = "guest,user,admin"
+   TemplateType = "Application"
+   category = "Payment"
+   page_version = "0.01"
+   last_updated = "2026-04-03"
+%]
+<div class="app-container">
+  <div class="page-header">
+    <h1>Payment Successful</h1>
+  </div>
+  <div class="content-container">
+    <div class="content-primary">
+      <div class="content-section">
+        <div class="success-box" style="padding:2em;border:1px solid #5cb85c;border-radius:8px;background:#f2fdf2;text-align:center">
+          <h2 style="color:#3c763d">&#10003; Payment Complete</h2>
+          <p>[% message | html %]</p>
+          <div class="form-actions" style="margin-top:1.5em">
+            <a href="[% c.uri_for('/membership/account') %]" class="btn btn-primary">View My Membership</a>
+            <a href="[% c.uri_for('/') %]" class="btn btn-secondary">Home</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

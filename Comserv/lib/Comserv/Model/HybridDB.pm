@@ -71,8 +71,10 @@ sub new {
     # Load database configuration
     $self->_load_config($c);
     
-    # Detect available backends (with caching to improve performance)
-    $self->_detect_backends_cached($c);
+    # Detect available backends (skip when in degraded/no-config mode)
+    unless ($self->{degraded_mode}) {
+        $self->_detect_backends_cached($c);
+    }
     
     return $self;
 }
@@ -110,13 +112,15 @@ sub _load_config {
             $self->{config} = decode_json($json_text);
             $c->log->info("HybridDB: Loaded configuration from $config_file");
         } else {
-            $c->log->error("HybridDB: Configuration file not found");
-            die "Database configuration file not found";
+            $c->log->warn("HybridDB: Configuration file (db_config.json) not found — running in degraded mode (no hybrid/offline DB)");
+            $self->{config}          = {};
+            $self->{degraded_mode}   = 1;
         }
     } catch {
         my $error = $_;
-        $c->log->error("HybridDB: Error loading configuration: $error");
-        die "Failed to load database configuration: $error";
+        $c->log->warn("HybridDB: Error loading configuration: $error — running in degraded mode");
+        $self->{config}        = {};
+        $self->{degraded_mode} = 1;
     };
 }
 
@@ -152,9 +156,11 @@ sub _find_config_file {
             File::Spec->catfile($FindBin::Bin, '..', 'config', CONFIG_FILE),
             File::Spec->catfile($FindBin::Bin, CONFIG_FILE),
             File::Spec->catfile($FindBin::Bin, '..', CONFIG_FILE),
+            File::Spec->catfile($FindBin::Bin, '..', '..', CONFIG_FILE),
             '/opt/comserv/config/' . CONFIG_FILE,
             '/opt/comserv/' . CONFIG_FILE,
-            '/etc/comserv/' . CONFIG_FILE
+            '/etc/comserv/' . CONFIG_FILE,
+            ($ENV{HOME} ? File::Spec->catfile($ENV{HOME}, CONFIG_FILE) : ()),
         );
         
         foreach my $path (@possible_paths) {
