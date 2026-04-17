@@ -8209,8 +8209,177 @@ YOUR ROLE:
 - When suggesting DB changes, always provide both Result class and migration SQL
 - Point out when something will break production before committing
 
+## ERROR ANALYSIS WORKFLOW
+When the user reports an error or a [PAGE ERROR DETECTED] block is present:
+1. Identify the file and line number from the error message.
+2. Request the relevant file: [READ_FILE: lib/Comserv/Controller/AI.pm]
+   The widget will fetch it and inject it into the next message automatically.
+3. Once you have the code, diagnose the root cause and explain it clearly.
+4. Propose a fix. For small files or single functions, use the fix format below.
+5. If the user approves, they will click "Apply Fix" — you do not need to repeat it.
+
+## REQUESTING FILES
+To ask the widget to load a file, write exactly:
+  [READ_FILE: relative/path/to/file.pm]
+Only one file per response. Use relative paths from the project root (e.g. lib/Comserv/Controller/AI.pm).
+
+## PROPOSING FIXES
+When you have diagnosed an issue and want to provide an applicable fix, use this exact format
+so the "Apply Fix" button appears:
+
+  ## FIX: lib/path/to/file.pm
+  ```perl
+  ... corrected content (full function or complete file for small files) ...
+  ```
+
+Rules for fixes:
+- For small files (<200 lines): provide the complete new file content.
+- For large files: provide only the corrected function/method/block. The user will need to
+  manually splice it in, or use the find/replace mode (provide FIND: and REPLACE WITH: sections).
+- Always show the fixed code in a single fenced code block immediately after the ## FIX: line.
+- Never output ## FIX: without a code block following it.
+- Only propose a fix when you are confident it is correct.
+- Do not add code comments unless the user asks.
+
 RESTRICTION: This agent is DEVELOPMENT ONLY. Never available on production.
 END_PROMPT
+}
+
+# ── read_file ──────────────────────────────────────────────────────────────────
+# Dev + admin only.  Returns lines from a project file as JSON.
+# GET/POST /ai/read_file?path=lib/Comserv/Controller/AI.pm&offset=0&limit=200
+# ──────────────────────────────────────────────────────────────────────────────
+sub read_file :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_is_dev_mode($c) && $c->check_any_user_role('admin')) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Dev + admin only' }));
+        return;
+    }
+
+    my $rel = $c->request->params->{path} || '';
+    $rel =~ s{^/+}{};
+    $rel =~ s{\.\.}{}g;
+    $rel =~ s{[^a-zA-Z0-9/_.\-]}{}g;
+
+    my $root = $c->config->{home}
+            || do { (my $p = __FILE__) =~ s{/lib/Comserv.*}{}; $p };
+    my $full = "$root/$rel";
+
+    unless (-f $full) {
+        $c->response->body(encode_json({ success => JSON::false, error => "Not found: $rel" }));
+        return;
+    }
+
+    my $offset = int($c->request->params->{offset} || 0);
+    my $limit  = int($c->request->params->{limit}  || 300);
+    $limit = 500 if $limit > 500;
+
+    open(my $fh, '<:utf8', $full) or do {
+        $c->response->body(encode_json({ success => JSON::false, error => "Cannot read: $!" }));
+        return;
+    };
+    my @lines = <$fh>;
+    close $fh;
+
+    my $total = scalar @lines;
+    my $end   = $offset + $limit - 1;
+    $end = $total - 1 if $end >= $total;
+    my @chunk = $offset <= $end ? @lines[$offset..$end] : ();
+
+    $c->response->body(encode_json({
+        success => JSON::true,
+        path    => $rel,
+        content => join('', @chunk),
+        offset  => $offset,
+        lines   => scalar @chunk,
+        total   => $total,
+    }));
+}
+
+# ── apply_fix ─────────────────────────────────────────────────────────────────
+# Dev + admin only.  Writes a corrected file after backing up the original.
+# POST /ai/apply_fix   { path: "lib/...", content: "..." }
+# For partial replacements supply find + replace params instead of content.
+# ──────────────────────────────────────────────────────────────────────────────
+sub apply_fix :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_is_dev_mode($c) && $c->check_any_user_role('admin')) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Dev + admin only' }));
+        return;
+    }
+
+    my $rel = $c->request->params->{path} || '';
+    $rel =~ s{^/+}{};
+    $rel =~ s{\.\.}{}g;
+    $rel =~ s{[^a-zA-Z0-9/_.\-]}{}g;
+
+    my $root = $c->config->{home}
+            || do { (my $p = __FILE__) =~ s{/lib/Comserv.*}{}; $p };
+    my $full = "$root/$rel";
+
+    unless (-f $full) {
+        $c->response->body(encode_json({ success => JSON::false, error => "Not found: $rel" }));
+        return;
+    }
+
+    require File::Copy;
+    my $bak = $full . '.bak';
+    File::Copy::copy($full, $bak) or do {
+        $c->response->body(encode_json({ success => JSON::false, error => "Backup failed: $!" }));
+        return;
+    };
+
+    my $content = $c->request->body_parameters->{content}
+               // $c->request->params->{content}
+               // '';
+
+    # Optional partial replacement mode: find + replace strings
+    if (!$content) {
+        my $find    = $c->request->body_parameters->{find}    // $c->request->params->{find}    // '';
+        my $replace = $c->request->body_parameters->{replace} // $c->request->params->{replace} // '';
+        if ($find) {
+            open(my $rfh, '<:utf8', $full) or do {
+                $c->response->body(encode_json({ success => JSON::false, error => "Read failed: $!" }));
+                return;
+            };
+            local $/;
+            $content = <$rfh>;
+            close $rfh;
+            my $count = ($content =~ s/\Q$find\E/$replace/g);
+            unless ($count) {
+                $c->response->body(encode_json({ success => JSON::false, error => "Search string not found in file" }));
+                unlink $bak;
+                return;
+            }
+        }
+    }
+
+    unless ($content) {
+        $c->response->body(encode_json({ success => JSON::false, error => "No content or find/replace params supplied" }));
+        unlink $bak;
+        return;
+    }
+
+    open(my $wfh, '>:utf8', $full) or do {
+        $c->response->body(encode_json({ success => JSON::false, error => "Write failed: $!" }));
+        return;
+    };
+    print $wfh $content;
+    close $wfh;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'apply_fix', "Applied fix to $rel (backup: $bak)");
+
+    $c->response->body(encode_json({
+        success => JSON::true,
+        path    => $rel,
+        backup  => "$rel.bak",
+        message => "File updated. Original backed up as $rel.bak",
+    }));
 }
 
 __PACKAGE__->meta->make_immutable;
