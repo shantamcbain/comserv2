@@ -1,0 +1,240 @@
+[% PageVersion = 'Shop/admin_edit.tt v0.01 2026/04/16 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+
+<div style="margin-bottom:var(--spacing-medium);font-family:var(--body-font);font-size:var(--font-size-small,0.85rem)">
+  <a href="/shop/admin" style="color:var(--primary-color)"><i class="fas fa-arrow-left"></i> Shop Admin</a>
+  &rsaquo; <span style="color:var(--text-muted-color)">Edit: [% item.name | html %]</span>
+</div>
+
+<div class="content-container">
+<h1 style="font-family:var(--header-font);color:var(--text-color);margin-bottom:var(--spacing-medium)">
+  <i class="fas fa-edit"></i> Edit Shop Listing: [% item.name | html %]
+</h1>
+
+[% IF error_msg %]
+<div style="background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:4px;padding:0.6em 1em;margin-bottom:1em">[% error_msg %]</div>
+[% END %]
+
+<form method="POST" action="/shop/admin/edit/[% item.id %]" enctype="multipart/form-data" id="shop-edit-form">
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--spacing-medium)">
+
+    <div>
+      <h3 style="font-family:var(--header-font);color:var(--text-color)">Pricing</h3>
+
+      <div style="margin-bottom:0.8em">
+        <label style="display:block;font-weight:bold;font-family:var(--body-font);margin-bottom:0.3em;color:var(--text-color)">Unit Price (CAD)</label>
+        <input type="number" name="unit_price" step="0.01" min="0"
+               value="[% item.unit_price || item.unit_cost || '' %]"
+               style="width:100%;padding:6px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-family:var(--body-font)">
+        <small style="color:var(--text-muted-color);font-family:var(--body-font)">Set to 0 or leave blank to hide from public store</small>
+      </div>
+
+      <div style="margin-bottom:0.8em">
+        <label style="display:block;font-weight:bold;font-family:var(--body-font);margin-bottom:0.3em;color:var(--text-color)">Discount (%)</label>
+        <input type="number" name="discount_percent" step="0.1" min="0" max="100"
+               value="[% item.discount_percent || 0 %]"
+               style="width:100%;padding:6px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-family:var(--body-font)">
+        <small style="color:var(--text-muted-color);font-family:var(--body-font)">0 = no discount, 10 = 10% off</small>
+      </div>
+
+      <div style="margin-bottom:0.8em">
+        <label style="display:block;font-weight:bold;font-family:var(--body-font);margin-bottom:0.3em;color:var(--text-color)">Status</label>
+        <select name="status" style="width:100%;padding:6px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+          <option value="active"   [% IF item.status == 'active'   %]selected[% END %]>Active (visible in store)</option>
+          <option value="inactive" [% IF item.status == 'inactive' %]selected[% END %]>Inactive (hidden)</option>
+          <option value="archived" [% IF item.status == 'archived' %]selected[% END %]>Archived</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom:0.8em;padding:0.8em;border:1px solid var(--border-color);border-radius:4px;background:var(--secondary-color)">
+        <label style="display:flex;align-items:center;gap:0.5em;cursor:pointer;font-family:var(--body-font);color:var(--text-color);font-weight:bold">
+          <input type="checkbox" name="show_in_shop" value="1" [% IF item.show_in_shop %]checked[% END %]
+                 style="width:16px;height:16px">
+          Show in public store
+        </label>
+        <small style="display:block;margin-top:0.3em;color:var(--text-muted-color);font-family:var(--body-font)">
+          When unchecked, this item is hidden from the customer-facing store (e.g. filament for internal 3D production).
+        </small>
+      </div>
+
+      <div style="margin-bottom:0.8em;padding:0.8em;border:1px solid var(--border-color);border-radius:4px;background:var(--secondary-color)">
+        <label style="display:flex;align-items:center;gap:0.5em;cursor:pointer;font-family:var(--body-font);color:var(--text-color);font-weight:bold">
+          <input type="checkbox" name="hide_stock_count" value="1" [% IF item.hide_stock_count %]checked[% END %]
+                 style="width:16px;height:16px">
+          Hide stock quantity from customers
+        </label>
+        <small style="display:block;margin-top:0.3em;color:var(--text-muted-color);font-family:var(--body-font)">
+          Show item as available without displaying the quantity — ideal for made-to-order items (3D prints, custom orders, services).
+        </small>
+      </div>
+    </div>
+
+    <div>
+      <h3 style="font-family:var(--header-font);color:var(--text-color)">Image</h3>
+
+      <div style="margin-bottom:0.8em">
+        <label style="display:block;font-weight:bold;font-family:var(--body-font);margin-bottom:0.3em;color:var(--text-color)">Upload New Image</label>
+        <input type="file" name="upload_image" accept="image/*"
+               style="font-family:var(--body-font);color:var(--text-color)">
+        <small style="display:block;color:var(--text-muted-color);font-family:var(--body-font);margin-top:0.2em">JPEG, PNG, GIF, WebP — max 5 MB</small>
+      </div>
+
+      <div style="margin-bottom:0.8em">
+        <label style="display:block;font-weight:bold;font-family:var(--body-font);margin-bottom:0.3em;color:var(--text-color)">Image Path / URL</label>
+        <div style="display:flex;gap:6px;align-items:stretch">
+          <input type="text" name="image_path" id="image_path" value="[% item.image_path | html %]"
+                 placeholder="https://... or /static/shop_images/..."
+                 style="flex:1;padding:6px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-family:var(--body-font)">
+          <button type="button" onclick="openImagePicker()"
+                  style="padding:6px 12px;background:#6a1b9a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--body-font);white-space:nowrap">
+            <i class="fas fa-folder-open"></i> Browse
+          </button>
+        </div>
+        <small style="color:var(--text-muted-color);font-family:var(--body-font)">Enter a URL, paste a path, or click Browse to select from uploaded files</small>
+      </div>
+
+      [% IF item.image_path %]
+      <div id="image-preview-wrap" style="margin-bottom:0.5em">
+        <img id="image-preview" src="[% item.image_path | html %]" alt="Preview"
+             style="max-width:180px;max-height:130px;object-fit:contain;border:1px solid var(--border-color);border-radius:4px;background:var(--secondary-color)">
+      </div>
+      [% ELSE %]
+      <div id="image-preview-wrap" style="display:none;margin-bottom:0.5em">
+        <img id="image-preview" src="" alt="Preview"
+             style="max-width:180px;max-height:130px;object-fit:contain;border:1px solid var(--border-color);border-radius:4px;background:var(--secondary-color)">
+      </div>
+      [% END %]
+    </div>
+  </div>
+
+  <div style="margin-top:var(--spacing-medium)">
+    <h3 style="font-family:var(--header-font);color:var(--text-color)">Description</h3>
+    <textarea name="description" rows="4"
+              style="width:100%;padding:6px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-family:var(--body-font);resize:vertical">[% item.description | html %]</textarea>
+  </div>
+
+  <div style="margin-top:var(--spacing-medium)">
+    <h3 style="font-family:var(--header-font);color:var(--text-color)">Product Options <small style="font-weight:normal;font-size:0.85rem">(JSON array)</small></h3>
+
+    <div style="margin-bottom:0.5em;display:flex;flex-wrap:wrap;gap:0.4em">
+      <span style="font-size:0.8rem;color:var(--text-muted-color);font-family:var(--body-font);align-self:center">Insert preset:</span>
+      <button type="button" onclick="soInsert('filament')"
+              style="padding:3px 10px;font-size:0.8rem;border:1px solid var(--border-color);border-radius:3px;background:var(--secondary-color);color:var(--text-color);cursor:pointer;font-family:var(--body-font)">
+        Filament (live stock)
+      </button>
+      <button type="button" onclick="soInsert('colour')"
+              style="padding:3px 10px;font-size:0.8rem;border:1px solid var(--border-color);border-radius:3px;background:var(--secondary-color);color:var(--text-color);cursor:pointer;font-family:var(--body-font)">
+        Colour
+      </button>
+      <button type="button" onclick="soInsert('size')"
+              style="padding:3px 10px;font-size:0.8rem;border:1px solid var(--border-color);border-radius:3px;background:var(--secondary-color);color:var(--text-color);cursor:pointer;font-family:var(--body-font)">
+        Size
+      </button>
+      <button type="button" onclick="soInsert('text')"
+              style="padding:3px 10px;font-size:0.8rem;border:1px solid var(--border-color);border-radius:3px;background:var(--secondary-color);color:var(--text-color);cursor:pointer;font-family:var(--body-font)">
+        Custom text field
+      </button>
+      <button type="button" onclick="soInsert('clear')"
+              style="padding:3px 10px;font-size:0.8rem;border:1px solid #e57373;border-radius:3px;background:var(--secondary-color);color:#c62828;cursor:pointer;font-family:var(--body-font)">
+        Clear
+      </button>
+    </div>
+
+    <textarea name="shop_options" rows="5" id="shop_options"
+              placeholder='[{"label":"Colour","type":"select","values":["Red","Blue","Green"]}]'
+              style="width:100%;padding:6px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-family:monospace;font-size:0.85rem;resize:vertical">[% item.shop_options | html %]</textarea>
+    <small style="color:var(--text-muted-color);font-family:var(--body-font)">
+      Use the preset buttons above, or copy-paste an example:<br>
+      <code>[{"label":"Filament","type":"filament_stock"}]</code><br>
+      <code>[{"label":"Colour","type":"select","values":["Red","Blue","Green"]}]</code><br>
+      <code>[{"label":"Custom Text","type":"text","placeholder":"Your text here"}]</code>
+    </small>
+  </div>
+
+  <div style="margin-top:var(--spacing-medium);display:flex;gap:0.6em">
+    <button type="submit" style="padding:8px 20px;background:var(--primary-color);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--body-font);font-size:1rem">
+      <i class="fas fa-save"></i> Save Changes
+    </button>
+    <a href="/shop/admin" style="padding:8px 16px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font)">
+      Cancel
+    </a>
+    <a href="/shop/item/[% item.id %]" style="padding:8px 16px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font);margin-left:auto">
+      <i class="fas fa-eye"></i> Preview in Store
+    </a>
+  </div>
+
+</form>
+
+[% PROCESS 'ai/partials/ai_form_assistant.tt'
+   ai_form_entity_label = 'shop listing'
+   ai_form_context      = 'ecommerce shop item management - pricing, images, product options and description'
+   ai_form_fields       = 'unit_price, discount_percent, status, image_path, description, shop_options'
+%]
+
+</div>
+</div>
+
+<script>
+var SO_PRESETS = {
+    filament: '{"label":"Filament","type":"filament_stock"}',
+    colour:   '{"label":"Colour","type":"select","values":["Black","White","Red","Blue","Green","Yellow","Orange","Purple","Pink","Grey"]}',
+    size:     '{"label":"Size","type":"select","values":["Small","Medium","Large","XL"]}',
+    text:     '{"label":"Custom Text","type":"text","placeholder":"Enter your text here"}'
+};
+
+function soInsert(preset) {
+    var ta = document.getElementById('shop_options');
+    if (!ta) return;
+    if (preset === 'clear') { ta.value = ''; return; }
+    var chunk = SO_PRESETS[preset];
+    if (!chunk) return;
+    var cur = ta.value.trim();
+    if (!cur || cur === '[]') {
+        ta.value = '[' + chunk + ']';
+    } else if (cur.startsWith('[') && cur.endsWith(']')) {
+        var inner = cur.slice(1, -1).trim();
+        ta.value = '[' + (inner ? inner + ',\n' : '') + chunk + ']';
+    } else {
+        ta.value = '[' + chunk + ']';
+    }
+}
+
+function openImagePicker() {
+    var itemId = '[% item.id %]';
+    var url = '/shop/file_picker?target_field=image_path';
+    window.open(url, 'shop_img_picker', 'width=860,height=640,scrollbars=yes,resizable=yes');
+}
+
+function shopPickerCallback(field, url) {
+    if (field === 'image_path') {
+        var input = document.getElementById('image_path');
+        if (input) input.value = url;
+        updateImagePreview(url);
+    }
+}
+
+function updateImagePreview(url) {
+    var wrap = document.getElementById('image-preview-wrap');
+    var img  = document.getElementById('image-preview');
+    if (!wrap || !img) return;
+    if (url && url.trim()) {
+        img.src = url.trim();
+        wrap.style.display = '';
+    } else {
+        wrap.style.display = 'none';
+        img.src = '';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var input = document.getElementById('image_path');
+    if (input) {
+        input.addEventListener('input', function() {
+            updateImagePreview(this.value);
+        });
+    }
+});
+</script>

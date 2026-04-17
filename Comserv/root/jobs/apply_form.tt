@@ -33,6 +33,7 @@
         </div>
         [% END %]
 
+        <form method="post" action="[% c.uri_for('/jobs/apply', [job.id]) %]" enctype="multipart/form-data">
         <form method="post" action="[% c.uri_for('/jobs/apply', [job.id]) %]">
 
           <div class="form-group">
@@ -51,6 +52,12 @@
             <label for="cover_letter">Cover Letter</label>
             <textarea id="cover_letter" name="cover_letter" class="form-control" rows="8"
                       placeholder="Tell the poster about yourself and why you are a good fit...">[% form_data.cover_letter | html %]</textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="resume_file">Resume <small class="form-text">(PDF, DOC, or DOCX — max 5 MB)</small></label>
+            <input type="file" id="resume_file" name="resume_file" class="form-control"
+                   accept=".pdf,.doc,.docx">
           </div>
 
           [% IF job.accept_points_payment || job.payment_type == 'points' || job.payment_type == 'hybrid' %]

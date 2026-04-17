@@ -1,0 +1,166 @@
+[% page_title = 'Receive Stock from Supplier' %]
+
+<h1>Receive Stock from Supplier</h1>
+<p>
+  <a href="/Inventory/invoice">← Supplier Invoices</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/stock/levels">Stock Levels</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory">Dashboard</a>
+</p>
+
+<p style="background:#e8f4fd;border-left:4px solid #007bff;padding:0.75rem 1rem;border-radius:4px;max-width:680px;">
+  Enter quantities and unit costs for all items received in this shipment.
+  A <strong>draft supplier invoice</strong> will be created — review it, then
+  <strong>Post</strong> to update stock levels and create the GL journal entry.
+</p>
+
+[% IF error_msg %]<p style="color:red;font-weight:bold">[% error_msg | html %]</p>[% END %]
+
+<form method="post" action="/Inventory/stock/receive">
+
+<fieldset style="margin-bottom:1.5rem;padding:1rem;border:1px solid #ccc;border-radius:6px;max-width:720px;">
+  <legend style="font-weight:bold;padding:0 0.5rem;">Invoice / Shipment Details</legend>
+  <table cellpadding="5">
+    <tr>
+      <th align="right"><label for="supplier_id">Supplier *</label></th>
+      <td>
+        <select name="supplier_id" id="supplier_id" required>
+          <option value="">— select supplier —</option>
+          [% FOREACH s IN suppliers %]
+          <option value="[% s.id %]"[% IF params.supplier_id == s.id %] selected[% END %]>[% s.name | html %]</option>
+          [% END %]
+        </select>
+        &nbsp;<a href="/Inventory/supplier/add?popup=1" onclick="openPopup(this.href);return false;"
+           style="font-size:0.85em;">+ New Supplier</a>
+      </td>
+    </tr>
+    <tr>
+      <th align="right"><label for="invoice_number">Their Invoice #</label></th>
+      <td><input type="text" id="invoice_number" name="invoice_number" size="30"
+           value="[% params.invoice_number | html %]" placeholder="e.g. Order #6548"></td>
+    </tr>
+    <tr>
+      <th align="right"><label for="invoice_date">Date *</label></th>
+      <td><input type="date" id="invoice_date" name="invoice_date" required
+           value="[% params.invoice_date || inv_date %]"></td>
+    </tr>
+    <tr>
+      <th align="right"><label for="due_date">Due Date</label></th>
+      <td><input type="date" id="due_date" name="due_date"
+           value="[% params.due_date %]"></td>
+    </tr>
+    [% IF coa_accounts.size %]
+    <tr>
+      <th align="right"><label for="ap_account_id">AP Account</label></th>
+      <td>
+        <select name="ap_account_id" id="ap_account_id">
+          <option value="">— select AP account —</option>
+          [% FOREACH a IN coa_accounts %]
+          [% IF a.accno.match('^2') %]
+          <option value="[% a.id %]"[% IF params.ap_account_id == a.id %] selected[% END %]>
+            [% a.accno %] [% a.description | html %]
+          </option>
+          [% END %]
+          [% END %]
+        </select>
+        <small style="color:#666"> — usually 2000 Accounts Payable</small>
+      </td>
+    </tr>
+    [% END %]
+    <tr>
+      <th align="right"><label for="notes">Notes</label></th>
+      <td><textarea id="notes" name="notes" rows="2" cols="45">[% params.notes | html %]</textarea></td>
+    </tr>
+  </table>
+</fieldset>
+
+<h2 style="margin-bottom:0.5rem;">Items Received</h2>
+<p style="color:#666;margin-top:0;font-size:0.9em;">
+  Enter quantity and unit cost only for items in this shipment. Leave blank to skip.
+</p>
+
+<table border="1" cellpadding="6" style="border-collapse:collapse;width:100%;max-width:900px;">
+  <thead style="background:#f0f0f0;">
+    <tr>
+      <th>SKU</th>
+      <th>Item</th>
+      <th style="width:100px">Qty Received</th>
+      <th style="width:110px">Unit Cost ($)</th>
+      <th style="width:90px">Line Total</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH item IN items %]
+  [% SET prev_qty  = params ? params.item("qty_"  _ item.id) : '' %]
+  [% SET prev_cost = params ? params.item("cost_" _ item.id) : (item.unit_cost || '') %]
+  <tr id="row-[% item.id %]">
+    <td style="font-family:monospace;font-size:0.85em;">[% item.sku | html %]</td>
+    <td>[% item.name | html %]</td>
+    <td>
+      <input type="number" name="qty_[% item.id %]" id="qty_[% item.id %]"
+             value="[% prev_qty %]" min="0" step="any" style="width:85px;"
+             oninput="calcRow([% item.id %])">
+    </td>
+    <td>
+      <input type="number" name="cost_[% item.id %]" id="cost_[% item.id %]"
+             value="[% prev_cost %]" min="0" step="0.01" style="width:95px;"
+             oninput="calcRow([% item.id %])">
+    </td>
+    <td style="text-align:right;" id="linetotal-[% item.id %]">
+      [% IF prev_qty && prev_cost %]$[% prev_qty * prev_cost | format("%.2f") %][% ELSE %]—[% END %]
+    </td>
+  </tr>
+  [% END %]
+  </tbody>
+  <tfoot>
+    <tr style="background:#f8f8f8;font-weight:bold;">
+      <td colspan="4" align="right">Invoice Total:</td>
+      <td style="text-align:right;">$<span id="grand-total">0.00</span></td>
+    </tr>
+  </tfoot>
+</table>
+
+<div style="margin-top:1.5rem;">
+  <button type="submit"
+          style="background:#28a745;color:white;border:none;padding:0.6rem 1.8rem;border-radius:5px;font-size:1rem;cursor:pointer;font-weight:bold;">
+    &#x2713; Create Draft Invoice
+  </button>
+  &nbsp;&nbsp;
+  <a href="/Inventory/invoice" style="color:#666;">Cancel</a>
+</div>
+
+</form>
+
+<script>
+function calcRow(id) {
+  var qty  = parseFloat(document.getElementById('qty_'  + id).value) || 0;
+  var cost = parseFloat(document.getElementById('cost_' + id).value) || 0;
+  var tot  = qty * cost;
+  var el   = document.getElementById('linetotal-' + id);
+  el.textContent = tot > 0 ? '$' + tot.toFixed(2) : '—';
+  calcGrand();
+}
+
+function calcGrand() {
+  var total = 0;
+  document.querySelectorAll('[id^="linetotal-"]').forEach(function(el) {
+    var t = el.textContent.replace('$','');
+    total += parseFloat(t) || 0;
+  });
+  document.getElementById('grand-total').textContent = total.toFixed(2);
+}
+
+function openPopup(url) {
+  var w = window.open(url, 'inv_popup', 'width=820,height=620,scrollbars=yes');
+  var timer = setInterval(function() {
+    if (w.closed) {
+      clearInterval(timer);
+      location.reload();
+    }
+  }, 600);
+}
+
+// Init grand total on page load
+calcGrand();
+</script>

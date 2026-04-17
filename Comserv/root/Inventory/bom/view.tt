@@ -1,0 +1,534 @@
+[% PageVersion = 'Inventory/bom/view.tt,v 0.01 2026/04/14 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Bill of Materials: [% item.name | html %]</h1>
+
+[% IF c.flash.success_msg %]<p class="success">[% c.flash.success_msg %]</p>[% END %]
+[% IF c.flash.error_msg %]<p class="error">[% c.flash.error_msg %]</p>[% END %]
+
+<div class="actions">
+  <a href="/Inventory/item/view/[% item.id %]">&#8592; Back to Item</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/item/edit/[% item.id %]">Edit Item</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/print/bom/[% item.id %]" target="_blank">&#128438; Print BOM Sheet</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/bom/list">All Assemblable Items</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/items">Item List</a>
+</div>
+
+<table border="0" cellpadding="4" style="margin-bottom:12px;">
+  <tr>
+    <th style="text-align:left">SKU</th>
+    <td>[% item.sku %]</td>
+    <th style="text-align:left;padding-left:20px;">Origin</th>
+    <td>[% item.item_origin || '-' %]</td>
+  </tr>
+  <tr>
+    <th style="text-align:left">Category</th>
+    <td>[% item.category || '-' %]</td>
+    <th style="text-align:left;padding-left:20px;">Unit</th>
+    <td>[% item.unit_of_measure %]</td>
+  </tr>
+  <tr>
+    <th style="text-align:left">Listed Unit Cost</th>
+    <td>[% item.unit_cost ? item.unit_cost : '—' %]</td>
+    <th style="text-align:left;padding-left:20px;">Assembled Cost (required only)</th>
+    <td>
+      <strong>[% assembled_cost > 0 ? assembled_cost : '—' %]</strong>
+      [% IF assembled_cost > 0 && item.unit_cost %]
+        [% IF assembled_cost > item.unit_cost %]
+          <span style="color:#dc3545;font-size:0.85em;">&#9650; over listed cost</span>
+        [% ELSE %]
+          <span style="color:#28a745;font-size:0.85em;">&#9660; under listed cost</span>
+        [% END %]
+      [% END %]
+    </td>
+  </tr>
+</table>
+
+[% SET bom_rows = item.bom_components %]
+
+<h2>Components</h2>
+
+[% IF bom_rows.size %]
+
+<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%;margin-bottom:18px;">
+  <thead style="background:#f0f0f0;">
+    <tr>
+      <th>#</th>
+      <th>Component Item</th>
+      <th>Unit Cost</th>
+      <th>Qty</th>
+      <th>Unit</th>
+      <th>Waste %</th>
+      <th>Eff. Qty</th>
+      <th>Line Cost</th>
+      <th>Optional?</th>
+      <th>Notes</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% total_required = 0 %]
+  [% total_optional = 0 %]
+  [% row_num = 0 %]
+  [% FOREACH comp IN bom_rows %]
+    [% row_num = row_num + 1 %]
+    [% ci = comp.component_item %]
+    [% eff_qty = comp.quantity * (1 + (comp.scrap_factor || 0)) %]
+    [% line_cost = ci && ci.unit_cost ? (ci.unit_cost * eff_qty) : 0 %]
+    [% IF !comp.is_optional %][% total_required = total_required + line_cost %][% END %]
+    [% IF comp.is_optional %][% total_optional = total_optional + line_cost %][% END %]
+    <tr style="[% comp.is_optional ? 'color:#888;font-style:italic;' : '' %]">
+      <td style="text-align:center">[% row_num %]</td>
+      <td>
+        [% IF ci %]
+          <a href="/Inventory/item/view/[% ci.id %]">[% ci.name | html %]</a>
+          <br><small style="color:#888">[% ci.sku %]</small>
+        [% ELSE %]
+          <em style="color:#999">#[% comp.component_item_id %] (missing)</em>
+        [% END %]
+      </td>
+      <td style="text-align:right">[% ci && ci.unit_cost ? ci.unit_cost : '—' %]</td>
+      <td style="text-align:right">[% comp.quantity %]</td>
+      <td>[% comp.unit %]</td>
+      <td style="text-align:right">[% comp.scrap_factor ? (comp.scrap_factor * 100) _ '%' : '0%' %]</td>
+      <td style="text-align:right">[% eff_qty %]</td>
+      <td style="text-align:right;[% comp.is_optional ? '' : 'font-weight:bold;' %]">
+        [% line_cost > 0 ? line_cost : '—' %]
+      </td>
+      <td style="text-align:center">[% comp.is_optional ? 'Yes' : '' %]</td>
+      <td>[% comp.notes | html %]</td>
+      <td style="white-space:nowrap;">
+        <button type="button"
+                onclick="toggleEditRow([% comp.id %])"
+                style="font-size:0.8em;padding:2px 6px;cursor:pointer;">Edit</button>
+        <form method="POST" action="/Inventory/bom/remove/[% comp.id %]"
+              onsubmit="return confirm('Remove [% IF ci %][% ci.name | html %][% ELSE %]this component[% END %] from BOM?');"
+              style="display:inline;">
+          <input type="hidden" name="from" value="bom">
+          <input type="submit" value="Remove"
+                 style="background:#dc3545;color:white;border:none;padding:2px 6px;border-radius:3px;cursor:pointer;font-size:0.8em;">
+        </form>
+      </td>
+    </tr>
+    <tr id="edit-row-[% comp.id %]" style="display:none;background:#fffbe6;">
+      <td colspan="11">
+        <form method="POST" action="/Inventory/bom/edit/[% comp.id %]"
+              style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:6px;">
+          <label>Qty:
+            <input type="number" name="quantity" value="[% comp.quantity %]"
+                   min="0.0001" step="0.0001" style="width:70px;" required>
+          </label>
+          <label>Unit:
+            <select name="unit">
+              [% FOREACH u IN ['each','g','kg','ml','L','cm','m','sheet','hour','kWh','litre'] %]
+              <option value="[% u %]" [% comp.unit == u ? 'selected' : '' %]>[% u %]</option>
+              [% END %]
+            </select>
+          </label>
+          <label>Waste %:
+            <input type="number" name="scrap_factor"
+                   value="[% comp.scrap_factor ? (comp.scrap_factor * 100) : 0 %]"
+                   min="0" max="100" step="0.1" style="width:60px;">
+          </label>
+          <label>Sort:
+            <input type="number" name="sort_order" value="[% comp.sort_order || 0 %]"
+                   style="width:50px;">
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;">
+            <input type="checkbox" name="is_optional" value="1"
+                   [% comp.is_optional ? 'checked' : '' %]>
+            Optional
+          </label>
+          <label>Notes:
+            <input type="text" name="notes" value="[% comp.notes | html %]" style="width:180px;">
+          </label>
+          <input type="submit" value="Save"
+                 style="background:#28a745;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;">
+          <button type="button" onclick="toggleEditRow([% comp.id %])"
+                  style="padding:4px 10px;cursor:pointer;">Cancel</button>
+        </form>
+      </td>
+    </tr>
+  [% END %]
+  </tbody>
+  <tfoot style="background:#f8f8f8;font-weight:bold;">
+    <tr>
+      <td colspan="7" style="text-align:right;padding-right:8px;">Required components total:</td>
+      <td style="text-align:right;">[% total_required > 0 ? total_required : '—' %]</td>
+      <td colspan="3"></td>
+    </tr>
+    [% IF total_optional > 0 %]
+    <tr style="color:#888;">
+      <td colspan="7" style="text-align:right;padding-right:8px;">Optional components total:</td>
+      <td style="text-align:right;">[% total_optional %]</td>
+      <td colspan="3"></td>
+    </tr>
+    <tr>
+      <td colspan="7" style="text-align:right;padding-right:8px;">Grand total (required + optional):</td>
+      <td style="text-align:right;">[% total_required + total_optional %]</td>
+      <td colspan="3"></td>
+    </tr>
+    [% END %]
+  </tfoot>
+</table>
+
+[% ELSE %]
+<p><em>No components defined yet. Add the first component below.</em></p>
+[% END %]
+
+<h2>Add Component</h2>
+
+[% IF all_items.size %]
+<form method="POST" action="/Inventory/bom/add/[% item.id %]"
+      onsubmit="patchRedirectToBom(this)">
+  <input type="hidden" name="redirect_to" value="bom">
+  <table cellpadding="4" style="border:1px solid #ccc;background:#fafafa;padding:8px;">
+    <tr>
+      <th><label for="component_item_id">Component Item *</label></th>
+      <td>
+        <select id="component_item_id" name="component_item_id" required style="max-width:320px;"
+                onchange="setDefaultUnit(this)">
+          <option value="">— select component —</option>
+          [% FOREACH ci IN all_items %]
+          <option value="[% ci.id %]" data-uom="[% ci.unit_of_measure %]" data-cost="[% ci.unit_cost || '' %]">
+            [% ci.name | html %] [[% ci.sku %]][% ci.unit_cost ? ' — $' _ ci.unit_cost : '' %]
+          </option>
+          [% END %]
+        </select>
+        <span id="cost-preview" style="margin-left:8px;color:#555;font-size:0.9em;"></span>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="quantity">Quantity *</label></th>
+      <td><input type="number" id="quantity" name="quantity" value="1" min="0.0001" step="0.0001"
+                 style="width:80px;" required></td>
+    </tr>
+    <tr>
+      <th><label for="unit">Unit</label></th>
+      <td>
+        <select id="unit" name="unit">
+          <option value="each">each</option>
+          <option value="g">g</option>
+          <option value="kg">kg</option>
+          <option value="ml">ml</option>
+          <option value="L">L</option>
+          <option value="cm">cm</option>
+          <option value="m">m</option>
+          <option value="sheet">sheet</option>
+          <option value="hour">hour</option>
+          <option value="kWh">kWh</option>
+          <option value="litre">litre</option>
+        </select>
+        <small>(auto-set from item; change if needed)</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="is_optional">Optional?</label></th>
+      <td><input type="checkbox" id="is_optional" name="is_optional" value="1">
+          <small>e.g. foundation in a frame, paint on a box</small></td>
+    </tr>
+    <tr>
+      <th><label for="scrap_factor">Waste/Scrap %</label></th>
+      <td><input type="number" id="scrap_factor" name="scrap_factor" value="0"
+                 min="0" max="100" step="0.1" style="width:70px;">
+          <small>e.g. 5 = 5% extra material for waste</small></td>
+    </tr>
+    <tr>
+      <th><label for="sort_order">Sort Order</label></th>
+      <td><input type="number" id="sort_order" name="sort_order" value="0" style="width:60px;"></td>
+    </tr>
+    <tr>
+      <th><label for="notes">Notes</label></th>
+      <td><input type="text" id="notes" name="notes" style="width:280px;"
+                 placeholder="e.g. 30cm length, pre-drilled, natural latex"></td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <input type="submit" value="Add to BOM"
+               style="background:#28a745;color:white;padding:5px 14px;border:none;border-radius:4px;cursor:pointer;">
+      </td>
+    </tr>
+  </table>
+</form>
+[% ELSE %]
+<p><em>No other active items in this site to use as components.
+   <a href="/Inventory/item/add">Add items</a> first.</em></p>
+[% END %]
+
+<hr style="margin:24px 0;border:none;border-top:2px solid #e0e0e0;">
+
+<h2>Add Direct Cost <small style="font-weight:normal;font-size:0.8em;color:#666">(electricity, printer depreciation, labour — no stock item needed)</small></h2>
+
+<div style="background:#f0f7ff;border:1px solid #b8d4f0;border-radius:4px;padding:10px 14px;margin-bottom:12px;font-size:0.88em;color:#333">
+  <strong>Filament note:</strong> Add filament using <em>Add Component</em> above — select your filament item, qty = grams used (e.g. 407.73), unit = g.
+  The filament is a placeholder for cost calculation; actual stock of the chosen colour is deducted manually when you fulfil the order.
+</div>
+
+<form method="POST" action="/Inventory/bom/add_cost/[% item.id %]" id="direct-cost-form">
+  <table cellpadding="4" style="border:1px solid #b8d4f0;background:#f5faff;padding:8px;">
+    <tr>
+      <th><label for="cost_label">Cost Label *</label></th>
+      <td>
+        <input type="text" id="cost_label" name="cost_label" required style="width:220px;"
+               placeholder="e.g. Electricity, Printer Depreciation, Labour">
+        <small>Creates/updates a Cost Centre inventory item automatically</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="cost_qty">Quantity *</label></th>
+      <td><input type="number" id="cost_qty" name="cost_qty" step="0.001" min="0.001" required
+                 style="width:90px;" placeholder="12.017"></td>
+    </tr>
+    <tr>
+      <th><label for="cost_unit">Unit *</label></th>
+      <td>
+        <select id="cost_unit" name="cost_unit">
+          <option value="hour">hour</option>
+          <option value="kWh">kWh</option>
+          <option value="each">each</option>
+          <option value="g">g</option>
+          <option value="kg">kg</option>
+          <option value="ml">ml</option>
+          <option value="m">m</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="cost_unit_cost">Unit Cost ($/unit) *</label></th>
+      <td>
+        <input type="number" id="cost_unit_cost" name="cost_unit_cost" step="0.0001" min="0.0001"
+               required style="width:90px;" placeholder="0.17">
+        <span id="cost-line-preview" style="margin-left:10px;color:#555;font-size:0.9em;"></span>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="cost_notes">Notes</label></th>
+      <td><input type="text" id="cost_notes" name="cost_notes" style="width:280px;"
+                 placeholder="e.g. 200W printer × 12h, rate from utility bill"></td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <input type="submit" value="Add Cost to BOM"
+               style="background:#1565c0;color:white;padding:5px 14px;border:none;border-radius:4px;cursor:pointer;">
+      </td>
+    </tr>
+  </table>
+</form>
+
+[% IF debug_errors && debug_errors.size > 0 %]
+<div class="debug">
+  [% FOREACH err IN debug_errors %]<p>[% err %]</p>[% END %]
+</div>
+[% END %]
+
+[% IF printers && printers.size > 0 %]
+<hr style="margin:24px 0;border:none;border-top:2px solid #e0e0e0;">
+<h2>3D Print Wizard <small style="font-weight:normal;font-size:0.8em;color:#666">(auto-add filament, electricity &amp; depreciation to BOM)</small></h2>
+<div style="background:#fff8e1;border:1px solid #ffe082;border-radius:4px;padding:10px 14px;margin-bottom:12px;font-size:0.88em;color:#333">
+  <strong>How it works:</strong> Enter slicer output (grams &amp; print time). The wizard adds filament (cost placeholder),
+  electricity (based on printer wattage), and printer depreciation as BOM lines automatically.
+  Actual colour stock deduction happens when you fulfil the order.
+</div>
+<form method="POST" action="/Inventory/bom/print_wizard/[% item.id %]" id="print-wizard-form">
+  <table cellpadding="4" style="border:1px solid #ffe082;background:#fffdf0;padding:8px;width:100%;max-width:680px">
+    <tr>
+      <th style="text-align:left;width:200px"><label for="pw_printer">Printer *</label></th>
+      <td>
+        <select id="pw_printer" name="printer_id" required onchange="pwUpdatePrinter(this)"
+                style="width:280px">
+          <option value="">— select printer —</option>
+          [% FOREACH p IN printers %]
+          [% SET peq = p.equipment %]
+          <option value="[% p.id %]"
+                  data-wattage="[% peq.wattage IF peq %][% '0' UNLESS peq && peq.wattage %]"
+                  data-depr="[% peq.depreciation_per_hour IF peq %][% '0' UNLESS peq && peq.depreciation_per_hour %]">[% p.name | html %][% IF p.sku %] ([% p.sku | html %])[% END %][% IF peq && peq.wattage %] — [% peq.wattage %]W[% END %]</option>
+          [% END %]
+        </select>
+        <span id="pw-printer-info" style="margin-left:8px;font-size:0.85em;color:#555"></span>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="pw_hours">Print Time (hours) *</label></th>
+      <td>
+        <input type="number" id="pw_hours" name="print_hours" step="0.01" min="0.01" required
+               style="width:90px" placeholder="12.02" oninput="pwCalc()">
+        <small style="color:#777"> e.g. 12h 1m = 12.017</small>
+      </td>
+    </tr>
+    [% IF filament_items && filament_items.size > 0 %]
+    <tr>
+      <th><label for="pw_filament_item">Filament Item</label></th>
+      <td>
+        <select id="pw_filament_item" name="filament_item_id" style="width:280px">
+          <option value="">— none (add manually) —</option>
+          [% FOREACH f IN filament_items %]
+          <option value="[% f.id %]">[% f.name | html %][% IF f.sku %] ([% f.sku | html %])[% END %] — $[% f.unit_cost || '?' %]/g</option>
+          [% END %]
+        </select>
+      </td>
+    </tr>
+    [% END %]
+    <tr>
+      <th><label for="pw_filament_g">Filament (grams)</label></th>
+      <td>
+        <input type="number" id="pw_filament_g" name="filament_g" step="0.01" min="0"
+               style="width:90px" placeholder="407.73" oninput="pwCalc()">
+        <small style="color:#777"> from slicer</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="pw_filament_scrap">Filament Scrap %</label></th>
+      <td>
+        <input type="number" id="pw_filament_scrap" name="filament_scrap" step="0.1" min="0" value="2"
+               style="width:70px">
+        <small style="color:#777"> purge &amp; waste factor</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="pw_kwh_rate">Hydro Rate ($/kWh)</label></th>
+      <td>
+        <input type="number" id="pw_kwh_rate" name="kwh_rate" step="0.001" min="0" value="0.17"
+               style="width:80px" oninput="pwCalc()">
+        <small style="color:#777"> BC Hydro step 1 ≈ $0.1002; step 2 ≈ $0.1502; avg ~$0.17</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="pw_avg_watt_pct">Avg Power % of Rated</label></th>
+      <td>
+        <input type="number" id="pw_avg_watt_pct" name="avg_watt_pct" step="1" min="1" max="100" value="50"
+               style="width:70px" oninput="pwCalc()">
+        <small style="color:#777"> typical FDM printers run ~50% of rated wattage</small>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2" style="padding-top:8px">
+        <div id="pw-cost-preview" style="background:#f0f7ff;border:1px solid #b8d4f0;border-radius:4px;padding:8px 12px;margin-bottom:8px;font-size:0.9em;display:none"></div>
+        <input type="submit" value="Add Print Costs to BOM"
+               style="background:#e65100;color:white;padding:6px 16px;border:none;border-radius:4px;cursor:pointer;font-size:1em">
+      </td>
+    </tr>
+  </table>
+</form>
+[% ELSE %]
+<div style="background:#f5f5f5;border:1px solid #ccc;border-radius:4px;padding:10px 14px;margin:16px 0;font-size:0.88em;color:#555">
+  <strong>3D Print Wizard:</strong> No printer items found. Add an item with "printer" in its name, category, or origin — and set its Wattage and Depreciation/hr — to enable the wizard.
+  <a href="/Inventory/item/add">Add item</a>
+</div>
+[% END %]
+
+[% PROCESS 'ai/partials/ai_form_assistant.tt'
+   ai_form_entity_label = 'BOM component'
+   ai_form_context      = 'Bill of Materials for a 3D printed item — adding material components (filament in grams) and overhead costs (electricity in kWh, printer depreciation per hour)'
+   ai_form_fields       = 'component_item_id, quantity, unit, scrap_factor, notes, cost_label, cost_qty, cost_unit, cost_unit_cost, cost_notes'
+%]
+
+<script>
+var uomMap = {
+[% FOREACH ci IN all_items %]
+  [% ci.id %]: { uom: "[% ci.unit_of_measure %]", cost: "[% ci.unit_cost || '' %]" }[% ',' UNLESS loop.last %]
+[% END %]
+};
+
+var unitSel = document.getElementById('unit');
+var costPreview = document.getElementById('cost-preview');
+
+function setDefaultUnit(sel) {
+  var data = uomMap[sel.value] || {};
+  var uom = data.uom || 'each';
+  for (var i = 0; i < unitSel.options.length; i++) {
+    if (unitSel.options[i].value === uom) { unitSel.selectedIndex = i; break; }
+  }
+  if (data.cost) {
+    costPreview.textContent = 'Unit cost: $' + data.cost;
+  } else {
+    costPreview.textContent = '';
+  }
+}
+
+function toggleEditRow(bomId) {
+  var row = document.getElementById('edit-row-' + bomId);
+  if (row) {
+    row.style.display = (row.style.display === 'none') ? 'table-row' : 'none';
+  }
+}
+
+function patchRedirectToBom(form) {
+  var action = form.getAttribute('action');
+  return true;
+}
+
+(function() {
+  var qtyEl  = document.getElementById('cost_qty');
+  var ucEl   = document.getElementById('cost_unit_cost');
+  var prev   = document.getElementById('cost-line-preview');
+  function updateCostPreview() {
+    var q = parseFloat(qtyEl && qtyEl.value) || 0;
+    var u = parseFloat(ucEl  && ucEl.value)  || 0;
+    if (q > 0 && u > 0 && prev) {
+      prev.textContent = '→ Line cost: $' + (q * u).toFixed(4);
+    } else if (prev) {
+      prev.textContent = '';
+    }
+  }
+  if (qtyEl) qtyEl.addEventListener('input', updateCostPreview);
+  if (ucEl)  ucEl.addEventListener('input',  updateCostPreview);
+})();
+
+var pwPrinterWattage = 0;
+var pwPrinterDepr    = 0;
+
+function pwUpdatePrinter(sel) {
+  var opt = sel.options[sel.selectedIndex];
+  pwPrinterWattage = parseFloat(opt.getAttribute('data-wattage')) || 0;
+  pwPrinterDepr    = parseFloat(opt.getAttribute('data-depr'))    || 0;
+  var info = document.getElementById('pw-printer-info');
+  if (info) {
+    if (pwPrinterWattage > 0 || pwPrinterDepr > 0) {
+      info.textContent = pwPrinterWattage + 'W rated · $' + pwPrinterDepr.toFixed(4) + '/hr depreciation';
+    } else {
+      info.textContent = 'No wattage or depreciation set — edit item to add.';
+    }
+  }
+  pwCalc();
+}
+
+function pwCalc() {
+  var hours      = parseFloat(document.getElementById('pw_hours')       && document.getElementById('pw_hours').value)       || 0;
+  var grams      = parseFloat(document.getElementById('pw_filament_g')  && document.getElementById('pw_filament_g').value)  || 0;
+  var kwhRate    = parseFloat(document.getElementById('pw_kwh_rate')     && document.getElementById('pw_kwh_rate').value)    || 0.17;
+  var wattPct    = parseFloat(document.getElementById('pw_avg_watt_pct') && document.getElementById('pw_avg_watt_pct').value) || 50;
+  var preview    = document.getElementById('pw-cost-preview');
+  if (!preview) return;
+
+  var lines = [];
+  var total  = 0;
+
+  if (grams > 0) {
+    lines.push('Filament: ' + grams.toFixed(2) + 'g (cost depends on filament item cost/g)');
+  }
+  if (hours > 0 && pwPrinterWattage > 0) {
+    var avgW = pwPrinterWattage * (wattPct / 100);
+    var kwh  = avgW * hours / 1000;
+    var elecCost = kwh * kwhRate;
+    lines.push('Electricity: ' + kwh.toFixed(4) + ' kWh = $' + elecCost.toFixed(4) + ' (' + avgW.toFixed(0) + 'W avg × ' + hours.toFixed(3) + 'h × $' + kwhRate + '/kWh)');
+    total += elecCost;
+  }
+  if (hours > 0 && pwPrinterDepr > 0) {
+    var deprCost = hours * pwPrinterDepr;
+    lines.push('Depreciation: ' + hours.toFixed(3) + 'h × $' + pwPrinterDepr.toFixed(4) + '/hr = $' + deprCost.toFixed(4));
+    total += deprCost;
+  }
+
+  if (lines.length > 0) {
+    preview.innerHTML = lines.map(function(l){ return '<div>· ' + l + '</div>'; }).join('') +
+      (total > 0 ? '<div style="margin-top:4px;font-weight:bold">Overhead total: $' + total.toFixed(4) + '</div>' : '');
+    preview.style.display = '';
+  } else {
+    preview.style.display = 'none';
+  }
+}
+</script>

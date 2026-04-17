@@ -1,0 +1,130 @@
+[% META title = 'Post a Listing' %]
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('input[name="listing_type"]').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            document.querySelectorAll('input[name="listing_type"]').forEach(function(r) {
+                r.closest('label').style.borderColor = '#dee2e6';
+                r.closest('label').style.background  = '';
+            });
+            if (this.checked) {
+                this.closest('label').style.borderColor = 'var(--primary-color, #007bff)';
+                this.closest('label').style.background  = '#f0f7ff';
+            }
+        });
+    });
+});
+</script>
+
+<div class="container" style="max-width:700px;margin:0 auto;padding:20px;">
+
+  <div style="margin-bottom:15px;">
+    <a href="/marketplace" style="color:var(--primary-color,#007bff);text-decoration:none;">← Back to Marketplace</a>
+  </div>
+
+  <h1 style="margin-bottom:20px;"><i class="fas fa-plus-circle"></i> Post a Listing</h1>
+
+  [% IF error_msg %]
+    <div style="background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:5px;padding:10px 15px;margin-bottom:15px;">[% error_msg | html %]</div>
+  [% END %]
+
+  <form method="POST" action="/marketplace/add" style="background:var(--bg-color,#fff);border:1px solid #ddd;border-radius:8px;padding:24px;">
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-weight:bold;margin-bottom:8px;">Listing Type <span style="color:red;">*</span></label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        [% FOR t IN [
+            {val => 'sale',   icon => '🏷️', label => 'For Sale',   desc => 'I have something to sell'},
+            {val => 'wanted', icon => '🔍', label => 'Wanted',     desc => 'I am looking for something'},
+            {val => 'job',    icon => '💼', label => 'Job / Gig',  desc => 'Offering or seeking work'},
+        ] %]
+        <label style="flex:1;min-width:140px;border:2px solid #dee2e6;border-radius:6px;padding:10px;cursor:pointer;text-align:center;
+               [% IF form.listing_type == t.val || (!form.listing_type && t.val == 'sale') %]border-color:var(--primary-color,#007bff);background:#f0f7ff;[% END %]">
+          <input type="radio" name="listing_type" value="[% t.val %]"
+                 [% IF form.listing_type == t.val || (!form.listing_type && t.val == 'sale') %]checked[% END %]
+                 style="display:none;">
+          <div style="font-size:1.4rem;">[% t.icon %]</div>
+          <div style="font-weight:bold;font-size:0.95rem;">[% t.label %]</div>
+          <div style="font-size:0.75rem;color:#666;">[% t.desc %]</div>
+        </label>
+        [% END %]
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-weight:bold;margin-bottom:5px;">Title <span style="color:red;">*</span></label>
+      <input type="text" name="title" value="[% form.title | html %]" required maxlength="255"
+             placeholder="What are you selling / looking for / offering?"
+             style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;">
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-weight:bold;margin-bottom:5px;">Description <span style="color:red;">*</span></label>
+      <textarea name="description" required rows="6"
+                placeholder="Describe the item or service — condition, details, how to pick up or get it..."
+                style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;resize:vertical;">[% form.description | html %]</textarea>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 120px;gap:12px;margin-bottom:16px;">
+      <div>
+        <label style="display:block;font-weight:bold;margin-bottom:5px;">Price</label>
+        <input type="number" name="price" value="[% form.price || '0.00' %]" min="0" step="0.01"
+               style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;">
+        <small style="color:#666;">Leave 0 for free or negotiable</small>
+      </div>
+      <div>
+        <label style="display:block;font-weight:bold;margin-bottom:5px;">Currency</label>
+        <select name="currency" style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;">
+          <option value="CAD" [% IF !form.currency || form.currency == 'CAD' %]selected[% END %]>CAD</option>
+          <option value="USD" [% IF form.currency == 'USD' %]selected[% END %]>USD</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-weight:bold;margin-bottom:5px;">Category</label>
+      <select name="category_id" style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;">
+        <option value="">— Select category —</option>
+        [% FOREACH cat IN categories %]
+          <option value="[% cat.id %]" [% IF form.category_id == cat.id %]selected[% END %]>[% cat.name | html %]</option>
+        [% END %]
+      </select>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-weight:bold;margin-bottom:5px;">Order / Contact URL <small style="font-weight:normal;color:#666;">(optional)</small></label>
+      <input type="url" name="order_url" value="[% form.order_url | html %]"
+             placeholder="https://... or leave blank"
+             style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;">
+      <small style="color:#666;">Link to your ordering page or contact form</small>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-weight:bold;margin-bottom:5px;">Expires On <small style="font-weight:normal;color:#666;">(optional)</small></label>
+      <input type="date" name="expires_at" value="[% form.expires_at | html %]"
+             style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;">
+    </div>
+
+    [% IF c.stash.user_roles.grep('member').size || c.stash.user_roles.grep('admin').size %]
+    <div style="margin-bottom:20px;padding:12px;background:var(--bg-secondary,#f8f9fa);border-radius:5px;border:1px solid #e9ecef;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:bold;">
+        <input type="checkbox" name="accepts_points" value="1" [% IF form.accepts_points %]checked[% END %]
+               style="width:18px;height:18px;">
+        ★ I accept Points as payment
+      </label>
+    </div>
+    [% ELSE %]
+    <div style="margin-bottom:20px;padding:10px 14px;background:var(--bg-secondary,#f8f9fa);border-radius:5px;border:1px solid #e9ecef;color:var(--text-muted-color,#666);font-size:0.875rem;">
+      ★ <strong>Points payments</strong> are available to <a href="/membership/plans">paid members</a>. <a href="/membership/plans">Upgrade your membership</a> to offer this option.
+    </div>
+    [% END %]
+
+    <div style="display:flex;gap:10px;">
+      <button type="submit" style="padding:10px 24px;background:var(--primary-color,#007bff);color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:1rem;">
+        <i class="fas fa-upload"></i> Post Listing
+      </button>
+      <a href="/marketplace" style="padding:10px 18px;border:1px solid #ccc;border-radius:5px;text-decoration:none;color:var(--text-color,#333);">Cancel</a>
+    </div>
+
+  </form>
+</div>

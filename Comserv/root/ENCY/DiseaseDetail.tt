@@ -18,12 +18,7 @@
 <div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
 [% END %]
 
-[% roles = c.session.roles;
-   is_admin = 0;
-   FOREACH r IN roles;
-     IF r == 'admin'; is_admin = 1; END;
-   END;
-%]
+[% is_editor = is_editor || 0; is_admin = is_admin || 0 %]
 
 [% IF edit_mode %]
 <h1>Editing Disease: [% disease.common_name | html %]</h1>
@@ -32,8 +27,8 @@
 [% END %]
 
 <p><a href="[% c.uri_for('/ENCY/Disease') %]">&larr; Back to Diseases</a>
-[% IF is_admin && !edit_mode && disease.record_id %]
-  | <a href="[% c.uri_for('/ENCY/Disease/edit') %]" onclick="document.cookie='record_id=[% disease.record_id %]'">Edit</a>
+[% IF is_editor && !edit_mode && disease.record_id %]
+  | <a href="[% c.uri_for('/ENCY/Disease/edit', { record_id => disease.record_id }) %]">Edit</a>
 [% END %]
 </p>
 
@@ -42,6 +37,7 @@
 [% IF disease.record_id %]
 <input type="hidden" name="record_id" value="[% disease.record_id %]" />
 [% END %]
+[% PROCESS 'ENCY/partials/AiFormFill.tt' %]
 [% END %]
 
 <h2>Overview</h2>
@@ -291,8 +287,10 @@
     [% END %]
 </table>
 
+[% IF !edit_mode %]
+[% PROCESS 'ENCY/partials/FormalRefs.tt' %]
+[% END %]
 [% IF edit_mode %]
-[% PROCESS 'ENCY/partials/AiFormFill.tt' %]
 <br/>
 <input type="submit" value="[% IF disease.record_id %]Update Disease[% ELSE %]Add Disease[% END %]" class="btn btn-primary" />
 <a href="[% c.uri_for('/ENCY/Disease') %]" class="btn btn-default">Cancel</a>
