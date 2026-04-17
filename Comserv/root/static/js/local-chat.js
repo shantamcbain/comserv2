@@ -235,6 +235,69 @@
         state.pageContext = ctx;
     }
 
+    // ── _collectPageErrors ────────────────────────────────────────────────────
+    // Scans the current page DOM for visible error messages and returns a
+    // formatted string to prepend to coding-agent prompts.
+    function _collectPageErrors() {
+        var errors = [];
+        var seen = {};
+
+        var selectors = [
+            '.error-message', '.alert-danger', '.alert-error',
+            '#error-message', '.flash-error', '.catalyst-error',
+            '.exception-title', '.exception-message',
+            '[class*="error"]', '[id*="error"]'
+        ];
+
+        selectors.forEach(function(sel) {
+            try {
+                document.querySelectorAll(sel).forEach(function(el) {
+                    var txt = (el.innerText || '').trim();
+                    if (txt && txt.length > 5 && txt.length < 2000 && !seen[txt]) {
+                        seen[txt] = 1;
+                        errors.push(txt);
+                    }
+                });
+            } catch(e) {}
+        });
+
+        // Also check page title for Catalyst error pages
+        if (document.title && /error|exception|500|404/i.test(document.title)) {
+            var bodySnippet = (document.body && document.body.innerText || '').substring(0, 800).trim();
+            if (bodySnippet && !seen[bodySnippet.substring(0, 50)]) {
+                errors.push('Page title: ' + document.title + '\n' + bodySnippet);
+            }
+        }
+
+        if (!errors.length) return '';
+
+        return '[PAGE ERROR DETECTED]\n' + errors.slice(0, 3).join('\n---\n') + '\n[/PAGE ERROR]';
+    }
+
+    // ── _handleReadFileRequest ─────────────────────────────────────────────────
+    // Called when the AI response contains [READ_FILE: path] tokens.
+    // Fetches the file content and sends it back as a follow-up context message.
+    function _handleReadFileRequest(path) {
+        var url = '/ai/read_file?path=' + encodeURIComponent(path) + '&limit=300';
+        fetch(url, { credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    var ctx = '[FILE: ' + data.path + ' (lines ' + (data.offset + 1)
+                            + '-' + (data.offset + data.lines) + ' of ' + data.total + ')]\n'
+                            + '```\n' + data.content + '\n```\n[/FILE]';
+                    var msgInput = document.getElementById('message-input');
+                    if (msgInput) {
+                        msgInput.value = ctx + '\n\n(File loaded. Please continue your analysis.)';
+                    }
+                } else {
+                    var msgInput = document.getElementById('message-input');
+                    if (msgInput) msgInput.value = '[Could not read file: ' + data.error + ']';
+                }
+            })
+            .catch(function(e) { console.error('read_file error', e); });
+    }
+
     // Match page URL against agent patterns and select appropriate agent
     function selectAgentForPage() {
         const pathname = window.location.pathname;
@@ -792,6 +855,7 @@
             const fi = document.getElementById('image-file-input');
             if (fi) fi.value = '';
         };
+        window._handleReadFileRequest = _handleReadFileRequest;
 
         // ── Other events ──────────────────────────────────────────────────────
         chatButton.addEventListener('click', function() { openChat(); });
@@ -1364,7 +1428,15 @@
                 });
 
             docPromise.then(function() {
-                sendAIRequest(prompt, statusIndicator, loadingMessage, imageData);
+                // When coding agent is active, auto-collect page errors and prepend them
+                var effectivePrompt = prompt;
+                if (state.pageContext && state.pageContext.agent_id === 'coding') {
+                    var pageErrors = _collectPageErrors();
+                    if (pageErrors && !prompt.toLowerCase().includes('[page error')) {
+                        effectivePrompt = pageErrors + '\n\n' + prompt;
+                    }
+                }
+                sendAIRequest(effectivePrompt, statusIndicator, loadingMessage, imageData);
             });
         }).catch(function(error) {
             console.error('Failed to load agents config:', error);
@@ -1783,6 +1855,14 @@
                 addMessage(cleanText, 'ai-message');
 
                 persistMessages();
+
+                // Coding agent: intercept [READ_FILE: path] requests automatically
+                if (state.pageContext && state.pageContext.agent_id === 'coding') {
+                    var rfMatch = cleanText.match(/\[READ_FILE:\s*([^\]]+)\]/i);
+                    if (rfMatch) {
+                        _handleReadFileRequest(rfMatch[1].trim());
+                    }
+                }
 
                 // Execute any in-app actions the AI embedded
                 if (actions.length > 0) {
