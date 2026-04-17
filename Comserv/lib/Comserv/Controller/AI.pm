@@ -388,6 +388,11 @@ sub generate :Local :Args(0) {
             $model = $json_data->{model} || '';
             $use_search = $json_data->{use_search} ? 1 : 0;
             $history_items = (ref($json_data->{history}) eq 'ARRAY') ? $json_data->{history} : [];
+            # Image attachment (base64) for vision models
+            my $image_data_b64 = $json_data->{image_data} || '';
+            my $image_mime     = $json_data->{image_mime} || 'image/jpeg';
+            $c->stash->{ai_image_data} = $image_data_b64;
+            $c->stash->{ai_image_mime} = $image_mime;
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'generate', "Extracted from JSON: prompt='" . substr($prompt, 0, 100) . "', provider='$provider', conversation_id=" . ($conversation_id || 'NEW') . ", use_search=$use_search");
         } else {
@@ -424,8 +429,8 @@ sub generate :Local :Args(0) {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
         'generate', "BEFORE_VALIDATION: conversation_id is " . (defined($conversation_id) ? "'$conversation_id'" : "undef"));
     
-    # Validate prompt
-    unless ($prompt && length($prompt) > 0) {
+    # Validate prompt — allow empty if image is attached
+    unless (($prompt && length($prompt) > 0) || ($c->stash->{ai_image_data} && length($c->stash->{ai_image_data}) > 0)) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
             'generate', "Empty prompt provided by user: $username");
         
@@ -437,6 +442,7 @@ sub generate :Local :Args(0) {
         $c->response->status(400);
         return;
     }
+    $prompt ||= '(describe this image)';
     
     # Log the query with preview
     my $prompt_preview = substr($prompt, 0, 100);
@@ -700,7 +706,21 @@ sub generate :Local :Args(0) {
                 my $hcontent = $h->{content} || '';
                 push @grok_messages, { role => $hrole, content => $hcontent } if $hcontent;
             }
-            push @grok_messages, { role => 'user', content => $prompt };
+            # Build user message — multimodal if image attached
+            my $img_b64  = $c->stash->{ai_image_data} || '';
+            my $img_mime = $c->stash->{ai_image_mime} || 'image/jpeg';
+            if ($img_b64) {
+                push @trace, sprintf("🖼️ Image attached (%s, %d bytes base64)", $img_mime, length($img_b64));
+                push @grok_messages, {
+                    role    => 'user',
+                    content => [
+                        { type => 'text',      text      => $prompt },
+                        { type => 'image_url', image_url => { url => "data:${img_mime};base64,${img_b64}", detail => 'high' } },
+                    ],
+                };
+            } else {
+                push @grok_messages, { role => 'user', content => $prompt };
+            }
             $response = $grok->chat(
                 messages   => \@grok_messages,
                 use_search => $use_search,
