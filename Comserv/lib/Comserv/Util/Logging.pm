@@ -92,10 +92,18 @@ our $EMAIL_NOTIFY_THRESHOLD = 'ERROR';
 # This prevents millions of low-value rows from filling the table.
 our $DB_LOG_MIN_LEVEL = $ENV{DB_LOG_MIN_LEVEL} || 'WARN';
 
+# Minimum level to emit to STDERR (captured by Docker as container logs).
+# Set COMSERV_LOG_MIN_LEVEL=WARN in production to suppress DEBUG/INFO noise.
+# Default: DEBUG (emit everything) to preserve existing dev behaviour.
+our $STDERR_LOG_MIN_LEVEL = $ENV{COMSERV_LOG_MIN_LEVEL} || 'DEBUG';
+
 # Internal subroutine to print log messages to STDERR and the log file
 sub _print_log {
-    my ($msg) = @_;
-    print STDERR "$msg\n";
+    my ($msg, $level) = @_;
+    $level //= 'DEBUG';
+    my $min_prio  = $LEVEL_PRIORITY{ uc($STDERR_LOG_MIN_LEVEL) } // 1;
+    my $msg_prio  = $LEVEL_PRIORITY{ uc($level)                } // 1;
+    print STDERR "$msg\n" if $msg_prio >= $min_prio;
     if (defined $LOG_FH && fileno($LOG_FH)) {
         flock($LOG_FH, LOCK_EX);
         print $LOG_FH "$msg\n";
@@ -377,9 +385,9 @@ sub log_with_details {
         push @$debug_errors, $log_message;
     }
 
-    # Restore standard behavior: also write to application log file and STDERR
+    # Write to application log file and STDERR (filtered by COMSERV_LOG_MIN_LEVEL).
     log_to_file($log_message, undef, $level);
-    _print_log($log_message);
+    _print_log($log_message, $level);
 
     # Log to database — only WARN and above to keep the table manageable.
     # DEBUG/INFO messages go to file log only.

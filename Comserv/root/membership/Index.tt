@@ -26,6 +26,9 @@
       <a href="[% c.uri_for('/membership/admin/manage_plans') %]" class="btn btn-secondary">Manage Plans</a>
       <a href="[% c.uri_for('/membership/admin/subscribers') %]" class="btn btn-secondary">All Subscribers</a>
       <a href="[% c.uri_for('/membership/admin/cost_tracking') %]" class="btn btn-secondary">Cost Tracking</a>
+      [% IF c.session.SiteName == 'CSC' %]
+      <a href="[% c.uri_for('/membership/admin/hosting_accounts') %]" class="btn btn-secondary">&#127760; Hosting Accounts</a>
+      [% END %]
     </div>
     [% END %]
   </div>
@@ -99,6 +102,87 @@
       </div>
       [% END %]
 
+      [%# ── CSC Site Registration (admin only, non-CSC SiteNames) ──────────── %]
+      [% IF is_admin AND !site_is_csc %]
+      <div class="content-section" style="border:1px solid #b0c4de;border-radius:8px;padding:1.2rem 1.4rem;background:#f4f8ff;">
+        <h2 style="margin-top:0;">&#127760; [% site_name | html %] — CSC Hosting Registration</h2>
+
+        [% IF hosting_account AND hosting_account.status == 'active' AND !hosting_account.alert_dismissed %]
+        <div style="border:2px solid #27ae60;border-radius:6px;padding:1rem 1.2rem;background:#f0fdf4;margin-bottom:1rem;">
+          <strong style="color:#27ae60;">&#10003; CSC Hosting Active for [% site_name | html %]</strong>
+          <p style="margin:0.4rem 0 0;">Your site is registered and active with CSC hosting.
+          Members can now purchase hosting plans.
+          Monthly cost: <strong>CAD [% hosting_account.monthly_cost %]/mo</strong>.</p>
+        </div>
+        [% ELSIF hosting_account AND hosting_account.status == 'pending' %]
+        <div style="border:2px solid #e67e22;border-radius:6px;padding:1rem 1.2rem;background:#fff8f0;margin-bottom:1rem;">
+          <strong style="color:#e67e22;">&#8987; CSC Hosting Registration Pending</strong>
+          <p style="margin:0.4rem 0 0;">Your registration was submitted and is awaiting CSC approval.
+          You will receive an email at <strong>[% hosting_account.contact_email | html %]</strong> when approved.</p>
+        </div>
+        [% END %]
+
+        [% IF csc_not_registered %]
+        <div style="border:2px solid #e67e22;border-radius:6px;padding:1rem 1.2rem;background:#fff8f0;margin-bottom:1rem;">
+          <strong style="color:#e67e22;">&#9888; [% site_name | html %] is not yet registered with CSC</strong>
+          <p style="margin:0.5rem 0 0;">Register to unlock hosting services for your members.
+          CSC handles domain setup, server maintenance, and billing —
+          [% site_name | html %] earns a referral commission on every hosting payment.</p>
+          <div style="margin-top:0.8rem;">
+            <a href="[% c.uri_for('/membership/hosting_signup', { plan => 'hosting-subdomain', ref => 'membership' }) %]"
+               class="btn btn-primary">Register [% site_name | html %] with CSC →</a>
+            <a href="[% c.uri_for('/hosting') %]" class="btn btn-secondary" style="margin-left:0.5rem;">Learn More</a>
+          </div>
+        </div>
+        [% ELSIF hosting_account %]
+          [% IF hosting_account.status == 'active' %]
+          <p style="color:#27ae60;margin:0 0 0.8rem;"><strong>&#10003; [% site_name | html %] is a registered CSC hosting partner.</strong>
+          Members of this site can purchase hosting plans below.</p>
+          [% ELSIF hosting_account.status == 'pending' %]
+          <p style="color:#e67e22;margin:0 0 0.8rem;"><strong>&#8987; Registration pending CSC approval.</strong>
+          Hosting plans will be available once CSC activates your account.</p>
+          [% END %]
+        [% END %]
+
+      </div>
+      [% END %][%# /IF is_admin AND !site_is_csc %]
+
+      [%# CSC hosting plan cards — visible to all users when site is an active hosting partner %]
+      [% IF !site_is_csc AND hosting_account AND hosting_account.status == 'active' AND csc_hosting_plans.size %]
+      <div class="content-section">
+        <h2>&#127760; CSC Hosting Plans</h2>
+        <p style="color:#555;margin-bottom:1rem;">
+          [% site_name | html %] is a CSC hosting partner. Members can purchase hosting plans directly through CSC.
+        </p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;">
+          [% FOREACH hplan IN csc_hosting_plans %]
+          <div style="border:1px solid #c8e6c9;border-radius:6px;padding:1rem;background:#f8fdf4[% IF hplan.is_featured %];border-color:#4a8c3f;border-width:2px[% END %]">
+            [% IF hplan.is_featured %]
+            <div style="background:#4a8c3f;color:#fff;text-align:center;padding:0.25rem;border-radius:3px;font-size:0.8em;margin-bottom:0.5rem;">&#9733; Most Popular</div>
+            [% END %]
+            <strong style="color:#2d5a27;">[% hplan.name | html %]</strong>
+            <div style="font-size:1.2rem;font-weight:bold;color:#4a8c3f;margin:0.3rem 0;">
+              [% IF hplan.price_monthly == 0 %]Free[% ELSE %][% hplan.price_currency | html %]&nbsp;[% hplan.price_monthly %]/mo[% END %]
+            </div>
+            [% IF hplan.description %]
+            <p style="font-size:0.85rem;color:#555;margin:0.4rem 0;">[% hplan.description | html %]</p>
+            [% END %]
+            <ul style="font-size:0.85rem;padding-left:1.2em;margin:0.4rem 0;">
+              [% IF hplan.has_subdomain %]<li>Subdomain on partner SiteName</li>[% END %]
+              [% IF hplan.has_custom_domain %]<li>Custom domain support</li>[% END %]
+              [% IF hplan.has_planning %]<li>Planning &amp; project tools</li>[% END %]
+              [% IF hplan.ai_requests_per_day > 0 %]<li>[% hplan.ai_requests_per_day %] AI requests/day</li>[% END %]
+            </ul>
+            <a href="[% c.uri_for('/membership/subscribe', { plan_id => hplan.id }) %]"
+               class="btn btn-primary" style="margin-top:0.6rem;display:inline-block;font-size:0.9rem;">
+              Get Hosting →
+            </a>
+          </div>
+          [% END %]
+        </div>
+      </div>
+      [% END %]
+
       [% IF plans.size %]
       <div class="content-section">
         <h2>Available Plans</h2>
@@ -124,13 +208,22 @@
                 <td>
                   <strong>[% plan.name | html %]</strong>
                   [% IF plan.is_featured %]<span class="badge">Popular</span>[% END %]
+                  [% IF plan.inventory_item %]
+                  <br><small style="color:#888;">SKU: [% plan.inventory_item.sku | html %]</small>
+                  [% END %]
                   [% IF plan.description %]<br><small>[% plan.description | html %]</small>[% END %]
+                  [%# BOM optional add-ons %]
+                  [% IF plan.inventory_item AND plan.inventory_item.is_assemblable %]
+                  <br><small style="color:#4a8c3f;font-weight:bold;">+ Optional add-ons available</small>
+                  [% END %]
                 </td>
+                [%# Price: pull from inventory item unit_price if linked, else plan price %]
+                [% SET display_price = plan.inventory_item ? plan.inventory_item.unit_price : plan.price_monthly %]
                 <td>
-                  [% IF plan.price_monthly == 0 %]
+                  [% IF display_price == 0 %]
                     Free
                   [% ELSE %]
-                    [% plan.price_currency | html %] [% plan.price_monthly %]/mo
+                    [% plan.price_currency | html %] [% display_price %]/mo
                   [% END %]
                 </td>
                 <td>
@@ -198,6 +291,8 @@
         </div>
       </div>
       [% END %]
+
+
 
     </div>
   </div>

@@ -1,0 +1,146 @@
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Place an Order — [% sitename | html %]</h1>
+
+[% IF success_msg %]
+<p style="color:green;font-weight:bold;padding:8px;background:#d4edda;border-radius:4px;">[% success_msg %]</p>
+[% END %]
+[% IF error_msg %]
+<p style="color:red;font-weight:bold;">[% error_msg %]</p>
+[% END %]
+
+<form method="POST" action="/CustomerOrder/new" id="order-form">
+
+<h2>Your Information</h2>
+<table cellpadding="6">
+  <tr>
+    <th><label for="customer_name">Your Name *</label></th>
+    <td><input type="text" id="customer_name" name="customer_name" required maxlength="255"
+               value="[% submitted.customer_name || c.session.username | html %]" style="width:260px;"></td>
+  </tr>
+  <tr>
+    <th><label for="customer_email">Email</label></th>
+    <td><input type="email" id="customer_email" name="customer_email" maxlength="255"
+               value="[% submitted.customer_email | html %]" style="width:260px;"></td>
+  </tr>
+  <tr>
+    <th><label for="customer_phone">Phone</label></th>
+    <td><input type="tel" id="customer_phone" name="customer_phone" maxlength="50"
+               value="[% submitted.customer_phone | html %]" style="width:180px;"></td>
+  </tr>
+  <tr>
+    <th><label for="notes">Special Requests / Notes</label></th>
+    <td><textarea id="notes" name="notes" rows="3" cols="50">[% submitted.notes | html %]</textarea></td>
+  </tr>
+</table>
+
+<h2>Items to Order</h2>
+<p><small>Select items available for order. Add a note per line for colour, size, or other details.</small></p>
+
+<table id="lines-table" border="1" cellpadding="5" style="border-collapse:collapse;width:100%;">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Item</th>
+      <th>Description / Custom Request</th>
+      <th>Qty</th>
+      <th>Unit Price</th>
+      <th>Total</th>
+      <th>Notes (colour, size…)</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody id="lines-body"></tbody>
+</table>
+
+<p><button type="button" onclick="addLine()">+ Add Line</button></p>
+
+<p style="font-size:1.1em;font-weight:bold;">
+  Estimated Total: $<span id="order-total">0.00</span>
+  <small style="font-size:0.75em;font-weight:normal;">(final price confirmed on contact)</small>
+</p>
+
+<p>
+  <input type="submit" value="Submit Order"
+         style="background:#28a745;color:white;padding:8px 20px;border:none;border-radius:4px;cursor:pointer;font-size:1em;">
+  <a href="/" style="margin-left:1em;">Cancel</a>
+</p>
+</form>
+
+<script>
+var lineIndex = 0;
+
+var items = [
+[% FOREACH i IN items %]
+  { id: [% i.id %], name: "[% i.name.replace('"', '&quot;') | html %]",
+    sku: "[% i.sku | html %]", price: "[% i.unit_price || '0.00' %]",
+    description: "[% i.description.replace('"', '&quot;').replace('\n', ' ') | html %]" }[% ',' UNLESS loop.last %]
+[% END %]
+];
+
+function buildItemSelect(name, idx) {
+  var s = '<select name="' + name + '" id="item_sel_' + idx + '" onchange="itemChanged(' + idx + ')" style="max-width:220px;">'
+    + '<option value="">— select item —</option>';
+  items.forEach(function(i) {
+    s += '<option value="' + i.id + '" data-price="' + i.price
+       + '" data-desc="' + i.description.replace(/"/g, '&quot;') + '">'
+       + i.name + ' [' + i.sku + ']</option>';
+  });
+  s += '</select>';
+  return s;
+}
+
+function itemChanged(idx) {
+  var sel = document.getElementById('item_sel_' + idx);
+  var opt = sel ? sel.options[sel.selectedIndex] : null;
+  var price = opt ? (parseFloat(opt.getAttribute('data-price')) || 0) : 0;
+  var desc  = opt ? (opt.getAttribute('data-desc')  || '') : '';
+  document.getElementById('unit_price_' + idx).textContent = price.toFixed(2);
+  var descEl = document.getElementById('description_' + idx);
+  if (descEl && !descEl.value) descEl.value = desc;
+  updateLine(idx);
+}
+
+function updateLine(idx) {
+  var qty   = parseFloat(document.getElementById('qty_' + idx).value) || 0;
+  var sel   = document.getElementById('item_sel_' + idx);
+  var opt   = sel ? sel.options[sel.selectedIndex] : null;
+  var price = opt ? (parseFloat(opt.getAttribute('data-price')) || 0) : 0;
+  var lt    = qty * price;
+  document.getElementById('lt_' + idx).textContent = lt.toFixed(2);
+  recalcTotal();
+}
+
+function recalcTotal() {
+  var total = 0;
+  document.querySelectorAll('[id^="lt_"]').forEach(function(el) {
+    total += parseFloat(el.textContent) || 0;
+  });
+  document.getElementById('order-total').textContent = total.toFixed(2);
+}
+
+function removeLine(idx) {
+  var row = document.getElementById('row_' + idx);
+  if (row) row.remove();
+  recalcTotal();
+}
+
+function addLine() {
+  var idx = lineIndex++;
+  var tbody = document.getElementById('lines-body');
+  var tr = document.createElement('tr');
+  tr.id = 'row_' + idx;
+  tr.innerHTML =
+    '<td>' + (idx + 1) + '</td>'
+    + '<td>' + buildItemSelect('item_id_' + idx, idx) + '</td>'
+    + '<td><input type="text" name="description_' + idx + '" id="description_' + idx + '" style="width:160px;"></td>'
+    + '<td><input type="number" name="quantity_' + idx + '" id="qty_' + idx + '" value="1" min="1" style="width:55px;" oninput="updateLine(' + idx + ')"></td>'
+    + '<td>$<span id="unit_price_' + idx + '">0.00</span></td>'
+    + '<td>$<span id="lt_' + idx + '">0.00</span></td>'
+    + '<td><input type="text" name="notes_line_' + idx + '" style="width:120px;"></td>'
+    + '<td><button type="button" onclick="removeLine(' + idx + ')">✕</button></td>';
+  tbody.appendChild(tr);
+}
+
+addLine();
+</script>

@@ -64,6 +64,11 @@ __PACKAGE__->add_columns(
         size => 50,
         is_nullable => 1,
     },
+    inventory_item_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+        comment     => 'FK → inventory_items — defines box type and BOM (e.g. Deep Box 10-frame)',
+    },
 );
 
 __PACKAGE__->set_primary_key('id');
@@ -78,6 +83,13 @@ __PACKAGE__->belongs_to(
     'Comserv::Model::Schema::Ency::Result::Hive',
     'hive_id',
     { is_deferrable => 1, on_delete => 'CASCADE' }
+);
+
+__PACKAGE__->belongs_to(
+    'inventory_item',
+    'Comserv::Model::Schema::Ency::Result::InventoryItem',
+    { 'foreign.id' => 'self.inventory_item_id' },
+    { is_deferrable => 1, on_delete => 'SET NULL', join_type => 'LEFT' }
 );
 
 __PACKAGE__->has_many(

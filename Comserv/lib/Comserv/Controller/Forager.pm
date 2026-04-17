@@ -9,9 +9,15 @@ has 'logging' => (
 );
 BEGIN { extends 'Catalyst::Controller'; }
 
-sub index :Path :Args(0) {
+sub redirect_capital :Path('/Forager') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->redirect($c->uri_for('/forager'), 301);
+    $c->detach;
+}
+
+sub index :Path('/forager') :Args(0) {
     my ( $self, $c ) = @_;
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Starting index action");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Starting index action");
        $c->session->{MailServer} = "http://webmail.forager.com";
 
     $c->stash(template => 'Forager/index.tt');

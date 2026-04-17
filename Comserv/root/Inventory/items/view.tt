@@ -1,4 +1,4 @@
-[% PageVersion = 'Inventory/items/view.tt,v 0.01 2026/03/30 shanta Exp' %]
+[% PageVersion = 'Inventory/items/view.tt,v 0.02 2026/04/10 shanta Exp' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <h1>Item: [% item.name %]</h1>
@@ -9,6 +9,16 @@
   <a href="/Inventory/item/edit/[% item.id %]">Edit</a>
   &nbsp;|&nbsp;
   <a href="/Inventory/stock/adjust?item_id=[% item.id %]">Adjust Stock</a>
+  [% IF item.is_assemblable %]
+  &nbsp;|&nbsp;
+  <a href="/Inventory/bom/[% item.id %]"><strong>Manage BOM</strong></a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/print/bom/[% item.id %]" target="_blank">&#128438; Print BOM</a>
+  [% END %]
+  &nbsp;|&nbsp;
+  <a href="/Inventory/equipment/[% item.id %]">Equipment Details</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/print/label/[% item.id %]" target="_blank">&#128438; Print Label</a>
   &nbsp;|&nbsp;
   <a href="/Inventory/items">Back to List</a>
 </div>
@@ -18,6 +28,8 @@
   <tr><th>SKU</th><td>[% item.sku %]</td></tr>
   <tr><th>Name</th><td>[% item.name %]</td></tr>
   <tr><th>Category</th><td>[% item.category || '-' %]</td></tr>
+  <tr><th>Origin</th><td>[% item.item_origin || '-' %]</td></tr>
+  <tr><th>Has BOM?</th><td>[% item.is_assemblable ? 'Yes' : 'No' %]</td></tr>
   <tr><th>Description</th><td>[% item.description || '-' %]</td></tr>
   <tr><th>Unit of Measure</th><td>[% item.unit_of_measure %]</td></tr>
   <tr><th>Unit Cost</th><td>[% item.unit_cost ? item.unit_cost : '-' %]</td></tr>
@@ -26,6 +38,26 @@
   <tr><th>Status</th><td>[% item.status %]</td></tr>
   <tr><th>Notes</th><td>[% item.notes || '-' %]</td></tr>
   <tr><th>Created By</th><td>[% item.created_by || '-' %]</td></tr>
+</table>
+
+<h2>Accounting Links</h2>
+<table border="1" cellpadding="4">
+  <tr>
+    <th>Stock / Asset Account</th>
+    <td>[% item.inventory_account ? item.inventory_account.accno _ ' — ' _ item.inventory_account.description : '—' %]</td>
+  </tr>
+  <tr>
+    <th>Sales / Income Account</th>
+    <td>[% item.income_account ? item.income_account.accno _ ' — ' _ item.income_account.description : '—' %]</td>
+  </tr>
+  <tr>
+    <th>COGS / Expense Account</th>
+    <td>[% item.expense_account ? item.expense_account.accno _ ' — ' _ item.expense_account.description : '—' %]</td>
+  </tr>
+  <tr>
+    <th>Returns Account</th>
+    <td>[% item.returns_account ? item.returns_account.accno _ ' — ' _ item.returns_account.description : '—' %]</td>
+  </tr>
 </table>
 
 <h2>Stock Levels</h2>
@@ -58,7 +90,153 @@
 </table>
 [% END %]
 
+[% IF item.is_assemblable %]
+<h2>Bill of Materials (Components)</h2>
+
+[% IF c.flash.success_msg %]<p style="color:green">[% c.flash.success_msg %]</p>[% END %]
+[% IF c.flash.error_msg %]<p style="color:red">[% c.flash.error_msg %]</p>[% END %]
+
+[% SET bom_rows = item.bom_components %]
+[% IF bom_rows.size %]
+<table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;">
+  <thead>
+    <tr>
+      <th>Component Item</th>
+      <th>Qty</th>
+      <th>Unit</th>
+      <th>Optional?</th>
+      <th>Scrap %</th>
+      <th>Notes</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH comp IN bom_rows %]
+    <tr>
+      <td>
+        [% IF comp.component_item %]
+          <a href="/Inventory/item/view/[% comp.component_item.id %]">
+            [% comp.component_item.name | html %]
+          </a>
+          <small style="color:#666">[% comp.component_item.sku %]</small>
+        [% ELSE %]
+          #[% comp.component_item_id %]
+        [% END %]
+      </td>
+      <td style="text-align:right">[% comp.quantity %]</td>
+      <td>[% comp.unit %]</td>
+      <td style="text-align:center">[% comp.is_optional ? 'Yes' : '' %]</td>
+      <td style="text-align:right">[% comp.scrap_factor ? (comp.scrap_factor * 100) _ '%' : '' %]</td>
+      <td>[% comp.notes | html %]</td>
+      <td>
+        <form method="POST" action="/Inventory/bom/remove/[% comp.id %]"
+              onsubmit="return confirm('Remove [% comp.component_item.name | html %] from BOM?');"
+              style="display:inline;">
+          <input type="submit" value="Remove"
+                 style="background:#dc3545;color:white;border:none;padding:2px 8px;border-radius:3px;cursor:pointer;font-size:0.85em;">
+        </form>
+      </td>
+    </tr>
+  [% END %]
+  </tbody>
+</table>
+[% ELSE %]
+<p><em>No components yet. Add the first component below.</em></p>
+[% END %]
+
+<h3>Add Component</h3>
+[% IF all_items.size %]
+<form method="POST" action="/Inventory/bom/add/[% item.id %]">
+  <input type="hidden" name="redirect_to" value="item">
+  <table cellpadding="4">
+    <tr>
+      <th><label for="component_item_id">Component Item *</label></th>
+      <td>
+        <select id="component_item_id" name="component_item_id" required style="max-width:280px;"
+                onchange="setDefaultUnit(this)">
+          <option value="">— select component —</option>
+          [% FOREACH ci IN all_items %]
+          <option value="[% ci.id %]" data-uom="[% ci.unit_of_measure %]">
+            [% ci.name | html %] [[% ci.sku %]]
+          </option>
+          [% END %]
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="quantity">Quantity *</label></th>
+      <td><input type="number" id="quantity" name="quantity" value="1" min="0.0001" step="0.0001"
+                 style="width:80px;" required></td>
+    </tr>
+    <tr>
+      <th><label for="unit">Unit</label></th>
+      <td>
+        <select id="unit" name="unit">
+          <option value="each">each</option>
+          <option value="g">g</option>
+          <option value="kg">kg</option>
+          <option value="ml">ml</option>
+          <option value="L">L</option>
+          <option value="cm">cm</option>
+          <option value="m">m</option>
+          <option value="sheet">sheet</option>
+          <option value="hour">hour</option>
+        </select>
+        <small>(auto-set from item; change if needed)</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="is_optional">Optional?</label></th>
+      <td><input type="checkbox" id="is_optional" name="is_optional" value="1">
+          <small>e.g. foundation in a frame, paint on a box</small></td>
+    </tr>
+    <tr>
+      <th><label for="scrap_factor">Waste/Scrap %</label></th>
+      <td><input type="number" id="scrap_factor" name="scrap_factor" value="0" min="0" max="100"
+                 step="0.1" style="width:70px;">
+          <small>e.g. 5 = 5% extra material for waste</small></td>
+    </tr>
+    <tr>
+      <th><label for="notes">Notes</label></th>
+      <td><input type="text" id="notes" name="notes" style="width:260px;"
+                 placeholder="e.g. 30cm length, pre-drilled"></td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <input type="submit" value="Add to BOM"
+               style="background:#28a745;color:white;padding:5px 14px;border:none;border-radius:4px;cursor:pointer;">
+      </td>
+    </tr>
+  </table>
+</form>
+
+<script>
+var uomMap = {
+[% FOREACH ci IN all_items %]
+  [% ci.id %]: "[% ci.unit_of_measure %]"[% ',' UNLESS loop.last %]
+[% END %]
+};
+var unitSel = document.getElementById('unit');
+function setDefaultUnit(sel) {
+  var uom = uomMap[sel.value] || 'each';
+  for (var i = 0; i < unitSel.options.length; i++) {
+    if (unitSel.options[i].value === uom) { unitSel.selectedIndex = i; break; }
+  }
+}
+</script>
+
+[% ELSE %]
+<p><em>No other active items in this site to use as components. <a href="/Inventory/item/add">Add items</a> first.</em></p>
+[% END %]
+
+[% END %][%# end is_assemblable %]
+
 <h2>Suppliers</h2>
+
+[% IF c.flash.success_msg %]<p class="success">[% c.flash.success_msg %]</p>[% END %]
+[% IF c.flash.error_msg %]<p class="error">[% c.flash.error_msg %]</p>[% END %]
+
+[% SET linked_supplier_ids = {} %]
 [% IF item.item_suppliers.count == 0 %]
   <p>No suppliers linked.</p>
 [% ELSE %]
@@ -69,19 +247,90 @@
       <th>Supplier SKU</th>
       <th>Unit Cost</th>
       <th>Preferred</th>
+      <th>Notes</th>
+      <th>Actions</th>
     </tr>
   </thead>
   <tbody>
   [% FOREACH is IN item.item_suppliers %]
-    <tr>
-      <td>[% is.supplier.name %]</td>
-      <td>[% is.supplier_sku || '-' %]</td>
-      <td>[% is.unit_cost || '-' %]</td>
-      <td>[% is.is_preferred ? 'Yes' : 'No' %]</td>
+    [% linked_supplier_ids.${is.supplier_id} = 1 %]
+    <tr [% IF is.is_preferred %]style="background:#f0fff0"[% END %]>
+      <td>
+        <a href="/Inventory/supplier/view/[% is.supplier_id %]">[% is.supplier.name | html %]</a>
+      </td>
+      <td>[% is.supplier_sku || '-' | html %]</td>
+      <td>[% is.unit_cost ? is.unit_cost : '-' %]</td>
+      <td style="text-align:center">
+        [% IF is.is_preferred %]
+          <strong style="color:green">&#9733; Preferred</strong>
+        [% ELSE %]
+          <form method="POST" action="/Inventory/item_supplier/preferred/[% is.id %]" style="display:inline">
+            <input type="submit" value="Set Preferred"
+                   style="font-size:0.8em;padding:2px 6px;cursor:pointer;">
+          </form>
+        [% END %]
+      </td>
+      <td>[% is.notes || '-' | html %]</td>
+      <td>
+        <form method="POST" action="/Inventory/item_supplier/remove/[% is.id %]" style="display:inline"
+              onsubmit="return confirm('Remove [% is.supplier.name | html %] from this item?')">
+          <input type="submit" value="Remove"
+                 style="background:#dc3545;color:white;border:none;padding:2px 8px;border-radius:3px;cursor:pointer;font-size:0.85em;">
+        </form>
+      </td>
     </tr>
   [% END %]
   </tbody>
 </table>
+[% END %]
+
+[% IF all_suppliers.size %]
+<h3>Link a Supplier</h3>
+<form method="POST" action="/Inventory/item_supplier/add">
+  <input type="hidden" name="item_id" value="[% item.id %]">
+  <table cellpadding="4">
+    <tr>
+      <th><label for="supplier_id">Supplier *</label></th>
+      <td>
+        <select id="supplier_id" name="supplier_id" required>
+          <option value="">— select supplier —</option>
+          [% FOREACH s IN all_suppliers %]
+          <option value="[% s.id %]">[% s.name | html %]</option>
+          [% END %]
+        </select>
+        <small><a href="/Inventory/supplier/add" target="_blank">Add new supplier</a></small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="supplier_sku">Supplier SKU</label></th>
+      <td><input type="text" id="supplier_sku" name="supplier_sku" maxlength="100"
+                 placeholder="Supplier's part number"></td>
+    </tr>
+    <tr>
+      <th><label for="unit_cost">Unit Cost</label></th>
+      <td><input type="number" id="unit_cost" name="unit_cost" step="0.01" min="0"
+                 placeholder="Cost from this supplier"></td>
+    </tr>
+    <tr>
+      <th><label for="is_preferred">Preferred?</label></th>
+      <td><input type="checkbox" id="is_preferred" name="is_preferred" value="1">
+          <small>Mark as the default/preferred supplier</small></td>
+    </tr>
+    <tr>
+      <th><label for="notes">Notes</label></th>
+      <td><input type="text" id="notes" name="notes" style="width:260px;"
+                 placeholder="e.g. minimum order qty, lead time notes"></td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <input type="submit" value="Link Supplier"
+               style="background:#007bff;color:white;padding:5px 14px;border:none;border-radius:4px;cursor:pointer;">
+      </td>
+    </tr>
+  </table>
+</form>
+[% ELSE %]
+<p><em>No active suppliers in this site. <a href="/Inventory/supplier/add">Add a supplier</a> first.</em></p>
 [% END %]
 
 <h2>Recent Transactions</h2>
@@ -94,8 +343,11 @@
       <th>Date</th>
       <th>Type</th>
       <th>Qty</th>
+      <th>Unit Cost</th>
+      <th>Value</th>
       <th>Location</th>
       <th>Reference</th>
+      <th>GL Entry</th>
       <th>By</th>
       <th>Notes</th>
     </tr>
@@ -106,8 +358,15 @@
       <td>[% tx.transaction_date %]</td>
       <td>[% tx.transaction_type %]</td>
       <td>[% tx.quantity %]</td>
+      <td>[% tx.unit_cost || '-' %]</td>
+      <td>[% tx.unit_cost ? tx.total_value : '-' %]</td>
       <td>[% tx.location ? tx.location.name : '-' %]</td>
       <td>[% tx.reference_number || '-' %]</td>
+      <td>
+        [% IF tx.gl_entry %]
+          <a href="/Accounting/gl/view/[% tx.gl_entry_id %]">[% tx.gl_entry.reference %]</a>
+        [% ELSE %]—[% END %]
+      </td>
       <td>[% tx.performed_by || '-' %]</td>
       <td>[% tx.notes || '-' %]</td>
     </tr>

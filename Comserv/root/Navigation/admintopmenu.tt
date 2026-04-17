@@ -170,6 +170,51 @@
             </div>
         </div>
 
+        <!-- Marketplace — admin management -->
+        [% IF c.stash.is_admin || c.session.username == 'Shanta' %]
+        <div class="submenu-item">
+            <span class="submenu-header"><a href="/marketplace" class="dropbtn"><i class="icon-marketplace"></i>Marketplace</a></span>
+            <div class="submenu">
+                <a href="/marketplace"><i class="icon-list"></i>Browse Listings</a>
+                <a href="/marketplace/add"><i class="icon-add"></i>Add Listing</a>
+                <a href="/admin/marketplace"><i class="icon-admin"></i>Manage Listings</a>
+                <a href="/admin/marketplace/categories"><i class="icon-folder"></i>Manage Categories</a>
+            </div>
+        </div>
+        [% END %]
+
+        <!-- Inventory & Accounting — admin only -->
+        [% IF c.stash.is_admin || c.session.username == 'Shanta' %]
+        <div class="submenu-item">
+            <span class="submenu-header"><a href="/Inventory" class="dropbtn"><i class="icon-inventory"></i>Inventory</a></span>
+            <div class="submenu">
+                <a href="/Inventory"><i class="icon-inventory"></i>Inventory Dashboard</a>
+                <a href="/Inventory/items"><i class="icon-list"></i>Items / SKUs</a>
+                <a href="/Inventory/item/add"><i class="icon-add"></i>Add Item</a>
+                <a href="/Inventory/suppliers"><i class="icon-supplier"></i>Suppliers</a>
+                <a href="/Inventory/locations"><i class="icon-location"></i>Locations</a>
+                <a href="/Inventory/bom/list"><i class="fas fa-sitemap"></i>Bill of Materials</a>
+                <a href="/Inventory/invoice"><i class="icon-invoice"></i>Supplier Invoices (AP)</a>
+                <a href="/Inventory/sales"><i class="icon-invoice"></i>Sales Invoices (AR)</a>
+                <div class="submenu-section">
+                    <span class="submenu-section-title">Shop / Orders</span>
+                    <a href="/shop"><i class="fas fa-store"></i>Online Store</a>
+                    <a href="/shop/admin"><i class="fas fa-store-alt"></i>Manage Store</a>
+                    <a href="/Cart/price_list"><i class="fas fa-print"></i>Price List (Printable)</a>
+                    <a href="/Cart/orders"><i class="fas fa-shopping-cart"></i>Cart Orders</a>
+                    <a href="/CustomerOrder"><i class="icon-cart"></i>Customer Orders</a>
+                    <a href="/Inventory/consignment"><i class="fas fa-handshake"></i>Consignments</a>
+                </div>
+                <div class="submenu-section">
+                    <span class="submenu-section-title">Accounting</span>
+                    <a href="/Accounting"><i class="icon-accounting"></i>Accounting Dashboard</a>
+                    <a href="/Accounting/coa"><i class="icon-coa"></i>Chart of Accounts</a>
+                    <a href="/Accounting/gl"><i class="icon-gl"></i>General Ledger</a>
+                </div>
+            </div>
+        </div>
+        [% END %]
+
         <!-- Logging -->
         <div class="submenu-item">
             <span class="submenu-header"><a href="/log"><i class="icon-log"></i>Logging</a></span>
