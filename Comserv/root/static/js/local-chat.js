@@ -33,6 +33,7 @@
         activeModel: null,
         isGuest: true,
         isAdmin: false,
+        isDevMode: false,           // true only on local development machine
         userModelOverride: false,   // true when user manually picks a model
         modelTiers: {
             small:  null,   // fastest/smallest Ollama model
@@ -202,6 +203,7 @@
         // Check each agent's URL patterns
         for (const [agentKey, agent] of Object.entries(agents)) {
             if (!agent.url_patterns) continue;
+            if (agent.local_only && !state.isDevMode) continue;
             
             // Check if any URL pattern matches the current pathname (case-insensitive)
             const pathLower = pathname.toLowerCase();
@@ -489,9 +491,10 @@
             .then(r => r.json())
             .then(function(data) {
                 if (data.success) {
-                    if (data.username)  state.username = data.username;
-                    if (data.is_admin)  state.isAdmin  = !!data.is_admin;
-                    if (data.is_guest !== undefined) state.isGuest = !!data.is_guest;
+                    if (data.username)  state.username   = data.username;
+                    if (data.is_admin)  state.isAdmin    = !!data.is_admin;
+                    if (data.is_guest !== undefined) state.isGuest   = !!data.is_guest;
+                    if (data.is_dev   !== undefined) state.isDevMode = !!data.is_dev;
                 }
                 if (data.success && data.providers && data.providers.length > 0) {
                     const sel = document.getElementById('ai-provider');
@@ -970,9 +973,10 @@
         .then(data => {
             if (!data.success) return;
 
-            if (data.username)              state.username = data.username;
-            if (data.is_admin !== undefined) state.isAdmin = !!data.is_admin;
-            if (data.is_guest !== undefined) state.isGuest = !!data.is_guest;
+            if (data.username)              state.username   = data.username;
+            if (data.is_admin !== undefined) state.isAdmin   = !!data.is_admin;
+            if (data.is_guest !== undefined) state.isGuest   = !!data.is_guest;
+            if (data.is_dev   !== undefined) state.isDevMode = !!data.is_dev;
 
             // Hide provider selector and history button for guests / non-admins
             if (data.is_guest || !data.can_access_history) {
