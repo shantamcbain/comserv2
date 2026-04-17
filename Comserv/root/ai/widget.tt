@@ -332,12 +332,14 @@
     // Model size score — lower = smaller/faster
     function ffModelScore(id) {
         var s = id.toLowerCase();
-        if (s.match(/0\.5b|1b|1\.5b|tiny|nano/)) return 1;
-        if (s.match(/3b|mini/))                   return 2;
-        if (s.match(/7b|8b/))                     return 3;
-        if (s.match(/13b|14b|20b/))               return 4;
-        if (s.match(/30b|34b|70b|large/))         return 5;
-        if (s.match(/grok-3/))                    return 7;
+        if (s.match(/0\.5b|1b|1\.5b|tiny|nano/))  return 1;
+        if (s.match(/3b|4b|mini/))                 return 2;
+        if (s.match(/7b|8b/))                      return 3;
+        if (s.match(/13b|14b|20b/))                return 4;
+        if (s.match(/30b|34b|70b|large/))          return 5;
+        if (s.match(/grok-4.*fast/))               return 6;
+        if (s.match(/grok-3-mini|grok-3-fast/))    return 6;
+        if (s.match(/grok-4|grok-3/))              return 7;
         return 3; // unknown → treat as medium
     }
 
@@ -347,12 +349,12 @@
             // No local Ollama models — fall back to Grok for search
             var grokModel = FF_ALL_MODELS.grok[0];
             return grokModel ? { model: grokModel, provider: 'grok' }
-                             : { model: 'mistral:latest', provider: 'ollama' };
+                             : { model: 'gemma3:4b', provider: 'ollama' };
         }
         if (!FF_ALL_MODELS.ollama.length) {
             var grokModel = FF_ALL_MODELS.grok[0];
             return grokModel ? { model: grokModel, provider: 'grok' }
-                             : { model: 'mistral:latest', provider: 'ollama' };
+                             : { model: 'gemma3:4b', provider: 'ollama' };
         }
         // Sort ollama models by size score
         var ranked = FF_ALL_MODELS.ollama.slice().sort(function(a,b){ return ffModelScore(a)-ffModelScore(b); });
@@ -382,7 +384,7 @@
                             });
                     }
                     if (p.service === 'ollama' && p.models) {
-                        p.models.filter(function(m){ return m.id && !m.id.match(/embed|rerank|tinyllama|phi:2|llava/i); })
+                        p.models.filter(function(m){ return m.id && !m.id.match(/embed|rerank|tinyllama|phi:2|llava|whisper|tts/i); })
                             .forEach(function(m) {
                                 FF_ALL_MODELS.ollama.push(m.id);
                                 opts.push({ val: m.id+'|ollama', label: m.id+' (Ollama)' });
@@ -413,7 +415,8 @@
             })
             .catch(function() {
                 sel.innerHTML = '<option value="auto|auto">⚡ Auto (recommended)</option>'
-                              + '<option value="mistral:latest|ollama">mistral:latest (Ollama)</option>';
+                              + '<option value="gemma3:4b|ollama">gemma3:4b (Ollama)</option>'
+                              + '<option value="qwen2.5:7b|ollama">qwen2.5:7b (Ollama)</option>';
             });
     }
 
