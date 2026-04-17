@@ -1,20 +1,55 @@
-[% IF is_admin %]
-<div id="ency-ai-fill-panel" style="margin:1em 0;padding:1em;border:1px solid #acd;background:#f0f7ff;border-radius:4px;">
+[% IF is_editor %]
+<div id="ency-ai-fill-panel" style="margin:1em 0;padding:1em;border:1px solid #acd;background:#f0f7ff;border-radius:6px;">
   <strong>Ask AI to Fill Form</strong>
-  <span id="ency-ai-prompt-data" data-prompt="[% ency_ai_prompt | html %]" style="display:none;"></span>
-  <div style="margin-top:0.5em;display:flex;flex-wrap:wrap;gap:0.5em;align-items:center;">
-    <input type="text" id="ency-ai-entity-name" placeholder="Enter name to look up (e.g. Betaderm cream)..." size="40" />
+  <span id="ency-ai-prompt-data"
+        data-prompt="[% ency_ai_prompt | html %]"
+        data-auto-search="[% ency_ai_auto_web_search | html %]"
+        style="display:none;"></span>
+  <div style="margin-top:0.6em;display:flex;flex-wrap:wrap;gap:0.5em;align-items:center;">
+    <input type="text" id="ency-ai-entity-name" placeholder="Enter name to look up…" size="38"
+           value="[% ency_ai_entity_name | html %]" />
     <select id="ency-ai-model-sel" title="AI model to use" style="font-size:0.9em;">
-      <option value="grok-3-mini|grok"  >Grok 3 Mini (fast)</option>
-      <option value="grok-3|grok" selected>Grok 3 (recommended)</option>
-      <option value="grok-4-0709|grok"  >Grok 4 (best)</option>
+      <option value="grok-4-0709|grok" selected>Grok 4 (loading…)</option>
     </select>
     <button type="button" id="ency-ai-ask-btn" onclick="encyAiFill()">Ask AI</button>
-    <span id="ency-ai-status" style="color:#555;font-style:italic;"></span>
+    <button type="button" id="ency-ai-review-btn" onclick="encyAiReview()"
+            title="Send current field values to AI and ask it to identify errors or inconsistencies"
+            style="background:#fff3cd;border:1px solid #ffc107;padding:0.3em 0.7em;cursor:pointer;">Review &amp; Correct</button>
+    [% IF is_admin %]
+    <button type="button" id="ency-ai-sync-btn" onclick="encyAiSyncModels()"
+            title="Sync available xAI model list from the API — run this if AI returns 410/deprecated errors"
+            style="background:#e8f4e8;border:1px solid #5a9;padding:0.3em 0.7em;cursor:pointer;font-size:0.85em;">&#8635; Sync Models</button>
+    [% END %]
+    <span id="ency-ai-status" style="color:#555;font-style:italic;font-size:0.9em;"></span>
+  </div>
+  <div style="margin-top:0.5em;font-size:0.85em;color:#444;">
+    <label style="font-weight:bold;" title="Leave blank to ask AI about all fields. Enter field names to ONLY update those fields and leave everything else untouched.">
+      Limit to specific fields (leave blank for all):
+    </label>
+    <input type="text" id="ency-ai-target-fields"
+           placeholder="e.g. harvest, preparation, dosage"
+           style="width:28em;font-size:0.95em;margin-left:0.4em;"
+           title="Only these fields will be filled by AI. All other fields are untouched regardless of what AI returns." />
+    <span style="color:#888;margin-left:0.4em;">⚠ Always fill specific fields when correcting a single field.</span>
+  </div>
+  <div style="margin-top:0.4em;font-size:0.82em;color:#666;">
+    <label style="cursor:pointer;">
+      <input type="checkbox" id="ency-ai-override" style="vertical-align:middle;">
+      Override existing values (default: only fills empty fields)
+    </label>
+    &nbsp;&nbsp;
+    <label style="cursor:pointer;" title="Enables Grok live web search for current data (may be unavailable on some plans)">
+      <input type="checkbox" id="ency-ai-web-search" style="vertical-align:middle;">
+      Use live web search (Grok only — required for accurate author/person data)
+    </label>
+    <span style="margin-left:1em;color:#888;">
+      Note: The <em>Reference</em> field is always appended, never replaced.
+      For <strong>authors and people</strong>, always enable web search for accurate results.
+    </span>
   </div>
   <div id="ency-ai-raw" style="display:none;margin-top:0.8em;">
     <strong>AI Raw Response:</strong>
-    <pre id="ency-ai-raw-text" style="background:#eee;padding:0.5em;max-height:180px;overflow:auto;font-size:0.85em;"></pre>
+    <pre id="ency-ai-raw-text" style="background:#eee;padding:0.5em;max-height:180px;overflow:auto;font-size:0.85em;white-space:pre-wrap;"></pre>
     <button type="button" onclick="encyAiMarkReference()">Mark Reference as AI-generated</button>
     <span style="color:#888;font-size:0.85em;margin-left:0.5em;">Appends attribution to the Reference field.</span>
   </div>
@@ -22,52 +57,153 @@
     <strong>ENCY Links Found:</strong>
     <div id="ency-resolve-results" style="margin-top:0.4em;"></div>
   </div>
+  <div id="ency-review-panel" style="display:none;margin-top:0.8em;border-top:2px solid #ffc107;padding-top:0.6em;">
+    <strong style="color:#856404;">AI Review Suggestions:</strong>
+    <div id="ency-review-results" style="margin-top:0.4em;"></div>
+  </div>
+  <div id="ency-ref-picker-panel" style="margin-top:0.8em;border-top:1px solid #acd;padding-top:0.6em;">
+    <strong>Reference Picker</strong>
+    <span style="font-size:0.85em;color:#666;margin-left:0.5em;">Search the reference library and formally link a citation to this record.</span>
+    <div style="margin-top:0.5em;display:flex;gap:0.5em;flex-wrap:wrap;align-items:center;">
+      <input type="text" id="ency-ref-search-input" placeholder="Search by title, author, or ISBN…" size="38"
+             oninput="encyRefSearch(this.value)" style="font-size:0.95em;" />
+      <a href="/ENCY/Reference/add" target="_blank" style="font-size:0.85em;white-space:nowrap;">+ Add new reference</a>
+    </div>
+    <div id="ency-ref-search-results" style="margin-top:0.5em;"></div>
+    <div id="ency-ref-linked-chips" style="margin-top:0.5em;"></div>
+  </div>
+  <div id="ency-ai-staged-panel" style="display:none;margin-top:0.8em;border-top:2px solid #4a90d9;padding-top:0.6em;">
+    <div style="display:flex;align-items:center;gap:0.8em;margin-bottom:0.6em;flex-wrap:wrap;">
+      <strong style="color:#1a4a7a;">AI Suggestions — Fields With Existing Content:</strong>
+      <button type="button" id="ency-ai-stage-all-btn" onclick="encyStageAll()" style="padding:0.25em 0.7em;cursor:pointer;background:#d4edda;border:1px solid #28a745;border-radius:3px;">Append All</button>
+      <button type="button" id="ency-ai-skip-all-btn" onclick="encySkipAll()" style="padding:0.25em 0.7em;cursor:pointer;background:#f8f9fa;border:1px solid #aaa;border-radius:3px;">Skip All</button>
+      <span style="font-size:0.82em;color:#666;">Choose action per field, or use buttons above for bulk action.</span>
+    </div>
+    <div id="ency-ai-staged-items"></div>
+  </div>
 </div>
+
 <script>
 (function() {
+    // ── Dynamic model loader ── same endpoint as local-chat.js ──────────────
+    function loadEncyModelOptions() {
+        var sel = document.getElementById('ency-ai-model-sel');
+        if (!sel) return;
+        fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.success || !data.providers) return;
+                var grokProvider = null;
+                data.providers.forEach(function(p) { if (p.service === 'grok') grokProvider = p; });
+                if (!grokProvider) return;
+                var FALLBACK = [
+                    { val: 'grok-4-0709|grok',               label: 'Grok 4' },
+                    { val: 'grok-4-fast-non-reasoning|grok', label: 'Grok 4 Fast' },
+                    { val: 'grok-code-fast-1|grok',          label: 'Grok Code Fast' }
+                ];
+                var models = (grokProvider.models && grokProvider.models.length > 0)
+                    ? grokProvider.models
+                        .filter(function(m) { return m.id && !m.id.match(/imagine|video/i); })
+                        .map(function(m) {
+                            var lbl = m.id.replace(/-/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+                            return { val: m.id + '|grok', label: lbl + ' (xAI)' };
+                        })
+                    : FALLBACK;
+                sel.innerHTML = '';
+                models.forEach(function(m, i) {
+                    var opt = document.createElement('option');
+                    opt.value = m.val;
+                    opt.textContent = m.label;
+                    if (i === 0) opt.selected = true;
+                    sel.appendChild(opt);
+                });
+            })
+            .catch(function() { /* keep default option on failure */ });
+    }
+    loadEncyModelOptions();
+    // Auto-check web-search for entity types that need it (e.g. authors/people)
+    (function() {
+        var pd = document.getElementById('ency-ai-prompt-data');
+        if (pd && pd.getAttribute('data-auto-search') === '1') {
+            var ws = document.getElementById('ency-ai-web-search');
+            if (ws) ws.checked = true;
+        }
+    })();
+    // ────────────────────────────────────────────────────────────────────────
+
+    var INTEGRATIVE_SYSTEM = [
+        'You are an integrative health encyclopedia assistant serving a multi-disciplinary practitioner team:',
+        'MDs, naturopathic doctors (NDs), herbalists, TCM practitioners, Ayurvedic practitioners,',
+        'and other complementary healthcare providers.',
+        '',
+        'Your role is to provide balanced, evidence-informed information from MULTIPLE healing traditions.',
+        'Do NOT default to allopathic/pharmaceutical framing as the primary or only valid approach.',
+        'Present information from ALL relevant traditions where known:',
+        '  - Conventional medicine (allopathic/pharmaceutical)',
+        '  - Naturopathic medicine',
+        '  - Herbal/botanical medicine (western, TCM, Ayurvedic, indigenous)',
+        '  - Traditional Chinese Medicine (TCM) where relevant',
+        '  - Ayurvedic medicine where relevant',
+        '',
+        'The encyclopedia supports INFORMED PATIENT DECISION-MAKING.',
+        'Users are practitioners helping patients choose their own healthcare approach.',
+        'Do NOT add disclaimers telling people to consult a doctor — this IS a practitioner tool.',
+        'Do NOT present pharmaceutical or surgical intervention as default or superior.',
+        'Do NOT omit herbal, naturopathic, or traditional treatments.',
+        '',
+        'Return ONLY a raw JSON object. No markdown, no code fences, no disclaimers, no prose — pure JSON only.'
+    ].join(' ');
+
     function getModelAndProvider() {
         var sel = document.getElementById('ency-ai-model-sel');
         if (sel && sel.value) {
             var parts = sel.value.split('|');
             return { model: parts[0], provider: parts[1] || 'grok' };
         }
-        var widgetSel = document.getElementById('model-select');
-        if (widgetSel && widgetSel.selectedIndex >= 0) {
-            var opt = widgetSel.options[widgetSel.selectedIndex];
-            return {
-                model:    opt.value || 'grok-3',
-                provider: opt.getAttribute('data-provider') || 'grok'
-            };
-        }
-        return { model: 'grok-3', provider: 'grok' };
+        return { model: 'grok-4-0709', provider: 'grok' };
     }
 
     function encyAiFill() {
         var name = document.getElementById('ency-ai-entity-name').value.trim();
         if (!name) { alert('Please enter a name to look up.'); return; }
-        var promptEl  = document.getElementById('ency-ai-prompt-data');
-        var systemPrompt = promptEl ? promptEl.getAttribute('data-prompt') : '';
-        var statusEl  = document.getElementById('ency-ai-status');
-        var btn       = document.getElementById('ency-ai-ask-btn');
-        btn.disabled  = true;
+        var promptEl     = document.getElementById('ency-ai-prompt-data');
+        var allFieldList = promptEl ? promptEl.getAttribute('data-prompt') : '';
+        var statusEl     = document.getElementById('ency-ai-status');
+        var btn          = document.getElementById('ency-ai-ask-btn');
+        var overrideAll  = document.getElementById('ency-ai-override').checked;
+
+        // Parse target fields — if set, ONLY these fields will be requested and applied
+        var targetInput = document.getElementById('ency-ai-target-fields');
+        var targetRaw   = targetInput ? targetInput.value.trim() : '';
+        var targetFields = targetRaw
+            ? targetRaw.split(/[\s,;]+/).map(function(f){ return f.trim().toLowerCase(); }).filter(Boolean)
+            : [];
+        var fieldList = targetFields.length ? targetFields.join(', ') : allFieldList;
+
+        btn.disabled     = true;
         document.getElementById('ency-ai-raw').style.display = 'none';
         document.getElementById('ency-resolve-panel').style.display = 'none';
 
-        var mp = getModelAndProvider();
-        var isGrok = (mp.provider === 'grok');
+        var mp        = getModelAndProvider();
+        var isGrok    = (mp.provider === 'grok');
+        var timeoutMs = isGrok ? 45000 : 120000;
         statusEl.textContent = 'Asking ' + mp.model + '\u2026';
 
         var controller = new AbortController();
-        var timeoutMs  = isGrok ? 45000 : 120000;
         var timeoutId  = setTimeout(function() { controller.abort(); }, timeoutMs);
 
+        var fieldInstruction = targetFields.length
+            ? 'Return ONLY a raw JSON object containing ONLY these specific fields (no other fields): ' + fieldList + '. Do NOT include any other fields in the response even if you know them.'
+            : 'Return ONLY a raw JSON object (no markdown, no code blocks, no explanation) with encyclopedia fields. Fields to include: ' + fieldList;
+
         var payload = {
-            prompt:     'Return ONLY a raw JSON object (no markdown, no code blocks, no explanation) with encyclopedia fields for: ' + name + '. Required fields: ' + systemPrompt,
-            system:     'You are an encyclopedia data assistant. Return ONLY a raw JSON object with the requested fields filled in for the named entity. No markdown, no code fences, no prose \u2014 pure JSON only.',
+            prompt:     fieldInstruction + ' The subject is: ' + name,
+            system:     INTEGRATIVE_SYSTEM,
             provider:   mp.provider,
             model:      mp.model,
             page_path:  window.location.pathname,
-            page_title: document.title
+            page_title: document.title,
+            use_search: (mp.provider === 'grok') && document.getElementById('ency-ai-web-search') && document.getElementById('ency-ai-web-search').checked
         };
 
         fetch('/ai/generate', {
@@ -96,28 +232,55 @@
             var raw = (data.response || '').trim();
             document.getElementById('ency-ai-raw-text').textContent = raw;
             document.getElementById('ency-ai-raw').style.display = '';
+
             var jsonStart = raw.indexOf('{');
             var jsonEnd   = raw.lastIndexOf('}');
             if (jsonStart === -1 || jsonEnd === -1) {
                 statusEl.textContent = '[' + modelUsed + '] AI did not return JSON. See raw response above.';
                 return;
             }
+
             try {
                 var fields = JSON.parse(raw.substring(jsonStart, jsonEnd + 1));
-                var filled = 0, skipped = [];
+                var filled = 0, blocked = [], staged = [], skipped = [];
+
                 Object.keys(fields).forEach(function(key) {
-                    var el = document.querySelector('[name="' + key + '"]');
-                    if (!el || fields[key] === null || fields[key] === undefined || fields[key] === '') return;
-                    var raw = fields[key];
-                    var val;
-                    if (Array.isArray(raw)) {
-                        val = raw.join('\n');
-                    } else if (typeof raw === 'object') {
-                        val = Object.entries(raw).map(function(e){ return e[0] + ': ' + e[1]; }).join('\n');
-                    } else {
-                        val = String(raw);
+                    // If target fields specified, skip any field not in the list
+                    if (targetFields.length && targetFields.indexOf(key.toLowerCase()) === -1) {
+                        blocked.push(key);
+                        return;
                     }
+                    var el = document.querySelector('[name="' + key + '"]');
+                    if (!el) return;
+                    var aiValue = fields[key];
+                    if (aiValue === null || aiValue === undefined || aiValue === '') return;
+
+                    // Normalise AI value to string
+                    var val;
+                    if (Array.isArray(aiValue)) {
+                        val = aiValue.join('\n');
+                    } else if (typeof aiValue === 'object') {
+                        val = Object.entries(aiValue).map(function(e){ return e[0] + ': ' + e[1]; }).join('\n');
+                    } else {
+                        val = String(aiValue);
+                    }
+
+                    // --- Reference field: always APPEND, never replace ---
+                    if (key === 'reference') {
+                        var existing = (el.value || '').trim();
+                        if (existing) {
+                            el.value = existing + '\n' + val;
+                        } else {
+                            el.value = val;
+                        }
+                        filled++;
+                        return;
+                    }
+
                     if (el.tagName === 'SELECT') {
+                        // Only set if empty (no selection) or override enabled
+                        var hasSelection = (el.selectedIndex > 0 && el.options[el.selectedIndex].value !== '');
+                        if (hasSelection && !overrideAll) { skipped.push(key); return; }
                         var matched = false;
                         for (var i = 0; i < el.options.length; i++) {
                             var optVal  = el.options[i].value.toLowerCase();
@@ -133,23 +296,40 @@
                         }
                         if (!matched) skipped.push(key + '=' + val);
                     } else {
-                        el.value = val;
-                        filled++;
+                        var currentVal = (el.value || '').trim();
+                        if (!currentVal) {
+                            el.value = val;
+                            filled++;
+                            return;
+                        }
+                        if (overrideAll) {
+                            el.value = val;
+                            filled++;
+                            return;
+                        }
+                        if (currentVal.indexOf(val) !== -1) {
+                            return;
+                        }
+                        staged.push({ key: key, el: el, currentVal: currentVal, aiVal: val });
                     }
                 });
-                var msg = 'Model: ' + modelUsed + ' \u2014 Filled ' + filled + ' field(s). Review carefully \u2014 AI data may be approximate.';
-                if (skipped.length) { msg += ' (Skipped selects: ' + skipped.join(', ') + ')'; }
+
+                var msg = '[' + modelUsed + '] Filled ' + filled + ' field(s) directly.';
+                if (staged.length)   { msg += ' ' + staged.length + ' field(s) staged for review — see diff panel below.'; }
+                if (blocked.length)  { msg += ' Blocked (not in target list): ' + blocked.join(', '); }
+                if (skipped.length)  { msg += ' Skipped (SELECT already set): ' + skipped.join(', '); }
                 statusEl.textContent = msg;
+                encyRenderStagedDiff(staged);
                 encyResolveLinks(fields);
             } catch(e) {
-                statusEl.textContent = 'Could not parse JSON. See raw response above.';
+                statusEl.textContent = 'Could not parse JSON: ' + e.message + '. See raw response.';
             }
         })
         .catch(function(err) {
             clearTimeout(timeoutId);
             btn.disabled = false;
             if (err.name === 'AbortError') {
-                statusEl.textContent = 'Request timed out (' + Math.round(timeoutMs/1000) + 's) using ' + mp.model + '. Try a faster model or try again.';
+                statusEl.textContent = 'Timed out (' + Math.round(timeoutMs/1000) + 's) — try a faster model.';
             } else {
                 statusEl.textContent = 'Request failed: ' + err.message;
             }
@@ -161,30 +341,25 @@
         var results = document.getElementById('ency-resolve-results');
         results.innerHTML = '';
         panel.style.display = 'none';
-
-        var tasks = [];
+        var tasks = [], found = 0;
 
         function addTask(label, fieldText, type) {
             if (!fieldText) return;
             var text = Array.isArray(fieldText) ? fieldText.join(', ') : String(fieldText);
-            var terms = text.split(/[,;\n]+/).map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 2; });
-            terms.forEach(function(term) {
-                tasks.push({ label: label, term: term, type: type });
-            });
+            text.split(/[,;\n]+/).map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 2; })
+                .forEach(function(term) { tasks.push({ label: label, term: term, type: type }); });
         }
 
-        addTask('Herb',        fields.herbal_alternatives, 'herb');
-        addTask('Herb',        fields.herb_drug_interactions, 'herb');
-        addTask('Disease',     fields.indications,    'disease');
-        addTask('Disease',     fields.contraindications, 'disease');
-        addTask('Symptom',     fields.side_effects,   'symptom');
-        addTask('Constituent', fields.active_ingredients, 'constituent');
+        addTask('Herb',        fields.herbal_alternatives,    'herb');
+        addTask('Herb',        fields.herb_drug_interactions,  'herb');
+        addTask('Disease',     fields.indications,             'disease');
+        addTask('Disease',     fields.contraindications,       'disease');
+        addTask('Symptom',     fields.side_effects,            'symptom');
+        addTask('Constituent', fields.active_ingredients,      'constituent');
+        addTask('Herb',        fields.found_in_herbs,          'herb');
 
         if (!tasks.length) return;
-
-        var found = 0;
         var pending = tasks.length;
-
         tasks.forEach(function(task) {
             fetch('/ENCY/api/resolve?type=' + encodeURIComponent(task.type) + '&q=' + encodeURIComponent(task.term), { credentials: 'include' })
             .then(function(r){ return r.json(); })
@@ -195,8 +370,7 @@
                         var chip = document.createElement('span');
                         chip.style.cssText = 'display:inline-block;margin:2px 4px;padding:2px 8px;background:#dff0d8;border:1px solid #a3c77e;border-radius:10px;font-size:0.85em;';
                         var link = document.createElement('a');
-                        link.href   = rec.url;
-                        link.target = '_blank';
+                        link.href = rec.url; link.target = '_blank';
                         link.textContent = task.label + ': ' + rec.name + (rec.secondary ? ' (' + rec.secondary + ')' : '');
                         chip.appendChild(link);
                         results.appendChild(chip);
@@ -206,10 +380,108 @@
             .catch(function(){})
             .finally(function() {
                 pending--;
-                if (pending === 0 && found > 0) {
-                    panel.style.display = '';
-                }
+                if (pending === 0 && found > 0) panel.style.display = '';
             });
+        });
+    }
+
+    function encyRenderStagedDiff(staged) {
+        var panel     = document.getElementById('ency-ai-staged-panel');
+        var container = document.getElementById('ency-ai-staged-items');
+        container.innerHTML = '';
+        panel.style.display = 'none';
+        if (!staged || !staged.length) return;
+        panel.style.display = '';
+
+        staged.forEach(function(item) {
+            var div = document.createElement('div');
+            div.className = 'ency-staged-item';
+            div.style.cssText = 'margin:0.5em 0;padding:0.6em;background:#f0f7ff;border:1px solid #4a90d9;border-radius:4px;';
+            div.setAttribute('data-key', item.key);
+
+            var label = document.createElement('div');
+            label.style.cssText = 'font-weight:bold;margin-bottom:0.3em;';
+            label.textContent = item.key;
+            div.appendChild(label);
+
+            var diffWrap = document.createElement('div');
+            diffWrap.style.cssText = 'display:flex;gap:0.5em;margin-bottom:0.4em;flex-wrap:wrap;';
+
+            var existingBox = document.createElement('div');
+            existingBox.style.cssText = 'flex:1;min-width:200px;padding:0.4em;background:#fff8f8;border:1px solid #f5c6cb;border-radius:3px;font-size:0.85em;white-space:pre-wrap;max-height:120px;overflow:auto;';
+            existingBox.innerHTML = '<em style="color:#856404;display:block;margin-bottom:0.2em;">Existing</em>' + item.currentVal.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+            var aiBox = document.createElement('div');
+            aiBox.style.cssText = 'flex:1;min-width:200px;padding:0.4em;background:#f0fff4;border:1px solid #a3d9a5;border-radius:3px;font-size:0.85em;white-space:pre-wrap;max-height:120px;overflow:auto;';
+            aiBox.innerHTML = '<em style="color:#155724;display:block;margin-bottom:0.2em;">AI suggestion</em>' + item.aiVal.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+            diffWrap.appendChild(existingBox);
+            diffWrap.appendChild(aiBox);
+            div.appendChild(diffWrap);
+
+            var btnWrap = document.createElement('div');
+            btnWrap.style.cssText = 'display:flex;gap:0.5em;';
+
+            function makeActionBtn(label, style, handler) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = label;
+                b.style.cssText = style;
+                b.onclick = function() { handler(b); };
+                return b;
+            }
+
+            var appendBtn = makeActionBtn('Append',
+                'padding:0.25em 0.7em;cursor:pointer;font-size:0.9em;background:#d4edda;border:1px solid #28a745;border-radius:3px;',
+                function(btn) {
+                    item.el.value = item.currentVal + '\n' + item.aiVal;
+                    div.style.background = '#e8f5e9';
+                    div.style.borderColor = '#4caf50';
+                    btnWrap.querySelectorAll('button').forEach(function(b){ b.disabled = true; });
+                    btn.disabled = false;
+                    btn.textContent = '\u2713 Appended';
+                });
+
+            var replaceBtn = makeActionBtn('Replace',
+                'padding:0.25em 0.7em;cursor:pointer;font-size:0.9em;background:#fff3cd;border:1px solid #ffc107;border-radius:3px;',
+                function(btn) {
+                    item.el.value = item.aiVal;
+                    div.style.background = '#fff3cd';
+                    div.style.borderColor = '#ffc107';
+                    btnWrap.querySelectorAll('button').forEach(function(b){ b.disabled = true; });
+                    btn.disabled = false;
+                    btn.textContent = '\u2713 Replaced';
+                });
+
+            var skipBtn = makeActionBtn('Skip',
+                'padding:0.25em 0.7em;cursor:pointer;font-size:0.9em;background:#f8f9fa;border:1px solid #aaa;border-radius:3px;',
+                function(btn) {
+                    div.style.background = '#f8f9fa';
+                    div.style.borderColor = '#aaa';
+                    btnWrap.querySelectorAll('button').forEach(function(b){ b.disabled = true; });
+                    btn.disabled = false;
+                    btn.textContent = '\u2713 Skipped';
+                });
+
+            btnWrap.appendChild(appendBtn);
+            btnWrap.appendChild(replaceBtn);
+            btnWrap.appendChild(skipBtn);
+            div.appendChild(btnWrap);
+            container.appendChild(div);
+        });
+    }
+
+    function encyStageAll() {
+        document.querySelectorAll('#ency-ai-staged-items .ency-staged-item').forEach(function(div) {
+            var btns = div.querySelectorAll('button');
+            if (btns[0] && !btns[0].disabled) btns[0].click();
+        });
+    }
+
+    function encySkipAll() {
+        document.querySelectorAll('#ency-ai-staged-items .ency-staged-item').forEach(function(div) {
+            var btns = div.querySelectorAll('button');
+            if (btns[2] && !btns[2].disabled) btns[2].click();
         });
     }
 
@@ -218,15 +490,366 @@
         if (!refEl) return;
         var mp   = getModelAndProvider();
         var note = 'AI-generated (' + mp.model + '), reviewed by [% c.session.username | html %]';
-        if (refEl.value && refEl.value.indexOf('AI-generated') === -1) {
-            refEl.value = refEl.value + '\n' + note;
-        } else if (!refEl.value) {
+        var existing = (refEl.value || '').trim();
+        if (existing && existing.indexOf('AI-generated') === -1) {
+            refEl.value = existing + '\n' + note;
+        } else if (!existing) {
             refEl.value = note;
         }
     }
 
-    window.encyAiFill          = encyAiFill;
-    window.encyAiMarkReference = encyAiMarkReference;
+    function encyAiReview() {
+        var name = document.getElementById('ency-ai-entity-name').value.trim();
+        if (!name) { alert('Please enter the entity name first so AI knows what it is reviewing.'); return; }
+        var statusEl = document.getElementById('ency-ai-status');
+        var btn      = document.getElementById('ency-ai-review-btn');
+        var panel    = document.getElementById('ency-review-panel');
+        var results  = document.getElementById('ency-review-results');
+        btn.disabled = true;
+        panel.style.display = 'none';
+        results.innerHTML   = '';
+        statusEl.textContent = 'Reviewing current field values\u2026';
+
+        // Collect current field values from the form
+        var currentValues = {};
+        var inputs = document.querySelectorAll('input[name], textarea[name], select[name]');
+        inputs.forEach(function(el) {
+            var n = el.name;
+            if (!n || n === 'record_id') return;
+            var v = (el.value || '').trim();
+            if (v) currentValues[n] = v;
+        });
+
+        var mp        = getModelAndProvider();
+        var timeoutMs = 60000;
+        var controller = new AbortController();
+        setTimeout(function() { controller.abort(); }, timeoutMs);
+
+        var prompt = 'You are reviewing an ENCY encyclopedia record for "' + name + '". '
+            + 'Below are the CURRENT field values from the form. '
+            + 'Identify fields that appear INCORRECT, inconsistent with the entity, or obviously wrong (e.g. a disease name in the wrong record, wrong species data, mismatched content). '
+            + 'ONLY flag fields you are confident are wrong. Do NOT suggest changes to fields that are merely incomplete. '
+            + 'Return ONLY a raw JSON object with this structure: '
+            + '{"corrections": [{"field": "field_name", "current": "current value", "suggested": "corrected value", "reason": "why this is wrong"}]}. '
+            + 'If nothing appears wrong, return {"corrections": []}. '
+            + 'Current field values: ' + JSON.stringify(currentValues);
+
+        fetch('/ai/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            signal: controller.signal,
+            body: JSON.stringify({
+                prompt:     prompt,
+                system:     INTEGRATIVE_SYSTEM,
+                provider:   mp.provider,
+                model:      mp.model,
+                page_path:  window.location.pathname,
+                page_title: document.title,
+                use_search: (mp.provider === 'grok') && document.getElementById('ency-ai-web-search') && document.getElementById('ency-ai-web-search').checked
+            })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            if (!data.success) {
+                statusEl.textContent = 'Review failed: ' + (data.error || 'unknown error');
+                return;
+            }
+            var raw = (data.response || '').trim();
+            var jsonStart = raw.indexOf('{'), jsonEnd = raw.lastIndexOf('}');
+            if (jsonStart === -1) {
+                statusEl.textContent = 'AI returned no JSON. See raw response.';
+                document.getElementById('ency-ai-raw-text').textContent = raw;
+                document.getElementById('ency-ai-raw').style.display = '';
+                return;
+            }
+            var parsed = JSON.parse(raw.substring(jsonStart, jsonEnd + 1));
+            var corrections = parsed.corrections || [];
+            if (!corrections.length) {
+                statusEl.textContent = 'Review complete \u2014 no obvious errors found.';
+                return;
+            }
+            statusEl.textContent = 'Review found ' + corrections.length + ' potential issue(s). Review below:';
+            panel.style.display = '';
+            corrections.forEach(function(c) {
+                var el = document.querySelector('[name="' + c.field + '"]');
+                var div = document.createElement('div');
+                div.style.cssText = 'margin:0.5em 0;padding:0.5em;background:#fffbe6;border:1px solid #ffc107;border-radius:4px;';
+                div.innerHTML = '<strong>' + c.field + '</strong>: '
+                    + '<span style="color:#c00;text-decoration:line-through;">' + (c.current || '').substring(0,120).replace(/</g,'&lt;') + '</span> '
+                    + '&rarr; <span style="color:#155724;">' + (c.suggested || '').substring(0,200).replace(/</g,'&lt;') + '</span>'
+                    + '<br><em style="font-size:0.85em;color:#666;">' + (c.reason || '').replace(/</g,'&lt;') + '</em>';
+                if (el) {
+                    var applyBtn = document.createElement('button');
+                    applyBtn.type = 'button';
+                    applyBtn.textContent = 'Apply correction';
+                    applyBtn.style.cssText = 'margin-left:1em;font-size:0.85em;padding:0.15em 0.6em;cursor:pointer;';
+                    applyBtn.onclick = (function(field, suggested) {
+                        return function() {
+                            var formEl = document.querySelector('[name="' + field + '"]');
+                            if (formEl) {
+                                if (field === 'reference') {
+                                    formEl.value = (formEl.value || '').trim()
+                                        ? formEl.value + '\n[AI correction]: ' + suggested
+                                        : suggested;
+                                } else {
+                                    formEl.value = suggested;
+                                }
+                                applyBtn.textContent = '\u2713 Applied';
+                                applyBtn.disabled = true;
+                            }
+                        };
+                    })(c.field, c.suggested);
+                    div.appendChild(applyBtn);
+                }
+                results.appendChild(div);
+            });
+        })
+        .catch(function(err) {
+            btn.disabled = false;
+            statusEl.textContent = err.name === 'AbortError'
+                ? 'Review timed out \u2014 try a faster model.'
+                : 'Review failed: ' + err.message;
+        });
+    }
+
+    function encyAutoDetectName() {
+        var nameEl = document.getElementById('ency-ai-entity-name');
+        if (!nameEl || nameEl.value.trim()) return; // already filled
+        // Try common name fields in priority order
+        var candidates = ['botanical_name','common_name','name','generic_name','brand_name','term'];
+        for (var i = 0; i < candidates.length; i++) {
+            var f = document.querySelector('[name="' + candidates[i] + '"]');
+            if (f && f.value && f.value.trim()) {
+                nameEl.value = f.value.trim();
+                nameEl.title = 'Auto-detected from form field: ' + candidates[i];
+                break;
+            }
+        }
+    }
+
+    // Auto-detect on load and whenever a name field changes
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', encyAutoDetectName);
+    } else {
+        encyAutoDetectName();
+    }
+    var nameFields = ['botanical_name','common_name','name','generic_name','brand_name','term'];
+    nameFields.forEach(function(fn) {
+        var f = document.querySelector('[name="' + fn + '"]');
+        if (f) f.addEventListener('change', encyAutoDetectName);
+    });
+
+    // --- Field tooltip definitions ---
+    var FIELD_TIPS = {
+        icd_code:              'ICD Code — International Classification of Diseases code (WHO standard). e.g. L70 for Acne vulgaris. Used for clinical documentation and insurance billing.',
+        causative_agent:       'The organism, substance, or factor that directly causes the disease. e.g. bacteria (Staphylococcus), virus (influenza A), fungus (Candida), toxin, or nutritional deficiency.',
+        host_type:             'The organism that the disease affects: Human, Animal, Plant, or Insect.',
+        transmission:          'How the disease spreads — person to person, vector-borne (mosquito, tick), airborne, foodborne, contact, etc.',
+        prognosis:             'Expected outcome of the disease with and without treatment. Includes recovery time, likelihood of complications, and long-term impact.',
+        symptoms_description:  'Observable signs and subjective symptoms experienced by the host. Be specific to this disease — do not copy symptoms from another entity.',
+        diagnosis:             'How the condition is identified: clinical signs, lab tests, imaging, differential diagnosis criteria.',
+        treatment_conventional:'Evidence-based pharmaceutical or surgical treatments used in conventional allopathic medicine.',
+        treatment_herbal:      'Herbal, botanical, naturopathic, TCM, and Ayurvedic treatments used for this condition across healing traditions.',
+        prevention:            'Measures to prevent the disease: vaccination, hygiene, diet, lifestyle, or herbal prophylaxis.',
+        disease_type:          'Classification of the disease: infectious, autoimmune, degenerative, nutritional, metabolic, hereditary, environmental, psychosomatic, etc.',
+        botanical_name:        'Latin binomial scientific name — Genus species. e.g. Taraxacum officinale.',
+        key_name:              'Short identifier used internally for indexing. Usually the genus name or a standardised abbreviation.',
+        parts_used:            'Which parts of the plant are used medicinally. e.g. root, leaf, flower, seed, bark, resin.',
+        therapeutic_action:    'Categories of medicinal action. e.g. Antioxidant, Anti-inflammatory, Adaptogen, Diuretic, Carminative.',
+        constituents:          'Chemical constituents present in the herb. e.g. alkaloids, flavonoids, terpenes, essential oils.',
+        solvents:              'Solvents used in preparation. e.g. water (infusion/decoction), alcohol (tincture), oil (infused oil), DMSO (topical carrier).',
+        contra_indications:    'Conditions or circumstances where this herb should NOT be used. e.g. pregnancy, specific drug interactions, liver disease.',
+        apis:                  'Honeybee (Apis mellifera) interaction: does this plant attract or repel bees?',
+        pollinator:            'Detailed notes on pollinator relationships — which insects visit, what they collect (nectar, pollen, resin), any known effects on pollinators.',
+        cas_number:            'CAS Registry Number — unique numerical identifier assigned by Chemical Abstracts Service for chemical substances. e.g. 117-39-5 for Quercetin.',
+        iupac_name:            'IUPAC systematic chemical name following International Union of Pure and Applied Chemistry nomenclature.',
+        molecular_weight:      'Molecular weight in g/mol (Daltons).',
+        chemical_class:        'Chemical classification of the compound. e.g. Flavonoid, Alkaloid, Terpenoid, Polyphenol, Glycoside.',
+        pharmacological_effects:'How the substance acts on body systems at a physiological level.',
+        found_in_herbs:        'Herbs that contain this constituent or are relevant to this topic. Enter as comma-separated names — these will be auto-linked to herb records.',
+        found_in_foods:        'Foods that contain this constituent. Enter as comma-separated names.',
+        found_in_drugs:        'Pharmaceutical drugs that contain this constituent or interact with it.',
+        reference_system:      'Type of source: book, journal, website, thesis, monograph, pharmacopoeia, traditional_text, personal_communication.',
+        publication_date:      'Date of publication. Format: YYYY-MM-DD or YYYY.',
+        isbn:                  'International Standard Book Number — 10 or 13 digit identifier. Click the ISBN on the detail page to look up on Open Library.',
+        ecological_role:       'The role this organism plays in its ecosystem. e.g. pollinator, decomposer, predator, prey, keystone species.',
+        conservation_status:   'IUCN or national conservation status. e.g. Least Concern, Vulnerable, Endangered, Critically Endangered.',
+        prescription_status:   'Rx = prescription required. OTC = over the counter. Schedule = scheduled/controlled substance. Controlled = controlled drug with special restrictions.',
+        din_number:            'Drug Identification Number — Health Canada identifier for approved drugs sold in Canada.',
+        ndc_code:              'National Drug Code — US FDA identifier for approved drugs.',
+        atc_code:              'Anatomical Therapeutic Chemical code — WHO classification system for drugs by organ system and therapeutic use.',
+        herb_drug_interactions:'Known interactions between this drug and herbal medicines. Important for integrative practitioners managing patients using both.',
+        naturopathic_notes:    'Naturopathic and integrative medicine perspective on this drug — context, alternatives, harm reduction, or complementary approaches.',
+        notes:                 'For references: include page numbers, edition, chapter, and a short excerpt of the passage where the herb/treatment is mentioned.',
+        acute_chronic:         'Is the symptom typically acute (sudden onset, short duration) or chronic (long-term, persistent)?',
+        body_system:           'Body system primarily affected. e.g. Respiratory, Digestive, Neurological, Cardiovascular, Integumentary (skin), Endocrine.',
+        severity:              'Typical severity: mild, moderate, severe, life-threatening.',
+        alternate_terms:       'Other names or spellings for this glossary term.',
+        etymology:             'Origin of the word — Greek, Latin, or other language roots.',
+        distribution:          'Geographic regions where this organism is naturally found or where this disease occurs.',
+    };
+
+    function encyAddFieldTooltips() {
+        var tipIcon = '\u24d8'; // ⓘ
+        document.querySelectorAll('td strong, th').forEach(function(el) {
+            var text  = el.textContent.trim();
+            // Derive field name from label text: lowercase, replace spaces/special chars with _
+            var field = text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+            // Also try removing common suffixes
+            var tip   = FIELD_TIPS[field] || FIELD_TIPS[field.replace(/_code$/, '_code')]
+                     || FIELD_TIPS[field.replace(/_s$/, '')];
+            if (tip && !el.querySelector('.ency-tip')) {
+                var span = document.createElement('span');
+                span.className = 'ency-tip';
+                span.textContent = ' ' + tipIcon;
+                span.title = tip;
+                span.style.cssText = 'color:#6c9;cursor:help;font-size:0.9em;font-style:normal;';
+                el.appendChild(span);
+            }
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', encyAddFieldTooltips);
+    } else {
+        encyAddFieldTooltips();
+    }
+
+    function encyGetEntityInfo() {
+        var path = window.location.pathname;
+        var type = '', id = '';
+        // /ENCY/Animal/edit, /ENCY/Animal/add → type from path
+        var m = path.match(/\/ENCY\/([A-Za-z]+)\/(edit|add)/i);
+        if (m) {
+            type = m[1].toLowerCase();
+        } else if (/\/ENCY\/edit_herb/i.test(path)) {
+            type = 'herb';
+        } else if (/\/ENCY\/Reference\/\d+/i.test(path)) {
+            return { type: 'reference', id: 0 };
+        }
+        var hiddenId = document.querySelector('[name="record_id"]');
+        id = hiddenId ? (hiddenId.value || '') : '';
+        return { type: type, id: id };
+    }
+
+    var _refSearchTimer = null;
+    function encyRefSearch(q) {
+        clearTimeout(_refSearchTimer);
+        var results = document.getElementById('ency-ref-search-results');
+        if (!q || q.length < 2) { results.innerHTML = ''; return; }
+        _refSearchTimer = setTimeout(function() {
+            fetch('/ENCY/api/references?q=' + encodeURIComponent(q), { credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                results.innerHTML = '';
+                if (!data.results || !data.results.length) {
+                    results.innerHTML = '<em style="color:#999;font-size:0.85em;">No references found.</em>';
+                    return;
+                }
+                data.results.forEach(function(ref) {
+                    var chip = document.createElement('span');
+                    chip.style.cssText = 'display:inline-block;margin:0.2em 0.3em;padding:0.25em 0.6em;background:#e8f4f8;border:1px solid #4a90d9;border-radius:12px;cursor:pointer;font-size:0.85em;';
+                    chip.title = 'Click to link this reference';
+                    chip.innerHTML = '[' + ref.reference_id + '] ' +
+                        '<strong>' + esc(ref.title) + '</strong>' +
+                        (ref.author ? ' — ' + esc(ref.author) : '') +
+                        (ref.year   ? ' (' + esc(ref.year) + ')' : '');
+                    chip.onclick = (function(r) {
+                        return function() { encyLinkReference(r); };
+                    })(ref);
+                    results.appendChild(chip);
+                });
+            })
+            .catch(function(){});
+        }, 300);
+    }
+
+    function esc(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function encyLinkReference(ref) {
+        var info = encyGetEntityInfo();
+        var refEl = document.querySelector('[name="reference"]');
+
+        // Append [N] to the reference textarea
+        if (refEl) {
+            var existing = (refEl.value || '').trim();
+            var tag = '[' + ref.reference_id + ']';
+            if (existing.indexOf(tag) === -1) {
+                refEl.value = existing ? existing + '\n' + tag + ' ' + (ref.title || '') : tag + ' ' + (ref.title || '');
+            }
+        }
+
+        // Render chip in linked area
+        var linked = document.getElementById('ency-ref-linked-chips');
+        var chip = document.createElement('span');
+        chip.style.cssText = 'display:inline-block;margin:0.2em 0.3em;padding:0.25em 0.7em;background:#d4edda;border:1px solid #28a745;border-radius:12px;font-size:0.85em;';
+        chip.innerHTML = '\u2713 [' + ref.reference_id + '] ' + esc(ref.title) +
+            (ref.author ? ' — ' + esc(ref.author) : '') + ' ';
+        var viewLink = document.createElement('a');
+        viewLink.href = '/ENCY/Reference/' + ref.reference_id;
+        viewLink.target = '_blank';
+        viewLink.textContent = '\u2197';
+        chip.appendChild(viewLink);
+        linked.appendChild(chip);
+
+        // Formally link via API if we have entity info
+        if (!info.type || !info.id) return;
+        var form = new FormData();
+        form.append('entity_type', info.type);
+        form.append('entity_id',   info.id);
+        form.append('reference_id', ref.reference_id);
+        fetch('/ENCY/api/link_reference', {
+            method: 'POST',
+            credentials: 'include',
+            body: form
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (!d.ok) {
+                chip.style.background = '#f8d7da';
+                chip.title = 'DB link failed: ' + (d.error || '');
+            }
+        })
+        .catch(function(){});
+    }
+
+    function encyAiSyncModels() {
+        var btn = document.getElementById('ency-ai-sync-btn');
+        var statusEl = document.getElementById('ency-ai-status');
+        if (btn) btn.disabled = true;
+        statusEl.textContent = 'Syncing xAI model list\u2026';
+        fetch('/ai/sync_models?service=grok', { method: 'POST', credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (btn) btn.disabled = false;
+                if (d.success) {
+                    var count = d.count || (d.models && d.models.length) || '?';
+                    statusEl.textContent = '\u2713 Synced ' + count + ' models. Reloading dropdown\u2026';
+                    loadEncyModelOptions();
+                } else {
+                    statusEl.textContent = 'Sync failed: ' + (d.error || 'unknown error');
+                }
+            })
+            .catch(function(e) {
+                if (btn) btn.disabled = false;
+                statusEl.textContent = 'Sync request failed: ' + e.message;
+            });
+    }
+
+    window.encyAiFill           = encyAiFill;
+    window.encyAiReview         = encyAiReview;
+    window.encyAiMarkReference  = encyAiMarkReference;
+    window.encyAutoDetectName   = encyAutoDetectName;
+    window.encyRenderStagedDiff = encyRenderStagedDiff;
+    window.encyStageAll         = encyStageAll;
+    window.encySkipAll          = encySkipAll;
+    window.encyRefSearch        = encyRefSearch;
+    window.encyLinkReference    = encyLinkReference;
+    window.encyAiSyncModels     = encyAiSyncModels;
 })();
 </script>
 [% END %]

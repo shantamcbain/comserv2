@@ -1,0 +1,132 @@
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Supplier Invoice — [% invoice.invoice_number || invoice.id %]
+  [% IF invoice.status == 'draft' %]<span style="background:#ffc107;color:#333;padding:2px 8px;border-radius:3px;font-size:0.7em;vertical-align:middle;">DRAFT</span>[% END %]
+  [% IF invoice.status == 'posted' %]<span style="background:#28a745;color:white;padding:2px 8px;border-radius:3px;font-size:0.7em;vertical-align:middle;">POSTED</span>[% END %]
+</h1>
+<p>
+  <a href="/Inventory/invoice">← All Invoices</a>
+  [% IF invoice.status == 'draft' %]
+  &nbsp;|&nbsp;
+  <a href="/Inventory/invoice/edit/[% invoice.id %]"
+     style="background:#007bff;color:white;padding:4px 12px;border-radius:3px;text-decoration:none;">Edit</a>
+  &nbsp;
+  <a href="/Inventory/invoice/post/[% invoice.id %]"
+     onclick="return confirm('Post this invoice? Stock will be updated and a GL entry created. This cannot be undone.');"
+     style="background:#28a745;color:white;padding:4px 12px;border-radius:3px;text-decoration:none;">Post Invoice</a>
+  [% END %]
+  [% IF invoice.status == 'posted' %]
+  &nbsp;|&nbsp;
+  <a href="/Inventory/invoice/reprocess_stock/[% invoice.id %]"
+     onclick="return confirm('Reprocess stock from this invoice? Already-recorded lines will be skipped. Safe to run on posted invoices where stock was not updated.');"
+     style="background:#fd7e14;color:white;padding:4px 12px;border-radius:3px;text-decoration:none;">&#x21BB; Reprocess Stock</a>
+  [% END %]
+  [% IF !invoice.gl_entry_id && (invoice.status == 'posted' || invoice.status == 'paid' || invoice.status == 'outstanding') %]
+  &nbsp;|&nbsp;
+  <a href="/Inventory/invoice/create_gl/[% invoice.id %]"
+     onclick="return confirm('Create GL (double-entry) journal entries for this invoice? For paid invoices this also records the payment clearing entry.');"
+     style="background:#6f42c1;color:white;padding:4px 12px;border-radius:3px;text-decoration:none;">&#x2295; Create GL Entry</a>
+  [% END %]
+  [% IF invoice.gl_entry_id %]
+  &nbsp;|&nbsp;<small style="color:#6c757d;">GL #[% invoice.gl_entry_id %]</small>
+  [% END %]
+</p>
+
+<table cellpadding="6">
+  <tr><th>Supplier</th><td>[% invoice.supplier.name | html %]</td></tr>
+  <tr><th>Invoice #</th><td>[% invoice.invoice_number || '—' %]</td></tr>
+  <tr><th>Invoice Date</th><td>[% invoice.invoice_date %]</td></tr>
+  <tr><th>Due Date</th><td>[% invoice.due_date || '—' %]</td></tr>
+  <tr><th>Status</th><td>[% invoice.status | html %]</td></tr>
+  [% IF invoice.ap_account %]
+  <tr><th>AP Account</th><td>[% invoice.ap_account.accno %] [% invoice.ap_account.description | html %]</td></tr>
+  [% END %]
+  [% IF invoice.tax_amount && invoice.tax_amount > 0 %]
+  <tr><th>Tax</th><td>$[% invoice.tax_amount %][% IF invoice.tax_account %] <small>([% invoice.tax_account.accno %] [% invoice.tax_account.description | html %])</small>[% END %]</td></tr>
+  [% END %]
+  [% IF invoice.shipping_amount && invoice.shipping_amount > 0 %]
+  <tr><th>Shipping</th><td>$[% invoice.shipping_amount %][% IF invoice.shipping_account %] <small>([% invoice.shipping_account.accno %] [% invoice.shipping_account.description | html %])</small>[% END %]</td></tr>
+  [% END %]
+  [% IF invoice.discount_amount && invoice.discount_amount > 0 %]
+  <tr><th>Discount</th><td style="color:green">-$[% invoice.discount_amount %][% IF invoice.discount_account %] <small>([% invoice.discount_account.accno %] [% invoice.discount_account.description | html %])</small>[% END %]</td></tr>
+  [% END %]
+  <tr><th>Total</th><td><strong>$[% invoice.total_amount %]</strong></td></tr>
+  [% IF invoice.notes %]
+  <tr><th>Notes</th><td>[% invoice.notes | html %]</td></tr>
+  [% END %]
+</table>
+
+[% IF (is_admin || c.stash.is_admin) && invoice.status != 'paid' && invoice.status != 'voided' %]
+<div style="margin:1.5rem 0;padding:1rem 1.5rem;background:#e8f5e9;border:2px solid #4caf50;border-radius:8px;max-width:520px;">
+  <h3 style="margin:0 0 0.5rem;color:#1b5e20;">✅ Mark Paid by Shanta (Admin)</h3>
+  <p style="margin:0 0 0.5rem;font-size:0.9em;color:#333;">
+    Use when Shanta paid this invoice personally (debit card, cash, etc.).<br>
+    Marks it paid and credits Shanta's point account as compensation.
+  </p>
+  <form method="post" action="/Inventory/invoice/paid_by_shanta/[% invoice.id %]"
+        onsubmit="return confirm('Mark invoice [% invoice.invoice_number | html %] as paid by Shanta and credit his point account $[% invoice.total_amount %]?')">
+    <div style="margin-bottom:0.5em;">
+      <label style="font-size:0.85em;">Payment method / note (optional):</label><br>
+      <input type="text" name="payment_note" placeholder="e.g. RBC debit card, PayPal personal"
+             style="width:100%;padding:4px;border:1px solid #ccc;border-radius:3px;">
+    </div>
+    <div style="margin-bottom:0.5em;">
+      <label style="font-size:0.85em;">
+        <input type="checkbox" name="pre_point_system" value="1">
+        Pre-point-system invoice — mark paid only, do <strong>not</strong> credit points
+        (Shanta already credited at system start)
+      </label>
+    </div>
+    <button type="submit"
+            style="background:#388e3c;color:white;border:none;padding:0.5rem 1.4rem;border-radius:6px;font-size:1rem;cursor:pointer;font-weight:bold;">
+      Mark Paid by Shanta
+    </button>
+  </form>
+</div>
+[% END %]
+
+[% IF invoice.status == 'outstanding' %]
+<div style="margin:1.5rem 0;padding:1.2rem 1.5rem;background:#fff8e1;border:2px solid #f59e0b;border-radius:8px;max-width:520px;">
+  <h3 style="margin:0 0 0.75rem;color:#92400e;">&#127970; Pay with Points</h3>
+  <p style="margin:0 0 0.75rem;color:#78350f;">
+    Balance due: <strong>[% invoice.total_amount %] pts</strong>
+    <small style="color:#999;">(1 pt = CAD 1.00)</small>
+  </p>
+  <form method="post" action="/Inventory/invoice/pay_points/[% invoice.id %]"
+        onsubmit="return confirm('Pay [% invoice.total_amount %] points for invoice [% invoice.invoice_number | html %]?')">
+    <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.85rem;cursor:pointer;">
+      <input type="checkbox" name="auto_pay" value="1" style="width:1.1rem;height:1.1rem;">
+      <span>Enable <strong>auto-pay</strong> — automatically debit points on future renewals</span>
+    </label>
+    <button type="submit"
+            style="background:#d97706;color:white;border:none;padding:0.5rem 1.4rem;border-radius:6px;font-size:1rem;cursor:pointer;font-weight:bold;">
+      Pay Now
+    </button>
+  </form>
+</div>
+[% END %]
+
+<h2>Line Items</h2>
+[% SET line_list = invoice.lines %]
+[% IF line_list.size %]
+<table border="1" cellpadding="6" style="width:100%;border-collapse:collapse;">
+  <thead>
+    <tr><th>Item</th><th>Description</th><th>Qty</th><th>Unit Cost</th><th>Total</th><th>Account</th><th>Location</th></tr>
+  </thead>
+  <tbody>
+  [% FOREACH ln IN line_list %]
+  <tr>
+    <td>[% IF ln.item %]<a href="/Inventory/item/view/[% ln.item.id %]">[% ln.item.name | html %]</a>[% ELSE %]—[% END %]</td>
+    <td>[% ln.description | html %]</td>
+    <td style="text-align:right">[% ln.quantity %]</td>
+    <td style="text-align:right">$[% ln.unit_cost %]</td>
+    <td style="text-align:right">$[% ln.line_total %]</td>
+    <td>[% IF ln.account %][% ln.account.accno %] [% ln.account.description | html %][% END %]</td>
+    <td>[% IF ln.location %][% ln.location.name | html %][% END %]</td>
+  </tr>
+  [% END %]
+  </tbody>
+</table>
+[% ELSE %]
+<p>No line items.</p>
+[% END %]

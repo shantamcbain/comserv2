@@ -7,6 +7,7 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::UserVerification;
+use DateTime;
 use Data::Dumper;
 use JSON qw(decode_json encode_json);
 use Try::Tiny;
@@ -197,12 +198,39 @@ sub index :Path :Args(0) {
         push @{$c->stash->{debug_msg}}, "Admin controller index view - Template: admin/index.tt";
     }
     
-    # Pass data to the template
+    my $pending_hosting = 0;
+    my $pending_hosting_sites = [];
+    my $outstanding_invoices = [];
+    eval {
+        my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+        if (lc($site_name) eq 'csc') {
+            my @pending = $c->model('DBEncy')->resultset('HostingAccount')->search(
+                { status => 'pending' },
+                { order_by => { -asc => 'sitename' } }
+            )->all;
+            $pending_hosting = scalar @pending;
+            $pending_hosting_sites = \@pending;
+        } else {
+            my @inv = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search(
+                { sitename => $site_name, status => 'outstanding' },
+                { join => 'supplier', prefetch => 'supplier', order_by => { -asc => 'me.due_date' } }
+            )->all;
+            $outstanding_invoices = \@inv;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index',
+            "Outstanding invoices query error: $@");
+    }
+
     $c->stash(
-        template => 'admin/index.tt',
-        stats => $stats,
-        recent_activity => $recent_activity,
-        notifications => $notifications
+        template             => 'admin/index.tt',
+        stats                => $stats,
+        recent_activity      => $recent_activity,
+        notifications        => $notifications,
+        pending_hosting       => $pending_hosting,
+        pending_hosting_sites => $pending_hosting_sites,
+        outstanding_invoices  => $outstanding_invoices,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
@@ -368,6 +396,71 @@ sub get_system_notifications {
         }
     };
     
+    # Check for pending CSC hosting registrations — only for CSC-level admin/accounting users
+    eval {
+        my $user_id = $c->session->{user_id};
+        my $is_csc_admin = 0;
+        if ($user_id) {
+            my $user_obj = $c->model('DBEncy')->resultset('User')->find($user_id,
+                { columns => ['roles'] });
+            if ($user_obj) {
+                my $global_roles = $user_obj->roles || '';
+                $is_csc_admin = ($global_roles =~ /admin|accounting/i) ? 1 : 0;
+            }
+        }
+
+        if ($is_csc_admin) {
+            my $pending = $c->model('DBEncy')->resultset('HostingAccount')->search(
+                { status => 'pending' }
+            )->count;
+            if ($pending > 0) {
+                my $msg = "$pending pending CSC hosting registration(s) require approval."
+                    . " Note: new accounts without prior setup must be added manually to the"
+                    . " system after payment is confirmed.";
+                push @notifications, {
+                    type    => 'warning',
+                    message => $msg,
+                    link    => 'https://computersystemconsulting.ca/membership/admin/hosting_accounts',
+                };
+            }
+
+            # Recently paid hosting invoices (last 48h)
+            my $cutoff = DateTime->now->subtract(hours => 48)->strftime('%Y-%m-%d %H:%M:%S');
+            my @paid = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search(
+                { sitename => { '!=' => 'CSC' }, status => 'paid',
+                  updated_at => { '>=' => $cutoff } },
+                { order_by => { -desc => 'updated_at' } }
+            )->all;
+            for my $inv (@paid) {
+                push @notifications, {
+                    type    => 'success',
+                    message => 'Payment received: ' . $inv->sitename . ' — ' . $inv->invoice_number
+                               . ' (CAD ' . $inv->total_amount . ')',
+                    link    => 'https://computersystemconsulting.ca/Inventory/sales',
+                };
+            }
+        }
+
+        # Auto-pay overdue alert — shown to any site admin for their own invoices
+        eval {
+            my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+            my $today_str = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+            my $auto_due  = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search({
+                sitename => $site_name,
+                auto_pay => 1,
+                status   => { '!=' => 'paid' },
+                due_date => { '<=' => $today_str },
+            })->count;
+            if ($auto_due > 0) {
+                push @notifications, {
+                    type    => 'warning',
+                    message => "$auto_due auto-pay invoice(s) past due — confirm the charge has posted.",
+                    link    => '/Inventory/invoice/process_auto_pay',
+                };
+            }
+        };
+    };
+
     return \@notifications;
 }
 
@@ -2019,14 +2112,13 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
     my $site_name = $c->session->{site_name} || $c->stash->{site_name} || 'default';
     my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $site_name);
     
-    # Debug: Log the structure of database_comparison
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
-        "Database comparison structure: " . Data::Dumper::Dumper($database_comparison));
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
         "Set theme_name in stash: $theme_name for site: $site_name");
     
     # Use the standard debug message system
     if ($c->session->{debug_mode}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
+            "Database comparison structure: " . Data::Dumper::Dumper($database_comparison));
         $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
         push @{$c->stash->{debug_msg}}, "Admin controller schema_compare view - Template: admin/schema_compare.tt";
         push @{$c->stash->{debug_msg}}, "Site: $site_name, Theme: $theme_name";
@@ -2349,8 +2441,10 @@ sub get_database_comparison {
 sub compare_table_with_result_file {
     my ($self, $c, $table_name, $database) = @_;
     
+    my $result_name = $self->table_name_to_result_name($table_name);
     my $comparison = {
         table_name => $table_name,
+        result_name => $result_name,
         database => $database,
         has_result_file => 0,
         result_file_path => undef,

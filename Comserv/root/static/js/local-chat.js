@@ -503,8 +503,6 @@
                                         return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                                     })
                                 : [
-                                    { val: 'grok|grok-3-mini',               label: 'Grok 3 Mini (fast)' },
-                                    { val: 'grok|grok-3',                    label: 'Grok 3' },
                                     { val: 'grok|grok-4-0709',               label: 'Grok 4' },
                                     { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
                                     { val: 'grok|grok-code-fast-1',          label: 'Grok Code Fast' }
@@ -517,7 +515,7 @@
                             sel.appendChild(grp);
                             // Cheapest Grok for complex queries (non-guest)
                             if (!state.isGuest) {
-                                state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-3-mini';
+                                state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-4-0709';
                             }
                             // Show web search toggle for any user who has Grok access
                             // (toggle applies to Grok requests whether selected manually or via auto-routing)
@@ -1013,8 +1011,6 @@
                                 return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                             })
                         : [
-                            { val: 'grok|grok-3-mini',               label: 'Grok 3 Mini (fast)' },
-                            { val: 'grok|grok-3',                    label: 'Grok 3' },
                             { val: 'grok|grok-4-0709',               label: 'Grok 4' },
                             { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
                             { val: 'grok|grok-code-fast-1',          label: 'Grok Code Fast' }
@@ -1283,7 +1279,7 @@
             }
         }
 
-        // Parse provider|model format (e.g. "grok|grok-3-mini" or "ollama|llama3.1:latest")
+        // Parse provider|model format (e.g. "grok|grok-mini" or "ollama|llama3.1:latest")
         const providerParts = effectiveProvider.split('|');
         const providerName = providerParts[0];
         // Only pass a model name for Grok (client-chosen) or explicit user overrides.
@@ -1585,7 +1581,7 @@
                         // Re-send with Grok web search
                         const grokModel = (state.modelTiers && state.modelTiers.grok)
                                           ? state.modelTiers.grok
-                                          : 'grok|grok-3-mini';
+                                          : 'grok|grok-4-0709';
                         state.userModelOverride = grokModel;
                         const webEl = document.getElementById('enable-web-search');
                         if (webEl) webEl.checked = true;
@@ -1991,6 +1987,36 @@
         return map;
     }
 
+    // Levenshtein edit distance for typo tolerance
+    function _editDist(a, b) {
+        if (a === b) return 0;
+        if (!a.length) return b.length;
+        if (!b.length) return a.length;
+        var prev = Array.from({ length: b.length + 1 }, function(_, i) { return i; });
+        for (var i = 0; i < a.length; i++) {
+            var curr = [i + 1];
+            for (var j = 0; j < b.length; j++) {
+                curr.push(Math.min(
+                    curr[j] + 1,
+                    prev[j + 1] + 1,
+                    prev[j] + (a[i] === b[j] ? 0 : 1)
+                ));
+            }
+            prev = curr;
+        }
+        return prev[b.length];
+    }
+
+    // Returns true if word `w` fuzzy-matches any word in `labelWords`
+    // Threshold: 1 edit for words 4-5 chars, 2 edits for 6+ chars
+    function _fuzzyWordMatch(w, labelWords) {
+        if (w.length < 3) return false;
+        var maxDist = w.length >= 6 ? 2 : 1;
+        return labelWords.some(function(lw) {
+            return lw.length >= 3 && _editDist(w, lw) <= maxDist;
+        });
+    }
+
     // Try to resolve a navigation intent query to a list of {label,url} matches
     function resolveNavIntent(rawQuery) {
         const q = rawQuery
@@ -2011,7 +2037,14 @@
             return words.every(function(w) { return item.label.includes(w); })
                 || item.label.split(/\s+/).some(function(w) { return words.includes(w) && w.length > 3; });
         });
-        return partial.length ? partial : null;
+        if (partial.length) return partial;
+        // Typo-tolerant fallback: fuzzy match each query word against label words
+        const fuzzy = map.filter(function(item) {
+            const labelWords = item.label.split(/\s+/);
+            return words.filter(function(w) { return w.length >= 3; })
+                .some(function(w) { return _fuzzyWordMatch(w, labelWords); });
+        });
+        return fuzzy.length ? fuzzy : null;
     }
 
     // Navigation command regex — explicit nav keywords (voice-friendly: "open X", "go to X", etc.)
@@ -2107,9 +2140,180 @@
         return { cleanText, actions };
     }
 
+    // Fill form fields in the current page (or window.opener if popup).
+    // actionObj.fields is a plain object: { fieldName: value, ... }
+    // For checkboxes pass boolean/0/1; selects and inputs accept string values.
+    function _executeFillForm(actionObj) {
+        const chatMessages = document.getElementById('chat-messages');
+        const fields = actionObj.fields || {};
+
+        // When the chat is running in a detached popup window the form lives in the
+        // opener page — try that first, fall back to the current document.
+        const targetDoc = (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed)
+            ? window.opener.document
+            : document;
+
+        const filled = [];
+        const missed = [];
+
+        Object.keys(fields).forEach(function(fieldName) {
+            const value = fields[fieldName];
+            // Try by name first, then by id
+            let el = targetDoc.querySelector('[name="' + fieldName + '"]')
+                  || targetDoc.getElementById(fieldName);
+
+            if (!el) {
+                missed.push(fieldName);
+                return;
+            }
+
+            const tag  = el.tagName.toLowerCase();
+            const type = (el.getAttribute('type') || '').toLowerCase();
+
+            if (type === 'checkbox') {
+                el.checked = !!(value === true || value === 1 || value === '1' || value === 'true');
+            } else if (tag === 'select') {
+                el.value = String(value);
+                // Fallback: try case-insensitive match on option text
+                if (!el.value || el.value !== String(value)) {
+                    Array.from(el.options).forEach(function(opt) {
+                        if (opt.text.toLowerCase() === String(value).toLowerCase()) {
+                            el.value = opt.value;
+                        }
+                    });
+                }
+            } else {
+                el.value = value !== null && value !== undefined ? String(value) : '';
+            }
+
+            // Fire change/input events so any JS listeners react
+            el.dispatchEvent(new Event('input',  { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            filled.push(fieldName);
+        });
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+        const lbl = document.createElement('div');
+        lbl.className = 'msg-label';
+        lbl.textContent = 'System';
+        const el2 = document.createElement('div');
+        el2.className = 'message system-message';
+        let msg = '';
+        if (filled.length)  msg += '✅ Filled: ' + filled.join(', ') + '.';
+        if (missed.length)  msg += '\n⚠️ Not found: ' + missed.join(', ') + '.';
+        if (!filled.length && !missed.length) msg = '⚠️ No fields specified.';
+        el2.textContent = msg.trim();
+        wrapper.appendChild(lbl);
+        wrapper.appendChild(el2);
+        chatMessages.appendChild(wrapper);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // Project creation wizard — renders an inline form in the chat window.
+    // Submitted data is sent to /ai/action as a create_project ACTION.
+    function openProjectWizard(prefillTitle) {
+        const chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+
+        const existing = document.getElementById('ai-project-wizard');
+        if (existing) existing.remove();
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+        wrapper.id = 'ai-project-wizard';
+
+        const lbl = document.createElement('div');
+        lbl.className = 'msg-label';
+        lbl.textContent = 'Planning Agent';
+
+        const box = document.createElement('div');
+        box.className = 'message system-message';
+        box.style.cssText = 'padding:12px;max-width:480px;';
+
+        const DEPS = [
+            ['inventory',   'Inventory tracking'],
+            ['billing',     'Billing / payments'],
+            ['email',       'Email notifications'],
+            ['calendar',    'Calendar / bookings'],
+            ['helpdesk',    'HelpDesk / support'],
+            ['api',         'External API'],
+            ['schema',      'New DB tables needed'],
+            ['ai',          'AI / Chat integration'],
+        ];
+
+        box.innerHTML =
+            '<strong style="font-size:1.05em">📋 New Project Wizard</strong>' +
+            '<form id="ai-wizard-form" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">' +
+                '<label style="font-size:.85em;font-weight:600">Project name</label>' +
+                '<input id="wiz-name" type="text" required style="padding:4px 6px;border:1px solid #ccc;border-radius:4px;" value="' + (prefillTitle || '').replace(/"/g, '&quot;') + '">' +
+                '<label style="font-size:.85em;font-weight:600">Description</label>' +
+                '<textarea id="wiz-desc" rows="2" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px;resize:vertical;"></textarea>' +
+                '<label style="font-size:.85em;font-weight:600">Due date</label>' +
+                '<input id="wiz-due" type="date" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px;">' +
+                '<label style="font-size:.85em;font-weight:600">Dependencies needed (check all that apply)</label>' +
+                '<div id="wiz-deps" style="display:flex;flex-wrap:wrap;gap:4px 12px;">' +
+                    DEPS.map(function(d) {
+                        return '<label style="font-size:.82em"><input type="checkbox" name="dep" value="' + d[0] + '" style="margin-right:3px">' + d[1] + '</label>';
+                    }).join('') +
+                '</div>' +
+                '<div style="display:flex;gap:8px;margin-top:4px;">' +
+                    '<button type="submit" style="padding:5px 14px;background:#0077cc;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.85em">Create Project</button>' +
+                    '<button type="button" id="wiz-cancel" style="padding:5px 10px;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:.85em;background:#fff">Cancel</button>' +
+                '</div>' +
+            '</form>';
+
+        wrapper.appendChild(lbl);
+        wrapper.appendChild(box);
+        chatMessages.appendChild(wrapper);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        document.getElementById('wiz-cancel').addEventListener('click', function() {
+            wrapper.remove();
+        });
+
+        document.getElementById('ai-wizard-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var name = document.getElementById('wiz-name').value.trim();
+            var desc = document.getElementById('wiz-desc').value.trim();
+            var due  = document.getElementById('wiz-due').value;
+            var deps = Array.from(document.querySelectorAll('#wiz-deps input:checked')).map(function(cb) { return cb.value; });
+
+            if (!name) { alert('Project name is required.'); return; }
+
+            var depNote = deps.length ? '\n\nDependencies: ' + deps.join(', ') : '';
+            wrapper.remove();
+
+            executeAIAction({
+                action: 'create_project',
+                params: {
+                    name:        name,
+                    description: desc + depNote,
+                    due_date:    due || undefined,
+                }
+            });
+
+            if (deps.length) {
+                var depMsg = 'Project "' + name + '" was created. Dependencies noted: ' + deps.join(', ') + '. Please create the relevant sub-project todos and blocking dependencies.';
+                var chatInput = document.getElementById('chat-input') || document.getElementById('chat-message');
+                if (chatInput) {
+                    chatInput.value = depMsg;
+                    var sendBtn = document.getElementById('send-button') || document.querySelector('[data-action="send"]');
+                    if (sendBtn) sendBtn.click();
+                }
+            }
+        });
+    }
+
     // POST an action object to /ai/action and show a confirmation bubble.
     function executeAIAction(actionObj) {
         const chatMessages = document.getElementById('chat-messages');
+
+        // fill_form is handled entirely client-side — no server round-trip needed.
+        if (actionObj.action === 'fill_form') {
+            _executeFillForm(actionObj);
+            return;
+        }
 
         fetch('/ai/action', {
             method: 'POST',
@@ -2119,6 +2323,10 @@
         })
         .then(function(r) { return r.json(); })
         .then(function(result) {
+            if (result.success && result.action === 'open_project_wizard') {
+                openProjectWizard(result.wizard_title || '');
+                return;
+            }
             const wrapper = document.createElement('div');
             wrapper.className = 'msg-wrapper msg-wrapper-ai';
             const lbl = document.createElement('div');

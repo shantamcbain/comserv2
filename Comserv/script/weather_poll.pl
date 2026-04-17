@@ -158,6 +158,9 @@ for my $config (@configs) {
 
     log_msg("Stored weather for config $config_id: $row{temperature}°C, $row{condition_description}");
 
+    # Extract precipitation from raw API data (rain or snow in last hour)
+    my $precip = ($data->{rain}{'1h'} || $data->{rain}{'3h'} || $data->{snow}{'1h'} || $data->{snow}{'3h'} || 0);
+
     my %hist = (
         config_id             => $config_id,
         temperature           => $row{temperature},
@@ -166,6 +169,7 @@ for my $config (@configs) {
         pressure              => $row{pressure},
         wind_speed            => $row{wind_speed},
         cloudiness            => $row{cloudiness},
+        precipitation         => $precip,
         condition_main        => $row{condition_main},
         condition_description => $row{condition_description},
         weather_icon          => $row{weather_icon},
@@ -180,6 +184,39 @@ for my $config (@configs) {
         log_msg("History write skipped for config $config_id (table may not exist yet): $@");
     } else {
         log_msg("History row inserted for config $config_id.");
+    }
+
+    # --- Fetch and cache 5-day forecast ---
+    my $forecast_url;
+    if ($service eq 'openweathermap') {
+        my $loc_param = ($method eq 'city')
+            ? "q=" . uri_escape($location) . ($country ? ",$country" : '')
+            : "q=" . uri_escape($location);
+        $forecast_url = "https://api.openweathermap.org/data/2.5/forecast?$loc_param&appid=$api_key&units=$units";
+    }
+
+    if ($forecast_url) {
+        my $freq = $ua->get($forecast_url);
+        if ($freq->is_success) {
+            my $fdata = eval { JSON->new->utf8->decode($freq->content) };
+            if ($fdata && !$@) {
+                my $fnow = strftime('%Y-%m-%d %H:%M:%S', localtime);
+                eval {
+                    $schema->resultset('WeatherData')->update_or_create(
+                        {
+                            config_id    => $config_id,
+                            data_type    => 'forecast',
+                            retrieved_at => $fnow,
+                            raw_data     => $freq->content,
+                        },
+                        { key => 'idx_config_type' }
+                    );
+                };
+                log_msg($@ ? "Forecast store error: $@" : "Forecast stored for config $config_id.");
+            }
+        } else {
+            log_msg("Forecast API error for config $config_id: " . $freq->status_line);
+        }
     }
 }
 

@@ -18,12 +18,7 @@
 <div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
 [% END %]
 
-[% roles = c.session.roles;
-   is_admin = 0;
-   FOREACH r IN roles;
-     IF r == 'admin'; is_admin = 1; END;
-   END;
-%]
+[% is_editor = is_editor || 0; is_admin = is_admin || 0 %]
 
 [% IF edit_mode %]
 <h1>Editing Symptom: [% symptom.name | html %]</h1>
@@ -32,8 +27,8 @@
 [% END %]
 
 <p><a href="[% c.uri_for('/ENCY/Symptom') %]">&larr; Back to Symptoms</a>
-[% IF is_admin && !edit_mode && symptom.record_id %]
-  | <a href="[% c.uri_for('/ENCY/Symptom/edit') %]" onclick="document.cookie='record_id=[% symptom.record_id %]'">Edit</a>
+[% IF is_editor && !edit_mode && symptom.record_id %]
+  | <a href="[% c.uri_for('/ENCY/Symptom/edit', { record_id => symptom.record_id }) %]">Edit</a>
 [% END %]
 </p>
 
@@ -200,6 +195,9 @@
     [% END %]
 </table>
 
+[% IF !edit_mode %]
+[% PROCESS 'ENCY/partials/FormalRefs.tt' %]
+[% END %]
 [% IF edit_mode %]
 [% PROCESS 'ENCY/partials/AiFormFill.tt' %]
 <br/>

@@ -39,15 +39,26 @@ if [ -f "$DEPLOY_LOG" ] && [ $(wc -l < "$DEPLOY_LOG") -gt 6000 ]; then
     echo "Deploy log rotated (kept last 5000 lines)"
 fi
 
-# ── Container log trimming (cap at 100 MB) ───────────────────────────────────
-LOG_FILE=$(docker inspect --format='{{.LogPath}}' "$CONTAINER" 2>/dev/null || true)
-if [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ]; then
-    LOG_SIZE=$(du -m "$LOG_FILE" | cut -f1)
-    if [ "$LOG_SIZE" -gt 100 ]; then
-        echo "Trimming container log (${LOG_SIZE}MB -> 10MB)..."
-        tail -c 10485760 "$LOG_FILE" > "${LOG_FILE}.tmp" && mv "${LOG_FILE}.tmp" "$LOG_FILE"
+# ── Container log trimming (runs every cron tick for ALL comserv containers) ──
+# Caps each container log at LOG_TRIM_THRESHOLD_MB; trims to LOG_TRIM_TARGET_MB.
+LOG_TRIM_THRESHOLD_MB=50
+LOG_TRIM_TARGET_BYTES=10485760   # 10 MB kept after trim
+
+echo "Checking container log sizes..."
+for CNAME in $(docker ps --format '{{.Names}}' 2>/dev/null); do
+    LOG_FILE=$(docker inspect --format='{{.LogPath}}' "$CNAME" 2>/dev/null || true)
+    [ -z "$LOG_FILE" ] || [ ! -f "$LOG_FILE" ] && continue
+    LOG_SIZE_MB=$(du -m "$LOG_FILE" 2>/dev/null | cut -f1)
+    LOG_SIZE_MB=${LOG_SIZE_MB:-0}
+    echo "  $CNAME: ${LOG_SIZE_MB}MB"
+    if [ "$LOG_SIZE_MB" -gt "$LOG_TRIM_THRESHOLD_MB" ]; then
+        echo "  => Trimming $CNAME log (${LOG_SIZE_MB}MB -> 10MB)..."
+        tail -c "$LOG_TRIM_TARGET_BYTES" "$LOG_FILE" > "${LOG_FILE}.tmp" \
+            && mv "${LOG_FILE}.tmp" "$LOG_FILE" \
+            && echo "  => Done." \
+            || echo "  => WARNING: trim failed for $CNAME"
     fi
-fi
+done
 
 # ── Check for compose file ───────────────────────────────────────────────────
 if [ ! -f "$COMPOSE_FILE" ]; then

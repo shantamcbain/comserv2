@@ -18,12 +18,12 @@
  [% PageVersion %]
 [% END %]
     [% INCLUDE 'Header.tt' %]
-<body class="theme-[% theme_name || c.stash.theme_name || c.session.theme_name || 'default' %]">
+<body class="theme-[% theme_name || c.stash.theme_name || c.session.theme_name || 'default' %][% IF c.stash.has_bg_image %] has-bg-image[% END %]">
 [% IF c.stash.ai_popup_mode %]
     [%# Popup / detached-widget mode: render bare — no nav, no footer, no back-to-top %]
     [% content %]
-    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% USE date; date.format(date.now, '%s') %]">
-    <script src="/static/js/local-chat.js?v=[% date.format(date.now, '%s') %]"></script>
+    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% USE date; date.format(date.now, '%s') || '1' %]">
+    <script src="/static/js/local-chat.js?v=[% date.format(date.now, '%s') || '1' %]"></script>
 [% ELSE %]
     [% INCLUDE 'pagetop.tt' %]
 [%# INCLUDE 'home.tt' %]
@@ -42,8 +42,78 @@
     [% END %]
 
     <!-- Chat widget CSS and JS — outside footer TRY/CATCH so it appears on every page -->
-    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% USE date; date.format(date.now, '%s') %]">
-    <script src="/static/js/local-chat.js?v=[% date.format(date.now, '%s') %]"></script>
+    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% USE date; date.format(date.now, '%s') || '1' %]">
+    <script src="/static/js/local-chat.js?v=[% date.format(date.now, '%s') || '1' %]"></script>
+
+    <!-- AI Widget postMessage receiver — lets the popup widget fill forms on this page -->
+    <script>
+    (function() {
+        function applyFieldValue(name, value) {
+            var el = document.querySelector('[name="' + name + '"]');
+            if (!el) return false;
+            if (el.tagName === 'SELECT') {
+                var v = String(value).toLowerCase();
+                for (var i = 0; i < el.options.length; i++) {
+                    if (el.options[i].value.toLowerCase() === v ||
+                        el.options[i].text.toLowerCase()  === v) {
+                        el.selectedIndex = i;
+                        el.dispatchEvent(new Event('change', {bubbles:true}));
+                        return true;
+                    }
+                }
+                return false;
+            } else if (el.type === 'checkbox' || el.type === 'radio') {
+                el.checked = !!(value && value !== '0' && value !== 'false');
+                el.dispatchEvent(new Event('change', {bubbles:true}));
+                return true;
+            } else {
+                el.value = value;
+                el.dispatchEvent(new Event('input',  {bubbles:true}));
+                el.dispatchEvent(new Event('change', {bubbles:true}));
+                return true;
+            }
+        }
+
+        window.addEventListener('message', function(e) {
+            if (!e.data || !e.data.type) return;
+            var src = e.source;
+
+            if (e.data.type === 'ai_widget_fields_request') {
+                var fields = [];
+                document.querySelectorAll(
+                    'input[name]:not([type=hidden]):not([type=submit]):not([type=button]):not([type=image]),' +
+                    'textarea[name], select[name]'
+                ).forEach(function(el) {
+                    var label = '';
+                    if (el.id) {
+                        var lbl = document.querySelector('label[for="' + el.id + '"]');
+                        if (lbl) label = lbl.textContent.trim().replace(/\s+/g,' ');
+                    }
+                    fields.push({
+                        name:    el.name,
+                        value:   el.tagName === 'SELECT'
+                                     ? (el.options[el.selectedIndex] ? el.options[el.selectedIndex].text : '')
+                                     : (el.value || ''),
+                        label:   label,
+                        tagName: el.tagName.toLowerCase(),
+                        type:    el.type || ''
+                    });
+                });
+                if (src) src.postMessage({
+                    type:      'ai_widget_fields_response',
+                    fields:    fields,
+                    pageTitle: document.title,
+                    pagePath:  window.location.pathname
+                }, '*');
+            }
+
+            if (e.data.type === 'ai_widget_fill_one') {
+                var ok = applyFieldValue(e.data.field, e.data.value);
+                if (src) src.postMessage({ type: 'ai_widget_fill_ack', field: e.data.field, ok: ok }, '*');
+            }
+        });
+    })();
+    </script>
 [% END %]
 
 </body>

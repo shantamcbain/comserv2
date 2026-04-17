@@ -25,6 +25,12 @@ __PACKAGE__->add_columns(
         size      => 100,
         is_nullable => 0,
     },
+    inventory_item_id => {
+        data_type      => 'integer',
+        is_foreign_key => 1,
+        is_nullable    => 1,
+        documentation  => 'Linked CSC inventory item — price source of truth',
+    },
     description => {
         data_type   => 'text',
         is_nullable => 1,
@@ -209,5 +215,22 @@ sub is_free {
     my $self = shift;
     return $self->price_monthly == 0 && $self->price_annual == 0;
 }
+
+sub effective_price_monthly {
+    my $self = shift;
+    if ($self->inventory_item_id) {
+        eval {
+            my $item = $self->inventory_item;
+            return $item->unit_price if $item && defined $item->unit_price;
+        };
+    }
+    return $self->price_monthly;
+}
+
+__PACKAGE__->belongs_to(
+    inventory_item => 'Comserv::Model::Schema::Ency::Result::InventoryItem',
+    'inventory_item_id',
+    { join_type => 'LEFT', on_delete => 'SET NULL', is_foreign_key_constraint => 1 }
+);
 
 1;

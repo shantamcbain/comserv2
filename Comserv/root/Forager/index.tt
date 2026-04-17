@@ -1,20 +1,175 @@
-[% PageVersion = 'forager/index.tt,v 0.01 2024/11/22 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
-    [% PageVersion %]
+[% PageVersion %]
 [% END %]
-<nav>
+
+<style>
+.forager-hero {
+    background: linear-gradient(135deg, #2d5a27 0%, #4a8c3f 50%, #7ab648 100%);
+    color: #fff;
+    padding: 3rem 2rem;
+    text-align: center;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+}
+.forager-hero h1 {
+    font-size: 2.4rem;
+    margin-bottom: 0.5rem;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.4);
+}
+.forager-hero p {
+    font-size: 1.2rem;
+    margin: 0.5rem 0 1.5rem;
+    opacity: 0.92;
+}
+.forager-hero .hero-links a {
+    display: inline-block;
+    margin: 0.4rem;
+    padding: 0.6rem 1.4rem;
+    background: rgba(255,255,255,0.2);
+    color: #fff;
+    border: 2px solid rgba(255,255,255,0.6);
+    border-radius: 24px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: background 0.2s;
+}
+.forager-hero .hero-links a:hover {
+    background: rgba(255,255,255,0.4);
+}
+
+.forager-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+.forager-card {
+    background: #f8fdf4;
+    border: 1px solid #c8e6c9;
+    border-radius: 8px;
+    padding: 1.4rem 1.2rem;
+    text-align: center;
+}
+.forager-card .card-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.6rem;
+}
+.forager-card h3 {
+    color: #2d5a27;
+    margin: 0.4rem 0;
+}
+.forager-card p {
+    font-size: 0.95rem;
+    color: #555;
+    margin: 0.4rem 0 1rem;
+}
+.forager-card a {
+    display: inline-block;
+    padding: 0.4rem 1rem;
+    background: #4a8c3f;
+    color: #fff;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+.forager-card a:hover { background: #2d5a27; }
+
+.forager-about {
+    background: #fff;
+    border-left: 4px solid #7ab648;
+    padding: 1.2rem 1.5rem;
+    margin-bottom: 2rem;
+    border-radius: 0 8px 8px 0;
+}
+.forager-about h2 { color: #2d5a27; margin-top: 0; }
+.forager-season {
+    background: #fffde7;
+    border: 1px solid #f9a825;
+    border-radius: 8px;
+    padding: 1rem 1.4rem;
+    margin-bottom: 1.5rem;
+}
+.forager-season h3 { color: #e65100; margin-top: 0; }
+</style>
+
+<div class="forager-hero">
+    <h1>&#127807; Welcome to Forager</h1>
+    <p>Your guide to wild plants, medicinal herbs, and the art of foraging safely.</p>
+    <div class="hero-links">
+        <a href="[% c.uri_for('/ENCY') %]">&#128218; Plant Encyclopedia</a>
+        <a href="[% c.uri_for('/workshop') %]">&#127807; Workshops</a>
+        <a href="[% c.uri_for('/membership') %]">&#10024; Membership</a>
+        [% IF c.session.username %]
+        <a href="[% c.uri_for('/user/profile') %]">&#128100; My Profile</a>
+        [% ELSE %]
+        <a href="[% c.uri_for('/user/login') %]">&#128274; Login</a>
+        [% END %]
+    </div>
+</div>
+
+<div class="forager-about">
+    <h2>About Forager</h2>
+    <p>Forager is a community dedicated to teaching the safe and sustainable practice of foraging
+    wild plants, mushrooms, and medicinal herbs. Whether you are a curious beginner or an experienced
+    wildcrafter, you will find resources, workshops, and a supportive community here.</p>
+    <p>Our encyclopedia draws on the <em>Encyclopedia of Biological Life</em> (ENCY) to provide
+    accurate botanical information, traditional uses, preparation methods, and safety notes for
+    hundreds of species found across Canada and the Pacific Northwest.</p>
+</div>
+
+<div class="forager-season">
+    <h3>&#127809; What's in Season</h3>
+    <p>Spring is the best time for tender greens: <strong>stinging nettle</strong>,
+    <strong>chickweed</strong>, <strong>cleavers</strong>, and early <strong>dandelion</strong>
+    leaves. Look for <strong>fiddleheads</strong> along stream banks.
+    Check the <a href="[% c.uri_for('/ENCY') %]">Plant Encyclopedia</a> for identification tips
+    and safe preparation guidance before harvesting.</p>
+</div>
+
+<div class="forager-cards">
+    <div class="forager-card">
+        <div class="card-icon">&#128218;</div>
+        <h3>Plant Encyclopedia</h3>
+        <p>Browse hundreds of wild plants and medicinal herbs with photos, identification tips,
+        traditional uses, and safety warnings.</p>
+        <a href="[% c.uri_for('/ENCY') %]">Browse ENCY</a>
+    </div>
+
+    <div class="forager-card">
+        <div class="card-icon">&#127807;</div>
+        <h3>Foraging Workshops</h3>
+        <p>Join guided walks and hands-on workshops led by experienced foragers. Learn to identify
+        plants safely in the field.</p>
+        <a href="[% c.uri_for('/workshop') %]">See Workshops</a>
+    </div>
+
+    <div class="forager-card">
+        <div class="card-icon">&#129518;</div>
+        <h3>Medicinal Herbs</h3>
+        <p>Explore the healing properties of wild plants — from anti-inflammatory herbs to
+        immune-supporting roots and digestive tonics.</p>
+        <a href="[% c.uri_for('/ENCY') %]">Explore Herbs</a>
+    </div>
+
+    <div class="forager-card">
+        <div class="card-icon">&#10024;</div>
+        <h3>Community Membership</h3>
+        <p>Become a member to access exclusive content, workshop discounts, and connect with
+        fellow foragers in your region.</p>
+        <a href="[% c.uri_for('/membership') %]">Join Now</a>
+    </div>
+</div>
+
+<div class="forager-about">
+    <h2>&#128680; Foraging Safety</h2>
+    <p><strong>Never eat a plant unless you are 100% certain of its identification.</strong>
+    Many edible plants have toxic look-alikes. Always cross-reference multiple identification
+    features (leaf shape, stem, smell, habitat) and consult our encyclopedia or an experienced
+    forager before consuming any wild plant.</p>
     <ul>
-        <li><a href="[% c.uri_for('/') %]">Home</a></li>
-        <li><a href="[% c.uri_for('/forager') %]">Forager Home</a></li>
-        <li><a href="[% c.uri_for('/documentation') %]">Documentation</a></li>
-        <li><a href="[% c.uri_for('/coop') %]">Coop</a></li>
-        <li><a href="[% c.uri_for('/workshop') %]">Workshops</a></li>
-        <!-- Add more navigation links as needed -->
+        <li>Start with easy-to-identify species with no dangerous look-alikes</li>
+        <li>Harvest only from clean, unsprayed areas away from roadsides</li>
+        <li>Take only what you need — leave plenty for wildlife and regeneration</li>
+        <li>Know local regulations — some areas restrict harvesting</li>
     </ul>
-</nav>
-
-
-<main>
-    <p>This site is dedicated to teaching people about foraging, primarily focusing on medicinal herbs.</p>
-    <p>Explore our resources to learn more about foraging and the benefits of various herbs.</p>
-</main>
+</div>

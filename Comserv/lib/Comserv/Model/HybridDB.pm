@@ -156,9 +156,11 @@ sub _find_config_file {
             File::Spec->catfile($FindBin::Bin, '..', 'config', CONFIG_FILE),
             File::Spec->catfile($FindBin::Bin, CONFIG_FILE),
             File::Spec->catfile($FindBin::Bin, '..', CONFIG_FILE),
+            File::Spec->catfile($FindBin::Bin, '..', '..', CONFIG_FILE),
             '/opt/comserv/config/' . CONFIG_FILE,
             '/opt/comserv/' . CONFIG_FILE,
-            '/etc/comserv/' . CONFIG_FILE
+            '/etc/comserv/' . CONFIG_FILE,
+            ($ENV{HOME} ? File::Spec->catfile($ENV{HOME}, CONFIG_FILE) : ()),
         );
         
         foreach my $path (@possible_paths) {
