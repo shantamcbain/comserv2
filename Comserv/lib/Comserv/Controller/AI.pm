@@ -1164,8 +1164,13 @@ sub generate :Local :Args(0) {
         my $response_length = length($response->{response} || '');
         $model_used = $response->{model} || $model_used;
         my $ai_response = $response->{response} || '';
+        # Capture token count: Grok returns usage.total_tokens; Ollama returns eval_count
+        my $tokens_used = ($response->{usage} && $response->{usage}{total_tokens})
+            ? $response->{usage}{total_tokens}
+            : ($response->{eval_count} || undef);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-            'generate', "Query successful for user '$username' - Model: $model_used, Response length: $response_length chars");
+            'generate', "Query successful for user '$username' - Model: $model_used, Response length: $response_length chars" .
+            ($tokens_used ? ", tokens=$tokens_used" : ''));
         
         # Save conversation and messages to database
         try {
@@ -1309,7 +1314,8 @@ sub generate :Local :Args(0) {
                 model_used => $model_used,
                 metadata => encode_json($ai_metadata),
                 ip_address => $c->request->address,
-                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
+                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user',
+                ($tokens_used ? (tokens_used => $tokens_used) : ()),
             });
             
             unless ($ai_msg) {
@@ -2114,9 +2120,15 @@ sub chat :Local :Args(0) {
             }
 
             $model_used = $response->{model} || $grok->model;
+            # Capture Grok token usage for billing
+            $response_eval_count = ($response->{usage} && $response->{usage}{total_tokens})
+                ? $response->{usage}{total_tokens}
+                : 0;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                'chat', "Grok chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars");
-            push @chat_trace, sprintf("✅ Grok responded — model=%s %d chars", $model_used, length($ai_response));
+                'chat', "Grok chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars" .
+                ($response_eval_count ? ", tokens=$response_eval_count" : ''));
+            push @chat_trace, sprintf("✅ Grok responded — model=%s %d chars%s", $model_used, length($ai_response),
+                $response_eval_count ? " ($response_eval_count tokens)" : '');
 
         } else {
             # ── Ollama 3-Tier Escalation ──────────────────────────────────────
@@ -2476,7 +2488,8 @@ sub chat :Local :Args(0) {
                     thinking_trace   => \@chat_trace,
                 }),
                 ip_address => $c->request->address,
-                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
+                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal',
+                ($response_eval_count ? (tokens_used => $response_eval_count) : ()),
             });
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
