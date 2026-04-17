@@ -508,9 +508,10 @@
                                         return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                                     })
                                 : [
-                                    { val: 'grok|grok-4-0709',               label: 'Grok 4' },
-                                    { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
-                                    { val: 'grok|grok-code-fast-1',          label: 'Grok Code Fast' }
+                                    { val: 'grok|grok-4-fast-reasoning',     label: 'Grok 4 Fast Reasoning (xAI)' },
+                                    { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast (xAI)' },
+                                    { val: 'grok|grok-3',                    label: 'Grok 3 (xAI)' },
+                                    { val: 'grok|grok-3-mini',               label: 'Grok 3 Mini (xAI)' }
                                 ];
                             grokModels.forEach(function(m) {
                                 const opt = document.createElement('option');

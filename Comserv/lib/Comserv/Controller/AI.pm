@@ -157,9 +157,10 @@ sub index :Path :Args(0) {
                         push @external_models, { name => $id, provider => 'grok', label => $label };
                     }
                 } else {
-                    push @external_models, { name => 'grok-3',          provider => 'grok', label => 'Grok 3 (xAI)' };
-                    push @external_models, { name => 'grok-3-mini',     provider => 'grok', label => 'Grok 3 Mini (xAI)' };
-                    push @external_models, { name => 'grok-3-fast',     provider => 'grok', label => 'Grok 3 Fast (xAI)' };
+                    push @external_models, { name => 'grok-4-fast-reasoning',     provider => 'grok', label => 'Grok 4 Fast Reasoning (xAI)' };
+                    push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
+                    push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
+                    push @external_models, { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' };
                 }
             }
         } catch {
@@ -641,10 +642,9 @@ sub generate :Local :Args(0) {
             }
             $grok->api_key($grok_api_key);
             # Hardcoded list of known-dead Grok models (410 Gone) — always substitute regardless of DB state
-            my %GROK_DEAD = map { $_ => 'grok-3' } qw(
+            # Only add models here that are confirmed permanently retired by xAI
+            my %GROK_DEAD = map { $_ => 'grok-4-fast-non-reasoning' } qw(
                 grok-code-fast-1
-                grok-4-0709
-                grok-4-fast-non-reasoning
             );
             if ($model && $GROK_DEAD{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
@@ -2061,10 +2061,8 @@ sub chat :Local :Args(0) {
 
             $grok->api_key($grok_api_key);
             # Hardcoded known-dead Grok models — substitute before any API call
-            my %GROK_DEAD_CHAT = map { $_ => 'grok-3' } qw(
+            my %GROK_DEAD_CHAT = map { $_ => 'grok-4-fast-non-reasoning' } qw(
                 grok-code-fast-1
-                grok-4-0709
-                grok-4-fast-non-reasoning
             );
             if ($model && $GROK_DEAD_CHAT{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
@@ -4105,9 +4103,10 @@ sub _pick_ollama_tier {
         'llama3.2'   => 3,
         'llama3.1'   => 8, 'llama3'   => 8, 'llama2' => 7,
         'mistral'    => 7, 'mixtral'  => 47,
-        'qwen2.5'    => 7, 'qwen2'    => 7,
-        'phi3'       => 4, 'phi'      => 2,
-        'gemma2'     => 9, 'gemma'    => 7,
+        'qwen2.5'    => 7, 'qwen2'    => 7, 'qwen'   => 7,
+        'phi4'       => 14, 'phi3'    => 4, 'phi'    => 4,
+        'gemma3'     => 4, 'gemma2'   => 9, 'gemma'  => 7,
+        'deepseek'   => 7, 'command'  => 7,
     );
     for my $n (@names) {
         my $score;
@@ -4136,8 +4135,8 @@ sub _pick_ollama_tier {
     my @usable = grep { ($size_score{$_} // 7) >= 3 } @sorted;
     @usable = @sorted unless @usable;  # fallback if ALL models are tiny
 
-    my $small = $usable[0]  || $default_model || 'llama3.1:latest';
-    my $large = $usable[-1] || $default_model || 'llama3.1:latest';
+    my $small = $usable[0]  || $default_model || 'gemma3:4b';
+    my $large = $usable[-1] || $default_model || 'phi4:14b';
 
     # Only escalate if large model is meaningfully bigger (2x+).
     # If both tiers are similar size, keep them the same to avoid loading two models.
@@ -5820,9 +5819,10 @@ sub get_user_providers :Local :Args(0) {
                 # Fallback to hardcoded Grok models if none stored in metadata
                 if (!@$models && $key->service eq 'grok') {
                     $models = [
+                        { id => 'grok-4-fast-reasoning' },
+                        { id => 'grok-4-fast-non-reasoning' },
                         { id => 'grok-3' },
                         { id => 'grok-3-mini' },
-                        { id => 'grok-3-fast' },
                     ];
                 }
 
