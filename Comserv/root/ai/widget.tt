@@ -187,7 +187,7 @@
 
         <div id="ff-override-row">
             <label><input type="checkbox" id="ff-override"> Override existing values</label>
-            <label><input type="checkbox" id="ff-web-search"> Live web search (Grok only)</label>
+            <label><input type="checkbox" id="ff-web-search"> Live web search (Grok or Ollama w/ API key)</label>
         </div>
 
         <div id="ff-fields-info"></div>
@@ -343,7 +343,13 @@
 
     // Pick the smallest Ollama model that can reliably return JSON (~3b+)
     function ffAutoModel(fieldCount, useSearch) {
-        if (useSearch || !FF_ALL_MODELS.ollama.length) {
+        if (useSearch && !FF_ALL_MODELS.ollama.length) {
+            // No local Ollama models — fall back to Grok for search
+            var grokModel = FF_ALL_MODELS.grok[0];
+            return grokModel ? { model: grokModel, provider: 'grok' }
+                             : { model: 'mistral:latest', provider: 'ollama' };
+        }
+        if (!FF_ALL_MODELS.ollama.length) {
             var grokModel = FF_ALL_MODELS.grok[0];
             return grokModel ? { model: grokModel, provider: 'grok' }
                              : { model: 'mistral:latest', provider: 'ollama' };
