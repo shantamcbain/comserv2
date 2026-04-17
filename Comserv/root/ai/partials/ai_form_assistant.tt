@@ -23,10 +23,14 @@
              form-fill logic into other branches — extend this partial instead.
 %]
 
-[%# ── Role check — same pattern used across app (c.session.roles.grep) ─────── %]
-[% SET ai_form_ok = c.session.roles.grep('admin').size
-                 || c.session.roles.grep('editor').size
-                 || c.session.roles.grep('developer').size %]
+[%# ── Role check — use stash.is_admin (case-insensitive, pre-computed by auto) ── %]
+[%# Fall back to session roles grep for editor/developer (also try case-insensitive) %]
+[%# is_admin is a direct stash variable (most reliable); c.stash.is_admin also works %]
+[% SET ai_form_ok = is_admin
+                 || c.stash.is_admin
+                 || c.session.is_admin
+                 || c.session.roles.grep('(?i)editor').size
+                 || c.session.roles.grep('(?i)developer').size %]
 
 [%# ── Defaults ────────────────────────────────────────────────────────────── %]
 [% ai_form_entity_label = ai_form_entity_label || 'record' %]

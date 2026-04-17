@@ -1,0 +1,90 @@
+<div class="app-container">
+<div class="content-container">
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em;flex-wrap:wrap;gap:0.5em">
+  <h1 style="font-family:var(--header-font);color:var(--text-color);margin:0">Consignments</h1>
+  <div style="display:flex;gap:0.5em;flex-wrap:wrap">
+    <a href="/Inventory/consignment/partners" style="padding:6px 14px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font);font-size:0.9rem">
+      <i class="fas fa-handshake"></i> Partners
+    </a>
+    <a href="/Inventory/consignment/new" style="padding:6px 14px;background:var(--primary-color);color:#fff;border-radius:4px;text-decoration:none;font-family:var(--body-font)">
+      + New Consignment
+    </a>
+  </div>
+</div>
+
+[% IF c.flash.success_msg %]<div style="background:#d4edda;color:#155724;border:1px solid #c3e6cb;border-radius:4px;padding:0.6em 1em;margin-bottom:1em">[% c.flash.success_msg %]</div>[% END %]
+[% IF c.flash.error_msg %]<div style="background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:4px;padding:0.6em 1em;margin-bottom:1em">[% c.flash.error_msg %]</div>[% END %]
+
+<form method="GET" action="/Inventory/consignment" style="margin-bottom:1em">
+  <label style="font-family:var(--body-font);color:var(--text-color)">Status:
+    <select name="status" onchange="this.form.submit()" style="padding:4px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+      <option value="all"               [% IF filter_status == 'all'               %]selected[% END %]>All</option>
+      <option value="open"              [% IF filter_status == 'open'              %]selected[% END %]>Open</option>
+      <option value="partially_settled" [% IF filter_status == 'partially_settled' %]selected[% END %]>Partially Settled</option>
+      <option value="settled"           [% IF filter_status == 'settled'           %]selected[% END %]>Settled</option>
+      <option value="returned"          [% IF filter_status == 'returned'          %]selected[% END %]>Returned</option>
+    </select>
+  </label>
+</form>
+
+[% IF consignments.size == 0 %]
+<p style="color:var(--text-muted-color);font-family:var(--body-font)">No consignments found. <a href="/Inventory/consignment/new">Create the first one</a>.</p>
+[% ELSE %]
+<table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:0.9rem">
+  <thead>
+    <tr style="border-bottom:2px solid var(--border-color);background:var(--secondary-color)">
+      <th style="padding:8px 10px;text-align:left">Ref #</th>
+      <th style="padding:8px 10px;text-align:left">Partner</th>
+      <th style="padding:8px 10px;text-align:left">Date Sent</th>
+      <th style="padding:8px 10px;text-align:right">Items</th>
+      <th style="padding:8px 10px;text-align:right">Outstanding</th>
+      <th style="padding:8px 10px;text-align:center">Status</th>
+      <th style="padding:8px 10px;text-align:center">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH con IN consignments %]
+  [% SET total_sent = 0; SET total_out = 0 %]
+  [% FOREACH l IN con.lines %]
+    [% total_sent = total_sent + l.quantity_sent %]
+    [% total_out  = total_out  + (l.quantity_sent - l.quantity_sold - l.quantity_returned) %]
+  [% END %]
+  <tr style="border-bottom:1px solid var(--border-color)">
+    <td style="padding:7px 10px;color:var(--text-muted-color);font-size:0.85rem">[% con.reference_number || ('C-' _ con.id) %]</td>
+    <td style="padding:7px 10px;color:var(--text-color);font-weight:bold">[% con.partner.name | html %]
+      <br><small style="color:var(--text-muted-color);font-weight:normal">[% con.partner.commission_percent %]% commission</small>
+    </td>
+    <td style="padding:7px 10px;color:var(--text-muted-color)">[% con.date_sent %]</td>
+    <td style="padding:7px 10px;text-align:right">[% total_sent %]</td>
+    <td style="padding:7px 10px;text-align:right;color:[% total_out > 0 ? '#e65100' : '#155724' %]">
+      [% total_out %]
+    </td>
+    <td style="padding:7px 10px;text-align:center">
+      [% IF con.status == 'open' %]
+        <span style="background:#fff3e0;color:#e65100;border-radius:3px;padding:2px 8px;font-size:0.8rem">Open</span>
+      [% ELSIF con.status == 'partially_settled' %]
+        <span style="background:#e3f2fd;color:#1565c0;border-radius:3px;padding:2px 8px;font-size:0.8rem">Part. Settled</span>
+      [% ELSIF con.status == 'settled' %]
+        <span style="background:#d4edda;color:#155724;border-radius:3px;padding:2px 8px;font-size:0.8rem">Settled</span>
+      [% ELSE %]
+        <span style="background:#f5f5f5;color:#555;border-radius:3px;padding:2px 8px;font-size:0.8rem">[% con.status | html %]</span>
+      [% END %]
+    </td>
+    <td style="padding:7px 10px;text-align:center;white-space:nowrap">
+      <a href="/Inventory/consignment/view/[% con.id %]" style="color:var(--primary-color);font-size:0.85rem">View</a>
+      [% IF con.status != 'settled' %]
+      <form method="POST" action="/Inventory/consignment/delete/[% con.id %]" style="display:inline"
+            onsubmit="return confirm('Delete this consignment? This cannot be undone.')">
+        <button type="submit" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:0.85rem;padding:0 0 0 8px">Delete</button>
+      </form>
+      [% END %]
+    </td>
+  </tr>
+  [% END %]
+  </tbody>
+</table>
+[% END %]
+
+</div>
+</div>

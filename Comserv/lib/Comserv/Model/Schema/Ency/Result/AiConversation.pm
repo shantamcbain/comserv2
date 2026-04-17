@@ -48,7 +48,7 @@ __PACKAGE__->add_columns(
         is_nullable => 0,
     },
     metadata => {
-        data_type => 'longtext',
+        data_type   => 'longtext',
         is_nullable => 1,
     },
 );

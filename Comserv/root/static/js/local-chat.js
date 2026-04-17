@@ -461,8 +461,13 @@
         const chatInput = document.createElement('div');
         chatInput.className = 'chat-input';
         chatInput.innerHTML =
-            '<textarea id="message-input" placeholder="Type your message…"></textarea>' +
-            '<button id="send-message">Send</button>';
+            '<div id="chat-img-preview" style="display:none;padding:4px 0 2px;position:relative;"></div>' +
+            '<div style="display:flex;gap:3px;align-items:stretch;">' +
+            '<textarea id="message-input" style="flex:1;" placeholder="Type your message… (Ctrl+V to paste image)"></textarea>' +
+            '<div style="display:flex;flex-direction:column;gap:3px;">' +
+            '<label id="attach-image-btn" title="Attach image (or paste with Ctrl+V)" style="cursor:pointer;padding:4px 8px;background:var(--secondary-bg,#f0f0f0);border:1px solid #ccc;border-radius:4px;font-size:1.2em;user-select:none;text-align:center;">📎<input type="file" id="image-file-input" accept="image/*" style="display:none;"></label>' +
+            '<button id="send-message" style="flex:1;">Send</button>' +
+            '</div></div>';
 
         // Resize handle (bottom-right corner)
         const resizeHandle = document.createElement('div');
@@ -695,6 +700,32 @@
             document.getElementById('widget-history-drawer').style.display = 'none';
         });
 
+        // ── Image attachment helpers ──────────────────────────────────────────
+        function _setPendingImage(file) {
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                const dataUrl = ev.target.result;
+                const mime = file.type || 'image/jpeg';
+                const b64  = dataUrl.split(',')[1];
+                state.pendingImage = { data: b64, mime: mime, dataUrl: dataUrl };
+                const prev = document.getElementById('chat-img-preview');
+                if (prev) {
+                    prev.style.display = 'block';
+                    prev.innerHTML = '<img src="' + dataUrl + '" style="max-height:80px;max-width:120px;border-radius:4px;border:1px solid #ccc;vertical-align:middle;">' +
+                        ' <button type="button" title="Remove image" onclick="_clearPendingImage()" style="font-size:1em;border:none;background:none;cursor:pointer;color:#c00;">✕</button>' +
+                        ' <small style="color:#666;">' + (file.name || 'image') + '</small>';
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+        window._clearPendingImage = function() {
+            state.pendingImage = null;
+            const prev = document.getElementById('chat-img-preview');
+            if (prev) { prev.style.display = 'none'; prev.innerHTML = ''; }
+            const fi = document.getElementById('image-file-input');
+            if (fi) fi.value = '';
+        };
+
         // ── Other events ──────────────────────────────────────────────────────
         chatButton.addEventListener('click', function() { openChat(); });
         document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
@@ -703,6 +734,21 @@
         document.getElementById('send-message').addEventListener('click', sendMessage);
         document.getElementById('message-input').addEventListener('keypress', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+        });
+        document.getElementById('message-input').addEventListener('paste', function(e) {
+            const items = (e.clipboardData || window.clipboardData).items;
+            for (var i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    e.preventDefault();
+                    _setPendingImage(items[i].getAsFile());
+                    break;
+                }
+            }
+        });
+        document.getElementById('image-file-input').addEventListener('change', function(e) {
+            if (e.target.files && e.target.files[0]) {
+                _setPendingImage(e.target.files[0]);
+            }
         });
         document.getElementById('ai-provider').addEventListener('change', function(e) {
             const selectedVal = e.target.value;
@@ -1210,7 +1256,7 @@
     }
     
     // Function to query AI and get response
-    function queryAI(prompt) {
+    function queryAI(prompt, imageData) {
         const _siQ = document.getElementById('chat-status');
         const statusIndicator = _siQ || { textContent: '', className: '' };
         statusIndicator.textContent = 'AI is thinking...';
@@ -1249,20 +1295,19 @@
                 });
 
             docPromise.then(function() {
-                sendAIRequest(prompt, statusIndicator, loadingMessage);
+                sendAIRequest(prompt, statusIndicator, loadingMessage, imageData);
             });
         }).catch(function(error) {
             console.error('Failed to load agents config:', error);
-            // Fallback: still send request with default context
             if (!state.pageContext) {
                 state.pageContext = detectPageContext();
             }
-            sendAIRequest(prompt, statusIndicator, loadingMessage);
+            sendAIRequest(prompt, statusIndicator, loadingMessage, imageData);
         });
     }
     
     // Helper function to send AI request after context is ready
-    function sendAIRequest(prompt, statusIndicator, loadingMessage) {
+    function sendAIRequest(prompt, statusIndicator, loadingMessage, imageData) {
         // Classify query complexity to decide PROVIDER (ollama vs grok).
         // For Ollama, we do NOT override the model — the server's _select_model_for_context
         // already picks the best installed model per agent context.
@@ -1307,6 +1352,12 @@
             agent_name: state.pageContext.agent_name,
             page_content: extractPageContent()
         };
+
+        // Include image data if present (for Grok vision models)
+        if (imageData && imageData.data) {
+            requestPayload.image_data = imageData.data;
+            requestPayload.image_mime = imageData.mime || 'image/jpeg';
+        }
         
         // Include selected model for Grok
         if (modelName) {
@@ -1987,6 +2038,36 @@
         return map;
     }
 
+    // Levenshtein edit distance for typo tolerance
+    function _editDist(a, b) {
+        if (a === b) return 0;
+        if (!a.length) return b.length;
+        if (!b.length) return a.length;
+        var prev = Array.from({ length: b.length + 1 }, function(_, i) { return i; });
+        for (var i = 0; i < a.length; i++) {
+            var curr = [i + 1];
+            for (var j = 0; j < b.length; j++) {
+                curr.push(Math.min(
+                    curr[j] + 1,
+                    prev[j + 1] + 1,
+                    prev[j] + (a[i] === b[j] ? 0 : 1)
+                ));
+            }
+            prev = curr;
+        }
+        return prev[b.length];
+    }
+
+    // Returns true if word `w` fuzzy-matches any word in `labelWords`
+    // Threshold: 1 edit for words 4-5 chars, 2 edits for 6+ chars
+    function _fuzzyWordMatch(w, labelWords) {
+        if (w.length < 3) return false;
+        var maxDist = w.length >= 6 ? 2 : 1;
+        return labelWords.some(function(lw) {
+            return lw.length >= 3 && _editDist(w, lw) <= maxDist;
+        });
+    }
+
     // Try to resolve a navigation intent query to a list of {label,url} matches
     function resolveNavIntent(rawQuery) {
         const q = rawQuery
@@ -2007,7 +2088,14 @@
             return words.every(function(w) { return item.label.includes(w); })
                 || item.label.split(/\s+/).some(function(w) { return words.includes(w) && w.length > 3; });
         });
-        return partial.length ? partial : null;
+        if (partial.length) return partial;
+        // Typo-tolerant fallback: fuzzy match each query word against label words
+        const fuzzy = map.filter(function(item) {
+            const labelWords = item.label.split(/\s+/);
+            return words.filter(function(w) { return w.length >= 3; })
+                .some(function(w) { return _fuzzyWordMatch(w, labelWords); });
+        });
+        return fuzzy.length ? fuzzy : null;
     }
 
     // Navigation command regex — explicit nav keywords (voice-friendly: "open X", "go to X", etc.)
@@ -2037,7 +2125,7 @@
     function sendMessage() {
         const messageInput = document.getElementById('message-input');
         const message = messageInput.value.trim();
-        if (!message) return;
+        if (!message && !state.pendingImage) return;
 
         // Ensure page context is ready so navigation map is populated
         if (!state.pageContext) {
@@ -2051,9 +2139,9 @@
             return;
         }
 
-        // Client-side navigation interception — no AI round-trip needed
+        // Client-side navigation interception — no AI round-trip needed (skip if image-only)
         // 1. Explicit nav keyword: "open X", "go to X", "switch to X", etc.
-        const navMatch = message.match(NAV_RE);
+        const navMatch = message && message.match(NAV_RE);
         if (navMatch) {
             const matches = resolveNavIntent(message);
             if (matches && matches.length >= 1) {
@@ -2066,8 +2154,8 @@
         // 2. Bare page-name navigation (voice-control ready): short message (≤5 words)
         //    that resolves to EXACTLY ONE navigation entry with high confidence.
         //    Prevents accidental interception of regular questions.
-        const wordCount = message.trim().split(/\s+/).length;
-        if (wordCount <= 5) {
+        const wordCount = message ? message.trim().split(/\s+/).length : 0;
+        if (message && wordCount <= 5) {
             const bareMatches = resolveNavIntent(message);
             if (bareMatches && bareMatches.length === 1) {
                 // Only auto-navigate on an exact or strong label match — not a loose partial
@@ -2080,10 +2168,22 @@
             }
         }
 
-        addMessage(message, 'user-message');
+        // Build display message (text + optional thumbnail)
+        let displayHtml = message ? _escapeHtml(message) : '';
+        if (state.pendingImage) {
+            displayHtml += (displayHtml ? '<br>' : '') +
+                '<img src="' + state.pendingImage.dataUrl + '" style="max-height:120px;max-width:160px;border-radius:4px;margin-top:4px;display:block;">';
+        }
+        addMessage(displayHtml, 'user-message', true);
         messageInput.value = '';
+        const imgForRequest = state.pendingImage || null;
+        window._clearPendingImage();
         persistMessages();
-        queryAI(message);
+        queryAI(message || '(image attached)', imgForRequest);
+    }
+
+    function _escapeHtml(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
     
     // Function to add a message to the chat with sender label
@@ -2091,28 +2191,86 @@
     // Returns { cleanText, actions[] } where cleanText has the blocks removed.
     function extractActions(text) {
         const actions = [];
-        // Use a greedy match for the JSON body to handle nested objects correctly,
-        // then trim to the last } to find the true end of the JSON.
-        // Also allow optional whitespace before the closing ].
-        const re = /\[ACTION:\s*(\{[\s\S]*\})\s*\]/g;
-        const cleanText = text.replace(re, function(match, jsonStr) {
-            // Normalize curly/smart quotes that some AI models emit
-            const normalized = jsonStr
-                .replace(/[\u2018\u2019]/g, "'")
-                .replace(/[\u201C\u201D]/g, '"')
-                .trim();
-            // Find the last } to strip any trailing content the greedy match pulled in
-            const lastBrace = normalized.lastIndexOf('}');
-            const candidate = lastBrace >= 0 ? normalized.slice(0, lastBrace + 1) : normalized;
+        const cleanText = text.replace(/\[ACTION:\s*(\{[\s\S]*?\})\]/g, function(match, jsonStr) {
             try {
-                const obj = JSON.parse(candidate);
+                const obj = JSON.parse(jsonStr);
                 if (obj && obj.action) actions.push(obj);
             } catch(e) {
-                console.warn('AI action JSON parse error:', e, candidate);
+                console.warn('AI action JSON parse error:', e, jsonStr);
             }
             return '';
         }).trim();
         return { cleanText, actions };
+    }
+
+    // Fill form fields in the current page (or window.opener if popup).
+    // actionObj.fields is a plain object: { fieldName: value, ... }
+    // For checkboxes pass boolean/0/1; selects and inputs accept string values.
+    function _executeFillForm(actionObj) {
+        const chatMessages = document.getElementById('chat-messages');
+        const fields = actionObj.fields || {};
+
+        // When the chat is running in a detached popup window the form lives in the
+        // opener page — try that first, fall back to the current document.
+        const targetDoc = (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed)
+            ? window.opener.document
+            : document;
+
+        const filled = [];
+        const missed = [];
+
+        Object.keys(fields).forEach(function(fieldName) {
+            const value = fields[fieldName];
+            // Try by name first, then by id
+            let el = targetDoc.querySelector('[name="' + fieldName + '"]')
+                  || targetDoc.getElementById(fieldName);
+
+            if (!el) {
+                missed.push(fieldName);
+                return;
+            }
+
+            const tag  = el.tagName.toLowerCase();
+            const type = (el.getAttribute('type') || '').toLowerCase();
+
+            if (type === 'checkbox') {
+                el.checked = !!(value === true || value === 1 || value === '1' || value === 'true');
+            } else if (tag === 'select') {
+                el.value = String(value);
+                // Fallback: try case-insensitive match on option text
+                if (!el.value || el.value !== String(value)) {
+                    Array.from(el.options).forEach(function(opt) {
+                        if (opt.text.toLowerCase() === String(value).toLowerCase()) {
+                            el.value = opt.value;
+                        }
+                    });
+                }
+            } else {
+                el.value = value !== null && value !== undefined ? String(value) : '';
+            }
+
+            // Fire change/input events so any JS listeners react
+            el.dispatchEvent(new Event('input',  { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            filled.push(fieldName);
+        });
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+        const lbl = document.createElement('div');
+        lbl.className = 'msg-label';
+        lbl.textContent = 'System';
+        const el2 = document.createElement('div');
+        el2.className = 'message system-message';
+        let msg = '';
+        if (filled.length)  msg += '✅ Filled: ' + filled.join(', ') + '.';
+        if (missed.length)  msg += '\n⚠️ Not found: ' + missed.join(', ') + '.';
+        if (!filled.length && !missed.length) msg = '⚠️ No fields specified.';
+        el2.textContent = msg.trim();
+        wrapper.appendChild(lbl);
+        wrapper.appendChild(el2);
+        chatMessages.appendChild(wrapper);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
     // Project creation wizard — renders an inline form in the chat window.
@@ -2121,7 +2279,6 @@
         const chatMessages = document.getElementById('chat-messages');
         if (!chatMessages) return;
 
-        // Remove any existing wizard
         const existing = document.getElementById('ai-project-wizard');
         if (existing) existing.remove();
 
@@ -2199,7 +2356,6 @@
                 }
             });
 
-            // Also send the dependency list to the AI as a follow-up so it can create blocking todos
             if (deps.length) {
                 var depMsg = 'Project "' + name + '" was created. Dependencies noted: ' + deps.join(', ') + '. Please create the relevant sub-project todos and blocking dependencies.';
                 var chatInput = document.getElementById('chat-input') || document.getElementById('chat-message');
@@ -2215,6 +2371,12 @@
     // POST an action object to /ai/action and show a confirmation bubble.
     function executeAIAction(actionObj) {
         const chatMessages = document.getElementById('chat-messages');
+
+        // fill_form is handled entirely client-side — no server round-trip needed.
+        if (actionObj.action === 'fill_form') {
+            _executeFillForm(actionObj);
+            return;
+        }
 
         fetch('/ai/action', {
             method: 'POST',
@@ -2260,7 +2422,7 @@
         });
     }
 
-    function addMessage(text, className) {
+    function addMessage(text, className, isHtml) {
         const chatMessages = document.getElementById('chat-messages');
         const wrapper = document.createElement('div');
         wrapper.className = 'msg-wrapper ' + (className === 'user-message' ? 'msg-wrapper-user' : 'msg-wrapper-ai');
@@ -2279,7 +2441,9 @@
 
         const messageElement = document.createElement('div');
         messageElement.className = 'message ' + className;
-        if (className === 'ai-message' && window.AIUtils && AIUtils.formatMessageContent) {
+        if (isHtml) {
+            messageElement.innerHTML = text;
+        } else if (className === 'ai-message' && window.AIUtils && AIUtils.formatMessageContent) {
             messageElement.innerHTML = AIUtils.formatMessageContent(text);
         } else {
             messageElement.textContent = text;

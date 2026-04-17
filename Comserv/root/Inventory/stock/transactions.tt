@@ -1,0 +1,138 @@
+[% PageVersion = 'Inventory/stock/transactions.tt,v 0.01 2026/04/13 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Inventory Transaction Log</h1>
+<p>Site: <strong>[% sitename %]</strong></p>
+
+[% IF c.flash.success_msg %]<p class="success">[% c.flash.success_msg %]</p>[% END %]
+[% IF c.flash.error_msg %]<p class="error">[% c.flash.error_msg %]</p>[% END %]
+
+<div class="actions">
+  <a href="/Inventory/stock/adjust">New Adjustment</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/stock/levels">Stock Levels</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/items">Items</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory">Dashboard</a>
+</div>
+
+<form method="GET" action="/Inventory/stock/transactions">
+  <label>Item:
+    <select name="item_id">
+      <option value="">-- All Items --</option>
+      [% FOREACH item IN items %]
+      <option value="[% item.id %]"[% IF item_id == item.id %] selected[% END %]>[% item.sku %] - [% item.name %]</option>
+      [% END %]
+    </select>
+  </label>
+  &nbsp;
+  <label>Type:
+    <select name="transaction_type">
+      <option value="">-- All Types --</option>
+      <option value="receive"[% IF tx_type == 'receive' %] selected[% END %]>Receive</option>
+      <option value="issue"[% IF tx_type == 'issue' %] selected[% END %]>Issue</option>
+      <option value="adjust_up"[% IF tx_type == 'adjust_up' %] selected[% END %]>Adjust Up</option>
+      <option value="adjust_down"[% IF tx_type == 'adjust_down' %] selected[% END %]>Adjust Down</option>
+      <option value="transfer"[% IF tx_type == 'transfer' %] selected[% END %]>Transfer</option>
+      <option value="return"[% IF tx_type == 'return' %] selected[% END %]>Return</option>
+      <option value="count"[% IF tx_type == 'count' %] selected[% END %]>Physical Count</option>
+      <option value="produce"[% IF tx_type == 'produce' %] selected[% END %]>Produce</option>
+      <option value="consume"[% IF tx_type == 'consume' %] selected[% END %]>Consume</option>
+    </select>
+  </label>
+  &nbsp;
+  <label>From: <input type="date" name="date_from" value="[% date_from %]"></label>
+  &nbsp;
+  <label>To: <input type="date" name="date_to" value="[% date_to %]"></label>
+  &nbsp;
+  <input type="submit" value="Filter">
+  [% IF item_id || tx_type || date_from || date_to %]
+  &nbsp;<a href="/Inventory/stock/transactions">Clear</a>
+  [% END %]
+</form>
+
+[% IF transactions.size == 0 %]
+  <p>No transactions found for the selected filters.</p>
+[% ELSE %]
+<p><em>Showing [% transactions.size %] of [% total_count %] transaction(s) — Page [% page %] of [% total_pages %]</em></p>
+
+<table border="1" cellpadding="4" cellspacing="0">
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Item</th>
+      <th>Type</th>
+      <th>Quantity</th>
+      <th>Unit Cost</th>
+      <th>Value</th>
+      <th>Location</th>
+      <th>Reference</th>
+      <th>Performed By</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH tx IN transactions %]
+    [% value = (tx.quantity || 0) * (tx.unit_cost || 0) %]
+    [% is_inbound = (tx.transaction_type == 'receive' || tx.transaction_type == 'adjust_up' || tx.transaction_type == 'produce' || tx.transaction_type == 'harvest' || tx.transaction_type == 'return' || tx.transaction_type == 'count') %]
+    <tr>
+      <td>[% tx.transaction_date %]</td>
+      <td>
+        [% IF tx.item %]
+          <a href="/Inventory/item/view/[% tx.item.id %]">[% tx.item.name %]</a>
+          <br><small>[% tx.item.sku %]</small>
+        [% ELSE %]
+          <em>Unknown</em>
+        [% END %]
+      </td>
+      <td>
+        [% SWITCH tx.transaction_type %]
+          [% CASE 'receive'     %]<span style="color:green">Receive</span>
+          [% CASE 'issue'       %]<span style="color:#c66">Issue</span>
+          [% CASE 'adjust_up'   %]<span style="color:green">Adjust ↑</span>
+          [% CASE 'adjust_down' %]<span style="color:#c66">Adjust ↓</span>
+          [% CASE 'transfer'    %]<span style="color:#66c">Transfer</span>
+          [% CASE 'return'      %]<span style="color:green">Return</span>
+          [% CASE 'count'       %]<span style="color:#888">Count</span>
+          [% CASE 'produce'     %]<span style="color:green">Produce</span>
+          [% CASE 'consume'     %]<span style="color:#c66">Consume</span>
+          [% CASE              %][% tx.transaction_type %]
+        [% END %]
+      </td>
+      <td style="text-align:right">
+        [% IF is_inbound %]
+          <span style="color:green">+[% tx.quantity %]</span>
+        [% ELSE %]
+          <span style="color:#c66">-[% tx.quantity %]</span>
+        [% END %]
+        [% IF tx.item %] [% tx.item.unit_of_measure %][% END %]
+      </td>
+      <td style="text-align:right">[% tx.unit_cost ? tx.unit_cost : '-' %]</td>
+      <td style="text-align:right">[% value > 0 ? value : '-' %]</td>
+      <td>[% tx.location ? tx.location.name : '-' %]</td>
+      <td>[% tx.reference_number || '-' %]</td>
+      <td>[% tx.performed_by || '-' %]</td>
+      <td>[% tx.notes || '' %]</td>
+    </tr>
+  [% END %]
+  </tbody>
+</table>
+
+[% IF total_pages > 1 %]
+<div class="pagination">
+  [% IF page > 1 %]
+    <a href="/Inventory/stock/transactions?page=[% page - 1 %]&item_id=[% item_id %]&transaction_type=[% tx_type %]&date_from=[% date_from %]&date_to=[% date_to %]">&laquo; Previous</a>
+  [% END %]
+  Page [% page %] of [% total_pages %]
+  [% IF page < total_pages %]
+    <a href="/Inventory/stock/transactions?page=[% page + 1 %]&item_id=[% item_id %]&transaction_type=[% tx_type %]&date_from=[% date_from %]&date_to=[% date_to %]">Next &raquo;</a>
+  [% END %]
+</div>
+[% END %]
+
+[% END %]
+
+[% IF debug_errors && debug_errors.size > 0 %]
+<div class="debug">[% FOREACH err IN debug_errors %]<p>[% err %]</p>[% END %]</div>
+[% END %]
