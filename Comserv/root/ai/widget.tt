@@ -385,13 +385,25 @@
                 });
                 if (opts.length <= 1) opts.push({ val:'mistral:latest|ollama', label:'mistral:latest (Ollama)' });
                 sel.innerHTML = '';
+                // Restore previously saved model selection
+                var saved = localStorage.getItem('ai_widget_ff_model');
+                var defaultIdx = 0;
+                if (saved) {
+                    for (var i = 0; i < opts.length; i++) {
+                        if (opts[i].val === saved) { defaultIdx = i; break; }
+                    }
+                }
                 opts.forEach(function(o, i) {
                     var opt = document.createElement('option');
                     opt.value = o.val; opt.textContent = o.label;
-                    if (i === 0) opt.selected = true;
+                    if (i === defaultIdx) opt.selected = true;
                     sel.appendChild(opt);
                 });
                 sel.dataset.loaded = '1';
+                // Save on change
+                sel.addEventListener('change', function() {
+                    localStorage.setItem('ai_widget_ff_model', sel.value);
+                });
             })
             .catch(function() {
                 sel.innerHTML = '<option value="auto|auto">⚡ Auto (recommended)</option>'
