@@ -715,7 +715,7 @@ sub _fetch_rate {
 sub ai_usage :Path('/Accounting/ai_usage') :Args(0) {
     my ($self, $c) = @_;
 
-    unless ($c->check_any_user_role('admin', 'accounting')) {
+    unless ($c->stash->{is_admin} || grep { lc($_) eq 'admin' || lc($_) eq 'accounting' } @{ $c->session->{roles} // [] }) {
         $c->flash->{error_msg} = 'Access denied';
         $c->response->redirect($c->uri_for('/Accounting'));
         return;
