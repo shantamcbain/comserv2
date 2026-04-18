@@ -283,5 +283,70 @@
         document.getElementById('te-apply-status').textContent = '';
         teStatus('', '');
     };
+
+    // ── Auto-populate from URL params (?file=root/...&request=...) ───────────
+    // Called from the widget when template_editor agent is active and user sends a message.
+    (function() {
+        var params = new URLSearchParams(window.location.search);
+        var file    = params.get('file');
+        var request = params.get('request');
+
+        if (request) {
+            document.getElementById('te-request').value = request;
+        }
+
+        if (file) {
+            currentPath = file;
+            var sel = document.getElementById('te-file-select');
+            var found = false;
+            for (var i = 0; i < sel.options.length; i++) {
+                if (sel.options[i].value === file) {
+                    sel.selectedIndex = i;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                var opt = document.createElement('option');
+                opt.value = file;
+                opt.textContent = file;
+                opt.selected = true;
+                sel.appendChild(opt);
+            }
+
+            // Load the file, then auto-submit if a request was also provided
+            var loadBtn = document.getElementById('te-load-btn');
+            loadBtn.disabled = true;
+            loadBtn.textContent = 'Loading…';
+            teStatus('Loading ' + file + '…', 'info');
+            fetch('/ai/read_file?path=' + encodeURIComponent(file) + '&limit=500',
+                  { credentials: 'include' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    loadBtn.disabled = false;
+                    loadBtn.textContent = '📂 Load File';
+                    if (data.success) {
+                        currentContent = data.content;
+                        document.getElementById('te-current').value = data.content;
+                        document.getElementById('te-file-info').textContent =
+                            file + ' — ' + data.total + ' lines';
+                        document.getElementById('te-original-preview').value = data.content;
+                        teStatus('File loaded. Submitting to AI…', 'info');
+                        if (request) {
+                            teSubmit();
+                        } else {
+                            teStatus('File loaded. Describe your change and click Get AI Fix.', 'ok');
+                        }
+                    } else {
+                        teStatus('Could not load file: ' + data.error, 'err');
+                    }
+                })
+                .catch(function(e) {
+                    loadBtn.disabled = false;
+                    loadBtn.textContent = '📂 Load File';
+                    teStatus('Load error: ' + e, 'err');
+                });
+        }
+    })();
 })();
 </script>
