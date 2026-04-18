@@ -275,6 +275,40 @@
         return '[PAGE ERROR DETECTED]\n' + errors.slice(0, 3).join('\n---\n') + '\n[/PAGE ERROR]';
     }
 
+    // ── _getTemplatePathForPage ────────────────────────────────────────────────
+    // Maps the current page URL to its TT2 template file path (relative to project root).
+    function _getTemplatePathForPage(pathname) {
+        var map = {
+            '/':              'root/CSC/CSC.tt',
+            '/CSC':           'root/CSC/CSC.tt',
+            '/hosting':       'root/CSC/proxy_manager.tt',
+            '/BMaster':       'root/BMaster/index.tt',
+            '/ENCY':          'root/ENCY/index.tt',
+            '/workshop':      'root/Workshops/index.tt',
+            '/HelpDesk':      'root/HelpDesk/index.tt',
+            '/membership':    'root/membership/index.tt',
+            '/marketplace':   'root/marketplace/index.tt',
+            '/shop':          'root/shop/index.tt',
+            '/Documentation': 'root/Documentation/index.tt',
+            '/ai':            'root/ai/index.tt',
+            '/admin':         'root/admin/index.tt',
+        };
+        var clean = pathname.replace(/\/$/, '') || '/';
+        if (map[clean]) return map[clean];
+        for (var key in map) {
+            if (clean.startsWith(key + '/')) return map[key];
+        }
+        var parts = clean.replace(/^\//, '').split('/');
+        if (parts.length >= 2) {
+            var ctrl = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+            return 'root/' + ctrl + '/' + parts[1].toLowerCase() + '.tt';
+        } else if (parts[0]) {
+            var ctrl = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+            return 'root/' + ctrl + '/index.tt';
+        }
+        return null;
+    }
+
     // ── _handleReadFileRequest ─────────────────────────────────────────────────
     // Called when the AI response contains [READ_FILE: path] tokens.
     // Fetches the file content and sends it back as a follow-up context message.
@@ -1429,14 +1463,39 @@
                 });
 
             docPromise.then(function() {
-                // When coding agent is active, auto-collect page errors and prepend them
                 var effectivePrompt = prompt;
+
                 if (state.pageContext && state.pageContext.agent_id === 'coding') {
                     var pageErrors = _collectPageErrors();
                     if (pageErrors && !prompt.toLowerCase().includes('[page error')) {
                         effectivePrompt = pageErrors + '\n\n' + prompt;
                     }
                 }
+
+                if (state.pageContext && state.pageContext.agent_id === 'template_editor'
+                        && !prompt.includes('[FILE:')) {
+                    var tplPath = _getTemplatePathForPage(window.location.pathname);
+                    if (tplPath) {
+                        fetch('/ai/read_file?path=' + encodeURIComponent(tplPath) + '&limit=500',
+                              { credentials: 'include' })
+                            .then(function(r) { return r.json(); })
+                            .then(function(data) {
+                                if (data.success) {
+                                    var fileBlock = '[FILE: ' + data.path + ']\n```\n'
+                                                  + data.content + '\n```\n[/FILE]\n\n';
+                                    sendAIRequest(fileBlock + effectivePrompt,
+                                                  statusIndicator, loadingMessage, imageData);
+                                } else {
+                                    sendAIRequest(effectivePrompt, statusIndicator, loadingMessage, imageData);
+                                }
+                            })
+                            .catch(function() {
+                                sendAIRequest(effectivePrompt, statusIndicator, loadingMessage, imageData);
+                            });
+                        return;
+                    }
+                }
+
                 sendAIRequest(effectivePrompt, statusIndicator, loadingMessage, imageData);
             });
         }).catch(function(error) {
