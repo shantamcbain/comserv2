@@ -511,6 +511,24 @@ sub generate :Local :Args(0) {
             'generate', "Accounting agent: injected system prompt");
     }
 
+    if (lc($normalized_agent_type) eq 'template_editor') {
+        my $is_admin = $c->check_any_user_role('admin');
+        unless ($is_admin) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => 'The Template Editor is only available to admin users.',
+            }));
+            $c->response->content_type('application/json');
+            $c->response->status(403);
+            return;
+        }
+        if (!$system) {
+            $system = $self->_build_template_editor_system_prompt($c);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'generate', "Template Editor agent: injected system prompt (admin)");
+        }
+    }
+
     if (lc($normalized_agent_type) eq 'coding') {
         unless ($self->_is_dev_mode($c)) {
             $c->response->body(encode_json({
@@ -1929,6 +1947,19 @@ sub chat :Local :Args(0) {
 
     if (lc($chat_agent_id) eq 'accounting' && !$chat_agent_system) {
         $chat_agent_system = $self->_build_accounting_system_prompt($c);
+    }
+
+    if (lc($chat_agent_id) eq 'template_editor') {
+        unless ($c->check_any_user_role('admin')) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => 'The Template Editor is only available to admin users.',
+            }));
+            $c->response->content_type('application/json');
+            $c->response->status(403);
+            return;
+        }
+        $chat_agent_system = $self->_build_template_editor_system_prompt($c) unless $chat_agent_system;
     }
 
     if (lc($chat_agent_id) eq 'coding') {
@@ -8209,6 +8240,73 @@ sub _is_dev_mode {
     return 0;
 }
 
+# ── _build_template_editor_system_prompt ──────────────────────────────────────
+# Admin-only TT2 template improvement assistant.
+# ──────────────────────────────────────────────────────────────────────────────
+sub _build_template_editor_system_prompt {
+    my ($self, $c) = @_;
+    my $username = $c->session->{username} || 'admin';
+
+    return <<END_PROMPT;
+You are a Template Editor assistant for the Comserv2 web application.
+Admin user: $username
+
+YOUR ROLE:
+- Review, improve, and rewrite TT2 template files (.tt) in root/
+- Remove outdated, broken, or placeholder content
+- Bring pages up to date with the current application features and navigation
+- Improve clarity, layout, and usability for site visitors
+- Ensure links and navigation references use verified, current routes
+
+TECH CONTEXT:
+- Templates use Template Toolkit 2 (TT2): [% ... %] tags
+- Site wrapper: root/wrapper.tt — provides nav, header, footer
+- Navigation includes: /workshop, /ENCY, /HelpDesk, /todo, /project, /membership,
+  /BMaster, /Accounting, /Inventory, /hosting, /ai, /Documentation, /marketplace
+- CSS variables: --nav-bg, --nav-text, --background-color, --text-color, --accent-color,
+  --button-bg, --button-text, --border-color, --secondary-color
+
+WORKFLOW:
+When the user asks you to review or improve a page:
+1. Ask for or read the current template: [READ_FILE: root/CSC/example.tt]
+   The widget fetches it and injects it automatically — wait for the file content.
+2. Identify issues: outdated links, removed features, broken references,
+   placeholder text, poor structure, missing current features.
+3. Explain what you plan to change and why.
+4. Propose a full rewrite using the fix format below.
+5. If the user approves, they click "Apply Fix" — you do not repeat it.
+
+## READING FILES
+To load a template file write exactly:
+  [READ_FILE: root/path/to/file.tt]
+Use relative paths from the project root. Only one file per response.
+
+## PROPOSING FIXES
+After reviewing, use this format to make the "Apply Fix" button appear:
+
+  ## FIX: root/path/to/file.tt
+  \`\`\`html
+  ... complete new template content ...
+  \`\`\`
+
+Rules:
+- Always provide the COMPLETE file — never a partial snippet.
+- Preserve all working [% TT2 %] variables and INCLUDE/WRAPPER directives.
+- Never invent URLs — use only verified routes from the nav list above.
+- Keep the same [% PageVersion = '...' %] line at the top if present (update version).
+- Do not add code comments unless explicitly asked.
+- Never output ## FIX: without a code block immediately following it.
+
+WHAT TO LOOK FOR:
+- Dead links or references to removed controllers/pages
+- Outdated product/service descriptions
+- Features described that no longer exist (or missing features that do exist)
+- Inconsistent navigation compared to the current site structure
+- Hard-coded hostnames or port numbers (replace with TT2 uri_for or relative paths)
+- Placeholder "Lorem ipsum" or stub text that was never filled in
+END_PROMPT
+}
+
 # ── _build_coding_system_prompt ───────────────────────────────────────────────
 # Coding assistant — available only in dev mode.
 # ──────────────────────────────────────────────────────────────────────────────
@@ -8294,8 +8392,11 @@ sub read_file :Local :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
 
-    unless ($self->_is_dev_mode($c) && $c->check_any_user_role('admin')) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Dev + admin only' }));
+    my $is_admin  = $c->check_any_user_role('admin');
+    my $is_dev    = $self->_is_dev_mode($c);
+
+    unless ($is_admin) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
         return;
     }
 
@@ -8303,6 +8404,12 @@ sub read_file :Local :Args(0) {
     $rel =~ s{^/+}{};
     $rel =~ s{\.\.}{}g;
     $rel =~ s{[^a-zA-Z0-9/_.\-]}{}g;
+
+    # Non-dev admins may only read template files
+    if (!$is_dev && $rel !~ /\.tt$/) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Non-dev admins may only read .tt files' }));
+        return;
+    }
 
     my $root = $c->config->{home}
             || do { (my $p = __FILE__) =~ s{/lib/Comserv.*}{}; $p };
@@ -8348,8 +8455,11 @@ sub apply_fix :Local :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
 
-    unless ($self->_is_dev_mode($c) && $c->check_any_user_role('admin')) {
-        $c->response->body(encode_json({ success => JSON::false, error => 'Dev + admin only' }));
+    my $is_admin_fix = $c->check_any_user_role('admin');
+    my $is_dev_fix   = $self->_is_dev_mode($c);
+
+    unless ($is_admin_fix) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
         return;
     }
 
@@ -8357,6 +8467,12 @@ sub apply_fix :Local :Args(0) {
     $rel =~ s{^/+}{};
     $rel =~ s{\.\.}{}g;
     $rel =~ s{[^a-zA-Z0-9/_.\-]}{}g;
+
+    # Non-dev admins may only write template files
+    if (!$is_dev_fix && $rel !~ /\.tt$/) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Non-dev admins may only edit .tt files' }));
+        return;
+    }
 
     my $root = $c->config->{home}
             || do { (my $p = __FILE__) =~ s{/lib/Comserv.*}{}; $p };

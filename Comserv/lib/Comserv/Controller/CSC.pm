@@ -92,10 +92,10 @@ sub hosting_via_voip :Path('/CSC/hosting_via_voip') :Args(0) {
 }
 
 # Email test form
-sub email_test :Local :Args(0) {
+sub email_test :Path('/admin/email_test') :Args(0) {
     my ($self, $c) = @_;
 
-    unless ($c->check_any_user_role('admin')) {
+    unless ($c->stash->{is_admin} || grep { lc($_) eq 'admin' } @{ $c->session->{roles} // [] }) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'email_test',
             "Unauthorized email_test access from IP " . ($c->req->address || 'unknown'));
         $c->response->status(403);
@@ -154,7 +154,7 @@ sub email_test :Local :Args(0) {
         }
         
         # Redirect to avoid form resubmission
-        $c->response->redirect($c->uri_for('/CSC/email_test'));
+        $c->response->redirect($c->uri_for('/admin/email_test'));
         return;
     }
     
