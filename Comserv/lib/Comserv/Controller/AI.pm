@@ -8294,7 +8294,7 @@ sub read_file :Local :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
 
-    unless ($self->_is_dev_mode($c) && $c->check_any_user_role('admin')) {
+    unless ($self->_is_dev_mode($c) && ($c->stash->{is_admin} || grep { lc($_) eq 'admin' } @{ $c->session->{roles} // [] })) {
         $c->response->body(encode_json({ success => JSON::false, error => 'Dev + admin only' }));
         return;
     }
@@ -8348,7 +8348,7 @@ sub apply_fix :Local :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
 
-    unless ($self->_is_dev_mode($c) && $c->check_any_user_role('admin')) {
+    unless ($self->_is_dev_mode($c) && ($c->stash->{is_admin} || grep { lc($_) eq 'admin' } @{ $c->session->{roles} // [] })) {
         $c->response->body(encode_json({ success => JSON::false, error => 'Dev + admin only' }));
         return;
     }
