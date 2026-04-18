@@ -2368,6 +2368,17 @@
             return;
         }
 
+        // Template editor agent: open the dedicated form page with the file + request pre-loaded
+        if (state.pageContext && state.pageContext.agent_id === 'template_editor' && message) {
+            var tplPath = _getTemplatePathForPage(window.location.pathname);
+            var params = new URLSearchParams();
+            if (tplPath) params.set('file', tplPath);
+            params.set('request', message);
+            messageInput.value = '';
+            window.open('/ai/template_editor?' + params.toString(), '_blank');
+            return;
+        }
+
         // Client-side navigation interception — no AI round-trip needed (skip if image-only)
         // 1. Explicit nav keyword: "open X", "go to X", "switch to X", etc.
         const navMatch = message && message.match(NAV_RE);
