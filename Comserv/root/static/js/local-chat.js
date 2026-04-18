@@ -197,7 +197,8 @@
         // Keep the Auto option, then add one per eligible agent
         sel.innerHTML = '<option value="auto">⚡ Auto</option>';
         Object.entries(agents).forEach(function([key, agent]) {
-            if (agent.local_only && !state.isDevMode) return;
+            if (agent.local_only  && !state.isDevMode) return;
+            if (agent.admin_only  && !state.isAdmin)   return;
             var opt = document.createElement('option');
             opt.value = key;
             opt.textContent = (agent.icon || '') + ' ' + (agent.display_name || key);
