@@ -102,17 +102,18 @@ const AIUtils = {
                 const fixMatch = text.match(/##\s*FIX:\s*([^\n\r]+)/i);
                 pendingFixPath = fixMatch ? fixMatch[1].trim() : null;
 
-                // Detect [READ_FILE: path] hints (display as "📂 Read" link)
-                const rfMatch = text.match(/\[READ_FILE:\s*([^\]]+)\]/gi);
-                if (rfMatch) {
-                    text = text.replace(/\[READ_FILE:\s*([^\]]+)\]/gi, function(_, p) {
-                        const path = p.trim();
-                        return `<a href="#" class="ai-read-file-link" data-path="${this.escapeHtml(path)}"
-                                   onclick="if(window._handleReadFileRequest)window._handleReadFileRequest('${path.replace(/'/g,"\\'")}');return false;"
-                                   title="Load file into next message">📂 ${this.escapeHtml(path)}</a>`;
-                    }.bind(this));
-                }
-                html += this.renderTextWithLinks(text);
+                // Render text first (escapes HTML, converts URLs to links)
+                let rendered = this.renderTextWithLinks(text);
+
+                // Then replace [READ_FILE: path] tokens in the rendered output
+                rendered = rendered.replace(/\[READ_FILE:\s*([^\]]+)\]/gi, function(_, p) {
+                    const path = p.trim();
+                    return `<a href="#" class="ai-read-file-link" data-path="${this.escapeHtml(path)}"
+                               onclick="if(window._handleReadFileRequest)window._handleReadFileRequest('${path.replace(/'/g,"\\'")}');return false;"
+                               title="Load file into next message">📂 ${this.escapeHtml(path)}</a>`;
+                }.bind(this));
+
+                html += rendered;
             } else {
                 // Code block — language specifier on first line is stripped
                 let code = parts[i];
