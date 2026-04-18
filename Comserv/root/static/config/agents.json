@@ -1,5 +1,32 @@
 {
     "agents": {
+        "template_editor": {
+            "id": "template_editor",
+            "display_name": "Template Editor",
+            "icon": "✏️",
+            "admin_only": true,
+            "description": "Review and rewrite TT2 template files — remove outdated content, fix broken links, improve pages (admin only)",
+            "url_patterns": [],
+            "capabilities": {
+                "search_docs": false,
+                "search_web": false,
+                "search_code": true,
+                "context_aware": true,
+                "fill_form": false
+            },
+            "model_settings": {
+                "temperature": 0.3,
+                "max_tokens": 8000,
+                "model_preference": "phi4"
+            },
+            "directives": [
+                "Always read the current template before proposing changes",
+                "Provide complete file rewrites — never partial snippets",
+                "Use only verified relative URLs from the application nav list",
+                "Preserve TT2 syntax and INCLUDE/WRAPPER directives exactly",
+                "Explain what is outdated or broken before proposing the fix"
+            ]
+        },
         "coding": {
             "id": "coding",
             "display_name": "Coding Assistant",
