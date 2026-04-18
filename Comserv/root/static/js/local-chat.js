@@ -216,6 +216,7 @@
             if (chosen === 'auto') {
                 state.agentOverride = null;
                 state.pageContext = detectPageContext();
+                _updateAgentBanner('auto');
             } else {
                 _applyAgentOverride(chosen);
             }
@@ -228,12 +229,24 @@
         var agent = state.agentsConfig.agents[agentKey];
         if (!agent) return;
         state.agentOverride = agentKey;
-        // Re-build pageContext using the chosen agent regardless of URL
         var ctx = detectPageContext() || {};
         ctx.agent_id   = agent.id;
         ctx.agent_name = agent.display_name;
         if (agent.system_prompt) ctx.system_prompt = agent.system_prompt;
         state.pageContext = ctx;
+        _updateAgentBanner(agentKey);
+    }
+
+    function _updateAgentBanner(agentKey) {
+        var banner = document.getElementById('chat-agent-banner');
+        if (!banner) return;
+        if (agentKey === 'template_editor') {
+            banner.innerHTML = '✏️ <strong>Template Editor</strong> — Use the dedicated form to load, edit, and apply template changes: ' +
+                '<a href="/ai/template_editor" target="_blank" style="color:#1a73e8;font-weight:bold;">Open Template Editor →</a>';
+            banner.style.display = 'block';
+        } else {
+            banner.style.display = 'none';
+        }
     }
 
     // ── _collectPageErrors ────────────────────────────────────────────────────
@@ -601,6 +614,12 @@
             '</span>' +
             '<a href="/ai/manage_api_keys" target="_blank" class="manage-keys-link" title="Manage API keys">⚙️</a>';
 
+        // Agent-specific banner (shown when a special agent needs a dedicated page)
+        const agentBanner = document.createElement('div');
+        agentBanner.id = 'chat-agent-banner';
+        agentBanner.style.cssText = 'display:none;padding:6px 10px;background:#fffbe6;border-top:1px solid #f0c000;' +
+            'border-bottom:1px solid #f0c000;font-size:0.82em;color:#555;';
+
         // Status indicator
         const statusIndicator = document.createElement('div');
         statusIndicator.id = 'chat-status';
@@ -630,6 +649,7 @@
         chatPanel.appendChild(historyDrawer);
         chatPanel.appendChild(chatMessages);
         chatPanel.appendChild(providerSelector);
+        chatPanel.appendChild(agentBanner);
         chatPanel.appendChild(statusIndicator);
         chatPanel.appendChild(chatInput);
         chatPanel.appendChild(resizeHandle);
