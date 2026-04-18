@@ -192,6 +192,24 @@ sub index :Path :Args(0) {
         'index', "AI interface loaded for user: $username (host: $current_host, model: $current_model, can_select: " . ($can_select_model ? 'yes' : 'no') . ", external_models: " . scalar(@external_models) . ")");
 }
 
+=head2 template_editor
+
+Admin-only page for reviewing and applying AI-proposed TT2 template edits.
+
+=cut
+
+sub template_editor :Local :Args(0) {
+    my ($self, $c) = @_;
+    unless ($c->check_any_user_role('admin')) {
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+    $c->stash(
+        template   => 'ai/template_editor.tt',
+        page_title => 'Template Editor',
+    );
+}
+
 =head2 widget
 
 Renders a self-contained, layout-free popup window for the chat widget.
