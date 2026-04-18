@@ -33,6 +33,7 @@
         activeModel: null,
         isGuest: true,
         isAdmin: false,
+        isDevMode: false,           // true only on local development machine
         userModelOverride: false,   // true when user manually picks a model
         modelTiers: {
             small:  null,   // fastest/smallest Ollama model
@@ -188,6 +189,115 @@
             });
     }
     
+    // Populate the agent picker dropdown from agentsConfig, respecting local_only + isDevMode
+    function populateAgentPicker() {
+        var sel = document.getElementById('ai-agent-select');
+        if (!sel || !state.agentsConfig || !state.agentsConfig.agents) return;
+        var agents = state.agentsConfig.agents;
+        // Keep the Auto option, then add one per eligible agent
+        sel.innerHTML = '<option value="auto">⚡ Auto</option>';
+        Object.entries(agents).forEach(function([key, agent]) {
+            if (agent.local_only && !state.isDevMode) return;
+            var opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = (agent.icon || '') + ' ' + (agent.display_name || key);
+            sel.appendChild(opt);
+        });
+        // Restore previously saved agent selection
+        var saved = localStorage.getItem('ai_widget_agent');
+        if (saved && sel.querySelector('option[value="' + saved + '"]')) {
+            sel.value = saved;
+            if (saved !== 'auto') _applyAgentOverride(saved);
+        }
+        sel.addEventListener('change', function() {
+            var chosen = sel.value;
+            localStorage.setItem('ai_widget_agent', chosen);
+            if (chosen === 'auto') {
+                state.agentOverride = null;
+                state.pageContext = detectPageContext();
+            } else {
+                _applyAgentOverride(chosen);
+            }
+        });
+        sel.dataset.populated = '1';
+    }
+
+    function _applyAgentOverride(agentKey) {
+        if (!state.agentsConfig || !state.agentsConfig.agents) return;
+        var agent = state.agentsConfig.agents[agentKey];
+        if (!agent) return;
+        state.agentOverride = agentKey;
+        // Re-build pageContext using the chosen agent regardless of URL
+        var ctx = detectPageContext() || {};
+        ctx.agent_id   = agent.id;
+        ctx.agent_name = agent.display_name;
+        if (agent.system_prompt) ctx.system_prompt = agent.system_prompt;
+        state.pageContext = ctx;
+    }
+
+    // ── _collectPageErrors ────────────────────────────────────────────────────
+    // Scans the current page DOM for visible error messages and returns a
+    // formatted string to prepend to coding-agent prompts.
+    function _collectPageErrors() {
+        var errors = [];
+        var seen = {};
+
+        var selectors = [
+            '.error-message', '.alert-danger', '.alert-error',
+            '#error-message', '.flash-error', '.catalyst-error',
+            '.exception-title', '.exception-message',
+            '[class*="error"]', '[id*="error"]'
+        ];
+
+        selectors.forEach(function(sel) {
+            try {
+                document.querySelectorAll(sel).forEach(function(el) {
+                    var txt = (el.innerText || '').trim();
+                    if (txt && txt.length > 5 && txt.length < 2000 && !seen[txt]) {
+                        seen[txt] = 1;
+                        errors.push(txt);
+                    }
+                });
+            } catch(e) {}
+        });
+
+        // Also check page title for Catalyst error pages
+        if (document.title && /error|exception|500|404/i.test(document.title)) {
+            var bodySnippet = (document.body && document.body.innerText || '').substring(0, 800).trim();
+            if (bodySnippet && !seen[bodySnippet.substring(0, 50)]) {
+                errors.push('Page title: ' + document.title + '\n' + bodySnippet);
+            }
+        }
+
+        if (!errors.length) return '';
+
+        return '[PAGE ERROR DETECTED]\n' + errors.slice(0, 3).join('\n---\n') + '\n[/PAGE ERROR]';
+    }
+
+    // ── _handleReadFileRequest ─────────────────────────────────────────────────
+    // Called when the AI response contains [READ_FILE: path] tokens.
+    // Fetches the file content and sends it back as a follow-up context message.
+    function _handleReadFileRequest(path) {
+        var url = '/ai/read_file?path=' + encodeURIComponent(path) + '&limit=300';
+        fetch(url, { credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    var ctx = '[FILE: ' + data.path + ' (lines ' + (data.offset + 1)
+                            + '-' + (data.offset + data.lines) + ' of ' + data.total + ')]\n'
+                            + '```\n' + data.content + '\n```\n[/FILE]';
+                    var msgInput = document.getElementById('message-input');
+                    if (msgInput) {
+                        msgInput.value = ctx + '\n\n(File loaded. Please continue your analysis.)';
+                    }
+                } else {
+                    var msgInput = document.getElementById('message-input');
+                    if (msgInput) msgInput.value = '[Could not read file: ' + data.error + ']';
+                }
+            })
+            .catch(function(e) { console.error('read_file error', e); });
+    }
+
     // Match page URL against agent patterns and select appropriate agent
     function selectAgentForPage() {
         const pathname = window.location.pathname;
@@ -202,6 +312,7 @@
         // Check each agent's URL patterns
         for (const [agentKey, agent] of Object.entries(agents)) {
             if (!agent.url_patterns) continue;
+            if (agent.local_only && !state.isDevMode) continue;
             
             // Check if any URL pattern matches the current pathname (case-insensitive)
             const pathLower = pathname.toLowerCase();
@@ -442,7 +553,11 @@
         const providerSelector = document.createElement('div');
         providerSelector.className = 'provider-selector';
         providerSelector.innerHTML =
-            '<label for="ai-provider">AI Model:</label>' +
+            '<label for="ai-agent-select" style="font-size:0.82em;color:#555;">Agent:</label>' +
+            '<select id="ai-agent-select" title="Select AI agent / assistant" style="font-size:0.82em;max-width:110px;">' +
+              '<option value="auto">⚡ Auto</option>' +
+            '</select>' +
+            '<label for="ai-provider">Model:</label>' +
             '<select id="ai-provider"><option value="ollama">Ollama (Local)</option></select>' +
             '<span id="web-search-toggle" style="display:none;margin-left:6px;" title="Enable Grok web search (uses API credits)">' +
               '<label style="cursor:pointer;font-size:0.85em;user-select:none;">' +
@@ -465,7 +580,7 @@
             '<div style="display:flex;gap:3px;align-items:stretch;">' +
             '<textarea id="message-input" style="flex:1;" placeholder="Type your message… (Ctrl+V to paste image)"></textarea>' +
             '<div style="display:flex;flex-direction:column;gap:3px;">' +
-            '<label id="attach-image-btn" title="Attach image (or paste with Ctrl+V)" style="cursor:pointer;padding:4px 8px;background:var(--secondary-bg,#f0f0f0);border:1px solid #ccc;border-radius:4px;font-size:1.2em;user-select:none;text-align:center;">📎<input type="file" id="image-file-input" accept="image/*" style="display:none;"></label>' +
+            '<label id="attach-image-btn" title="Attach image (or paste with Ctrl+V)" style="display:none;cursor:pointer;padding:4px 8px;background:var(--secondary-bg,#f0f0f0);border:1px solid #ccc;border-radius:4px;font-size:1.2em;user-select:none;text-align:center;">📎<input type="file" id="image-file-input" accept="image/*" style="display:none;"></label>' +
             '<button id="send-message" style="flex:1;">Send</button>' +
             '</div></div>';
 
@@ -489,9 +604,10 @@
             .then(r => r.json())
             .then(function(data) {
                 if (data.success) {
-                    if (data.username)  state.username = data.username;
-                    if (data.is_admin)  state.isAdmin  = !!data.is_admin;
-                    if (data.is_guest !== undefined) state.isGuest = !!data.is_guest;
+                    if (data.username)  state.username   = data.username;
+                    if (data.is_admin)  state.isAdmin    = !!data.is_admin;
+                    if (data.is_guest !== undefined) state.isGuest   = !!data.is_guest;
+                    if (data.is_dev   !== undefined) state.isDevMode = !!data.is_dev;
                 }
                 if (data.success && data.providers && data.providers.length > 0) {
                     const sel = document.getElementById('ai-provider');
@@ -583,6 +699,19 @@
                 _firePreload();
                 // Re-fire every 110 minutes to keep model warm (keep_alive is 2h)
                 state._preloadTimer = setInterval(_firePreload, 110 * 60 * 1000);
+
+                // Populate agent picker now that is_dev is known
+                if (state.agentsConfig) {
+                    populateAgentPicker();
+                } else {
+                    loadAgentsConfig().then(function() { populateAgentPicker(); });
+                }
+
+                // Show/hide image attach based on admin role
+                var attachBtn = document.getElementById('attach-image-btn');
+                if (attachBtn) {
+                    attachBtn.style.display = state.isAdmin ? '' : 'none';
+                }
             })
             .catch(function() {});
 
@@ -726,6 +855,7 @@
             const fi = document.getElementById('image-file-input');
             if (fi) fi.value = '';
         };
+        window._handleReadFileRequest = _handleReadFileRequest;
 
         // ── Other events ──────────────────────────────────────────────────────
         chatButton.addEventListener('click', function() { openChat(); });
@@ -737,6 +867,7 @@
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
         });
         document.getElementById('message-input').addEventListener('paste', function(e) {
+            if (!state.isAdmin) return;
             const items = (e.clipboardData || window.clipboardData).items;
             for (var i = 0; i < items.length; i++) {
                 if (items[i].type.indexOf('image') !== -1) {
@@ -970,9 +1101,10 @@
         .then(data => {
             if (!data.success) return;
 
-            if (data.username)              state.username = data.username;
-            if (data.is_admin !== undefined) state.isAdmin = !!data.is_admin;
-            if (data.is_guest !== undefined) state.isGuest = !!data.is_guest;
+            if (data.username)              state.username   = data.username;
+            if (data.is_admin !== undefined) state.isAdmin   = !!data.is_admin;
+            if (data.is_guest !== undefined) state.isGuest   = !!data.is_guest;
+            if (data.is_dev   !== undefined) state.isDevMode = !!data.is_dev;
 
             // Hide provider selector and history button for guests / non-admins
             if (data.is_guest || !data.can_access_history) {
@@ -1296,7 +1428,15 @@
                 });
 
             docPromise.then(function() {
-                sendAIRequest(prompt, statusIndicator, loadingMessage, imageData);
+                // When coding agent is active, auto-collect page errors and prepend them
+                var effectivePrompt = prompt;
+                if (state.pageContext && state.pageContext.agent_id === 'coding') {
+                    var pageErrors = _collectPageErrors();
+                    if (pageErrors && !prompt.toLowerCase().includes('[page error')) {
+                        effectivePrompt = pageErrors + '\n\n' + prompt;
+                    }
+                }
+                sendAIRequest(effectivePrompt, statusIndicator, loadingMessage, imageData);
             });
         }).catch(function(error) {
             console.error('Failed to load agents config:', error);
@@ -1715,6 +1855,14 @@
                 addMessage(cleanText, 'ai-message');
 
                 persistMessages();
+
+                // Coding agent: intercept [READ_FILE: path] requests automatically
+                if (state.pageContext && state.pageContext.agent_id === 'coding') {
+                    var rfMatch = cleanText.match(/\[READ_FILE:\s*([^\]]+)\]/i);
+                    if (rfMatch) {
+                        _handleReadFileRequest(rfMatch[1].trim());
+                    }
+                }
 
                 // Execute any in-app actions the AI embedded
                 if (actions.length > 0) {

@@ -94,6 +94,15 @@ sub hosting_via_voip :Path('/CSC/hosting_via_voip') :Args(0) {
 # Email test form
 sub email_test :Local :Args(0) {
     my ($self, $c) = @_;
+
+    unless ($c->check_any_user_role('admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'email_test',
+            "Unauthorized email_test access from IP " . ($c->req->address || 'unknown'));
+        $c->response->status(403);
+        $c->response->body('Access denied');
+        return;
+    }
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'email_test', "Email test form requested");
     
     # If this is a form submission, process it
