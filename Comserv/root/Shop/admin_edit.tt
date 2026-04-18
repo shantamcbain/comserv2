@@ -203,17 +203,19 @@ function soInsert(preset) {
 }
 
 function openImagePicker() {
-    var itemId = '[% item.id %]';
-    var url = '/shop/file_picker?target_field=image_path';
-    window.open(url, 'shop_img_picker', 'width=860,height=640,scrollbars=yes,resizable=yes');
+    var url = '/file/file_picker?target_field=image_path&type=image';
+    window.open(url, 'file_picker', 'width=900,height=680,scrollbars=yes,resizable=yes');
+}
+
+function fpCallback(field, path, name, preview) {
+    if (field === 'image_path') {
+        var input = document.getElementById('image_path');
+        if (input) { input.value = path; input.dispatchEvent(new Event('input')); }
+    }
 }
 
 function shopPickerCallback(field, url) {
-    if (field === 'image_path') {
-        var input = document.getElementById('image_path');
-        if (input) input.value = url;
-        updateImagePreview(url);
-    }
+    fpCallback(field, url, url, url);
 }
 
 function updateImagePreview(url) {

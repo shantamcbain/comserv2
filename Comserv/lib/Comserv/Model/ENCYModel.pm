@@ -1214,7 +1214,6 @@ sub add_drug {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_drug', "Drug added successfully.");
     } or do {
         my $error = $@ || 'Unknown error';
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_drug', "Error adding drug: $error");
         return (0, "Failed to add drug: $error");
     };
     return (1, "Drug added successfully.", $record ? $record->record_id : undef);
@@ -1530,6 +1529,8 @@ my %FIELD_MAPPINGS = (
     contraindications     => { schema => 'ency',    resultset => 'Disease',     fields => ['common_name','scientific_name'] },
     side_effects          => { schema => 'ency',    resultset => 'Symptom',     fields => ['name','common_name'] },
     symptoms_description  => { schema => 'ency',    resultset => 'Symptom',     fields => ['name','common_name'] },
+    sister_plants         => { schema => 'forager', resultset => 'Herb',        fields => ['common_names','botanical_name'] },
+    related_terms         => { schema => 'ency',    resultset => 'Glossary',    fields => ['term'] },
 );
 
 my @STOP_WORDS = qw(and or the a an of in on at to with for by from as is are was were be been being

@@ -1,0 +1,147 @@
+[% META
+   title        = "Drive Detail"
+   description  = "File space usage breakdown for a drive mount point"
+   roles        = "admin"
+   TemplateType = "Application"
+   category     = "Admin"
+   page_version = "0.01"
+   last_updated = "2026-04-01"
+%]
+[% PageVersion = 'admin/HardwareMonitor/DriveDetail.tt,v 0.01 2026/04/01 AI Assistant Exp AI Assistant ' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.dd-usage-bar    { height: 24px; background: #e0e0e0; border-radius: 4px; overflow: hidden; margin: 8px 0 4px; }
+.dd-usage-fill   { height: 100%; border-radius: 4px; transition: width .3s; }
+.dd-fill-ok      { background: #4caf50; }
+.dd-fill-warn    { background: #ff9800; }
+.dd-fill-crit    { background: #f44336; }
+.dd-size-bar     { display: inline-block; height: 12px; background: #1976d2; border-radius: 2px; vertical-align: middle; }
+.dd-table        { width: 100%; border-collapse: collapse; }
+.dd-table th, .dd-table td { padding: 7px 10px; border-bottom: 1px solid #eee; text-align: left; }
+.dd-table th     { background: #f5f5f5; font-size: .85em; color: #555; }
+.dd-table tr:hover { background: #f9f9f9; }
+.dd-icon-dir     { color: #1976d2; }
+.dd-icon-file    { color: #757575; }
+.dd-stat         { display: inline-block; margin-right: 24px; }
+.dd-stat span    { font-size: 1.3em; font-weight: bold; }
+.dd-actions      { display: flex; gap: 6px; flex-wrap: wrap; }
+</style>
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>&#128194; Drive Detail: [% mount | html %]</h1>
+    <p style="margin:4px 0 0; color:#666;">
+      Host: <strong>[% host | html %]</strong>
+      &nbsp;|&nbsp;
+      <a href="[% c.uri_for('/admin/hardware_monitor') %]">&larr; Back to Hardware Monitor</a>
+      [% IF can_browse %]
+      &nbsp;|&nbsp;
+      <a href="[% file_browser_url %]" class="btn btn-secondary" style="font-size:.85em;">&#128065; Open in File Browser</a>
+      [% END %]
+    </p>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      [% IF c.flash.error_msg %]
+      <div class="error">[% c.flash.error_msg | html %]</div>
+      [% END %]
+      [% IF c.flash.success_msg %]
+      <div class="success">[% c.flash.success_msg | html %]</div>
+      [% END %]
+
+      <div class="content-section">
+        <h2>Disk Usage</h2>
+        [% IF disk_info.pct.defined %]
+          [% SET pct = disk_info.pct %]
+          [% SET fill_class = pct >= 90 ? 'dd-fill-crit' : pct >= 75 ? 'dd-fill-warn' : 'dd-fill-ok' %]
+          <div class="dd-usage-bar">
+            <div class="dd-usage-fill [% fill_class %]" style="width:[% pct %]%"></div>
+          </div>
+          <div style="margin-bottom:12px;">
+            <div class="dd-stat">Used <span>[% pct %]%</span></div>
+            [% IF disk_info.used_mb.defined %]
+            <div class="dd-stat">Used <span>[% IF disk_info.used_mb > 1024; (disk_info.used_mb / 1024).int; ' GB'; ELSE; disk_info.used_mb; ' MB'; END %]</span></div>
+            [% END %]
+            [% IF disk_info.free_mb.defined %]
+            <div class="dd-stat">Free <span>[% IF disk_info.free_mb > 1024; (disk_info.free_mb / 1024).int; ' GB'; ELSE; disk_info.free_mb; ' MB'; END %]</span></div>
+            [% END %]
+            [% IF disk_info.total_mb.defined %]
+            <div class="dd-stat">Total <span>[% IF disk_info.total_mb > 1024; (disk_info.total_mb / 1024).int; ' GB'; ELSE; disk_info.total_mb; ' MB'; END %]</span></div>
+            [% END %]
+          </div>
+        [% ELSE %]
+          <p class="empty-state">No disk metrics available from the database for this mount point.</p>
+        [% END %]
+      </div>
+
+      [% IF dir_sizes.size > 0 %]
+      <div class="content-section">
+        <h2>Space by Directory (top-level)</h2>
+        [% SET max_mb = dir_sizes.0.mb %]
+        <table class="dd-table data-table">
+          <thead>
+            <tr>
+              <th>Directory</th>
+              <th>Size</th>
+              <th style="width:220px;">Relative Size</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            [% FOR d IN dir_sizes %]
+            <tr>
+              <td>
+                <span class="dd-icon-[% d.is_dir ? 'dir' : 'file' %]">
+                  [% d.is_dir ? '&#128193;' : '&#128196;' %]
+                </span>
+                [% IF d.is_dir %]
+                  <a href="[% c.uri_for('/admin/hardware_monitor/drive_detail', { host => host, mount => d.path }) %]">
+                    [% d.name | html %]
+                  </a>
+                [% ELSE %]
+                  [% d.name | html %]
+                [% END %]
+              </td>
+              <td class="nowrap">
+                [% IF d.mb > 1024 %][% (d.mb / 1024).int %] GB[% ELSE %][% d.mb %] MB[% END %]
+              </td>
+              <td>
+                [% SET bar_pct = max_mb > 0 ? (d.mb / max_mb * 100).int : 0 %]
+                <span class="dd-size-bar" style="width:[% bar_pct %]px; max-width:200px;"></span>
+              </td>
+              <td>
+                <div class="dd-actions">
+                  [% IF d.is_dir %]
+                    <a href="[% c.uri_for('/file/admin_browser', { dir_path => d.path }) %]" class="btn btn-primary" style="font-size:.8em;padding:3px 8px;">Browse</a>
+                  [% ELSE %]
+                    <a href="[% c.uri_for('/file/download', { path => d.path }) %]" class="btn btn-secondary" style="font-size:.8em;padding:3px 8px;">Download</a>
+                  [% END %]
+                </div>
+              </td>
+            </tr>
+            [% END %]
+          </tbody>
+        </table>
+      </div>
+      [% ELSIF can_browse %]
+      <div class="content-section">
+        <p class="empty-state">No subdirectories found at this mount point.</p>
+      </div>
+      [% END %]
+
+      [% IF NOT can_browse %]
+      <div class="content-section">
+        <div class="error">
+          The mount point <strong>[% mount | html %]</strong> is not accessible on this server.
+          This drive may be on a remote host (<strong>[% host | html %]</strong>) and not mounted locally.
+          Use SSH or access the server directly to manage files.
+        </div>
+      </div>
+      [% END %]
+
+    </div>
+  </div>
+</div>

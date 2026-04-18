@@ -136,106 +136,55 @@ sub index :Path :Args(0) {
             " by user " . ($c->session->{username} || 'none');
     }
 
+    if ($self->npm_api->{key} eq 'dummy_key_for_development' || !$ENV{NPM_API_URL}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+            "NPM not configured — showing unconfigured state");
+        $c->stash(
+            proxies      => [],
+            template     => 'CSC/proxy_manager.tt',
+            environment  => $self->npm_api->{environment},
+            access_scope => $self->npm_api->{access_scope},
+            npm_not_configured => 1,
+        );
+        return;
+    }
+
     try {
-        # Make sure npm_ua is defined before trying to use it
-        if (!defined $c->stash->{npm_ua}) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
-                "npm_ua is not defined. Initializing it now.");
-            
-            # Initialize API client if it wasn't done in auto
-            $c->stash->{npm_ua} = LWP::UserAgent->new(
-                timeout => 10,
-                default_headers => HTTP::Headers->new(
-                    Authorization => "Bearer " . $self->npm_api->{key},
-                    'Content-Type' => 'application/json'
-                )
-            );
-            
-            # Add debug message to stash
-            $c->stash->{debug_msg} = "Had to initialize npm_ua in index action because it wasn't defined";
-        }
-        
-        # Double-check that npm_ua is now defined
-        unless (defined $c->stash->{npm_ua}) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
-                "Failed to initialize npm_ua");
-            
-            # Use the general error template with specific error details
-            $c->response->status(500);
-            $c->stash(
-                template => 'error.tt',
-                error_title => 'Hosting Error',
-                error_msg => 'Failed to initialize the API client for Nginx Proxy Manager.',
-                technical_details => 'The npm_ua object could not be created. This may indicate a configuration issue.',
-                action_required => 'Please check your NPM API configuration in the environment or config file.',
-                debug_msg => "Failed to initialize npm_ua in Hosting index action"
-            );
-            return;
-        }
-        
-        # Log the API request for debugging
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
-            "Making API request to: " . $self->npm_api->{url} . "/nginx/proxy-hosts");
-        
         my $res = $c->stash->{npm_ua}->get($self->npm_api->{url} . "/nginx/proxy-hosts");
         unless ($res->is_success) {
             my $error_details = "Status: " . $res->status_line;
-            if ($res->code == 401) {
-                $error_details .= " - This may indicate an invalid API key";
-            } elsif ($res->code == 404) {
-                $error_details .= " - This may indicate an incorrect API URL";
-            } elsif ($res->code == 0) {
-                $error_details .= " - This may indicate that the Nginx Proxy Manager is not running or not accessible";
-            }
-            
+            if    ($res->code == 401) { $error_details .= " — invalid API key";            }
+            elsif ($res->code == 404) { $error_details .= " — incorrect API URL";          }
+            elsif ($res->code == 0)   { $error_details .= " — NPM not running/accessible"; }
+
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
-                "Failed to fetch proxies: " . $error_details);
-            
-            # Use the general error template with more specific error details
-            $c->response->status(500);
+                "Failed to fetch proxies: $error_details");
             $c->stash(
-                template => 'error.tt',
-                error_title => 'Hosting Error',
-                error_msg => 'Failed to fetch proxies from the Nginx Proxy Manager API.',
-                technical_details => 'API request failed: ' . $error_details,
-                action_required => 'Please check that the Nginx Proxy Manager is running and accessible, and that your API key is valid.',
-                debug_msg => "Failed to fetch proxies in Hosting index action"
+                proxies           => [],
+                template          => 'CSC/proxy_manager.tt',
+                environment       => $self->npm_api->{environment},
+                access_scope      => $self->npm_api->{access_scope},
+                npm_fetch_error   => "NPM API request failed: $error_details",
             );
             return;
         }
 
         $c->stash(
-            proxies => decode_json($res->decoded_content),
-            template => 'CSC/proxy_manager.tt',
-            environment => $self->npm_api->{environment},
-            access_scope => $self->npm_api->{access_scope}
+            proxies      => decode_json($res->decoded_content),
+            template     => 'CSC/proxy_manager.tt',
+            environment  => $self->npm_api->{environment},
+            access_scope => $self->npm_api->{access_scope},
         );
     } catch {
         my $error_message = $_;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
-            "Proxy fetch failed: $error_message");
-        
-        # Determine the likely cause of the error
-        my $action_required = 'Please check that the Nginx Proxy Manager is running and accessible.';
-        if ($error_message =~ /Can't call method "get" on an undefined value/) {
-            $action_required = 'The API client was not properly initialized. Please check your NPM API configuration and ensure the auto method is being called correctly.';
-        } elsif ($error_message =~ /Connection refused/) {
-            $action_required = 'Connection to the Nginx Proxy Manager was refused. Please check that the service is running and the URL is correct.';
-        } elsif ($error_message =~ /timeout/i) {
-            $action_required = 'The connection to the Nginx Proxy Manager timed out. Please check that the service is running and responsive.';
-        } elsif ($error_message =~ /certificate/i) {
-            $action_required = 'There was an SSL certificate issue connecting to the Nginx Proxy Manager. Please check your SSL configuration.';
-        }
-        
-        # Use the general error template with more specific error details
-        $c->response->status(500);
+            "Proxy fetch exception: $error_message");
         $c->stash(
-            template => 'error.tt',
-            error_title => 'Hosting Error',
-            error_msg => 'Failed to fetch proxies from the Nginx Proxy Manager API.',
-            technical_details => 'Exception: ' . $error_message,
-            action_required => $action_required,
-            debug_msg => "Exception caught in Hosting index action"
+            proxies         => [],
+            template        => 'CSC/proxy_manager.tt',
+            environment     => $self->npm_api->{environment},
+            access_scope    => $self->npm_api->{access_scope},
+            npm_fetch_error => "Connection error: $error_message",
         );
         return;
     };
