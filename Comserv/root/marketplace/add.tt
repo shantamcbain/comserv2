@@ -108,11 +108,21 @@ document.addEventListener('DOMContentLoaded', function() {
         + 'accepts_points (1 or 0). '
         + 'No markdown, no explanation, no code fences — only the JSON object.';
 
-      fetch('/ai/generate', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: desc, system: SYSTEM, provider: 'grok', agent_type: 'form_fill' })
+      fetch('/ai/get_user_providers', { credentials: 'include' })
+      .then(function(r) { return r.json(); })
+      .then(function(pd) {
+        var provider = 'ollama';
+        if (pd.success && pd.providers) {
+          pd.providers.forEach(function(p) {
+            if (p.service === 'grok' && p.models && p.models.length) provider = 'grok';
+          });
+        }
+        return fetch('/ai/generate', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: desc, system: SYSTEM, provider: provider })
+        });
       })
       .then(function(r) { return r.json(); })
       .then(function(data) {
