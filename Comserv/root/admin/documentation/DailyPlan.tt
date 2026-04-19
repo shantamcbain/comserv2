@@ -57,6 +57,21 @@
     .header-nav-links a:hover {
         background-color: var(--bg-secondary);
     }
+
+    .dl-btn {
+        display: inline-block;
+        padding: 4px 10px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.82em;
+        font-weight: bold;
+        transition: opacity .15s;
+    }
+    .dl-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .dl-btn-start { background: #2a7a2a; color: #fff; }
+    .dl-btn-end   { background: #7a2a00; color: #fff; }
+    #dl-feedback  { font-size: .82em; margin-left: 6px; }
     
     /* Tab Styles */
     .tab-navigation {
@@ -128,6 +143,10 @@
                 <a href="/todo">Todo System</a>
             </div>
             <div style="text-align: right; color: var(--text-muted-color); font-size: 0.85em;">
+                <button class="dl-btn dl-btn-start" id="dl-start-btn" onclick="dailyLogAction('start')">🌅 Start Day</button>
+                <button class="dl-btn dl-btn-end"   id="dl-end-btn"   onclick="dailyLogAction('end')">🌙 End Day</button>
+                <span id="dl-feedback"></span>
+                &nbsp;|&nbsp;
                 <a href="/Documentation/DailyPlan/[% prev_date %]" class="prev-day-link">← Prev Day</a>
                 | Viewing [% display_date %] |
                 <a href="/Documentation/DailyPlan/[% next_date %]" class="next-day-link">Next Day →</a>
@@ -1556,4 +1575,41 @@
         });
     }
 
+</script>
+
+<script>
+function dailyLogAction(action) {
+    var startBtn = document.getElementById('dl-start-btn');
+    var endBtn   = document.getElementById('dl-end-btn');
+    var feedback = document.getElementById('dl-feedback');
+    if (startBtn) startBtn.disabled = true;
+    if (endBtn)   endBtn.disabled   = true;
+    feedback.textContent = action === 'start' ? 'Starting…' : 'Closing…';
+    feedback.style.color = '';
+
+    fetch('/ai/daily_log', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'action=' + encodeURIComponent(action)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.success) {
+            feedback.textContent = d.message;
+            feedback.style.color = '#2a7a2a';
+        } else {
+            feedback.textContent = d.error || 'Error';
+            feedback.style.color = '#9b0000';
+        }
+        if (startBtn) startBtn.disabled = false;
+        if (endBtn)   endBtn.disabled   = false;
+    })
+    .catch(function(e) {
+        feedback.textContent = 'Request failed';
+        feedback.style.color = '#9b0000';
+        if (startBtn) startBtn.disabled = false;
+        if (endBtn)   endBtn.disabled   = false;
+    });
+}
 </script>

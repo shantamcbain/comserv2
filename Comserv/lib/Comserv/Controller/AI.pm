@@ -192,6 +192,129 @@ sub index :Path :Args(0) {
         'index', "AI interface loaded for user: $username (host: $current_host, model: $current_model, can_select: " . ($can_select_model ? 'yes' : 'no') . ", external_models: " . scalar(@external_models) . ")");
 }
 
+=head2 daily_log
+
+API endpoint for start-of-day / end-of-day log entry buttons on the DailyPlan page.
+POST params: action=start|end
+
+=cut
+
+sub daily_log :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required' }));
+        return;
+    }
+
+    my $action   = $c->req->param('action') || '';
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $username = $c->session->{username} || 'user';
+    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+
+    my $schema;
+    eval { $schema = $c->model('DBEncy')->schema };
+    if ($@ || !$schema) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'DB unavailable' }));
+        return;
+    }
+
+    # Find or create today's DailyPlan for this site
+    my $plan;
+    my $plan_name = "Daily Log $today";
+    eval {
+        $plan = $schema->resultset('DailyPlan')->find_or_create(
+            { sitename => $sitename, plan_name => $plan_name },
+            { key => 'dailyplan_sitename_plan_name',
+              default => {
+                  plan_description => "Auto-created daily log for $today",
+                  status           => 'active',
+                  start_date       => $today,
+                  due_date         => $today,
+                  priority         => 0,
+                  created_by       => $username,
+              }
+            }
+        );
+    };
+    if ($@ || !$plan) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => "Could not find/create daily plan: $@" }));
+        return;
+    }
+
+    if ($action eq 'start') {
+        my $title = "\x{1F305} Good Morning - Daily Log - $today";
+        my $entry;
+        eval {
+            $entry = $schema->resultset('DailyPlanEntry')->create({
+                plan_id    => $plan->id,
+                entry_type => 'note',
+                title      => $title,
+                description => "Start of day log entry for $today",
+                status     => 'in_progress',
+                created_by => $username,
+                metadata   => '{}',
+            });
+        };
+        if ($@ || !$entry) {
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => "Could not create log entry: $@" }));
+            return;
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily_log',
+            "Start-of-day log entry #" . $entry->id . " created by $username");
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            action   => 'start',
+            entry_id => $entry->id,
+            message  => "Good morning! Daily log started.",
+        }));
+        return;
+    }
+
+    if ($action eq 'end') {
+        my $log_title_prefix = "Good Morning - Daily Log - $today";
+        my $open_entry;
+        eval {
+            $open_entry = $schema->resultset('DailyPlanEntry')->search({
+                plan_id    => $plan->id,
+                status     => 'in_progress',
+                title      => { -like => "%$log_title_prefix%" },
+            }, { order_by => { -desc => 'created_at' }, rows => 1 })->first;
+        };
+        unless ($open_entry) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => 'No open daily log entry found for today. Did you start the day log?',
+            }));
+            return;
+        }
+        eval { $open_entry->update({ status => 'completed' }) };
+        if ($@) {
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => "Could not close log entry: $@" }));
+            return;
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily_log',
+            "End-of-day log entry #" . $open_entry->id . " closed by $username");
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            action   => 'end',
+            entry_id => $open_entry->id,
+            message  => "Good evening! Daily log closed. Have a great rest of your day.",
+        }));
+        return;
+    }
+
+    $c->response->status(400);
+    $c->response->body(encode_json({ success => JSON::false, error => "Unknown action '$action'. Use action=start or action=end" }));
+}
+
 =head2 template_editor
 
 Admin-only page for reviewing and applying AI-proposed TT2 template edits.
