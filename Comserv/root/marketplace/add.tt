@@ -42,14 +42,14 @@ document.addEventListener('DOMContentLoaded', function() {
         </button>
         <span id="ai-fill-status" style="font-size:.85rem;color:#555;"></span>
       </div>
+      <pre id="ai-fill-raw" style="display:none;margin-top:8px;padding:8px;background:#f0f0f0;
+           border-radius:4px;font-size:.78rem;white-space:pre-wrap;max-height:120px;overflow:auto;"></pre>
     </div>
   </details>
+  <script id="ai-cats-json" type="application/json">[[% FOREACH cat IN categories %]{"id":"[% cat.id %]","name":"[% cat.name.replace('"', '\\"') %]"}[% ',' UNLESS loop.last %][% END %]]</script>
   <script>
   (function() {
-    var CATS = [
-      [% FOREACH cat IN categories %]{ id: '[% cat.id %]', name: '[% cat.name | html %]' }[% UNLESS loop.last %],[% END %]
-      [% END %]
-    ];
+    var CATS = JSON.parse(document.getElementById('ai-cats-json').textContent || '[]');
 
     function fillField(name, value) {
       if (value === undefined || value === null || value === '') return false;
@@ -130,15 +130,23 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.textContent = '🤖 Fill Form';
         if (!data.success) { statusEl.textContent = '❌ AI error: ' + (data.error || 'unknown'); return; }
         var raw = (data.response || '').trim();
+        var rawEl = document.getElementById('ai-fill-raw');
+        rawEl.textContent = raw;
+        rawEl.style.display = '';
         var js = raw.indexOf('{'), je = raw.lastIndexOf('}');
-        if (js === -1) { statusEl.textContent = '❌ AI returned no JSON — try rephrasing.'; return; }
+        if (js === -1) { statusEl.textContent = '❌ AI returned no JSON — see raw response below.'; return; }
         var fields;
         try { fields = JSON.parse(raw.substring(js, je + 1)); }
-        catch(e) { statusEl.textContent = '❌ JSON parse error: ' + e.message; return; }
-        var filled = 0;
-        Object.keys(fields).forEach(function(k) { if (fillField(k, fields[k])) filled++; });
-        statusEl.textContent = '✅ Filled ' + filled + ' field(s). Review and adjust as needed.';
-        document.getElementById('ai-fill-panel').open = false;
+        catch(e) { statusEl.textContent = '❌ JSON parse error: ' + e.message + ' — see raw response below.'; return; }
+        var filled = 0, skipped = [];
+        Object.keys(fields).forEach(function(k) {
+          if (fillField(k, fields[k])) filled++;
+          else skipped.push(k + '=' + fields[k]);
+        });
+        statusEl.textContent = '✅ Filled ' + filled + ' field(s).'
+          + (skipped.length ? ' Skipped: ' + skipped.join(', ') : '')
+          + ' Review and adjust as needed.';
+        if (filled > 0) document.getElementById('ai-fill-panel').open = false;
       })
       .catch(function(e) {
         btn.disabled = false;
