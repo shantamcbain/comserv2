@@ -200,7 +200,9 @@ Admin-only page for reviewing and applying AI-proposed TT2 template edits.
 
 sub template_editor :Local :Args(0) {
     my ($self, $c) = @_;
-    unless ($c->check_any_user_role('admin')) {
+    my $_te_roles = $c->session->{roles} || [];
+    $_te_roles = [$_te_roles] unless ref $_te_roles eq 'ARRAY';
+    unless (grep { /^admin$/i } @$_te_roles) {
         $c->response->redirect($c->uri_for('/'));
         return;
     }
@@ -530,7 +532,9 @@ sub generate :Local :Args(0) {
     }
 
     if (lc($normalized_agent_type) eq 'template_editor') {
-        my $is_admin = $c->check_any_user_role('admin');
+        my $_ta_roles = $c->session->{roles} || [];
+        $_ta_roles = [$_ta_roles] unless ref $_ta_roles eq 'ARRAY';
+        my $is_admin = grep { /^admin$/i } @$_ta_roles;
         unless ($is_admin) {
             $c->response->body(encode_json({
                 success => JSON::false,
@@ -1968,7 +1972,9 @@ sub chat :Local :Args(0) {
     }
 
     if (lc($chat_agent_id) eq 'template_editor') {
-        unless ($c->check_any_user_role('admin')) {
+        my $_ct_roles = $c->session->{roles} || [];
+        $_ct_roles = [$_ct_roles] unless ref $_ct_roles eq 'ARRAY';
+        unless (grep { /^admin$/i } @$_ct_roles) {
             $c->response->body(encode_json({
                 success => JSON::false,
                 error   => 'The Template Editor is only available to admin users.',
@@ -8438,7 +8444,9 @@ sub read_file :Local :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
 
-    my $is_admin  = $c->check_any_user_role('admin');
+    my $_rf_roles = $c->session->{roles} || [];
+    $_rf_roles = [$_rf_roles] unless ref $_rf_roles eq 'ARRAY';
+    my $is_admin  = grep { /^admin$/i } @$_rf_roles;
     my $is_dev    = $self->_is_dev_mode($c);
 
     unless ($is_admin) {
@@ -8501,7 +8509,9 @@ sub apply_fix :Local :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
 
-    my $is_admin_fix = $c->check_any_user_role('admin');
+    my $_af_roles = $c->session->{roles} || [];
+    $_af_roles = [$_af_roles] unless ref $_af_roles eq 'ARRAY';
+    my $is_admin_fix = grep { /^admin$/i } @$_af_roles;
     my $is_dev_fix   = $self->_is_dev_mode($c);
 
     unless ($is_admin_fix) {
