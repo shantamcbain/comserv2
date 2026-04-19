@@ -1352,6 +1352,87 @@
         labelEl.title = 'Assisting page: ' + pagePath;
     }
 
+    // ── Form Fill Strip ──────────────────────────────────────────────────────
+    // Injected into the chat panel when the page has fillable form fields.
+    // Uses window._getPageFormFields / window._applyFieldValue from layout.tt.
+    function injectFormFillStrip() {
+        if (document.getElementById('lc-ff-strip')) return; // already injected
+        if (typeof window._getPageFormFields !== 'function') return;
+        const fields = window._getPageFormFields();
+        if (!fields || fields.length === 0) return;
+
+        const chatPanel = document.getElementById('chat-panel');
+        if (!chatPanel) return;
+
+        // Build field description for the AI prompt
+        const fieldDesc = fields.map(function(f) {
+            if (f.type === 'radio' && f.options) return f.label + ' (one of: ' + f.options.join(', ') + ')';
+            if (f.tagName === 'select') return f.label + ' (select)';
+            return f.label;
+        }).join(', ');
+
+        const strip = document.createElement('div');
+        strip.id = 'lc-ff-strip';
+        strip.style.cssText = 'padding:6px 10px;background:#fffbe6;border-top:1px solid #e6c200;font-size:0.84em;flex-shrink:0;';
+        strip.innerHTML =
+            '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;">' +
+                '<span style="font-weight:bold;white-space:nowrap;">🪄 Fill Form:</span>' +
+                '<textarea id="lc-ff-input" rows="2" placeholder="Describe what to fill in…" ' +
+                    'style="flex:1;min-width:120px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:.85em;resize:none;box-sizing:border-box;"></textarea>' +
+                '<button id="lc-ff-btn" style="padding:5px 10px;background:var(--primary-color,#007bff);color:#fff;' +
+                    'border:none;border-radius:4px;cursor:pointer;font-size:.85em;white-space:nowrap;flex-shrink:0;">Fill</button>' +
+                '<button id="lc-ff-close" title="Dismiss" style="padding:3px 7px;background:transparent;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:.85em;">✕</button>' +
+            '</div>' +
+            '<div id="lc-ff-status" style="font-size:.78em;margin-top:3px;color:#555;"></div>';
+
+        const chatInputEl = chatPanel.querySelector('.chat-input');
+        if (chatInputEl) chatPanel.insertBefore(strip, chatInputEl);
+        else chatPanel.appendChild(strip);
+
+        document.getElementById('lc-ff-close').addEventListener('click', function() { strip.remove(); });
+
+        document.getElementById('lc-ff-btn').addEventListener('click', function() {
+            const desc = (document.getElementById('lc-ff-input').value || '').trim();
+            if (!desc) { document.getElementById('lc-ff-status').textContent = 'Describe what to fill in.'; return; }
+            const btn = document.getElementById('lc-ff-btn');
+            const statusEl = document.getElementById('lc-ff-status');
+            btn.disabled = true; btn.textContent = '⏳';
+            statusEl.textContent = 'Asking AI…';
+
+            const SYSTEM = 'You fill in a web form. The page is "' + document.title + '". ' +
+                'Return ONLY a raw JSON object. Keys must exactly match the HTML name attributes: ' + fieldDesc + '. ' +
+                'Values must be plain strings or numbers. No markdown, no code fences, no explanation.';
+
+            const selProvider = document.getElementById('ai-provider');
+            const provider = (selProvider && selProvider.value) || 'ollama';
+
+            fetch('/ai/generate', {
+                method: 'POST', credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: desc, system: SYSTEM, provider: provider })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                btn.disabled = false; btn.textContent = 'Fill';
+                if (!data.success) { statusEl.textContent = '❌ ' + (data.error || 'AI error'); return; }
+                const raw = (data.response || '').trim();
+                const js = raw.indexOf('{'), je = raw.lastIndexOf('}');
+                if (js === -1) { statusEl.textContent = '❌ No JSON returned. Try rephrasing.'; return; }
+                let parsed;
+                try { parsed = JSON.parse(raw.substring(js, je + 1)); }
+                catch(e) { statusEl.textContent = '❌ Parse error: ' + e.message; return; }
+                let filled = 0, skipped = [];
+                Object.keys(parsed).forEach(function(k) {
+                    if (window._applyFieldValue && window._applyFieldValue(k, parsed[k])) filled++;
+                    else skipped.push(k);
+                });
+                statusEl.textContent = '✅ Filled ' + filled + ' field(s).'
+                    + (skipped.length ? ' Skipped: ' + skipped.join(', ') : '');
+            })
+            .catch(function(e) { btn.disabled = false; btn.textContent = 'Fill'; statusEl.textContent = '❌ ' + e; });
+        });
+    }
+
     // Open chat panel
     function openChat() {
         const chatPanel = document.getElementById('chat-panel');
@@ -1396,6 +1477,8 @@
         const messageInput = document.getElementById('message-input');
         messageInput.focus();
 
+        // Inject form-fill strip if the page has fillable form fields
+        injectFormFillStrip();
     }
     
     // Reset conversation - clear session and UI
