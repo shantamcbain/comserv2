@@ -125,6 +125,38 @@
                 if (src) src.postMessage({ type: 'ai_widget_fill_ack', field: e.data.field, ok: ok }, '*');
             }
         });
+
+        // Expose globally so local-chat.js inline widget can fill form fields
+        window._applyFieldValue = applyFieldValue;
+
+        // Expose page form fields for the inline widget fill strip
+        window._getPageFormFields = function() {
+            var skip = '#local-chat-widget, #chat-panel, #chat-button, script, style, nav, footer, header';
+            var fields = [];
+            document.querySelectorAll(
+                'input[name]:not([type=hidden]):not([type=submit]):not([type=button]):not([type=image]):not([type=radio]),' +
+                'textarea[name], select[name]'
+            ).forEach(function(el) {
+                if (el.closest(skip)) return;
+                var label = '';
+                if (el.id) {
+                    var lbl = document.querySelector('label[for="' + el.id + '"]');
+                    if (lbl) label = lbl.textContent.trim().replace(/\s+/g,' ').replace(/\*$/,'').trim();
+                }
+                fields.push({ name: el.name, label: label || el.name, tagName: el.tagName.toLowerCase(), type: el.type || '' });
+            });
+            // Add radio groups (one entry per unique name)
+            var radioNames = {};
+            document.querySelectorAll('input[type=radio][name]').forEach(function(el) {
+                if (el.closest(skip)) return;
+                if (!radioNames[el.name]) {
+                    var vals = Array.from(document.querySelectorAll('input[type=radio][name="' + el.name + '"]')).map(function(r){ return r.value; });
+                    radioNames[el.name] = true;
+                    fields.push({ name: el.name, label: el.name, tagName: 'input', type: 'radio', options: vals });
+                }
+            });
+            return fields;
+        };
     })();
     </script>
 [% END %]
