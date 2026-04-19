@@ -21,7 +21,7 @@
     </div>
 
     <!-- TABLE OF CONTENTS -->
-    <div id="toc" style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-bottom: var(--spacing-large);">
+    <div id="toc" style="background-color: rgba(255,255,255,0.15); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-bottom: var(--spacing-large);">
         <h3 style="margin-top: 0; color: var(--primary-color);">Table of Contents</h3>
         <ul style="list-style-position: inside; color: var(--text-color);">
             <li><a href="#architecture" style="color: var(--link-color); text-decoration: none;">Architecture Overview</a></li>
@@ -58,7 +58,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>lib/Comserv/Model/Membership.pm</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Business logic: access checks, pricing, provisioning</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Controller::Membership</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>lib/Comserv/Controller/Membership.pm</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Member-facing pages: plans, subscribe, account, upgrade, cancel</td>
@@ -68,7 +68,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>lib/Comserv/Controller/Membership/Admin.pm</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Admin pages: plan CRUD, subscribers, cost tracking, payment config</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Controller::Payment</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>lib/Comserv/Controller/Payment.pm</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">App-wide payment: PayPal IPN, Patreon OAuth2, internal coin checkout</td>
@@ -103,7 +103,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">MembershipPlan</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Plan definitions with feature flags and AI model list</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>membership_plan_pricing</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">MembershipPlanPricing</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Regional price overrides (region_code or DEFAULT)</td>
@@ -113,7 +113,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">UserMembership</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Active and expired memberships linking user → plan → site</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>membership_service_access</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">MembershipServiceAccess</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Per-service access rows; checked at runtime by gate logic</td>
@@ -123,7 +123,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">PaymentTransaction</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Unified payment audit trail (PayPal, Patreon, internal)</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>internal_currency_accounts</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">InternalCurrencyAccount</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Coin wallet per user; SELECT FOR UPDATE on mutations</td>
@@ -133,7 +133,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">InternalCurrencyTransaction</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Immutable coin ledger with balance_after snapshot</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>system_cost_tracking</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">SystemCostTracking</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Operational expenses per site and period</td>
@@ -170,7 +170,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>($c, $user_id, $service_name, $site_id)</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">1 if active access row exists, 0 otherwise</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>get_active_plan</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>($c, $user_id, $site_id)</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">UserMembership row with plan prefetched, or undef</td>
@@ -180,7 +180,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>($c, $site_id)</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Arrayref of active MembershipPlan rows ordered by sort_order</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>calculate_price</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>($c, $plan, $region_code)</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Hashref: <code>{monthly, annual, currency}</code></td>
@@ -190,7 +190,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>($c, $membership)</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Writes membership_service_access rows from plan flags</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>expire_membership</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>($c, $membership_id)</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Deactivates service rows, sets grace_period_end</td>
@@ -225,7 +225,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">membership/Index.tt</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>plans</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/plans</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">membership/Plans.tt</td>
@@ -235,7 +235,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/plan_details/:id</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">membership/PlanDetails.tt</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>subscribe</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/subscribe</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">membership/Subscribe.tt → redirects to /payment</td>
@@ -245,7 +245,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/account</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">membership/Account.tt</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>upgrade</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/upgrade</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">membership/Upgrade.tt</td>
@@ -255,7 +255,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/cancel</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">membership/Cancel.tt</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>autopay_settings</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/autopay_settings</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">membership/Account.tt (section)</td>
@@ -280,15 +280,15 @@
             </thead>
             <tbody>
                 <tr><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>index</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/admin</td></tr>
-                <tr style="background-color: var(--light-color);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>manage_plans</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/admin/manage_plans</td></tr>
+                <tr style="background-color: rgba(255,255,255,0.15);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>manage_plans</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/admin/manage_plans</td></tr>
                 <tr><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>create_plan / edit_plan / delete_plan / toggle_plan</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/admin/{action}</td></tr>
-                <tr style="background-color: var(--light-color);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>subscribers</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/admin/subscribers</td></tr>
+                <tr style="background-color: rgba(255,255,255,0.15);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>subscribers</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/admin/subscribers</td></tr>
                 <tr><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>subscriber_details</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/admin/subscriber_details/:id</td></tr>
-                <tr style="background-color: var(--light-color);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>grant_access / revoke_access</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/admin/{action}</td></tr>
+                <tr style="background-color: rgba(255,255,255,0.15);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>grant_access / revoke_access</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/admin/{action}</td></tr>
                 <tr><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>cost_tracking / add_cost</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/admin/{action}</td></tr>
-                <tr style="background-color: var(--light-color);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>pricing</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/admin/pricing</td></tr>
+                <tr style="background-color: rgba(255,255,255,0.15);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>pricing</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/admin/pricing</td></tr>
                 <tr><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>benefactor_contribution</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/admin/benefactor_contribution</td></tr>
-                <tr style="background-color: var(--light-color);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>patreon_settings / paypal_settings</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/admin/{action}</td></tr>
+                <tr style="background-color: rgba(255,255,255,0.15);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>patreon_settings / paypal_settings</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">/membership/admin/{action}</td></tr>
             </tbody>
         </table>
         <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
@@ -312,7 +312,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>paypal_ipn</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Receives PayPal IPN, posts back to PayPal for verification, activates membership on success. Idempotent on transaction ID.</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>paypal_checkout</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Builds PayPal redirect URL for membership payment</td>
                 </tr>
@@ -320,7 +320,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>paypal_return / paypal_cancel</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Landing pages after PayPal checkout completes or is cancelled</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>patreon_callback</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Exchanges Patreon OAuth2 code for token, links patron to user, updates membership</td>
                 </tr>
@@ -328,7 +328,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>internal_checkout</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">SELECT FOR UPDATE on coin account, deducts coins, activates membership</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>buy_coins / paypal_coins_return</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">PayPal flow specifically for purchasing internal coins</td>
                 </tr>
@@ -357,9 +357,9 @@
             </thead>
             <tbody>
                 <tr><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>balance</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Logged-in user</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Shows current coin balance</td></tr>
-                <tr style="background-color: var(--light-color);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>history</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Logged-in user</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Full transaction history with balance_after snapshots</td></tr>
+                <tr style="background-color: rgba(255,255,255,0.15);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>history</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Logged-in user</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Full transaction history with balance_after snapshots</td></tr>
                 <tr><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>purchase</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Logged-in user</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Initiates PayPal checkout for coin purchase</td></tr>
-                <tr style="background-color: var(--light-color);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>transfer</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Logged-in user</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Transfer coins to another user (transactional, both accounts locked)</td></tr>
+                <tr style="background-color: rgba(255,255,255,0.15);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>transfer</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Logged-in user</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Transfer coins to another user (transactional, both accounts locked)</td></tr>
                 <tr><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>earn</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Admin only</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Admin grants coins to a user; logged for audit</td></tr>
             </tbody>
         </table>
@@ -372,7 +372,7 @@
         <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
             To gate any controller on a membership service, add to its <code>auto</code> method:
         </p>
-        <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
+        <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
             <pre style="color: var(--text-color); font-family: monospace; margin: 0; overflow-x: auto;"><code>my $user_id = $c->session->{user_id};
 unless ($user_id) {
     $c->response->redirect($c->uri_for('/user/login'));
@@ -420,11 +420,11 @@ unless ($has_access) {
             </thead>
             <tbody>
                 <tr><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>PAYPAL_CLIENT_ID</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">PayPal checkout</td></tr>
-                <tr style="background-color: var(--light-color);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>PAYPAL_SECRET</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">PayPal IPN verification</td></tr>
+                <tr style="background-color: rgba(255,255,255,0.15);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>PAYPAL_SECRET</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">PayPal IPN verification</td></tr>
                 <tr><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>PAYPAL_MODE</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>sandbox</code> or <code>live</code></td></tr>
-                <tr style="background-color: var(--light-color);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>PATREON_CLIENT_ID</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Patreon OAuth2</td></tr>
+                <tr style="background-color: rgba(255,255,255,0.15);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>PATREON_CLIENT_ID</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Patreon OAuth2</td></tr>
                 <tr><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>PATREON_CLIENT_SECRET</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Patreon OAuth2</td></tr>
-                <tr style="background-color: var(--light-color);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>PATREON_REDIRECT_URI</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Patreon OAuth2 callback</td></tr>
+                <tr style="background-color: rgba(255,255,255,0.15);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>PATREON_REDIRECT_URI</code></td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Patreon OAuth2 callback</td></tr>
             </tbody>
         </table>
         <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
@@ -443,9 +443,9 @@ unless ($has_access) {
             </thead>
             <tbody>
                 <tr><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">t/controller_Membership.t</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">19</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">can() checks, _is_admin role logic</td></tr>
-                <tr style="background-color: var(--light-color);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">t/controller_Membership_Admin.t</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">28</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">can() checks, _is_admin case-insensitivity</td></tr>
+                <tr style="background-color: rgba(255,255,255,0.15);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">t/controller_Membership_Admin.t</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">28</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">can() checks, _is_admin case-insensitivity</td></tr>
                 <tr><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">t/model_Membership.t</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">20</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">calculate_price (all 3 resolution paths), check_access guards, get_available_plans, get_allowed_ai_models</td></tr>
-                <tr style="background-color: var(--light-color);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">t/controller_Payment.t</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">32</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">_require_login, _apply_promo_discount (all discount types)</td></tr>
+                <tr style="background-color: rgba(255,255,255,0.15);"><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">t/controller_Payment.t</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">32</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">_require_login, _apply_promo_discount (all discount types)</td></tr>
                 <tr><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">t/controller_Currency.t</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">18</td><td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">_require_login, _is_admin role detection</td></tr>
             </tbody>
         </table>

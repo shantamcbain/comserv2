@@ -15,7 +15,7 @@
     <h1 style="color:var(--text-color);font-family:var(--header-font)">Consignment Tracking</h1>
     <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-04-17 | Version: 1.00 | Audience: Administrators &amp; Accounting</div>
 
-    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:var(--light-color);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
+    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:rgba(255,255,255,0.15);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
         <div class="col-100">
             <h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:0">Quick Navigation</h2>
             <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-small)">
@@ -79,7 +79,7 @@
                 <li>Click <strong>+ Add Another Item</strong> for multiple lines</li>
                 <li>Click <strong>Create Consignment</strong></li>
             </ol>
-            <div style="background-color:var(--light-color);border-left:4px solid var(--warning-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small)">
+            <div style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--warning-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small)">
                 <strong>Note:</strong> Only items with <em>Show in Shop = Yes</em> appear in the item dropdown.
                 If a print-on-demand item is not listed, go to <a href="/shop/admin" style="color:var(--link-color)">/shop/admin</a>
                 and enable Show in Shop for that item first.

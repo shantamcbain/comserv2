@@ -23,7 +23,7 @@
     </div>
 
     <!-- Table of Contents -->
-    <div id="toc" style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+    <div id="toc" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
         <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0; margin-bottom: var(--spacing-small); line-height: 1.6;">Quick Navigation</h2>
         <ul style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-small); line-height: 1.8; margin-left: 1.5em;">
             <li style="margin-bottom: var(--spacing-small);"><a href="#overview" style="color: var(--link-color);">Overview</a></li>

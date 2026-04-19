@@ -25,16 +25,16 @@
     </p>
 
     <!-- TABLE OF CONTENTS -->
-    <div id="toc" style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-bottom: var(--spacing-large);">
+    <div id="toc" style="background-color: rgba(255,255,255,0.15); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-bottom: var(--spacing-large);">
         <h3 style="margin-top: 0; color: var(--primary-color);">Jump to Section</h3>
         <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-            <a href="#general" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">General</a>
-            <a href="#plans" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Plans &amp; Pricing</a>
-            <a href="#payment" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Payment</a>
-            <a href="#coins" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Internal Coins</a>
-            <a href="#services" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Services</a>
-            <a href="#ai" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">AI Models</a>
-            <a href="#account" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Account &amp; Billing</a>
+            <a href="#general" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">General</a>
+            <a href="#plans" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Plans &amp; Pricing</a>
+            <a href="#payment" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Payment</a>
+            <a href="#coins" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Internal Coins</a>
+            <a href="#services" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Services</a>
+            <a href="#ai" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">AI Models</a>
+            <a href="#account" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Account &amp; Billing</a>
         </div>
     </div>
 
@@ -42,7 +42,7 @@
     <div id="general" style="margin-bottom: var(--spacing-large);">
         <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">General</h2>
 
-        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: var(--light-color);">
+        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: rgba(255,255,255,0.15);">
             <h4 style="color: var(--primary-color); margin-top: 0;">Do I need a membership to use this site?</h4>
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">No. You are automatically on the <strong>Free tier</strong> when you register. Free membership gives you basic access to the site. Paid plans unlock additional features and services.</p>
         </div>
@@ -52,7 +52,7 @@
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">Membership expands what you can do on the site. Higher tiers give access to more powerful AI models, community tools (beekeeping, planning), hosting, email addresses on the site's domain, and the internal coin economy. It also helps keep the site running sustainably.</p>
         </div>
 
-        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: var(--light-color);">
+        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: rgba(255,255,255,0.15);">
             <h4 style="color: var(--primary-color); margin-top: 0;">Does every site have the same membership plans?</h4>
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">No. Each site on this platform defines its own plans, prices, and included services. Plans are site-specific. Check <a href="/membership/plans" style="color: var(--link-color);">/membership/plans</a> to see what is available on this particular site.</p>
         </div>
@@ -69,7 +69,7 @@
     <div id="plans" style="margin-bottom: var(--spacing-large);">
         <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Plans &amp; Pricing</h2>
 
-        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: var(--light-color);">
+        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: rgba(255,255,255,0.15);">
             <h4 style="color: var(--primary-color); margin-top: 0;">How is pricing determined?</h4>
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">Base prices are set in USD. The site then applies geographic adjustments based on your region so that the price is proportionate to local purchasing power. Members in higher-cost countries pay the base rate; members in lower-income regions pay a reduced rate.</p>
         </div>
@@ -79,7 +79,7 @@
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">Yes. Annual billing typically saves 15–20% compared to paying monthly. The plan page shows both prices so you can compare before choosing.</p>
         </div>
 
-        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: var(--light-color);">
+        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: rgba(255,255,255,0.15);">
             <h4 style="color: var(--primary-color); margin-top: 0;">The price shown seems wrong for my country. What do I do?</h4>
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">Contact the site admin through the <a href="/helpdesk" style="color: var(--link-color);">HelpDesk</a>. Regional pricing can be manually adjusted, and benefactor contributions allow community members to sponsor access for others in need.</p>
         </div>
@@ -96,7 +96,7 @@
     <div id="payment" style="margin-bottom: var(--spacing-large);">
         <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Payment</h2>
 
-        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: var(--light-color);">
+        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: rgba(255,255,255,0.15);">
             <h4 style="color: var(--primary-color); margin-top: 0;">What payment methods are accepted?</h4>
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">Three methods are supported:</p>
             <ul style="color: var(--text-color); font-family: var(--body-font); margin: var(--spacing-small) 0 0 var(--spacing-medium); line-height: 1.8;">
@@ -111,7 +111,7 @@
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">No. Card and banking details are handled entirely by PayPal or Patreon. The site only receives confirmation that a payment was made successfully — never your card number or banking credentials.</p>
         </div>
 
-        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: var(--light-color);">
+        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: rgba(255,255,255,0.15);">
             <h4 style="color: var(--primary-color); margin-top: 0;">Can I pay with cryptocurrency?</h4>
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">Not directly. The internal coin system is not a cryptocurrency — it exists only within this site. If you hold crypto you can convert it to PayPal funds externally and then use PayPal to pay here.</p>
         </div>
@@ -121,7 +121,7 @@
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">Activation is usually instant. If after a few minutes your account still shows the Free tier, please <a href="/helpdesk" style="color: var(--link-color);">open a HelpDesk ticket</a> with your PayPal transaction ID. An admin will manually verify and activate your membership.</p>
         </div>
 
-        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: var(--light-color);">
+        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: rgba(255,255,255,0.15);">
             <h4 style="color: var(--primary-color); margin-top: 0;">How does Patreon linking work?</h4>
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">Go to <a href="/membership/account" style="color: var(--link-color);">My Account</a> and click <em>Connect Patreon</em>. You will be redirected to Patreon to authorise the link. Once connected, your patron tier is mapped to a membership plan automatically. If you cancel your Patreon pledge, your membership here will revert to Free at the next renewal check.</p>
         </div>
@@ -133,7 +133,7 @@
     <div id="coins" style="margin-bottom: var(--spacing-large);">
         <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Internal Coins</h2>
 
-        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: var(--light-color);">
+        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: rgba(255,255,255,0.15);">
             <h4 style="color: var(--primary-color); margin-top: 0;">What are coins?</h4>
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">Coins are the site's internal currency. They can be used to pay for membership, services, and other features without needing PayPal every time. They are <strong>not</strong> a cryptocurrency and have no external monetary value.</p>
         </div>
@@ -147,7 +147,7 @@
             </ul>
         </div>
 
-        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: var(--light-color);">
+        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: rgba(255,255,255,0.15);">
             <h4 style="color: var(--primary-color); margin-top: 0;">Can I cash out my coins?</h4>
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">No. Coins cannot be converted back to money or transferred outside the site. They are a convenience currency for internal use only.</p>
         </div>
@@ -157,7 +157,7 @@
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">Your coin balance is displayed in the navigation bar at the top of every page when you are logged in. You can also see your full transaction history at <a href="/currency/history" style="color: var(--link-color);">/currency/history</a>.</p>
         </div>
 
-        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: var(--light-color);">
+        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: rgba(255,255,255,0.15);">
             <h4 style="color: var(--primary-color); margin-top: 0;">Can I earn coins by providing services to other members?</h4>
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">Yes, on sites where the service-listing feature is enabled. Members can list skills or services, and other members can pay for them in coins. This lets the community sustain itself and makes membership accessible to those who contribute work rather than money.</p>
         </div>
@@ -169,7 +169,7 @@
     <div id="services" style="margin-bottom: var(--spacing-large);">
         <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Services</h2>
 
-        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: var(--light-color);">
+        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: rgba(255,255,255,0.15);">
             <h4 style="color: var(--primary-color); margin-top: 0;">What is the beekeeping / Apiary module?</h4>
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">The Apiary module is a hive-management tool for beekeepers. It lets you track hives, inspections, honey production, and queen status. Access requires a plan that includes the beekeeping service. If you try to access it without the right plan, you will be shown an upgrade prompt.</p>
         </div>
@@ -179,7 +179,7 @@
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">The AI-assisted planning system helps you create and manage plans for projects, schedules, goals, and to-do lists. It uses the AI models available on your plan to offer suggestions, structure, and follow-up prompts.</p>
         </div>
 
-        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: var(--light-color);">
+        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: rgba(255,255,255,0.15);">
             <h4 style="color: var(--primary-color); margin-top: 0;">Can I get an email address at this site's domain?</h4>
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">Some plans include the <em>has_email</em> feature. If your plan includes it, contact the site admin to set up your address. Not all sites have email hosting configured.</p>
         </div>
@@ -196,7 +196,7 @@
     <div id="ai" style="margin-bottom: var(--spacing-large);">
         <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">AI Models</h2>
 
-        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: var(--light-color);">
+        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: rgba(255,255,255,0.15);">
             <h4 style="color: var(--primary-color); margin-top: 0;">What AI system does this site use?</h4>
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">The site uses <strong>Ollama</strong> — open-source AI models that run locally on the site's own hardware. No data is sent to OpenAI, Google, or other external AI companies. Your conversations are private.</p>
         </div>
@@ -206,7 +206,7 @@
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">Larger AI models use significantly more computing resources. To keep the site fast and affordable for everyone, access to the most powerful models is gated by membership tier. Your plan determines which models appear in the model selection list.</p>
         </div>
 
-        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: var(--light-color);">
+        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: rgba(255,255,255,0.15);">
             <h4 style="color: var(--primary-color); margin-top: 0;">Can admins use all models?</h4>
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">Yes. Site admins and global admins always see the full list of installed models regardless of membership tier.</p>
         </div>
@@ -218,7 +218,7 @@
     <div id="account" style="margin-bottom: var(--spacing-large);">
         <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Account &amp; Billing</h2>
 
-        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: var(--light-color);">
+        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: rgba(255,255,255,0.15);">
             <h4 style="color: var(--primary-color); margin-top: 0;">What happens when my membership expires?</h4>
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">You get a brief grace period. During the grace period all services remain active. After the grace period ends, premium services are suspended and your account returns to the Free tier. Your content and data are not deleted.</p>
         </div>
@@ -228,7 +228,7 @@
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">Visit <a href="/membership/cancel" style="color: var(--link-color);">/membership/cancel</a>. Your current plan remains active until the end of the period you have already paid for. No partial refunds are issued for unused time. After expiry you revert to the Free tier automatically.</p>
         </div>
 
-        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: var(--light-color);">
+        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: rgba(255,255,255,0.15);">
             <h4 style="color: var(--primary-color); margin-top: 0;">How do I upgrade to a higher plan?</h4>
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">Go to <a href="/membership/upgrade" style="color: var(--link-color);">/membership/upgrade</a>. You pay the difference for the remaining period of your current billing cycle. New services activate immediately.</p>
         </div>
@@ -238,7 +238,7 @@
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">Yes. Each site you visit has its own separate membership. Your account on one site does not automatically grant membership benefits on another, even if they share the same platform.</p>
         </div>
 
-        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: var(--light-color);">
+        <div style="border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); margin-bottom: var(--spacing-medium); background-color: rgba(255,255,255,0.15);">
             <h4 style="color: var(--primary-color); margin-top: 0;">Where can I see my membership status at any time?</h4>
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 0; line-height: 1.6;">A badge showing your current membership tier and your coin balance appear in the top navigation bar on every page when you are logged in. For full details, visit <a href="/membership/account" style="color: var(--link-color);">My Membership Account</a>.</p>
         </div>

@@ -770,7 +770,7 @@
                 : '';
 
             html += `
-                <div style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; background-color: #fff;">
+                <div style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; background-color: rgba(255,255,255,0.88);">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                         <strong style="font-size: 14px;">${typeIcon} ${vol.name}</strong>
                         <span style="background-color: ${typeColor}; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px;">${typeLabel}</span>
@@ -805,7 +805,7 @@
                 : '';
 
             html += `
-                <div style="border: 1px solid #ddd; border-radius: 4px; padding: 15px; background-color: #fff;">
+                <div style="border: 1px solid #ddd; border-radius: 4px; padding: 15px; background-color: rgba(255,255,255,0.88);">
                     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
                         <div style="flex: 1;">
                             <h4 style="margin: 0 0 5px 0; color: #333;">
@@ -1807,7 +1807,7 @@
     }
 
     .card-body {
-        background-color: #fff;
+        background-color: rgba(255,255,255,0.88);
     }
 
     .alert {
