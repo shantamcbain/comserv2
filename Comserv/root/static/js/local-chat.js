@@ -1352,56 +1352,49 @@
         labelEl.title = 'Assisting page: ' + pagePath;
     }
 
-    // ── Form Fill Strip ──────────────────────────────────────────────────────
-    // Injected into the chat panel when the page has fillable form fields.
-    // Uses window._getPageFormFields / window._applyFieldValue from layout.tt.
+    // ── Form Fill Button ─────────────────────────────────────────────────────
+    // When the page has fillable form fields, adds a "🪄 Fill Form" button
+    // next to the Send button. User types description in the normal message
+    // input, then clicks Fill Form — AI fills the form fields directly.
     function injectFormFillStrip() {
-        if (document.getElementById('lc-ff-strip')) return; // already injected
+        if (document.getElementById('lc-ff-btn')) return;
         if (typeof window._getPageFormFields !== 'function') return;
         const fields = window._getPageFormFields();
         if (!fields || fields.length === 0) return;
 
-        const chatPanel = document.getElementById('chat-panel');
-        if (!chatPanel) return;
+        const sendBtn = document.getElementById('send-message');
+        if (!sendBtn) return;
 
-        // Build field description for the AI prompt
+        // Build field description for the AI system prompt
         const fieldDesc = fields.map(function(f) {
-            if (f.type === 'radio' && f.options) return f.label + ' (one of: ' + f.options.join(', ') + ')';
-            if (f.tagName === 'select') return f.label + ' (select)';
-            return f.label;
+            if (f.type === 'radio' && f.options) return f.name + ' (one of: ' + f.options.join(', ') + ')';
+            if (f.tagName === 'select') return f.name + ' (' + (f.label || 'select') + ')';
+            return f.name + (f.label && f.label !== f.name ? ' (' + f.label + ')' : '');
         }).join(', ');
 
-        const strip = document.createElement('div');
-        strip.id = 'lc-ff-strip';
-        strip.style.cssText = 'padding:6px 10px;background:#fffbe6;border-top:1px solid #e6c200;font-size:0.84em;flex-shrink:0;';
-        strip.innerHTML =
-            '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;">' +
-                '<span style="font-weight:bold;white-space:nowrap;">🪄 Fill Form:</span>' +
-                '<textarea id="lc-ff-input" rows="2" placeholder="Describe what to fill in…" ' +
-                    'style="flex:1;min-width:120px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:.85em;resize:none;box-sizing:border-box;"></textarea>' +
-                '<button id="lc-ff-btn" style="padding:5px 10px;background:var(--primary-color,#007bff);color:#fff;' +
-                    'border:none;border-radius:4px;cursor:pointer;font-size:.85em;white-space:nowrap;flex-shrink:0;">Fill</button>' +
-                '<button id="lc-ff-close" title="Dismiss" style="padding:3px 7px;background:transparent;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:.85em;">✕</button>' +
-            '</div>' +
-            '<div id="lc-ff-status" style="font-size:.78em;margin-top:3px;color:#555;"></div>';
+        const ffBtn = document.createElement('button');
+        ffBtn.id = 'lc-ff-btn';
+        ffBtn.textContent = '🪄 Fill Form';
+        ffBtn.title = 'Describe what to fill in the message box, then click here to fill the form with AI';
+        ffBtn.style.cssText = 'padding:4px 8px;background:#f0c000;color:#333;border:none;border-radius:4px;' +
+            'cursor:pointer;font-size:.8em;font-weight:bold;white-space:nowrap;flex-shrink:0;';
 
-        const chatInputEl = chatPanel.querySelector('.chat-input');
-        if (chatInputEl) chatPanel.insertBefore(strip, chatInputEl);
-        else chatPanel.appendChild(strip);
+        // Insert after Send button
+        sendBtn.parentNode.insertBefore(ffBtn, sendBtn.nextSibling);
 
-        document.getElementById('lc-ff-close').addEventListener('click', function() { strip.remove(); });
-
-        document.getElementById('lc-ff-btn').addEventListener('click', function() {
-            const desc = (document.getElementById('lc-ff-input').value || '').trim();
-            if (!desc) { document.getElementById('lc-ff-status').textContent = 'Describe what to fill in.'; return; }
-            const btn = document.getElementById('lc-ff-btn');
-            const statusEl = document.getElementById('lc-ff-status');
-            btn.disabled = true; btn.textContent = '⏳';
-            statusEl.textContent = 'Asking AI…';
+        ffBtn.addEventListener('click', function() {
+            const msgInput = document.getElementById('message-input');
+            const desc = (msgInput ? msgInput.value : '').trim();
+            if (!desc) {
+                alert('Type a description of what to fill in the message box first, then click Fill Form.');
+                if (msgInput) msgInput.focus();
+                return;
+            }
+            ffBtn.disabled = true; ffBtn.textContent = '⏳';
 
             const SYSTEM = 'You fill in a web form. The page is "' + document.title + '". ' +
-                'Return ONLY a raw JSON object. Keys must exactly match the HTML name attributes: ' + fieldDesc + '. ' +
-                'Values must be plain strings or numbers. No markdown, no code fences, no explanation.';
+                'Return ONLY a raw JSON object. Keys must exactly match the HTML field name attributes: ' + fieldDesc + '. ' +
+                'Values must be plain strings or numbers. No markdown, no code fences, no explanation — only the JSON object.';
 
             const selProvider = document.getElementById('ai-provider');
             const provider = (selProvider && selProvider.value) || 'ollama';
@@ -1413,23 +1406,25 @@
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
-                btn.disabled = false; btn.textContent = 'Fill';
-                if (!data.success) { statusEl.textContent = '❌ ' + (data.error || 'AI error'); return; }
+                ffBtn.disabled = false; ffBtn.textContent = '🪄 Fill Form';
+                if (!data.success) { alert('AI error: ' + (data.error || 'unknown')); return; }
                 const raw = (data.response || '').trim();
                 const js = raw.indexOf('{'), je = raw.lastIndexOf('}');
-                if (js === -1) { statusEl.textContent = '❌ No JSON returned. Try rephrasing.'; return; }
+                if (js === -1) { alert('AI returned no JSON. Try rephrasing your description.'); return; }
                 let parsed;
                 try { parsed = JSON.parse(raw.substring(js, je + 1)); }
-                catch(e) { statusEl.textContent = '❌ Parse error: ' + e.message; return; }
-                let filled = 0, skipped = [];
+                catch(e) { alert('JSON parse error: ' + e.message + '\n\nAI said:\n' + raw.substring(0, 300)); return; }
+                let filled = 0;
                 Object.keys(parsed).forEach(function(k) {
                     if (window._applyFieldValue && window._applyFieldValue(k, parsed[k])) filled++;
-                    else skipped.push(k);
                 });
-                statusEl.textContent = '✅ Filled ' + filled + ' field(s).'
-                    + (skipped.length ? ' Skipped: ' + skipped.join(', ') : '');
+                // Show brief success in status bar
+                const si = document.getElementById('chat-status');
+                if (si) { si.textContent = '✅ Filled ' + filled + ' form field(s) — review and save.'; }
+                // Clear message input
+                if (msgInput) msgInput.value = '';
             })
-            .catch(function(e) { btn.disabled = false; btn.textContent = 'Fill'; statusEl.textContent = '❌ ' + e; });
+            .catch(function(e) { ffBtn.disabled = false; ffBtn.textContent = '🪄 Fill Form'; alert('Request failed: ' + e); });
         });
     }
 
