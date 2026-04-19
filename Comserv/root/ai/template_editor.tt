@@ -194,7 +194,11 @@
 
         var provider = document.getElementById('te-provider').value;
         var fileBlock = '[FILE: ' + currentPath + ']\n```\n' + currentContent + '\n```\n[/FILE]\n\n';
-        var fullPrompt = fileBlock + request;
+        var mandate = '\n\nCRITICAL: You MUST respond with ONLY:\n'
+            + '1. A short bullet list of what changed.\n'
+            + '2. A ## FIX: ' + currentPath + ' block containing the COMPLETE rewritten file.\n'
+            + 'Do NOT write prose. Do NOT describe how to edit. Do NOT ask questions. Output the fix block now.';
+        var fullPrompt = fileBlock + request + mandate;
 
         var btn = document.getElementById('te-submit-btn');
         btn.disabled = true;
