@@ -80,7 +80,7 @@
     
     .tab-button:hover {
         color: var(--text-color);
-        background-color: var(--secondary-color);
+        background-color: rgba(255,255,255,0.12);
     }
     
     .tab-button.active {
@@ -409,7 +409,7 @@
     <div id="daily-plan-guide" class="tab-content">
         <h2>Instructions for Admin Working on The Daily Plan</h2>
         [%  INCLUDE 'admin/documentation/DailyAuditGuide.tt' %]
-        <div style="background: var(--light-color); border: 1px solid var(--info-color); border-radius: 4px; padding: 20px; margin: 20px 0;">
+        <div style="background: rgba(255,255,255,0.15); border: 1px solid var(--info-color); border-radius: 4px; padding: 20px; margin: 20px 0;">
             <h3>How to Update This Daily Plan</h3>
             <ol style="line-height: 1.8;">
                 <li><strong>Read First:</strong> Always read the entire DailyPlan.tt file before making changes. Understand the tab structure and container relationships.</li>

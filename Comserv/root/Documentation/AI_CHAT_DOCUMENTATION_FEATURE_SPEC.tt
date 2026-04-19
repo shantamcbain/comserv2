@@ -39,7 +39,7 @@
     </div>
 
     <!-- TABLE OF CONTENTS -->
-    <div id="toc" style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-large) 0;">
+    <div id="toc" style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-large) 0;">
         <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Table of Contents</h3>
         <ul style="color: var(--text-color); font-family: var(--body-font);">
             <li><a href="#executive-summary">Executive Summary</a></li>
@@ -96,7 +96,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr style="background: var(--light-color);">
+                    <tr style="background: rgba(255,255,255,0.15);">
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">FR-1</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Chat widget in lower right, visible to all users (including non-authenticated)</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🔴 Critical</td>
@@ -108,7 +108,7 @@
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🔴 Critical</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">User sees citations</td>
                     </tr>
-                    <tr style="background: var(--light-color);">
+                    <tr style="background: rgba(255,255,255,0.15);">
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">FR-3</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Role-based documentation filtering (users can't see admin docs)</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🔴 Critical</td>
@@ -120,7 +120,7 @@
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🔴 Critical</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Admin panel only</td>
                     </tr>
-                    <tr style="background: var(--light-color);">
+                    <tr style="background: rgba(255,255,255,0.15);">
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">FR-5</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Model selection: Ollama for all; XAI for dev/admin</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🟠 High</td>
@@ -132,7 +132,7 @@
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🟠 High</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Configurable</td>
                     </tr>
-                    <tr style="background: var(--light-color);">
+                    <tr style="background: rgba(255,255,255,0.15);">
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">FR-7</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Code search (developers/admins can search .pm and .tt files)</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🟠 High</td>
@@ -144,7 +144,7 @@
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🟠 High</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Backend only</td>
                     </tr>
-                    <tr style="background: var(--light-color);">
+                    <tr style="background: rgba(255,255,255,0.15);">
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">FR-9</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Conversation resume page at /ai/conversations with search, filter, and context preservation</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🟠 High</td>
@@ -156,7 +156,7 @@
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🟠 High</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Yes</td>
                     </tr>
-                    <tr style="background: var(--light-color);">
+                    <tr style="background: rgba(255,255,255,0.15);">
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">FR-11</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Admin controls to change model and agent assignments without code changes (dynamic config)</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🟠 High</td>
@@ -179,7 +179,7 @@
             <h2 id="architecture" style="color: var(--text-color); font-family: var(--header-font);">3. Architecture Overview</h2>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">3.1 System Design (Key Change: Metadata-Only Index)</h3>
-            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; font-family: var(--body-font); color: var(--text-color);">
+            <div style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; font-family: var(--body-font); color: var(--text-color);">
                 <p><strong>Important:</strong> .tt files remain on disk as the source of truth. The database stores ONLY metadata (file_path, title, content_hash, role_permissions). When search happens:</p>
                 <ol>
                     <li>User query → Search metadata_index via FULLTEXT</li>
@@ -201,7 +201,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr style="background: var(--light-color);">
+                    <tr style="background: rgba(255,255,255,0.15);">
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Non-Authenticated</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ Yes (limited docs)</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Ollama only</td>
@@ -215,7 +215,7 @@
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">❌ No</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">⚙️ Configurable</td>
                     </tr>
-                    <tr style="background: var(--light-color);">
+                    <tr style="background: rgba(255,255,255,0.15);">
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Developer/Editor</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ Yes</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Ollama + XAI</td>
@@ -248,7 +248,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr style="background: var(--light-color);">
+                    <tr style="background: rgba(255,255,255,0.15);">
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong><a href="/Documentation/AI_Chat_Schema_Documentation" target="_blank" style="color: var(--link-color);">AI_Chat_Schema_Documentation.tt</a></strong></td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">0.01</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ Excellent - Explicitly states "DBIx::Class Result classes (not raw SQL files)"</td>
@@ -260,7 +260,7 @@
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">🟠 Partial - Correct content but missing explicit Result class emphasis</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">⚠️ NEEDS CORRECTION</td>
                     </tr>
-                    <tr style="background: var(--light-color);">
+                    <tr style="background: rgba(255,255,255,0.15);">
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong><a href="/Documentation/Schema" target="_blank" style="color: var(--link-color);">Schema.tt</a></strong></td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">0.1 (outdated)</td>
                         <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">❌ Critical - Describes SQL migration approach, no mention of Result classes</td>
@@ -270,7 +270,7 @@
             </table>
 
             <h4 style="color: var(--text-color); font-family: var(--header-font);">Critical Findings</h4>
-            <div style="background: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><strong>✅ Best Practice Found:</strong> <a href="/Documentation/AI_Chat_Schema_Documentation" target="_blank" style="color: var(--link-color);">AI_Chat_Schema_Documentation.tt</a> correctly emphasizes Result classes in Overview section (line 47): "This schema is built using <em>DBIx::Class Result classes</em> (not raw SQL files) for type safety and version control"</li>
                     <li><strong>⚠️ Version Issue:</strong> <a href="/Documentation/DBSchemaManager_Usage_Guide" target="_blank" style="color: var(--link-color);">DBSchemaManager_Usage_Guide.tt</a> uses page_version "1.0" instead of "0.01" per documentation standards</li>
@@ -281,7 +281,7 @@
             </div>
 
             <h4 style="color: var(--text-color); font-family: var(--header-font);">Recommended Actions</h4>
-            <div style="background: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <ol style="color: var(--text-color); font-family: var(--body-font);">
                     <li><strong>Priority 1:</strong> Fix <a href="/Documentation/DBSchemaManager_Usage_Guide" target="_blank" style="color: var(--link-color);">DBSchemaManager_Usage_Guide.tt</a> - Change page_version from "1.0" to "0.01" and add section on "Result Classes First" approach</li>
                     <li><strong>Priority 1:</strong> Rewrite <a href="/Documentation/Schema" target="_blank" style="color: var(--link-color);">Schema.tt</a> - Remove SQL migration approach, replace with Result class creation workflow using <a href="/Documentation/DBSchemaManager_Usage_Guide" target="_blank" style="color: var(--link-color);">DBSchemaManager</a></li>
@@ -299,7 +299,7 @@
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">4.1 Extend Existing: ai_messages Table</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Location:</strong> <a href="/Documentation/Result_Class_Development_Guide" target="_blank" style="color: var(--link-color);">/lib/Comserv/Model/Schema/Ency/Result/AiMessage.pm</a> (EXTEND existing fields)</p>
-            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
+            <div style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: var(--font-size-small);"><code>Fields to ADD to existing AiMessage table:
   agent_type => 'enum' (documentation, helpdesk, ency, beekeeping, hamradio, etc.)
   model_used => 'varchar' (ollama, xai, web)
@@ -315,7 +315,7 @@
             <h3 style="color: var(--text-color); font-family: var(--header-font);">4.2 New Table: documentation_metadata_index</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Location:</strong> <a href="/Documentation/Result_Class_Development_Guide" target="_blank" style="color: var(--link-color);">/lib/Comserv/Model/Schema/Ency/Result/DocumentationMetadataIndex.pm</a></p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Stores ONLY metadata and searchable excerpts of .tt files. Full content remains on disk.</p>
-            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
+            <div style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: var(--font-size-small);"><code>Fields:
   id => 'integer'
   file_path => 'varchar(512)' UNIQUE
@@ -334,7 +334,7 @@
             <h3 style="color: var(--text-color); font-family: var(--header-font);">4.3 New Table: code_search_index</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Location:</strong> <a href="/Documentation/Result_Class_Development_Guide" target="_blank" style="color: var(--link-color);">/lib/Comserv/Model/Schema/Ency/Result/CodeSearchIndex.pm</a></p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Index of application source code (.pm and .tt code) for developers/admins</p>
-            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
+            <div style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: var(--font-size-small);"><code>Fields:
   id => 'integer'
   file_path => 'varchar(512)' UNIQUE
@@ -351,7 +351,7 @@
             <h3 style="color: var(--text-color); font-family: var(--header-font);">4.4 New Table: web_search_results</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Location:</strong> <a href="/Documentation/Result_Class_Development_Guide" target="_blank" style="color: var(--link-color);">/lib/Comserv/Model/Schema/Ency/Result/WebSearchResult.pm</a></p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Store web search results BEFORE admin verification. Once verified, can be added to documentation_metadata_index.</p>
-            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
+            <div style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: var(--font-size-small);"><code>Fields:
   id => 'integer'
   query => 'varchar(500)' (original search query)
@@ -373,7 +373,7 @@
             <h3 style="color: var(--text-color); font-family: var(--header-font);">4.5 New Table: ai_model_config</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Location:</strong> <a href="/Documentation/Result_Class_Development_Guide" target="_blank" style="color: var(--link-color);">/lib/Comserv/Model/Schema/Ency/Result/AiModelConfig.pm</a></p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Admin configuration for model access by role</p>
-            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
+            <div style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: var(--font-size-small);"><code>Fields:
   id => 'integer'
   role => 'varchar(100)' (admin, developer, user, guest, etc.)
@@ -396,7 +396,7 @@
             <h3 style="color: var(--text-color); font-family: var(--header-font);">4.6 New Table: documentation_role_access</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Location:</strong> <a href="/Documentation/Result_Class_Development_Guide" target="_blank" style="color: var(--link-color);">/lib/Comserv/Model/Schema/Ency/Result/DocumentationRoleAccess.pm</a></p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Fine-grained role-based access to documentation sections</p>
-            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
+            <div style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: var(--font-size-small);"><code>Fields:
   id => 'integer'
   role => 'varchar(100)'
@@ -424,7 +424,7 @@
             </ul>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Example Agents:</h3>
-            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0;">
+            <div style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0;">
                 <table style="width: 100%; color: var(--text-color); font-family: var(--body-font); border-collapse: collapse;">
                     <thead>
                         <tr style="background: var(--secondary-color, #0066cc); color: white;">
@@ -435,7 +435,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr style="background: var(--light-color);">
+                        <tr style="background: rgba(255,255,255,0.15);">
                             <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Documentation Agent</td>
                             <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">General help on using Comserv</td>
                             <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">/Documentation/*</td>
@@ -447,7 +447,7 @@
                             <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">/lib/*, /root/*/</td>
                             <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Dev/Admin</td>
                         </tr>
-                        <tr style="background: var(--light-color);">
+                        <tr style="background: rgba(255,255,255,0.15);">
                             <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">ENCY Agent</td>
                             <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Help with inventory/encyclodepdia system</td>
                             <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">ENCY docs + database</td>
@@ -513,7 +513,7 @@
             </ul>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Phased Approach (8-10 Weeks)</h3>
-            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
+            <div style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0; overflow-x: auto;">
                 <table style="width: 100%; color: var(--text-color); font-family: var(--body-font); border-collapse: collapse;">
                     <thead>
                         <tr style="background: var(--secondary-color, #0066cc); color: white;">
@@ -549,7 +549,7 @@
                                 • 🆕 Model configuration endpoints (allow dynamic model switching)
                             </td>
                         </tr>
-                        <tr style="background: var(--light-color);">
+                        <tr style="background: rgba(255,255,255,0.15);">
                             <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">3: Frontend & UI</td>
                             <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">2-3 weeks</td>
                             <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">
@@ -577,7 +577,7 @@
                                 • API key management (Kubernetes-ready)
                             </td>
                         </tr>
-                        <tr style="background: var(--light-color);">
+                        <tr style="background: rgba(255,255,255,0.15);">
                             <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">5: Integration & Polish</td>
                             <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">1-2 weeks</td>
                             <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">
@@ -675,7 +675,7 @@
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font);">10. Next Steps</h2>
 
-            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0;">
+            <div style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-medium) 0;">
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Ready to Begin Phase 1?</strong></p>
                 <ol style="color: var(--text-color); font-family: var(--body-font);">
                     <li><strong>Approve this spec:</strong> Confirm architecture and database design</li>

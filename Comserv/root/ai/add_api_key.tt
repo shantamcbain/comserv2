@@ -13,7 +13,7 @@
 }
 
 .form-section {
-    background: var(--secondary-color);
+    background: var(--nav-bg);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 25px;
