@@ -7091,28 +7091,29 @@ sub action :Local :Args(0) {
             $c->response->body(encode_json({ success => JSON::false, error => 'subject required' }));
             return;
         }
-        my $project_id = $params->{project_id};
-        unless ($project_id && $project_id =~ /^\d+$/) {
-            $c->response->status(400);
-            $c->response->body(encode_json({ success => JSON::false, error => 'project_id (numeric) required' }));
-            return;
+        my $project_id = ($params->{project_id} && $params->{project_id} =~ /^\d+$/)
+                       ? $params->{project_id} : undef;
+
+        # Look up project_code from project_id (optional)
+        my $project_code = '';
+        if ($project_id) {
+            eval {
+                my $proj = $schema->resultset('Project')->find($project_id);
+                $project_code = $proj->project_code if $proj && $proj->project_code;
+            };
         }
 
-        # Look up project_code from project_id
-        my $project_code = 'default_code';
-        eval {
-            my $proj = $schema->resultset('Project')->find($project_id);
-            $project_code = $proj->project_code if $proj && $proj->project_code;
-        };
-
-        my $due_date   = $params->{due_date} || do {
+        my $due_date = $params->{due_date} || do {
             my $dt = DateTime->now->add(days => 7); $dt->ymd;
         };
         unless ($due_date =~ /^\d{4}-\d{2}-\d{2}$/) {
-            $c->response->status(400);
-            $c->response->body(encode_json({ success => JSON::false, error => 'due_date must be YYYY-MM-DD' }));
-            return;
+            $due_date = DateTime->now->add(days => 7)->ymd;
         }
+
+        # Map numeric status codes to DB text values
+        my %status_map = ( 1 => 'NEW', 2 => 'IN PROGRESS', 3 => 'COMPLETED', 4 => 'CANCELLED' );
+        my $raw_status  = $params->{status} // 1;
+        my $todo_status = $status_map{$raw_status} || ($raw_status =~ /^[A-Z ]/ ? $raw_status : 'NEW');
 
         my $priority    = $params->{priority} // 3;
         my $description = $params->{description} || '';
@@ -7139,14 +7140,14 @@ sub action :Local :Args(0) {
                 project_code        => $project_code,
                 developer           => $current_user,
                 username_of_poster  => $current_user,
-                status              => 'NEW',
+                status              => $todo_status,
                 priority            => $priority,
                 share               => 0,
                 last_mod_by         => $current_user,
                 last_mod_date       => $today,
                 user_id             => $user_id,
                 group_of_poster     => $group,
-                project_id          => $project_id,
+                ($project_id ? (project_id => $project_id) : ()),
                 date_time_posted    => $today,
                 ($parent_id ? (parent_id => $parent_id) : ()),
             });
@@ -7844,9 +7845,26 @@ sub _build_planning_system_prompt {
         $projects_list = "No existing projects found for $site_name.\n";
     }
 
+    my $today = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+
     return <<END_PROMPT;
-You are the AI Project Planning Agent for $site_name. Your role is to help users design and
-create new features, projects, and sub-projects through a structured interactive conversation.
+You are the AI Project Planning Agent for $site_name. The current user is: $username. Today: $today
+
+## DAILY LOG ENTRIES — handle immediately with NO extra questions:
+When the user says "good morning", "morning log", "start of day log", "create a log entry" or similar:
+→ Emit: [ACTION: {"action": "create_todo", "params": {"subject": "🌅 Good Morning - Daily Log - $today", "description": "Daily start-of-day log entry", "status": 2, "priority": 3}}]
+Then say: "Good morning! I've created your daily log entry as In Progress. Close it at end of day by saying 'close the log'."
+
+When the user says "good evening", "end of day", "close the log", "wrap up" or similar:
+→ First find the open daily log todo from the injected todo data, then:
+→ Emit: [ACTION: {"action": "update_todo_status", "params": {"todo_id": FIND_THE_LOG_ID, "status": 3}}]
+Then say: "Good evening! Daily log closed. Have a great rest of your day."
+
+## IN-APP ACTIONS — general:
+[ACTION: {"action": "create_todo", "params": {"subject": "title", "description": "...", "project_id": N_OR_OMIT, "due_date": "YYYY-MM-DD_OR_OMIT", "status": 2, "priority": 3}}]
+[ACTION: {"action": "update_todo_status", "params": {"todo_id": N, "status": 3}}]
+[ACTION: {"action": "create_project", "params": {"name": "...", "description": "..."}}]
+Always use real todo_id values from the injected todo data — never invent IDs.
 
 PHILOSOPHY:
 - Ask before you act — always confirm the user's intent before creating anything in the DB
