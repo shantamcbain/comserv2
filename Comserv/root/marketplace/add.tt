@@ -13,6 +13,85 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    // Inject "Fill Listing" tab into the floating chat widget once it appears
+    function injectWidgetFillTab() {
+        var chatPanel = document.getElementById('chat-panel');
+        if (!chatPanel || document.getElementById('widget-fill-tab')) return;
+
+        var fillTab = document.createElement('div');
+        fillTab.id = 'widget-fill-tab';
+        fillTab.style.cssText = 'padding:6px 10px;background:#fffbe6;border-top:1px solid #f0c000;font-size:0.85em;';
+        fillTab.innerHTML =
+            '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
+                '<span style="font-weight:bold;">🏷️ Fill Listing with AI:</span>' +
+                '<textarea id="wf-desc" rows="2" placeholder="e.g. Sell my 3D printer, $150, good condition, electronics" ' +
+                    'style="flex:1;min-width:160px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:.85em;resize:none;"></textarea>' +
+                '<button id="wf-btn" style="padding:5px 12px;background:var(--primary-color,#007bff);color:#fff;' +
+                    'border:none;border-radius:4px;cursor:pointer;font-size:.85em;white-space:nowrap;">🤖 Fill</button>' +
+            '</div>' +
+            '<div id="wf-status" style="font-size:.8em;margin-top:4px;color:#555;"></div>';
+
+        var chatInput = chatPanel.querySelector('.chat-input');
+        if (chatInput) chatPanel.insertBefore(fillTab, chatInput);
+        else chatPanel.appendChild(fillTab);
+
+        document.getElementById('wf-btn').addEventListener('click', function() {
+            var desc = (document.getElementById('wf-desc').value || '').trim();
+            if (!desc) { document.getElementById('wf-status').textContent = 'Please describe your listing.'; return; }
+            var btn = document.getElementById('wf-btn');
+            var statusEl = document.getElementById('wf-status');
+            btn.disabled = true; btn.textContent = '⏳';
+            statusEl.textContent = 'Asking AI…';
+
+            var CATS = JSON.parse(document.getElementById('ai-cats-json').textContent || '[]');
+            var catList = CATS.map(function(c){ return c.id + '=' + c.name; }).join(', ');
+            var SYSTEM = 'You help fill in a marketplace listing form. ' +
+                'Return ONLY a raw JSON object with these exact keys: ' +
+                'listing_type (one of: sale, wanted, job), title (short compelling title), ' +
+                'description (detailed, 2-4 sentences), price (number, 0 if free/negotiable), ' +
+                'currency (CAD or USD), category_id (pick the best matching id from: ' + catList + '), ' +
+                'accepts_points (1 or 0). ' +
+                'No markdown, no explanation, no code fences — only the JSON object.';
+
+            fetch('/ai/get_user_providers', { credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(pd) {
+                var provider = 'ollama';
+                if (pd.success && pd.providers) {
+                    pd.providers.forEach(function(p) {
+                        if (p.service === 'grok' && p.models && p.models.length) provider = 'grok';
+                    });
+                }
+                return fetch('/ai/generate', {
+                    method: 'POST', credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: desc, system: SYSTEM, provider: provider })
+                });
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                btn.disabled = false; btn.textContent = '🤖 Fill';
+                if (!data.success) { statusEl.textContent = '❌ ' + (data.error || 'AI error'); return; }
+                var raw = (data.response || '').trim();
+                var js = raw.indexOf('{'), je = raw.lastIndexOf('}');
+                if (js === -1) { statusEl.textContent = '❌ AI returned no JSON.'; return; }
+                var fields;
+                try { fields = JSON.parse(raw.substring(js, je + 1)); }
+                catch(e) { statusEl.textContent = '❌ Parse error: ' + e.message; return; }
+                var filled = 0;
+                Object.keys(fields).forEach(function(k) { if (window._mktFillField(k, fields[k])) filled++; });
+                statusEl.textContent = '✅ Filled ' + filled + ' field(s). Review the form above.';
+            })
+            .catch(function(e) { btn.disabled = false; btn.textContent = '🤖 Fill'; statusEl.textContent = '❌ ' + e; });
+        });
+    }
+
+    var observer = new MutationObserver(function() {
+        if (document.getElementById('chat-panel')) { injectWidgetFillTab(); observer.disconnect(); }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    injectWidgetFillTab(); // also try immediately in case widget already exists
 });
 </script>
 
@@ -52,6 +131,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var CATS = JSON.parse(document.getElementById('ai-cats-json').textContent || '[]');
 
     function fillField(name, value) {
+      // Also exposed as window._mktFillField for the widget injection code above
       if (value === undefined || value === null || value === '') return false;
       var el = document.querySelector('[name="' + name + '"]');
       if (!el) return false;
@@ -88,6 +168,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return true;
       }
     }
+    window._mktFillField = fillField;
 
     document.getElementById('ai-fill-btn').addEventListener('click', function() {
       var desc = (document.getElementById('ai-listing-desc').value || '').trim();
