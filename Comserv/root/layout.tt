@@ -62,7 +62,20 @@
                     }
                 }
                 return false;
-            } else if (el.type === 'checkbox' || el.type === 'radio') {
+            } else if (el.type === 'radio') {
+                var radios = document.querySelectorAll('[name="' + name + '"]');
+                var rfound = false;
+                radios.forEach(function(r) {
+                    if (r.value.toLowerCase() === String(value).toLowerCase()) {
+                        r.checked = true;
+                        r.dispatchEvent(new Event('change', {bubbles:true}));
+                        rfound = true;
+                    } else {
+                        r.checked = false;
+                    }
+                });
+                return rfound;
+            } else if (el.type === 'checkbox') {
                 el.checked = !!(value && value !== '0' && value !== 'false');
                 el.dispatchEvent(new Event('change', {bubbles:true}));
                 return true;

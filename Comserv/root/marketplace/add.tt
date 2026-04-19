@@ -24,6 +24,121 @@ document.addEventListener('DOMContentLoaded', function() {
 
   <h1 style="margin-bottom:20px;"><i class="fas fa-plus-circle"></i> Post a Listing</h1>
 
+  <!-- ── AI Listing Assistant ────────────────────────────────────────── -->
+  <details id="ai-fill-panel" style="background:var(--bg-secondary,#f8f9fa);border:1px solid var(--nav-bg,#dee2e6);
+           border-radius:8px;padding:14px 18px;margin-bottom:18px;" open>
+    <summary style="font-weight:bold;cursor:pointer;font-size:.95rem;list-style:none;display:flex;align-items:center;gap:.5rem;">
+      🤖 <span>Fill with AI — describe your listing</span>
+    </summary>
+    <div style="margin-top:12px;">
+      <textarea id="ai-listing-desc" rows="3" placeholder="e.g. I want to sell my FDM 3D printer, great condition, $150 CAD. It's electronics / computer equipment."
+                style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #ccc;
+                       border-radius:5px;resize:vertical;font-size:.9rem;"></textarea>
+      <div style="display:flex;gap:.6rem;align-items:center;margin-top:8px;flex-wrap:wrap;">
+        <button type="button" id="ai-fill-btn"
+                style="padding:8px 18px;background:var(--primary-color,#007bff);color:#fff;
+                       border:none;border-radius:5px;cursor:pointer;font-size:.9rem;font-weight:bold;">
+          🤖 Fill Form
+        </button>
+        <span id="ai-fill-status" style="font-size:.85rem;color:#555;"></span>
+      </div>
+    </div>
+  </details>
+  <script>
+  (function() {
+    var CATS = [
+      [% FOREACH cat IN categories %]{ id: '[% cat.id %]', name: '[% cat.name | html %]' }[% UNLESS loop.last %],[% END %]
+      [% END %]
+    ];
+
+    function fillField(name, value) {
+      if (value === undefined || value === null || value === '') return false;
+      var el = document.querySelector('[name="' + name + '"]');
+      if (!el) return false;
+      var v = String(value);
+      if (el.tagName === 'SELECT') {
+        var lv = v.toLowerCase();
+        for (var i = 0; i < el.options.length; i++) {
+          if (el.options[i].value.toLowerCase() === lv || el.options[i].text.toLowerCase() === lv) {
+            el.selectedIndex = i;
+            el.dispatchEvent(new Event('change', {bubbles:true}));
+            return true;
+          }
+        }
+        return false;
+      } else if (el.type === 'radio') {
+        var radios = document.querySelectorAll('[name="' + name + '"]');
+        var hit = false;
+        radios.forEach(function(r) {
+          if (r.value.toLowerCase() === v.toLowerCase()) {
+            r.checked = true;
+            r.dispatchEvent(new Event('change', {bubbles:true}));
+            hit = true;
+          } else { r.checked = false; }
+        });
+        return hit;
+      } else if (el.type === 'checkbox') {
+        el.checked = !!(v && v !== '0' && v.toLowerCase() !== 'false');
+        el.dispatchEvent(new Event('change', {bubbles:true}));
+        return true;
+      } else {
+        el.value = v;
+        el.dispatchEvent(new Event('input',  {bubbles:true}));
+        el.dispatchEvent(new Event('change', {bubbles:true}));
+        return true;
+      }
+    }
+
+    document.getElementById('ai-fill-btn').addEventListener('click', function() {
+      var desc = (document.getElementById('ai-listing-desc').value || '').trim();
+      if (!desc) { document.getElementById('ai-fill-status').textContent = 'Please describe your listing first.'; return; }
+
+      var btn = document.getElementById('ai-fill-btn');
+      var statusEl = document.getElementById('ai-fill-status');
+      btn.disabled = true;
+      btn.textContent = '⏳ Thinking…';
+      statusEl.textContent = '';
+
+      var catList = CATS.map(function(c){ return c.id + '=' + c.name; }).join(', ');
+      var SYSTEM = 'You help fill in a marketplace listing form. '
+        + 'Return ONLY a raw JSON object with these exact keys: '
+        + 'listing_type (one of: sale, wanted, job), title (short compelling title), '
+        + 'description (detailed, 2-4 sentences), price (number, 0 if free/negotiable), '
+        + 'currency (CAD or USD), category_id (pick the best matching id from: ' + catList + '), '
+        + 'accepts_points (1 or 0). '
+        + 'No markdown, no explanation, no code fences — only the JSON object.';
+
+      fetch('/ai/generate', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: desc, system: SYSTEM, provider: 'grok', agent_type: 'form_fill' })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        btn.disabled = false;
+        btn.textContent = '🤖 Fill Form';
+        if (!data.success) { statusEl.textContent = '❌ AI error: ' + (data.error || 'unknown'); return; }
+        var raw = (data.response || '').trim();
+        var js = raw.indexOf('{'), je = raw.lastIndexOf('}');
+        if (js === -1) { statusEl.textContent = '❌ AI returned no JSON — try rephrasing.'; return; }
+        var fields;
+        try { fields = JSON.parse(raw.substring(js, je + 1)); }
+        catch(e) { statusEl.textContent = '❌ JSON parse error: ' + e.message; return; }
+        var filled = 0;
+        Object.keys(fields).forEach(function(k) { if (fillField(k, fields[k])) filled++; });
+        statusEl.textContent = '✅ Filled ' + filled + ' field(s). Review and adjust as needed.';
+        document.getElementById('ai-fill-panel').open = false;
+      })
+      .catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = '🤖 Fill Form';
+        statusEl.textContent = '❌ Request failed: ' + e;
+      });
+    });
+  })();
+  </script>
+
   [% IF error_msg %]
     <div style="background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:5px;padding:10px 15px;margin-bottom:15px;">[% error_msg | html %]</div>
   [% END %]
