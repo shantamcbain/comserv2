@@ -1,5 +1,5 @@
 [% META title = 'Computer Systems Consulting' %]
-[% PageVersion = 'CSC/CSC.tt,v 0.04 2026/04/19 shanta' %]
+[% PageVersion = 'CSC/CSC.tt,v 0.03 2025/04/29 shanta Exp shanta ' %]
 [% IF debug %][% debug %][% END %]
 [% IF c.session.debug_mode == 1 %]
  [%	PageVersion %]
@@ -30,10 +30,11 @@
   <li><a href='/marketplace'>Marketplace</a> &mdash; Buy, sell or post services. Members can pay with <strong>points</strong>.</li>
   <li><a href='/workshop'>Workshops</a></li>
   <li><strong>Domain names</strong> &mdash; Available as an add-on for members with an associated domain. <a href='/membership'>Join as a member</a> to get started.</li>
+  <li>Check out our <a href='http://demo.computersystemconsulting.ca' target='_blank'>Demo site</a>.</li>
 </ul>
 
-<h2>Payments</h2>
-<p>Pay for services with <strong>PayPal</strong>. Members may also use <strong>CSC Points</strong> &mdash; earn points by contributing and redeem them for services or marketplace items.</p>
+<h2>Crypto &amp; Points Payments</h2>
+<p>Pay for services with Bitcoin or other crypto. Members may also use <strong>CSC Points</strong> &mdash; earn points by contributing and redeem them for services or marketplace items.</p>
 
 
 
