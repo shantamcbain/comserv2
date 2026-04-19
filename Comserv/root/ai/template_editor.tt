@@ -144,10 +144,19 @@
             <button class="te-btn" style="background:#888;color:#fff;" onclick="teReset()">✖ Discard</button>
             <span id="te-apply-status" style="font-size:.85rem;"></span>
         </div>
-        <div class="te-section-head" style="margin-top:1.2rem;">AI Explanation</div>
+        <div class="te-section-head" style="margin-top:1.2rem;display:flex;align-items:center;justify-content:space-between;">
+            <span>AI Explanation</span>
+            <div style="display:flex;gap:.4rem;">
+                <button class="te-btn te-btn-primary" id="te-exp-source-btn" onclick="teExpViewSource()" title="View as plain text">📝 Source</button>
+                <button class="te-btn" id="te-exp-preview-btn" onclick="teExpViewPreview()"
+                        style="background:#555;color:#fff;" title="Render as HTML">🖥 Preview</button>
+            </div>
+        </div>
         <div id="te-ai-explanation" style="font-size:.9rem;white-space:pre-wrap;padding:.6rem;
              background:var(--bg-secondary,#f5f5f5);border-radius:4px;border:1px solid var(--nav-bg,#ccc);">
         </div>
+        <iframe id="te-exp-frame" style="display:none;width:100%;height:300px;border:1px solid var(--nav-bg,#ccc);border-radius:4px;"
+                sandbox="allow-same-origin allow-scripts"></iframe>
     </div>
 </div>
 
@@ -254,12 +263,45 @@
             document.getElementById('te-apply-status').textContent = '';
             teStatus('AI proposed a fix for ' + proposedPath + '. Review below and click Apply.', 'ok');
         } else {
-            document.getElementById('te-ai-explanation').textContent = raw;
-            document.getElementById('te-proposed').value = '';
-            document.getElementById('te-diff-panel').classList.add('visible');
-            teStatus('AI did not produce a ## FIX: block. Response shown below — try rephrasing your request.', 'err');
+            // Fallback: try to extract any fenced code block as the proposed content
+            var codeRe = /```[^\n\r]*\n([\s\S]*?)```/;
+            var cm = raw.match(codeRe);
+            if (cm) {
+                var fallbackContent = cm[1];
+                var fallbackExplanation = raw.replace(codeRe, '').trim();
+                document.getElementById('te-proposed').value = fallbackContent;
+                document.getElementById('te-ai-explanation').textContent = fallbackExplanation || raw;
+                document.getElementById('te-diff-panel').classList.add('visible');
+                document.getElementById('te-apply-status').textContent = '';
+                teStatus('AI did not use ## FIX: format — extracted code block. Review carefully before applying.', 'info');
+            } else {
+                document.getElementById('te-ai-explanation').textContent = raw;
+                document.getElementById('te-proposed').value = '';
+                document.getElementById('te-diff-panel').classList.add('visible');
+                teStatus('AI did not produce a ## FIX: block. Raw response shown below — try rephrasing your request.', 'err');
+            }
         }
     }
+
+    window.teExpViewSource = function() {
+        document.getElementById('te-ai-explanation').style.display = '';
+        document.getElementById('te-exp-frame').style.display = 'none';
+        document.getElementById('te-exp-source-btn').style.opacity = '1';
+        document.getElementById('te-exp-preview-btn').style.opacity = '.6';
+    };
+
+    window.teExpViewPreview = function() {
+        var text = document.getElementById('te-ai-explanation').textContent;
+        if (!text) { teStatus('No AI explanation to preview.', 'err'); return; }
+        var frame = document.getElementById('te-exp-frame');
+        frame.srcdoc = '<html><body style="font-family:sans-serif;padding:1rem;font-size:.9rem;">'
+            + text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                   .replace(/\n/g,'<br>') + '</body></html>';
+        frame.style.display = '';
+        document.getElementById('te-ai-explanation').style.display = 'none';
+        document.getElementById('te-exp-preview-btn').style.opacity = '1';
+        document.getElementById('te-exp-source-btn').style.opacity = '.6';
+    };
 
     window.teApply = function() {
         var proposed = document.getElementById('te-proposed').value;
