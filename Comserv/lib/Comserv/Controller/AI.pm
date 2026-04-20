@@ -4843,6 +4843,8 @@ Rules:
 - ALWAYS use the real numeric todo_id from the LIVE TODO DATA above — never make up an ID.
 - Include the action block in addition to your normal response text, not instead of it.
 - The application will automatically execute the action and show the user a confirmation.
+
+SUPPORT ESCALATION: If you genuinely cannot help the user (question requires a human, account-specific access you don't have, or is truly outside your capabilities), add [SUPPORT_NEEDED] on its own line at the very end of your response. The widget will then offer the user options to create a support ticket or start a live chat with support staff. Only use [SUPPORT_NEEDED] when you truly cannot help — not for questions you can answer.
 ACTION
 
     if ($is_admin) {
@@ -4885,7 +4887,8 @@ ACTION
              . "NEVER mention /admin, /admin/*, or any administrative URL. "
              . "NEVER use your training knowledge to guess application URLs — only use the navigation guide. "
              . "If a user asks about the admin panel or any admin feature, say: "
-             . "'That section requires administrator privileges. Please log in with an admin account or contact your system administrator.'"
+             . "'That section requires administrator privileges. Please log in with an admin account or contact your system administrator.' "
+             . "SUPPORT ESCALATION: If you genuinely cannot help, add [SUPPORT_NEEDED] on its own line at the very end of your response so the user can be connected with support staff."
              . $guest_knowledge
              . $page_nav
              . $nav_guide;
@@ -4973,6 +4976,7 @@ sub _build_navigation_command_guide {
         [ 'AI Assistant (admin)', 'admin', [
             [ 'Manage AI models',           '/ai/models'                ],
             [ 'AI server status',           '/ai/check_status'          ],
+            [ 'Support chat admin',         '/chat/admin'               ],
         ]],
         [ 'Tasks / Todos', 'user', [
             [ 'Todo list',                  '/todo'                     ],
