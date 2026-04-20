@@ -1964,6 +1964,17 @@ sub port_favicon :Path('/favicon/port') :Args(1) {
     $c->response->body($svg);
 }
 
+sub helpdesk_favicon :Path('/favicon/helpdesk') :Args(0) {
+    my ($self, $c) = @_;
+    my $svg = q{<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="4" fill="#1a7a4a"/>
+  <text x="16" y="22" text-anchor="middle" font-family="monospace,sans-serif" font-weight="bold" font-size="13" fill="white">HD</text>
+</svg>};
+    $c->response->content_type('image/svg+xml');
+    $c->response->headers->header('Cache-Control' => 'public, max-age=86400');
+    $c->response->body($svg);
+}
+
 sub site_favicon :Path('/favicon/site') :Args(1) {
     my ($self, $c, $sitename) = @_;
 

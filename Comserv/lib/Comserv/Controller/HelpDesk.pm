@@ -59,8 +59,10 @@ sub base :Chained('/') :PathPart('HelpDesk') :CaptureArgs(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
         "Starting HelpDesk base action");
     
-    # Common setup for all HelpDesk pages
-    $c->stash(section => 'helpdesk');
+    $c->stash(
+        section       => 'helpdesk',
+        site_favicon  => '/favicon/helpdesk',
+    );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
         "Completed HelpDesk base action");
