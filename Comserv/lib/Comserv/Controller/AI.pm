@@ -5086,6 +5086,14 @@ sub _build_navigation_command_guide {
          . "Present the full list as a numbered or bulleted list so nothing is missed.\n"
          . "Only use URLs from this list; do not invent others. "
          . "If no match exists for a navigation request, say: 'I don't know that page — visit $base_url to browse available options.'\n"
+         . "CONSIGNMENT QUICK REFERENCE (for consignment questions from any page):\n"
+         . "Consignment = sending items to a partner store to sell on your behalf.\n"
+         . "  List:      $base_url/Inventory/consignment\n"
+         . "  New batch: $base_url/Inventory/consignment/new\n"
+         . "  Partners:  $base_url/Inventory/consignment/partners\n"
+         . "  Docs:      $base_url/Documentation/Inventory/consignment\n"
+         . "Workflow: Set up partner → create batch (select items + qty + retail price) → view/print slip → settle when partner pays\n"
+         . "Known partners: Monashee Arts Council (Lumby BC), Monashee Coop (30% commission)\n"
          . $guide;
 }
 
@@ -5193,6 +5201,40 @@ sub _build_page_navigation_hint {
             $hint .= "Navigation context — Projects (guest):\n"
                    . "- Log in to view project information.\n";
         }
+    } elsif ($page_path =~ m{/Inventory/consignment}i) {
+        $hint .= "Navigation context — Consignment Tracking:\n"
+               . "Consignment = sending items to a partner store; partner sells them and keeps a commission.\n"
+               . "- Consignment list:        $base_url/Inventory/consignment\n"
+               . "- Create new consignment:  $base_url/Inventory/consignment/new\n"
+               . "- Consignment partners:    $base_url/Inventory/consignment/partners\n"
+               . "- View/settle:             $base_url/Inventory/consignment/view/<id>\n"
+               . "- Full docs:               $base_url/Documentation/Inventory/consignment\n"
+               . "WORKFLOW: 1) Set up a partner at /Inventory/consignment/partners\n"
+               . "2) Create batch at /Inventory/consignment/new — select partner, enter items + qty + retail price\n"
+               . "3) View consignment to print slip or settle when partner pays\n"
+               . "4) On settlement: enter qty sold and qty returned per line; optionally post GL entry\n"
+               . "Partners: Monashee Arts Council (Lumby), Monashee Coop (30% commission)\n";
+    } elsif ($page_path =~ m{/Inventory}i) {
+        $hint .= "Navigation context — Inventory:\n"
+               . "- Inventory dashboard:    $base_url/Inventory\n"
+               . "- Items list:             $base_url/Inventory/items\n"
+               . "- Add item:               $base_url/Inventory/item/add\n"
+               . "- Suppliers:              $base_url/Inventory/suppliers\n"
+               . "- Supplier invoices:      $base_url/Inventory/invoice\n"
+               . "- New invoice:            $base_url/Inventory/invoice/new\n"
+               . "- Stock transactions:     $base_url/Inventory/stock/transactions\n"
+               . "- Customer sales:         $base_url/Inventory/sales\n"
+               . "- Consignments:           $base_url/Inventory/consignment\n"
+               . "- New consignment:        $base_url/Inventory/consignment/new\n"
+               . "- Consignment partners:   $base_url/Inventory/consignment/partners\n"
+               . "- Consignment docs:       $base_url/Documentation/Inventory/consignment\n";
+    } elsif ($page_path =~ m{/Accounting}i) {
+        $hint .= "Navigation context — Accounting:\n"
+               . "- Accounting dashboard:   $base_url/Accounting\n"
+               . "- Chart of accounts:      $base_url/Accounting/coa\n"
+               . "- General ledger:         $base_url/Accounting/gl\n"
+               . "- Consignment settlement posts GL: DR AR + Commission / CR Sales Revenue\n"
+               . "- For consignment management go to: $base_url/Inventory/consignment\n";
     } elsif ($page_path =~ m{/ency}i) {
         $hint .= "Navigation context — Encyclopedia:\n"
                 . "- Search for information: $base_url/ency/search?q=TERM\n";
