@@ -532,6 +532,7 @@ sub generate :Local :Args(0) {
             $model = $json_data->{model} || '';
             $use_search = $json_data->{use_search} ? 1 : 0;
             $history_items = (ref($json_data->{history}) eq 'ARRAY') ? $json_data->{history} : [];
+            $c->stash->{skip_role_prompt} = $json_data->{skip_role_prompt} ? 1 : 0;
             # Image attachment (base64) for vision models
             my $image_data_b64 = $json_data->{image_data} || '';
             my $image_mime     = $json_data->{image_mime} || 'image/jpeg';
@@ -712,12 +713,14 @@ sub generate :Local :Args(0) {
         $can_select_model_gen = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_gen;
     }
 
-    # Role-based capability injection into system prompt
-    my $role_prompt = $self->_build_role_system_prompt($c, $user_roles_gen, $provider, $page_path, $page_title);
-    if ($role_prompt && $system) {
-        $system .= "\n\n" . $role_prompt;
-    } elsif ($role_prompt) {
-        $system = $role_prompt;
+    # Role-based capability injection into system prompt (skip when caller supplies a precise system prompt)
+    unless ($c->stash->{skip_role_prompt}) {
+        my $role_prompt = $self->_build_role_system_prompt($c, $user_roles_gen, $provider, $page_path, $page_title);
+        if ($role_prompt && $system) {
+            $system .= "\n\n" . $role_prompt;
+        } elsif ($role_prompt) {
+            $system = $role_prompt;
+        }
     }
 
     # Only admins/editors may use web search (costs money per call)

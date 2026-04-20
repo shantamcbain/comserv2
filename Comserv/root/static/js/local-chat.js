@@ -1402,7 +1402,7 @@
             fetch('/ai/generate', {
                 method: 'POST', credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: desc, system: SYSTEM, provider: provider })
+                body: JSON.stringify({ prompt: desc, system: SYSTEM, provider: provider, skip_role_prompt: true })
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
