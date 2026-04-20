@@ -755,7 +755,7 @@ sub create_user :Path('/admin/create_user') :Args(0) {
         @available_sites = $schema->resultset('Site')->search({ name => $sitename })->all;
     }
 
-    my @available_roles = ('normal', 'editor', 'developer', 'WorkshopLeader', 'admin');
+    my @available_roles = ('normal', 'editor', 'developer', 'WorkshopLeader', 'helpdesk', 'admin');
 
     $c->stash(
         available_sites => \@available_sites,

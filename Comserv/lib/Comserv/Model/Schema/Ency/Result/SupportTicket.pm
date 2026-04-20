@@ -102,4 +102,10 @@ __PACKAGE__->belongs_to(
     { join_type => 'LEFT' }
 );
 
+__PACKAGE__->has_many(
+    messages => 'Comserv::Model::Schema::Ency::Result::TicketMessage',
+    'ticket_id',
+    { order_by => 'me.created_at' }
+);
+
 1;
