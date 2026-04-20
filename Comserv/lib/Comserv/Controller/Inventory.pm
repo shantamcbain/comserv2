@@ -3924,13 +3924,22 @@ sub consignment_print :Path('/Inventory/consignment/print') :Args(1) {
         }
     };
 
-    $c->stash(
+    my $vars = {
+        %{ $c->stash },
         consignment => $consignment,
         sitename    => $sitename,
         site_info   => \%site_info,
-        wrapper     => '',
-        template    => 'Inventory/consignment/print.tt',
-    );
+        c           => $c,
+    };
+
+    my $view   = $c->view('TT');
+    my $output = '';
+    $view->template->process('Inventory/consignment/print.tt', $vars, \$output)
+        or die $view->template->error;
+
+    $c->response->content_type('text/html; charset=utf-8');
+    $c->response->body($output);
+    $c->detach;
 }
 
 sub consignment_delete :Path('/Inventory/consignment/delete') :Args(1) {
