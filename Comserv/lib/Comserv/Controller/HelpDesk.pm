@@ -257,22 +257,25 @@ Admin page for HelpDesk management
 
 =cut
 
-sub _require_admin {
+sub _is_staff {
     my ($self, $c) = @_;
     my $roles = $c->session->{roles};
-    my $has_admin = 0;
-    if ($roles) {
-        $has_admin = ref($roles) eq 'ARRAY'
-            ? grep { $_ eq 'admin' } @$roles
-            : ($roles =~ /\badmin\b/i ? 1 : 0);
-    }
-    unless ($has_admin) {
+    return 0 unless $roles;
+    return ref($roles) eq 'ARRAY'
+        ? (grep { $_ eq 'admin' || $_ eq 'helpdesk' } @$roles) ? 1 : 0
+        : ($roles =~ /\b(?:admin|helpdesk)\b/i ? 1 : 0);
+}
+
+sub _require_admin {
+    my ($self, $c) = @_;
+    my $is_staff = $self->_is_staff($c);
+    unless ($is_staff) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_require_admin',
             "Unauthorized HelpDesk admin access by: " . ($c->session->{username} || 'Guest'));
         $c->stash->{error_msg} = "You don't have permission to access the HelpDesk admin area.";
         $c->detach('index');
     }
-    return $has_admin;
+    return $is_staff;
 }
 
 sub admin :Chained('base') :PathPart('admin') :Args(0) {
@@ -453,12 +456,7 @@ sub view_ticket :Chained('ticket_base') :PathPart('view') :Args(1) {
         }
 
         my $user_id  = $c->session->{user_id} || 0;
-        my $is_admin = 0;
-        if ($c->session->{roles}) {
-            my $roles = $c->session->{roles};
-            $is_admin = ref($roles) eq 'ARRAY' ? grep { $_ eq 'admin' } @$roles
-                                                 : ($roles =~ /\badmin\b/i ? 1 : 0);
-        }
+        my $is_admin = $self->_is_staff($c);
 
         unless ($is_admin || ($ticket->user_id && $ticket->user_id == $user_id)) {
             $c->stash(
@@ -470,11 +468,14 @@ sub view_ticket :Chained('ticket_base') :PathPart('view') :Args(1) {
             return;
         }
 
+        my @messages = eval { $ticket->messages->all } // ();
+
         $c->stash(
-            template => 'CSC/HelpDesk/ticket_status.tt',
-            ticket   => $ticket,
-            tickets  => [$ticket],
-            title    => 'Ticket: ' . $ticket_number,
+            template  => 'CSC/HelpDesk/ticket_view.tt',
+            ticket    => $ticket,
+            messages  => \@messages,
+            is_staff  => $is_admin,
+            title     => 'Ticket: ' . $ticket_number,
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view_ticket',
@@ -487,6 +488,92 @@ sub view_ticket :Chained('ticket_base') :PathPart('view') :Args(1) {
     };
 
     $c->forward($c->view('TT'));
+}
+
+=head2 ticket_reply
+
+Add a reply message to a ticket and email the other party
+
+=cut
+
+sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
+    my ($self, $c, $ticket_number) = @_;
+
+    unless ($c->req->method eq 'POST') {
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $body_text = $c->req->params->{reply_body} || '';
+    unless ($body_text) {
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $is_staff     = $self->_is_staff($c);
+    my $sender_name  = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
+    $sender_name     = $c->session->{username} || 'Anonymous' unless $sender_name =~ /\S/;
+    my $sender_email = $c->session->{email} || '';
+    my $sender_type  = $is_staff ? 'staff' : 'user';
+    my $site_name    = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $ticket = $schema->resultset('SupportTicket')->find({ ticket_number => $ticket_number });
+
+        unless ($ticket) {
+            $c->stash(error_msg => "Ticket not found.", template => 'CSC/HelpDesk/ticket_status.tt', tickets => []);
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        my $user_id = $c->session->{user_id} || 0;
+        unless ($is_staff || ($ticket->user_id && $ticket->user_id == $user_id)) {
+            $c->stash(error_msg => 'Permission denied.', template => 'CSC/HelpDesk/ticket_status.tt', tickets => []);
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        $schema->resultset('TicketMessage')->create({
+            ticket_id    => $ticket->id,
+            sender_type  => $sender_type,
+            sender_name  => $sender_name,
+            sender_email => $sender_email,
+            body         => $body_text,
+        });
+
+        if ($sender_type eq 'staff' && $ticket->email) {
+            my $subject = "Re: [Ticket " . $ticket->ticket_number . "] " . $ticket->subject;
+            my $body    = "Hello,\n\n"
+                . "A staff member has replied to your support ticket.\n\n"
+                . "--- Reply from $sender_name ---\n$body_text\n\n"
+                . "View your ticket: " . $c->uri_for('/HelpDesk/ticket/view/' . $ticket_number) . "\n\n"
+                . "Regards,\n$site_name Support Team";
+            eval { $c->model('Mail')->send_email($c, $ticket->email, $subject, $body) };
+            $self->logging->log_with_details($c, $@ ? 'error' : 'info', __FILE__, __LINE__, 'ticket_reply',
+                $@ ? "Email to submitter failed: $@" : "Reply email sent to " . $ticket->email);
+        } elsif ($sender_type eq 'user') {
+            my $from_email = $c->model('Mail')->can('get_smtp_config')
+                ? eval { $c->model('Mail')->get_smtp_config($c, undef)->{from} } || ''
+                : '';
+            my $staff_subject = "[HelpDesk] Customer reply on Ticket " . $ticket->ticket_number;
+            my $staff_body    = "A customer has replied to ticket " . $ticket->ticket_number . ".\n\n"
+                . "Subject: " . $ticket->subject . "\n"
+                . "From: $sender_name ($sender_email)\n\n"
+                . "--- Reply ---\n$body_text\n\n"
+                . "View ticket: " . $c->uri_for('/HelpDesk/admin/tickets/open') . "\n\n"
+                . "Regards,\n$site_name HelpDesk";
+            if ($from_email) {
+                eval { $c->model('Mail')->send_email($c, $from_email, $staff_subject, $staff_body) };
+            }
+        }
+
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'ticket_reply',
+            "Error posting reply: $_");
+    };
+
+    $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
 }
 
 =head2 ticket_list
@@ -503,12 +590,7 @@ sub ticket_list :Chained('ticket_base') :PathPart('list') :Args(0) {
 
     my $user_id   = $c->session->{user_id} || 0;
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
-    my $is_admin  = 0;
-    if ($c->session->{roles}) {
-        my $roles = $c->session->{roles};
-        $is_admin = ref($roles) eq 'ARRAY' ? grep { $_ eq 'admin' } @$roles
-                                             : ($roles =~ /\badmin\b/i ? 1 : 0);
-    }
+    my $is_admin  = $self->_is_staff($c);
 
     try {
         my $schema = $c->model('DBEncy')->schema;
@@ -544,6 +626,26 @@ sub ticket_list :Chained('ticket_base') :PathPart('list') :Args(0) {
 Fallback for HelpDesk URLs that don't match any actions
 
 =cut
+
+sub tickets_alert :Chained('base') :PathPart('admin/tickets_alert') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    unless ($self->_is_staff($c)) {
+        $c->response->body('{"open_count":0}');
+        return;
+    }
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+    my $is_csc    = (lc($site_name) eq 'csc');
+    my $count = 0;
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my %search = (status => 'open');
+        $search{site_name} = $site_name unless $is_csc;
+        $count = $schema->resultset('SupportTicket')->search(\%search)->count;
+    };
+    $c->response->headers->header('Cache-Control' => 'no-store');
+    $c->response->body('{"open_count":' . ($count + 0) . '}');
+}
 
 sub default :Chained('base') :PathPart('') :Args {
     my ($self, $c) = @_;

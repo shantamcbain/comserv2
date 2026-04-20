@@ -74,8 +74,9 @@ __PACKAGE__->register_class('InventoryAssignment', 'Comserv::Model::Schema::Ency
 __PACKAGE__->register_class('InventoryItemSupplier', 'Comserv::Model::Schema::Ency::Result::InventoryItemSupplier');
 __PACKAGE__->register_class('InventoryItemBOM', 'Comserv::Model::Schema::Ency::Result::InventoryItemBOM');
 
-# Register HelpDesk support ticket class
+# Register HelpDesk support ticket and messaging classes
 __PACKAGE__->register_class('SupportTicket', 'Comserv::Model::Schema::Ency::Result::SupportTicket');
+__PACKAGE__->register_class('TicketMessage', 'Comserv::Model::Schema::Ency::Result::TicketMessage');
 
 __PACKAGE__->meta->make_immutable(inline_constructor => 0);
 1;

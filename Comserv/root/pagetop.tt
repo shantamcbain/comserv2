@@ -6,6 +6,7 @@
 [% END %]
 [% SET roles = c.stash.user_roles || c.session.roles || [] %]
 [% SET is_admin = c.stash.is_admin || roles.grep('admin').size > 0 ? 1 : 0 %]
+[% SET is_helpdesk_staff = is_admin || roles.grep('helpdesk').size > 0 ? 1 : 0 %]
 
 <!-- Add Font Awesome for the paint brush icon -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -375,6 +376,46 @@ document.addEventListener('DOMContentLoaded', function() {
 [% IF success_msg %]
 <p class="success">Success: [% success_msg %]</p>
 [% END %]
+    [% IF is_helpdesk_staff %]
+    <div id="hd-ticket-alert" style="display:none;background:#1a7a4a;color:#fff;padding:6px 14px;border-radius:4px;margin-bottom:8px;font-size:0.9em;display:flex;align-items:center;gap:10px;">
+        <strong>&#128179; HelpDesk:</strong>
+        <span id="hd-ticket-alert-text"></span>
+        <a href="[% c.uri_for('/HelpDesk/admin/tickets/open') %]" style="color:#fff;font-weight:bold;text-decoration:underline;">View Tickets</a>
+        <button onclick="document.getElementById('hd-ticket-alert').style.display='none';" style="background:none;border:none;color:#fff;cursor:pointer;font-size:1.1em;margin-left:auto;">&#x2715;</button>
+    </div>
+    <script>
+    (function() {
+        var alertEl = document.getElementById('hd-ticket-alert');
+        var textEl  = document.getElementById('hd-ticket-alert-text');
+        var dismissed = sessionStorage.getItem('hd_alert_dismissed_at');
+        function checkTickets() {
+            fetch('[% c.uri_for('/HelpDesk/admin/tickets_alert') %]')
+                .then(function(r){ return r.json(); })
+                .then(function(d){
+                    var n = d.open_count || 0;
+                    if (n > 0 && !dismissed) {
+                        textEl.textContent = n + ' open ticket' + (n === 1 ? '' : 's') + ' awaiting response';
+                        alertEl.style.display = 'flex';
+                    } else {
+                        alertEl.style.display = 'none';
+                    }
+                }).catch(function(){});
+        }
+        document.addEventListener('DOMContentLoaded', function(){
+            checkTickets();
+            setInterval(checkTickets, 120000);
+        });
+        var closeBtn = alertEl ? alertEl.querySelector('button') : null;
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function(){
+                dismissed = Date.now();
+                sessionStorage.setItem('hd_alert_dismissed_at', dismissed);
+            });
+        }
+    })();
+    </script>
+    [% END %]
+
     [% IF is_admin && c.stash.debug_msg %]
         [% FOREACH msg IN c.stash.debug_msg %]
         <p class="debug">Debug: [% msg %]</p>
