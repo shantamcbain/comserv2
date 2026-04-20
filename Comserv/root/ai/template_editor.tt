@@ -52,10 +52,11 @@
     <div class="te-row">
         <div class="te-col" style="max-width:500px;">
             <label class="te-label" for="te-file-select">Page / Template file</label>
-            <select id="te-file-select" class="te-select">
+            <select id="te-file-select" class="te-select" onchange="document.getElementById('te-file-manual').value=this.value;">
                 <option value="">— choose a page —</option>
                 <optgroup label="Main Pages">
                     <option value="root/CSC/CSC.tt">Home (/CSC)</option>
+                    <option value="root/Shanta/Shanta.tt">Shanta (/Shanta)</option>
                     <option value="root/CSC/proxy_manager.tt">Hosting (/hosting)</option>
                     <option value="root/membership/index.tt">Membership (/membership)</option>
                     <option value="root/marketplace/index.tt">Marketplace (/marketplace)</option>
@@ -73,6 +74,9 @@
                     <option value="root/Inventory/index.tt">Inventory (/Inventory)</option>
                 </optgroup>
             </select>
+            <label class="te-label" for="te-file-manual" style="margin-top:.4rem;">Or type a path directly:</label>
+            <input id="te-file-manual" class="te-input" type="text" placeholder="root/Folder/file.tt"
+                   oninput="document.getElementById('te-file-select').value='';">
         </div>
         <div class="te-col" style="max-width:180px;display:flex;align-items:flex-end;">
             <button class="te-btn te-btn-primary" id="te-load-btn" onclick="teLoadFile()">📂 Load File</button>
@@ -173,9 +177,10 @@
     }
 
     window.teLoadFile = function() {
+        var manual = (document.getElementById('te-file-manual').value || '').trim();
         var sel = document.getElementById('te-file-select');
-        var path = sel.value;
-        if (!path) { teStatus('Please select a template file first.', 'err'); return; }
+        var path = manual || sel.value;
+        if (!path) { teStatus('Please select a template file or type a path.', 'err'); return; }
         currentPath = path;
         var btn = document.getElementById('te-load-btn');
         btn.disabled = true;
@@ -418,56 +423,74 @@
         }
 
         if (file) {
-            currentPath = file;
+            // Build a list of paths to try in order (primary + fallback alternatives)
+            var pathsToTry = [file];
+            // If primary is CtrlName/CtrlName.tt, also try CtrlName/index.tt and vice versa
+            var m = file.match(/^(root\/[^/]+\/)([^/]+)\.tt$/);
+            if (m) {
+                var dir = m[1], base = m[2];
+                var dirPart = dir.replace(/^root\//, '').replace(/\/$/, '');
+                if (base.toLowerCase() === dirPart.toLowerCase()) {
+                    pathsToTry.push(dir + 'index.tt');
+                } else if (base === 'index') {
+                    pathsToTry.push(dir + dirPart + '.tt');
+                    pathsToTry.push(dir + dirPart.charAt(0).toUpperCase() + dirPart.slice(1) + '.tt');
+                }
+            }
+
+            function tryLoadPath(paths, onSuccess, onFail) {
+                if (!paths.length) { onFail(); return; }
+                var p = paths[0];
+                fetch('/ai/read_file?path=' + encodeURIComponent(p) + '&limit=500', { credentials: 'include' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) { onSuccess(p, data); }
+                    else { tryLoadPath(paths.slice(1), onSuccess, onFail); }
+                })
+                .catch(function() { tryLoadPath(paths.slice(1), onSuccess, onFail); });
+            }
+
+            // Set up the select/path display
             var sel = document.getElementById('te-file-select');
             var found = false;
             for (var i = 0; i < sel.options.length; i++) {
-                if (sel.options[i].value === file) {
-                    sel.selectedIndex = i;
-                    found = true;
-                    break;
-                }
+                if (sel.options[i].value === file) { sel.selectedIndex = i; found = true; break; }
             }
             if (!found) {
                 var opt = document.createElement('option');
-                opt.value = file;
-                opt.textContent = file;
-                opt.selected = true;
+                opt.value = file; opt.textContent = file; opt.selected = true;
                 sel.appendChild(opt);
             }
+            document.getElementById('te-file-manual').value = file;
 
-            // Load the file, then auto-submit if a request was also provided
             var loadBtn = document.getElementById('te-load-btn');
             loadBtn.disabled = true;
             loadBtn.textContent = 'Loading…';
             teStatus('Loading ' + file + '…', 'info');
-            fetch('/ai/read_file?path=' + encodeURIComponent(file) + '&limit=500',
-                  { credentials: 'include' })
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
+
+            tryLoadPath(pathsToTry,
+                function(resolvedPath, data) {
                     loadBtn.disabled = false;
                     loadBtn.textContent = '📂 Load File';
-                    if (data.success) {
-                        currentContent = data.content;
-                        document.getElementById('te-current').value = data.content;
-                        document.getElementById('te-file-info').textContent =
-                            file + ' — ' + data.total + ' lines';
-                        document.getElementById('te-original-preview').value = data.content;
-                        teStatus('File loaded. Submitting to AI…', 'info');
-                        if (request) {
-                            teSubmit();
-                        } else {
-                            teStatus('File loaded. Describe your change and click Get AI Fix.', 'ok');
-                        }
+                    currentPath = resolvedPath;
+                    currentContent = data.content;
+                    document.getElementById('te-file-manual').value = resolvedPath;
+                    document.getElementById('te-current').value = data.content;
+                    document.getElementById('te-file-info').textContent = resolvedPath + ' — ' + data.total + ' lines';
+                    document.getElementById('te-original-preview').value = data.content;
+                    if (request) {
+                        teStatus('File loaded (' + resolvedPath + '). Submitting to AI…', 'info');
+                        teSubmit();
                     } else {
-                        teStatus('Could not load file: ' + data.error, 'err');
+                        teStatus('File loaded: ' + resolvedPath + '. Describe your change and click Get AI Fix.', 'ok');
                     }
-                })
-                .catch(function(e) {
+                },
+                function() {
                     loadBtn.disabled = false;
                     loadBtn.textContent = '📂 Load File';
-                    teStatus('Load error: ' + e, 'err');
-                });
+                    teStatus('Could not find template file. Tried: ' + pathsToTry.join(', ') + '. Please type the correct path above.', 'err');
+                }
+            );
         }
     })();
 })();
