@@ -1389,8 +1389,18 @@ sub generate :Local :Args(0) {
             # Pass 1: trim history messages.  Pass 1.5: drop oldest history pairs.
             # Pass 2: strip page_content from system.  Pass 3: hard-cap system prompt.
             # Planning/ENCY/BMaster agents have large injected system prompts — raise limits.
-            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint accounting)) ? 16_000 : 8_000;
-            my $SYS_MAX_CHARS = ($normalized_agent_type =~ /^(planning|accounting)$/) ? 12_000 : 6_000;
+            # Admin users have larger nav guides — raise limits so admin links are not truncated.
+            my $_gen_is_admin = !$is_guest && do {
+                my $_gr = $c->session->{roles} || [];
+                $_gr = [split /,/, $_gr] unless ref $_gr;
+                grep { /^(admin|developer|editor)$/i } @$_gr;
+            };
+            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint accounting)) ? 16_000
+                              : $_gen_is_admin ? 14_000
+                              : 8_000;
+            my $SYS_MAX_CHARS = ($normalized_agent_type =~ /^(planning|accounting)$/) ? 12_000
+                               : $_gen_is_admin                                        ? 10_000
+                               : 6_000;
             my $raw_total_gen = 0;
             $raw_total_gen += length($_->{content} || '') for @ollama_msgs;
             if ($raw_total_gen > $BUDGET_CHARS) {
@@ -2661,8 +2671,13 @@ sub chat :Local :Args(0) {
             # Pass 1: trim messages.  Pass 1.5: drop oldest history pairs.
             # Pass 2: strip page_content.  Pass 3: hard-cap system prompt.
             # Planning/ENCY/BMaster agents have large injected system prompts — raise limits.
-            my $BUDGET_CHARS  = (grep { lc($chat_agent_id) eq $_ } qw(planning ency bmaster 3dprint)) ? 16_000 : 8_000;
-            my $SYS_MAX_CHARS_CHAT = lc($chat_agent_id) eq 'planning' ? 12_000 : 6_000;
+            # Admin users have larger nav guides — raise limits so admin links are not truncated.
+            my $BUDGET_CHARS  = (grep { lc($chat_agent_id) eq $_ } qw(planning ency bmaster 3dprint)) ? 16_000
+                              : $can_select_model_perm ? 14_000
+                              : 8_000;
+            my $SYS_MAX_CHARS_CHAT = lc($chat_agent_id) eq 'planning'   ? 12_000
+                                   : $can_select_model_perm             ? 10_000
+                                   : 6_000;
             my $raw_total = 0;
             $raw_total += length($_->{content} || '') for @ollama_messages;
             if ($raw_total > $BUDGET_CHARS) {
