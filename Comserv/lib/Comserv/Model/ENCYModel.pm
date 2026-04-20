@@ -35,13 +35,16 @@ sub add_herb {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_herb', "Adding new herb: " . join(", ", map { "$_: $herb_data->{$_}" } keys %$herb_data));
 
+    my $new_record;
     eval {
-        $self->forager_schema->resultset('Herb')->create($herb_data);
+        $new_record = $self->forager_schema->resultset('Herb')->create($herb_data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_herb', "Herb added successfully.");
     } or do {
         my $error = $@ || 'Unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_herb', "Error adding herb: $error");
+        return (0, $error);
     };
+    return (1, $new_record);
 }
 
 sub update_herb {
