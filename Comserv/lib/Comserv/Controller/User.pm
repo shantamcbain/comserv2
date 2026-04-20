@@ -2015,6 +2015,12 @@ sub complete_password_setup :Local {
 sub list_users :Local :Args(0) {
     my ($self, $c) = @_;
 
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'list_users')) {
+        $c->res->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     my $q      = $c->req->param('q')    || '';
     my $field  = $c->req->param('by')   || 'email';
     my $schema = $c->model('DBEncy');
