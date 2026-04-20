@@ -3928,7 +3928,7 @@ sub consignment_print :Path('/Inventory/consignment/print') :Args(1) {
         consignment => $consignment,
         sitename    => $sitename,
         site_info   => \%site_info,
-        no_wrapper  => 1,
+        wrapper     => '',
         template    => 'Inventory/consignment/print.tt',
     );
 }

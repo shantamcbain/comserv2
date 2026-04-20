@@ -1,4 +1,4 @@
-[% IF c.stash.no_wrapper %][% content %][% STOP %][% END %]<!DOCTYPE html>
+<!DOCTYPE html>
 <!-- File: /home/shanta/PycharmProjects/comserv/Comserv/root/layout.tt -->
 <html data-debug-mode="[% c.session.debug_mode || 0 %]">[% PageVersion = 'layout.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
 [%# DBI is now provided by the application context, no need to include DefaultDBI.tt %]
