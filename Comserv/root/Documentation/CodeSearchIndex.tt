@@ -24,19 +24,19 @@
     </div>
 
     <!-- TABLE OF CONTENTS SECTION -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
             <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
-                <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Prerequisites</a>
-                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Features</a>
-                <a href="#schema" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Schema</a>
-                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
-                <a href="#usage-examples" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Usage Examples</a>
-                <a href="#code-elements" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Code Elements</a>
-                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">See Also</a>
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Overview</a>
+                <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Prerequisites</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Key Features</a>
+                <a href="#schema" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Schema</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Methods</a>
+                <a href="#usage-examples" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Usage Examples</a>
+                <a href="#code-elements" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Code Elements</a>
+                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">See Also</a>
             </div>
         </div>
     </div>
@@ -47,7 +47,7 @@
             <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
             <p style="color: var(--text-color); font-family: var(--body-font);">The <strong>CodeSearchIndex Result Class</strong> (Comserv::Model::Schema::Ency::Result::CodeSearchIndex) is a DBIx::Class Result class that manages a searchable index of code files with extracted code elements and role-based access control. It stores file paths, file types, searchable code content, extracted code elements (functions, classes, variables), and controls access based on user roles.</p>
             <p style="color: var(--text-color); font-family: var(--body-font);">This class enables efficient code searching and discovery with proper access restrictions, maintaining a content hash for change detection and automatic indexing timestamps. It supports multiple file types (Perl modules, Template Toolkit, SQL) and provides helper methods for accessing and filtering code elements.</p>
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
                 <strong>Initial Release (v0.01 - 2026-01-11)</strong>: Complete documentation of CodeSearchIndex Result class including schema definition, field descriptions, helper methods, and code element extraction patterns.
             </div>
             <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
@@ -97,7 +97,7 @@
             
             <h3 style="color: var(--text-color); font-family: var(--header-font);">4.2 Column Definitions</h3>
             <table border="1" style="width: 100%; border-collapse: collapse;">
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <th style="padding: 8px; text-align: left;">Column</th>
                     <th style="padding: 8px; text-align: left;">Type</th>
                     <th style="padding: 8px; text-align: left;">Nullable</th>
@@ -111,7 +111,7 @@
                     <td style="padding: 8px;">Auto-increment</td>
                     <td style="padding: 8px;">Primary key - unique index entry identifier</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: 8px;"><code>file_path</code></td>
                     <td style="padding: 8px;">VARCHAR(512)</td>
                     <td style="padding: 8px;">NO</td>
@@ -125,7 +125,7 @@
                     <td style="padding: 8px;"></td>
                     <td style="padding: 8px;">Type of file being indexed (pm=Perl, tt=Template Toolkit, sql=SQL)</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: 8px;"><code>code_elements</code></td>
                     <td style="padding: 8px;">JSON</td>
                     <td style="padding: 8px;">YES</td>
@@ -139,7 +139,7 @@
                     <td style="padding: 8px;"></td>
                     <td style="padding: 8px;">Full searchable code content for full-text search</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: 8px;"><code>content_hash</code></td>
                     <td style="padding: 8px;">VARCHAR(64)</td>
                     <td style="padding: 8px;">NO</td>
@@ -153,7 +153,7 @@
                     <td style="padding: 8px;">CURRENT_TIMESTAMP</td>
                     <td style="padding: 8px;">When the file was indexed</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: 8px;"><code>min_role</code></td>
                     <td style="padding: 8px;">ENUM('developer', 'admin')</td>
                     <td style="padding: 8px;">NO</td>

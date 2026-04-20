@@ -15,7 +15,7 @@
     <h1 style="color:var(--text-color);font-family:var(--header-font)">Bill of Materials (BOM)</h1>
     <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-04-17 | Version: 1.00 | Audience: Site Administrators</div>
 
-    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:var(--light-color);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
+    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:rgba(255,255,255,0.15);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
         <div class="col-100">
             <h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:0">Quick Navigation</h2>
             <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-small)">
@@ -95,7 +95,7 @@
                 The BOM view shows the <strong>assembled cost</strong> = sum of (component quantity × component unit_cost) for all required components.
                 Compare this to your <em>unit_price</em> (selling price) to verify your margin.
             </p>
-            <div style="background-color:var(--light-color);border-left:4px solid var(--primary-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small)">
+            <div style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--primary-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small)">
                 <strong>Example — Bee Hotel 3D Print:</strong><br>
                 407.73 g PLA @ $0.028/g = $11.42<br>
                 12.02 kWh electricity @ $0.12/kWh = $1.44<br>

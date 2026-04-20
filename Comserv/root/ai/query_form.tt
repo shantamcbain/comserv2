@@ -134,7 +134,7 @@
 }
 
 .reset-button {
-    background-color: var(--secondary-color);
+    background-color: rgba(255,255,255,0.12);
     color: var(--text-color);
 }
 

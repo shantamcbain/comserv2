@@ -15,7 +15,7 @@
     <h1 style="color:var(--text-color);font-family:var(--header-font)">Shop &amp; Marketplace</h1>
     <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-04-17 | Version: 1.00 | Audience: Site Administrators</div>
 
-    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:var(--light-color);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
+    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:rgba(255,255,255,0.15);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
         <div class="col-100">
             <h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:0">Quick Navigation</h2>
             <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-small)">
@@ -92,7 +92,7 @@
                     </tr>
                 </tbody>
             </table>
-            <div style="background-color:var(--light-color);border-left:4px solid var(--warning-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small);margin-top:0.5em">
+            <div style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--warning-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small);margin-top:0.5em">
                 <strong>Policy:</strong> Public customers can NEVER see hidden items (show_in_shop = No). Only admin users see hidden items in /shop/admin. This is enforced at the controller level.
             </div>
             <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
@@ -187,7 +187,7 @@
                 <li>Click <strong>Save</strong></li>
             </ol>
 
-            <div style="background-color:var(--light-color);border-left:4px solid var(--warning-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small);margin-top:0.5em">
+            <div style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--warning-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small);margin-top:0.5em">
                 <strong>Current limitation — one image per item:</strong> The system stores a single <em>image_path</em> per inventory item.
                 Multiple product photos (gallery) are not yet supported. As a workaround, create a collage image outside the system and upload that as the single product image.
                 Multi-image/gallery support is a planned future feature.

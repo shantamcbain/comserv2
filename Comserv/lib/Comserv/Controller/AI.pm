@@ -192,6 +192,334 @@ sub index :Path :Args(0) {
         'index', "AI interface loaded for user: $username (host: $current_host, model: $current_model, can_select: " . ($can_select_model ? 'yes' : 'no') . ", external_models: " . scalar(@external_models) . ")");
 }
 
+=head2 daily_log
+
+API endpoint for start-of-day / end-of-day log entry buttons on the DailyPlan page.
+POST params: action=start|end
+
+=cut
+
+sub daily_log :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required' }));
+        return;
+    }
+
+    my $action   = $c->req->param('action') || '';
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $username = $c->session->{username} || 'user';
+    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+
+    my $schema;
+    eval { $schema = $c->model('DBEncy')->schema };
+    if ($@ || !$schema) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'DB unavailable' }));
+        return;
+    }
+
+    # Find or create today's DailyPlan for this site
+    my $plan;
+    my $plan_name = "Daily Log $today";
+    eval {
+        $plan = $schema->resultset('DailyPlan')->find_or_create(
+            { sitename => $sitename, plan_name => $plan_name },
+            { key => 'dailyplan_sitename_plan_name',
+              default => {
+                  plan_description => "Auto-created daily log for $today",
+                  status           => 'active',
+                  start_date       => $today,
+                  due_date         => $today,
+                  priority         => 0,
+                  created_by       => $username,
+              }
+            }
+        );
+    };
+    if ($@ || !$plan) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => "Could not find/create daily plan: $@" }));
+        return;
+    }
+
+    if ($action eq 'start') {
+        my $title = "\x{1F305} Good Morning - Daily Log - $today";
+        my $entry;
+        eval {
+            $entry = $schema->resultset('DailyPlanEntry')->create({
+                plan_id    => $plan->id,
+                entry_type => 'note',
+                title      => $title,
+                description => "Start of day log entry for $today",
+                status     => 'in_progress',
+                created_by => $username,
+                metadata   => '{}',
+            });
+        };
+        if ($@ || !$entry) {
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => "Could not create log entry: $@" }));
+            return;
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily_log',
+            "Start-of-day log entry #" . $entry->id . " created by $username");
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            action   => 'start',
+            entry_id => $entry->id,
+            message  => "Good morning! Daily log started.",
+        }));
+        return;
+    }
+
+    if ($action eq 'end') {
+        my $log_title_prefix = "Good Morning - Daily Log - $today";
+        my $open_entry;
+        eval {
+            $open_entry = $schema->resultset('DailyPlanEntry')->search({
+                plan_id    => $plan->id,
+                status     => 'in_progress',
+                title      => { -like => "%$log_title_prefix%" },
+            }, { order_by => { -desc => 'created_at' }, rows => 1 })->first;
+        };
+        unless ($open_entry) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => 'No open daily log entry found for today. Did you start the day log?',
+            }));
+            return;
+        }
+        eval { $open_entry->update({ status => 'completed' }) };
+        if ($@) {
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => "Could not close log entry: $@" }));
+            return;
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily_log',
+            "End-of-day log entry #" . $open_entry->id . " closed by $username");
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            action   => 'end',
+            entry_id => $open_entry->id,
+            message  => "Good evening! Daily log closed. Have a great rest of your day.",
+        }));
+        return;
+    }
+
+    $c->response->status(400);
+    $c->response->body(encode_json({ success => JSON::false, error => "Unknown action '$action'. Use action=start or action=end" }));
+}
+
+=head2 _daily_log_action
+
+Shared helper for keyword interceptors and the daily_log endpoint.
+Returns a hashref suitable for JSON encoding.
+
+=cut
+
+sub _daily_log_action {
+    my ($self, $c, $action, $username, $user_id) = @_;
+    $username //= $c->session->{username} || 'user';
+    $user_id  //= $c->session->{user_id}  || 0;
+
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+
+    my $schema;
+    eval { $schema = $c->model('DBEncy')->schema };
+    return { success => JSON::false, error => 'DB unavailable' } if $@ || !$schema;
+
+    my $plan;
+    eval {
+        $plan = $schema->resultset('DailyPlan')->find_or_create(
+            { sitename => $sitename, plan_name => "Daily Log $today" },
+            { key => 'dailyplan_sitename_plan_name',
+              default => {
+                  plan_description => "Auto-created daily log for $today",
+                  status           => 'active',
+                  start_date       => $today,
+                  due_date         => $today,
+                  priority         => 0,
+                  created_by       => $username,
+              }
+            }
+        );
+    };
+    return { success => JSON::false, error => "Could not find/create daily plan: $@" } if $@ || !$plan;
+
+    if ($action eq 'start') {
+        my $entry;
+        eval {
+            $entry = $schema->resultset('DailyPlanEntry')->create({
+                plan_id     => $plan->id,
+                entry_type  => 'note',
+                title       => "\x{1F305} Good Morning - Daily Log - $today",
+                description => "Start of day log entry for $today",
+                status      => 'in_progress',
+                created_by  => $username,
+                metadata    => '{}',
+            });
+        };
+        return { success => JSON::false, error => "Could not create log entry: $@" } if $@ || !$entry;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
+            "Start-of-day log #" . $entry->id . " created by $username via keyword");
+
+        # Check SystemLog for recent ERROR/CRITICAL entries (last 24 hours)
+        my $error_count  = 0;
+        my $todo_created = 0;
+        eval {
+            my $since = do {
+                my @t = localtime(time - 86400);
+                sprintf('%04d-%02d-%02d %02d:%02d:%02d', $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
+            };
+            my @errs = $schema->resultset('SystemLog')->search(
+                { level     => { -in => ['error','critical','ERROR','CRITICAL'] },
+                  timestamp => { '>=' => $since } },
+                { order_by => { -desc => 'timestamp' }, rows => 10 }
+            )->all;
+            if (@errs) {
+                $error_count = scalar @errs;
+                my $todo_subject = "\x{26A0}\x{FE0F} Morning Check: $error_count system error(s) need review ($today)";
+                my $max_show = $error_count > 5 ? 5 : $error_count;
+                my $todo_desc = "Errors found during morning log check ($today):\n" .
+                    join("\n", map { "[" . $_->level . "] " . $_->timestamp . " — " . substr($_->message, 0, 200) }
+                         @errs[0..$max_show-1]);
+                eval {
+                    $schema->resultset('Todo')->create({
+                        subject              => $todo_subject,
+                        description          => $todo_desc,
+                        status               => 2,
+                        priority             => 1,
+                        sitename             => $sitename,
+                        developer            => $username,
+                        username_of_poster   => $username,
+                        last_mod_by          => $username,
+                        last_mod_date        => $today,
+                        date_time_posted     => $today . ' 00:00:00',
+                        start_date           => $today,
+                        due_date             => $today,
+                        parent_todo          => '',
+                        estimated_man_hours  => 0,
+                        accumulative_time    => '00:00:00',
+                        group_of_poster      => 'admin',
+                        project_code         => 'system',
+                        share                => 0,
+                    });
+                    $todo_created = 1;
+                };
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
+                    "Morning check: $error_count errors found, todo_created=$todo_created");
+            }
+        };
+
+        my $extra = $error_count
+            ? ($todo_created
+                ? " \x{26A0}\x{FE0F} $error_count system error(s) found in the last 24h — a review todo has been created."
+                : " \x{26A0}\x{FE0F} $error_count system error(s) found in the last 24h.")
+            : '';
+        return {
+            success  => JSON::true,
+            action   => 'start',
+            entry_id => $entry->id + 0,
+            response => "\x{1F305} Good morning, $username! Your daily log has been started (entry #" . $entry->id . ").$extra Have a productive day!",
+            message  => "Daily log started.",
+        };
+    }
+
+    if ($action eq 'end') {
+        my $log_title_prefix = "Good Morning - Daily Log - $today";
+        my $open_entry;
+        eval {
+            $open_entry = $schema->resultset('DailyPlanEntry')->search({
+                plan_id => $plan->id,
+                status  => 'in_progress',
+                title   => { -like => "%$log_title_prefix%" },
+            }, { order_by => { -desc => 'created_at' }, rows => 1 })->first;
+        };
+        unless ($open_entry) {
+            return {
+                success  => JSON::false,
+                response => "No open daily log entry found for today. Type \"good morning\" or \"start day\" to start one.",
+                error    => 'No open log entry for today',
+            };
+        }
+        eval { $open_entry->update({ status => 'completed' }) };
+        return { success => JSON::false, error => "Could not close log entry: $@" } if $@;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
+            "End-of-day log #" . $open_entry->id . " closed by $username via keyword");
+        return {
+            success  => JSON::true,
+            action   => 'end',
+            entry_id => $open_entry->id + 0,
+            response => "\x{1F319} Good night, $username! Your daily log has been closed. Have a great rest of your day!",
+            message  => "Daily log closed.",
+        };
+    }
+
+    return { success => JSON::false, error => "Unknown action '$action'" };
+}
+
+=head2 update_log_entry
+
+AJAX endpoint — update title/description on a DailyPlanEntry.
+POST params: entry_id, title, description
+
+=cut
+
+sub update_log_entry :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required' }));
+        return;
+    }
+
+    my $entry_id    = $c->req->param('entry_id')    || 0;
+    my $title       = $c->req->param('title')       // '';
+    my $description = $c->req->param('description') // '';
+
+    unless ($entry_id) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'entry_id required' }));
+        return;
+    }
+
+    my $schema;
+    eval { $schema = $c->model('DBEncy')->schema };
+    if ($@ || !$schema) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'DB unavailable' }));
+        return;
+    }
+
+    my $entry;
+    eval { $entry = $schema->resultset('DailyPlanEntry')->find($entry_id) };
+    unless ($entry) {
+        $c->response->status(404);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Entry not found' }));
+        return;
+    }
+
+    eval { $entry->update({ title => $title, description => $description }) };
+    if ($@) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => "Update failed: $@" }));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_log_entry',
+        "DailyPlanEntry #$entry_id updated by " . ($c->session->{username} || 'user'));
+    $c->response->body(encode_json({ success => JSON::true, message => 'Saved' }));
+}
+
 =head2 template_editor
 
 Admin-only page for reviewing and applying AI-proposed TT2 template edits.
@@ -200,7 +528,9 @@ Admin-only page for reviewing and applying AI-proposed TT2 template edits.
 
 sub template_editor :Local :Args(0) {
     my ($self, $c) = @_;
-    unless ($c->check_any_user_role('admin')) {
+    my $_te_roles = $c->session->{roles} || [];
+    $_te_roles = [$_te_roles] unless ref $_te_roles eq 'ARRAY';
+    unless (grep { /^admin$/i } @$_te_roles) {
         $c->response->redirect($c->uri_for('/'));
         return;
     }
@@ -407,6 +737,7 @@ sub generate :Local :Args(0) {
             $model = $json_data->{model} || '';
             $use_search = $json_data->{use_search} ? 1 : 0;
             $history_items = (ref($json_data->{history}) eq 'ARRAY') ? $json_data->{history} : [];
+            $c->stash->{skip_role_prompt} = $json_data->{skip_role_prompt} ? 1 : 0;
             # Image attachment (base64) for vision models
             my $image_data_b64 = $json_data->{image_data} || '';
             my $image_mime     = $json_data->{image_mime} || 'image/jpeg';
@@ -462,7 +793,21 @@ sub generate :Local :Args(0) {
         return;
     }
     $prompt ||= '(describe this image)';
-    
+
+    # ── Keyword interceptors: handle well-known phrases without calling the AI model ──
+    # "good morning" / "start day" → create a daily log start-of-day entry
+    if (!$is_guest && $prompt =~ /^\s*(good\s+morning|start\s+day|begin\s+day|start\s+of\s+day)\s*[!.]?\s*$/i) {
+        my $kw_resp = $self->_daily_log_action($c, 'start', $username, $user_id);
+        $c->response->body(encode_json($kw_resp));
+        return;
+    }
+    # "good night" / "end day" → close the daily log entry
+    if (!$is_guest && $prompt =~ /^\s*(good\s+night|end\s+day|finish\s+day|end\s+of\s+day)\s*[!.]?\s*$/i) {
+        my $kw_resp = $self->_daily_log_action($c, 'end', $username, $user_id);
+        $c->response->body(encode_json($kw_resp));
+        return;
+    }
+
     # Log the query with preview
     my $prompt_preview = substr($prompt, 0, 100);
     $prompt_preview .= '...' if length($prompt) > 100;
@@ -530,7 +875,9 @@ sub generate :Local :Args(0) {
     }
 
     if (lc($normalized_agent_type) eq 'template_editor') {
-        my $is_admin = $c->check_any_user_role('admin');
+        my $_ta_roles = $c->session->{roles} || [];
+        $_ta_roles = [$_ta_roles] unless ref $_ta_roles eq 'ARRAY';
+        my $is_admin = grep { /^admin$/i } @$_ta_roles;
         unless ($is_admin) {
             $c->response->body(encode_json({
                 success => JSON::false,
@@ -585,12 +932,14 @@ sub generate :Local :Args(0) {
         $can_select_model_gen = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_gen;
     }
 
-    # Role-based capability injection into system prompt
-    my $role_prompt = $self->_build_role_system_prompt($c, $user_roles_gen, $provider, $page_path, $page_title);
-    if ($role_prompt && $system) {
-        $system .= "\n\n" . $role_prompt;
-    } elsif ($role_prompt) {
-        $system = $role_prompt;
+    # Role-based capability injection into system prompt (skip when caller supplies a precise system prompt)
+    unless ($c->stash->{skip_role_prompt}) {
+        my $role_prompt = $self->_build_role_system_prompt($c, $user_roles_gen, $provider, $page_path, $page_title);
+        if ($role_prompt && $system) {
+            $system .= "\n\n" . $role_prompt;
+        } elsif ($role_prompt) {
+            $system = $role_prompt;
+        }
     }
 
     # Only admins/editors may use web search (costs money per call)
@@ -1040,8 +1389,18 @@ sub generate :Local :Args(0) {
             # Pass 1: trim history messages.  Pass 1.5: drop oldest history pairs.
             # Pass 2: strip page_content from system.  Pass 3: hard-cap system prompt.
             # Planning/ENCY/BMaster agents have large injected system prompts — raise limits.
-            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint accounting)) ? 16_000 : 8_000;
-            my $SYS_MAX_CHARS = ($normalized_agent_type =~ /^(planning|accounting)$/) ? 12_000 : 6_000;
+            # Admin users have larger nav guides — raise limits so admin links are not truncated.
+            my $_gen_is_admin = !$is_guest && do {
+                my $_gr = $c->session->{roles} || [];
+                $_gr = [split /,/, $_gr] unless ref $_gr;
+                grep { /^(admin|developer|editor)$/i } @$_gr;
+            };
+            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint accounting)) ? 16_000
+                              : $_gen_is_admin ? 14_000
+                              : 8_000;
+            my $SYS_MAX_CHARS = ($normalized_agent_type =~ /^(planning|accounting)$/) ? 12_000
+                               : $_gen_is_admin                                        ? 10_000
+                               : 6_000;
             my $raw_total_gen = 0;
             $raw_total_gen += length($_->{content} || '') for @ollama_msgs;
             if ($raw_total_gen > $BUDGET_CHARS) {
@@ -1079,9 +1438,12 @@ sub generate :Local :Args(0) {
                     $ollama_msgs[0]{content} = $sys;
                     push @trace, "⚠️ Stripped page_content from system prompt (still over budget)";
 
-                    # Pass 3: hard-cap system prompt to SYS_MAX_CHARS
+                    # Pass 3: hard-cap system prompt to SYS_MAX_CHARS (snap to newline to avoid mid-URL cuts)
                     if (length($sys) > $SYS_MAX_CHARS) {
-                        $ollama_msgs[0]{content} = substr($sys, 0, $SYS_MAX_CHARS) . "\n[system prompt truncated to fit context budget]";
+                        my $cut = substr($sys, 0, $SYS_MAX_CHARS);
+                        my $nl  = rindex($cut, "\n");
+                        $cut    = substr($cut, 0, $nl > 0 ? $nl : $SYS_MAX_CHARS);
+                        $ollama_msgs[0]{content} = $cut . "\n[system prompt truncated to fit context budget]";
                         push @trace, sprintf("⚠️ System prompt truncated from %d to %d chars", length($sys), $SYS_MAX_CHARS);
                     }
                 }
@@ -1881,7 +2243,19 @@ sub chat :Local :Args(0) {
         $c->response->status(400);
         return;
     }
-    
+
+    # ── Keyword interceptors (chat endpoint) ──────────────────────────────────
+    if (!$is_guest && $prompt =~ /^\s*(good\s+morning|start\s+day|begin\s+day|start\s+of\s+day)\s*[!.]?\s*$/i) {
+        my $kw_resp = $self->_daily_log_action($c, 'start', $username, $user_id);
+        $c->response->body(encode_json($kw_resp));
+        return;
+    }
+    if (!$is_guest && $prompt =~ /^\s*(good\s+night|end\s+day|finish\s+day|end\s+of\s+day)\s*[!.]?\s*$/i) {
+        my $kw_resp = $self->_daily_log_action($c, 'end', $username, $user_id);
+        $c->response->body(encode_json($kw_resp));
+        return;
+    }
+
     # Inject project/task context into system prompt if provided
     if ($project_id || $task_id) {
         my $ctx = $self->_build_project_context($c, $project_id, $task_id);
@@ -1968,7 +2342,9 @@ sub chat :Local :Args(0) {
     }
 
     if (lc($chat_agent_id) eq 'template_editor') {
-        unless ($c->check_any_user_role('admin')) {
+        my $_ct_roles = $c->session->{roles} || [];
+        $_ct_roles = [$_ct_roles] unless ref $_ct_roles eq 'ARRAY';
+        unless (grep { /^admin$/i } @$_ct_roles) {
             $c->response->body(encode_json({
                 success => JSON::false,
                 error   => 'The Template Editor is only available to admin users.',
@@ -2298,8 +2674,13 @@ sub chat :Local :Args(0) {
             # Pass 1: trim messages.  Pass 1.5: drop oldest history pairs.
             # Pass 2: strip page_content.  Pass 3: hard-cap system prompt.
             # Planning/ENCY/BMaster agents have large injected system prompts — raise limits.
-            my $BUDGET_CHARS  = (grep { lc($chat_agent_id) eq $_ } qw(planning ency bmaster 3dprint)) ? 16_000 : 8_000;
-            my $SYS_MAX_CHARS_CHAT = lc($chat_agent_id) eq 'planning' ? 12_000 : 6_000;
+            # Admin users have larger nav guides — raise limits so admin links are not truncated.
+            my $BUDGET_CHARS  = (grep { lc($chat_agent_id) eq $_ } qw(planning ency bmaster 3dprint)) ? 16_000
+                              : $can_select_model_perm ? 14_000
+                              : 8_000;
+            my $SYS_MAX_CHARS_CHAT = lc($chat_agent_id) eq 'planning'   ? 12_000
+                                   : $can_select_model_perm             ? 10_000
+                                   : 6_000;
             my $raw_total = 0;
             $raw_total += length($_->{content} || '') for @ollama_messages;
             if ($raw_total > $BUDGET_CHARS) {
@@ -2336,7 +2717,10 @@ sub chat :Local :Args(0) {
                     push @chat_trace, "⚠️ Stripped page_content from system prompt (still over budget)";
                     # Pass 3: hard-cap system prompt
                     if (length($sys) > $SYS_MAX_CHARS_CHAT) {
-                        $ollama_messages[0]{content} = substr($sys, 0, $SYS_MAX_CHARS_CHAT) . "\n[system prompt truncated to fit context budget]";
+                        my $cut = substr($sys, 0, $SYS_MAX_CHARS_CHAT);
+                        my $nl  = rindex($cut, "\n");
+                        $cut    = substr($cut, 0, $nl > 0 ? $nl : $SYS_MAX_CHARS_CHAT);
+                        $ollama_messages[0]{content} = $cut . "\n[system prompt truncated to fit context budget]";
                         push @chat_trace, sprintf("⚠️ System prompt truncated from %d to %d chars", length($sys), $SYS_MAX_CHARS_CHAT);
                     }
                 }
@@ -4465,6 +4849,8 @@ Rules:
 - ALWAYS use the real numeric todo_id from the LIVE TODO DATA above — never make up an ID.
 - Include the action block in addition to your normal response text, not instead of it.
 - The application will automatically execute the action and show the user a confirmation.
+
+SUPPORT ESCALATION: If you genuinely cannot help the user (question requires a human, account-specific access you don't have, or is truly outside your capabilities), add [SUPPORT_NEEDED] on its own line at the very end of your response. The widget will then offer the user options to create a support ticket or start a live chat with support staff. Only use [SUPPORT_NEEDED] when you truly cannot help — not for questions you can answer.
 ACTION
 
     if ($is_admin) {
@@ -4507,7 +4893,8 @@ ACTION
              . "NEVER mention /admin, /admin/*, or any administrative URL. "
              . "NEVER use your training knowledge to guess application URLs — only use the navigation guide. "
              . "If a user asks about the admin panel or any admin feature, say: "
-             . "'That section requires administrator privileges. Please log in with an admin account or contact your system administrator.'"
+             . "'That section requires administrator privileges. Please log in with an admin account or contact your system administrator.' "
+             . "SUPPORT ESCALATION: If you genuinely cannot help, add [SUPPORT_NEEDED] on its own line at the very end of your response so the user can be connected with support staff."
              . $guest_knowledge
              . $page_nav
              . $nav_guide;
@@ -4554,27 +4941,75 @@ sub _build_navigation_command_guide {
     # Each section: [ section_name, min_role, [ [label, path], ... ] ]
     # min_role: 'guest' | 'user' | 'admin'
     my @sections = (
+        # ── High-priority: put admin sections FIRST so they survive truncation ──
+        [ 'Admin', 'admin', [
+            [ 'Admin panel',                '/admin'                    ],
+            [ 'User management',            '/admin/users'              ],
+            [ 'Application logs',           '/admin/logs'               ],
+            [ 'Git pull',                   '/admin/git_pull'           ],
+            [ 'Docker containers',          '/admin/docker-containers'  ],
+            [ 'Theme management',           '/themeadmin'               ],
+            [ 'Planning',                   '/admin/planning'           ],
+            [ 'System info',                '/admin/system_info'        ],
+            [ 'Admin settings',             '/admin/settings'           ],
+            [ 'Log viewer',                 '/log'                      ],
+            [ 'File management',            '/file/list'                ],
+            [ 'Duplicate files',            '/file/duplicates'          ],
+        ]],
+        [ 'Inventory', 'admin', [
+            [ 'Inventory dashboard',        '/Inventory'                ],
+            [ 'Inventory items',            '/Inventory/items'          ],
+            [ 'Add inventory item',         '/Inventory/item/add'       ],
+            [ 'Suppliers',                  '/Inventory/suppliers'      ],
+            [ 'Add supplier',               '/Inventory/supplier/add'   ],
+            [ 'Supplier invoices',          '/Inventory/invoice'        ],
+            [ 'New supplier invoice',       '/Inventory/invoice/new'    ],
+            [ 'Stock transactions',         '/Inventory/stock/transactions' ],
+            [ 'Customer sales',             '/Inventory/sales'          ],
+        ]],
+        [ 'Accounting', 'admin', [
+            [ 'Accounting dashboard',       '/Accounting'               ],
+            [ 'Chart of accounts',          '/Accounting/coa'           ],
+            [ 'Seed / import COA',          '/Accounting/coa/seed'      ],
+            [ 'Merge COA seed',             '/Accounting/coa/seed_merge'],
+            [ 'General ledger',             '/Accounting/gl'            ],
+        ]],
+        [ 'Site management (admin)', 'admin', [
+            [ 'Site list / setup',          '/site'                     ],
+            [ 'Add a new site',             '/site/add_site'            ],
+            [ 'Add a domain to a site',     '/site/add_domain'          ],
+            [ 'Site details',               '/site/details'             ],
+            [ 'Modify site',                '/site/modify'              ],
+        ]],
+        [ 'AI Assistant (admin)', 'admin', [
+            [ 'Manage AI models',           '/ai/models'                ],
+            [ 'AI server status',           '/ai/check_status'          ],
+            [ 'Support chat admin',         '/chat/admin'               ],
+        ]],
+        # ── Common sections ───────────────────────────────────────────────────
         [ 'Home', 'guest', [
             [ 'Main menu / home',           '/'                         ],
         ]],
-        [ 'Workshops', 'guest', [
-            [ 'Workshops home',             '/workshop'                 ],
-            [ 'Add a workshop',             '/workshop/add'             ],
+        [ 'Tasks / Todos', 'user', [
+            [ 'Todo list',                  '/todo'                     ],
+            [ 'Todos by day',               '/todo?filter=day'          ],
+            [ 'Todos by week',              '/todo?filter=week'         ],
+            [ 'Todos by month',             '/todo?filter=month'        ],
+            [ 'Add a todo',                 '/todo/addtodo'             ],
         ]],
-        [ 'Workshops (logged in)', 'user', [
-            [ 'My workshop dashboard',      '/workshop/dashboard'       ],
+        [ 'Projects', 'user', [
+            [ 'Projects home',              '/project'                  ],
+            [ 'Add a project',              '/project/addproject'       ],
         ]],
-        [ 'Workshops (admin/leader)', 'admin', [
-            [ 'Workshop resources',         '/workshop/resources'       ],
+        [ 'User account', 'guest', [
+            [ 'Login',                      '/user/login'               ],
+            [ 'Create account',             '/user/create_account'      ],
+            [ 'Forgot password',            '/user/forgot_password'     ],
         ]],
-        [ 'Documentation', 'guest', [
-            [ 'Documentation home',         '/Documentation'            ],
-            [ 'Daily plan',                 '/Documentation/DailyPlan'  ],
-        ]],
-        [ 'Encyclopedia (ENCY)', 'guest', [
-            [ 'Encyclopedia home',          '/ENCY'                     ],
-            [ 'Encyclopedia search',        '/ENCY/search'              ],
-            [ 'Bee pasture / plant forage', '/ENCY/BeePastureView'      ],
+        [ 'User account (logged in)', 'user', [
+            [ 'My profile',                 '/user/profile'             ],
+            [ 'Account settings',           '/user/settings'            ],
+            [ 'Logout',                     '/user/logout'              ],
         ]],
         [ 'HelpDesk', 'guest', [
             [ 'HelpDesk home',              '/HelpDesk'                 ],
@@ -4592,21 +5027,6 @@ sub _build_navigation_command_guide {
             [ 'Manage API keys',            '/ai/manage_api_keys'       ],
             [ 'AI in-app action endpoint',  '/ai/action'                ],
         ]],
-        [ 'AI Assistant (admin)', 'admin', [
-            [ 'Manage AI models',           '/ai/models'                ],
-            [ 'AI server status',           '/ai/check_status'          ],
-        ]],
-        [ 'Tasks / Todos', 'user', [
-            [ 'Todo list',                  '/todo'                     ],
-            [ 'Todos by day',               '/todo?filter=day'          ],
-            [ 'Todos by week',              '/todo?filter=week'         ],
-            [ 'Todos by month',             '/todo?filter=month'        ],
-            [ 'Add a todo',                 '/todo/addtodo'             ],
-        ]],
-        [ 'Projects', 'user', [
-            [ 'Projects home',              '/project'                  ],
-            [ 'Add a project',              '/project/addproject'       ],
-        ]],
         [ 'Marketplace', 'guest', [
             [ 'Marketplace / buy and sell', '/marketplace'              ],
             [ 'Browse listings',            '/marketplace/browse'       ],
@@ -4615,54 +5035,24 @@ sub _build_navigation_command_guide {
             [ 'Post a listing / sell item', '/marketplace/add'          ],
             [ 'My listings',                '/marketplace/my_listings'  ],
         ]],
-        [ 'User account', 'guest', [
-            [ 'Login',                      '/user/login'               ],
-            [ 'Create account',             '/user/create_account'      ],
-            [ 'Forgot password',            '/user/forgot_password'     ],
+        [ 'Documentation', 'guest', [
+            [ 'Documentation home',         '/Documentation'            ],
+            [ 'Daily plan',                 '/Documentation/DailyPlan'  ],
         ]],
-        [ 'User account (logged in)', 'user', [
-            [ 'My profile',                 '/user/profile'             ],
-            [ 'Account settings',           '/user/settings'            ],
-            [ 'Logout',                     '/user/logout'              ],
+        [ 'Encyclopedia (ENCY)', 'guest', [
+            [ 'Encyclopedia home',          '/ENCY'                     ],
+            [ 'Encyclopedia search',        '/ENCY/search'              ],
+            [ 'Bee pasture / plant forage', '/ENCY/BeePastureView'      ],
         ]],
-        [ 'Admin', 'admin', [
-            [ 'Admin panel',                '/admin'                    ],
-            [ 'User management',            '/admin/users'              ],
-            [ 'Application logs',           '/admin/logs'               ],
-            [ 'Git pull',                   '/admin/git_pull'           ],
-            [ 'Docker containers',          '/admin/docker-containers'  ],
-            [ 'Theme management',           '/themeadmin'               ],
-            [ 'Planning',                   '/admin/planning'           ],
-            [ 'System info',                '/admin/system_info'        ],
-            [ 'Admin settings',             '/admin/settings'           ],
-            [ 'Log viewer',                 '/log'                      ],
-            [ 'File management',            '/file/list'                ],
-            [ 'Duplicate files',            '/file/duplicates'          ],
+        [ 'Workshops', 'guest', [
+            [ 'Workshops home',             '/workshop'                 ],
+            [ 'Add a workshop',             '/workshop/add'             ],
         ]],
-        [ 'Site management (admin)', 'admin', [
-            [ 'Site list / setup',          '/site'                     ],
-            [ 'Add a new site',             '/site/add_site'            ],
-            [ 'Add a domain to a site',     '/site/add_domain'          ],
-            [ 'Site details',               '/site/details'             ],
-            [ 'Modify site',                '/site/modify'              ],
+        [ 'Workshops (logged in)', 'user', [
+            [ 'My workshop dashboard',      '/workshop/dashboard'       ],
         ]],
-        [ 'Accounting', 'admin', [
-            [ 'Accounting dashboard',       '/Accounting'               ],
-            [ 'Chart of accounts',          '/Accounting/coa'           ],
-            [ 'Seed / import COA',          '/Accounting/coa/seed'      ],
-            [ 'Merge COA seed',             '/Accounting/coa/seed_merge'],
-            [ 'General ledger',             '/Accounting/gl'            ],
-        ]],
-        [ 'Inventory', 'admin', [
-            [ 'Inventory dashboard',        '/Inventory'                ],
-            [ 'Inventory items',            '/Inventory/items'          ],
-            [ 'Add inventory item',         '/Inventory/item/add'       ],
-            [ 'Suppliers',                  '/Inventory/suppliers'      ],
-            [ 'Add supplier',               '/Inventory/supplier/add'   ],
-            [ 'Supplier invoices',          '/Inventory/invoice'        ],
-            [ 'New supplier invoice',       '/Inventory/invoice/new'    ],
-            [ 'Stock transactions',         '/Inventory/stock/transactions' ],
-            [ 'Customer sales',             '/Inventory/sales'          ],
+        [ 'Workshops (admin/leader)', 'admin', [
+            [ 'Workshop resources',         '/workshop/resources'       ],
         ]],
     );
 
@@ -7252,23 +7642,30 @@ sub action :Local :Args(0) {
             return;
         }
         my $description = $params->{description} || '';
-        my $page_url    = $params->{page_url}    || $c->request->referer || '';
-        my $priority    = $params->{priority}    // 2;
-        my $sitename    = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-        my $user_id     = $c->session->{user_id} || 1;
-        my $roles       = $c->session->{roles}   || [];
-        my $group       = ref $roles eq 'ARRAY' && @$roles ? $roles->[0] : 'user';
+        my $category    = $params->{category}    || 'General';
+        my $priority    = $params->{priority}    || 'normal';
+        my $email       = $params->{email}       || $c->session->{email} || '';
+        my $site_name   = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+        my $user_id     = $c->session->{user_id} || undef;
+        my $username    = $current_user;
+
+        my $ticket_number = uc($site_name) . '-' . DateTime->now->strftime('%Y%m%d') . '-' . sprintf('%04d', int(rand(9999)) + 1);
+        my $now_str = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
 
         my $new_ticket;
         eval {
-            $new_ticket = $schema->resultset('AiSupportSession')->create({
-                user_id          => $user_id,
-                sitename         => $sitename,
-                status           => 'pending',
-                subject          => $subject,
-                user_description => $description,
-                page_url         => $page_url,
-                conversation_id  => do { my $cid = $params->{conversation_id} || $c->session->{current_conversation_id}; ($cid && $cid =~ /^\d+$/) ? $cid : undef },
+            $new_ticket = $schema->resultset('SupportTicket')->create({
+                ticket_number => $ticket_number,
+                site_name     => $site_name,
+                user_id       => $user_id,
+                username      => $username,
+                email         => $email,
+                subject       => $subject,
+                description   => $description,
+                category      => $category,
+                priority      => $priority,
+                status        => 'open',
+                created_at    => $now_str,
             });
         };
         if ($@ || !$new_ticket) {
@@ -7278,14 +7675,16 @@ sub action :Local :Args(0) {
             $c->response->body(encode_json({ success => JSON::false, error => 'Ticket creation failed' }));
             return;
         }
-        my $ticket_id = $new_ticket->id // '?';
+        my $ticket_id  = $new_ticket->id // '?';
+        my $ticket_num = $new_ticket->ticket_number // $ticket_number;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
-            "AI action create_helpdesk_ticket: id=$ticket_id sitename=$sitename by=$current_user subject='$subject'");
+            "AI action create_helpdesk_ticket: id=$ticket_id num=$ticket_num sitename=$site_name by=$username subject='$subject'");
         $c->response->body(encode_json({
-            success    => JSON::true,
-            message    => "Support ticket #$ticket_id created: \"$subject\". An admin will be notified.",
-            ticket_id  => $ticket_id + 0,
-            ticket_url => "/ai/support/$ticket_id",
+            success       => JSON::true,
+            message       => "Support ticket $ticket_num created: \"$subject\". An admin will be notified.",
+            ticket_id     => $ticket_id + 0,
+            ticket_number => $ticket_num,
+            ticket_url    => "/HelpDesk/ticket/$ticket_num",
         }));
         return;
     }
@@ -8438,7 +8837,9 @@ sub read_file :Local :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
 
-    my $is_admin  = $c->check_any_user_role('admin');
+    my $_rf_roles = $c->session->{roles} || [];
+    $_rf_roles = [$_rf_roles] unless ref $_rf_roles eq 'ARRAY';
+    my $is_admin  = grep { /^admin$/i } @$_rf_roles;
     my $is_dev    = $self->_is_dev_mode($c);
 
     unless ($is_admin) {
@@ -8501,7 +8902,9 @@ sub apply_fix :Local :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
 
-    my $is_admin_fix = $c->check_any_user_role('admin');
+    my $_af_roles = $c->session->{roles} || [];
+    $_af_roles = [$_af_roles] unless ref $_af_roles eq 'ARRAY';
+    my $is_admin_fix = grep { /^admin$/i } @$_af_roles;
     my $is_dev_fix   = $self->_is_dev_mode($c);
 
     unless ($is_admin_fix) {

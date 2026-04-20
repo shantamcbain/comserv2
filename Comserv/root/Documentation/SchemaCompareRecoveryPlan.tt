@@ -25,7 +25,7 @@
     </div>
 
     <!-- TABLE OF CONTENTS -->
-    <div id="toc" style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-large) 0;">
+    <div id="toc" style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-large) 0;">
         <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Navigation</h3>
         <ul style="color: var(--text-color); font-family: var(--body-font);">
             <li><a href="#executive-summary">Executive Summary</a></li>
@@ -48,7 +48,7 @@
             </p>
             
             <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-large) 0;">
-                <tr style="background: var(--light-color);">
+                <tr style="background: rgba(255,255,255,0.15);">
                     <th style="border: 1px solid #ccc; padding: 10px; text-align: left; color: var(--text-color);">Metric</th>
                     <th style="border: 1px solid #ccc; padding: 10px; text-align: left; color: var(--text-color);">Value</th>
                 </tr>
@@ -78,7 +78,7 @@
             <h2 id="architecture-decisions" style="color: var(--text-color); font-family: var(--header-font);">Architecture Decisions (Approved)</h2>
             
             <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-large) 0;">
-                <tr style="background: var(--light-color);">
+                <tr style="background: rgba(255,255,255,0.15);">
                     <th style="border: 1px solid #ccc; padding: 10px; text-align: left; color: var(--text-color);">Decision</th>
                     <th style="border: 1px solid #ccc; padding: 10px; text-align: left; color: var(--text-color);">Choice</th>
                     <th style="border: 1px solid #ccc; padding: 10px; text-align: left; color: var(--text-color);">Rationale</th>
@@ -135,7 +135,7 @@
             </p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Functions to Extract:</strong></p>
             
-            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 3px; margin: var(--spacing-medium) 0;">
+            <div style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 3px; margin: var(--spacing-medium) 0;">
                 <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong>Core Functions (3):</strong></p>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><strong>sync_table_to_result()</strong> [schema:3316-3383] - Sync DB table fields to Result file</li>
@@ -144,7 +144,7 @@
                 </ul>
             </div>
 
-            <div style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 3px; margin: var(--spacing-medium) 0;">
+            <div style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 3px; margin: var(--spacing-medium) 0;">
                 <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong>Helper Functions (6):</strong></p>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><strong>get_table_field_info()</strong> [schema:3452-3567] - Get DB field definitions</li>
@@ -193,7 +193,7 @@
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Dependency Chain</h3>
-            <pre style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 3px; color: var(--text-color); font-family: monospace; overflow-x: auto;">
+            <pre style="background: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 3px; color: var(--text-color); font-family: monospace; overflow-x: auto;">
 create_result_from_table()
   ├─ generate_result_file()
   │  └─ generate_result_file_content()
@@ -230,7 +230,7 @@ sync_result_to_table()
             <h2 id="execution-checklist" style="color: var(--text-color); font-family: var(--header-font);">Execution Checklist</h2>
             
             <table style="width: 100%; border-collapse: collapse;">
-                <tr style="background: var(--light-color);">
+                <tr style="background: rgba(255,255,255,0.15);">
                     <th style="border: 1px solid #ccc; padding: 10px; text-align: left; color: var(--text-color);">Phase</th>
                     <th style="border: 1px solid #ccc; padding: 10px; text-align: center; color: var(--text-color);">Status</th>
                 </tr>
@@ -268,7 +268,7 @@ sync_result_to_table()
             <h2 id="files-involved" style="color: var(--text-color); font-family: var(--header-font);">Files Involved</h2>
             
             <table style="width: 100%; border-collapse: collapse;">
-                <tr style="background: var(--light-color);">
+                <tr style="background: rgba(255,255,255,0.15);">
                     <th style="border: 1px solid #ccc; padding: 10px; text-align: left; color: var(--text-color);">File</th>
                     <th style="border: 1px solid #ccc; padding: 10px; text-align: left; color: var(--text-color);">Action</th>
                     <th style="border: 1px solid #ccc; padding: 10px; text-align: left; color: var(--text-color);">Status</th>

@@ -24,18 +24,18 @@
     </div>
 
     <!-- TABLE OF CONTENTS SECTION -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
             <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
-                <a href="#schema" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Schema</a>
-                <a href="#columns" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Columns</a>
-                <a href="#relationships" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Relationships</a>
-                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
-                <a href="#verification" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Verification</a>
-                <a href="#usage" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Usage</a>
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Overview</a>
+                <a href="#schema" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Schema</a>
+                <a href="#columns" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Columns</a>
+                <a href="#relationships" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Relationships</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Methods</a>
+                <a href="#verification" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Verification</a>
+                <a href="#usage" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Usage</a>
             </div>
         </div>
     </div>
@@ -64,7 +64,7 @@
         <div class="col-100">
             <h2 id="columns" style="color: var(--text-color); font-family: var(--header-font);">3. Column Reference</h2>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; overflow-x: auto;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; overflow-x: auto;">
                 <table style="width: 100%; border-collapse: collapse; font-family: monospace; font-size: var(--font-size-small); color: var(--text-color);">
                     <tr style="border-bottom: 1px solid var(--border-color);">
                         <th style="text-align: left; padding: 8px; background-color: var(--primary-color); color: white;">Column Name</th>
@@ -78,7 +78,7 @@
                         <td style="padding: 8px;">NO (PK)</td>
                         <td style="padding: 8px;">Primary key, auto-increment</td>
                     </tr>
-                    <tr style="border-bottom: 1px solid var(--border-color); background-color: var(--light-color);">
+                    <tr style="border-bottom: 1px solid var(--border-color); background-color: rgba(255,255,255,0.15);">
                         <td style="padding: 8px;"><strong>query</strong></td>
                         <td style="padding: 8px;">varchar(500)</td>
                         <td style="padding: 8px;">NO</td>
@@ -90,7 +90,7 @@
                         <td style="padding: 8px;">NO</td>
                         <td style="padding: 8px;">Title of the search result</td>
                     </tr>
-                    <tr style="border-bottom: 1px solid var(--border-color); background-color: var(--light-color);">
+                    <tr style="border-bottom: 1px solid var(--border-color); background-color: rgba(255,255,255,0.15);">
                         <td style="padding: 8px;"><strong>result_url</strong></td>
                         <td style="padding: 8px;">varchar(1000)</td>
                         <td style="padding: 8px;">NO</td>
@@ -102,7 +102,7 @@
                         <td style="padding: 8px;">NO</td>
                         <td style="padding: 8px;">Preview snippet from search engine</td>
                     </tr>
-                    <tr style="border-bottom: 1px solid var(--border-color); background-color: var(--light-color);">
+                    <tr style="border-bottom: 1px solid var(--border-color); background-color: rgba(255,255,255,0.15);">
                         <td style="padding: 8px;"><strong>full_content</strong></td>
                         <td style="padding: 8px;">longtext</td>
                         <td style="padding: 8px;">YES</td>
@@ -114,7 +114,7 @@
                         <td style="padding: 8px;">NO</td>
                         <td style="padding: 8px;">Source: web, public_domain_book, arxiv, github, stackoverflow (default: web)</td>
                     </tr>
-                    <tr style="border-bottom: 1px solid var(--border-color); background-color: var(--light-color);">
+                    <tr style="border-bottom: 1px solid var(--border-color); background-color: rgba(255,255,255,0.15);">
                         <td style="padding: 8px;"><strong>found_by_user_id</strong></td>
                         <td style="padding: 8px;">integer (FK)</td>
                         <td style="padding: 8px;">NO</td>
@@ -126,7 +126,7 @@
                         <td style="padding: 8px;">NO</td>
                         <td style="padding: 8px;">Verification status (default: false)</td>
                     </tr>
-                    <tr style="border-bottom: 1px solid var(--border-color); background-color: var(--light-color);">
+                    <tr style="border-bottom: 1px solid var(--border-color); background-color: rgba(255,255,255,0.15);">
                         <td style="padding: 8px;"><strong>verified_by_user_id</strong></td>
                         <td style="padding: 8px;">integer (FK)</td>
                         <td style="padding: 8px;">YES</td>
@@ -138,7 +138,7 @@
                         <td style="padding: 8px;">YES</td>
                         <td style="padding: 8px;">Admin notes on verification decision</td>
                     </tr>
-                    <tr style="border-bottom: 1px solid var(--border-color); background-color: var(--light-color);">
+                    <tr style="border-bottom: 1px solid var(--border-color); background-color: rgba(255,255,255,0.15);">
                         <td style="padding: 8px;"><strong>created_at</strong></td>
                         <td style="padding: 8px;">timestamp</td>
                         <td style="padding: 8px;">NO</td>
@@ -185,7 +185,7 @@
             <h3 id="method-is_pending" style="color: var(--text-color); font-family: var(--header-font);">5.1 is_pending_verification()</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Boolean</p>
             <p style="color: var(--text-color); font-family: var(--body-font);">Checks if result is awaiting verification. Equivalent to <code>!$result->is_verified</code>.</p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 if ($result->is_pending_verification) {
     # Result needs review
@@ -232,7 +232,7 @@ if ($result->is_pending_verification) {
             <h2 id="usage" style="color: var(--text-color); font-family: var(--header-font);">7. Usage Examples</h2>
             
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Creating a Web Search Result</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 my $result = $schema->resultset('WebSearchResult')->create({
     query           => 'perl catalyst web framework',
@@ -246,7 +246,7 @@ my $result = $schema->resultset('WebSearchResult')->create({
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Verifying a Result (Admin Only)</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 if ($result->is_pending_verification && $admin_user->can_verify_results) {
     $result->mark_as_verified(
@@ -258,7 +258,7 @@ if ($result->is_pending_verification && $admin_user->can_verify_results) {
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Finding Unverified Results</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 my @pending = $schema->resultset('WebSearchResult')
     ->search({ is_verified => 0 })

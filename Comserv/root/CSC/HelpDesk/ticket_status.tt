@@ -226,7 +226,7 @@
     }
 
     .description-box {
-        background-color: #fff;
+        background-color: rgba(255,255,255,0.88);
         border: 1px solid #dee2e6;
         border-radius: 4px;
         padding: 10px;

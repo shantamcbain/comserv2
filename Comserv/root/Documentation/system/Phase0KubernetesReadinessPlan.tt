@@ -30,18 +30,18 @@
     </div>
 
     <!-- TABLE OF CONTENTS -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
-                <a href="#infrastructure-context" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Infrastructure</a>
-                <a href="#db-config-authority" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">DB Config Authority</a>
-                <a href="#existing-system" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Existing System</a>
-                <a href="#phase-0-requires" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">What Phase 0 Requires</a>
-                <a href="#implementation-steps" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Implementation Steps</a>
-                <a href="#approval-questions" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Approval Questions</a>
-                <a href="#next-action" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Next Action</a>
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Overview</a>
+                <a href="#infrastructure-context" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Infrastructure</a>
+                <a href="#db-config-authority" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">DB Config Authority</a>
+                <a href="#existing-system" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Existing System</a>
+                <a href="#phase-0-requires" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">What Phase 0 Requires</a>
+                <a href="#implementation-steps" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Implementation Steps</a>
+                <a href="#approval-questions" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Approval Questions</a>
+                <a href="#next-action" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Next Action</a>
             </div>
         </div>
     </div>
@@ -68,7 +68,7 @@
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Proxmox Infrastructure (All 3 Hosts)</h3>
             <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Proxmox Host</strong></th>
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Version</strong></th>
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>K8s Role</strong></th>
@@ -95,7 +95,7 @@
             </table>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: 20px;">K8s Cluster Composition</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><strong>Master Node</strong>: VM 100 on proxmoxws (Ubuntu, control plane, API server)</li>
                     <li><strong>Worker Nodes</strong>: VM 201 on proxmox720 (running), VM 103 on proxmoxws (running), VM 202 on proxmox720 (stopped, can be activated)</li>
@@ -129,9 +129,9 @@
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Understanding db_config.json</h3>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <table style="width: 100%; border-collapse: collapse;">
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <th style="text-align: left; padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Attribute</th>
                         <th style="text-align: left; padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Value</th>
                     </tr>
@@ -139,7 +139,7 @@
                         <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);"><strong>Scope</strong></td>
                         <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Unique to EACH MACHINE (not tracked in git)</td>
                     </tr>
-                    <tr style="background-color: var(--light-color);">
+                    <tr style="background-color: rgba(255,255,255,0.15);">
                         <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);"><strong>Authority</strong></td>
                         <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">PRIMARY source of database configuration on that machine</td>
                     </tr>
@@ -147,7 +147,7 @@
                         <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);"><strong>File Location</strong></td>
                         <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Comserv/db_config.json</td>
                     </tr>
-                    <tr style="background-color: var(--light-color);">
+                    <tr style="background-color: rgba(255,255,255,0.15);">
                         <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);"><strong>Template</strong></td>
                         <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Comserv/db_config.json.template (reference)</td>
                     </tr>
@@ -155,7 +155,7 @@
                         <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);"><strong>Git Status</strong></td>
                         <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">In .gitignore (never committed)</td>
                     </tr>
-                    <tr style="background-color: var(--light-color);">
+                    <tr style="background-color: rgba(255,255,255,0.15);">
                         <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);"><strong>Security</strong></td>
                         <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Safe to have actual credentials; unique per machine</td>
                     </tr>
@@ -166,7 +166,7 @@
             
             <p style="color: var(--text-color); font-family: var(--body-font);">The file contains 10 database connections organized by type and priority:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0; overflow-x: auto;"><code>{
   "production_server": {      // Priority 1: ENCY database on production
     "db_type": "mariadb",
@@ -222,7 +222,7 @@
             
             <p style="color: var(--text-color); font-family: var(--body-font);">Application checks in this order; uses first match found:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid #4caf50; margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid #4caf50; margin: var(--spacing-small) 0;">
                 <ol style="color: var(--text-color); font-family: var(--body-font);">
                     <li><strong>Kubernetes Secrets</strong> (Lines 91-151)
                         <ul>
@@ -249,7 +249,7 @@
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: var(--spacing-large);">How DBI Connections Are Established</h3>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <p style="color: var(--text-color); font-family: var(--body-font);">For each connection configuration loaded:</p>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><strong>MySQL/MariaDB</strong>: Uses DBI->connect() with DSN format<br/>
@@ -264,7 +264,7 @@
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: var(--spacing-large);">Current Configuration Loading Behavior</h3>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <p style="color: var(--text-color); font-family: var(--body-font);">If K8s Secrets found (lines 91-151):</p>
                 <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code>✅ "Configuration loaded from K8s Secrets"
    Checked paths: /var/run/secrets/comserv/dbi/</code></pre>
@@ -345,7 +345,7 @@
             
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Core Principle</strong>: Application must work in ALL deployment scenarios without code changes:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li>✅ <strong>Native development</strong> (port 3001 via Perl) - Current</li>
                     <li>✅ <strong>Docker Compose with db_config.json</strong> - Current</li>
@@ -357,7 +357,7 @@
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: var(--spacing-large);">Phase 0 Deliverables Table</h3>
             
             <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <th style="text-align: left; padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Deliverable</th>
                     <th style="text-align: left; padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Current State</th>
                     <th style="text-align: left; padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Needed</th>
@@ -367,7 +367,7 @@
                     <td style="padding: 8px; border: 1px solid var(--border-color); color: #d32f2f;">❌ docker-compose.dev.yml has defaults (lines 18, 23)</td>
                     <td style="padding: 8px; border: 1px solid var(--border-color); color: #4caf50;">✅ Remove password defaults, require .env</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);"><strong>2. Config Validation</strong>: Test all three sources</td>
                     <td style="padding: 8px; border: 1px solid var(--border-color); color: #ff9800;">⚠️ RemoteDB.pm code exists, not fully tested</td>
                     <td style="padding: 8px; border: 1px solid var(--border-color); color: #4caf50;">✅ Verify K8s Secrets, env vars, db_config.json</td>
@@ -377,7 +377,7 @@
                     <td style="padding: 8px; border: 1px solid var(--border-color); color: #d32f2f;">❌ docker-entrypoint.sh has no pre-flight checks</td>
                     <td style="padding: 8px; border: 1px solid var(--border-color); color: #4caf50;">✅ Add network validation before app startup</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);"><strong>4. Graceful Shutdown</strong>: SIGTERM handling for K8s</td>
                     <td style="padding: 8px; border: 1px solid var(--border-color); color: #ff9800;">⚠️ Supervisor handles signals, unclear if Catalyst graceful</td>
                     <td style="padding: 8px; border: 1px solid var(--border-color); color: #4caf50;">✅ Verify signal handlers, document behavior</td>
@@ -387,7 +387,7 @@
                     <td style="padding: 8px; border: 1px solid var(--border-color); color: #ff9800;">⚠️ /health endpoint exists but untested</td>
                     <td style="padding: 8px; border: 1px solid var(--border-color); color: #4caf50;">✅ Verify /health works, add /readiness for DB</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);"><strong>6. Documentation</strong>: Record what's been validated</td>
                     <td style="padding: 8px; border: 1px solid var(--border-color); color: #d32f2f;">❌ No Phase 0 completion documentation</td>
                     <td style="padding: 8px; border: 1px solid var(--border-color); color: #4caf50;">✅ Document each step, tested scenarios, results</td>
@@ -407,7 +407,7 @@
 
             <h3 id="step-1" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">STEP 1: Document Current State (20 minutes)</h3>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Action</strong>: Create detailed documentation of exactly how db_config.json is used</p>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li>Document db_config.json.template structure</li>
@@ -419,7 +419,7 @@
 
             <h3 id="step-2" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 15px;">STEP 2: Security Audit - Remove Exposed Credentials (15 minutes)</h3>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Files affected</strong>:</p>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li>docker-compose.dev.yml (lines 18, 23 have password defaults)</li>
@@ -433,7 +433,7 @@ AFTER:  COMSERV_DB_PRODUCTION_SERVER_PASSWORD: "${{...}}"</pre>
 
             <h3 id="step-3" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 15px;">STEP 3: Create Configuration Guide (.env.example) (10 minutes)</h3>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>File</strong>: Create Comserv/.env.example</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Content</strong>:</p>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
@@ -447,7 +447,7 @@ AFTER:  COMSERV_DB_PRODUCTION_SERVER_PASSWORD: "${{...}}"</pre>
 
             <h3 id="step-4" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 15px;">STEP 4: Enhance Network Diagnostics (20 minutes)</h3>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>File</strong>: Comserv/docker-entrypoint.sh</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Add before line 77</strong>:</p>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
@@ -461,7 +461,7 @@ AFTER:  COMSERV_DB_PRODUCTION_SERVER_PASSWORD: "${{...}}"</pre>
 
             <h3 id="step-5" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 15px;">STEP 5: Verify Graceful Shutdown (15 minutes)</h3>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Check</strong>: Does Catalyst app handle SIGTERM?</p>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li>Review Comserv.pm for signal handlers</li>
@@ -473,7 +473,7 @@ AFTER:  COMSERV_DB_PRODUCTION_SERVER_PASSWORD: "${{...}}"</pre>
 
             <h3 id="step-6" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 15px;">STEP 6: Verify Health Check Endpoints (15 minutes)</h3>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Check</strong>: Do /health and /readiness endpoints work?</p>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li>Find Health.pm controller</li>
@@ -485,7 +485,7 @@ AFTER:  COMSERV_DB_PRODUCTION_SERVER_PASSWORD: "${{...}}"</pre>
 
             <h3 id="step-7" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 15px;">STEP 7: Create K8s Secrets Setup Guide (10 minutes)</h3>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>File</strong>: Create Comserv/kubernetes/SECRETS_SETUP.md</p>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li>How to create K8s Secrets from db_config.json</li>

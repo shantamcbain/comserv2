@@ -40,7 +40,11 @@
             medium: null,   // mid-size Ollama model
             large:  null,   // largest Ollama model
             grok:   null    // Grok model (premium users)
-        }
+        },
+        supportMode: false,         // true when user is in live support chat mode
+        supportConvId: null,        // conversation_id for current support chat
+        supportLastMsgId: 0,        // last message id seen in support chat
+        supportPollTimer: null      // setInterval handle for support chat polling
     };
     
     // Load persisted state from sessionStorage (or from window.AI_RESUME_CONVERSATION
@@ -1352,6 +1356,82 @@
         labelEl.title = 'Assisting page: ' + pagePath;
     }
 
+    // ── Form Fill Button ─────────────────────────────────────────────────────
+    // When the page has fillable form fields, adds a "🪄 Fill Form" button
+    // next to the Send button. User types description in the normal message
+    // input, then clicks Fill Form — AI fills the form fields directly.
+    function injectFormFillStrip() {
+        if (document.getElementById('lc-ff-btn')) return;
+        if (typeof window._getPageFormFields !== 'function') return;
+        const fields = window._getPageFormFields();
+        if (!fields || fields.length === 0) return;
+
+        const sendBtn = document.getElementById('send-message');
+        if (!sendBtn) return;
+
+        // Build field description for the AI system prompt
+        const fieldDesc = fields.map(function(f) {
+            if (f.type === 'radio' && f.options) return f.name + ' (one of: ' + f.options.join(', ') + ')';
+            if (f.tagName === 'select') return f.name + ' (' + (f.label || 'select') + ')';
+            return f.name + (f.label && f.label !== f.name ? ' (' + f.label + ')' : '');
+        }).join(', ');
+
+        const ffBtn = document.createElement('button');
+        ffBtn.id = 'lc-ff-btn';
+        ffBtn.textContent = '🪄 Fill Form';
+        ffBtn.title = 'Describe what to fill in the message box, then click here to fill the form with AI';
+        ffBtn.style.cssText = 'padding:4px 8px;background:#f0c000;color:#333;border:none;border-radius:4px;' +
+            'cursor:pointer;font-size:.8em;font-weight:bold;white-space:nowrap;flex-shrink:0;';
+
+        // Insert after Send button
+        sendBtn.parentNode.insertBefore(ffBtn, sendBtn.nextSibling);
+
+        ffBtn.addEventListener('click', function() {
+            const msgInput = document.getElementById('message-input');
+            const desc = (msgInput ? msgInput.value : '').trim();
+            if (!desc) {
+                alert('Type a description of what to fill in the message box first, then click Fill Form.');
+                if (msgInput) msgInput.focus();
+                return;
+            }
+            ffBtn.disabled = true; ffBtn.textContent = '⏳';
+
+            const SYSTEM = 'You fill in a web form. The page is "' + document.title + '". ' +
+                'Return ONLY a raw JSON object. Keys must exactly match the HTML field name attributes: ' + fieldDesc + '. ' +
+                'Values must be plain strings or numbers. No markdown, no code fences, no explanation — only the JSON object.';
+
+            const selProvider = document.getElementById('ai-provider');
+            const provider = (selProvider && selProvider.value) || 'ollama';
+
+            fetch('/ai/generate', {
+                method: 'POST', credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: desc, system: SYSTEM, provider: provider, skip_role_prompt: true })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                ffBtn.disabled = false; ffBtn.textContent = '🪄 Fill Form';
+                if (!data.success) { alert('AI error: ' + (data.error || 'unknown')); return; }
+                const raw = (data.response || '').trim();
+                const js = raw.indexOf('{'), je = raw.lastIndexOf('}');
+                if (js === -1) { alert('AI returned no JSON. Try rephrasing your description.'); return; }
+                let parsed;
+                try { parsed = JSON.parse(raw.substring(js, je + 1)); }
+                catch(e) { alert('JSON parse error: ' + e.message + '\n\nAI said:\n' + raw.substring(0, 300)); return; }
+                let filled = 0;
+                Object.keys(parsed).forEach(function(k) {
+                    if (window._applyFieldValue && window._applyFieldValue(k, parsed[k])) filled++;
+                });
+                // Show brief success in status bar
+                const si = document.getElementById('chat-status');
+                if (si) { si.textContent = '✅ Filled ' + filled + ' form field(s) — review and save.'; }
+                // Clear message input
+                if (msgInput) msgInput.value = '';
+            })
+            .catch(function(e) { ffBtn.disabled = false; ffBtn.textContent = '🪄 Fill Form'; alert('Request failed: ' + e); });
+        });
+    }
+
     // Open chat panel
     function openChat() {
         const chatPanel = document.getElementById('chat-panel');
@@ -1396,6 +1476,8 @@
         const messageInput = document.getElementById('message-input');
         messageInput.focus();
 
+        // Inject form-fill strip if the page has fillable form fields
+        injectFormFillStrip();
     }
     
     // Reset conversation - clear session and UI
@@ -1930,9 +2012,15 @@
                     chatMessages.scrollTop = chatMessages.scrollHeight;
                 }
 
-                // Add AI response — strip any embedded [ACTION: ...] blocks before display
-                const { cleanText, actions } = extractActions(data.response || '');
+                // Add AI response — strip any embedded [ACTION: ...] and [SUPPORT_NEEDED] before display
+                const { cleanText: _rawClean, actions } = extractActions(data.response || '');
+                const _needsSupport = _detectSupportNeeded(_rawClean);
+                const cleanText = _stripSupportTag(_rawClean);
                 addMessage(cleanText, 'ai-message');
+
+                if (_needsSupport && !state.supportMode) {
+                    _showEscalationButtons();
+                }
 
                 persistMessages();
 
@@ -2350,11 +2438,181 @@
         return true;
     }
 
+    // ── Support Chat ──────────────────────────────────────────────────────────
+
+    function _showEscalationButtons(afterEl) {
+        var strip = document.createElement('div');
+        strip.className = 'support-escalation-strip';
+        strip.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;padding:6px 10px 4px;border-top:1px solid #e0e0e0;margin-top:4px;';
+        strip.innerHTML =
+            '<span style="font-size:.82em;color:#666;align-self:center;">Need more help?</span>'
+          + '<button class="chat-action-btn" onclick="(function(){'
+          + '  var _s=window.__aiChatSupportFns;if(_s)_s.ticket();'
+          + '})();" style="font-size:.8em;padding:4px 10px;background:#eee;border:1px solid #ccc;border-radius:4px;cursor:pointer;">📋 Create Ticket</button>'
+          + '<button class="chat-action-btn" onclick="(function(){'
+          + '  var _s=window.__aiChatSupportFns;if(_s)_s.startChat();'
+          + '})();" style="font-size:.8em;padding:4px 10px;background:#1a6bb5;color:#fff;border:none;border-radius:4px;cursor:pointer;">💬 Chat with Support</button>';
+        var container = document.getElementById('chat-messages');
+        if (container) { container.appendChild(strip); container.scrollTop = container.scrollHeight; }
+    }
+
+    function _detectSupportNeeded(text) {
+        if (/\[SUPPORT_NEEDED\]/i.test(text)) return true;
+        var phrases = [
+            /i\s+(don'?t|do not|cannot|can'?t)\s+(have|access|provide|help|answer|assist)/i,
+            /outside\s+(my|the AI'?s?)\s+(capabilities|knowledge|scope|ability)/i,
+            /please\s+contact\s+support/i,
+            /you\s+('?ll?\s+)?need\s+to\s+contact/i,
+            /i\s+am\s+unable\s+to\s+assist/i,
+        ];
+        return phrases.some(function(re) { return re.test(text); });
+    }
+
+    function _stripSupportTag(text) {
+        return text.replace(/\[SUPPORT_NEEDED\]\s*/gi, '').trim();
+    }
+
+    function _enterSupportMode(convId, lastMsgId) {
+        state.supportMode   = true;
+        state.supportConvId = convId;
+        state.supportLastMsgId = lastMsgId || 0;
+        var header = document.getElementById('chat-header');
+        if (header) {
+            header.style.background = '#1a6bb5';
+            header.textContent = '💬 Support Chat (live)';
+        }
+        var inputRow = document.querySelector('#chat-input-row, .chat-input-area, .input-area');
+        var placeholder = document.getElementById('message-input');
+        if (placeholder) placeholder.placeholder = 'Type a message to support…';
+        _addSupportSystemMsg('✅ You are now connected to a support agent. They will respond as soon as possible.');
+        _startSupportPolling();
+    }
+
+    function _exitSupportMode() {
+        if (state.supportPollTimer) { clearInterval(state.supportPollTimer); state.supportPollTimer = null; }
+        state.supportMode   = false;
+        state.supportConvId = null;
+        state.supportLastMsgId = 0;
+        var header = document.getElementById('chat-header');
+        if (header) { header.style.background = ''; header.textContent = state.currentAgent ? (state.currentAgent.display_name || 'AI Assistant') : 'AI Assistant'; }
+        var placeholder = document.getElementById('message-input');
+        if (placeholder) placeholder.placeholder = 'Type a message…';
+    }
+
+    function _addSupportSystemMsg(text) {
+        var el = document.createElement('div');
+        el.className = 'message system-message';
+        el.style.cssText = 'background:#e8f0fe;border:1px solid #acc;padding:6px 12px;border-radius:6px;font-size:.85em;color:#1a3a6b;margin:4px 0;';
+        el.textContent = text;
+        var container = document.getElementById('chat-messages');
+        if (container) { container.appendChild(el); container.scrollTop = container.scrollHeight; }
+    }
+
+    function _startSupportPolling() {
+        if (state.supportPollTimer) clearInterval(state.supportPollTimer);
+        state.supportPollTimer = setInterval(function() {
+            if (!state.supportMode || !state.supportConvId) { clearInterval(state.supportPollTimer); return; }
+            fetch('/chat/get_messages?conversation_id=' + state.supportConvId + '&last_id=' + state.supportLastMsgId, {
+                credentials: 'include'
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (!d.success || !d.messages) return;
+                d.messages.forEach(function(msg) {
+                    if (msg.id > state.supportLastMsgId) {
+                        state.supportLastMsgId = msg.id;
+                        if (msg.role === 'assistant') {
+                            addMessage(msg.content, 'ai-message');
+                        }
+                    }
+                });
+            })
+            .catch(function() {});
+        }, 5000);
+    }
+
+    function _initSupportChat(contextMsg) {
+        _addSupportSystemMsg('⏳ Connecting to support…');
+        var body = new URLSearchParams({
+            message: contextMsg || 'User requested live support',
+            agent_type: 'support',
+            title: 'Support Chat - ' + (document.title || window.location.pathname)
+        });
+        fetch('/chat/send_message', { method: 'POST', credentials: 'include', body: body })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success && d.conversation_id) {
+                state.supportLastMsgId = d.message_id || 0;
+                _enterSupportMode(d.conversation_id, d.message_id);
+            } else {
+                _addSupportSystemMsg('❌ Could not connect to support. Please try creating a ticket.');
+            }
+        })
+        .catch(function() {
+            _addSupportSystemMsg('❌ Network error. Please try again.');
+        });
+    }
+
+    function _createTicketFromSupport() {
+        var lastAiMsg = '';
+        document.querySelectorAll('#chat-messages .ai-message').forEach(function(el) { lastAiMsg = el.textContent; });
+        var body = new URLSearchParams({
+            action: 'create_helpdesk_ticket',
+            subject: 'Support request from AI chat - ' + (document.title || window.location.pathname),
+            description: 'User requested support via AI chat widget.\n\nLast AI response:\n' + lastAiMsg.slice(0, 500),
+            category: 'General',
+            priority: 'normal'
+        });
+        fetch('/ai/action', { method: 'POST', credentials: 'include', body: body })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) {
+                var url = d.ticket_url || '/HelpDesk';
+                addMessage('✅ Support ticket created! View it at: ' + url, 'system-message');
+            } else {
+                addMessage('❌ Could not create ticket: ' + (d.error || 'unknown error'), 'system-message');
+            }
+        })
+        .catch(function() { addMessage('❌ Network error creating ticket.', 'system-message'); });
+    }
+
+    window.__aiChatSupportFns = {
+        ticket:    _createTicketFromSupport,
+        startChat: function() {
+            var lastUserMsg = '';
+            document.querySelectorAll('#chat-messages .user-message').forEach(function(el) { lastUserMsg = el.textContent; });
+            _initSupportChat(lastUserMsg.slice(-200) || 'User requested live support');
+        },
+        exit:      _exitSupportMode
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+
     // Function to send a message
     function sendMessage() {
         const messageInput = document.getElementById('message-input');
         const message = messageInput.value.trim();
         if (!message && !state.pendingImage) return;
+
+        // Support chat mode: route message to Chat controller, not AI
+        if (state.supportMode && state.supportConvId) {
+            messageInput.value = '';
+            addMessage(message, 'user-message');
+            var _spBody = new URLSearchParams({
+                message: message,
+                conversation_id: state.supportConvId,
+                agent_type: 'support'
+            });
+            fetch('/chat/send_message', { method: 'POST', credentials: 'include', body: _spBody })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success && d.message_id > state.supportLastMsgId) {
+                    state.supportLastMsgId = d.message_id;
+                }
+            })
+            .catch(function() {});
+            return;
+        }
 
         // Ensure page context is ready so navigation map is populated
         if (!state.pageContext) {
@@ -2366,6 +2624,42 @@
                 sendMessage();
             });
             return;
+        }
+
+        // Early keyword interceptor: daily log actions bypass all AI routing
+        {
+            const _lcMsg = message.toLowerCase().trim().replace(/[!.]+$/, '').replace(/\s+/g, ' ');
+            const _isMorning = /^(good morning|start day|begin day|start of day)$/.test(_lcMsg);
+            const _isNight   = /^(good night|end day|finish day|end of day)$/.test(_lcMsg);
+            if (_isMorning || _isNight) {
+                const _action = _isMorning ? 'start' : 'end';
+                messageInput.value = '';
+                addMessage(message, 'user-message');
+                const _chatMsgs = document.getElementById('chat-messages');
+                const _loadEl = document.createElement('div');
+                _loadEl.className = 'message ai-message';
+                _loadEl.textContent = '⏳ ' + (_isMorning ? 'Starting your day…' : 'Closing your day…');
+                if (_chatMsgs) { _chatMsgs.appendChild(_loadEl); _chatMsgs.scrollTop = _chatMsgs.scrollHeight; }
+                fetch('/ai/daily_log', {
+                    method: 'POST', credentials: 'include',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'action=' + encodeURIComponent(_action)
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (_loadEl && _loadEl.parentNode) _loadEl.parentNode.removeChild(_loadEl);
+                    var resp = d.response || d.error || (_isMorning ? 'Day started.' : 'Day closed.');
+                    addMessage(resp, 'ai-message');
+                    if (d.success && window.location.pathname.includes('/Documentation/DailyPlan')) {
+                        setTimeout(function() { window.location.reload(); }, 800);
+                    }
+                })
+                .catch(function(e) {
+                    if (_loadEl && _loadEl.parentNode) _loadEl.parentNode.removeChild(_loadEl);
+                    addMessage('❌ Request failed: ' + e, 'ai-message');
+                });
+                return;
+            }
         }
 
         // Template editor agent: open the dedicated form page with the file + request pre-loaded
