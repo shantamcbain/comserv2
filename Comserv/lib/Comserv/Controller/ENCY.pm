@@ -663,9 +663,12 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
             ident_character => $form_data->{ident_character},
             image => $form_data->{image},
             stem => $form_data->{stem},
-            nectar => $form_data->{nectar},
-            pollinator => $form_data->{pollinator},
-            pollen => $form_data->{pollen},
+            nectar => (ref($form_data->{nectar}) eq 'ARRAY' ? $form_data->{nectar}[-1] : ($form_data->{nectar} // 0)),
+            nectarnotes => $form_data->{nectarnotes} // '',
+            pollinator => (ref($form_data->{pollinator}) eq 'ARRAY' ? join(', ', grep { length } @{$form_data->{pollinator}}) : ($form_data->{pollinator} // '')),
+            pollen => (ref($form_data->{pollen}) eq 'ARRAY' ? $form_data->{pollen}[-1] : ($form_data->{pollen} // 0)),
+            pollennotes => $form_data->{pollennotes} // '',
+            apis => $form_data->{apis} // '',
             leaves => $form_data->{leaves},
             flowers => $form_data->{flowers},
             fruit => $form_data->{fruit},
@@ -689,9 +692,11 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
             non_med => $form_data->{non_med},
             history => $form_data->{history},
             reference => $form_data->{reference},
+            preparation => $form_data->{preparation} // '',
+            share => $form_data->{share} // 0,
             username_of_poster => $c->session->{username},
             group_of_poster => $c->session->{group},
-            date_time_posted => \'NOW()',  # Assuming you want to set this to the current timestamp
+            date_time_posted => \'NOW()',
         };
 
         # Use the existing logging system to log the new herb data
