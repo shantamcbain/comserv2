@@ -255,13 +255,109 @@ Admin page for HelpDesk management
 
 =cut
 
+sub _require_admin {
+    my ($self, $c) = @_;
+    my $roles = $c->session->{roles};
+    my $has_admin = 0;
+    if ($roles) {
+        $has_admin = ref($roles) eq 'ARRAY'
+            ? grep { $_ eq 'admin' } @$roles
+            : ($roles =~ /\badmin\b/i ? 1 : 0);
+    }
+    unless ($has_admin) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_require_admin',
+            "Unauthorized HelpDesk admin access by: " . ($c->session->{username} || 'Guest'));
+        $c->stash->{error_msg} = "You don't have permission to access the HelpDesk admin area.";
+        $c->detach('index');
+    }
+    return $has_admin;
+}
+
 sub admin :Chained('base') :PathPart('admin') :Args(0) {
     my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin', 
-        "Starting admin action");
-    
-    # Check if user has admin role
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin', "Starting admin action");
+    $self->_require_admin($c);
+    $c->stash(
+        template => 'CSC/HelpDesk/admin.tt',
+        title    => 'HelpDesk Administration',
+    );
+    push @{$c->stash->{debug_msg}}, "HelpDesk admin page loaded";
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin', "Completed admin action");
+    $c->forward($c->view('TT'));
+}
+
+sub admin_tickets :Chained('base') :PathPart('admin/tickets') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_admin($c);
+    $self->_load_admin_tickets($c, undef, 'All Tickets');
+}
+
+sub admin_tickets_open :Chained('base') :PathPart('admin/tickets/open') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_admin($c);
+    $self->_load_admin_tickets($c, 'open', 'Open Tickets');
+}
+
+sub admin_tickets_closed :Chained('base') :PathPart('admin/tickets/closed') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_admin($c);
+    $self->_load_admin_tickets($c, 'closed', 'Closed Tickets');
+}
+
+sub admin_tickets_resolved :Chained('base') :PathPart('admin/tickets/resolved') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_admin($c);
+    $self->_load_admin_tickets($c, 'resolved', 'Resolved Tickets');
+}
+
+sub _load_admin_tickets {
+    my ($self, $c, $status_filter, $title) = @_;
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_load_admin_tickets',
+        "Loading admin tickets: filter=" . ($status_filter || 'all') . " site=$site_name");
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my %search = (site_name => $site_name);
+        $search{status} = $status_filter if $status_filter;
+
+        my @tickets = $schema->resultset('SupportTicket')->search(
+            \%search,
+            { order_by => { -desc => 'created_at' }, rows => 100 }
+        )->all;
+
+        $c->stash(
+            template      => 'CSC/HelpDesk/ticket_status.tt',
+            tickets       => \@tickets,
+            title         => $title,
+            is_admin_view => 1,
+            status_filter => $status_filter || 'all',
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_load_admin_tickets',
+            "Error loading admin tickets: $_");
+        $c->stash(
+            template  => 'CSC/HelpDesk/ticket_status.tt',
+            tickets   => [],
+            title     => $title,
+            error_msg => 'Error loading tickets.',
+        );
+    };
+
+    $c->forward($c->view('TT'));
+}
+
+=head2 admin_base
+
+Intermediate chain for all /HelpDesk/admin/... sub-paths (requires admin role).
+
+=cut
+
+sub admin_base :Chained('base') :PathPart('admin') :CaptureArgs(0) {
+    my ($self, $c) = @_;
+
     my $has_admin_role = 0;
     if ($c->session->{roles}) {
         my $roles = $c->session->{roles};
@@ -271,30 +367,109 @@ sub admin :Chained('base') :PathPart('admin') :Args(0) {
             $has_admin_role = $roles =~ /\badmin\b/i;
         }
     }
-    
+
     unless ($has_admin_role) {
-        my $root_controller = $c->controller('Root');
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin', 
-            "Unauthorized access attempt to HelpDesk admin by user: " . ($root_controller->user_exists($c) ? ($c->session->{username} || 'Guest') : 'Guest'));
-        
-        # Redirect to main HelpDesk page with error message
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin_base',
+            "Unauthorized access to HelpDesk admin area by: " . ($c->session->{username} || 'Guest'));
         $c->stash->{error_msg} = "You don't have permission to access the HelpDesk admin area.";
         $c->detach('index');
         return;
     }
-    
-    $c->stash(
-        template => 'CSC/HelpDesk/admin.tt',
-        title => 'HelpDesk Administration'
-    );
-    
-    # Push debug message to stash
-    push @{$c->stash->{debug_msg}}, "HelpDesk admin page loaded";
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin', 
-        "Completed admin action");
-    
-    # Explicitly forward to the TT view
+
+    $c->stash(subsection => 'admin');
+}
+
+=head2 admin_tickets_base
+
+Intermediate chain for /HelpDesk/admin/tickets/...
+
+=cut
+
+sub admin_tickets_base :Chained('admin_base') :PathPart('tickets') :CaptureArgs(0) {
+    my ($self, $c) = @_;
+}
+
+=head2 admin_tickets_open
+
+Show all open tickets for admin — /HelpDesk/admin/tickets/open
+
+=cut
+
+sub admin_tickets_open :Chained('admin_tickets_base') :PathPart('open') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_tickets_open',
+        "Loading open tickets for admin");
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+
+    try {
+        my $schema  = $c->model('DBEncy')->schema;
+        my @tickets = $schema->resultset('SupportTicket')->search(
+            { site_name => $site_name, status => 'open' },
+            { order_by => { -desc => 'created_at' }, rows => 100 }
+        )->all;
+
+        $c->stash(
+            template    => 'CSC/HelpDesk/admin_tickets.tt',
+            tickets     => \@tickets,
+            title       => 'Open Tickets',
+            status_filter => 'open',
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_tickets_open',
+            "Error loading open tickets: $_");
+        $c->stash(
+            template    => 'CSC/HelpDesk/admin_tickets.tt',
+            tickets     => [],
+            error_msg   => 'Error loading tickets.',
+            title       => 'Open Tickets',
+            status_filter => 'open',
+        );
+    };
+
+    $c->forward($c->view('TT'));
+}
+
+=head2 admin_tickets_all
+
+Show all tickets for admin — /HelpDesk/admin/tickets/all
+
+=cut
+
+sub admin_tickets_all :Chained('admin_tickets_base') :PathPart('all') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_tickets_all',
+        "Loading all tickets for admin");
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+
+    try {
+        my $schema  = $c->model('DBEncy')->schema;
+        my @tickets = $schema->resultset('SupportTicket')->search(
+            { site_name => $site_name },
+            { order_by => { -desc => 'created_at' }, rows => 200 }
+        )->all;
+
+        $c->stash(
+            template    => 'CSC/HelpDesk/admin_tickets.tt',
+            tickets     => \@tickets,
+            title       => 'All Tickets',
+            status_filter => 'all',
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_tickets_all',
+            "Error loading tickets: $_");
+        $c->stash(
+            template    => 'CSC/HelpDesk/admin_tickets.tt',
+            tickets     => [],
+            error_msg   => 'Error loading tickets.',
+            title       => 'All Tickets',
+            status_filter => 'all',
+        );
+    };
+
     $c->forward($c->view('TT'));
 }
 
