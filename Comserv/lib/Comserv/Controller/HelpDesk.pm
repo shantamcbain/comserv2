@@ -476,15 +476,17 @@ sub view_ticket :Chained('ticket_base') :PathPart('view') :Args(1) {
                 "Could not load ticket messages: $@");
         }
 
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_ticket',
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view_ticket',
             "Loaded " . scalar(@messages) . " messages for ticket $ticket_number");
 
         $c->stash(
-            template  => 'CSC/HelpDesk/ticket_view.tt',
-            ticket    => $ticket,
-            messages  => \@messages,
-            is_staff  => $is_admin,
-            title     => 'Ticket: ' . $ticket_number,
+            template     => 'CSC/HelpDesk/ticket_view.tt',
+            ticket       => $ticket,
+            messages     => \@messages,
+            is_staff     => $is_admin,
+            title        => 'Ticket: ' . $ticket_number,
+            success_msg  => $c->flash->{success_msg} || '',
+            error_msg    => $c->flash->{error_msg}   || '',
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view_ticket',
@@ -508,6 +510,9 @@ Add a reply message to a ticket and email the other party
 sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
     my ($self, $c, $ticket_number) = @_;
 
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'ticket_reply',
+        "ticket_reply called: method=" . $c->req->method . " ticket=$ticket_number");
+
     unless ($c->req->method eq 'POST') {
         $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
         return;
@@ -515,6 +520,7 @@ sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
 
     my $body_text = $c->req->params->{reply_body} || '';
     unless ($body_text) {
+        $c->flash->{error_msg} = 'Reply body cannot be empty.';
         $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
         return;
     }
@@ -543,7 +549,7 @@ sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
             return;
         }
 
-        $schema->resultset('TicketMessage')->create({
+        my $msg = $schema->resultset('TicketMessage')->create({
             ticket_id    => $ticket->id,
             sender_type  => $sender_type,
             sender_name  => $sender_name,
@@ -551,6 +557,8 @@ sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
             body         => $body_text,
             created_at   => strftime('%Y-%m-%d %H:%M:%S', localtime),
         });
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'ticket_reply',
+            "Message inserted OK: id=" . $msg->id . " ticket_id=" . $ticket->id);
 
         if ($sender_type eq 'staff') {
             my $to_email = $ticket->email || '';
@@ -593,9 +601,12 @@ sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
             }
         }
 
+        $c->flash->{success_msg} = 'Your reply has been posted.';
+
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'ticket_reply',
             "Error posting reply: $_");
+        $c->flash->{error_msg} = 'Error posting reply: ' . $_;
     };
 
     $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
