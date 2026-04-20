@@ -469,7 +469,15 @@ sub view_ticket :Chained('ticket_base') :PathPart('view') :Args(1) {
             return;
         }
 
-        my @messages = eval { $ticket->messages->all } // ();
+        my @messages;
+        eval { @messages = $ticket->messages->all };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view_ticket',
+                "Could not load ticket messages: $@");
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_ticket',
+            "Loaded " . scalar(@messages) . " messages for ticket $ticket_number");
 
         $c->stash(
             template  => 'CSC/HelpDesk/ticket_view.tt',
@@ -543,29 +551,44 @@ sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
             body         => $body_text,
         });
 
-        if ($sender_type eq 'staff' && $ticket->email) {
-            my $subject = "Re: [Ticket " . $ticket->ticket_number . "] " . $ticket->subject;
-            my $body    = "Hello,\n\n"
-                . "A staff member has replied to your support ticket.\n\n"
-                . "--- Reply from $sender_name ---\n$body_text\n\n"
-                . "View your ticket: " . $c->uri_for('/HelpDesk/ticket/view/' . $ticket_number) . "\n\n"
-                . "Regards,\n$site_name Support Team";
-            eval { $c->model('Mail')->send_email($c, $ticket->email, $subject, $body) };
-            $self->logging->log_with_details($c, $@ ? 'error' : 'info', __FILE__, __LINE__, 'ticket_reply',
-                $@ ? "Email to submitter failed: $@" : "Reply email sent to " . $ticket->email);
+        if ($sender_type eq 'staff') {
+            my $to_email = $ticket->email || '';
+            if ($to_email) {
+                my $subject = "Re: [Ticket " . $ticket->ticket_number . "] " . $ticket->subject;
+                my $body    = "Hello,\n\n"
+                    . "A staff member has replied to your support ticket.\n\n"
+                    . "--- Reply from $sender_name ---\n$body_text\n\n"
+                    . "View your ticket: " . $c->uri_for('/HelpDesk/ticket/view/' . $ticket_number) . "\n\n"
+                    . "Regards,\n$site_name Support Team";
+                eval { $c->model('Mail')->send_email($c, $to_email, $subject, $body) };
+                $self->logging->log_with_details($c, $@ ? 'error' : 'info', __FILE__, __LINE__, 'ticket_reply',
+                    $@ ? "Email to submitter failed: $@" : "Reply email sent to $to_email");
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'ticket_reply',
+                    "No email address on ticket " . $ticket->ticket_number . " — skipping notification email");
+            }
         } elsif ($sender_type eq 'user') {
-            my $from_email = $c->model('Mail')->can('get_smtp_config')
-                ? eval { $c->model('Mail')->get_smtp_config($c, undef)->{from} } || ''
-                : '';
-            my $staff_subject = "[HelpDesk] Customer reply on Ticket " . $ticket->ticket_number;
-            my $staff_body    = "A customer has replied to ticket " . $ticket->ticket_number . ".\n\n"
-                . "Subject: " . $ticket->subject . "\n"
-                . "From: $sender_name ($sender_email)\n\n"
-                . "--- Reply ---\n$body_text\n\n"
-                . "View ticket: " . $c->uri_for('/HelpDesk/admin/tickets/open') . "\n\n"
-                . "Regards,\n$site_name HelpDesk";
+            my $site_id   = $c->session->{site_id} || undef;
+            my $from_email = '';
+            eval {
+                if ($c->model('Mail')->can('get_smtp_config')) {
+                    my $smtp_cfg = $c->model('Mail')->get_smtp_config($c, $site_id);
+                    $from_email  = $smtp_cfg->{from} || $smtp_cfg->{username} || '';
+                }
+            };
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ticket_reply',
+                "Customer reply on ticket " . $ticket->ticket_number . "; staff notify email: " . ($from_email || 'none'));
             if ($from_email) {
+                my $staff_subject = "[HelpDesk] Customer reply on Ticket " . $ticket->ticket_number;
+                my $staff_body    = "A customer has replied to ticket " . $ticket->ticket_number . ".\n\n"
+                    . "Subject: " . $ticket->subject . "\n"
+                    . "From: $sender_name ($sender_email)\n\n"
+                    . "--- Reply ---\n$body_text\n\n"
+                    . "View ticket: " . $c->uri_for('/HelpDesk/admin/tickets/open') . "\n\n"
+                    . "Regards,\n$site_name HelpDesk";
                 eval { $c->model('Mail')->send_email($c, $from_email, $staff_subject, $staff_body) };
+                $self->logging->log_with_details($c, $@ ? 'error' : 'info', __FILE__, __LINE__, 'ticket_reply',
+                    $@ ? "Staff notify email failed: $@" : "Staff notify email sent to $from_email");
             }
         }
 
