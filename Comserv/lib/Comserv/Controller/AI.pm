@@ -1389,8 +1389,18 @@ sub generate :Local :Args(0) {
             # Pass 1: trim history messages.  Pass 1.5: drop oldest history pairs.
             # Pass 2: strip page_content from system.  Pass 3: hard-cap system prompt.
             # Planning/ENCY/BMaster agents have large injected system prompts — raise limits.
-            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint accounting)) ? 16_000 : 8_000;
-            my $SYS_MAX_CHARS = ($normalized_agent_type =~ /^(planning|accounting)$/) ? 12_000 : 6_000;
+            # Admin users have larger nav guides — raise limits so admin links are not truncated.
+            my $_gen_is_admin = !$is_guest && do {
+                my $_gr = $c->session->{roles} || [];
+                $_gr = [split /,/, $_gr] unless ref $_gr;
+                grep { /^(admin|developer|editor)$/i } @$_gr;
+            };
+            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint accounting)) ? 16_000
+                              : $_gen_is_admin ? 14_000
+                              : 8_000;
+            my $SYS_MAX_CHARS = ($normalized_agent_type =~ /^(planning|accounting)$/) ? 12_000
+                               : $_gen_is_admin                                        ? 10_000
+                               : 6_000;
             my $raw_total_gen = 0;
             $raw_total_gen += length($_->{content} || '') for @ollama_msgs;
             if ($raw_total_gen > $BUDGET_CHARS) {
@@ -1428,9 +1438,12 @@ sub generate :Local :Args(0) {
                     $ollama_msgs[0]{content} = $sys;
                     push @trace, "⚠️ Stripped page_content from system prompt (still over budget)";
 
-                    # Pass 3: hard-cap system prompt to SYS_MAX_CHARS
+                    # Pass 3: hard-cap system prompt to SYS_MAX_CHARS (snap to newline to avoid mid-URL cuts)
                     if (length($sys) > $SYS_MAX_CHARS) {
-                        $ollama_msgs[0]{content} = substr($sys, 0, $SYS_MAX_CHARS) . "\n[system prompt truncated to fit context budget]";
+                        my $cut = substr($sys, 0, $SYS_MAX_CHARS);
+                        my $nl  = rindex($cut, "\n");
+                        $cut    = substr($cut, 0, $nl > 0 ? $nl : $SYS_MAX_CHARS);
+                        $ollama_msgs[0]{content} = $cut . "\n[system prompt truncated to fit context budget]";
                         push @trace, sprintf("⚠️ System prompt truncated from %d to %d chars", length($sys), $SYS_MAX_CHARS);
                     }
                 }
@@ -2661,8 +2674,13 @@ sub chat :Local :Args(0) {
             # Pass 1: trim messages.  Pass 1.5: drop oldest history pairs.
             # Pass 2: strip page_content.  Pass 3: hard-cap system prompt.
             # Planning/ENCY/BMaster agents have large injected system prompts — raise limits.
-            my $BUDGET_CHARS  = (grep { lc($chat_agent_id) eq $_ } qw(planning ency bmaster 3dprint)) ? 16_000 : 8_000;
-            my $SYS_MAX_CHARS_CHAT = lc($chat_agent_id) eq 'planning' ? 12_000 : 6_000;
+            # Admin users have larger nav guides — raise limits so admin links are not truncated.
+            my $BUDGET_CHARS  = (grep { lc($chat_agent_id) eq $_ } qw(planning ency bmaster 3dprint)) ? 16_000
+                              : $can_select_model_perm ? 14_000
+                              : 8_000;
+            my $SYS_MAX_CHARS_CHAT = lc($chat_agent_id) eq 'planning'   ? 12_000
+                                   : $can_select_model_perm             ? 10_000
+                                   : 6_000;
             my $raw_total = 0;
             $raw_total += length($_->{content} || '') for @ollama_messages;
             if ($raw_total > $BUDGET_CHARS) {
@@ -2699,7 +2717,10 @@ sub chat :Local :Args(0) {
                     push @chat_trace, "⚠️ Stripped page_content from system prompt (still over budget)";
                     # Pass 3: hard-cap system prompt
                     if (length($sys) > $SYS_MAX_CHARS_CHAT) {
-                        $ollama_messages[0]{content} = substr($sys, 0, $SYS_MAX_CHARS_CHAT) . "\n[system prompt truncated to fit context budget]";
+                        my $cut = substr($sys, 0, $SYS_MAX_CHARS_CHAT);
+                        my $nl  = rindex($cut, "\n");
+                        $cut    = substr($cut, 0, $nl > 0 ? $nl : $SYS_MAX_CHARS_CHAT);
+                        $ollama_messages[0]{content} = $cut . "\n[system prompt truncated to fit context budget]";
                         push @chat_trace, sprintf("⚠️ System prompt truncated from %d to %d chars", length($sys), $SYS_MAX_CHARS_CHAT);
                     }
                 }
@@ -4828,6 +4849,8 @@ Rules:
 - ALWAYS use the real numeric todo_id from the LIVE TODO DATA above — never make up an ID.
 - Include the action block in addition to your normal response text, not instead of it.
 - The application will automatically execute the action and show the user a confirmation.
+
+SUPPORT ESCALATION: If you genuinely cannot help the user (question requires a human, account-specific access you don't have, or is truly outside your capabilities), add [SUPPORT_NEEDED] on its own line at the very end of your response. The widget will then offer the user options to create a support ticket or start a live chat with support staff. Only use [SUPPORT_NEEDED] when you truly cannot help — not for questions you can answer.
 ACTION
 
     if ($is_admin) {
@@ -4870,7 +4893,8 @@ ACTION
              . "NEVER mention /admin, /admin/*, or any administrative URL. "
              . "NEVER use your training knowledge to guess application URLs — only use the navigation guide. "
              . "If a user asks about the admin panel or any admin feature, say: "
-             . "'That section requires administrator privileges. Please log in with an admin account or contact your system administrator.'"
+             . "'That section requires administrator privileges. Please log in with an admin account or contact your system administrator.' "
+             . "SUPPORT ESCALATION: If you genuinely cannot help, add [SUPPORT_NEEDED] on its own line at the very end of your response so the user can be connected with support staff."
              . $guest_knowledge
              . $page_nav
              . $nav_guide;
@@ -4917,27 +4941,78 @@ sub _build_navigation_command_guide {
     # Each section: [ section_name, min_role, [ [label, path], ... ] ]
     # min_role: 'guest' | 'user' | 'admin'
     my @sections = (
+        # ── High-priority: put admin sections FIRST so they survive truncation ──
+        [ 'Admin', 'admin', [
+            [ 'Admin panel',                '/admin'                    ],
+            [ 'User management',            '/admin/users'              ],
+            [ 'Application logs',           '/admin/logs'               ],
+            [ 'Git pull',                   '/admin/git_pull'           ],
+            [ 'Docker containers',          '/admin/docker-containers'  ],
+            [ 'Theme management',           '/themeadmin'               ],
+            [ 'Planning',                   '/admin/planning'           ],
+            [ 'System info',                '/admin/system_info'        ],
+            [ 'Admin settings',             '/admin/settings'           ],
+            [ 'Log viewer',                 '/log'                      ],
+            [ 'File management',            '/file/list'                ],
+            [ 'Duplicate files',            '/file/duplicates'          ],
+        ]],
+        [ 'Inventory', 'admin', [
+            [ 'Inventory dashboard',        '/Inventory'                ],
+            [ 'Inventory items',            '/Inventory/items'          ],
+            [ 'Add inventory item',         '/Inventory/item/add'       ],
+            [ 'Suppliers',                  '/Inventory/suppliers'      ],
+            [ 'Add supplier',               '/Inventory/supplier/add'   ],
+            [ 'Supplier invoices',          '/Inventory/invoice'        ],
+            [ 'New supplier invoice',       '/Inventory/invoice/new'    ],
+            [ 'Stock transactions',         '/Inventory/stock/transactions' ],
+            [ 'Customer sales',             '/Inventory/sales'          ],
+            [ 'Consignments',               '/Inventory/consignment'    ],
+            [ 'New consignment',            '/Inventory/consignment/new' ],
+            [ 'Consignment partners',       '/Inventory/consignment/partners' ],
+        ]],
+        [ 'Accounting', 'admin', [
+            [ 'Accounting dashboard',       '/Accounting'               ],
+            [ 'Chart of accounts',          '/Accounting/coa'           ],
+            [ 'Seed / import COA',          '/Accounting/coa/seed'      ],
+            [ 'Merge COA seed',             '/Accounting/coa/seed_merge'],
+            [ 'General ledger',             '/Accounting/gl'            ],
+        ]],
+        [ 'Site management (admin)', 'admin', [
+            [ 'Site list / setup',          '/site'                     ],
+            [ 'Add a new site',             '/site/add_site'            ],
+            [ 'Add a domain to a site',     '/site/add_domain'          ],
+            [ 'Site details',               '/site/details'             ],
+            [ 'Modify site',                '/site/modify'              ],
+        ]],
+        [ 'AI Assistant (admin)', 'admin', [
+            [ 'Manage AI models',           '/ai/models'                ],
+            [ 'AI server status',           '/ai/check_status'          ],
+            [ 'Support chat admin',         '/chat/admin'               ],
+        ]],
+        # ── Common sections ───────────────────────────────────────────────────
         [ 'Home', 'guest', [
             [ 'Main menu / home',           '/'                         ],
         ]],
-        [ 'Workshops', 'guest', [
-            [ 'Workshops home',             '/workshop'                 ],
-            [ 'Add a workshop',             '/workshop/add'             ],
+        [ 'Tasks / Todos', 'user', [
+            [ 'Todo list',                  '/todo'                     ],
+            [ 'Todos by day',               '/todo?filter=day'          ],
+            [ 'Todos by week',              '/todo?filter=week'         ],
+            [ 'Todos by month',             '/todo?filter=month'        ],
+            [ 'Add a todo',                 '/todo/addtodo'             ],
         ]],
-        [ 'Workshops (logged in)', 'user', [
-            [ 'My workshop dashboard',      '/workshop/dashboard'       ],
+        [ 'Projects', 'user', [
+            [ 'Projects home',              '/project'                  ],
+            [ 'Add a project',              '/project/addproject'       ],
         ]],
-        [ 'Workshops (admin/leader)', 'admin', [
-            [ 'Workshop resources',         '/workshop/resources'       ],
+        [ 'User account', 'guest', [
+            [ 'Login',                      '/user/login'               ],
+            [ 'Create account',             '/user/create_account'      ],
+            [ 'Forgot password',            '/user/forgot_password'     ],
         ]],
-        [ 'Documentation', 'guest', [
-            [ 'Documentation home',         '/Documentation'            ],
-            [ 'Daily plan',                 '/Documentation/DailyPlan'  ],
-        ]],
-        [ 'Encyclopedia (ENCY)', 'guest', [
-            [ 'Encyclopedia home',          '/ENCY'                     ],
-            [ 'Encyclopedia search',        '/ENCY/search'              ],
-            [ 'Bee pasture / plant forage', '/ENCY/BeePastureView'      ],
+        [ 'User account (logged in)', 'user', [
+            [ 'My profile',                 '/user/profile'             ],
+            [ 'Account settings',           '/user/settings'            ],
+            [ 'Logout',                     '/user/logout'              ],
         ]],
         [ 'HelpDesk', 'guest', [
             [ 'HelpDesk home',              '/HelpDesk'                 ],
@@ -4955,21 +5030,6 @@ sub _build_navigation_command_guide {
             [ 'Manage API keys',            '/ai/manage_api_keys'       ],
             [ 'AI in-app action endpoint',  '/ai/action'                ],
         ]],
-        [ 'AI Assistant (admin)', 'admin', [
-            [ 'Manage AI models',           '/ai/models'                ],
-            [ 'AI server status',           '/ai/check_status'          ],
-        ]],
-        [ 'Tasks / Todos', 'user', [
-            [ 'Todo list',                  '/todo'                     ],
-            [ 'Todos by day',               '/todo?filter=day'          ],
-            [ 'Todos by week',              '/todo?filter=week'         ],
-            [ 'Todos by month',             '/todo?filter=month'        ],
-            [ 'Add a todo',                 '/todo/addtodo'             ],
-        ]],
-        [ 'Projects', 'user', [
-            [ 'Projects home',              '/project'                  ],
-            [ 'Add a project',              '/project/addproject'       ],
-        ]],
         [ 'Marketplace', 'guest', [
             [ 'Marketplace / buy and sell', '/marketplace'              ],
             [ 'Browse listings',            '/marketplace/browse'       ],
@@ -4978,54 +5038,24 @@ sub _build_navigation_command_guide {
             [ 'Post a listing / sell item', '/marketplace/add'          ],
             [ 'My listings',                '/marketplace/my_listings'  ],
         ]],
-        [ 'User account', 'guest', [
-            [ 'Login',                      '/user/login'               ],
-            [ 'Create account',             '/user/create_account'      ],
-            [ 'Forgot password',            '/user/forgot_password'     ],
+        [ 'Documentation', 'guest', [
+            [ 'Documentation home',         '/Documentation'            ],
+            [ 'Daily plan',                 '/Documentation/DailyPlan'  ],
         ]],
-        [ 'User account (logged in)', 'user', [
-            [ 'My profile',                 '/user/profile'             ],
-            [ 'Account settings',           '/user/settings'            ],
-            [ 'Logout',                     '/user/logout'              ],
+        [ 'Encyclopedia (ENCY)', 'guest', [
+            [ 'Encyclopedia home',          '/ENCY'                     ],
+            [ 'Encyclopedia search',        '/ENCY/search'              ],
+            [ 'Bee pasture / plant forage', '/ENCY/BeePastureView'      ],
         ]],
-        [ 'Admin', 'admin', [
-            [ 'Admin panel',                '/admin'                    ],
-            [ 'User management',            '/admin/users'              ],
-            [ 'Application logs',           '/admin/logs'               ],
-            [ 'Git pull',                   '/admin/git_pull'           ],
-            [ 'Docker containers',          '/admin/docker-containers'  ],
-            [ 'Theme management',           '/themeadmin'               ],
-            [ 'Planning',                   '/admin/planning'           ],
-            [ 'System info',                '/admin/system_info'        ],
-            [ 'Admin settings',             '/admin/settings'           ],
-            [ 'Log viewer',                 '/log'                      ],
-            [ 'File management',            '/file/list'                ],
-            [ 'Duplicate files',            '/file/duplicates'          ],
+        [ 'Workshops', 'guest', [
+            [ 'Workshops home',             '/workshop'                 ],
+            [ 'Add a workshop',             '/workshop/add'             ],
         ]],
-        [ 'Site management (admin)', 'admin', [
-            [ 'Site list / setup',          '/site'                     ],
-            [ 'Add a new site',             '/site/add_site'            ],
-            [ 'Add a domain to a site',     '/site/add_domain'          ],
-            [ 'Site details',               '/site/details'             ],
-            [ 'Modify site',                '/site/modify'              ],
+        [ 'Workshops (logged in)', 'user', [
+            [ 'My workshop dashboard',      '/workshop/dashboard'       ],
         ]],
-        [ 'Accounting', 'admin', [
-            [ 'Accounting dashboard',       '/Accounting'               ],
-            [ 'Chart of accounts',          '/Accounting/coa'           ],
-            [ 'Seed / import COA',          '/Accounting/coa/seed'      ],
-            [ 'Merge COA seed',             '/Accounting/coa/seed_merge'],
-            [ 'General ledger',             '/Accounting/gl'            ],
-        ]],
-        [ 'Inventory', 'admin', [
-            [ 'Inventory dashboard',        '/Inventory'                ],
-            [ 'Inventory items',            '/Inventory/items'          ],
-            [ 'Add inventory item',         '/Inventory/item/add'       ],
-            [ 'Suppliers',                  '/Inventory/suppliers'      ],
-            [ 'Add supplier',               '/Inventory/supplier/add'   ],
-            [ 'Supplier invoices',          '/Inventory/invoice'        ],
-            [ 'New supplier invoice',       '/Inventory/invoice/new'    ],
-            [ 'Stock transactions',         '/Inventory/stock/transactions' ],
-            [ 'Customer sales',             '/Inventory/sales'          ],
+        [ 'Workshops (admin/leader)', 'admin', [
+            [ 'Workshop resources',         '/workshop/resources'       ],
         ]],
     );
 
@@ -5056,6 +5086,14 @@ sub _build_navigation_command_guide {
          . "Present the full list as a numbered or bulleted list so nothing is missed.\n"
          . "Only use URLs from this list; do not invent others. "
          . "If no match exists for a navigation request, say: 'I don't know that page — visit $base_url to browse available options.'\n"
+         . "CONSIGNMENT QUICK REFERENCE (for consignment questions from any page):\n"
+         . "Consignment = sending items to a partner store to sell on your behalf.\n"
+         . "  List:      $base_url/Inventory/consignment\n"
+         . "  New batch: $base_url/Inventory/consignment/new\n"
+         . "  Partners:  $base_url/Inventory/consignment/partners\n"
+         . "  Docs:      $base_url/Documentation/Inventory/consignment\n"
+         . "Workflow: Set up partner → create batch (select items + qty + retail price) → view/print slip → settle when partner pays\n"
+         . "Known partners: Monashee Arts Council (Lumby BC), Monashee Coop (30% commission)\n"
          . $guide;
 }
 
@@ -5163,6 +5201,40 @@ sub _build_page_navigation_hint {
             $hint .= "Navigation context — Projects (guest):\n"
                    . "- Log in to view project information.\n";
         }
+    } elsif ($page_path =~ m{/Inventory/consignment}i) {
+        $hint .= "Navigation context — Consignment Tracking:\n"
+               . "Consignment = sending items to a partner store; partner sells them and keeps a commission.\n"
+               . "- Consignment list:        $base_url/Inventory/consignment\n"
+               . "- Create new consignment:  $base_url/Inventory/consignment/new\n"
+               . "- Consignment partners:    $base_url/Inventory/consignment/partners\n"
+               . "- View/settle:             $base_url/Inventory/consignment/view/<id>\n"
+               . "- Full docs:               $base_url/Documentation/Inventory/consignment\n"
+               . "WORKFLOW: 1) Set up a partner at /Inventory/consignment/partners\n"
+               . "2) Create batch at /Inventory/consignment/new — select partner, enter items + qty + retail price\n"
+               . "3) View consignment to print slip or settle when partner pays\n"
+               . "4) On settlement: enter qty sold and qty returned per line; optionally post GL entry\n"
+               . "Partners: Monashee Arts Council (Lumby), Monashee Coop (30% commission)\n";
+    } elsif ($page_path =~ m{/Inventory}i) {
+        $hint .= "Navigation context — Inventory:\n"
+               . "- Inventory dashboard:    $base_url/Inventory\n"
+               . "- Items list:             $base_url/Inventory/items\n"
+               . "- Add item:               $base_url/Inventory/item/add\n"
+               . "- Suppliers:              $base_url/Inventory/suppliers\n"
+               . "- Supplier invoices:      $base_url/Inventory/invoice\n"
+               . "- New invoice:            $base_url/Inventory/invoice/new\n"
+               . "- Stock transactions:     $base_url/Inventory/stock/transactions\n"
+               . "- Customer sales:         $base_url/Inventory/sales\n"
+               . "- Consignments:           $base_url/Inventory/consignment\n"
+               . "- New consignment:        $base_url/Inventory/consignment/new\n"
+               . "- Consignment partners:   $base_url/Inventory/consignment/partners\n"
+               . "- Consignment docs:       $base_url/Documentation/Inventory/consignment\n";
+    } elsif ($page_path =~ m{/Accounting}i) {
+        $hint .= "Navigation context — Accounting:\n"
+               . "- Accounting dashboard:   $base_url/Accounting\n"
+               . "- Chart of accounts:      $base_url/Accounting/coa\n"
+               . "- General ledger:         $base_url/Accounting/gl\n"
+               . "- Consignment settlement posts GL: DR AR + Commission / CR Sales Revenue\n"
+               . "- For consignment management go to: $base_url/Inventory/consignment\n";
     } elsif ($page_path =~ m{/ency}i) {
         $hint .= "Navigation context — Encyclopedia:\n"
                 . "- Search for information: $base_url/ency/search?q=TERM\n";
@@ -8508,6 +8580,13 @@ account categories:
 - Customer sales list:        /Inventory/sales
 - Suppliers list:             /Inventory/suppliers
 - Add supplier:               /Inventory/supplier/add
+- Consignment list:           /Inventory/consignment
+- New consignment form:       /Inventory/consignment/new
+- View consignment:           /Inventory/consignment/view/<id>
+- Settle consignment:         /Inventory/consignment/settle/<id>  (POST from view page)
+- Delete consignment:         /Inventory/consignment/delete/<id>
+- Consignment partners:       /Inventory/consignment/partners
+- Consignment docs:           /Documentation/Inventory/consignment
 - AI usage cost allocation:   /Accounting/ai_usage
 - Accounting docs overview:   /Documentation/Accounting
 - COA documentation:          /Documentation/Accounting/coa
@@ -8544,6 +8623,40 @@ Debit increases Assets and Expenses; Credit increases Liabilities, Equity, Incom
 - expense_accno   → Expense/COGS (5000 COGS) — debited on supplier invoice purchase
 - returns_accno   → Contra-income (4100 Sales Returns) — debited on customer returns
 Warning: system does not enforce correct account type — admin must choose correctly.
+
+## CONSIGNMENT WORKFLOW
+
+Consignment means sending your items to a partner store who sells them on your behalf.
+The partner keeps a commission percentage; you receive the remainder. You retain ownership until sold or returned.
+
+### Step 1 — Set up a consignment partner (one-time per partner)
+Go to /Inventory/consignment/partners or click "Consignment partners" in the Inventory nav.
+Fill in: Partner Name, Address, Commission % (e.g. 30 for Monashee Coop), Contact info.
+Current partners for 3D: Monashee Arts Council (Vernon St, Lumby), Monashee Coop (30% commission).
+
+### Step 2 — Create a new consignment batch
+Go to /Inventory/consignment/new or click "New consignment" in the Inventory nav.
+Form fields:
+- Partner (required) — select from your partner list; shows commission % automatically
+- Date Sent (required) — defaults to today
+- Reference # — optional internal reference
+- Notes — any notes about the batch
+- Line items: select Item, enter Quantity Sent, set Retail Price per unit
+  - Click "Add Item" to add more rows; use the × button to remove a row
+  - Items must already exist in /Inventory/items before they can be consigned
+On save: stock is reduced by the consigned quantity (transaction_type = consignment_out).
+You are redirected to the consignment list at /Inventory/consignment.
+
+### Step 3 — View and print a consignment
+Click any consignment in the list at /Inventory/consignment to open /Inventory/consignment/view/<id>.
+The view page shows all lines, partner, dates, and a Print Slip button for a physical record.
+
+### Step 4 — Settle a consignment (when partner pays you)
+From the view page (/Inventory/consignment/view/<id>), enter qty sold and qty returned for each line, then click Settle.
+The system calculates: gross revenue, commission deducted, net revenue to you.
+Stock is reduced further by qty_sold (transaction_type = consignment_sold) and returned qty goes back to stock.
+If "Post GL entry" is checked on the settlement form, a journal entry posts automatically:
+  DR 1100 AR (net revenue) + DR 5600 Commission / CR 4000 Sales Revenue (gross)
 
 ### Automatic GL Posting
 - Supplier invoice saved → DR expense/inventory accounts + DR tax + DR shipping; CR AP (fully automatic)
