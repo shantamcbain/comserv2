@@ -1438,9 +1438,12 @@ sub generate :Local :Args(0) {
                     $ollama_msgs[0]{content} = $sys;
                     push @trace, "⚠️ Stripped page_content from system prompt (still over budget)";
 
-                    # Pass 3: hard-cap system prompt to SYS_MAX_CHARS
+                    # Pass 3: hard-cap system prompt to SYS_MAX_CHARS (snap to newline to avoid mid-URL cuts)
                     if (length($sys) > $SYS_MAX_CHARS) {
-                        $ollama_msgs[0]{content} = substr($sys, 0, $SYS_MAX_CHARS) . "\n[system prompt truncated to fit context budget]";
+                        my $cut = substr($sys, 0, $SYS_MAX_CHARS);
+                        my $nl  = rindex($cut, "\n");
+                        $cut    = substr($cut, 0, $nl > 0 ? $nl : $SYS_MAX_CHARS);
+                        $ollama_msgs[0]{content} = $cut . "\n[system prompt truncated to fit context budget]";
                         push @trace, sprintf("⚠️ System prompt truncated from %d to %d chars", length($sys), $SYS_MAX_CHARS);
                     }
                 }
@@ -2714,7 +2717,10 @@ sub chat :Local :Args(0) {
                     push @chat_trace, "⚠️ Stripped page_content from system prompt (still over budget)";
                     # Pass 3: hard-cap system prompt
                     if (length($sys) > $SYS_MAX_CHARS_CHAT) {
-                        $ollama_messages[0]{content} = substr($sys, 0, $SYS_MAX_CHARS_CHAT) . "\n[system prompt truncated to fit context budget]";
+                        my $cut = substr($sys, 0, $SYS_MAX_CHARS_CHAT);
+                        my $nl  = rindex($cut, "\n");
+                        $cut    = substr($cut, 0, $nl > 0 ? $nl : $SYS_MAX_CHARS_CHAT);
+                        $ollama_messages[0]{content} = $cut . "\n[system prompt truncated to fit context budget]";
                         push @chat_trace, sprintf("⚠️ System prompt truncated from %d to %d chars", length($sys), $SYS_MAX_CHARS_CHAT);
                     }
                 }
@@ -4935,27 +4941,75 @@ sub _build_navigation_command_guide {
     # Each section: [ section_name, min_role, [ [label, path], ... ] ]
     # min_role: 'guest' | 'user' | 'admin'
     my @sections = (
+        # ── High-priority: put admin sections FIRST so they survive truncation ──
+        [ 'Admin', 'admin', [
+            [ 'Admin panel',                '/admin'                    ],
+            [ 'User management',            '/admin/users'              ],
+            [ 'Application logs',           '/admin/logs'               ],
+            [ 'Git pull',                   '/admin/git_pull'           ],
+            [ 'Docker containers',          '/admin/docker-containers'  ],
+            [ 'Theme management',           '/themeadmin'               ],
+            [ 'Planning',                   '/admin/planning'           ],
+            [ 'System info',                '/admin/system_info'        ],
+            [ 'Admin settings',             '/admin/settings'           ],
+            [ 'Log viewer',                 '/log'                      ],
+            [ 'File management',            '/file/list'                ],
+            [ 'Duplicate files',            '/file/duplicates'          ],
+        ]],
+        [ 'Inventory', 'admin', [
+            [ 'Inventory dashboard',        '/Inventory'                ],
+            [ 'Inventory items',            '/Inventory/items'          ],
+            [ 'Add inventory item',         '/Inventory/item/add'       ],
+            [ 'Suppliers',                  '/Inventory/suppliers'      ],
+            [ 'Add supplier',               '/Inventory/supplier/add'   ],
+            [ 'Supplier invoices',          '/Inventory/invoice'        ],
+            [ 'New supplier invoice',       '/Inventory/invoice/new'    ],
+            [ 'Stock transactions',         '/Inventory/stock/transactions' ],
+            [ 'Customer sales',             '/Inventory/sales'          ],
+        ]],
+        [ 'Accounting', 'admin', [
+            [ 'Accounting dashboard',       '/Accounting'               ],
+            [ 'Chart of accounts',          '/Accounting/coa'           ],
+            [ 'Seed / import COA',          '/Accounting/coa/seed'      ],
+            [ 'Merge COA seed',             '/Accounting/coa/seed_merge'],
+            [ 'General ledger',             '/Accounting/gl'            ],
+        ]],
+        [ 'Site management (admin)', 'admin', [
+            [ 'Site list / setup',          '/site'                     ],
+            [ 'Add a new site',             '/site/add_site'            ],
+            [ 'Add a domain to a site',     '/site/add_domain'          ],
+            [ 'Site details',               '/site/details'             ],
+            [ 'Modify site',                '/site/modify'              ],
+        ]],
+        [ 'AI Assistant (admin)', 'admin', [
+            [ 'Manage AI models',           '/ai/models'                ],
+            [ 'AI server status',           '/ai/check_status'          ],
+            [ 'Support chat admin',         '/chat/admin'               ],
+        ]],
+        # ── Common sections ───────────────────────────────────────────────────
         [ 'Home', 'guest', [
             [ 'Main menu / home',           '/'                         ],
         ]],
-        [ 'Workshops', 'guest', [
-            [ 'Workshops home',             '/workshop'                 ],
-            [ 'Add a workshop',             '/workshop/add'             ],
+        [ 'Tasks / Todos', 'user', [
+            [ 'Todo list',                  '/todo'                     ],
+            [ 'Todos by day',               '/todo?filter=day'          ],
+            [ 'Todos by week',              '/todo?filter=week'         ],
+            [ 'Todos by month',             '/todo?filter=month'        ],
+            [ 'Add a todo',                 '/todo/addtodo'             ],
         ]],
-        [ 'Workshops (logged in)', 'user', [
-            [ 'My workshop dashboard',      '/workshop/dashboard'       ],
+        [ 'Projects', 'user', [
+            [ 'Projects home',              '/project'                  ],
+            [ 'Add a project',              '/project/addproject'       ],
         ]],
-        [ 'Workshops (admin/leader)', 'admin', [
-            [ 'Workshop resources',         '/workshop/resources'       ],
+        [ 'User account', 'guest', [
+            [ 'Login',                      '/user/login'               ],
+            [ 'Create account',             '/user/create_account'      ],
+            [ 'Forgot password',            '/user/forgot_password'     ],
         ]],
-        [ 'Documentation', 'guest', [
-            [ 'Documentation home',         '/Documentation'            ],
-            [ 'Daily plan',                 '/Documentation/DailyPlan'  ],
-        ]],
-        [ 'Encyclopedia (ENCY)', 'guest', [
-            [ 'Encyclopedia home',          '/ENCY'                     ],
-            [ 'Encyclopedia search',        '/ENCY/search'              ],
-            [ 'Bee pasture / plant forage', '/ENCY/BeePastureView'      ],
+        [ 'User account (logged in)', 'user', [
+            [ 'My profile',                 '/user/profile'             ],
+            [ 'Account settings',           '/user/settings'            ],
+            [ 'Logout',                     '/user/logout'              ],
         ]],
         [ 'HelpDesk', 'guest', [
             [ 'HelpDesk home',              '/HelpDesk'                 ],
@@ -4973,22 +5027,6 @@ sub _build_navigation_command_guide {
             [ 'Manage API keys',            '/ai/manage_api_keys'       ],
             [ 'AI in-app action endpoint',  '/ai/action'                ],
         ]],
-        [ 'AI Assistant (admin)', 'admin', [
-            [ 'Manage AI models',           '/ai/models'                ],
-            [ 'AI server status',           '/ai/check_status'          ],
-            [ 'Support chat admin',         '/chat/admin'               ],
-        ]],
-        [ 'Tasks / Todos', 'user', [
-            [ 'Todo list',                  '/todo'                     ],
-            [ 'Todos by day',               '/todo?filter=day'          ],
-            [ 'Todos by week',              '/todo?filter=week'         ],
-            [ 'Todos by month',             '/todo?filter=month'        ],
-            [ 'Add a todo',                 '/todo/addtodo'             ],
-        ]],
-        [ 'Projects', 'user', [
-            [ 'Projects home',              '/project'                  ],
-            [ 'Add a project',              '/project/addproject'       ],
-        ]],
         [ 'Marketplace', 'guest', [
             [ 'Marketplace / buy and sell', '/marketplace'              ],
             [ 'Browse listings',            '/marketplace/browse'       ],
@@ -4997,54 +5035,24 @@ sub _build_navigation_command_guide {
             [ 'Post a listing / sell item', '/marketplace/add'          ],
             [ 'My listings',                '/marketplace/my_listings'  ],
         ]],
-        [ 'User account', 'guest', [
-            [ 'Login',                      '/user/login'               ],
-            [ 'Create account',             '/user/create_account'      ],
-            [ 'Forgot password',            '/user/forgot_password'     ],
+        [ 'Documentation', 'guest', [
+            [ 'Documentation home',         '/Documentation'            ],
+            [ 'Daily plan',                 '/Documentation/DailyPlan'  ],
         ]],
-        [ 'User account (logged in)', 'user', [
-            [ 'My profile',                 '/user/profile'             ],
-            [ 'Account settings',           '/user/settings'            ],
-            [ 'Logout',                     '/user/logout'              ],
+        [ 'Encyclopedia (ENCY)', 'guest', [
+            [ 'Encyclopedia home',          '/ENCY'                     ],
+            [ 'Encyclopedia search',        '/ENCY/search'              ],
+            [ 'Bee pasture / plant forage', '/ENCY/BeePastureView'      ],
         ]],
-        [ 'Admin', 'admin', [
-            [ 'Admin panel',                '/admin'                    ],
-            [ 'User management',            '/admin/users'              ],
-            [ 'Application logs',           '/admin/logs'               ],
-            [ 'Git pull',                   '/admin/git_pull'           ],
-            [ 'Docker containers',          '/admin/docker-containers'  ],
-            [ 'Theme management',           '/themeadmin'               ],
-            [ 'Planning',                   '/admin/planning'           ],
-            [ 'System info',                '/admin/system_info'        ],
-            [ 'Admin settings',             '/admin/settings'           ],
-            [ 'Log viewer',                 '/log'                      ],
-            [ 'File management',            '/file/list'                ],
-            [ 'Duplicate files',            '/file/duplicates'          ],
+        [ 'Workshops', 'guest', [
+            [ 'Workshops home',             '/workshop'                 ],
+            [ 'Add a workshop',             '/workshop/add'             ],
         ]],
-        [ 'Site management (admin)', 'admin', [
-            [ 'Site list / setup',          '/site'                     ],
-            [ 'Add a new site',             '/site/add_site'            ],
-            [ 'Add a domain to a site',     '/site/add_domain'          ],
-            [ 'Site details',               '/site/details'             ],
-            [ 'Modify site',                '/site/modify'              ],
+        [ 'Workshops (logged in)', 'user', [
+            [ 'My workshop dashboard',      '/workshop/dashboard'       ],
         ]],
-        [ 'Accounting', 'admin', [
-            [ 'Accounting dashboard',       '/Accounting'               ],
-            [ 'Chart of accounts',          '/Accounting/coa'           ],
-            [ 'Seed / import COA',          '/Accounting/coa/seed'      ],
-            [ 'Merge COA seed',             '/Accounting/coa/seed_merge'],
-            [ 'General ledger',             '/Accounting/gl'            ],
-        ]],
-        [ 'Inventory', 'admin', [
-            [ 'Inventory dashboard',        '/Inventory'                ],
-            [ 'Inventory items',            '/Inventory/items'          ],
-            [ 'Add inventory item',         '/Inventory/item/add'       ],
-            [ 'Suppliers',                  '/Inventory/suppliers'      ],
-            [ 'Add supplier',               '/Inventory/supplier/add'   ],
-            [ 'Supplier invoices',          '/Inventory/invoice'        ],
-            [ 'New supplier invoice',       '/Inventory/invoice/new'    ],
-            [ 'Stock transactions',         '/Inventory/stock/transactions' ],
-            [ 'Customer sales',             '/Inventory/sales'          ],
+        [ 'Workshops (admin/leader)', 'admin', [
+            [ 'Workshop resources',         '/workshop/resources'       ],
         ]],
     );
 
