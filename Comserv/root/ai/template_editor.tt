@@ -1,0 +1,474 @@
+[% META
+   title       = "Template Editor"
+   description = "Admin tool to review and apply AI-proposed TT2 template edits"
+   roles       = "admin"
+   category    = "AI Module"
+   page_version = "0.01"
+%]
+[% PageVersion = 'ai/template_editor.tt,v 0.01 2026/04/18 shanta' %]
+
+<style>
+.te-wrap        { max-width: 1200px; margin: 0 auto; padding: 1rem; }
+.te-row         { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.te-col         { flex: 1; min-width: 280px; }
+.te-label       { font-weight: bold; margin-bottom: .3rem; display: block; font-size: .9rem; color: var(--text-color, #222); }
+.te-select,
+.te-textarea,
+.te-input       { width: 100%; box-sizing: border-box; padding: .5rem;
+                  border: 1px solid var(--nav-bg, #ccc); border-radius: 4px;
+                  background: var(--bg-color, #fff); color: var(--text-color, #222);
+                  font-family: monospace; font-size: .85rem; }
+.te-select      { font-family: inherit; }
+.te-textarea    { resize: vertical; }
+.te-btn         { padding: .5rem 1.2rem; border: none; border-radius: 4px; cursor: pointer;
+                  font-size: .9rem; font-weight: bold; }
+.te-btn-primary { background: #1a73e8; color: #fff; }
+.te-btn-success { background: #2a7a2a; color: #fff; }
+.te-btn-danger  { background: #9b0000; color: #fff; }
+.te-btn:disabled{ opacity: .5; cursor: not-allowed; }
+.te-status      { padding: .4rem .8rem; border-radius: 4px; font-size: .85rem; margin-top: .5rem; }
+.te-status.info { background: #e8f0fe; color: #1a73e8; }
+.te-status.ok   { background: #e6f4ea; color: #1e7e34; }
+.te-status.err  { background: #fce8e6; color: #9b0000; }
+.te-diff-panel  { display: none; }
+.te-diff-panel.visible { display: block; }
+.te-panels      { display: flex; gap: 1rem; flex-wrap: wrap; }
+.te-panels .te-col { min-width: 320px; }
+.te-section-head { font-size: 1rem; font-weight: bold; margin: 1rem 0 .4rem;
+                   border-bottom: 2px solid var(--nav-bg, #ccc); padding-bottom: .3rem; }
+</style>
+
+<div class="te-wrap">
+    <h1 style="margin-bottom:.3rem;">✏️ Template Editor</h1>
+    <p style="color:var(--text-secondary,#555);font-size:.9rem;margin-top:0;">
+        Select a page, describe what to change, and let the AI rewrite the template.
+        Review the proposed content, then click <strong>Apply Fix</strong> to save.
+    </p>
+
+    <div id="te-status" class="te-status info" style="display:none;"></div>
+
+    <!-- ── Step 1: Pick file ── -->
+    <div class="te-section-head">Step 1 — Select Template</div>
+    <div class="te-row">
+        <div class="te-col" style="max-width:500px;">
+            <label class="te-label" for="te-file-select">Page / Template file</label>
+            <select id="te-file-select" class="te-select">
+                <option value="">— choose a page —</option>
+                <optgroup label="Main Pages">
+                    <option value="root/CSC/CSC.tt">Home (/CSC)</option>
+                    <option value="root/CSC/proxy_manager.tt">Hosting (/hosting)</option>
+                    <option value="root/membership/index.tt">Membership (/membership)</option>
+                    <option value="root/marketplace/index.tt">Marketplace (/marketplace)</option>
+                    <option value="root/Workshops/index.tt">Workshops (/workshop)</option>
+                    <option value="root/HelpDesk/index.tt">HelpDesk (/HelpDesk)</option>
+                    <option value="root/shop/index.tt">Shop (/shop)</option>
+                    <option value="root/Documentation/index.tt">Documentation (/Documentation)</option>
+                    <option value="root/ai/index.tt">AI Chat (/ai)</option>
+                    <option value="root/admin/index.tt">Admin (/admin)</option>
+                </optgroup>
+                <optgroup label="Specialist Pages">
+                    <option value="root/BMaster/index.tt">BMaster (/BMaster)</option>
+                    <option value="root/ENCY/index.tt">ENCY (/ENCY)</option>
+                    <option value="root/Accounting/index.tt">Accounting (/Accounting)</option>
+                    <option value="root/Inventory/index.tt">Inventory (/Inventory)</option>
+                </optgroup>
+            </select>
+        </div>
+        <div class="te-col" style="max-width:180px;display:flex;align-items:flex-end;">
+            <button class="te-btn te-btn-primary" id="te-load-btn" onclick="teLoadFile()">📂 Load File</button>
+        </div>
+    </div>
+
+    <!-- ── Step 2: Current content ── -->
+    <div class="te-section-head" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Step 2 — Current File Content</span>
+        <div style="display:flex;gap:.4rem;">
+            <button class="te-btn te-btn-primary" id="te-source-btn" onclick="teViewSource()" title="View TT source">📝 Source</button>
+            <button class="te-btn" id="te-preview-btn" onclick="teViewPreview()"
+                    style="background:#555;color:#fff;" title="Preview rendered page">🖥 Preview</button>
+        </div>
+    </div>
+    <textarea id="te-current" class="te-textarea" rows="12"
+              placeholder="Current file content will appear here after you click Load File…"
+              readonly></textarea>
+    <iframe id="te-preview-frame" style="display:none;width:100%;height:420px;border:1px solid var(--nav-bg,#ccc);border-radius:4px;"
+            sandbox="allow-same-origin allow-scripts allow-forms"></iframe>
+    <div style="font-size:.8rem;color:#888;margin-top:.2rem;" id="te-file-info"></div>
+
+    <!-- ── Step 3: Request ── -->
+    <div class="te-section-head">Step 3 — Describe Your Change</div>
+    <div class="te-row">
+        <div class="te-col">
+            <label class="te-label" for="te-request">What should the AI change?</label>
+            <textarea id="te-request" class="te-textarea" rows="4"
+                      placeholder="e.g. Remove the Crypto &amp; Points section — replace it with PayPal and CSC Points only. Remove the Demo site link."></textarea>
+        </div>
+    </div>
+    <div class="te-row" style="align-items:center;gap:.7rem;">
+        <div>
+            <label class="te-label" for="te-provider" style="display:inline;">Provider:</label>
+            <select id="te-provider" class="te-select" style="width:auto;font-family:inherit;">
+                <option value="grok">Grok (recommended)</option>
+                <option value="ollama">Ollama (local)</option>
+            </select>
+        </div>
+        <button class="te-btn te-btn-primary" id="te-submit-btn" onclick="teSubmit()" style="margin-top:1.3rem;">
+            🤖 Get AI Fix
+        </button>
+    </div>
+
+    <!-- ── Step 4: AI response + proposed fix ── -->
+    <div id="te-diff-panel" class="te-diff-panel">
+        <div class="te-section-head">Step 4 — Review &amp; Apply</div>
+        <div class="te-panels">
+            <div class="te-col">
+                <label class="te-label">Current file</label>
+                <textarea id="te-original-preview" class="te-textarea" rows="20" readonly></textarea>
+            </div>
+            <div class="te-col">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem;">
+                    <span class="te-label" style="margin-bottom:0;">Proposed new content</span>
+                    <div style="display:flex;gap:.4rem;">
+                        <button class="te-btn te-btn-primary" id="te-prop-source-btn" onclick="tePropViewSource()" title="View TT source">📝 Source</button>
+                        <button class="te-btn" id="te-prop-preview-btn" onclick="tePropViewPreview()"
+                                style="background:#555;color:#fff;" title="Preview rendered HTML">🖥 Preview</button>
+                    </div>
+                </div>
+                <textarea id="te-proposed" class="te-textarea" rows="20"></textarea>
+                <iframe id="te-proposed-frame" style="display:none;width:100%;height:500px;border:1px solid var(--nav-bg,#ccc);border-radius:4px;"
+                        sandbox="allow-same-origin allow-scripts"></iframe>
+            </div>
+        </div>
+        <div style="margin-top:.8rem;display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;">
+            <button class="te-btn te-btn-success" id="te-apply-btn" onclick="teApply()">✅ Apply Fix</button>
+            <button class="te-btn" style="background:#888;color:#fff;" onclick="teReset()">✖ Discard</button>
+            <span id="te-apply-status" style="font-size:.85rem;"></span>
+        </div>
+        <div class="te-section-head" style="margin-top:1.2rem;display:flex;align-items:center;justify-content:space-between;">
+            <span>AI Explanation</span>
+            <div style="display:flex;gap:.4rem;">
+                <button class="te-btn te-btn-primary" id="te-exp-source-btn" onclick="teExpViewSource()" title="View as plain text">📝 Source</button>
+                <button class="te-btn" id="te-exp-preview-btn" onclick="teExpViewPreview()"
+                        style="background:#555;color:#fff;" title="Render as HTML">🖥 Preview</button>
+            </div>
+        </div>
+        <div id="te-ai-explanation" style="font-size:.9rem;white-space:pre-wrap;padding:.6rem;
+             background:var(--bg-secondary,#f5f5f5);border-radius:4px;border:1px solid var(--nav-bg,#ccc);">
+        </div>
+        <iframe id="te-exp-frame" style="display:none;width:100%;height:300px;border:1px solid var(--nav-bg,#ccc);border-radius:4px;"
+                sandbox="allow-same-origin allow-scripts"></iframe>
+    </div>
+</div>
+
+<script>
+(function() {
+    var currentPath = '';
+    var currentContent = '';
+
+    function teStatus(msg, type) {
+        var el = document.getElementById('te-status');
+        el.textContent = msg;
+        el.className = 'te-status ' + (type || 'info');
+        el.style.display = msg ? 'block' : 'none';
+    }
+
+    window.teLoadFile = function() {
+        var sel = document.getElementById('te-file-select');
+        var path = sel.value;
+        if (!path) { teStatus('Please select a template file first.', 'err'); return; }
+        currentPath = path;
+        var btn = document.getElementById('te-load-btn');
+        btn.disabled = true;
+        btn.textContent = 'Loading…';
+        teStatus('Fetching ' + path + '…', 'info');
+        fetch('/ai/read_file?path=' + encodeURIComponent(path) + '&limit=500', { credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                btn.disabled = false;
+                btn.textContent = '📂 Load File';
+                if (data.success) {
+                    currentContent = data.content;
+                    document.getElementById('te-current').value = data.content;
+                    document.getElementById('te-file-info').textContent =
+                        path + ' — ' + data.total + ' lines';
+                    document.getElementById('te-original-preview').value = data.content;
+                    teStatus('File loaded: ' + data.total + ' lines.', 'ok');
+                } else {
+                    teStatus('Could not load file: ' + data.error, 'err');
+                }
+            })
+            .catch(function(e) {
+                btn.disabled = false;
+                btn.textContent = '📂 Load File';
+                teStatus('Fetch error: ' + e, 'err');
+            });
+    };
+
+    window.teSubmit = function() {
+        var request = document.getElementById('te-request').value.trim();
+        if (!request) { teStatus('Please describe what you want changed.', 'err'); return; }
+        if (!currentContent) { teStatus('Please load the file first.', 'err'); return; }
+        if (!currentPath)    { teStatus('Please select a file first.', 'err'); return; }
+
+        var provider = document.getElementById('te-provider').value;
+        var fileBlock = '[FILE: ' + currentPath + ']\n```\n' + currentContent + '\n```\n[/FILE]\n\n';
+        var mandate = '\n\nCRITICAL: You MUST respond with ONLY:\n'
+            + '1. A short bullet list of what changed.\n'
+            + '2. A ## FIX: ' + currentPath + ' block containing the COMPLETE rewritten file.\n'
+            + 'Do NOT write prose. Do NOT describe how to edit. Do NOT ask questions. Output the fix block now.';
+        var fullPrompt = fileBlock + request + mandate;
+
+        var btn = document.getElementById('te-submit-btn');
+        btn.disabled = true;
+        btn.textContent = '⏳ Asking AI…';
+        teStatus('Sending to AI…', 'info');
+        document.getElementById('te-diff-panel').classList.remove('visible');
+
+        fetch('/ai/generate', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'prompt=' + encodeURIComponent(fullPrompt)
+                + '&provider=' + encodeURIComponent(provider)
+                + '&agent_type=template_editor'
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            btn.textContent = '🤖 Get AI Fix';
+            if (!data.success) {
+                teStatus('AI error: ' + (data.error || 'unknown'), 'err');
+                return;
+            }
+            var raw = data.response || '';
+            parseAIResponse(raw);
+        })
+        .catch(function(e) {
+            btn.disabled = false;
+            btn.textContent = '🤖 Get AI Fix';
+            teStatus('Request failed: ' + e, 'err');
+        });
+    };
+
+    function parseAIResponse(raw) {
+        var fixRe = /##\s*FIX:\s*([^\n\r]+)[\r\n]+```[^\n\r]*\n([\s\S]*?)```/i;
+        var m = raw.match(fixRe);
+        if (m) {
+            var proposedPath = m[1].trim();
+            var proposedContent = m[2];
+            var explanation = raw.replace(fixRe, '').trim();
+            document.getElementById('te-proposed').value = proposedContent;
+            document.getElementById('te-ai-explanation').textContent = explanation || '(no explanation)';
+            document.getElementById('te-diff-panel').classList.add('visible');
+            document.getElementById('te-apply-status').textContent = '';
+            teStatus('AI proposed a fix for ' + proposedPath + '. Review below and click Apply.', 'ok');
+        } else {
+            // Fallback: try to extract any fenced code block as the proposed content
+            var codeRe = /```[^\n\r]*\n([\s\S]*?)```/;
+            var cm = raw.match(codeRe);
+            if (cm) {
+                var fallbackContent = cm[1];
+                var fallbackExplanation = raw.replace(codeRe, '').trim();
+                document.getElementById('te-proposed').value = fallbackContent;
+                document.getElementById('te-ai-explanation').textContent = fallbackExplanation || raw;
+                document.getElementById('te-diff-panel').classList.add('visible');
+                document.getElementById('te-apply-status').textContent = '';
+                teStatus('AI did not use ## FIX: format — extracted code block. Review carefully before applying.', 'info');
+            } else {
+                document.getElementById('te-ai-explanation').textContent = raw;
+                document.getElementById('te-proposed').value = '';
+                document.getElementById('te-diff-panel').classList.add('visible');
+                teStatus('AI did not produce a ## FIX: block. Raw response shown below — try rephrasing your request.', 'err');
+            }
+        }
+    }
+
+    window.teExpViewSource = function() {
+        document.getElementById('te-ai-explanation').style.display = '';
+        document.getElementById('te-exp-frame').style.display = 'none';
+        document.getElementById('te-exp-source-btn').style.opacity = '1';
+        document.getElementById('te-exp-preview-btn').style.opacity = '.6';
+    };
+
+    window.teExpViewPreview = function() {
+        var text = document.getElementById('te-ai-explanation').textContent;
+        if (!text) { teStatus('No AI explanation to preview.', 'err'); return; }
+        var frame = document.getElementById('te-exp-frame');
+        frame.srcdoc = '<html><body style="font-family:sans-serif;padding:1rem;font-size:.9rem;">'
+            + text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                   .replace(/\n/g,'<br>') + '</body></html>';
+        frame.style.display = '';
+        document.getElementById('te-ai-explanation').style.display = 'none';
+        document.getElementById('te-exp-preview-btn').style.opacity = '1';
+        document.getElementById('te-exp-source-btn').style.opacity = '.6';
+    };
+
+    window.teApply = function() {
+        var proposed = document.getElementById('te-proposed').value;
+        if (!proposed) { teStatus('No proposed content to apply.', 'err'); return; }
+        if (!currentPath) { teStatus('No file path set.', 'err'); return; }
+        if (!confirm('Apply the proposed changes to ' + currentPath + '?')) return;
+        var btn = document.getElementById('te-apply-btn');
+        btn.disabled = true;
+        btn.textContent = 'Applying…';
+        fetch('/ai/apply_fix', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'path=' + encodeURIComponent(currentPath)
+                + '&content=' + encodeURIComponent(proposed)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            btn.textContent = '✅ Apply Fix';
+            if (data.success) {
+                document.getElementById('te-apply-status').textContent = '✅ Applied successfully!';
+                document.getElementById('te-apply-status').style.color = '#1e7e34';
+                currentContent = proposed;
+                document.getElementById('te-current').value = proposed;
+                document.getElementById('te-original-preview').value = proposed;
+                teStatus('Fix applied to ' + currentPath + '. A .bak backup was saved.', 'ok');
+            } else {
+                document.getElementById('te-apply-status').textContent = '❌ ' + (data.error || 'Failed');
+                document.getElementById('te-apply-status').style.color = '#9b0000';
+                teStatus('Apply failed: ' + (data.error || 'unknown error'), 'err');
+            }
+        })
+        .catch(function(e) {
+            btn.disabled = false;
+            btn.textContent = '✅ Apply Fix';
+            teStatus('Apply request failed: ' + e, 'err');
+        });
+    };
+
+    window.teReset = function() {
+        document.getElementById('te-diff-panel').classList.remove('visible');
+        document.getElementById('te-apply-status').textContent = '';
+        teStatus('', '');
+    };
+
+    // ── File → page URL map for preview ─────────────────────────────────────
+    var FILE_TO_URL = {
+        'root/CSC/CSC.tt':              '/CSC',
+        'root/CSC/proxy_manager.tt':    '/hosting',
+        'root/membership/index.tt':     '/membership',
+        'root/marketplace/index.tt':    '/marketplace',
+        'root/Workshops/index.tt':      '/workshop',
+        'root/HelpDesk/index.tt':       '/HelpDesk',
+        'root/shop/index.tt':           '/shop',
+        'root/Documentation/index.tt':  '/Documentation',
+        'root/ai/index.tt':             '/ai',
+        'root/admin/index.tt':          '/admin',
+        'root/BMaster/index.tt':        '/BMaster',
+        'root/ENCY/index.tt':           '/ENCY',
+        'root/Accounting/index.tt':     '/Accounting',
+        'root/Inventory/index.tt':      '/Inventory',
+    };
+
+    window.tePropViewSource = function() {
+        document.getElementById('te-proposed').style.display = '';
+        document.getElementById('te-proposed-frame').style.display = 'none';
+        document.getElementById('te-prop-source-btn').style.opacity = '1';
+        document.getElementById('te-prop-preview-btn').style.opacity = '.6';
+    };
+
+    window.tePropViewPreview = function() {
+        var content = document.getElementById('te-proposed').value;
+        if (!content) { teStatus('No proposed content to preview yet.', 'err'); return; }
+        var frame = document.getElementById('te-proposed-frame');
+        frame.srcdoc = content;
+        frame.style.display = '';
+        document.getElementById('te-proposed').style.display = 'none';
+        document.getElementById('te-prop-preview-btn').style.opacity = '1';
+        document.getElementById('te-prop-source-btn').style.opacity = '.6';
+    };
+
+    window.teViewSource = function() {
+        document.getElementById('te-current').style.display = '';
+        document.getElementById('te-preview-frame').style.display = 'none';
+        document.getElementById('te-source-btn').style.opacity = '1';
+        document.getElementById('te-preview-btn').style.opacity = '.6';
+    };
+
+    window.teViewPreview = function() {
+        var url = FILE_TO_URL[currentPath];
+        if (!url) {
+            teStatus('No preview URL known for this file. Navigate to the page directly.', 'err');
+            return;
+        }
+        var frame = document.getElementById('te-preview-frame');
+        frame.src = url;
+        frame.style.display = '';
+        document.getElementById('te-current').style.display = 'none';
+        document.getElementById('te-preview-btn').style.opacity = '1';
+        document.getElementById('te-source-btn').style.opacity = '.6';
+        teStatus('Previewing ' + url + ' — this is the live page, changes are not applied yet.', 'info');
+    };
+
+    // ── Auto-populate from URL params (?file=root/...&request=...) ───────────
+    // Called from the widget when template_editor agent is active and user sends a message.
+    (function() {
+        var params = new URLSearchParams(window.location.search);
+        var file    = params.get('file');
+        var request = params.get('request');
+
+        if (request) {
+            document.getElementById('te-request').value = request;
+        }
+
+        if (file) {
+            currentPath = file;
+            var sel = document.getElementById('te-file-select');
+            var found = false;
+            for (var i = 0; i < sel.options.length; i++) {
+                if (sel.options[i].value === file) {
+                    sel.selectedIndex = i;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                var opt = document.createElement('option');
+                opt.value = file;
+                opt.textContent = file;
+                opt.selected = true;
+                sel.appendChild(opt);
+            }
+
+            // Load the file, then auto-submit if a request was also provided
+            var loadBtn = document.getElementById('te-load-btn');
+            loadBtn.disabled = true;
+            loadBtn.textContent = 'Loading…';
+            teStatus('Loading ' + file + '…', 'info');
+            fetch('/ai/read_file?path=' + encodeURIComponent(file) + '&limit=500',
+                  { credentials: 'include' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    loadBtn.disabled = false;
+                    loadBtn.textContent = '📂 Load File';
+                    if (data.success) {
+                        currentContent = data.content;
+                        document.getElementById('te-current').value = data.content;
+                        document.getElementById('te-file-info').textContent =
+                            file + ' — ' + data.total + ' lines';
+                        document.getElementById('te-original-preview').value = data.content;
+                        teStatus('File loaded. Submitting to AI…', 'info');
+                        if (request) {
+                            teSubmit();
+                        } else {
+                            teStatus('File loaded. Describe your change and click Get AI Fix.', 'ok');
+                        }
+                    } else {
+                        teStatus('Could not load file: ' + data.error, 'err');
+                    }
+                })
+                .catch(function(e) {
+                    loadBtn.disabled = false;
+                    loadBtn.textContent = '📂 Load File';
+                    teStatus('Load error: ' + e, 'err');
+                });
+        }
+    })();
+})();
+</script>

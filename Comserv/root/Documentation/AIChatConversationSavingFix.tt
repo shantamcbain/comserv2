@@ -102,15 +102,15 @@
             <h2 id="fix" style="color: var(--text-color); font-family: var(--header-font);">Fix Applied</h2>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">File Modified</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border-radius: 4px; color: var(--text-color); font-family: monospace;"><code>/Comserv/lib/Comserv/Controller/AI.pm</code></pre>
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 4px; color: var(--text-color); font-family: monospace;"><code>/Comserv/lib/Comserv/Controller/AI.pm</code></pre>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Method</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border-radius: 4px; color: var(--text-color); font-family: monospace;"><code>sub chat :Local :Args(0)  # Lines 492-731 (after fix)</code></pre>
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 4px; color: var(--text-color); font-family: monospace;"><code>sub chat :Local :Args(0)  # Lines 492-731 (after fix)</code></pre>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Changes</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">Added database conversation saving logic after successful Ollama response (lines 636-700):</p>
 
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border-radius: 4px; color: var(--text-color); font-family: monospace; margin: var(--spacing-small) 0;"><code># Save conversation to database
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 4px; color: var(--text-color); font-family: monospace; margin: var(--spacing-small) 0;"><code># Save conversation to database
 my $conversation_id;
 try {
     my $user_id = $c->session->{user_id};

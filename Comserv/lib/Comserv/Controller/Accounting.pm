@@ -712,5 +712,143 @@ sub _fetch_rate {
     return $cached->{rates}{ uc($to) } // 1;
 }
 
+sub ai_usage :Path('/Accounting/ai_usage') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->stash->{is_admin} || grep { lc($_) eq 'admin' || lc($_) eq 'accounting' } @{ $c->session->{roles} // [] }) {
+        $c->flash->{error_msg} = 'Access denied';
+        $c->response->redirect($c->uri_for('/Accounting'));
+        return;
+    }
+
+    my $schema = $self->_schema($c)->schema;
+
+    # Date range defaults: first of current month → today
+    use POSIX qw(strftime);
+    my $today      = strftime('%Y-%m-%d', localtime);
+    my $month_from = strftime('%Y-%m-01',  localtime);
+
+    my $period_from  = $c->request->params->{period_from}  || $month_from;
+    my $period_to    = $c->request->params->{period_to}    || $today;
+    my $provider     = $c->request->params->{provider}     || 'grok';
+    my $agent_filter = $c->request->params->{agent_filter} || 'all';
+    my $invoice_amt  = $c->request->params->{invoice_amount} || 0;
+    my $invoice_id   = $c->request->params->{invoice_id}   || '';
+
+    # Build model filter clause
+    my %where = (
+        role       => 'assistant',
+        created_at => { '>=' => "$period_from 00:00:00", '<=' => "$period_to 23:59:59" },
+    );
+    if ($provider eq 'grok') {
+        $where{model_used} = { -like => '%grok%' };
+    } elsif ($provider eq 'ollama') {
+        $where{model_used} = { -not_like => '%grok%' };
+    }
+    if ($agent_filter ne 'all') {
+        $where{agent_type} = $agent_filter;
+    }
+
+    # Models summary
+    my @model_rows = $schema->resultset('AiMessage')->search(
+        \%where,
+        {
+            select   => ['model_used',
+                         { count => 'id',          -as => 'calls'  },
+                         { sum   => 'tokens_used',  -as => 'tokens' }],
+            as       => [qw(model_used calls tokens)],
+            group_by => ['model_used'],
+            order_by => { -desc => 'calls' },
+        }
+    );
+    my @models = map { { model_used => $_->model_used || '(unknown)',
+                         calls      => $_->get_column('calls'),
+                         tokens     => $_->get_column('tokens') || 0 } } @model_rows;
+
+    # Agent breakdown
+    my @agent_rows = $schema->resultset('AiMessage')->search(
+        \%where,
+        {
+            select   => ['agent_type',
+                         { count => 'id',          -as => 'calls'  },
+                         { sum   => 'tokens_used',  -as => 'tokens' }],
+            as       => [qw(agent_type calls tokens)],
+            group_by => ['agent_type'],
+            order_by => { -desc => 'calls' },
+        }
+    );
+    my @agents = map { { agent_type => $_->agent_type || '(unknown)',
+                         calls      => $_->get_column('calls'),
+                         tokens     => $_->get_column('tokens') || 0 } } @agent_rows;
+
+    # Per-user usage
+    my @usage_rows = $schema->resultset('AiMessage')->search(
+        \%where,
+        {
+            select   => ['user_id',
+                         { count => 'me.id',       -as => 'api_calls' },
+                         { sum   => 'tokens_used',  -as => 'total_tokens' }],
+            as       => [qw(user_id api_calls total_tokens)],
+            group_by => ['user_id'],
+            order_by => { -desc => 'api_calls' },
+        }
+    );
+
+    my $grand_calls  = 0;
+    my $grand_tokens = 0;
+    my @usage;
+    for my $row (@usage_rows) {
+        my $uid    = $row->user_id;
+        my $calls  = $row->get_column('api_calls')    || 0;
+        my $tokens = $row->get_column('total_tokens') || 0;
+        $grand_calls  += $calls;
+        $grand_tokens += $tokens;
+
+        my $user_obj = eval { $schema->resultset('User')->find($uid) };
+        push @usage, {
+            username     => $user_obj ? $user_obj->username : "(uid $uid)",
+            email        => $user_obj ? ($user_obj->email || '') : '',
+            api_calls    => $calls,
+            total_tokens => $tokens,
+            call_pct     => 0,
+            token_pct    => 0,
+            allocated    => '0.00',
+        };
+    }
+
+    # Calculate percentages and allocation
+    for my $u (@usage) {
+        $u->{call_pct}  = $grand_calls  ? sprintf('%.1f', $u->{api_calls}    / $grand_calls  * 100) : 0;
+        $u->{token_pct} = $grand_tokens ? sprintf('%.1f', $u->{total_tokens} / $grand_tokens * 100) : 0;
+        if ($invoice_amt > 0) {
+            my $pct = $grand_tokens ? $u->{token_pct} : $u->{call_pct};
+            $u->{allocated} = sprintf('%.2f', $invoice_amt * $pct / 100);
+        }
+    }
+
+    # Distinct agent types for filter dropdown
+    my @all_agents = $schema->resultset('AiMessage')->search(
+        { role => 'assistant' },
+        { select => [{ distinct => 'agent_type' }], as => ['agent_type'] }
+    );
+    my @agent_list = map { $_->agent_type || '(unknown)' } @all_agents;
+
+    $c->stash(
+        template     => 'Accounting/ai_usage.tt',
+        period_from  => $period_from,
+        period_to    => $period_to,
+        provider     => $provider,
+        agent_filter => $agent_filter,
+        agent_list   => \@agent_list,
+        invoice_amt  => $invoice_amt,
+        invoice_id   => $invoice_id,
+        models       => \@models,
+        agents       => \@agents,
+        usage        => \@usage,
+        grand_calls  => $grand_calls,
+        grand_tokens => $grand_tokens,
+    );
+}
+
 __PACKAGE__->meta->make_immutable;
 1;

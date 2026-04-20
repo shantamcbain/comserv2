@@ -15,7 +15,7 @@
     <h1 style="color:var(--text-color);font-family:var(--header-font)">Chart of Accounts</h1>
     <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-04-17 | Version: 1.00 | Audience: Administrators &amp; Accounting</div>
 
-    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:var(--light-color);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
+    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:rgba(255,255,255,0.15);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
         <div class="col-100">
             <h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:0">Quick Navigation</h2>
             <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-small)">
@@ -144,7 +144,7 @@
                 <li><strong>Expense Account</strong> → select an <em>Expense</em> account (5000s) — e.g. 5000 Cost of Goods Sold</li>
                 <li><strong>Returns Account</strong> → select an <em>Income</em> account (4000s) — e.g. 4100 Sales Returns</li>
             </ul>
-            <div style="background-color:var(--light-color);border-left:4px solid var(--warning-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small)">
+            <div style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--warning-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small)">
                 The system does not enforce account type on these fields — it is your responsibility to choose the correct type.
                 Assigning a liability account as the income account, for example, will produce incorrect financial statements.
             </div>

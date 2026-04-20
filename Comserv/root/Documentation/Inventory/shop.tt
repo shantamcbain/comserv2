@@ -15,7 +15,7 @@
     <h1 style="color:var(--text-color);font-family:var(--header-font)">Shop &amp; Marketplace</h1>
     <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-04-17 | Version: 1.00 | Audience: Site Administrators</div>
 
-    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:var(--light-color);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
+    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:rgba(255,255,255,0.15);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
         <div class="col-100">
             <h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:0">Quick Navigation</h2>
             <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-small)">
@@ -92,7 +92,7 @@
                     </tr>
                 </tbody>
             </table>
-            <div style="background-color:var(--light-color);border-left:4px solid var(--warning-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small);margin-top:0.5em">
+            <div style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--warning-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small);margin-top:0.5em">
                 <strong>Policy:</strong> Public customers can NEVER see hidden items (show_in_shop = No). Only admin users see hidden items in /shop/admin. This is enforced at the controller level.
             </div>
             <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
@@ -156,13 +156,42 @@
     <div id="images" class="row">
         <div class="col-100">
             <h2 style="color:var(--text-color);font-family:var(--header-font)">6. Product Images</h2>
-            <ul style="color:var(--text-color);font-family:var(--body-font)">
-                <li>On the shop edit form, click <strong>Browse Files</strong> to open the FileManager and select an existing image from the server</li>
-                <li>Or paste an image URL directly into the Image Path field</li>
-                <li>Recommended: upload product photos to <code>/static/images/products/</code> via FileManager first, then select them</li>
-                <li>Supported formats: JPG, PNG, WebP, GIF</li>
-                <li>No image = a placeholder is shown to customers</li>
-            </ul>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Go to <a href="/shop/admin" style="color:var(--link-color)">/shop/admin</a> and click <strong>Edit</strong> on the item to reach the shop edit form.
+                Each item currently supports <strong>one image</strong> (the <em>image_path</em> field). There are three ways to set it:
+            </p>
+
+            <h3 style="color:var(--text-color);font-family:var(--header-font);margin-top:1em">Method 1 — Upload from your computer (simplest)</h3>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>On the shop edit form, find the <strong>Upload New Image</strong> section</li>
+                <li>Click the file input and select a photo from your computer (JPG, PNG, WebP, GIF supported)</li>
+                <li>Click <strong>Save</strong> — the image is uploaded to the server and the path is saved automatically</li>
+                <li>A live preview of the image appears on the edit form as soon as you select it</li>
+            </ol>
+
+            <h3 style="color:var(--text-color);font-family:var(--header-font);margin-top:1em">Method 2 — FileManager (browse server files)</h3>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>On the shop edit form, click the <strong>Browse</strong> button next to the Image Path field</li>
+                <li>The <strong>FilePicker</strong> popup opens at <code>/file/file_picker?type=image</code></li>
+                <li>Use the search box to find an image by filename, or leave blank and click <strong>Search</strong> to browse recent files</li>
+                <li>Choose the source: <em>Database</em> (files previously uploaded) or <em>NFS filesystem</em> (files on the server's NFS share)</li>
+                <li>Image thumbnails are shown — click <strong>✓ Use</strong> on the image you want</li>
+                <li>The popup closes and the Image Path field is filled in automatically</li>
+                <li>Click <strong>Save</strong> on the edit form to apply</li>
+            </ol>
+
+            <h3 style="color:var(--text-color);font-family:var(--header-font);margin-top:1em">Method 3 — Paste a URL or path directly</h3>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Type or paste a full URL (e.g. <code>https://example.com/photo.jpg</code>) or an absolute server path (e.g. <code>/static/shop_images/gnome.jpg</code>) into the <strong>Image Path</strong> text field</li>
+                <li>A preview appears immediately</li>
+                <li>Click <strong>Save</strong></li>
+            </ol>
+
+            <div style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--warning-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small);margin-top:0.5em">
+                <strong>Current limitation — one image per item:</strong> The system stores a single <em>image_path</em> per inventory item.
+                Multiple product photos (gallery) are not yet supported. As a workaround, create a collage image outside the system and upload that as the single product image.
+                Multi-image/gallery support is a planned future feature.
+            </div>
             <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
         </div>
     </div>

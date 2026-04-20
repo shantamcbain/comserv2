@@ -26,18 +26,18 @@
     </div>
 
     <!-- TABLE OF CONTENTS SECTION -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
             <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
-                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Features</a>
-                <a href="#core-methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Core Methods</a>
-                <a href="#helper-methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Helpers</a>
-                <a href="#api-endpoints" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">API</a>
-                <a href="#usage-examples" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Examples</a>
-                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">See Also</a>
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Overview</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Features</a>
+                <a href="#core-methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Core Methods</a>
+                <a href="#helper-methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Helpers</a>
+                <a href="#api-endpoints" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">API</a>
+                <a href="#usage-examples" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Examples</a>
+                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">See Also</a>
             </div>
         </div>
     </div>
@@ -55,7 +55,7 @@
             <p style="color: var(--text-color); font-family: var(--body-font);">
                 <strong>Architecture</strong>: Moose-based Catalyst subcontroller with admin authentication checks, logging integration, and JSON API endpoints. Follows the same pattern as Admin/Backup.pm for consistency.
             </p>
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; color: var(--text-color);">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; color: var(--text-color);">
                 <strong>v0.03 Updates (2026-01-11)</strong>: Version consolidation update. Verified all 13 methods against HEAD commits. Helper method table format validated. No API signature changes detected in recent commits.
                 <br/><br/>
                 <strong>v0.02 Updates (2026-01-09)</strong>: Enhanced API documentation with detailed error handling patterns. Added authentication flow documentation. Documented Try::Tiny error handling integration across all methods. Reference recent git commits affecting schema operations.
@@ -97,26 +97,26 @@
         <div class="col-100">
             <h2 id="core-methods" style="color: var(--text-color); font-family: var(--header-font);">Core Methods (Actions)</h2>
             
-            <h3 style="color: var(--text-color); font-family: var(--header-font);">1. sync_table_to_result <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:43]</code></h3>
-            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Route</strong>: <span style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">POST /schema-comparison/sync_table_to_result</span></p>
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">1. sync_table_to_result <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">[:43]</code></h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Route</strong>: <span style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">POST /schema-comparison/sync_table_to_result</span></p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Synchronize database table field changes to Result file.</p>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>Required Params</strong>: table_name, field_name, database (JSON body)</p>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>Auth</strong>: Admin role required ($c->user_exists + check_user_roles('admin'))</p>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>Error Handling</strong>: Try::Tiny catches JSON errors (400), missing params (400), sync errors (500). Returns JSON with success flag and error messages.</p>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>Logging</strong>: All operations logged via Comserv::Util::Logging with file/line context</p>
 
-            <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: var(--spacing-large);">2. sync_result_to_table <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:113]</code></h3>
-            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Route</strong>: <span style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">POST /schema-comparison/sync_result_to_table</span></p>
+            <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: var(--spacing-large);">2. sync_result_to_table <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">[:113]</code></h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Route</strong>: <span style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">POST /schema-comparison/sync_result_to_table</span></p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Synchronize Result file field changes back to database table (logs intent; actual ALTER TABLE handled separately).</p>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>Required Params</strong>: table_name, field_name, database (JSON body)</p>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>Auth</strong>: Admin role required</p>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>Error Handling</strong>: Same Try::Tiny pattern as sync_table_to_result</p>
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-small); margin: var(--spacing-small) 0; font-size: var(--font-size-small);">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-small); margin: var(--spacing-small) 0; font-size: var(--font-size-small);">
                 <strong>⚠️ Note</strong>: This method logs the intent to update the database but does NOT execute ALTER TABLE directly. Database schema changes must be executed separately via migration scripts to ensure proper backup and rollback procedures.
             </div>
 
-            <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: var(--spacing-large);">3. create_result_from_table <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:183]</code></h3>
-            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Route</strong>: <span style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">POST /schema-comparison/create_result_from_table</span></p>
+            <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: var(--spacing-large);">3. create_result_from_table <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">[:183]</code></h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Route</strong>: <span style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">POST /schema-comparison/create_result_from_table</span></p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Generate a new Result file from an existing database table schema.</p>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>Required Params</strong>: table_name, database (JSON body)</p>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>Auth</strong>: Admin role required</p>

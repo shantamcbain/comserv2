@@ -209,7 +209,7 @@
     .no-devices {
         text-align: center;
         padding: 30px;
-        background-color: #ffffff;
+        background-color: rgba(255,255,255,0.88);
         border-radius: 4px;
         border: 1px solid #dee2e6;
     }

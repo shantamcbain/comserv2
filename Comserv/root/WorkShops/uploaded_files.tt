@@ -204,7 +204,7 @@
         width: 100%;
         border-collapse: collapse;
         margin-top: 20px;
-        background-color: white;
+        background-color: rgba(255,255,255,0.88);
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
     
@@ -307,7 +307,7 @@
     .no-files {
         text-align: center;
         padding: 30px;
-        background-color: #fff;
+        background-color: rgba(255,255,255,0.88);
         border-radius: 8px;
         color: #666;
         margin-top: 20px;
@@ -335,7 +335,7 @@
     }
     
     .admin-debug pre {
-        background-color: #fff;
+        background-color: rgba(255,255,255,0.88);
         padding: 10px;
         border-radius: 4px;
         font-family: monospace;
