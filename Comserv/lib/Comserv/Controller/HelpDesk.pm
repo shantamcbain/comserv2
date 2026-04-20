@@ -4,6 +4,7 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use POSIX qw(strftime);
 use Try::Tiny;
+use JSON ();
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -626,6 +627,67 @@ sub ticket_list :Chained('ticket_base') :PathPart('list') :Args(0) {
 Fallback for HelpDesk URLs that don't match any actions
 
 =cut
+
+sub api_search_tickets :Chained('base') :PathPart('api/search_tickets') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+    $c->response->headers->header('Cache-Control' => 'no-store');
+
+    my $q         = $c->req->param('q') || '';
+    my $limit     = int($c->req->param('limit') || 20);
+    $limit        = 50 if $limit > 50;
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+    my $is_csc    = (lc($site_name) eq 'csc');
+    my $is_staff  = $self->_is_staff($c);
+
+    unless ($q) {
+        $c->response->body(JSON::encode_json({ error => 'q parameter required', tickets => [] }));
+        return;
+    }
+
+    my @results;
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my $like   = { -like => '%' . $q . '%' };
+        my %where  = (
+            -or => [
+                subject     => $like,
+                description => $like,
+                category    => $like,
+                ticket_number => $like,
+            ]
+        );
+        $where{site_name} = $site_name unless $is_csc || $is_staff;
+
+        my @tickets = $schema->resultset('SupportTicket')->search(
+            \%where,
+            { order_by => { -desc => 'created_at' }, rows => $limit }
+        )->all;
+
+        for my $t (@tickets) {
+            push @results, {
+                ticket_number => $t->ticket_number,
+                site_name     => $t->site_name,
+                subject       => $t->subject,
+                category      => $t->category || 'other',
+                priority      => $t->priority  || 'medium',
+                status        => $t->status,
+                created_at    => $t->created_at . '',
+                summary       => do {
+                    my $d = $t->description || '';
+                    length($d) > 200 ? substr($d, 0, 200) . '…' : $d;
+                },
+            };
+        }
+    };
+
+    $c->response->body(JSON::encode_json({
+        query   => $q,
+        count   => scalar(@results),
+        tickets => \@results,
+    }));
+}
 
 sub tickets_alert :Chained('base') :PathPart('admin/tickets_alert') :Args(0) {
     my ($self, $c) = @_;
