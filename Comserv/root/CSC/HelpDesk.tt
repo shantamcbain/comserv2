@@ -53,6 +53,14 @@
             <p>Chat with our AI assistant for instant help. It can search the knowledge base, create tickets, and escalate to a live agent.</p>
             <a href="[% c.uri_for('/ai') %]" class="btn btn-success">Chat with AI</a>
         </div>
+
+        [% IF c.check_user_roles('admin') %]
+        <div class="option-card option-card-admin">
+            <h3>HelpDesk Admin</h3>
+            <p>Manage tickets, view open requests, and administer the support system.</p>
+            <a href="[% c.uri_for('/HelpDesk/admin') %]" class="btn btn-warning">Admin Panel</a>
+        </div>
+        [% END %]
     </div>
 
     <!-- Include the original HelpDesk contents -->
@@ -106,6 +114,10 @@
     
     .option-card-ai {
         border-left: 4px solid #28a745;
+    }
+
+    .option-card-admin {
+        border-left: 4px solid #fd7e14;
     }
     
     .debug-message {
