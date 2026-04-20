@@ -549,6 +549,7 @@ sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
             sender_name  => $sender_name,
             sender_email => $sender_email,
             body         => $body_text,
+            created_at   => strftime('%Y-%m-%d %H:%M:%S', localtime),
         });
 
         if ($sender_type eq 'staff') {
