@@ -650,7 +650,7 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
         my $form_data = $c->request->body_parameters;
 
         # Use the existing logging system to log the form data
-        $self->logging->log_with_details($c, __FILE__, __LINE__, 'add_herb', "Form data received: " . join(", ", map { "$_: $form_data->{$_}" } keys %$form_data));
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_herb', "Form data received: " . join(", ", map { "$_: $form_data->{$_}" } keys %$form_data));
 
         my $new_herb = {
             therapeutic_action => $form_data->{therapeutic_action},
@@ -695,14 +695,24 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
         };
 
         # Use the existing logging system to log the new herb data
-        $self->logging->log_with_details($c, __FILE__, __LINE__, 'add_herb', "New herb data: " . join(", ", map { "$_: $new_herb->{$_}" } keys %$new_herb));
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_herb', "New herb data: " . join(", ", map { "$_: $new_herb->{$_}" } keys %$new_herb));
 
         # Save the new herb using the ENCYModel
-        $c->model('ENCYModel')->add_herb($new_herb);
+        my ($ok, $result) = $c->model('ENCYModel')->add_herb($c, $new_herb);
 
-        # Redirect or display a success message
-        $c->flash->{success_msg} = 'Herb added successfully';
-        $c->res->redirect($c->uri_for($self->action_for('index')));
+        if ($ok) {
+            $c->flash->{success_msg} = 'Herb added successfully';
+            $c->res->redirect($c->uri_for($self->action_for('index')));
+        } else {
+            $c->stash(
+                error_msg      => "Failed to add herb: $result",
+                template       => 'ENCY/add_herb_form.tt',
+                user_role      => $c->session->{roles},
+                ency_ai_prompt => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator',
+                form_data      => $form_data,
+            );
+            $self->_stash_image_files($c);
+        }
     } else {
         # Display the form
         $self->_stash_image_files($c);
