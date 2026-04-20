@@ -28,7 +28,7 @@
         <p><strong>Status:</strong> Fix verified and deployed. All 7 AI Chat Result classes now included in automatic startup initialization.</p>
     </div>
 
-    <div id="toc" class="row" style="margin: 20px 0; background-color: var(--light-color); padding: 15px; border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: 20px 0; background-color: rgba(255,255,255,0.15); padding: 15px; border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="margin-top: 0;">Quick Navigation</h2>
             <a href="#issue-summary" style="color: var(--link-color); margin-right: 15px;">Issue Summary</a>

@@ -13,10 +13,10 @@
 <!--
 
 .combobox {
-background-color: #FFFFFF;
-color: #808080;
+background-color: var(--background-color, #fff);
+color: var(--text-color, #808080);
 font-size: 10pt;
-font-family: arial;
+font-family: var(--body-font, arial);
 font-weight: bold;
 }
 

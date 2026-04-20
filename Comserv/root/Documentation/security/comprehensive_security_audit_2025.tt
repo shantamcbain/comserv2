@@ -91,7 +91,7 @@
     </div>
 
     <div class="row">
-        <div class="col-100" style="background-color: var(--light-color); border-left: 4px solid #dc3545; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+        <div class="col-100" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid #dc3545; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
             <h3 style="color: #dc3545; font-family: var(--header-font);">⚠️ CRITICAL VULNERABILITIES: 4 Issues (1 Fixed ✅, 3 Remaining ❌)</h3>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
                 <li><strong>✅ FIXED - Weak Cryptographic Implementation:</strong> Proxmox credentials now encrypted with AES-256-CBC</li>
@@ -104,7 +104,7 @@
     </div>
 
     <!-- NAVIGATION -->
-    <div class="row" style="margin: var(--spacing-large) 0; padding: var(--spacing-medium); background-color: var(--secondary-color); border-radius: 4px;">
+    <div class="row" style="margin: var(--spacing-large) 0; padding: var(--spacing-medium); background-color: rgba(255,255,255,0.12); border-radius: 4px;">
         <div class="col-100" style="text-align: center;">
             <h3 style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium);">📑 Jump to Section</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">
@@ -246,7 +246,7 @@ script/comserv_server.pl
 
     <!-- Critical Issue 2: Database Passwords -->
     <div class="row">
-        <div class="col-100" style="background-color: var(--light-color); border-left: 6px solid #dc3545; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+        <div class="col-100" style="background-color: rgba(255,255,255,0.15); border-left: 6px solid #dc3545; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
             <h3 style="color: #dc3545; font-family: var(--header-font);">2. Plaintext Database Passwords</h3>
             
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>File:</strong> <code>db_config.template.json, ConfigDatabaseInit.pm:27-30</code> | <strong>CVSS:</strong> 9.3 | <strong>OWASP:</strong> A02:2021</p>
@@ -282,7 +282,7 @@ my $db = $ENV{CONFIG_DB_NAME} or die "CONFIG_DB_NAME not set";
     </div>
 
     <!-- Navigation Breakpoint -->
-    <div class="row" style="margin: var(--spacing-medium) 0; padding: var(--spacing-small); background-color: var(--secondary-color); border-radius: 4px; text-align: center;">
+    <div class="row" style="margin: var(--spacing-medium) 0; padding: var(--spacing-small); background-color: rgba(255,255,255,0.12); border-radius: 4px; text-align: center;">
         <div class="col-100">
             <p style="color: var(--text-color); font-family: var(--body-font);">
                 <a href="#critical-vulnerabilities" style="color: var(--link-color);">↑ Critical Issues</a> | 
@@ -294,7 +294,7 @@ my $db = $ENV{CONFIG_DB_NAME} or die "CONFIG_DB_NAME not set";
 
     <!-- Critical Issue 3: Cookie Security -->
     <div class="row">
-        <div class="col-100" style="background-color: var(--light-color); border-left: 6px solid #dc3545; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+        <div class="col-100" style="background-color: rgba(255,255,255,0.15); border-left: 6px solid #dc3545; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
             <h3 style="color: #dc3545; font-family: var(--header-font);">3. Cookie Security Misconfiguration</h3>
             
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>File:</strong> <code>Comserv/lib/Comserv.pm:56-61</code> | <strong>CVSS:</strong> 8.8 | <strong>OWASP:</strong> A04:2021</p>
@@ -333,7 +333,7 @@ my $db = $ENV{CONFIG_DB_NAME} or die "CONFIG_DB_NAME not set";
     </div>
 
     <!-- Navigation Breakpoint -->
-    <div class="row" style="margin: var(--spacing-medium) 0; padding: var(--spacing-small); background-color: var(--secondary-color); border-radius: 4px; text-align: center;">
+    <div class="row" style="margin: var(--spacing-medium) 0; padding: var(--spacing-small); background-color: rgba(255,255,255,0.12); border-radius: 4px; text-align: center;">
         <div class="col-100">
             <p style="color: var(--text-color); font-family: var(--body-font);">
                 <a href="#critical-vulnerabilities" style="color: var(--link-color);">↑ Critical Issues</a> | 
@@ -345,7 +345,7 @@ my $db = $ENV{CONFIG_DB_NAME} or die "CONFIG_DB_NAME not set";
 
     <!-- Critical Issue 4: Hardcoded User Bypass -->
     <div class="row">
-        <div class="col-100" style="background-color: var(--light-color); border-left: 6px solid #dc3545; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+        <div class="col-100" style="background-color: rgba(255,255,255,0.15); border-left: 6px solid #dc3545; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
             <h3 style="color: #dc3545; font-family: var(--header-font);">4. Hardcoded Special User Bypass</h3>
             
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>File:</strong> <code>Comserv/lib/Comserv/Util/AdminAuth.pm:56-62</code> | <strong>CVSS:</strong> 8.0 | <strong>OWASP:</strong> A01:2021</p>
@@ -395,7 +395,7 @@ my $db = $ENV{CONFIG_DB_NAME} or die "CONFIG_DB_NAME not set";
     </div>
 
     <div class="row">
-        <div class="col-100" style="background-color: var(--light-color); border-left: 6px solid #ff8c42; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+        <div class="col-100" style="background-color: rgba(255,255,255,0.15); border-left: 6px solid #ff8c42; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
             <h3 style="color: #ff8c42; font-family: var(--header-font);">1. Missing CSRF Token Protection</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>CVSS:</strong> 8.1 | <strong>Timeline:</strong> 1-2 weeks</p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Issue:</strong> All POST/DELETE/PUT operations lack CSRF token validation. Attacker can forge requests on behalf of authenticated users.</p>
@@ -411,7 +411,7 @@ my $db = $ENV{CONFIG_DB_NAME} or die "CONFIG_DB_NAME not set";
     </div>
 
     <!-- Navigation Breakpoint -->
-    <div class="row" style="margin: var(--spacing-medium) 0; padding: var(--spacing-small); background-color: var(--secondary-color); border-radius: 4px; text-align: center;">
+    <div class="row" style="margin: var(--spacing-medium) 0; padding: var(--spacing-small); background-color: rgba(255,255,255,0.12); border-radius: 4px; text-align: center;">
         <div class="col-100">
             <p style="color: var(--text-color); font-family: var(--body-font);">
                 <a href="#high-severity" style="color: var(--link-color);">↑ High Severity</a> | 
@@ -430,7 +430,7 @@ my $db = $ENV{CONFIG_DB_NAME} or die "CONFIG_DB_NAME not set";
     </div>
 
     <div class="row">
-        <div class="col-100" style="background-color: var(--light-color); border-left: 6px solid #ffc107; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+        <div class="col-100" style="background-color: rgba(255,255,255,0.15); border-left: 6px solid #ffc107; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
             <h3 style="color: #ffc107; font-family: var(--header-font);">1. Missing Security Headers</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>CVSS:</strong> 6.2 | <strong>Timeline:</strong> 2-4 weeks</p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Missing:</strong> Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, Strict-Transport-Security</p>
@@ -488,7 +488,7 @@ my $db = $ENV{CONFIG_DB_NAME} or die "CONFIG_DB_NAME not set";
     </div>
 
     <!-- NEXT STEPS -->
-    <div class="row" style="margin-top: var(--spacing-large); padding: var(--spacing-medium); background-color: var(--light-color); border-left: 6px solid #28a745; border-radius: 4px;">
+    <div class="row" style="margin-top: var(--spacing-large); padding: var(--spacing-medium); background-color: rgba(255,255,255,0.15); border-left: 6px solid #28a745; border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: #28a745; font-family: var(--header-font);">✅ NEXT STEPS</h2>
             <ol style="color: var(--text-color); font-family: var(--body-font);">

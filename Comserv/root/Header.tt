@@ -157,5 +157,5 @@
         }
     </script>
     <!-- AI utilities - loaded globally so the chat widget works on all pages -->
-    <script src="/static/js/ai-common.js"></script>
+    <script src="/static/js/ai-common.js?v=[% USE date; date.format(date.now, '%s') || '1' %]"></script>
 </head>

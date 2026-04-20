@@ -89,7 +89,7 @@
                         <td>auto_increment</td>
                         <td>Primary key - auto-generated index ID</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>file_path</td>
                         <td>VARCHAR(512)</td>
                         <td>NO</td>
@@ -103,7 +103,7 @@
                         <td>REQUIRED</td>
                         <td>File type: 'pm' (Perl modules), 'tt' (Template Toolkit), 'sql' (SQL files)</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>code_elements</td>
                         <td>JSON</td>
                         <td>YES</td>
@@ -117,7 +117,7 @@
                         <td>REQUIRED</td>
                         <td>Full searchable content (code with comments, normalized for search)</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>content_hash</td>
                         <td>VARCHAR(64)</td>
                         <td>NO</td>
@@ -131,7 +131,7 @@
                         <td>CURRENT_TIMESTAMP</td>
                         <td>Timestamp when file was indexed (auto-set)</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>min_role</td>
                         <td>ENUM</td>
                         <td>NO</td>
@@ -165,7 +165,7 @@
                         <td>Perl modules (Comserv application code)</td>
                         <td>Subroutines, package declarations, use statements, variables</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td><strong>'tt'</strong></td>
                         <td>.tt</td>
                         <td>Template Toolkit templates (views and documentation)</td>
@@ -180,7 +180,7 @@
                 </table>
 
                 <h3>File Type Usage</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my $index = $schema->resultset('CodeSearchIndex')->create({
     file_path => 'Comserv/lib/Comserv/Controller/Admin.pm',
     file_type => 'pm',
@@ -232,7 +232,7 @@ my @sql_files = $schema->resultset('CodeSearchIndex')->search({
                 </ul>
 
                 <h3>Example: Perl Module Code Elements</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>use JSON::MaybeXS;
 
 my $code_elements = {
@@ -275,14 +275,14 @@ my $index = $schema->resultset('CodeSearchIndex')->create({
                 </ul>
 
                 <h3>Access Control Examples</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Developer role can access:</strong></p>
                     <pre><code>my @accessible = $schema->resultset('CodeSearchIndex')->search({
     min_role => 'developer'
 })->all;</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Admin-only code search:</strong></p>
                     <pre><code>my @admin_code = $schema->resultset('CodeSearchIndex')->search({
     min_role => 'admin'
@@ -290,7 +290,7 @@ my $index = $schema->resultset('CodeSearchIndex')->create({
                 </div>
 
                 <h3>Helper Method: is_accessible_by_role()</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my $index = $schema->resultset('CodeSearchIndex')->find($id);
 
 if ($index->is_accessible_by_role($user->role)) {
@@ -316,7 +316,7 @@ if ($index->is_accessible_by_role($user->role)) {
                 </ul>
 
                 <h3>Change Detection Pattern</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>use Digest::SHA;
 use File::Slurp;
 
@@ -348,7 +348,7 @@ if ($index->content_hash ne $current_hash) {
                 <h2>API Methods & Helpers</h2>
                 
                 <h3>Standard DBIx::Class Methods</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Creating Index Entries:</strong></p>
                     <pre><code>my $index = $schema->resultset('CodeSearchIndex')->create({
     file_path => 'Comserv/lib/Comserv/Model/Schema/Ency/Result/User.pm',
@@ -364,7 +364,7 @@ if ($index->content_hash ne $current_hash) {
 });</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Retrieving Indexes:</strong></p>
                     <pre><code>my $index = $schema->resultset('CodeSearchIndex')->find(1);
 
@@ -381,7 +381,7 @@ my @by_role = $schema->resultset('CodeSearchIndex')->search({
 })->all;</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Updating Indexes:</strong></p>
                     <pre><code>$index->update({
     searchable_code => $new_content,
@@ -391,31 +391,31 @@ my @by_role = $schema->resultset('CodeSearchIndex')->search({
                 </div>
 
                 <h3>Code Element Extraction Helpers</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>get_code_elements():</strong> Get parsed code elements as hash</p>
                     <pre><code>my $elements = $index->get_code_elements();
 # Returns: { functions => [...], classes => [...], ... }</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>get_functions():</strong> Get list of functions/subroutines</p>
                     <pre><code>my @functions = @{ $index->get_functions() };
 # Returns: ['new', 'action_list', 'index', ...]</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>get_classes():</strong> Get package/class names</p>
                     <pre><code>my @classes = @{ $index->get_classes() };
 # Returns: ['Comserv::Controller::Admin', ...]</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>get_variables():</strong> Get variable names</p>
                     <pre><code>my @vars = @{ $index->get_variables() };
 # Returns: ['$VERSION', '@EXPORT', ...]</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>is_accessible_by_role($user_role):</strong> Check access permission</p>
                     <pre><code>if ($index->is_accessible_by_role('developer')) {
     # User can search this file
@@ -427,7 +427,7 @@ my @by_role = $schema->resultset('CodeSearchIndex')->search({
                 <h2>Usage Examples</h2>
                 
                 <h3>Example 1: Index a Perl Module</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>use File::Slurp;
 use Digest::SHA;
 use JSON::MaybeXS;
@@ -453,7 +453,7 @@ print "Indexed: " . $index->file_path . "\n";</code></pre>
                 </div>
 
                 <h3>Example 2: Search Code by Function Name</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>use JSON::MaybeXS;
 
 my $search_term = 'authenticate';
@@ -479,7 +479,7 @@ print "Found " . scalar(@results) . " matching files\n";</code></pre>
                 </div>
 
                 <h3>Example 3: Detect File Changes and Re-index</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>use File::Slurp;
 use Digest::SHA;
 
@@ -509,7 +509,7 @@ print "Total re-indexed: $reindexed files\n";</code></pre>
                 </div>
 
                 <h3>Example 4: Extract and Display Code Elements</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my $index = $schema->resultset('CodeSearchIndex')->search({
     file_path => 'Comserv/lib/Comserv/Controller/User.pm'
 })->first;
@@ -535,7 +535,7 @@ if ($index) {
                 </div>
 
                 <h3>Example 5: Admin Code Search (Restricted Access)</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px static var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px static var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my $search_results;
 my @all_indexes = $schema->resultset('CodeSearchIndex')->all;
 

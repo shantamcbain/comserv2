@@ -71,7 +71,7 @@
     }
 
     .theme-section {
-        background-color: white;
+        background-color: rgba(255,255,255,0.88);
         border: 1px solid var(--border-color, #dee2e6);
         border-radius: 5px;
         padding: 15px;
@@ -107,7 +107,7 @@
         border-radius: 3px;
         font-family: monospace;
         font-size: 13px;
-        background-color: white;
+        background-color: rgba(255,255,255,0.88);
     }
 
     .css-variable-actions {
@@ -128,7 +128,7 @@
     .css-preview {
         margin-top: 30px;
         padding: 20px;
-        background-color: white;
+        background-color: rgba(255,255,255,0.88);
         border: 1px solid var(--border-color, #dee2e6);
         border-radius: 5px;
     }
@@ -205,7 +205,7 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        background-color: white;
+        background-color: rgba(255,255,255,0.88);
         border: 1px solid var(--border-color, #ccc);
         border-radius: 8px;
         padding: 20px;

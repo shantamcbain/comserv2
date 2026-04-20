@@ -190,6 +190,7 @@ sub prune :Path('/admin/logging/audit/prune') :Args(0) {
         $c->flash->{success_msg} = "Pruned $deleted records from system_log.";
     }
     $c->res->redirect($c->uri_for('/admin/logging/audit'));
+    $c->detach;
 }
 
 # POST /admin/logging/audit/alert_action
@@ -219,6 +220,7 @@ sub alert_action :Path('/admin/logging/audit/alert_action') :Args(0) {
         $c->flash->{error_msg} = "Error updating alert: $@" if $@;
     }
     $c->res->redirect($c->uri_for('/admin/logging/audit'));
+    $c->detach;
 }
 
 __PACKAGE__->meta->make_immutable;

@@ -1,5 +1,63 @@
 {
     "agents": {
+        "template_editor": {
+            "id": "template_editor",
+            "display_name": "Template Editor",
+            "icon": "✏️",
+            "admin_only": true,
+            "description": "Review and rewrite TT2 template files — remove outdated content, fix broken links, improve pages (admin only)",
+            "url_patterns": [],
+            "capabilities": {
+                "search_docs": false,
+                "search_web": false,
+                "search_code": true,
+                "context_aware": true,
+                "fill_form": false
+            },
+            "model_settings": {
+                "temperature": 0.3,
+                "max_tokens": 8000,
+                "model_preference": "phi4"
+            },
+            "directives": [
+                "Always read the current template before proposing changes",
+                "Provide complete file rewrites — never partial snippets",
+                "Use only verified relative URLs from the application nav list",
+                "Preserve TT2 syntax and INCLUDE/WRAPPER directives exactly",
+                "Explain what is outdated or broken before proposing the fix"
+            ]
+        },
+        "coding": {
+            "id": "coding",
+            "display_name": "Coding Assistant",
+            "icon": "💻",
+            "local_only": true,
+            "system_prompt": "You are a Coding Assistant for the Comserv2 Catalyst/Perl web application. You help developers read, write, debug, and refactor code across the stack.\n\nTECH STACK:\n- Backend: Perl 5, Catalyst MVC framework, DBIx::Class ORM, Template Toolkit (TT2)\n- Database: MariaDB, accessed via DBIx::Class schema (Comserv::Model::Schema::Ency)\n- Frontend: HTML/CSS, vanilla JavaScript, some jQuery\n- AI: Local Ollama models + Grok (xAI) via Comserv::Model::Grok\n- Config: comserv.conf (Catalyst config), db_config.json (database connections)\n- Directory layout:\n    lib/Comserv/Controller/   — Catalyst controllers (AI.pm, Inventory.pm, Accounting.pm, Root.pm, ...)\n    lib/Comserv/Model/        — Models: DBEncy, Ollama, Grok, ThemeConfig, ...\n    lib/Comserv/Model/Schema/Ency/Result/  — DBIx::Class result classes\n    root/                     — TT2 templates, static files\n    root/static/js/           — JavaScript (local-chat.js, widget.tt)\n    root/static/config/       — agents.json and other config\n    sql/migrations/           — DB migration SQL files\n\nKEY CONVENTIONS:\n- Controllers use try/catch from Try::Tiny; logging via $self->logging->log_with_details()\n- All DB access goes through $c->model(\"DBEncy\")->schema->resultset(\"ClassName\")\n- TT2 templates use [% ... %] tags; wrapper is root/wrapper.tt\n- New DB columns require a sql/migrations/NNN_description.sql file AND a matching Result class update\n- Agent system prompts are built by _build_X_system_prompt() private methods in AI.pm\n- The chat widget lives in root/ai/widget.tt + root/static/js/local-chat.js\n\nERROR ANALYSIS WORKFLOW:\nWhen a [PAGE ERROR DETECTED] block is present or the user reports an error:\n1. Identify the file and line number from the error.\n2. Request the file: [READ_FILE: lib/Comserv/Controller/AI.pm]\n   The widget fetches it and injects it automatically — wait for it.\n3. Diagnose the root cause and explain it clearly.\n4. Propose a fix using the FIX format below. The user clicks Apply Fix to approve.\n\nREQUESTING FILES:\nWrite exactly: [READ_FILE: relative/path/to/file.pm]\nOne file per response. Use paths relative to the project root.\n\nPROPOSING FIXES:\nUse this format so the Apply Fix button appears:\n## FIX: lib/path/to/file.pm\n```perl\n...corrected code...\n```\nFor files under 200 lines provide complete content. For larger files provide only the corrected function. Never output ## FIX: without a code block immediately after.\n\nRESTRICTIONS:\n- DEVELOPMENT ONLY — never on production\n- No code comments unless explicitly asked\n- Always follow existing code style",
+            "description": "Comserv2 application coding assistant — Perl/Catalyst, DBIx::Class, TT2, JS (dev only)",
+            "url_patterns": [
+                "/ai",
+                "/admin"
+            ],
+            "capabilities": {
+                "search_docs": true,
+                "search_web": true,
+                "search_code": true,
+                "context_aware": true,
+                "fill_form": false
+            },
+            "model_settings": {
+                "temperature": 0.2,
+                "max_tokens": 8000,
+                "model_preference": "phi4"
+            },
+            "directives": [
+                "Always read surrounding context (imports, conventions) before suggesting code",
+                "Follow existing code style — no comments unless explicitly asked",
+                "For DB changes, always include both the Result class update AND migration SQL",
+                "Never guess URLs — only use verified relative paths",
+                "When unsure about a file or method, say so rather than guessing"
+            ]
+        },
         "planning": {
             "id": "planning",
             "display_name": "Planning Assistant",
