@@ -581,8 +581,8 @@ sub logout :Local {
 
     # Get username before clearing session (for the success message)
     my $username = '';
-    if ($c->user_exists) {
-        $username = $c->user->username if $c->user->can('username');
+    if ($c->user_exists && $c->user && $c->user->can('username')) {
+        $username = $c->user->username;
     } elsif ($c->session->{username}) {
         $username = $c->session->{username};
     } else {

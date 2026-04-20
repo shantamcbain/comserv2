@@ -178,15 +178,34 @@ sub get_messages :Path('get_messages') :Args(0) {
         );
         $search_params{conversation_id} = $conversation_id if $conversation_id;
         
-        # Admin sees all messages in conversation; users see only their own
-        if ($is_admin) {
+        # For support conversations: user can see ALL messages (incl. admin responses)
+        # if they own the conversation. Admin sees all messages always.
+        my $is_support_conv = 0;
+        if ($conversation_id && !$is_admin) {
+            my $conv = $schema->resultset('AiConversation')->find($conversation_id);
+            if ($conv) {
+                my $meta = {};
+                eval { $meta = decode_json($conv->metadata || '{}') };
+                $is_support_conv = 1 if ($meta->{support_chat} || ($conv->user_id == $user_id && $meta->{agent_type} eq 'support'));
+                # Also check if the conversation belongs to this user
+                if ($conv->user_id == $user_id) {
+                    my $first_msg = $schema->resultset('AiMessage')->search(
+                        { conversation_id => $conversation_id, agent_type => 'support' },
+                        { rows => 1 }
+                    )->first;
+                    $is_support_conv = 1 if $first_msg;
+                }
+            }
+        }
+
+        if ($is_admin || $is_support_conv) {
             @messages = $schema->resultset('AiMessage')->search(
                 \%search_params,
                 { order_by => { -asc => 'id' } }
             )->all();
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_messages',
-                "Admin retrieving messages - found " . scalar(@messages) . " messages");
+                ($is_admin ? "Admin" : "User (support conv)") . " retrieving messages - found " . scalar(@messages) . " messages");
         } else {
             $search_params{user_id} = $user_id;
             @messages = $schema->resultset('AiMessage')->search(
@@ -391,7 +410,7 @@ sub respond :Path('respond') :Args(0) {
             role => 'assistant',
             content => $message,
             metadata => encode_json($msg_metadata),
-            agent_type => 'chat',
+            agent_type => 'support',
             user_role => 'admin'
         });
         
@@ -417,6 +436,88 @@ sub respond :Path('respond') :Args(0) {
             error => 'Failed to store response'
         }));
     };
+}
+
+=head2 pending_count
+
+Returns count of open support conversations awaiting admin response.
+Used by admin nav badge.
+
+=cut
+
+sub pending_count :Path('pending_count') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    my $count = 0;
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        # Support conversations: AiMessage with agent_type='support' and role='user'
+        # that have no corresponding admin response in the same conversation
+        my @support_convs = $schema->resultset('AiMessage')->search(
+            { agent_type => 'support', role => 'user' },
+            { columns => ['conversation_id'], distinct => 1 }
+        )->all;
+        foreach my $row (@support_convs) {
+            my $cid = $row->conversation_id;
+            my $has_admin = $schema->resultset('AiMessage')->count(
+                { conversation_id => $cid, agent_type => 'support', role => 'assistant' }
+            );
+            # Count conversations where last message is from user (awaiting response)
+            my $last = $schema->resultset('AiMessage')->search(
+                { conversation_id => $cid, agent_type => 'support' },
+                { order_by => { -desc => 'id' }, rows => 1 }
+            )->first;
+            $count++ if $last && $last->role eq 'user';
+        }
+    };
+    $c->response->body(encode_json({ count => $count }));
+}
+
+=head2 support_conversations
+
+Admin endpoint: list all active support chat conversations.
+
+=cut
+
+sub support_conversations :Path('support_conversations') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    unless ($c->check_user_roles('admin')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => 0, error => 'Unauthorized' }));
+        return;
+    }
+    my @convs;
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my @conv_ids = map { $_->conversation_id }
+            $schema->resultset('AiMessage')->search(
+                { agent_type => 'support' },
+                { columns => ['conversation_id'], distinct => 1,
+                  order_by => { -desc => 'conversation_id' } }
+            )->all;
+        foreach my $cid (@conv_ids) {
+            my $conv = $schema->resultset('AiConversation')->find($cid);
+            next unless $conv;
+            my @msgs = map { { $_->get_columns } }
+                $schema->resultset('AiMessage')->search(
+                    { conversation_id => $cid, agent_type => 'support' },
+                    { order_by => { -asc => 'id' } }
+                )->all;
+            my $last = @msgs ? $msgs[-1] : undef;
+            push @convs, {
+                conversation_id => $cid,
+                user_id         => $conv->user_id,
+                title           => $conv->title || "Support Chat #$cid",
+                created_at      => $conv->created_at->iso8601,
+                message_count   => scalar @msgs,
+                last_role       => $last ? $last->{role} : '',
+                last_message    => $last ? substr($last->{content}, 0, 100) : '',
+                messages        => \@msgs,
+            };
+        }
+    };
+    $c->response->body(encode_json({ success => 1, conversations => \@convs }));
 }
 
 __PACKAGE__->meta->make_immutable;

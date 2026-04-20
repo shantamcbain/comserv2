@@ -2605,13 +2605,13 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
 
         # ── Step 1: Auto-detect cross-project todo-level blocks ────────────────
         # Find todos with blocked_by_todo_id pointing to a todo in a DIFFERENT project
-        my @blocked_todos = $tdrs->search(
-            {
-                'me.blocked_by_todo_id' => { '!=' => undef },
-                'me.status'             => { -not_in => \@done_statuses_dep },
-                'me.project_id'         => { '!=' => undef },
-            }
-        )->all;
+        my %bt_cond = (
+            'me.blocked_by_todo_id' => { '!=' => undef },
+            'me.status'             => { -not_in => \@done_statuses_dep },
+            'me.project_id'         => { '!=' => undef },
+        );
+        $bt_cond{'me.sitename'} = $sitename unless $is_csc;
+        my @blocked_todos = $tdrs->search(\%bt_cond)->all;
 
         for my $blocked (@blocked_todos) {
             my $blocker_todo_id = $blocked->blocked_by_todo_id // next;
@@ -2647,8 +2647,10 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         }
 
         # ── Step 2: Fetch active deps and auto-resolve completed ones ──────────
+        my %dep_search = (status => 'active');
+        $dep_search{sitename} = $sitename unless $is_csc;
         my @dep_rows = $c->model('DBEncy')->resultset('ProjectDependency')->search(
-            { status => 'active' },
+            \%dep_search,
             { order_by => { -asc => 'project_id' } }
         )->all;
 
