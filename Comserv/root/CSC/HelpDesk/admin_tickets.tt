@@ -1,0 +1,94 @@
+[% PageVersion = 'CSC/HelpDesk/admin_tickets.tt,v 0.01 2026/04/20 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+ <br>[% PageVersion %]</br>
+[% END %]
+
+<div class="helpdesk-container">
+    <h1>[% title || 'Ticket Management' %]</h1>
+
+    [% IF error_msg %]
+    <div class="alert-error">[% error_msg %]</div>
+    [% END %]
+
+    <div class="admin-ticket-nav">
+        <a href="[% c.uri_for('/HelpDesk/admin/tickets/open') %]"
+           class="btn [% status_filter == 'open' ? 'btn-primary' : 'btn-secondary' %]">Open</a>
+        <a href="[% c.uri_for('/HelpDesk/admin/tickets/all') %]"
+           class="btn [% status_filter == 'all' ? 'btn-primary' : 'btn-secondary' %]">All</a>
+        <a href="[% c.uri_for('/HelpDesk/admin') %]" class="btn btn-secondary">&#8592; Admin</a>
+    </div>
+
+    [% IF tickets && tickets.size %]
+    <p>[% tickets.size %] ticket(s)</p>
+    <table class="tickets-table">
+        <thead>
+            <tr>
+                <th>Ticket #</th>
+                <th>Site</th>
+                <th>Subject</th>
+                <th>Category</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Submitted by</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        [% FOREACH t IN tickets %]
+            <tr>
+                <td><code>[% t.ticket_number %]</code></td>
+                <td>[% t.site_name %]</td>
+                <td>[% t.subject %]</td>
+                <td>[% t.category || 'other' %]</td>
+                <td>
+                    [% IF t.priority == 'critical' %]<span class="priority-critical">Critical</span>
+                    [% ELSIF t.priority == 'high' %]<span class="priority-high">High</span>
+                    [% ELSIF t.priority == 'medium' %]<span class="priority-medium">Medium</span>
+                    [% ELSE %]<span class="priority-low">Low</span>
+                    [% END %]
+                </td>
+                <td>
+                    [% IF t.status == 'open' %]<span class="status-open">Open</span>
+                    [% ELSIF t.status == 'in_progress' %]<span class="status-in-progress">In Progress</span>
+                    [% ELSIF t.status == 'resolved' %]<span class="status-resolved">Resolved</span>
+                    [% ELSE %]<span class="status-closed">Closed</span>
+                    [% END %]
+                </td>
+                <td>[% t.username || 'guest' %]</td>
+                <td>[% t.created_at %]</td>
+                <td>
+                    <a href="[% c.uri_for('/HelpDesk/ticket/view/' _ t.ticket_number) %]"
+                       class="btn btn-sm btn-primary">View</a>
+                </td>
+            </tr>
+        [% END %]
+        </tbody>
+    </table>
+    [% ELSE %]
+    <div class="no-tickets">
+        <p>No tickets found.</p>
+    </div>
+    [% END %]
+</div>
+
+<style>
+    .admin-ticket-nav { margin-bottom: 16px; display: flex; gap: 8px; }
+    .helpdesk-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .tickets-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    .tickets-table th, .tickets-table td { padding: 10px 12px; border: 1px solid #ddd; text-align: left; font-size: 0.9em; }
+    .tickets-table th { background: #f5f5f5; font-weight: bold; }
+    .tickets-table tr:nth-child(even) { background: #fafafa; }
+    .priority-critical { color: #fff; background: #c0392b; padding: 2px 6px; border-radius: 3px; font-size: 0.85em; }
+    .priority-high     { color: #fff; background: #e67e22; padding: 2px 6px; border-radius: 3px; font-size: 0.85em; }
+    .priority-medium   { color: #fff; background: #f39c12; padding: 2px 6px; border-radius: 3px; font-size: 0.85em; }
+    .priority-low      { color: #fff; background: #27ae60; padding: 2px 6px; border-radius: 3px; font-size: 0.85em; }
+    .status-open       { color: #fff; background: #2980b9; padding: 2px 6px; border-radius: 3px; font-size: 0.85em; }
+    .status-in-progress{ color: #fff; background: #8e44ad; padding: 2px 6px; border-radius: 3px; font-size: 0.85em; }
+    .status-resolved   { color: #fff; background: #27ae60; padding: 2px 6px; border-radius: 3px; font-size: 0.85em; }
+    .status-closed     { color: #fff; background: #7f8c8d; padding: 2px 6px; border-radius: 3px; font-size: 0.85em; }
+    .btn-sm { padding: 3px 8px; font-size: 0.85em; }
+    .alert-error { background: #fde; border: 1px solid #c00; padding: 10px; border-radius: 4px; margin-bottom: 12px; }
+    .no-tickets { padding: 40px; text-align: center; color: #666; }
+</style>
