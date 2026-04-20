@@ -53,15 +53,6 @@
     <label for="stem">Stem:</label><br>
     <textarea id="stem" name="stem"></textarea><br>
 
-    <label for="nectar">Nectar:</label><br>
-    <textarea id="nectar" name="nectar"></textarea><br>
-
-    <label for="pollinator">Pollinator:</label><br>
-    <textarea id="pollinator" name="pollinator"></textarea><br>
-
-    <label for="pollen">Pollen:</label><br>
-    <textarea id="pollen" name="pollen"></textarea><br>
-
     <label for="leaves">Leaves:</label><br>
     <textarea id="leaves" name="leaves"></textarea><br>
 
@@ -84,7 +75,7 @@
     <input type="text" id="distribution" name="distribution" maxlength="100" required><br>
 
     <label for="url">URL:</label><br>
-    <input type="url" id="url" name="url" maxlength="150" required><br>
+    <input type="text" id="url" name="url" maxlength="255"><br>
 
 <label for="nectar">Nectar:</label><br>
     <select id="nectar" name="nectar" required>
@@ -97,7 +88,7 @@
     </div>
 
     <label for="pollinator">Pollinator:</label><br>
-    <input type="text" id="pollinator" name="pollinator" maxlength="100" required><br>
+    <textarea id="pollinator" name="pollinator"></textarea><br>
 
     <label for="pollen">Pollen:</label><br>
     <select id="pollen" name="pollen" required>
