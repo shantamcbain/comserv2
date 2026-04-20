@@ -1,4 +1,3 @@
-[% META title = ticket.subject || 'Support Ticket' %]
 [% PageVersion = 'CSC/HelpDesk/ticket_view.tt,v 0.01 2026/04/20' %]
 [% IF c.session.debug_mode == 1 %]<br>[% PageVersion %]</br>[% END %]
 
