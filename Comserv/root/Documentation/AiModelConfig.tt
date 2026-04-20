@@ -24,19 +24,19 @@
     </div>
 
     <!-- TABLE OF CONTENTS SECTION -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
             <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
-                <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Prerequisites</a>
-                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Features</a>
-                <a href="#schema" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Schema</a>
-                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
-                <a href="#usage-examples" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Usage Examples</a>
-                <a href="#constraints" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Constraints</a>
-                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">See Also</a>
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Overview</a>
+                <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Prerequisites</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Key Features</a>
+                <a href="#schema" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Schema</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Methods</a>
+                <a href="#usage-examples" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Usage Examples</a>
+                <a href="#constraints" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Constraints</a>
+                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">See Also</a>
             </div>
         </div>
     </div>
@@ -47,7 +47,7 @@
             <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
             <p style="color: var(--text-color); font-family: var(--body-font);">The <strong>AiModelConfig Result Class</strong> (Comserv::Model::Schema::Ency::Result::AiModelConfig) is a DBIx::Class Result class that manages configurations for AI models integrated into Comserv. It stores model-specific settings including API endpoints, encrypted API keys, model parameters (temperature, max tokens), feature flags for documentation search and web search, and role-based access control.</p>
             <p style="color: var(--text-color); font-family: var(--body-font);">This class supports multi-site, multi-role, multi-agent-type configurations, allowing different AI models to be available for different user roles and agent types within each site. It includes built-in encryption support for API keys and automatic timestamp management.</p>
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
                 <strong>Initial Release (v0.01 - 2026-01-11)</strong>: Complete documentation of AiModelConfig Result class including schema definition, field descriptions, methods, and usage patterns.
             </div>
             <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
@@ -98,7 +98,7 @@
             
             <h3 style="color: var(--text-color); font-family: var(--header-font);">4.2 Column Definitions</h3>
             <table border="1" style="width: 100%; border-collapse: collapse;">
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <th style="padding: 8px; text-align: left;">Column</th>
                     <th style="padding: 8px; text-align: left;">Type</th>
                     <th style="padding: 8px; text-align: left;">Nullable</th>
@@ -112,7 +112,7 @@
                     <td style="padding: 8px;">Auto-increment</td>
                     <td style="padding: 8px;">Primary key - unique configuration identifier</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: 8px;"><code>site_id</code></td>
                     <td style="padding: 8px;">INTEGER</td>
                     <td style="padding: 8px;">NO</td>
@@ -126,7 +126,7 @@
                     <td style="padding: 8px;"></td>
                     <td style="padding: 8px;">User role (e.g., 'admin', 'developer')</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: 8px;"><code>agent_type</code></td>
                     <td style="padding: 8px;">VARCHAR(100)</td>
                     <td style="padding: 8px;">NO</td>
@@ -140,7 +140,7 @@
                     <td style="padding: 8px;"></td>
                     <td style="padding: 8px;">Name of the AI model (e.g., 'gpt-4', 'claude-3', 'grok')</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: 8px;"><code>enabled</code></td>
                     <td style="padding: 8px;">BOOLEAN</td>
                     <td style="padding: 8px;">NO</td>
@@ -154,7 +154,7 @@
                     <td style="padding: 8px;"></td>
                     <td style="padding: 8px;">API endpoint URL for the model provider</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: 8px;"><code>api_key_encrypted</code></td>
                     <td style="padding: 8px;">VARCHAR(512)</td>
                     <td style="padding: 8px;">YES</td>
@@ -168,7 +168,7 @@
                     <td style="padding: 8px;">NULL</td>
                     <td style="padding: 8px;">Temperature parameter for LLM (0.0 to 2.0 typically)</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: 8px;"><code>max_tokens</code></td>
                     <td style="padding: 8px;">INTEGER</td>
                     <td style="padding: 8px;">YES</td>
@@ -182,7 +182,7 @@
                     <td style="padding: 8px;">1 (true)</td>
                     <td style="padding: 8px;">Enable automatic documentation search during model queries</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: 8px;"><code>allow_web_search</code></td>
                     <td style="padding: 8px;">BOOLEAN</td>
                     <td style="padding: 8px;">NO</td>
@@ -196,7 +196,7 @@
                     <td style="padding: 8px;">0 (false)</td>
                     <td style="padding: 8px;">Allow model to search codebase for relevant code examples</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: 8px;"><code>priority</code></td>
                     <td style="padding: 8px;">INTEGER</td>
                     <td style="padding: 8px;">NO</td>
@@ -210,7 +210,7 @@
                     <td style="padding: 8px;">CURRENT_TIMESTAMP</td>
                     <td style="padding: 8px;">Configuration creation timestamp</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: 8px;"><code>updated_at</code></td>
                     <td style="padding: 8px;">TIMESTAMP</td>
                     <td style="padding: 8px;">NO</td>

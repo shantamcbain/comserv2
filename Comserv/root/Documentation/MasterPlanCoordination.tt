@@ -17,7 +17,7 @@
 <div class="app-container">
     <h1>Master Plan Coordination Dashboard</h1>
     
-    <details style="background: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; margin: 20px 0; padding: 0;">
+    <details style="background: rgba(255,255,255,0.15); border: 1px solid var(--border-color); border-radius: 4px; margin: 20px 0; padding: 0;">
         <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: var(--header-bg); border-bottom: 1px solid var(--border-color);">
             📊 Master Status Metadata (Session Info & Audit Trail) - Click to Expand
         </summary>
@@ -91,7 +91,7 @@
                 </tr>
             </thead>
             <tbody>
-                <tr style="background: var(--light-color);">
+                <tr style="background: rgba(255,255,255,0.15);">
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>Master Plan = Links</strong></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Master plan references each plan with 1-2 sentence summary + link to dedicated plan file</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>&lt;a href="/Documentation/Plans/A1ConfigurationInfrastructure"&gt;A.1: Configuration Infrastructure&lt;/a&gt;</code> Status: ✅ COMPLETE</td>
@@ -101,7 +101,7 @@
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Each plan has dedicated .tt file containing: full description, task list, timeline, resources, status, dependencies, notes</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">/Documentation/Plans/A1ConfigurationInfrastructure.tt (v1.00) = detailed plan document</td>
                 </tr>
-                <tr style="background: var(--light-color);">
+                <tr style="background: rgba(255,255,255,0.15);">
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>No Duplication</strong></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Detailed content appears ONLY in individual plan files, never in master plan</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Task breakdown (10+ items) = belongs in A1ConfigurationInfrastructure.tt, not in MasterPlanCoordination.tt</td>
@@ -111,7 +111,7 @@
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Keep summary sections under 500 lines each. If exceeding: extract to separate file</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Priority Matrix >500 lines? Move to separate PriorityMatrix.tt, link from master plan</td>
                 </tr>
-                <tr style="background: var(--light-color);">
+                <tr style="background: rgba(255,255,255,0.15);">
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>Coordinator Role</strong></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Master plan shows relationships, dependencies, and execution sequence across plans</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">"Plan A.1 unblocks A.2" or "Plans B.1-B.3 run parallel" = appears in master plan</td>
@@ -149,7 +149,7 @@
                     <li>Create link if plan file missing</li>
                 </ul>
             </div>
-            <div style="background: var(--light-color); padding: 15px; border-radius: 4px; border-left: 4px solid var(--primary-color);">
+            <div style="background: rgba(255,255,255,0.15); padding: 15px; border-radius: 4px; border-left: 4px solid var(--primary-color);">
                 <strong>📝 Update Process</strong>
                 <ul style="margin: 10px 0 0 0; padding-left: 20px;">
                     <li>Execute Step 9: Verify Plan Count Sync</li>
@@ -494,7 +494,7 @@
                     <td style="border: 1px solid var(--border-color);">Monashee Coop management system. Handles cooperative organization structures, member management, shared resources, and cooperative governance tracking. Features todo/project integration, logs, and collaborative workflows. Website: monasheecoop.ca</td>
                     <td style="border: 1px solid var(--border-color);"><a href="/Documentation/controllers/MCoop.tt" class="doc-link">📄 MISSING DOCS</a> | Controller: <code>MCoop.pm</code></td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="border: 1px solid var(--border-color);"><strong>Ve7tit</strong></td>
                     <td style="border: 1px solid var(--border-color);">Radio communications system. Manages amateur radio call signs, frequencies, licensing, repeater assignments, and radio network management. Includes log integration and equipment tracking.</td>
                     <td style="border: 1px solid var(--border-color);"><a href="/Documentation/controllers/Ve7tit" class="doc-link">✅ Ve7tit.tt</a> | <a href="/Documentation/controllers/changelog/2024-08-ve7tit-controller-fixes.tt" class="doc-link">Changelog</a></td>
@@ -504,7 +504,7 @@
                     <td style="border: 1px solid var(--border-color);">Family genealogy and history management system. Tracks Weaver Beck family lineage, ancestry records, family events, historical documentation, and genealogical relationships. Supports family tree visualization and heritage documentation.</td>
                     <td style="border: 1px solid var(--border-color);"><a href="/Documentation/controllers/WeaverBeck.tt" class="doc-link">📄 MISSING DOCS</a> | Controller: <code>WeaverBeck.pm</code></td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="border: 1px solid var(--border-color);"><strong>Shanta</strong></td>
                     <td style="border: 1px solid var(--border-color);">Personal/household management system. Your personal site for household projects, personal todos, home maintenance logs, family calendar, and personal knowledge base.</td>
                     <td style="border: 1px solid var(--border-color);"><a href="/Documentation/controllers/Shanta.tt" class="doc-link">📄 MISSING DOCS</a> | Controller: <code>Shanta.pm</code></td>
@@ -519,7 +519,7 @@
                     <td style="border: 1px solid var(--border-color);">Community/Code Space system. Manages community spaces, event scheduling, member projects, resource allocation, and collaborative learning. Features maker-space tracking and project showcases.</td>
                     <td style="border: 1px solid var(--border-color);"><a href="/Documentation/controllers/CSC.tt" class="doc-link">📄 MISSING DOCS</a> | Controller: <code>CSC.pm</code></td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="border: 1px solid var(--border-color);"><strong>USBM</strong></td>
                     <td style="border: 1px solid var(--border-color);">Bureau/Management system. Handles organizational administration, policy management, resource allocation, reporting structures, and documentation workflows. Enterprise/org-focused.</td>
                     <td style="border: 1px solid var(--border-color);"><a href="/Documentation/controllers/USBM.tt" class="doc-link">📄 MISSING DOCS</a> | Controller: <code>USBM.pm</code></td>

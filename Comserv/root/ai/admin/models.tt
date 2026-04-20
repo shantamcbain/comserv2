@@ -237,7 +237,7 @@
 }
 
 .model-card {
-    background: var(--secondary-color);
+    background: var(--nav-bg);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 20px;
@@ -432,7 +432,7 @@
     padding: 8px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
-    background: var(--secondary-color);
+    background: var(--nav-bg);
     color: var(--text-color);
 }
 

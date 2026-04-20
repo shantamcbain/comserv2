@@ -90,7 +90,7 @@
 }
 
 .api-key-card {
-    background: var(--secondary-color);
+    background: var(--nav-bg);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 20px;
@@ -147,7 +147,7 @@
     text-align: center;
     padding: 40px;
     color: var(--text-color);
-    background: var(--secondary-color);
+    background: var(--nav-bg);
     border: 2px dashed var(--border-color);
     border-radius: 8px;
 }

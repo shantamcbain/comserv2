@@ -21,7 +21,7 @@
     </div>
 
     <!-- TABLE OF CONTENTS -->
-    <div id="toc" style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-bottom: var(--spacing-large);">
+    <div id="toc" style="background-color: rgba(255,255,255,0.15); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-bottom: var(--spacing-large);">
         <h3 style="margin-top: 0; color: var(--primary-color);">Table of Contents</h3>
         <ul style="list-style-position: inside; color: var(--text-color);">
             <li><a href="#overview" style="color: var(--link-color); text-decoration: none;">What is Membership?</a></li>
@@ -68,7 +68,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); font-weight: bold;">Free</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Basic site access, read-only features, limited AI model access</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); font-weight: bold;">Supporter</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Full site access, more AI models, internal coin allowance, priority support</td>
                 </tr>
@@ -76,7 +76,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); font-weight: bold;">Member</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">All Supporter features + beekeeping module, planning tools, subdomain/email address on site domain</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); font-weight: bold;">Pro / Business</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">All Member features + hosting space, custom domain, access to all AI models, service-earning capabilities</td>
                 </tr>
@@ -122,7 +122,7 @@
             See the <a href="#coins" style="color: var(--link-color);">Internal Coins</a> section for details.
         </p>
 
-        <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); border-radius: 4px; margin-top: var(--spacing-medium);">
+        <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); border-radius: 4px; margin-top: var(--spacing-medium);">
             <strong style="color: var(--text-color);">Note on promo codes:</strong>
             <p style="color: var(--text-color); margin: var(--spacing-small) 0 0 0; line-height: 1.5;">If you have a promo code, enter it on the payment page before completing checkout. Promo codes can give a percentage discount, a fixed amount off, or free months.</p>
         </div>
@@ -150,7 +150,7 @@
             <li>View your full coin history at <a href="/currency/history" style="color: var(--link-color);">/currency/history</a>.</li>
         </ul>
 
-        <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); border-radius: 4px; margin-top: var(--spacing-medium);">
+        <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); border-radius: 4px; margin-top: var(--spacing-medium);">
             <strong style="color: var(--text-color);">Coins are not cryptocurrency.</strong>
             <p style="color: var(--text-color); margin: var(--spacing-small) 0 0 0; line-height: 1.5;">Coins exist only within this site and have no external monetary value. They cannot be withdrawn as cash.</p>
         </div>
@@ -175,7 +175,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Advanced AI Models</strong></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Access to more powerful Ollama models beyond the free tier selection</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Email Address</strong></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">A yourname@sitename email address (where supported by the site)</td>
                 </tr>
@@ -183,7 +183,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Hosting / Subdomain</strong></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Web hosting space and/or a subdomain under the site's domain</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Beekeeping Module</strong></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Full access to the Apiary hive-management and beekeeping tracking system</td>
                 </tr>
@@ -191,7 +191,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Planning System</strong></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">AI-assisted planning tools for projects, schedules, and goals</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Internal Currency</strong></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Ability to earn and transfer coins for contributing services to other members</td>
                 </tr>

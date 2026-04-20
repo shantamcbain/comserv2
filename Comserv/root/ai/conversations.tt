@@ -334,7 +334,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .ai-conversations-admin-controls {
     margin-top: var(--spacing-medium);
     padding: var(--spacing-small) var(--spacing-medium);
-    background-color: var(--secondary-color);
+    background-color: rgba(255,255,255,0.12);
     border-radius: 4px;
     border-left: 3px solid var(--accent-color);
     display: inline-block;
@@ -347,7 +347,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .ai-conversations-empty-state {
     text-align: center;
     padding: var(--spacing-large);
-    background-color: var(--secondary-color);
+    background-color: rgba(255,255,255,0.12);
     border-radius: 4px;
     border: 2px dashed var(--border-color);
     margin: var(--spacing-large) 0;
@@ -374,7 +374,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .ai-conversations-stats {
     margin-bottom: var(--spacing-large);
     padding: var(--spacing-small) var(--spacing-medium);
-    background-color: var(--secondary-color);
+    background-color: rgba(255,255,255,0.12);
     border-radius: 4px;
     border-left: 3px solid var(--accent-color);
     display: inline-block;
@@ -409,7 +409,7 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .ai-conversations-item-row:hover {
-    background-color: var(--secondary-color);
+    background-color: rgba(255,255,255,0.12);
 }
 
 .ai-conversations-item-toggle {
@@ -448,7 +448,7 @@ document.addEventListener('DOMContentLoaded', function() {
     white-space: nowrap;
     min-width: 60px;
     font-family: monospace;
-    background-color: var(--secondary-color);
+    background-color: rgba(255,255,255,0.12);
     padding: 2px 6px;
     border-radius: 3px;
 }
@@ -498,7 +498,7 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .status-archived {
-    background-color: var(--secondary-color);
+    background-color: rgba(255,255,255,0.12);
     color: var(--text-color);
 }
 
@@ -506,7 +506,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .ai-conversations-item-details {
     max-height: 0;
     overflow: hidden;
-    background-color: var(--secondary-color);
+    background-color: rgba(255,255,255,0.12);
     transition: max-height 0.2s ease;
 }
 
@@ -527,7 +527,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .ai-conversations-debug-section {
     margin-bottom: var(--spacing-medium);
     padding: var(--spacing-small);
-    background-color: var(--secondary-color);
+    background-color: rgba(255,255,255,0.12);
     border-left: 3px solid var(--link-color);
     border-radius: 4px;
 }
@@ -596,7 +596,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .ai-conversations-message {
     padding: var(--spacing-small) var(--spacing-medium);
     border-left: 3px solid var(--border-color);
-    background-color: var(--secondary-color);
+    background-color: rgba(255,255,255,0.12);
     border-radius: 4px;
     margin-bottom: var(--spacing-small);
 }
@@ -618,7 +618,7 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .message-debug-btn:hover {
-    background-color: var(--secondary-color);
+    background-color: rgba(255,255,255,0.12);
     color: var(--text-color);
     border-color: var(--text-color);
     opacity: 1;
@@ -627,7 +627,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .message-debug-info {
     margin: var(--spacing-small) 0;
     padding: var(--spacing-small);
-    background-color: var(--secondary-color);
+    background-color: rgba(255,255,255,0.12);
     border: 1px solid var(--border-color);
     border-radius: 3px;
     font-size: 0.85em;
@@ -679,12 +679,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .ai-conversations-message[data-role="user"] {
     border-left-color: var(--link-color);
-    background-color: var(--secondary-color);
+    background-color: rgba(255,255,255,0.12);
 }
 
 .ai-conversations-message[data-role="assistant"] {
     border-left-color: var(--success-color);
-    background-color: var(--secondary-color);
+    background-color: rgba(255,255,255,0.12);
 }
 
 .message-header {
@@ -741,7 +741,7 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .code-block {
-    background-color: var(--secondary-color);
+    background-color: rgba(255,255,255,0.12);
     color: var(--text-color);
     border: 1px solid var(--border-color);
     padding: 10px;
@@ -806,7 +806,7 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .conv-thinking summary:hover {
-    background-color: var(--secondary-color);
+    background-color: rgba(255,255,255,0.12);
 }
 
 .conv-thinking-body {

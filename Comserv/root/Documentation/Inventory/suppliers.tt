@@ -15,7 +15,7 @@
     <h1 style="color:var(--text-color);font-family:var(--header-font)">Supplier Management &amp; Purchase Invoices</h1>
     <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-04-17 | Version: 1.00 | Audience: Site Administrators</div>
 
-    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:var(--light-color);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
+    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:rgba(255,255,255,0.15);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
         <div class="col-100">
             <h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:0">Quick Navigation</h2>
             <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-small)">
@@ -116,7 +116,7 @@
                 <li>Use the order number as the invoice number, prefixed with the marketplace name: <code>EBAY-08-14516-76824</code></li>
                 <li>Enter the item cost and shipping separately on the invoice</li>
             </ol>
-            <div style="background-color:var(--light-color);border-left:4px solid var(--primary-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small)">
+            <div style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--primary-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small)">
                 <strong>Example — HP 126A Toner (eBay, Apr 2026):</strong><br>
                 Supplier: eBay Marketplace | Invoice: EBAY-08-14516-76824<br>
                 Line 1: HP 126A CE310A Toner (2-pack) × 1 = $43.45<br>

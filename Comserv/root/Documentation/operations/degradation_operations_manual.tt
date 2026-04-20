@@ -58,7 +58,7 @@
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Check System Status</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">Verify the detection system is running correctly:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Check counter file exists and is valid YAML
 ls -la /Comserv/root/Documentation/session_history/.prompt_counter
@@ -80,7 +80,7 @@ perl /Comserv/root/Documentation/session_history/detect_degradation_patterns.pl 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Review Anomaly Patterns</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">Identify recurring anomaly patterns in recent sessions:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Count anomaly occurrences in current session (Audit Log)
 grep "problems:" -A 5 prompts_log.yaml | grep -v "null"
@@ -103,7 +103,7 @@ grep "status:" prompts_log.yaml | tail -20
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Monitor Counter File Changes</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">Track how status changes throughout sessions:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Watch counter file for changes (every 5 seconds)
 watch -n 5 'cat /Comserv/root/Documentation/session_history/.prompt_counter'
@@ -128,7 +128,7 @@ perl -e '
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font);">Troubleshooting Guide</h2>
             
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large);">Issue: Script Exits with Error "Cannot load counter file"</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Script fails immediately, counter file not readable</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Causes:</strong> YAML::XS not installed, permission denied, corrupted YAML syntax</p>
@@ -141,7 +141,7 @@ perl -e '
                 </ul>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large);">Issue: "Invalid time window for file repeats" Error</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Script dies with validation error during detection</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Causes:</strong> Counter file has invalid or missing time_window_minutes (≤0 or undefined)</p>
@@ -153,7 +153,7 @@ perl -e '
                 </ul>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large);">Issue: JSON Parse Errors in Audit Log</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> "Failed to parse audit log entry" warnings, anomalies not detected properly</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Causes:</strong> Malformed JSON entries, invalid line breaks, missing fields</p>
@@ -166,7 +166,7 @@ perl -e '
                 </ul>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--info-color); font-family: var(--header-font); font-size: var(--font-size-large);">Issue: Status Not Updating (Stuck at Same Level)</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Status always shows "NORMAL" despite anomalies, or status never changes</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Causes:</strong> Audit log not being written, prompt counter not incrementing, time windows too large</p>
@@ -179,7 +179,7 @@ perl -e '
                 </ul>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--info-color); font-family: var(--header-font); font-size: var(--font-size-large);">Issue: Script Runs Slowly (Timeout)</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Script takes >5 seconds to execute, or appears hung</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Causes:</strong> Large audit log file, inefficient JSON parsing, file permissions issues</p>
@@ -201,7 +201,7 @@ perl -e '
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Weekly: Archive Audit Log</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">Keep audit log manageable by archiving old entries weekly:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 #!/bin/bash
 # Archive audit log (keep last 500 entries for analysis)
@@ -226,7 +226,7 @@ gzip -q $ARCHIVE_DIR/audit_log_$DATE.json &
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Monthly: Run Full Test Suite</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">Ensure all detection logic is still working correctly:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Run complete test suite
 cd /Comserv
@@ -244,7 +244,7 @@ fi
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Quarterly: Review Configuration</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">Evaluate if thresholds and time windows need adjustment based on observed patterns:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Analyze anomaly frequency in recent sessions
 perl -e '
@@ -294,7 +294,7 @@ cat .prompt_counter | grep -A 2 "anomaly_threshold"
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Enable Debug Logging</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">Modify script to add debug output:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Add to script top for debug output
 my $DEBUG = $ENV{DEBUG_DEGRADATION} || 0;
@@ -319,7 +319,7 @@ DEBUG_DEGRADATION=1 perl detect_degradation_patterns.pl ...
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Reset System to Initial State</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">If system becomes unresponsive or corrupted:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Stop any running detection processes
 pkill -f detect_degradation_patterns
@@ -351,7 +351,7 @@ perl /Comserv/root/Documentation/session_history/detect_degradation_patterns.pl 
 
     <div class="row">
         <div class="col-100">
-            <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+            <div class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
                 <h2 style="color: var(--success-color); font-family: var(--header-font);">See Also</h2>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><a href="/Documentation/operations/degradation_system_architecture" style="color: var(--link-color);">System Architecture - Technical Components</a></li>

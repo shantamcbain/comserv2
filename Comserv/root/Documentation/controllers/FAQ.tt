@@ -24,19 +24,19 @@
     </div>
 
     <!-- TABLE OF CONTENTS SECTION -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
             <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
-                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Features</a>
-                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
-                <a href="#urls" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">URL Structure</a>
-                <a href="#access" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Access Control</a>
-                <a href="#navigation" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Navigation</a>
-                <a href="#logging" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Logging</a>
-                <a href="#enhancements" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Enhancements</a>
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Overview</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Key Features</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Methods</a>
+                <a href="#urls" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">URL Structure</a>
+                <a href="#access" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Access Control</a>
+                <a href="#navigation" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Navigation</a>
+                <a href="#logging" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Logging</a>
+                <a href="#enhancements" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Enhancements</a>
             </div>
         </div>
     </div>
@@ -72,13 +72,13 @@
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">3.1 Base Methods</h3>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
-                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">auto</code>: Common setup for all FAQ actions, initializes debug messages</li>
+                <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 2px;">auto</code>: Common setup for all FAQ actions, initializes debug messages</li>
             </ul>
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">3.2 Page Methods</h3>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
-                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">index</code>: Main FAQ page with category listings and popular questions</li>
-                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">category</code>: Category-specific FAQ pages with relevant questions and answers</li>
+                <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 2px;">index</code>: Main FAQ page with category listings and popular questions</li>
+                <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 2px;">category</code>: Category-specific FAQ pages with relevant questions and answers</li>
             </ul>
             
             <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
@@ -95,11 +95,11 @@
                     <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Description</th>
                 </tr>
                 <tr>
-                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code style="background-color: var(--light-color); padding: 2px 4px;">/faq</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px;">/faq</code></td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Main FAQ page with all categories and popular questions</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
-                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code style="background-color: var(--light-color); padding: 2px 4px;">/faq/category/{id}</code></td>
+                <tr style="background-color: rgba(255,255,255,0.12);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px;">/faq/category/{id}</code></td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Category-specific FAQ pages with relevant questions and answers</td>
                 </tr>
             </table>
@@ -125,13 +125,13 @@
     <div class="row">
         <div class="col-100">
             <h2 id="navigation" style="color: var(--text-color); font-family: var(--header-font);">6. Navigation Integration</h2>
-            <p style="color: var(--text-color); font-family: var(--body-font);">The FAQ system is integrated into the HelpDesk dropdown menu in the main navigation through the <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">TopDropListHelpDesk.tt</code> template, providing easy access to the FAQ system.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The FAQ system is integrated into the HelpDesk dropdown menu in the main navigation through the <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 2px;">TopDropListHelpDesk.tt</code> template, providing easy access to the FAQ system.</p>
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">6.1 Related Template Files</h3>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
-                <li><strong>Main FAQ Template</strong>: <code style="background-color: var(--light-color); padding: 2px 4px;">/root/CSC/FAQ/index.tt</code> - Main FAQ template with categories and popular questions</li>
-                <li><strong>Category Template</strong>: <code style="background-color: var(--light-color); padding: 2px 4px;">/root/CSC/FAQ/category.tt</code> - Category-specific FAQ template</li>
-                <li><strong>Navigation Menu</strong>: <code style="background-color: var(--light-color); padding: 2px 4px;">/root/Navigation/TopDropListHelpDesk.tt</code> - HelpDesk dropdown menu with FAQ link</li>
+                <li><strong>Main FAQ Template</strong>: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px;">/root/CSC/FAQ/index.tt</code> - Main FAQ template with categories and popular questions</li>
+                <li><strong>Category Template</strong>: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px;">/root/CSC/FAQ/category.tt</code> - Category-specific FAQ template</li>
+                <li><strong>Navigation Menu</strong>: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px;">/root/Navigation/TopDropListHelpDesk.tt</code> - HelpDesk dropdown menu with FAQ link</li>
             </ul>
             
             <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
@@ -142,16 +142,16 @@
     <div class="row">
         <div class="col-100">
             <h2 id="logging" style="color: var(--text-color); font-family: var(--header-font);">7. Logging and Debugging</h2>
-            <p style="color: var(--text-color); font-family: var(--body-font);">The FAQ controller uses comprehensive logging with <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">log_with_details</code>:</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The FAQ controller uses comprehensive logging with <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 2px;">log_with_details</code>:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0; overflow-x: auto;"><code>$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name', 
     "Detailed message with relevant information");</code></pre>
             </div>
             
             <p style="color: var(--text-color); font-family: var(--body-font); margin-top: var(--spacing-medium);">Debug messages are stored in the stash for display in templates when debug mode is enabled:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>push @{$c->stash->{debug_msg}}, "Debug message";</code></pre>
             </div>
             
@@ -171,7 +171,7 @@
     <!-- FUTURE ENHANCEMENTS SECTION -->
     <div class="row">
         <div class="col-100">
-            <div id="enhancements" class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 0 4px 4px 0;">
+            <div id="enhancements" class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 0 4px 4px 0;">
                 <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">8. Future Enhancements</h2>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><strong>Search Functionality</strong>: Add search capability for finding specific questions quickly</li>
