@@ -1909,6 +1909,8 @@ sub begin :Private {
 
 sub _port_label {
     my ($port) = @_;
+    my %named = ( 4010 => 'AI', 4020 => 'DEV', 4030 => 'QA' );
+    return $named{$port} if exists $named{$port};
     my $s = "$port";
     $s =~ s/0+$// if $s =~ /0+$/;
     if (length($s) > 2) { $s = substr($s, -2) }
