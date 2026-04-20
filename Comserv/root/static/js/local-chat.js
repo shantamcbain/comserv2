@@ -2446,6 +2446,42 @@
             return;
         }
 
+        // Early keyword interceptor: daily log actions bypass all AI routing
+        {
+            const _lcMsg = message.toLowerCase().trim().replace(/[!.]+$/, '').replace(/\s+/g, ' ');
+            const _isMorning = /^(good morning|start day|begin day|start of day)$/.test(_lcMsg);
+            const _isNight   = /^(good night|end day|finish day|end of day)$/.test(_lcMsg);
+            if (_isMorning || _isNight) {
+                const _action = _isMorning ? 'start' : 'end';
+                messageInput.value = '';
+                addMessage(message, 'user-message');
+                const _chatMsgs = document.getElementById('chat-messages');
+                const _loadEl = document.createElement('div');
+                _loadEl.className = 'message ai-message';
+                _loadEl.textContent = '⏳ ' + (_isMorning ? 'Starting your day…' : 'Closing your day…');
+                if (_chatMsgs) { _chatMsgs.appendChild(_loadEl); _chatMsgs.scrollTop = _chatMsgs.scrollHeight; }
+                fetch('/ai/daily_log', {
+                    method: 'POST', credentials: 'include',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'action=' + encodeURIComponent(_action)
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (_loadEl && _loadEl.parentNode) _loadEl.parentNode.removeChild(_loadEl);
+                    var resp = d.response || d.error || (_isMorning ? 'Day started.' : 'Day closed.');
+                    addMessage(resp, 'ai-message');
+                    if (d.success && window.location.pathname.includes('/Documentation/DailyPlan')) {
+                        setTimeout(function() { window.location.reload(); }, 800);
+                    }
+                })
+                .catch(function(e) {
+                    if (_loadEl && _loadEl.parentNode) _loadEl.parentNode.removeChild(_loadEl);
+                    addMessage('❌ Request failed: ' + e, 'ai-message');
+                });
+                return;
+            }
+        }
+
         // Template editor agent: open the dedicated form page with the file + request pre-loaded
         if (state.pageContext && state.pageContext.agent_id === 'template_editor' && message) {
             var tplPath = _getTemplatePathForPage(window.location.pathname);
