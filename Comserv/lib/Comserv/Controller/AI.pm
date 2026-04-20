@@ -368,11 +368,65 @@ sub _daily_log_action {
         return { success => JSON::false, error => "Could not create log entry: $@" } if $@ || !$entry;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
             "Start-of-day log #" . $entry->id . " created by $username via keyword");
+
+        # Check SystemLog for recent ERROR/CRITICAL entries (last 24 hours)
+        my $error_count  = 0;
+        my $todo_created = 0;
+        eval {
+            my $since = do {
+                my @t = localtime(time - 86400);
+                sprintf('%04d-%02d-%02d %02d:%02d:%02d', $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
+            };
+            my @errs = $schema->resultset('SystemLog')->search(
+                { level     => { -in => ['error','critical','ERROR','CRITICAL'] },
+                  timestamp => { '>=' => $since } },
+                { order_by => { -desc => 'timestamp' }, rows => 10 }
+            )->all;
+            if (@errs) {
+                $error_count = scalar @errs;
+                my $todo_subject = "\x{26A0}\x{FE0F} Morning Check: $error_count system error(s) need review ($today)";
+                my $max_show = $error_count > 5 ? 5 : $error_count;
+                my $todo_desc = "Errors found during morning log check ($today):\n" .
+                    join("\n", map { "[" . $_->level . "] " . $_->timestamp . " — " . substr($_->message, 0, 200) }
+                         @errs[0..$max_show-1]);
+                eval {
+                    $schema->resultset('Todo')->create({
+                        subject              => $todo_subject,
+                        description          => $todo_desc,
+                        status               => 2,
+                        priority             => 1,
+                        sitename             => $sitename,
+                        developer            => $username,
+                        username_of_poster   => $username,
+                        last_mod_by          => $username,
+                        last_mod_date        => $today,
+                        date_time_posted     => $today . ' 00:00:00',
+                        start_date           => $today,
+                        due_date             => $today,
+                        parent_todo          => '',
+                        estimated_man_hours  => 0,
+                        accumulative_time    => '00:00:00',
+                        group_of_poster      => 'admin',
+                        project_code         => 'system',
+                        share                => 0,
+                    });
+                    $todo_created = 1;
+                };
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
+                    "Morning check: $error_count errors found, todo_created=$todo_created");
+            }
+        };
+
+        my $extra = $error_count
+            ? ($todo_created
+                ? " \x{26A0}\x{FE0F} $error_count system error(s) found in the last 24h — a review todo has been created."
+                : " \x{26A0}\x{FE0F} $error_count system error(s) found in the last 24h.")
+            : '';
         return {
             success  => JSON::true,
             action   => 'start',
             entry_id => $entry->id + 0,
-            response => "\x{1F305} Good morning, $username! Your daily log has been started (entry #" . $entry->id . "). Have a productive day!",
+            response => "\x{1F305} Good morning, $username! Your daily log has been started (entry #" . $entry->id . ").$extra Have a productive day!",
             message  => "Daily log started.",
         };
     }

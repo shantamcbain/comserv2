@@ -149,7 +149,7 @@
                         onclick="toggleLogPanel()"
                         oncontextmenu="event.preventDefault();dailyLogAction('end')"
                         title="Day log active — click to view, right-click to close">
-                  🌅 Day Active
+                  🌅 Start Day
                 </button>
                 <button class="dl-btn dl-btn-end" id="dl-end-btn" onclick="dailyLogAction('end')">🌙 End Day</button>
                 [% ELSE %]
