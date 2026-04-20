@@ -7615,23 +7615,30 @@ sub action :Local :Args(0) {
             return;
         }
         my $description = $params->{description} || '';
-        my $page_url    = $params->{page_url}    || $c->request->referer || '';
-        my $priority    = $params->{priority}    // 2;
-        my $sitename    = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-        my $user_id     = $c->session->{user_id} || 1;
-        my $roles       = $c->session->{roles}   || [];
-        my $group       = ref $roles eq 'ARRAY' && @$roles ? $roles->[0] : 'user';
+        my $category    = $params->{category}    || 'General';
+        my $priority    = $params->{priority}    || 'normal';
+        my $email       = $params->{email}       || $c->session->{email} || '';
+        my $site_name   = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+        my $user_id     = $c->session->{user_id} || undef;
+        my $username    = $current_user;
+
+        my $ticket_number = uc($site_name) . '-' . DateTime->now->strftime('%Y%m%d') . '-' . sprintf('%04d', int(rand(9999)) + 1);
+        my $now_str = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
 
         my $new_ticket;
         eval {
-            $new_ticket = $schema->resultset('AiSupportSession')->create({
-                user_id          => $user_id,
-                sitename         => $sitename,
-                status           => 'pending',
-                subject          => $subject,
-                user_description => $description,
-                page_url         => $page_url,
-                conversation_id  => do { my $cid = $params->{conversation_id} || $c->session->{current_conversation_id}; ($cid && $cid =~ /^\d+$/) ? $cid : undef },
+            $new_ticket = $schema->resultset('SupportTicket')->create({
+                ticket_number => $ticket_number,
+                site_name     => $site_name,
+                user_id       => $user_id,
+                username      => $username,
+                email         => $email,
+                subject       => $subject,
+                description   => $description,
+                category      => $category,
+                priority      => $priority,
+                status        => 'open',
+                created_at    => $now_str,
             });
         };
         if ($@ || !$new_ticket) {
@@ -7641,14 +7648,16 @@ sub action :Local :Args(0) {
             $c->response->body(encode_json({ success => JSON::false, error => 'Ticket creation failed' }));
             return;
         }
-        my $ticket_id = $new_ticket->id // '?';
+        my $ticket_id  = $new_ticket->id // '?';
+        my $ticket_num = $new_ticket->ticket_number // $ticket_number;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
-            "AI action create_helpdesk_ticket: id=$ticket_id sitename=$sitename by=$current_user subject='$subject'");
+            "AI action create_helpdesk_ticket: id=$ticket_id num=$ticket_num sitename=$site_name by=$username subject='$subject'");
         $c->response->body(encode_json({
-            success    => JSON::true,
-            message    => "Support ticket #$ticket_id created: \"$subject\". An admin will be notified.",
-            ticket_id  => $ticket_id + 0,
-            ticket_url => "/ai/support/$ticket_id",
+            success       => JSON::true,
+            message       => "Support ticket $ticket_num created: \"$subject\". An admin will be notified.",
+            ticket_id     => $ticket_id + 0,
+            ticket_number => $ticket_num,
+            ticket_url    => "/HelpDesk/ticket/$ticket_num",
         }));
         return;
     }
