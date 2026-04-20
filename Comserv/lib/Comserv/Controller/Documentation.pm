@@ -2734,6 +2734,26 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         dep_auto_resolved     => $auto_resolved_count,
         dep_auto_detected     => $auto_detected_count,
 
+        daily_plan_entries => do {
+            my @dp_entries;
+            eval {
+                my $today_str = $current_date_str;
+                my $plan_name = "Daily Log $today_str";
+                my $dp = $c->model('DBEncy')->resultset('DailyPlan')->search(
+                    { sitename => $sitename, plan_name => $plan_name },
+                    { rows => 1 }
+                )->first;
+                if ($dp) {
+                    @dp_entries = map { { $_->get_columns } }
+                        $c->model('DBEncy')->resultset('DailyPlanEntry')->search(
+                            { plan_id => $dp->id },
+                            { order_by => { -asc => 'id' } }
+                        )->all;
+                }
+            };
+            \@dp_entries;
+        },
+
         template => 'admin/documentation/DailyPlan.tt'
     );
 }
