@@ -2753,6 +2753,25 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
             };
             \@dp_entries;
         },
+        open_log_entry => do {
+            my $open;
+            eval {
+                my $today_str = $current_date_str;
+                my $plan_name = "Daily Log $today_str";
+                my $dp = $c->model('DBEncy')->resultset('DailyPlan')->search(
+                    { sitename => $sitename, plan_name => $plan_name },
+                    { rows => 1 }
+                )->first;
+                if ($dp) {
+                    my $row = $c->model('DBEncy')->resultset('DailyPlanEntry')->search(
+                        { plan_id => $dp->id, status => 'in_progress' },
+                        { order_by => { -desc => 'id' }, rows => 1 }
+                    )->first;
+                    $open = { $row->get_columns } if $row;
+                }
+            };
+            $open;
+        },
 
         template => 'admin/documentation/DailyPlan.tt'
     );
