@@ -3895,6 +3895,44 @@ sub consignment_view :Path('/Inventory/consignment/view') :Args(1) {
     );
 }
 
+sub consignment_print :Path('/Inventory/consignment/print') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $consignment;
+    eval {
+        $consignment = $schema->resultset('InventoryConsignment')->find(
+            { 'me.id' => $id, 'me.sitename' => $sitename },
+            { prefetch => ['partner', { 'lines' => 'item' }] }
+        );
+    };
+    unless ($consignment) {
+        $c->flash->{error_msg} = 'Consignment not found.';
+        $c->res->redirect($c->uri_for('/Inventory/consignment'));
+        $c->detach;
+    }
+
+    my %site_info;
+    eval {
+        my $site = $schema->resultset('Site')->search({ name => $sitename })->first;
+        if ($site) {
+            my @cfgs = $schema->resultset('SiteConfig')->search({ site_id => $site->id })->all;
+            %site_info = map { $_->config_key => $_->config_value } @cfgs;
+            $site_info{display_name} ||= $site->site_display_name || $sitename;
+            $site_info{email}        ||= $site->mail_from || '';
+        }
+    };
+
+    $c->stash(
+        consignment => $consignment,
+        sitename    => $sitename,
+        site_info   => \%site_info,
+        no_wrapper  => 1,
+        template    => 'Inventory/consignment/print.tt',
+    );
+}
+
 sub consignment_delete :Path('/Inventory/consignment/delete') :Args(1) {
     my ($self, $c, $id) = @_;
     my $sitename = $self->_sitename($c);
