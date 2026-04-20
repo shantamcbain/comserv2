@@ -143,8 +143,19 @@
                 <a href="/todo">Todo System</a>
             </div>
             <div style="text-align: right; color: var(--text-muted-color); font-size: 0.85em;">
+                [% IF open_log_entry %]
+                <button class="dl-btn dl-btn-start" id="dl-start-btn"
+                        style="background:#2a7a2a;color:#fff;border-color:#1a5a1a;"
+                        onclick="toggleLogPanel()"
+                        oncontextmenu="event.preventDefault();dailyLogAction('end')"
+                        title="Day log active — click to view, right-click to close">
+                  🌅 Day Active
+                </button>
+                <button class="dl-btn dl-btn-end" id="dl-end-btn" onclick="dailyLogAction('end')">🌙 End Day</button>
+                [% ELSE %]
                 <button class="dl-btn dl-btn-start" id="dl-start-btn" onclick="dailyLogAction('start')">🌅 Start Day</button>
                 <button class="dl-btn dl-btn-end"   id="dl-end-btn"   onclick="dailyLogAction('end')">🌙 End Day</button>
+                [% END %]
                 <span id="dl-feedback"></span>
                 &nbsp;|&nbsp;
                 <a href="/Documentation/DailyPlan/[% prev_date %]" class="prev-day-link">← Prev Day</a>
@@ -153,6 +164,42 @@
             </div>
         </div>
     </div>
+
+    <!-- Daily Log Entry Panel (shown when day is active) -->
+    [% IF open_log_entry %]
+    <div id="log-panel" style="display:none;background:#f0fff0;border:1px solid #2a7a2a;border-radius:6px;
+         padding:14px 18px;margin:8px 0;position:relative;">
+      <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:220px;">
+          <div style="font-weight:bold;color:#1a5a1a;margin-bottom:6px;">🌅 Today's Log Entry</div>
+          <div style="font-size:.9em;margin-bottom:4px;"><strong>Started:</strong> [% open_log_entry.created_at %]</div>
+          <div style="font-size:.9em;margin-bottom:8px;"><strong>Title:</strong>
+            <input id="log-title-edit" type="text" value="[% open_log_entry.title | html %]"
+                   style="width:100%;box-sizing:border-box;padding:4px 8px;border:1px solid #ccc;border-radius:4px;font-size:.9em;">
+          </div>
+          <div style="font-size:.9em;"><strong>Notes:</strong>
+            <textarea id="log-desc-edit" rows="3"
+                      style="width:100%;box-sizing:border-box;padding:4px 8px;border:1px solid #ccc;border-radius:4px;font-size:.9em;resize:vertical;">[% open_log_entry.description | html %]</textarea>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;min-width:120px;">
+          <button onclick="saveLogEntry([% open_log_entry.id %])"
+                  style="padding:7px 14px;background:#2a7a2a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.9em;">
+            💾 Save Notes
+          </button>
+          <button onclick="dailyLogAction('end')"
+                  style="padding:7px 14px;background:#555;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.9em;">
+            🌙 Close Day
+          </button>
+          <button onclick="document.getElementById('log-panel').style.display='none'"
+                  style="padding:7px 14px;background:#eee;color:#333;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:.9em;">
+            ✖ Dismiss
+          </button>
+        </div>
+      </div>
+      <div id="log-save-status" style="font-size:.8em;margin-top:6px;color:#555;"></div>
+    </div>
+    [% END %]
 
     <!-- Tab Navigation -->
     <div class="tab-navigation">
@@ -1596,20 +1643,53 @@ function dailyLogAction(action) {
     .then(function(r) { return r.json(); })
     .then(function(d) {
         if (d.success) {
-            feedback.textContent = d.message;
+            feedback.textContent = d.message || (action === 'start' ? 'Day started!' : 'Day closed!');
             feedback.style.color = '#2a7a2a';
+            setTimeout(function() { window.location.reload(); }, 800);
         } else {
             feedback.textContent = d.error || 'Error';
             feedback.style.color = '#9b0000';
+            if (startBtn) startBtn.disabled = false;
+            if (endBtn)   endBtn.disabled   = false;
         }
-        if (startBtn) startBtn.disabled = false;
-        if (endBtn)   endBtn.disabled   = false;
     })
     .catch(function(e) {
         feedback.textContent = 'Request failed';
         feedback.style.color = '#9b0000';
         if (startBtn) startBtn.disabled = false;
         if (endBtn)   endBtn.disabled   = false;
+    });
+}
+
+function toggleLogPanel() {
+    var panel = document.getElementById('log-panel');
+    if (!panel) return;
+    panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'block' : 'none';
+}
+
+function saveLogEntry(entryId) {
+    var title = (document.getElementById('log-title-edit') || {}).value || '';
+    var desc  = (document.getElementById('log-desc-edit')  || {}).value || '';
+    var statusEl = document.getElementById('log-save-status');
+    if (statusEl) statusEl.textContent = 'Saving…';
+
+    fetch('/ai/update_log_entry', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'entry_id=' + encodeURIComponent(entryId)
+            + '&title='    + encodeURIComponent(title)
+            + '&description=' + encodeURIComponent(desc)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (statusEl) {
+            statusEl.textContent = d.success ? '✅ Saved' : ('❌ ' + (d.error || 'Save failed'));
+            statusEl.style.color = d.success ? '#2a7a2a' : '#9b0000';
+        }
+    })
+    .catch(function(e) {
+        if (statusEl) { statusEl.textContent = '❌ Request failed'; statusEl.style.color = '#9b0000'; }
     });
 }
 </script>
