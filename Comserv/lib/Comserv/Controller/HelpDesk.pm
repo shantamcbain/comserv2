@@ -313,15 +313,18 @@ sub admin_tickets_resolved :Chained('base') :PathPart('admin/tickets/resolved') 
 sub _load_admin_tickets {
     my ($self, $c, $status_filter, $title) = @_;
 
-    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+    my $site_name  = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+    my $is_csc     = (lc($site_name) eq 'csc');
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_load_admin_tickets',
-        "Loading admin tickets: filter=" . ($status_filter || 'all') . " site=$site_name");
+        "Loading admin tickets: filter=" . ($status_filter || 'all')
+        . " site=$site_name csc_admin=" . ($is_csc ? 'yes' : 'no'));
 
     try {
         my $schema = $c->model('DBEncy')->schema;
-        my %search = (site_name => $site_name);
-        $search{status} = $status_filter if $status_filter;
+        my %search;
+        $search{site_name} = $site_name unless $is_csc;
+        $search{status}    = $status_filter if $status_filter;
 
         my @tickets = $schema->resultset('SupportTicket')->search(
             \%search,
@@ -329,7 +332,7 @@ sub _load_admin_tickets {
         )->all;
 
         $c->stash(
-            template      => 'CSC/HelpDesk/ticket_status.tt',
+            template      => 'CSC/HelpDesk/admin_tickets.tt',
             tickets       => \@tickets,
             title         => $title,
             is_admin_view => 1,
@@ -339,134 +342,10 @@ sub _load_admin_tickets {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_load_admin_tickets',
             "Error loading admin tickets: $_");
         $c->stash(
-            template  => 'CSC/HelpDesk/ticket_status.tt',
+            template  => 'CSC/HelpDesk/admin_tickets.tt',
             tickets   => [],
             title     => $title,
             error_msg => 'Error loading tickets.',
-        );
-    };
-
-    $c->forward($c->view('TT'));
-}
-
-=head2 admin_base
-
-Intermediate chain for all /HelpDesk/admin/... sub-paths (requires admin role).
-
-=cut
-
-sub admin_base :Chained('base') :PathPart('admin') :CaptureArgs(0) {
-    my ($self, $c) = @_;
-
-    my $has_admin_role = 0;
-    if ($c->session->{roles}) {
-        my $roles = $c->session->{roles};
-        if (ref($roles) eq 'ARRAY') {
-            $has_admin_role = grep { $_ eq 'admin' } @$roles;
-        } elsif (!ref($roles)) {
-            $has_admin_role = $roles =~ /\badmin\b/i;
-        }
-    }
-
-    unless ($has_admin_role) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin_base',
-            "Unauthorized access to HelpDesk admin area by: " . ($c->session->{username} || 'Guest'));
-        $c->stash->{error_msg} = "You don't have permission to access the HelpDesk admin area.";
-        $c->detach('index');
-        return;
-    }
-
-    $c->stash(subsection => 'admin');
-}
-
-=head2 admin_tickets_base
-
-Intermediate chain for /HelpDesk/admin/tickets/...
-
-=cut
-
-sub admin_tickets_base :Chained('admin_base') :PathPart('tickets') :CaptureArgs(0) {
-    my ($self, $c) = @_;
-}
-
-=head2 admin_tickets_open
-
-Show all open tickets for admin — /HelpDesk/admin/tickets/open
-
-=cut
-
-sub admin_tickets_open :Chained('admin_tickets_base') :PathPart('open') :Args(0) {
-    my ($self, $c) = @_;
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_tickets_open',
-        "Loading open tickets for admin");
-
-    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
-
-    try {
-        my $schema  = $c->model('DBEncy')->schema;
-        my @tickets = $schema->resultset('SupportTicket')->search(
-            { site_name => $site_name, status => 'open' },
-            { order_by => { -desc => 'created_at' }, rows => 100 }
-        )->all;
-
-        $c->stash(
-            template    => 'CSC/HelpDesk/admin_tickets.tt',
-            tickets     => \@tickets,
-            title       => 'Open Tickets',
-            status_filter => 'open',
-        );
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_tickets_open',
-            "Error loading open tickets: $_");
-        $c->stash(
-            template    => 'CSC/HelpDesk/admin_tickets.tt',
-            tickets     => [],
-            error_msg   => 'Error loading tickets.',
-            title       => 'Open Tickets',
-            status_filter => 'open',
-        );
-    };
-
-    $c->forward($c->view('TT'));
-}
-
-=head2 admin_tickets_all
-
-Show all tickets for admin — /HelpDesk/admin/tickets/all
-
-=cut
-
-sub admin_tickets_all :Chained('admin_tickets_base') :PathPart('all') :Args(0) {
-    my ($self, $c) = @_;
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_tickets_all',
-        "Loading all tickets for admin");
-
-    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
-
-    try {
-        my $schema  = $c->model('DBEncy')->schema;
-        my @tickets = $schema->resultset('SupportTicket')->search(
-            { site_name => $site_name },
-            { order_by => { -desc => 'created_at' }, rows => 200 }
-        )->all;
-
-        $c->stash(
-            template    => 'CSC/HelpDesk/admin_tickets.tt',
-            tickets     => \@tickets,
-            title       => 'All Tickets',
-            status_filter => 'all',
-        );
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_tickets_all',
-            "Error loading tickets: $_");
-        $c->stash(
-            template    => 'CSC/HelpDesk/admin_tickets.tt',
-            tickets     => [],
-            error_msg   => 'Error loading tickets.',
-            title       => 'All Tickets',
-            status_filter => 'all',
         );
     };
 
