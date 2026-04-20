@@ -410,6 +410,62 @@ sub _daily_log_action {
     return { success => JSON::false, error => "Unknown action '$action'" };
 }
 
+=head2 update_log_entry
+
+AJAX endpoint — update title/description on a DailyPlanEntry.
+POST params: entry_id, title, description
+
+=cut
+
+sub update_log_entry :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required' }));
+        return;
+    }
+
+    my $entry_id    = $c->req->param('entry_id')    || 0;
+    my $title       = $c->req->param('title')       // '';
+    my $description = $c->req->param('description') // '';
+
+    unless ($entry_id) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'entry_id required' }));
+        return;
+    }
+
+    my $schema;
+    eval { $schema = $c->model('DBEncy')->schema };
+    if ($@ || !$schema) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'DB unavailable' }));
+        return;
+    }
+
+    my $entry;
+    eval { $entry = $schema->resultset('DailyPlanEntry')->find($entry_id) };
+    unless ($entry) {
+        $c->response->status(404);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Entry not found' }));
+        return;
+    }
+
+    eval { $entry->update({ title => $title, description => $description }) };
+    if ($@) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => "Update failed: $@" }));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_log_entry',
+        "DailyPlanEntry #$entry_id updated by " . ($c->session->{username} || 'user'));
+    $c->response->body(encode_json({ success => JSON::true, message => 'Saved' }));
+}
+
 =head2 template_editor
 
 Admin-only page for reviewing and applying AI-proposed TT2 template edits.
