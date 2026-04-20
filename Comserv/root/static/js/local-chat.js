@@ -320,8 +320,10 @@
             var ctrl = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
             return 'root/' + ctrl + '/' + parts[1].toLowerCase() + '.tt';
         } else if (parts[0]) {
+            // Convention: site homepages use {Ctrl}/{Ctrl}.tt (e.g. Shanta/Shanta.tt, CSC/CSC.tt)
+            // Fall back to {Ctrl}/index.tt when the controller-name variant is not in the static map
             var ctrl = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-            return 'root/' + ctrl + '/index.tt';
+            return 'root/' + ctrl + '/' + ctrl + '.tt';
         }
         return null;
     }

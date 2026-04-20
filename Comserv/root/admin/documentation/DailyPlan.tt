@@ -607,10 +607,28 @@
             </summary>
             <div style="padding:10px 14px;">
 
-                [%# Branch server list — Open links only (start commands belong in the terminal) %]
+                [%# Quick-open dropdown %]
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                    <label for="bs-select" style="font-weight:bold;color:#fd7e14;white-space:nowrap;">Open branch:</label>
+                    <select id="bs-select" style="flex:1;min-width:180px;padding:4px 8px;border:1px solid #fd7e14;border-radius:4px;font-family:monospace;font-size:0.9em;">
+                        <option value="">— select a branch —</option>
+                        [% FOREACH b IN all_branches %]
+                        <option value="[% scheme %]://[% host %]:[% b.port %][% b.url %]"
+                            [% IF b.name == cur_branch %]selected[% END %]>
+                            [% b.label %] :[% b.port %][% IF b.name == cur_branch %] ←[% END %]
+                        </option>
+                        [% END %]
+                    </select>
+                    <button onclick="(function(){var s=document.getElementById('bs-select');if(s&&s.value)window.open(s.value,'_blank');})()"
+                            style="padding:5px 14px;background:#fd7e14;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.9em;white-space:nowrap;">
+                        Open →
+                    </button>
+                </div>
+
+                [%# Current branch highlight %]
                 [% IF cur_branch && cur_branch != 'main' %]
                 [% SET cur_port = bp.$cur_branch || '????' %]
-                <div style="margin-bottom:10px;padding:6px 10px;background:color-mix(in srgb,#fd7e14 8%,var(--bg-color));border-radius:4px;display:flex;align-items:center;gap:10px;">
+                <div style="margin-bottom:10px;padding:6px 10px;background:color-mix(in srgb,#fd7e14 8%,var(--bg-color));border-radius:4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                     <span style="font-weight:bold;color:#fd7e14;">▶ Current branch:</span>
                     <code>[% cur_branch %]</code>
                     <span style="color:var(--text-muted-color);">port [% cur_port %]</span>
