@@ -560,6 +560,26 @@ sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'ticket_reply',
             "Message inserted OK: id=" . $msg->id . " ticket_id=" . $ticket->id);
 
+        my $public_ticket_url = do {
+            my $public_domain = '';
+            eval {
+                my $site_rec = $schema->resultset('Site')->search(
+                    { name => $ticket->site_name },
+                    { rows => 1 }
+                )->first;
+                if ($site_rec) {
+                    my $domain_rec = $schema->resultset('SiteDomain')->search(
+                        { site_id => $site_rec->id },
+                        { rows => 1 }
+                    )->first;
+                    $public_domain = $domain_rec->domain if $domain_rec;
+                }
+            };
+            $public_domain
+                ? 'https://' . $public_domain . '/HelpDesk/ticket/view/' . $ticket_number
+                : $c->uri_for('/HelpDesk/ticket/view/' . $ticket_number)->as_string;
+        };
+
         if ($sender_type eq 'staff') {
             my $to_email = $ticket->email || '';
             if ($to_email) {
@@ -567,7 +587,7 @@ sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
                 my $body    = "Hello,\n\n"
                     . "A staff member has replied to your support ticket.\n\n"
                     . "--- Reply from $sender_name ---\n$body_text\n\n"
-                    . "View your ticket: " . $c->uri_for('/HelpDesk/ticket/view/' . $ticket_number) . "\n\n"
+                    . "View your ticket: $public_ticket_url\n\n"
                     . "Regards,\n$site_name Support Team";
                 eval { $c->model('Mail')->send_email($c, $to_email, $subject, $body) };
                 $self->logging->log_with_details($c, $@ ? 'error' : 'info', __FILE__, __LINE__, 'ticket_reply',
