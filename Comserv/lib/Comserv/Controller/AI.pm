@@ -315,6 +315,101 @@ sub daily_log :Local :Args(0) {
     $c->response->body(encode_json({ success => JSON::false, error => "Unknown action '$action'. Use action=start or action=end" }));
 }
 
+=head2 _daily_log_action
+
+Shared helper for keyword interceptors and the daily_log endpoint.
+Returns a hashref suitable for JSON encoding.
+
+=cut
+
+sub _daily_log_action {
+    my ($self, $c, $action, $username, $user_id) = @_;
+    $username //= $c->session->{username} || 'user';
+    $user_id  //= $c->session->{user_id}  || 0;
+
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+
+    my $schema;
+    eval { $schema = $c->model('DBEncy')->schema };
+    return { success => JSON::false, error => 'DB unavailable' } if $@ || !$schema;
+
+    my $plan;
+    eval {
+        $plan = $schema->resultset('DailyPlan')->find_or_create(
+            { sitename => $sitename, plan_name => "Daily Log $today" },
+            { key => 'dailyplan_sitename_plan_name',
+              default => {
+                  plan_description => "Auto-created daily log for $today",
+                  status           => 'active',
+                  start_date       => $today,
+                  due_date         => $today,
+                  priority         => 0,
+                  created_by       => $username,
+              }
+            }
+        );
+    };
+    return { success => JSON::false, error => "Could not find/create daily plan: $@" } if $@ || !$plan;
+
+    if ($action eq 'start') {
+        my $entry;
+        eval {
+            $entry = $schema->resultset('DailyPlanEntry')->create({
+                plan_id     => $plan->id,
+                entry_type  => 'note',
+                title       => "\x{1F305} Good Morning - Daily Log - $today",
+                description => "Start of day log entry for $today",
+                status      => 'in_progress',
+                created_by  => $username,
+                metadata    => '{}',
+            });
+        };
+        return { success => JSON::false, error => "Could not create log entry: $@" } if $@ || !$entry;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
+            "Start-of-day log #" . $entry->id . " created by $username via keyword");
+        return {
+            success  => JSON::true,
+            action   => 'start',
+            entry_id => $entry->id + 0,
+            response => "\x{1F305} Good morning, $username! Your daily log has been started (entry #" . $entry->id . "). Have a productive day!",
+            message  => "Daily log started.",
+        };
+    }
+
+    if ($action eq 'end') {
+        my $log_title_prefix = "Good Morning - Daily Log - $today";
+        my $open_entry;
+        eval {
+            $open_entry = $schema->resultset('DailyPlanEntry')->search({
+                plan_id => $plan->id,
+                status  => 'in_progress',
+                title   => { -like => "%$log_title_prefix%" },
+            }, { order_by => { -desc => 'created_at' }, rows => 1 })->first;
+        };
+        unless ($open_entry) {
+            return {
+                success  => JSON::false,
+                response => "No open daily log entry found for today. Type \"good morning\" or \"start day\" to start one.",
+                error    => 'No open log entry for today',
+            };
+        }
+        eval { $open_entry->update({ status => 'completed' }) };
+        return { success => JSON::false, error => "Could not close log entry: $@" } if $@;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
+            "End-of-day log #" . $open_entry->id . " closed by $username via keyword");
+        return {
+            success  => JSON::true,
+            action   => 'end',
+            entry_id => $open_entry->id + 0,
+            response => "\x{1F319} Good night, $username! Your daily log has been closed. Have a great rest of your day!",
+            message  => "Daily log closed.",
+        };
+    }
+
+    return { success => JSON::false, error => "Unknown action '$action'" };
+}
+
 =head2 template_editor
 
 Admin-only page for reviewing and applying AI-proposed TT2 template edits.
@@ -588,7 +683,21 @@ sub generate :Local :Args(0) {
         return;
     }
     $prompt ||= '(describe this image)';
-    
+
+    # ── Keyword interceptors: handle well-known phrases without calling the AI model ──
+    # "good morning" / "start day" → create a daily log start-of-day entry
+    if (!$is_guest && $prompt =~ /^\s*(good\s+morning|start\s+day|begin\s+day|start\s+of\s+day)\s*[!.]?\s*$/i) {
+        my $kw_resp = $self->_daily_log_action($c, 'start', $username, $user_id);
+        $c->response->body(encode_json($kw_resp));
+        return;
+    }
+    # "good night" / "end day" → close the daily log entry
+    if (!$is_guest && $prompt =~ /^\s*(good\s+night|end\s+day|finish\s+day|end\s+of\s+day)\s*[!.]?\s*$/i) {
+        my $kw_resp = $self->_daily_log_action($c, 'end', $username, $user_id);
+        $c->response->body(encode_json($kw_resp));
+        return;
+    }
+
     # Log the query with preview
     my $prompt_preview = substr($prompt, 0, 100);
     $prompt_preview .= '...' if length($prompt) > 100;
@@ -2011,7 +2120,19 @@ sub chat :Local :Args(0) {
         $c->response->status(400);
         return;
     }
-    
+
+    # ── Keyword interceptors (chat endpoint) ──────────────────────────────────
+    if (!$is_guest && $prompt =~ /^\s*(good\s+morning|start\s+day|begin\s+day|start\s+of\s+day)\s*[!.]?\s*$/i) {
+        my $kw_resp = $self->_daily_log_action($c, 'start', $username, $user_id);
+        $c->response->body(encode_json($kw_resp));
+        return;
+    }
+    if (!$is_guest && $prompt =~ /^\s*(good\s+night|end\s+day|finish\s+day|end\s+of\s+day)\s*[!.]?\s*$/i) {
+        my $kw_resp = $self->_daily_log_action($c, 'end', $username, $user_id);
+        $c->response->body(encode_json($kw_resp));
+        return;
+    }
+
     # Inject project/task context into system prompt if provided
     if ($project_id || $task_id) {
         my $ctx = $self->_build_project_context($c, $project_id, $task_id);
