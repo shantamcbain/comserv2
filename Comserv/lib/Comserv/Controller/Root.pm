@@ -1909,7 +1909,32 @@ sub begin :Private {
 
 sub _port_label {
     my ($port) = @_;
-    my %named = ( 4001 => 'Pl', 4010 => 'AI', 4020 => 'DEV', 4030 => 'QA' );
+    my %named = (
+        3000 => 'PC',   # ProjectConfig
+        4001 => 'Pl',   # PlanningSystem
+        4002 => 'SM',   # SchemaManagement
+        4003 => 'HA',   # InfrastructureHA
+        4004 => 'WS',   # WorkShops
+        4005 => 'Us',   # Users
+        4006 => 'FM',   # FileManagement
+        4007 => 'Ma',   # UnifiedMail
+        4008 => 'Mb',   # Membership
+        4009 => 'Pt',   # PointSystem
+        4010 => 'AI',   # AIChatSystem
+        4011 => 'Cs',   # CssThemes
+        4012 => 'En',   # ENCY
+        4013 => 'HD',   # HelpDesk
+        4014 => 'Hp',   # HealthPlanning
+        4015 => 'SH',   # ProdServerHealth
+        4016 => 'Sc',   # Security
+        4017 => 'Dc',   # Documentation
+        4018 => 'AP',   # APISystem
+        4019 => 'BM',   # BMaster
+        4020 => 'Ch',   # AIChatPlanInt
+        4021 => 'In',   # InventorySystem
+        4022 => 'DL',   # DevTimeLogging
+        4030 => '3D',   # 3DPrinting
+    );
     return $named{$port} if exists $named{$port};
     my $s = "$port";
     $s =~ s/0+$// if $s =~ /0+$/;
