@@ -2294,7 +2294,7 @@
         { label: 'todo list',                  url: '/todo' },
         { label: 'todos',                      url: '/todo' },
         { label: 'projects',                   url: '/project' },
-        { label: 'daily plan',                 url: '/Documentation/DailyPlan' },
+        { label: 'daily plan',                 url: '/planning/daily' },
         { label: 'documentation',              url: '/Documentation' },
         { label: 'encyclopedia',               url: '/ENCY' },
         { label: 'ency',                       url: '/ENCY' },
@@ -2652,7 +2652,7 @@
                     if (_loadEl && _loadEl.parentNode) _loadEl.parentNode.removeChild(_loadEl);
                     var resp = d.response || d.error || (_isMorning ? 'Day started.' : 'Day closed.');
                     addMessage(resp, 'ai-message');
-                    if (d.success && window.location.pathname.includes('/Documentation/DailyPlan')) {
+                    if (d.success && window.location.pathname.includes('/planning/daily')) {
                         setTimeout(function() { window.location.reload(); }, 800);
                     }
                 })

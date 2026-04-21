@@ -23,7 +23,7 @@
             <span class="submenu-header"><a href="/admin" class="dropbtn"><i class="icon-admin"></i>Admin</a></span>
             <div class="submenu">
                 <a href="/navigation/add_link?category=Admin_links&return_url=/admin" class="submenu-add-button"><i class="icon-add"></i>Add Admin Link</a>
-                <a href="/Documentation/DailyPlan"><i class="icon-calendar"></i>Daily Plan</a>
+                <a href="/planning/daily"><i class="icon-calendar"></i>Daily Plan</a>
                 <a href="/admin/git_pull"><i class="icon-git"></i>Git Pull</a>
                 <a href="/log"><i class="icon-log"></i>Open Log</a>
                 <a href="/Documentation/Planning"><i class="icon-planning"></i>Planning</a>
@@ -58,7 +58,7 @@
                 <a href="/documentation?category=admin_guides"><i class="icon-admin-guide"></i>Admin Guides</a>
                 <a href="/documentation"><i class="icon-list"></i>All Documentation</a>
                 <a href="/documentation?category=changelog"><i class="icon-changelog"></i>Changelog</a>
-                <a href="/Documentation/DailyPlan"><i class="icon-calendar"></i>Daily Plan</a>
+                <a href="/planning/daily"><i class="icon-calendar"></i>Daily Plan</a>
                 <a href="/Documentation/Planning"><i class="icon-planning"></i>Planning</a>
                 <a href="/documentation?category=tutorials"><i class="icon-tutorial"></i>Tutorials</a>
                 <a href="/documentation?category=user_guides"><i class="icon-user-guide"></i>User Guides</a>
