@@ -101,6 +101,21 @@ Save to `{@artifacts_path}/plan.md`. If the feature is trivial and doesn't warra
 - Added apiary theme overrides: `--bg-color: #f1faee`, `--bg-secondary: #fdf6e3` (honey cream)
 - Run verification: syntax OK
 
+### [ ] Step: Queen Log Data Model — Schema and Migration
+Design and implement the canonical queen data model. Keep `queens` as the canonical table name. `queens_enhanced` remains as a reference/staging table until migration is complete.
+
+**DB tracking:** Project 219 (QueenLogModel) under Apiary Management System (91) under BMaster (20).
+
+- Extend `queens` table with rich fields from `queens_enhanced`: `genetic_line`, `color_marking`, `parent_queen_id` (self-ref FK), `drone_source`, `mating_status` ENUM, `laying_status` ENUM, `temperament_rating` ENUM, `current_yard_id` FK, `current_pallet_id` FK, `current_hive_configuration_id` FK, `purpose` ENUM, `acquisition_cost`, `acquisition_date`, `updated_at`, `created_by`, `updated_by` — update `Queen.pm` Result class to match (todo 793)
+- Create `queen_events` table + `QueenEvent.pm` Result class: event_type ENUM (grafted, emerged, mated, introduced, superseded, replaced, dead, sold, treated, moved), event_date, notes, inspector, hive_id nullable FK — add `has_many queen_events` to `Queen.pm` (todo 794)
+- Create `queen_hive_assignments` table + `QueenHiveAssignment.pm`: queen_id FK, hive_id FK, yard_id FK nullable, assigned_date, removed_date nullable, reason, notes — add `current_queen` helper to `Hive.pm` (todo 795)
+- Add `queen_id` INT FK nullable to `inspections` table; update `Inspection.pm` + `Queen.pm` relationships; fix `ApiaryModel::get_queens_for_hive()` bug (queries non-existent `hive_id` field — replace with query via `queen_hive_assignments`) (todo 796)
+- Data migration plan: Forager `ApisQueensTb` → `queens` (todo 797)
+- Data migration plan: Forager `ApisQueenLogTb` → `inspections` + `queen_events` (todo 798)
+- Documentation: Update `Queen.pm` POD, `Hive.pm` POD, `Inspection.pm` POD, `Planning.tt` Queen Log sub-project, `ApplicationTtTemplate.tt` queen patterns (todo 799)
+- All schema changes via Result class edits + `/admin/schema_comparison` — NOT direct SQL apply
+- Run verification: `perl -cw Comserv/script/comserv_server.pl`
+
 ### [ ] Step: Hive Inspection — Schema Updates
 Complete gap analysis documented in `spec.md` (Hive Inspection Feature section). Apply the following schema changes:
 - Fix `Inspection.inspection_type` enum: add `queen_check` value (in DB and Result class)
