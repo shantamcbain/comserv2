@@ -1,172 +1,75 @@
--- Queen Log Data Model — Schema Migration
+-- Queen Log Data Model — Schema Reference
 -- File: 009_queen_log_schema.sql
 -- DB Project: 219 (QueenLogModel) under Apiary Management System (91)
 -- Todos: 793, 794, 795, 796
--- Apply via: /admin/schema_comparison (Result class driven) or directly to ency DB
-
--- NOTE: All Result class definitions are the canonical source of truth.
--- This file documents the SQL equivalent for DBA review and /admin/schema_comparison.
--- Do NOT apply directly without reviewing against live schema.
-
-SET FOREIGN_KEY_CHECKS = 0;
-
--- ============================================================================
--- TODO 793: Extend queens table with full lifecycle management fields
--- ============================================================================
--- The queens table already exists from apiary_schema.sql (basic form).
--- This migration adds the extended fields defined in Queen.pm Result class.
-
--- INVENTORY ARCHITECTURE NOTE:
--- Queen IS an inventory item (same as Box, HiveFrame, Honey).
--- acquisition_cost and acquisition_date are NOT stored here — use inventory_items table.
--- inventory_item_id is NULL while queen is a cell/virgin; set on mating confirmation (home-reared)
--- or at purchase (bought queen). SKU format: Q-{sitename}-{tag_number}
 --
--- MULTI-TENANCY: sitename column present on queens, queen_events, queen_hive_assignments.
--- The unique tag_number constraint is PER SITE (tag_number + sitename).
-
-CREATE TABLE IF NOT EXISTS queens (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    sitename VARCHAR(50) NOT NULL COMMENT 'Site tenant identifier — all queries must filter by this',
-    tag_number VARCHAR(50) NOT NULL COMMENT 'Unique identifier / physical tag on the queen',
-    birth_date DATE COMMENT 'Date queen emerged or was estimated to have emerged',
-    breed VARCHAR(100) COMMENT 'Breed or race (e.g. Italian, Carniolan, Buckfast)',
-    genetic_line VARCHAR(100) COMMENT 'Named breeding line within the breed',
-    color_marking VARCHAR(50) COMMENT 'Physical colour dot or paint marking on thorax',
-    origin VARCHAR(100) COMMENT 'Source / breeder of the queen',
-    parent_queen_id INT COMMENT 'Mother queen — self-referential FK for genetic lineage tracking',
-    drone_source VARCHAR(100) COMMENT 'Description or tag of drone source used for mating',
-    mating_status ENUM('virgin','mated','laying','drone_layer','superseded','missing','dead') NOT NULL DEFAULT 'virgin',
-    laying_status ENUM('laying_well','laying_poor','not_laying','drone_layer','superseded','missing'),
-    performance_rating INT COMMENT 'Subjective performance score 1-10',
-    temperament_rating ENUM('calm','moderate','aggressive','very_aggressive') NOT NULL DEFAULT 'calm',
-    health_status ENUM('healthy','diseased','injured','missing','dead') NOT NULL DEFAULT 'healthy',
-    current_yard_id INT COMMENT 'FK → yards — current yard (denormalised for quick lookup)',
-    current_pallet_id INT COMMENT 'FK → pallets — current pallet (denormalised)',
-    current_position INT COMMENT 'Position on pallet (1-based from left)',
-    current_hive_configuration_id INT COMMENT 'FK → hive_configurations — active hive/nuc',
-    location_type ENUM('hive','nuc','mating_nuc','cage','transport_box','mail','bank','unknown') NOT NULL DEFAULT 'unknown'
-        COMMENT 'hive/nuc/mating_nuc: see current_hive_configuration_id; cage/transport_box/mail/bank: see location_notes',
-    location_notes VARCHAR(255) COMMENT 'Cage tag, box number, postal tracking, recipient name etc.',
-    purpose ENUM('production','breeding','replacement','sale','research') NOT NULL DEFAULT 'production',
-    introduction_date DATE COMMENT 'Date queen was introduced to her current hive',
-    removal_date DATE COMMENT 'Date queen was removed, superseded, or died',
-    inventory_item_id INT COMMENT 'FK → inventory_items — NULL until queen reaches mated/purchased state',
-    status ENUM('active','inactive','sold','dead','missing') NOT NULL DEFAULT 'active',
-    comments TEXT COMMENT 'General notes (kept for backward compatibility)',
-    notes TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    created_by VARCHAR(50),
-    updated_by VARCHAR(50),
-
-    UNIQUE KEY tag_number_sitename_unique (tag_number, sitename),
-    FOREIGN KEY (parent_queen_id) REFERENCES queens(id) ON DELETE SET NULL,
-    FOREIGN KEY (current_yard_id) REFERENCES yards(id) ON DELETE SET NULL,
-    FOREIGN KEY (current_hive_configuration_id) REFERENCES hive_configurations(id) ON DELETE SET NULL,
-    FOREIGN KEY (inventory_item_id) REFERENCES inventory_items(id) ON DELETE SET NULL,
-    INDEX idx_sitename (sitename),
-    INDEX idx_status (status),
-    INDEX idx_mating_status (mating_status),
-    INDEX idx_current_yard (current_yard_id),
-    INDEX idx_purpose (purpose),
-    INDEX idx_location_type (location_type)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- If queens table already exists (basic form), apply ALTER to add missing columns:
--- ALTER TABLE queens
---     ADD COLUMN sitename VARCHAR(50) NOT NULL DEFAULT 'BMaster' AFTER id,
---     ADD COLUMN genetic_line VARCHAR(100) AFTER breed,
---     ADD COLUMN color_marking VARCHAR(50) AFTER genetic_line,
---     ADD COLUMN parent_queen_id INT AFTER origin,
---     ADD COLUMN drone_source VARCHAR(100) AFTER parent_queen_id,
---     ADD COLUMN laying_status ENUM('laying_well','laying_poor','not_laying','drone_layer','superseded','missing') AFTER mating_status,
---     ADD COLUMN current_yard_id INT AFTER performance_rating,
---     ADD COLUMN current_pallet_id INT AFTER current_yard_id,
---     ADD COLUMN current_position INT AFTER current_pallet_id,
---     ADD COLUMN current_hive_configuration_id INT AFTER current_position,
---     ADD COLUMN location_type ENUM('hive','nuc','mating_nuc','cage','transport_box','mail','bank','unknown') NOT NULL DEFAULT 'unknown' AFTER current_hive_configuration_id,
---     ADD COLUMN location_notes VARCHAR(255) AFTER location_type,
---     ADD COLUMN purpose ENUM('production','breeding','replacement','sale','research') NOT NULL DEFAULT 'production' AFTER location_notes,
---     ADD COLUMN inventory_item_id INT AFTER removal_date,
---     ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at,
---     ADD COLUMN created_by VARCHAR(50) AFTER updated_at,
---     ADD COLUMN updated_by VARCHAR(50) AFTER created_by,
---     DROP INDEX tag_number_unique,
---     ADD UNIQUE KEY tag_number_sitename_unique (tag_number, sitename),
---     ADD CONSTRAINT fk_queen_parent FOREIGN KEY (parent_queen_id) REFERENCES queens(id) ON DELETE SET NULL,
---     ADD CONSTRAINT fk_queen_yard FOREIGN KEY (current_yard_id) REFERENCES yards(id) ON DELETE SET NULL,
---     ADD CONSTRAINT fk_queen_inventory FOREIGN KEY (inventory_item_id) REFERENCES inventory_items(id) ON DELETE SET NULL;
+-- THIS FILE IS REFERENCE ONLY — DO NOT EXECUTE.
+-- Schema is defined by Result classes. Admin applies changes via /admin/schema_comparison.
+-- Result class files are the canonical source of truth.
+--
+--   queens              → Comserv/lib/Comserv/Model/Schema/Ency/Result/Queen.pm
+--   queen_events        → Comserv/lib/Comserv/Model/Schema/Ency/Result/QueenEvent.pm
+--   queen_hive_assignments → Comserv/lib/Comserv/Model/Schema/Ency/Result/QueenHiveAssignment.pm
+--   inspections.queen_id FK → Comserv/lib/Comserv/Model/Schema/Ency/Result/Inspection.pm
 
 -- ============================================================================
--- TODO 794: Create queen_events table
+-- TODO 793: queens table — extended fields (see Queen.pm)
 -- ============================================================================
-
-CREATE TABLE IF NOT EXISTS queen_events (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    sitename VARCHAR(50) NOT NULL COMMENT 'Site tenant identifier — propagated from queen.sitename',
-    queen_id INT NOT NULL COMMENT 'FK → queens',
-    event_type ENUM(
-        'grafted','emerged','mated','introduced','superseded',
-        'replaced','dead','sold','treated','moved',
-        'marked','clipped','inspected'
-    ) NOT NULL COMMENT 'Type of lifecycle event',
-    event_date DATE NOT NULL COMMENT 'Date the event occurred',
-    hive_id INT COMMENT 'FK → hives — hive where event occurred (nullable)',
-    yard_id INT COMMENT 'FK → yards — yard where event occurred (nullable)',
-    inspector VARCHAR(50) COMMENT 'Username of person recording the event',
-    notes TEXT COMMENT 'Free-form notes about this event',
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_by VARCHAR(50),
-
-    FOREIGN KEY (queen_id) REFERENCES queens(id) ON DELETE CASCADE,
-    FOREIGN KEY (hive_id) REFERENCES hives(id) ON DELETE SET NULL,
-    FOREIGN KEY (yard_id) REFERENCES yards(id) ON DELETE SET NULL,
-    INDEX idx_queen_id (queen_id),
-    INDEX idx_event_type (event_type),
-    INDEX idx_event_date (event_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================================
--- TODO 795: Create queen_hive_assignments table
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS queen_hive_assignments (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    sitename VARCHAR(50) NOT NULL COMMENT 'Site tenant identifier — propagated from queen.sitename',
-    queen_id INT NOT NULL COMMENT 'FK → queens',
-    hive_id INT NOT NULL COMMENT 'FK → hives',
-    yard_id INT COMMENT 'FK → yards — denormalised from hive.yard_id for reporting',
-    assigned_date DATE NOT NULL COMMENT 'Date queen was introduced / moved into this hive',
-    removed_date DATE COMMENT 'Date queen left this hive (NULL = currently assigned)',
-    reason VARCHAR(100) COMMENT 'Reason for introduction or removal',
-    notes TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_by VARCHAR(50),
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by VARCHAR(50),
-
-    FOREIGN KEY (queen_id) REFERENCES queens(id) ON DELETE CASCADE,
-    FOREIGN KEY (hive_id) REFERENCES hives(id) ON DELETE CASCADE,
-    FOREIGN KEY (yard_id) REFERENCES yards(id) ON DELETE SET NULL,
-    INDEX idx_queen_id (queen_id),
-    INDEX idx_hive_id (hive_id),
-    INDEX idx_active_assignments (hive_id, removed_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+--
+-- ARCHITECTURE:
+--   Queen IS an inventory item (same pattern as Box, HiveFrame).
+--   Cost and purchase date are in inventory_items — NOT duplicated here.
+--   inventory_item_id = NULL while queen is a cell or virgin (pre-inventory).
+--   Set inventory_item_id when: mating confirmed (home-reared) or at purchase.
+--   SKU format: Q-{sitename}-{tag_number}
+--
+-- MULTI-TENANCY:
+--   sitename on queens/queen_events/queen_hive_assignments scopes records per site.
+--   Unique constraint is (tag_number, sitename) — not tag_number alone.
+--
+-- LOCATION MODEL:
+--   location_type = 'hive'  → current_hive_configuration_id points to hive config.
+--                              Hive type (full, nuc, mating_nuc) is defined by hive BOM.
+--   location_type = 'cage'  → queen is in an introduction or transit cage.
+--                              The cage is an inventory_item with its own location
+--                              (transport_box, counter, mail) in the inventory system.
+--                              location_notes = cage tag or inventory_item reference.
+--
+-- Fields added to queens (beyond original apiary_schema.sql):
+--   sitename, genetic_line, color_marking, parent_queen_id (self-ref FK),
+--   drone_source, laying_status ENUM, performance_rating, temperament_rating ENUM,
+--   health_status ENUM, current_yard_id FK, current_pallet_id FK, current_position,
+--   current_hive_configuration_id FK, location_type ENUM('hive','cage','unknown'),
+--   location_notes, purpose ENUM, introduction_date, removal_date,
+--   inventory_item_id FK → inventory_items,
+--   updated_at, created_by, updated_by
+--   UNIQUE KEY changed: tag_number → (tag_number, sitename)
 
 -- ============================================================================
--- TODO 796: Add queen_id FK to inspections table
+-- TODO 794: queen_events table (see QueenEvent.pm)
 -- ============================================================================
+--
+-- New table — tracked per-site via sitename column.
+-- event_type ENUM: grafted, emerged, mated, introduced, superseded, replaced,
+--                  dead, sold, treated, moved, marked, clipped, inspected
+-- FK: queen_id → queens(id) ON DELETE CASCADE
+-- FK: hive_id  → hives(id)  ON DELETE SET NULL  (nullable)
+-- FK: yard_id  → yards(id)  ON DELETE SET NULL  (nullable)
 
--- If inspections table exists, add the queen_id column:
--- ALTER TABLE inspections
---     ADD COLUMN queen_id INT COMMENT 'FK → queens — queen confirmed present during this inspection (nullable)'
---         AFTER temperature,
---     ADD CONSTRAINT fk_inspection_queen FOREIGN KEY (queen_id) REFERENCES queens(id) ON DELETE SET NULL,
---     ADD INDEX idx_queen_id (queen_id);
+-- ============================================================================
+-- TODO 795: queen_hive_assignments table (see QueenHiveAssignment.pm)
+-- ============================================================================
+--
+-- New table — full history of which queen was in which hive and when.
+-- removed_date NULL = currently assigned.
+-- FK: queen_id → queens(id) ON DELETE CASCADE
+-- FK: hive_id  → hives(id)  ON DELETE CASCADE
+-- FK: yard_id  → yards(id)  ON DELETE SET NULL  (nullable, denormalised from hive)
 
--- Full inspections table definition already includes queen_id (see apiary_schema.sql).
--- The column was added to the CREATE TABLE IF NOT EXISTS definition below for reference:
--- queen_id INT COMMENT 'FK → queens — queen confirmed present during this inspection (nullable)',
-
-SET FOREIGN_KEY_CHECKS = 1;
+-- ============================================================================
+-- TODO 796: inspections.queen_id FK (see Inspection.pm)
+-- ============================================================================
+--
+-- queen_id INT NULL added to inspections table.
+-- FK: queen_id → queens(id) ON DELETE SET NULL
+-- Records which queen was confirmed present during an inspection.
