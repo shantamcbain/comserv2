@@ -183,22 +183,25 @@ Returns the name of the application directory (workflow)
 sub get_app_workflow {
     my ($class, $app_home) = @_;
     
-    return 'Unknown' if !$app_home;
+    return 'main' if !$app_home;
     
-    my $workflow = 'Unknown';
+    my $workflow = 'main';
     eval {
         require File::Basename;
         require Cwd;
         
-        # Use dirname + abs_path to properly resolve the parent directory
-        # e.g. /home/user/.zenflow/worktrees/workshops-7d21/Comserv -> workshops-7d21
-        # e.g. /opt/comserv -> opt (production Docker)
-        my $parent = File::Basename::dirname($app_home);
+        my $parent   = File::Basename::dirname($app_home);
         my $resolved = Cwd::abs_path($parent) || $parent;
-        $workflow = File::Basename::basename($resolved);
+
+        # Zenflow worktree paths contain /.zenflow/worktrees/<branch-name>/
+        # e.g. /home/user/.zenflow/worktrees/planningsystem-59ae/Comserv
+        if ($resolved =~ m{/\.zenflow/worktrees/([^/]+)}) {
+            $workflow = $1;
+        }
+        # Otherwise this is main / production — leave as 'main'
     };
     
-    return $workflow || 'Unknown';
+    return $workflow || 'main';
 }
 
 1;
