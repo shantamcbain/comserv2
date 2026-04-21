@@ -34,11 +34,11 @@
 
 [% IF can_plan %]
 <li class="horizontal-dropdown">
-    <a href="/Documentation/DailyPlan" class="dropbtn"><i class="icon-calendar"></i>Planning</a>
+    <a href="/planning/daily" class="dropbtn"><i class="icon-calendar"></i>Planning</a>
     <div class="dropdown-content">
 
         [%# Core planning links %]
-        <a href="/Documentation/DailyPlan"><i class="icon-calendar"></i>Daily Plan</a>
+        <a href="/planning/daily"><i class="icon-calendar"></i>Daily Plan</a>
         <a href="/todo"><i class="icon-check-square"></i>Todo System</a>
         <a href="/log"><i class="icon-log"></i>Logs</a>
 
