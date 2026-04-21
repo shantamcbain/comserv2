@@ -569,30 +569,31 @@
 
         [%# All known branch servers for the overview panel %]
         [% SET all_branches = [
-            { name => 'planningsystem-59ae',                   port => 4001, label => 'PlanningSystem',       url => '/Documentation/DailyPlan' },
-            { name => 'aichatsystem-ef4e',                     port => 4010, label => 'AIChatSystem',         url => '/Documentation/DailyPlan' },
-            { name => 'schema-managment-system-7eb3',          port => 4002, label => 'SchemaManagement',     url => '/Documentation/DailyPlan' },
-            { name => 'new-task-9cf1',                         port => 4003, label => 'InfrastructureHA',     url => '/Documentation/DailyPlan' },
-            { name => 'workshops-7d21',                        port => 4004, label => 'WorkShops',            url => '/workshop' },
-            { name => 'users-e5b8',                            port => 4005, label => 'Users',                url => '/user/dashboard' },
-            { name => 'set-up-project-config-d327',            port => 3000, label => 'ProjectConfig',        url => '/Documentation/DailyPlan' },
-            { name => 'new-task-bb05',                         port => 4006, label => 'FileManagement',       url => '/admin/planning' },
-            { name => 'unified-mail-system-site-managed-2c53', port => 4007, label => 'UnifiedMail',          url => '/Documentation/DailyPlan' },
-            { name => 'membership-1304',                       port => 4008, label => 'Membership',           url => '/membership' },
-            { name => 'pointsystem-3230',                      port => 4009, label => 'PointSystem',          url => '/Documentation/DailyPlan' },
-            { name => 'cssthemes-9195',                        port => 4011, label => 'CssThemes',            url => '/Documentation/DailyPlan' },
-            { name => 'ency-53b0',                             port => 4012, label => 'ENCY',                 url => '/ENCY' },
-            { name => 'helpdesk-7217',                         port => 4013, label => 'HelpDesk',             url => '/HelpDesk' },
-            { name => 'healthplanning-9db9',                   port => 4014, label => 'HealthPlanning',       url => '/Documentation/DailyPlan' },
-            { name => 'productionserverhealth-82fb',           port => 4015, label => 'ProdServerHealth',     url => '/Documentation/DailyPlan' },
-            { name => 'security-764f',                         port => 4016, label => 'Security',             url => '/Documentation/DailyPlan' },
-            { name => 'documentation-9122',                    port => 4017, label => 'Documentation',        url => '/Documentation' },
-            { name => 'api-bc05',                              port => 4018, label => 'APISystem',            url => '/Documentation/DailyPlan' },
-            { name => 'bmaster-f0fd',                          port => 4019, label => 'BMaster',              url => '/Documentation/DailyPlan' },
-            { name => 'aichatsystem-planning-system-int-f187', port => 4020, label => 'AIChatPlanInt',        url => '/Documentation/DailyPlan' },
-            { name => 'inventory-system-104a',                 port => 4021, label => 'InventorySystem',      url => '/Inventory' },
-            { name => '3dprinting-use-this-as-the-branc-41f3', port => 4030, label => '3DPrinting',           url => '/Documentation/DailyPlan' },
-            { name => 'developer-time-logging-points-ba-542a', port => 4022, label => 'DevTimeLogging',       url => '/Documentation/DailyPlan' },
+            { name => 'main',                                   port => 3001, label => 'MAIN',                url => '/planning/daily', cmd => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && perl script/comserv_server.pl -p 3001 -r' },
+            { name => 'planningsystem-59ae',                    port => 4001, label => 'PlanningSystem',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/planningsystem-59ae/Comserv && perl script/comserv_server.pl -p 4001 -r' },
+            { name => 'aichatsystem-ef4e',                      port => 4010, label => 'AIChatSystem',        url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/aichatsystem-ef4e/Comserv && perl script/comserv_server.pl -p 4010 -r' },
+            { name => 'schema-managment-system-7eb3',           port => 4002, label => 'SchemaManagement',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/schema-managment-system-7eb3/Comserv && perl script/comserv_server.pl -p 4002 -r' },
+            { name => 'new-task-9cf1',                          port => 4003, label => 'InfrastructureHA',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/new-task-9cf1/Comserv && perl script/comserv_server.pl -p 4003 -r' },
+            { name => 'workshops-7d21',                         port => 4004, label => 'WorkShops',           url => '/workshop',       cmd => 'cd /home/shanta/.zenflow/worktrees/workshops-7d21/Comserv && perl script/comserv_server.pl -p 4004 -r' },
+            { name => 'users-e5b8',                             port => 4005, label => 'Users',               url => '/user/dashboard', cmd => 'cd /home/shanta/.zenflow/worktrees/users-e5b8/Comserv && perl script/comserv_server.pl -p 4005 -r' },
+            { name => 'set-up-project-config-d327',             port => 3000, label => 'ProjectConfig',       url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/set-up-project-config-d327/Comserv && perl script/comserv_server.pl -p 3000 -r' },
+            { name => 'new-task-bb05',                          port => 4006, label => 'FileManagement',      url => '/admin/planning', cmd => 'cd /home/shanta/.zenflow/worktrees/new-task-bb05/Comserv && perl script/comserv_server.pl -p 4006 -r' },
+            { name => 'unified-mail-system-site-managed-2c53',  port => 4007, label => 'UnifiedMail',         url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/unified-mail-system-site-managed-2c53/Comserv && perl script/comserv_server.pl -p 4007 -r' },
+            { name => 'membership-1304',                        port => 4008, label => 'Membership',          url => '/membership',     cmd => 'cd /home/shanta/.zenflow/worktrees/membership-1304/Comserv && perl script/comserv_server.pl -p 4008 -r' },
+            { name => 'pointsystem-3230',                       port => 4009, label => 'PointSystem',         url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/pointsystem-3230/Comserv && perl script/comserv_server.pl -p 4009 -r' },
+            { name => 'cssthemes-9195',                         port => 4011, label => 'CssThemes',           url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/cssthemes-9195/Comserv && perl script/comserv_server.pl -p 4011 -r' },
+            { name => 'ency-53b0',                              port => 4012, label => 'ENCY',                url => '/ENCY',           cmd => 'cd /home/shanta/.zenflow/worktrees/ency-53b0/Comserv && perl script/comserv_server.pl -p 4012 -r' },
+            { name => 'helpdesk-7217',                          port => 4013, label => 'HelpDesk',            url => '/HelpDesk',       cmd => 'cd /home/shanta/.zenflow/worktrees/helpdesk-7217/Comserv && perl script/comserv_server.pl -p 4013 -r' },
+            { name => 'healthplanning-9db9',                    port => 4014, label => 'HealthPlanning',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/healthplanning-9db9/Comserv && perl script/comserv_server.pl -p 4014 -r' },
+            { name => 'productionserverhealth-82fb',            port => 4015, label => 'ProdServerHealth',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/productionserverhealth-82fb/Comserv && perl script/comserv_server.pl -p 4015 -r' },
+            { name => 'security-764f',                          port => 4016, label => 'Security',            url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/security-764f/Comserv && perl script/comserv_server.pl -p 4016 -r' },
+            { name => 'documentation-9122',                     port => 4017, label => 'Documentation',       url => '/Documentation',  cmd => 'cd /home/shanta/.zenflow/worktrees/documentation-9122/Comserv && perl script/comserv_server.pl -p 4017 -r' },
+            { name => 'api-bc05',                               port => 4018, label => 'APISystem',           url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/api-bc05/Comserv && perl script/comserv_server.pl -p 4018 -r' },
+            { name => 'bmaster-f0fd',                           port => 4019, label => 'BMaster',             url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/bmaster-f0fd/Comserv && perl script/comserv_server.pl -p 4019 -r' },
+            { name => 'aichatsystem-planning-system-int-f187',  port => 4020, label => 'AIChatPlanInt',       url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/aichatsystem-planning-system-int-f187/Comserv && perl script/comserv_server.pl -p 4020 -r' },
+            { name => 'inventory-system-104a',                  port => 4021, label => 'InventorySystem',     url => '/Inventory',      cmd => 'cd /home/shanta/.zenflow/worktrees/inventory-system-104a/Comserv && perl script/comserv_server.pl -p 4021 -r' },
+            { name => '3dprinting-use-this-as-the-branc-41f3',  port => 4030, label => '3DPrinting',          url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/3dprinting-use-this-as-the-branc-41f3/Comserv && perl script/comserv_server.pl -p 4030 -r' },
+            { name => 'developer-time-logging-points-ba-542a',  port => 4022, label => 'DevTimeLogging',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/developer-time-logging-points-ba-542a/Comserv && perl script/comserv_server.pl -p 4022 -r' },
         ] %]
 
         [%# workstation.local gets full table; other domains get dropdown only %]
@@ -646,14 +647,18 @@
                     <tr style="border-bottom:1px solid var(--border-color);">
                         <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Branch</th>
                         <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Port</th>
+                        <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Start Command</th>
                         <th style="padding:4px 8px;"></th>
                     </tr>
                     [% FOREACH b IN all_branches %]
                     <tr style="border-bottom:1px solid var(--border-color);[% IF b.name == cur_branch %]background:color-mix(in srgb,#fd7e14 8%,var(--bg-color));[% END %]">
-                        <td style="padding:5px 8px;"><code>[% b.label %]</code>
+                        <td style="padding:5px 8px;white-space:nowrap;"><code>[% b.label %]</code>
                             [% IF b.name == cur_branch %]<span style="color:#fd7e14;font-size:0.8em;"> ← current</span>[% END %]
                         </td>
-                        <td style="padding:5px 8px;"><code>:[% b.port %]</code></td>
+                        <td style="padding:5px 8px;white-space:nowrap;"><code>:[% b.port %]</code></td>
+                        <td style="padding:5px 8px;">
+                            <code style="font-size:0.82em;user-select:all;cursor:text;color:var(--text-muted-color);">[% b.cmd %]</code>
+                        </td>
                         <td style="padding:5px 8px;white-space:nowrap;">
                             <a href="[% scheme %]://[% host %]:[% b.port %][% b.url %]" target="_blank"
                                style="padding:2px 8px;background:var(--primary-color);color:#fff;border-radius:3px;text-decoration:none;font-size:0.85em;">Open</a>
