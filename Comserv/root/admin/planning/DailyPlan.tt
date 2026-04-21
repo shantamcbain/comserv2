@@ -596,8 +596,8 @@
             { name => 'developer-time-logging-points-ba-542a',  port => 4022, label => 'DevTimeLogging',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/developer-time-logging-points-ba-542a/Comserv && perl script/comserv_server.pl -p 4022 -r' },
         ] %]
 
-        [%# workstation.local gets full table; other domains get dropdown only %]
-        [% SET is_workstation = (host.match('^workstation') || host == 'localhost') ? 1 : 0 %]
+        [%# .local and .zero domains (dev machines) get full table; production domains get dropdown only %]
+        [% SET is_workstation = (host.match('\.local$') || host.match('\.zero$') || host == 'localhost') ? 1 : 0 %]
 
         <details style="margin-bottom:14px;border:1px solid #fd7e14;border-radius:6px;font-size:0.85em;">
             <summary style="padding:8px 14px;cursor:pointer;background:color-mix(in srgb,#fd7e14 10%,var(--bg-color));border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
