@@ -742,13 +742,18 @@
         [% END %]
         <div id="project-sortable-list">
         [% SET current_site_label = '' %]
+        [% SET in_site_group = 0 %]
         [% FOREACH proj IN planning_projects %]
-            [%# Site group header for CSC all-sites view %]
+            [%# Site group collapsible container for CSC all-sites view %]
             [% IF is_csc && !filter_site && proj.sitename != current_site_label %]
+            [% IF in_site_group %]</details>[% END %]
             [% SET current_site_label = proj.sitename %]
-            <div class="site-group-header" style="margin:18px 0 6px;padding:4px 10px;background:var(--primary-color);color:#fff;border-radius:4px;font-size:0.85em;font-weight:bold;">
-                🌐 [% proj.sitename %]
-            </div>
+            [% SET in_site_group = 1 %]
+            <details class="site-group" style="margin-bottom:6px;">
+                <summary style="padding:4px 10px;background:var(--primary-color);color:#fff;border-radius:4px;font-size:0.85em;font-weight:bold;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;">
+                    <span>🌐 [% proj.sitename %]</span>
+                    <span style="font-size:0.9em;opacity:0.8;">▾</span>
+                </summary>
             [% END %]
 
             [%# Project card %]
@@ -853,6 +858,7 @@
                 </div>
             </details>
         [% END %]
+        [% IF in_site_group %]</details>[% END %]
         </div>[%# end #project-sortable-list %]
 
         [%# ── Standalone plans (not linked to any project) ── %]
