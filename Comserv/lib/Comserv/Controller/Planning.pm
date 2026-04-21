@@ -702,6 +702,7 @@ sub _daily_log_action {
                 username         => $username,
                 sitename         => $sitename,
                 start_date       => $today,
+                due_date         => $today,
                 project_code     => 'daily',
                 abstract         => $log_abstract,
                 details          => $details,
