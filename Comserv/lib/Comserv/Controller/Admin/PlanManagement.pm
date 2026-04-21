@@ -315,7 +315,10 @@ sub update :Path('/admin/plan') :Args(1) {
 sub delete :Path('/admin/plan') :Args(1) {
     my ($self, $c, $plan_id) = @_;
     
-    return unless $c->req->method eq 'DELETE';
+    unless ($c->req->method eq 'DELETE') {
+        $c->response->redirect($c->uri_for('/admin/plan/list'));
+        $c->detach;
+    }
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete', 
         "Deleting plan: $plan_id");
@@ -351,7 +354,10 @@ sub delete :Path('/admin/plan') :Args(1) {
 sub add_project :Path('/admin/plan') :Args(2) {
     my ($self, $c, $plan_id, $action) = @_;
     
-    return unless $action eq 'project' && $c->req->method eq 'POST';
+    unless ($action eq 'project' && $c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/admin/plan/list'));
+        $c->detach;
+    }
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_project', 
         "Adding project to plan: $plan_id");

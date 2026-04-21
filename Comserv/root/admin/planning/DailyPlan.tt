@@ -158,9 +158,9 @@
                 [% END %]
                 <span id="dl-feedback"></span>
                 &nbsp;|&nbsp;
-                <a href="/Documentation/DailyPlan/[% prev_date %]" class="prev-day-link">← Prev Day</a>
+                <a href="/planning/daily/[% prev_date %]" class="prev-day-link">← Prev Day</a>
                 | Viewing [% display_date %] |
-                <a href="/Documentation/DailyPlan/[% next_date %]" class="next-day-link">Next Day →</a>
+                <a href="/planning/daily/[% next_date %]" class="next-day-link">Next Day →</a>
             </div>
         </div>
     </div>
@@ -227,6 +227,9 @@
         [% IF is_csc %]
         <button class="tab-button" onclick="switchTab(event, 'daily-plan-guide')">
             DAILY PLAN GUIDE
+        </button>
+        <button class="tab-button" onclick="switchTab(event, 'zencoder-prompt')">
+            ZENCODER PROMPT
         </button>
         <button class="tab-button" onclick="switchTab(event, 'master-plan-coordination')">
             MASTER PLAN COORDINATION
@@ -538,7 +541,6 @@
 
         [%# Static branch → port map (matches Planning.tt overview) %]
         [% SET bp = {
-            'main'                                     => 3001,
             'planningsystem-59ae'                      => 4001,
             'aichatsystem-ef4e'                        => 4010,
             'schema-managment-system-7eb3'             => 4002,
@@ -567,7 +569,6 @@
 
         [%# All known branch servers for the overview panel %]
         [% SET all_branches = [
-            { name => 'main',                                  port => 3001, label => 'MAIN',                 url => '/Documentation/DailyPlan' },
             { name => 'planningsystem-59ae',                   port => 4001, label => 'PlanningSystem',       url => '/Documentation/DailyPlan' },
             { name => 'aichatsystem-ef4e',                     port => 4010, label => 'AIChatSystem',         url => '/Documentation/DailyPlan' },
             { name => 'schema-managment-system-7eb3',          port => 4002, label => 'SchemaManagement',     url => '/Documentation/DailyPlan' },
@@ -645,22 +646,14 @@
                     <tr style="border-bottom:1px solid var(--border-color);">
                         <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Branch</th>
                         <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Port</th>
-                        <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Start Command</th>
                         <th style="padding:4px 8px;"></th>
                     </tr>
                     [% FOREACH b IN all_branches %]
-                    [% SET b_worktree = (b.name == 'main') ? '/home/shanta/PycharmProjects/comserv2/Comserv' : ('/home/shanta/.zenflow/worktrees/' _ b.name _ '/Comserv') %]
-                    [% SET b_cmd = 'cd ' _ b_worktree _ ' && perl script/comserv_server.pl -p ' _ b.port _ ' -r' %]
                     <tr style="border-bottom:1px solid var(--border-color);[% IF b.name == cur_branch %]background:color-mix(in srgb,#fd7e14 8%,var(--bg-color));[% END %]">
                         <td style="padding:5px 8px;"><code>[% b.label %]</code>
                             [% IF b.name == cur_branch %]<span style="color:#fd7e14;font-size:0.8em;"> ← current</span>[% END %]
                         </td>
                         <td style="padding:5px 8px;"><code>:[% b.port %]</code></td>
-                        <td style="padding:5px 8px;max-width:340px;">
-                            <code id="cmd-[% b.port %]" style="font-size:0.8em;word-break:break-all;">[% b_cmd %]</code>
-                            <button onclick="navigator.clipboard.writeText(document.getElementById('cmd-[% b.port %]').textContent);this.textContent='✓';setTimeout(()=>this.textContent='📋',1500);"
-                                style="padding:1px 6px;border:1px solid var(--border-color);border-radius:3px;background:transparent;color:var(--text-muted-color);cursor:pointer;margin-left:4px;font-size:0.85em;">📋</button>
-                        </td>
                         <td style="padding:5px 8px;white-space:nowrap;">
                             <a href="[% scheme %]://[% host %]:[% b.port %][% b.url %]" target="_blank"
                                style="padding:2px 8px;background:var(--primary-color);color:#fff;border-radius:3px;text-decoration:none;font-size:0.85em;">Open</a>
@@ -1086,7 +1079,12 @@
     </div>
 
     [% IF is_csc %]
-    <!-- TAB: MASTER PLAN COORDINATION (CSC only) — coordinator view only; detail lives in DB -->
+    <!-- TAB 5: ZENCODER PROMPT (CSC only) -->
+    <div id="zencoder-prompt" class="tab-content">
+        [% INCLUDE "admin/documentation/ZencoderOpeningPrompt.tt" %]
+    </div>
+
+    <!-- TAB 6: MASTER PLAN COORDINATION (CSC only) — coordinator view only; detail lives in DB -->
     <div id="master-plan-coordination" class="tab-content">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--primary-color);">
             <h2 style="margin:0;font-size:1.2em;">🗺️ Master Plan Coordination — CSC</h2>
@@ -1655,7 +1653,7 @@ function dailyLogAction(action) {
     feedback.textContent = action === 'start' ? 'Starting…' : 'Closing…';
     feedback.style.color = '';
 
-    fetch('/ai/daily_log', {
+    fetch('/planning/daily_log', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -1694,7 +1692,7 @@ function saveLogEntry(entryId) {
     var statusEl = document.getElementById('log-save-status');
     if (statusEl) statusEl.textContent = 'Saving…';
 
-    fetch('/ai/update_log_entry', {
+    fetch('/planning/update_log_entry', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
