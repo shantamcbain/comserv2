@@ -8,6 +8,12 @@ __PACKAGE__->add_columns(
         data_type         => 'integer',
         is_auto_increment => 1,
     },
+    sitename => {
+        data_type   => 'varchar',
+        size        => 50,
+        is_nullable => 0,
+        comment     => 'Site tenant identifier — all queries must filter by this',
+    },
     tag_number => {
         data_type   => 'varchar',
         size        => 50,
@@ -159,7 +165,7 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key('id');
 
 __PACKAGE__->add_unique_constraint(
-    tag_number_unique => ['tag_number'],
+    tag_number_sitename_unique => ['tag_number', 'sitename'],
 );
 
 # --- Relationships --------------------------------------------------------
