@@ -8,6 +8,12 @@ __PACKAGE__->add_columns(
         data_type         => 'integer',
         is_auto_increment => 1,
     },
+    sitename => {
+        data_type   => 'varchar',
+        size        => 50,
+        is_nullable => 0,
+        comment     => 'Site tenant identifier — propagated from queen.sitename',
+    },
     queen_id => {
         data_type   => 'integer',
         is_nullable => 0,
