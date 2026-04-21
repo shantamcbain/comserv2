@@ -531,8 +531,7 @@
         [% SET view_sitename = filter_site || plan_sitename %]
 
         [%# ── Branch server launcher (CSC admin only) ── %]
-        [% SET _bsite = c.stash.SiteName || c.session.SiteName || 'CSC' %]
-        [% IF is_admin && _bsite == 'CSC' %]
+        [% IF is_admin && is_csc %]
         [% SET cur_branch = c.stash.app_workflow || 'main' %]
         [% SET host       = c.req.uri.host %]
         [% SET scheme     = c.req.uri.scheme %]
@@ -757,7 +756,7 @@
             [% SET current_site_label = proj.sitename %]
             [% SET in_site_group = 1 %]
             <details class="site-group" style="margin-bottom:6px;">
-                <summary style="padding:4px 10px;background:var(--primary-color);color:#fff;border-radius:4px;font-size:0.85em;font-weight:bold;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;">
+                <summary style="padding:4px 10px;background:var(--primary-color);color:var(--primary-text-color, var(--button-text-color, #fff));border-radius:4px;font-size:0.85em;font-weight:bold;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;border:1px solid var(--primary-color);">
                     <span>🌐 [% proj.sitename %]</span>
                     <span style="font-size:0.9em;opacity:0.8;">▾</span>
                 </summary>
