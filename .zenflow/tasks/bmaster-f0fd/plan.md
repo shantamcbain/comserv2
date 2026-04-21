@@ -101,7 +101,8 @@ Save to `{@artifacts_path}/plan.md`. If the feature is trivial and doesn't warra
 - Added apiary theme overrides: `--bg-color: #f1faee`, `--bg-secondary: #fdf6e3` (honey cream)
 - Run verification: syntax OK
 
-### [ ] Step: Queen Log Data Model — Schema and Migration
+### [x] Step: Queen Log Data Model — Schema and Migration
+<!-- chat-id: 2fd469c9-90a1-4dbd-bbd8-fd58ef3c92d0 -->
 Design and implement the canonical queen data model. Keep `queens` as the canonical table name. `queens_enhanced` remains as a reference/staging table until migration is complete.
 
 **DB tracking:** Project 219 (QueenLogModel) under Apiary Management System (91) under BMaster (20).
