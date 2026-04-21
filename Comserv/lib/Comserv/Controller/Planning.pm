@@ -36,6 +36,13 @@ sub daily :Path('/planning/daily') :Args {
     my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
     my $is_csc   = (uc($sitename) eq 'CSC') ? 1 : 0;
 
+    # Detect local/dev domain (.local, .zero, localhost) — shown branch servers panel
+    my $req_host = $c->req->uri->host_port;
+    my $is_local_domain = ($req_host =~ /\.local(?::\d+)?$/
+                        || $req_host =~ /\.zero(?::\d+)?$/
+                        || $req_host =~ /^localhost/) ? 1 : 0;
+    $c->stash->{is_local_domain} = $is_local_domain;
+
     # Role check: any authenticated non-guest user
     my $user_roles = $c->stash->{user_roles} || $c->session->{roles} || [];
     $user_roles = [$user_roles] unless ref $user_roles eq 'ARRAY';
