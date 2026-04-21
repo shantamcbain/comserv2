@@ -533,10 +533,12 @@
         [%# ── Data from controller stash (fetched in Documentation.pm::daily_plan) ── %]
         [% SET view_sitename = filter_site || plan_sitename %]
 
-        [%# ── Branch server launcher (CSC admin only) ── %]
-        [% IF is_admin && is_csc %]
+        [%# ── Branch server launcher (CSC admin, or any admin on .local/.zero dev domains) ── %]
+        [% SET _bs_host = c.req.uri.host %]
+        [% SET _bs_is_local = (_bs_host.match('\.local(?::\d+)?$') || _bs_host.match('\.zero(?::\d+)?$') || _bs_host.match('^localhost')) ? 1 : 0 %]
+        [% IF is_admin && (is_csc || _bs_is_local) %]
         [% SET cur_branch = c.stash.app_workflow || 'main' %]
-        [% SET host       = c.req.uri.host %]
+        [% SET host       = _bs_host %]
         [% SET scheme     = c.req.uri.scheme %]
 
         [%# Static branch → port map (matches Planning.tt overview) %]
