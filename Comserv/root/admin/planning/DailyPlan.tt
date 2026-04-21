@@ -536,7 +536,7 @@
         [%# ── Branch server launcher (CSC admin, or any admin on .local/.zero dev domains) ── %]
         [% SET _bs_host = c.req.uri.host %]
         [% SET _bs_is_local = (_bs_host.match('\.local(?::\d+)?$') || _bs_host.match('\.zero(?::\d+)?$') || _bs_host.match('^localhost')) ? 1 : 0 %]
-        [% IF is_admin && (is_csc || _bs_is_local) %]
+        [% IF (is_admin && is_csc) || (_bs_is_local && c.session.username) %]
         [% SET cur_branch = c.stash.app_workflow || 'main' %]
         [% SET host       = _bs_host %]
         [% SET scheme     = c.req.uri.scheme %]
