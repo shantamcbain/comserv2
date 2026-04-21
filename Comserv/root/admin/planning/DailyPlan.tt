@@ -695,13 +695,14 @@
         [% IF is_csc && plan_sitenames && plan_sitenames.size %]
         <div style="margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:0.85em;">
             <span style="color:var(--text-muted-color);font-weight:bold;">Filter:</span>
-            <a href="/Documentation/DailyPlan#planning"
+            <a href="/planning/daily#planning"
                style="padding:2px 10px;border-radius:3px;text-decoration:none;border:1px solid var(--border-color);
-               [% IF !filter_site %]background:var(--primary-color);color:#fff[% ELSE %]color:var(--text-color)[% END %]">All</a>
+               [% IF !filter_site %]background:var(--primary-color);color:var(--button-text-color,#fff)[% ELSE %]color:var(--text-color)[% END %]">All</a>
             [% FOREACH sname IN plan_sitenames %]
-            <a href="/Documentation/DailyPlan?filter_site=[% sname %]#planning"
+            [% NEXT UNLESS sname %]
+            <a href="/planning/daily?filter_site=[% sname %]#planning"
                style="padding:2px 10px;border-radius:3px;text-decoration:none;border:1px solid var(--border-color);
-               [% IF filter_site == sname %]background:var(--primary-color);color:#fff[% ELSE %]color:var(--text-color)[% END %]">
+               [% IF filter_site == sname %]background:var(--primary-color);color:var(--button-text-color,#fff)[% ELSE %]color:var(--text-color)[% END %]">
                 [% sname %]
             </a>
             [% END %]
@@ -756,7 +757,7 @@
             [% SET current_site_label = proj.sitename %]
             [% SET in_site_group = 1 %]
             <details class="site-group" style="margin-bottom:6px;">
-                <summary style="padding:4px 10px;background:var(--primary-color);color:var(--primary-text-color, var(--button-text-color, #fff));border-radius:4px;font-size:0.85em;font-weight:bold;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;border:1px solid var(--primary-color);">
+                <summary class="site-group-header" style="padding:4px 10px;background:color-mix(in srgb,var(--primary-color) 20%,var(--bg-color));color:var(--text-color);border-radius:4px;font-size:0.85em;font-weight:bold;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;border:1px solid var(--primary-color);">
                     <span>🌐 [% proj.sitename %]</span>
                     <span style="font-size:0.9em;opacity:0.8;">▾</span>
                 </summary>
