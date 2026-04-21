@@ -109,15 +109,15 @@ __PACKAGE__->add_columns(
     },
     location_type => {
         data_type => 'enum',
-        extra     => { list => [qw/hive nuc mating_nuc cage transport_box mail bank unknown/] },
+        extra     => { list => [qw/hive cage unknown/] },
         default_value => 'unknown',
-        comment   => 'Current physical location category. hive/nuc/mating_nuc = use current_hive_configuration_id; cage/transport_box/mail = see location_notes',
+        comment   => 'Queen lives in a hive (all types: full, nuc, mating_nuc — determined by hive BOM) or a cage. Cage location (transport_box, mail, counter) is tracked via the cage inventory_item location.',
     },
     location_notes => {
         data_type   => 'varchar',
         size        => 255,
         is_nullable => 1,
-        comment     => 'Free-form location detail: cage tag, transport box number, postal tracking, recipient name',
+        comment     => 'Cage tag or cage inventory_item_id reference when location_type=cage',
     },
     purpose => {
         data_type => 'enum',
@@ -258,33 +258,31 @@ sub current_location {
     my $self = shift;
     my $lt = $self->location_type // 'unknown';
 
-    if ( $lt =~ /^(hive|nuc|mating_nuc)$/ && $self->current_hive_configuration_id ) {
+    if ( $lt eq 'hive' && $self->current_hive_configuration_id ) {
         my $cfg = $self->current_hive_configuration;
         if ( $cfg ) {
-            my $label = ucfirst($lt) . ': ' . ( $cfg->hive ? $cfg->hive->hive_number : 'unknown hive' );
-            if ( $self->current_yard_id && $self->current_yard ) {
-                $label .= ' @ ' . $self->current_yard->name;
-            }
+            my $label = 'Hive: ' . ( $cfg->hive ? $cfg->hive->hive_number : 'unknown' );
+            $label .= ' @ ' . $self->current_yard->name
+                if $self->current_yard_id && $self->current_yard;
             return $label;
         }
     }
 
-    if ( $lt eq 'cage' )          { return 'Cage'          . ( $self->location_notes ? ': ' . $self->location_notes : '' ) }
-    if ( $lt eq 'transport_box' ) { return 'Transport Box' . ( $self->location_notes ? ': ' . $self->location_notes : '' ) }
-    if ( $lt eq 'mail' )          { return 'In Mail'       . ( $self->location_notes ? ' — ' . $self->location_notes : '' ) }
-    if ( $lt eq 'bank' )          { return 'Queen Bank'    . ( $self->location_notes ? ': ' . $self->location_notes : '' ) }
+    if ( $lt eq 'cage' ) {
+        return 'Cage' . ( $self->location_notes ? ': ' . $self->location_notes : '' );
+    }
 
     return 'Unknown location';
 }
 
 sub is_in_transit {
     my $self = shift;
-    return ( $self->location_type // '' ) =~ /^(cage|transport_box|mail)$/;
+    return ( $self->location_type // '' ) eq 'cage';
 }
 
 sub is_placed {
     my $self = shift;
-    return ( $self->location_type // '' ) =~ /^(hive|nuc|mating_nuc)$/;
+    return ( $self->location_type // '' ) eq 'hive';
 }
 
 sub current_hive {
@@ -368,13 +366,15 @@ INVENTORY CREATION RULE:
     Queen record created linked to that item. Queen enters at 'mated' or 'laying'.
 
 LOCATION MODEL:
-  location_type ENUM drives how to interpret current position:
-  - hive / nuc / mating_nuc → current_hive_configuration_id (HiveConfiguration.hive_type matches)
-  - cage             → location_notes = cage tag or description
-  - transport_box    → location_notes = box number / batch ID
-  - mail             → location_notes = postal tracking number / recipient
-  - bank             → location_notes = queen bank identifier
-  queen_hive_assignments records the full history of hive/nuc placements.
+  A queen lives in exactly one of two places:
+  - hive  → current_hive_configuration_id identifies the hive configuration.
+             Hive type (full, nuc, mating_nuc, single, double) is defined by the hive BOM,
+             not by the queen record. All hive variants map to location_type='hive'.
+  - cage  → queen is in an introduction or transit cage.
+             The cage itself is an inventory_item with its own location (transport_box,
+             kitchen counter, mail, etc.) tracked via the inventory location system.
+             location_notes holds the cage tag or cage inventory_item reference.
+  queen_hive_assignments records the full history of hive placements.
 
 Schema changes from the original queens table (applied via /admin/schema_comparison):
 - Added: genetic_line, color_marking, parent_queen_id (self-ref FK), drone_source
