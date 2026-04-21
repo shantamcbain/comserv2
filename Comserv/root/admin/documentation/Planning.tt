@@ -287,7 +287,8 @@ last_updated = '2026/02/08'
                     <div class="jump-line">
                         <strong><a href="#group-bmaster" class="jump-link">🐝 BMaster Beekeeping</a></strong>:
                         <a href="#anchor-bmaster-ui" class="jump-link">UI✅</a> |
-                        <a href="#anchor-bmaster-apiary" class="jump-link">Apiary⏳</a> |
+                        <a href="#anchor-bmaster-queen-log" class="jump-link">QueenLog✅</a> |
+                        <a href="#anchor-bmaster-apiary" class="jump-link">Apiary📌</a> |
                         <a href="#anchor-bmaster-beepasture" class="jump-link">BeePasture📌</a> |
                         <a href="#anchor-bmaster-health" class="jump-link">Health📌</a> |
                         <a href="#anchor-bmaster-queens" class="jump-link">Queens📌</a> |
@@ -2149,32 +2150,32 @@ last_updated = '2026/02/08'
             <!-- Sub-project 2a: Queen Log Data Model — DB Project 219 -->
             <div id="anchor-bmaster-queen-log" class="nav-anchor"></div>
             <details id="bmaster-queen-log" class="priority-container" open>
-                <summary class="priority-summary">⏳ Queen Log Data Model — DB Project 219 (IN PROGRESS — BLOCKER)</summary>
+                <summary class="priority-summary">✅ Queen Log Data Model — DB Project 219 (COMPLETE)</summary>
                 <div class="priority-content">
-                    <div style="background:#fff3cd;border:1px solid #ffc107;padding:10px;border-radius:4px;margin:8px 0;">
-                        <strong>⚠️ BLOCKER:</strong> Hive Inspection System (Project 220) cannot be fully implemented until the queen data model is stable. Queen Log work must complete todos 793–796 before Hive Inspection schema work starts.
+                    <div style="background:#d4edda;border:1px solid #28a745;padding:10px;border-radius:4px;margin:8px 0;">
+                        <strong>✅ COMPLETE:</strong> All Result classes implemented. Queen Log blocker resolved — Hive Inspection System (Project 220) may now proceed.
                     </div>
 
                     <p><strong>DB Project:</strong> <a href="/project/details?project_id=219">Queen Log Data Model (ID 219)</a> — sub-project of Apiary Management System (ID 91)</p>
-                    <p><strong>Zenflow plan step:</strong> <code>.zenflow/tasks/bmaster-f0fd/plan.md</code> § "Queen Log Data Model — Schema and Migration"</p>
+                    <p><strong>Zenflow plan step:</strong> <code>.zenflow/tasks/bmaster-f0fd/plan.md</code> § "Queen Log Data Model — Schema and Migration" — <strong>DONE</strong></p>
 
                     <h4>Schema Strategy</h4>
                     <ul>
-                        <li>📌 <strong>Keep <code>queens</code> as the canonical table name.</strong> The existing <code>Queen.pm</code> (mapping <code>queens</code>) is extended — no new table name.</li>
-                        <li>📌 <strong><code>queens_enhanced</code> stays as-is</strong> (reference/staging) until migration from Forager is complete, then reviewed for deprecation. No data in either table yet — both empty.</li>
-                        <li>📌 <strong>Legacy Forager data</strong> in <code>apis_queens_tb</code> and <code>apis_queen_log_tb</code> must migrate to <code>queens</code>, <code>queen_events</code>, and <code>inspections</code>.</li>
+                        <li>✅ <strong>Keep <code>queens</code> as the canonical table name.</strong> The existing <code>Queen.pm</code> (mapping <code>queens</code>) is extended — no new table name.</li>
+                        <li>✅ <strong><code>queens_enhanced</code> stays as-is</strong> (reference/staging) until migration from Forager is complete, then reviewed for deprecation. No data in either table yet — both empty.</li>
+                        <li>✅ <strong>Legacy Forager data</strong> in <code>apis_queens_tb</code> and <code>apis_queen_log_tb</code> migration scripts ready in <code>sql/migrations/009</code> and <code>010</code>.</li>
                     </ul>
 
                     <h4>Implementation Todos (Project 219)</h4>
                     <ul>
                         <li>⏳ <strong>Todo 162:</strong> Develop data model for queen log — ORIGINAL (In-Process)</li>
-                        <li>📌 <strong>Todo 793:</strong> Extend <code>queens</code> table — add genetic_line, color_marking, parent_queen_id (self-ref), mating_status ENUM, laying_status ENUM, temperament_rating ENUM, location FKs, purpose ENUM, cost/date fields. Update <code>Queen.pm</code>. <strong>BLOCKS Hive Inspection.</strong></li>
-                        <li>📌 <strong>Todo 794:</strong> Create <code>queen_events</code> table + <code>QueenEvent.pm</code> — lifecycle events: grafted, emerged, mated, introduced, superseded, replaced, dead, sold, treated, moved</li>
-                        <li>📌 <strong>Todo 795:</strong> Create <code>queen_hive_assignments</code> table + <code>QueenHiveAssignment.pm</code> — replaces direct hive_id on queen, tracks full movement history. Add <code>current_queen</code> helper to <code>Hive.pm</code>.</li>
-                        <li>📌 <strong>Todo 796:</strong> Add <code>queen_id</code> FK to <code>inspections</code> table. Fix <code>ApiaryModel::get_queens_for_hive()</code> bug — currently queries non-existent <code>hive_id</code> field on Queen. Replace with <code>queen_hive_assignments</code> join.</li>
-                        <li>📌 <strong>Todo 797:</strong> Data migration plan: Forager <code>ApisQueensTb</code> → <code>queens</code></li>
-                        <li>📌 <strong>Todo 798:</strong> Data migration plan: Forager <code>ApisQueenLogTb</code> → <code>inspections</code> + <code>queen_events</code></li>
-                        <li>📌 <strong>Todo 799:</strong> Documentation: POD for all changed Result classes, Planning.tt, ApplicationTtTemplate.tt queen patterns</li>
+                        <li>✅ <strong>Todo 793:</strong> Extended <code>queens</code> table — genetic_line, color_marking, parent_queen_id (self-ref), mating_status ENUM, laying_status ENUM, temperament_rating ENUM, location FKs, purpose ENUM, cost/date fields. <code>Queen.pm</code> updated with full lifecycle management + custom methods.</li>
+                        <li>✅ <strong>Todo 794:</strong> Created <code>queen_events</code> table + <code>QueenEvent.pm</code> — 13 event types: grafted, emerged, mated, introduced, superseded, replaced, dead, sold, treated, moved, marked, clipped, inspected.</li>
+                        <li>✅ <strong>Todo 795:</strong> Created <code>queen_hive_assignments</code> table + <code>QueenHiveAssignment.pm</code>. Added <code>current_queen</code> + <code>queen_history</code> helpers to <code>Hive.pm</code>.</li>
+                        <li>✅ <strong>Todo 796:</strong> Added <code>queen_id</code> FK to <code>inspections</code> table + <code>belongs_to 'queen'</code> relationship. Fixed <code>ApiaryModel::get_queens_for_hive()</code> — now queries via <code>QueenHiveAssignment</code> with prefetch.</li>
+                        <li>✅ <strong>Todo 797:</strong> Migration script: <code>sql/migrations/010_queen_log_forager_migration.sql</code> § ApisQueensTb → queens (field mapping, parent self-ref resolution, yard/hive FK resolution, queen_hive_assignments creation)</li>
+                        <li>✅ <strong>Todo 798:</strong> Migration script: <code>sql/migrations/010_queen_log_forager_migration.sql</code> § ApisQueenLogTb → inspections + queen_events (box data, status mapping, brood events, lifecycle events)</li>
+                        <li>✅ <strong>Todo 799:</strong> PODs updated in Queen.pm, QueenEvent.pm, QueenHiveAssignment.pm, Hive.pm, Inspection.pm. Planning.tt updated. ApplicationTtTemplate.tt queen patterns added.</li>
                     </ul>
 
                     <h4>Forager Legacy Tables (migration source)</h4>
@@ -2190,10 +2191,10 @@ last_updated = '2026/02/08'
             <!-- Sub-project 2b: Hive Inspection System — DB Project 220 -->
             <div id="anchor-bmaster-apiary" class="nav-anchor"></div>
             <details id="bmaster-apiary" class="priority-container">
-                <summary class="priority-summary">📌 Hive Inspection System — DB Project 220 (BLOCKED — awaiting Queen Log)</summary>
+                <summary class="priority-summary">📌 Hive Inspection System — DB Project 220 (READY — Queen Log complete)</summary>
                 <div class="priority-content">
-                    <div style="background:#f8d7da;border:1px solid #dc3545;padding:10px;border-radius:4px;margin:8px 0;">
-                        <strong>🚫 BLOCKED BY:</strong> Queen Log Data Model (Project 219) todos 793–796 must be complete before this work begins.
+                    <div style="background:#d4edda;border:1px solid #28a745;padding:10px;border-radius:4px;margin:8px 0;">
+                        <strong>✅ UNBLOCKED:</strong> Queen Log Data Model (Project 219) todos 793–796 are complete. Hive Inspection schema work may now begin.
                     </div>
 
                     <p><strong>DB Project:</strong> <a href="/project/details?project_id=220">Hive Inspection System (ID 220)</a> — sub-project of Apiary Management System (ID 91)</p>
