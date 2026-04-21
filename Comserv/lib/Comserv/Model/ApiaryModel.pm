@@ -112,22 +112,40 @@ sub get_queens_for_hive {
 
     my @queens;
     eval {
-        # Get a DBIx::Class::Schema object
         my $schema = $self->schema;
-
-        # Get a DBIx::Class::ResultSet object for the 'Queen' table
-        my $rs = $schema->resultset('Queen');
-
-        # Fetch all queens for the given hive
-        @queens = $rs->search({ hive_id => $hive_id });
+        my $rs = $schema->resultset('QueenHiveAssignment');
+        my @assignments = $rs->search(
+            { hive_id => $hive_id },
+            { prefetch => 'queen', order_by => { -desc => 'assigned_date' } }
+        );
+        @queens = map { $_->queen } @assignments;
     };
     if ($@) {
-        # An error occurred, handle it here
         warn "An error occurred while fetching queens for hive: $@";
         return;
     }
 
     return \@queens;
+}
+
+sub get_current_queen_for_hive {
+    my ($self, $hive_id) = @_;
+
+    my $queen;
+    eval {
+        my $schema = $self->schema;
+        my $assignment = $schema->resultset('QueenHiveAssignment')->search(
+            { hive_id => $hive_id, removed_date => undef },
+            { prefetch => 'queen', order_by => { -desc => 'assigned_date' }, rows => 1 }
+        )->first;
+        $queen = $assignment ? $assignment->queen : undef;
+    };
+    if ($@) {
+        warn "An error occurred while fetching current queen for hive: $@";
+        return;
+    }
+
+    return $queen;
 }
 
 __PACKAGE__->meta->make_immutable;

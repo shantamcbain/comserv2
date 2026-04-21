@@ -2118,13 +2118,13 @@ last_updated = '2026/02/08'
                         [% SET schema = c.model('DBEncy').schema %]
                         [% SET apiary_project = schema.resultset('Project').find(91) %]
                         [% IF apiary_project %]
-                            [% SET apiary_sub = schema.resultset('Project').search({ parent_id => 91 }, { order_by => 'sort_order' }) %]
-                            [% IF apiary_sub.count > 0 %]
-                                [% FOREACH sub IN apiary_sub.all %]
+                            [% SET apiary_subs = schema.resultset('Project').search({ parent_id => 91 }, { order_by => 'sort_order' }) %]
+                            [% IF apiary_subs.count > 0 %]
+                                [% FOREACH subproj IN apiary_subs.all %]
                                 <div style="margin:10px 0;padding:10px;border:1px solid #ccc;background:#f9f9f9;border-radius:4px;">
-                                    <strong>[% sub.name %]</strong> — <span style="color:#666;">[% sub.status %]</span>
-                                    <a href="/project/details?project_id=[% sub.id %]" style="margin-left:10px;font-size:0.9em;">View todos</a>
-                                    [% SET sub_todos = schema.resultset('Todo').search({ project_id => sub.id }, { order_by => 'sort_order' }) %]
+                                    <strong>[% subproj.name %]</strong> — <span style="color:#666;">[% subproj.status %]</span>
+                                    <a href="/project/details?project_id=[% subproj.id %]" style="margin-left:10px;font-size:0.9em;">View todos</a>
+                                    [% SET sub_todos = schema.resultset('Todo').search({ project_id => subproj.id }, { order_by => 'sort_order' }) %]
                                     [% IF sub_todos.count > 0 %]
                                         <ul style="margin:5px 0;padding-left:20px;">
                                         [% FOREACH t IN sub_todos.all %]

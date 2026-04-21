@@ -32,6 +32,11 @@ __PACKAGE__->add_columns(
         size => [5,2],
         is_nullable => 1,
     },
+    queen_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+        comment     => 'FK → queens — queen confirmed present during this inspection (nullable)',
+    },
     inspector => {
         data_type => 'varchar',
         size => 50,
@@ -126,6 +131,13 @@ __PACKAGE__->belongs_to(
     'Comserv::Model::Schema::Ency::Result::Hive',
     'hive_id',
     { is_deferrable => 1, on_delete => 'CASCADE' }
+);
+
+__PACKAGE__->belongs_to(
+    'queen',
+    'Comserv::Model::Schema::Ency::Result::Queen',
+    'queen_id',
+    { is_deferrable => 1, on_delete => 'SET NULL', join_type => 'LEFT' }
 );
 
 __PACKAGE__->has_many(
