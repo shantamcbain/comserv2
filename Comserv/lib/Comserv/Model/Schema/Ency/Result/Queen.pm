@@ -87,26 +87,6 @@ __PACKAGE__->add_columns(
         extra     => { list => [qw/healthy diseased injured missing dead/] },
         default_value => 'healthy',
     },
-    current_yard_id => {
-        data_type   => 'integer',
-        is_nullable => 1,
-        comment     => 'FK → yards — current yard location (denormalised for quick lookup)',
-    },
-    current_pallet_id => {
-        data_type   => 'integer',
-        is_nullable => 1,
-        comment     => 'FK → pallets — current pallet (denormalised)',
-    },
-    current_position => {
-        data_type   => 'integer',
-        is_nullable => 1,
-        comment     => 'Position on pallet (1-based from left)',
-    },
-    current_hive_configuration_id => {
-        data_type   => 'integer',
-        is_nullable => 1,
-        comment     => 'FK → hive_configurations — active hive/nuc configuration (covers full hive, 5_frame_nuc, mating_nuc)',
-    },
     location_type => {
         data_type => 'enum',
         extra     => { list => [qw/hive cage unknown/] },
@@ -197,27 +177,6 @@ __PACKAGE__->has_many(
 );
 
 __PACKAGE__->belongs_to(
-    'current_yard',
-    'Comserv::Model::Schema::Ency::Result::Yard',
-    'current_yard_id',
-    { is_deferrable => 1, on_delete => 'SET NULL', join_type => 'LEFT' }
-);
-
-__PACKAGE__->belongs_to(
-    'current_pallet',
-    'Comserv::Model::Schema::Ency::Result::Pallet',
-    'current_pallet_id',
-    { is_deferrable => 1, on_delete => 'SET NULL', join_type => 'LEFT' }
-);
-
-__PACKAGE__->belongs_to(
-    'current_hive_configuration',
-    'Comserv::Model::Schema::Ency::Result::HiveConfiguration',
-    'current_hive_configuration_id',
-    { is_deferrable => 1, on_delete => 'SET NULL', join_type => 'LEFT' }
-);
-
-__PACKAGE__->belongs_to(
     'inventory_item',
     'Comserv::Model::Schema::Ency::Result::InventoryItem',
     { 'foreign.id' => 'self.inventory_item_id' },
@@ -258,14 +217,15 @@ sub current_location {
     my $self = shift;
     my $lt = $self->location_type // 'unknown';
 
-    if ( $lt eq 'hive' && $self->current_hive_configuration_id ) {
-        my $cfg = $self->current_hive_configuration;
-        if ( $cfg ) {
-            my $label = 'Hive: ' . ( $cfg->hive ? $cfg->hive->hive_number : 'unknown' );
-            $label .= ' @ ' . $self->current_yard->name
-                if $self->current_yard_id && $self->current_yard;
+    if ( $lt eq 'hive' ) {
+        my $hive = $self->current_hive;
+        if ( $hive ) {
+            my $label = 'Hive: ' . $hive->hive_number;
+            my $yard  = $hive->yard;
+            $label .= ' @ ' . $yard->name if $yard;
             return $label;
         }
+        return 'Hive: unknown (no active assignment)';
     }
 
     if ( $lt eq 'cage' ) {
