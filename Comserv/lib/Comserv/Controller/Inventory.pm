@@ -3900,8 +3900,6 @@ sub consignment_print :Path('/Inventory/consignment/print') :Args(1) {
     my $sitename = $self->_sitename($c);
     my $schema   = $self->_schema($c);
 
-    return $c->res->redirect($c->uri_for('/user/login')) unless $c->session->{username};
-
     my $consignment;
     eval {
         $consignment = $schema->resultset('InventoryConsignment')->find(
@@ -3910,8 +3908,8 @@ sub consignment_print :Path('/Inventory/consignment/print') :Args(1) {
         );
     };
     unless ($consignment) {
-        $c->res->body('Consignment not found.');
-        $c->res->status(404);
+        $c->flash->{error_msg} = 'Consignment not found.';
+        $c->res->redirect($c->uri_for('/Inventory/consignment'));
         $c->detach;
     }
 
@@ -3926,14 +3924,22 @@ sub consignment_print :Path('/Inventory/consignment/print') :Args(1) {
         }
     };
 
-    $c->stash(
-        consignment  => $consignment,
-        sitename     => $sitename,
-        site_info    => \%site_info,
-        print_date   => $self->_now(),
-        ai_popup_mode => 1,
-        template     => 'Inventory/print/consignment.tt',
-    );
+    my $vars = {
+        %{ $c->stash },
+        consignment => $consignment,
+        sitename    => $sitename,
+        site_info   => \%site_info,
+        c           => $c,
+    };
+
+    my $view   = $c->view('TT');
+    my $output = '';
+    $view->template->process('Inventory/consignment/print.tt', $vars, \$output)
+        or die $view->template->error;
+
+    $c->response->content_type('text/html; charset=utf-8');
+    $c->response->body($output);
+    $c->detach;
 }
 
 sub consignment_delete :Path('/Inventory/consignment/delete') :Args(1) {

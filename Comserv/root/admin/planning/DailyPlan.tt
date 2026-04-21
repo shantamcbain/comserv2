@@ -158,9 +158,9 @@
                 [% END %]
                 <span id="dl-feedback"></span>
                 &nbsp;|&nbsp;
-                <a href="/Documentation/DailyPlan/[% prev_date %]" class="prev-day-link">← Prev Day</a>
+                <a href="/planning/daily/[% prev_date %]" class="prev-day-link">← Prev Day</a>
                 | Viewing [% display_date %] |
-                <a href="/Documentation/DailyPlan/[% next_date %]" class="next-day-link">Next Day →</a>
+                <a href="/planning/daily/[% next_date %]" class="next-day-link">Next Day →</a>
             </div>
         </div>
     </div>
@@ -227,6 +227,9 @@
         [% IF is_csc %]
         <button class="tab-button" onclick="switchTab(event, 'daily-plan-guide')">
             DAILY PLAN GUIDE
+        </button>
+        <button class="tab-button" onclick="switchTab(event, 'zencoder-prompt')">
+            ZENCODER PROMPT
         </button>
         <button class="tab-button" onclick="switchTab(event, 'master-plan-coordination')">
             MASTER PLAN COORDINATION
@@ -530,15 +533,15 @@
         [%# ── Data from controller stash (fetched in Documentation.pm::daily_plan) ── %]
         [% SET view_sitename = filter_site || plan_sitename %]
 
-        [%# ── Branch server launcher (CSC admin only) ── %]
-        [% IF is_admin && is_csc %]
+        [%# ── Branch server launcher (CSC admin, or any .local/.zero dev domain) ── %]
+        [%# is_local_domain computed in Planning.pm::daily (Perl regex on host_port) %]
+        [% IF (is_admin && is_csc) || is_local_domain %]
         [% SET cur_branch = c.stash.app_workflow || 'main' %]
         [% SET host       = c.req.uri.host %]
         [% SET scheme     = c.req.uri.scheme %]
 
         [%# Static branch → port map (matches Planning.tt overview) %]
         [% SET bp = {
-            'main'                                     => 3001,
             'planningsystem-59ae'                      => 4001,
             'aichatsystem-ef4e'                        => 4010,
             'schema-managment-system-7eb3'             => 4002,
@@ -567,35 +570,36 @@
 
         [%# All known branch servers for the overview panel %]
         [% SET all_branches = [
-            { name => 'main',                                  port => 3001, label => 'MAIN',                 url => '/Documentation/DailyPlan' },
-            { name => 'planningsystem-59ae',                   port => 4001, label => 'PlanningSystem',       url => '/Documentation/DailyPlan' },
-            { name => 'aichatsystem-ef4e',                     port => 4010, label => 'AIChatSystem',         url => '/Documentation/DailyPlan' },
-            { name => 'schema-managment-system-7eb3',          port => 4002, label => 'SchemaManagement',     url => '/Documentation/DailyPlan' },
-            { name => 'new-task-9cf1',                         port => 4003, label => 'InfrastructureHA',     url => '/Documentation/DailyPlan' },
-            { name => 'workshops-7d21',                        port => 4004, label => 'WorkShops',            url => '/workshop' },
-            { name => 'users-e5b8',                            port => 4005, label => 'Users',                url => '/user/dashboard' },
-            { name => 'set-up-project-config-d327',            port => 3000, label => 'ProjectConfig',        url => '/Documentation/DailyPlan' },
-            { name => 'new-task-bb05',                         port => 4006, label => 'FileManagement',       url => '/admin/planning' },
-            { name => 'unified-mail-system-site-managed-2c53', port => 4007, label => 'UnifiedMail',          url => '/Documentation/DailyPlan' },
-            { name => 'membership-1304',                       port => 4008, label => 'Membership',           url => '/membership' },
-            { name => 'pointsystem-3230',                      port => 4009, label => 'PointSystem',          url => '/Documentation/DailyPlan' },
-            { name => 'cssthemes-9195',                        port => 4011, label => 'CssThemes',            url => '/Documentation/DailyPlan' },
-            { name => 'ency-53b0',                             port => 4012, label => 'ENCY',                 url => '/ENCY' },
-            { name => 'helpdesk-7217',                         port => 4013, label => 'HelpDesk',             url => '/HelpDesk' },
-            { name => 'healthplanning-9db9',                   port => 4014, label => 'HealthPlanning',       url => '/Documentation/DailyPlan' },
-            { name => 'productionserverhealth-82fb',           port => 4015, label => 'ProdServerHealth',     url => '/Documentation/DailyPlan' },
-            { name => 'security-764f',                         port => 4016, label => 'Security',             url => '/Documentation/DailyPlan' },
-            { name => 'documentation-9122',                    port => 4017, label => 'Documentation',        url => '/Documentation' },
-            { name => 'api-bc05',                              port => 4018, label => 'APISystem',            url => '/Documentation/DailyPlan' },
-            { name => 'bmaster-f0fd',                          port => 4019, label => 'BMaster',              url => '/Documentation/DailyPlan' },
-            { name => 'aichatsystem-planning-system-int-f187', port => 4020, label => 'AIChatPlanInt',        url => '/Documentation/DailyPlan' },
-            { name => 'inventory-system-104a',                 port => 4021, label => 'InventorySystem',      url => '/Inventory' },
-            { name => '3dprinting-use-this-as-the-branc-41f3', port => 4030, label => '3DPrinting',           url => '/Documentation/DailyPlan' },
-            { name => 'developer-time-logging-points-ba-542a', port => 4022, label => 'DevTimeLogging',       url => '/Documentation/DailyPlan' },
+            { name => 'main',                                   port => 3001, label => 'MAIN',                url => '/planning/daily', cmd => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && perl script/comserv_server.pl -p 3001 -r' },
+            { name => 'planningsystem-59ae',                    port => 4001, label => 'PlanningSystem',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/planningsystem-59ae/Comserv && perl script/comserv_server.pl -p 4001 -r' },
+            { name => 'aichatsystem-ef4e',                      port => 4010, label => 'AIChatSystem',        url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/aichatsystem-ef4e/Comserv && perl script/comserv_server.pl -p 4010 -r' },
+            { name => 'schema-managment-system-7eb3',           port => 4002, label => 'SchemaManagement',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/schema-managment-system-7eb3/Comserv && perl script/comserv_server.pl -p 4002 -r' },
+            { name => 'new-task-9cf1',                          port => 4003, label => 'InfrastructureHA',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/new-task-9cf1/Comserv && perl script/comserv_server.pl -p 4003 -r' },
+            { name => 'workshops-7d21',                         port => 4004, label => 'WorkShops',           url => '/workshop',       cmd => 'cd /home/shanta/.zenflow/worktrees/workshops-7d21/Comserv && perl script/comserv_server.pl -p 4004 -r' },
+            { name => 'users-e5b8',                             port => 4005, label => 'Users',               url => '/user/dashboard', cmd => 'cd /home/shanta/.zenflow/worktrees/users-e5b8/Comserv && perl script/comserv_server.pl -p 4005 -r' },
+            { name => 'set-up-project-config-d327',             port => 3000, label => 'ProjectConfig',       url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/set-up-project-config-d327/Comserv && perl script/comserv_server.pl -p 3000 -r' },
+            { name => 'new-task-bb05',                          port => 4006, label => 'FileManagement',      url => '/admin/planning', cmd => 'cd /home/shanta/.zenflow/worktrees/new-task-bb05/Comserv && perl script/comserv_server.pl -p 4006 -r' },
+            { name => 'unified-mail-system-site-managed-2c53',  port => 4007, label => 'UnifiedMail',         url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/unified-mail-system-site-managed-2c53/Comserv && perl script/comserv_server.pl -p 4007 -r' },
+            { name => 'membership-1304',                        port => 4008, label => 'Membership',          url => '/membership',     cmd => 'cd /home/shanta/.zenflow/worktrees/membership-1304/Comserv && perl script/comserv_server.pl -p 4008 -r' },
+            { name => 'pointsystem-3230',                       port => 4009, label => 'PointSystem',         url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/pointsystem-3230/Comserv && perl script/comserv_server.pl -p 4009 -r' },
+            { name => 'cssthemes-9195',                         port => 4011, label => 'CssThemes',           url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/cssthemes-9195/Comserv && perl script/comserv_server.pl -p 4011 -r' },
+            { name => 'ency-53b0',                              port => 4012, label => 'ENCY',                url => '/ENCY',           cmd => 'cd /home/shanta/.zenflow/worktrees/ency-53b0/Comserv && perl script/comserv_server.pl -p 4012 -r' },
+            { name => 'helpdesk-7217',                          port => 4013, label => 'HelpDesk',            url => '/HelpDesk',       cmd => 'cd /home/shanta/.zenflow/worktrees/helpdesk-7217/Comserv && perl script/comserv_server.pl -p 4013 -r' },
+            { name => 'healthplanning-9db9',                    port => 4014, label => 'HealthPlanning',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/healthplanning-9db9/Comserv && perl script/comserv_server.pl -p 4014 -r' },
+            { name => 'productionserverhealth-82fb',            port => 4015, label => 'ProdServerHealth',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/productionserverhealth-82fb/Comserv && perl script/comserv_server.pl -p 4015 -r' },
+            { name => 'security-764f',                          port => 4016, label => 'Security',            url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/security-764f/Comserv && perl script/comserv_server.pl -p 4016 -r' },
+            { name => 'documentation-9122',                     port => 4017, label => 'Documentation',       url => '/Documentation',  cmd => 'cd /home/shanta/.zenflow/worktrees/documentation-9122/Comserv && perl script/comserv_server.pl -p 4017 -r' },
+            { name => 'api-bc05',                               port => 4018, label => 'APISystem',           url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/api-bc05/Comserv && perl script/comserv_server.pl -p 4018 -r' },
+            { name => 'bmaster-f0fd',                           port => 4019, label => 'BMaster',             url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/bmaster-f0fd/Comserv && perl script/comserv_server.pl -p 4019 -r' },
+            { name => 'aichatsystem-planning-system-int-f187',  port => 4020, label => 'AIChatPlanInt',       url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/aichatsystem-planning-system-int-f187/Comserv && perl script/comserv_server.pl -p 4020 -r' },
+            { name => 'inventory-system-104a',                  port => 4021, label => 'InventorySystem',     url => '/Inventory',      cmd => 'cd /home/shanta/.zenflow/worktrees/inventory-system-104a/Comserv && perl script/comserv_server.pl -p 4021 -r' },
+            { name => '3dprinting-use-this-as-the-branc-41f3',  port => 4030, label => '3DPrinting',          url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/3dprinting-use-this-as-the-branc-41f3/Comserv && perl script/comserv_server.pl -p 4030 -r' },
+            { name => 'developer-time-logging-points-ba-542a',  port => 4022, label => 'DevTimeLogging',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/developer-time-logging-points-ba-542a/Comserv && perl script/comserv_server.pl -p 4022 -r' },
         ] %]
 
-        [%# workstation.local gets full table; other domains get dropdown only %]
-        [% SET is_workstation = (host.match('^workstation') || host == 'localhost') ? 1 : 0 %]
+        [%# .local and .zero domains (dev machines) get full table; production domains get dropdown only %]
+        [%# host may include port (e.g. bmast.local:4001) so match without $ anchor %]
+        [% SET is_workstation = (host.match('\.local(?::\d+)?$') || host.match('\.zero(?::\d+)?$') || host.match('^localhost')) ? 1 : 0 %]
 
         <details style="margin-bottom:14px;border:1px solid #fd7e14;border-radius:6px;font-size:0.85em;">
             <summary style="padding:8px 14px;cursor:pointer;background:color-mix(in srgb,#fd7e14 10%,var(--bg-color));border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
@@ -649,17 +653,13 @@
                         <th style="padding:4px 8px;"></th>
                     </tr>
                     [% FOREACH b IN all_branches %]
-                    [% SET b_worktree = (b.name == 'main') ? '/home/shanta/PycharmProjects/comserv2/Comserv' : ('/home/shanta/.zenflow/worktrees/' _ b.name _ '/Comserv') %]
-                    [% SET b_cmd = 'cd ' _ b_worktree _ ' && perl script/comserv_server.pl -p ' _ b.port _ ' -r' %]
                     <tr style="border-bottom:1px solid var(--border-color);[% IF b.name == cur_branch %]background:color-mix(in srgb,#fd7e14 8%,var(--bg-color));[% END %]">
-                        <td style="padding:5px 8px;"><code>[% b.label %]</code>
+                        <td style="padding:5px 8px;white-space:nowrap;"><code>[% b.label %]</code>
                             [% IF b.name == cur_branch %]<span style="color:#fd7e14;font-size:0.8em;"> ← current</span>[% END %]
                         </td>
-                        <td style="padding:5px 8px;"><code>:[% b.port %]</code></td>
-                        <td style="padding:5px 8px;max-width:340px;">
-                            <code id="cmd-[% b.port %]" style="font-size:0.8em;word-break:break-all;">[% b_cmd %]</code>
-                            <button onclick="navigator.clipboard.writeText(document.getElementById('cmd-[% b.port %]').textContent);this.textContent='✓';setTimeout(()=>this.textContent='📋',1500);"
-                                style="padding:1px 6px;border:1px solid var(--border-color);border-radius:3px;background:transparent;color:var(--text-muted-color);cursor:pointer;margin-left:4px;font-size:0.85em;">📋</button>
+                        <td style="padding:5px 8px;white-space:nowrap;"><code>:[% b.port %]</code></td>
+                        <td style="padding:5px 8px;">
+                            <code style="font-size:0.82em;user-select:all;cursor:text;color:var(--text-muted-color);">[% b.cmd %]</code>
                         </td>
                         <td style="padding:5px 8px;white-space:nowrap;">
                             <a href="[% scheme %]://[% host %]:[% b.port %][% b.url %]" target="_blank"
@@ -695,13 +695,14 @@
         [% IF is_csc && plan_sitenames && plan_sitenames.size %]
         <div style="margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:0.85em;">
             <span style="color:var(--text-muted-color);font-weight:bold;">Filter:</span>
-            <a href="/Documentation/DailyPlan#planning"
+            <a href="/planning/daily#planning"
                style="padding:2px 10px;border-radius:3px;text-decoration:none;border:1px solid var(--border-color);
-               [% IF !filter_site %]background:var(--primary-color);color:#fff[% ELSE %]color:var(--text-color)[% END %]">All</a>
+               [% IF !filter_site %]background:var(--primary-color);color:var(--button-text-color,#fff)[% ELSE %]color:var(--text-color)[% END %]">All</a>
             [% FOREACH sname IN plan_sitenames %]
-            <a href="/Documentation/DailyPlan?filter_site=[% sname %]#planning"
+            [% NEXT UNLESS sname %]
+            <a href="/planning/daily?filter_site=[% sname %]#planning"
                style="padding:2px 10px;border-radius:3px;text-decoration:none;border:1px solid var(--border-color);
-               [% IF filter_site == sname %]background:var(--primary-color);color:#fff[% ELSE %]color:var(--text-color)[% END %]">
+               [% IF filter_site == sname %]background:var(--primary-color);color:var(--button-text-color,#fff)[% ELSE %]color:var(--text-color)[% END %]">
                 [% sname %]
             </a>
             [% END %]
@@ -756,7 +757,7 @@
             [% SET current_site_label = proj.sitename %]
             [% SET in_site_group = 1 %]
             <details class="site-group" style="margin-bottom:6px;">
-                <summary style="padding:4px 10px;background:var(--primary-color);color:var(--primary-text-color, var(--button-text-color, #fff));border-radius:4px;font-size:0.85em;font-weight:bold;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;border:1px solid var(--primary-color);">
+                <summary class="site-group-header" style="padding:4px 10px;background:color-mix(in srgb,var(--primary-color) 20%,var(--bg-color));color:var(--text-color);border-radius:4px;font-size:0.85em;font-weight:bold;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;border:1px solid var(--primary-color);">
                     <span>🌐 [% proj.sitename %]</span>
                     <span style="font-size:0.9em;opacity:0.8;">▾</span>
                 </summary>
@@ -1086,7 +1087,12 @@
     </div>
 
     [% IF is_csc %]
-    <!-- TAB: MASTER PLAN COORDINATION (CSC only) — coordinator view only; detail lives in DB -->
+    <!-- TAB 5: ZENCODER PROMPT (CSC only) -->
+    <div id="zencoder-prompt" class="tab-content">
+        [% INCLUDE "admin/documentation/ZencoderOpeningPrompt.tt" %]
+    </div>
+
+    <!-- TAB 6: MASTER PLAN COORDINATION (CSC only) — coordinator view only; detail lives in DB -->
     <div id="master-plan-coordination" class="tab-content">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--primary-color);">
             <h2 style="margin:0;font-size:1.2em;">🗺️ Master Plan Coordination — CSC</h2>
@@ -1655,7 +1661,7 @@ function dailyLogAction(action) {
     feedback.textContent = action === 'start' ? 'Starting…' : 'Closing…';
     feedback.style.color = '';
 
-    fetch('/ai/daily_log', {
+    fetch('/planning/daily_log', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -1694,7 +1700,7 @@ function saveLogEntry(entryId) {
     var statusEl = document.getElementById('log-save-status');
     if (statusEl) statusEl.textContent = 'Saving…';
 
-    fetch('/ai/update_log_entry', {
+    fetch('/planning/update_log_entry', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
