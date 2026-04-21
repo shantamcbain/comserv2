@@ -263,6 +263,27 @@ __PACKAGE__->might_have(
     { cascade_delete => 1 }
 );
 
+__PACKAGE__->might_have(
+    'queen',
+    'Comserv::Model::Schema::Ency::Result::Queen',
+    { 'foreign.inventory_item_id' => 'self.id' },
+    { cascade_delete => 0 }
+);
+
+__PACKAGE__->has_many(
+    'boxes',
+    'Comserv::Model::Schema::Ency::Result::Box',
+    { 'foreign.inventory_item_id' => 'self.id' },
+    { cascade_delete => 0 }
+);
+
+__PACKAGE__->has_many(
+    'hive_frames',
+    'Comserv::Model::Schema::Ency::Result::HiveFrame',
+    { 'foreign.inventory_item_id' => 'self.id' },
+    { cascade_delete => 0 }
+);
+
 __PACKAGE__->has_many(
     'bom_components' => 'Comserv::Model::Schema::Ency::Result::InventoryItemBOM',
     { 'foreign.parent_item_id' => 'self.id' },

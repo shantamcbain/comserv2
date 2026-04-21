@@ -116,14 +116,10 @@ __PACKAGE__->add_columns(
         is_nullable => 1,
         comment     => 'Date queen was removed, superseded, or died',
     },
-    acquisition_cost => {
-        data_type => 'decimal',
-        size      => [8, 2],
+    inventory_item_id => {
+        data_type   => 'integer',
         is_nullable => 1,
-    },
-    acquisition_date => {
-        data_type   => 'date',
-        is_nullable => 1,
+        comment     => 'FK → inventory_items — queen as inventory item (tracks cost, purchase_date, supplier, stock)',
     },
     status => {
         data_type => 'enum',
@@ -200,6 +196,13 @@ __PACKAGE__->belongs_to(
     'current_hive_configuration',
     'Comserv::Model::Schema::Ency::Result::HiveConfiguration',
     'current_hive_configuration_id',
+    { is_deferrable => 1, on_delete => 'SET NULL', join_type => 'LEFT' }
+);
+
+__PACKAGE__->belongs_to(
+    'inventory_item',
+    'Comserv::Model::Schema::Ency::Result::InventoryItem',
+    { 'foreign.id' => 'self.inventory_item_id' },
     { is_deferrable => 1, on_delete => 'SET NULL', join_type => 'LEFT' }
 );
 
@@ -315,23 +318,29 @@ Canonical queen tracking table. Replaces and extends the minimal original schema
 with full lifecycle management: genetic lineage, performance scoring, location
 tracking, event history, and hive assignment history.
 
+Architecture: Queen IS an InventoryItem. The inventory_item_id FK links to
+inventory_items for acquisition cost, purchase date, supplier, and stock
+management. Queen-specific attributes (genetics, lifecycle, location) stay here.
+Same pattern as Box.pm and HiveFrame.pm.
+
 Schema changes from the original queens table (applied via /admin/schema_comparison):
 - Added: genetic_line, color_marking, parent_queen_id (self-ref FK), drone_source
 - Changed: mating_status varchar → ENUM; health_status varchar → ENUM
 - Added: laying_status ENUM, temperament_rating ENUM, purpose ENUM, status ENUM
 - Added: current_yard_id FK, current_pallet_id FK, current_position,
          current_hive_configuration_id FK
-- Added: acquisition_cost, acquisition_date, notes, created_at, updated_at,
-         created_by, updated_by
+- Added: inventory_item_id FK → inventory_items (replaces acquisition_cost/date)
+- Added: notes, created_at, updated_at, created_by, updated_by
 - Kept:  comments (backward compat), introduction_date, removal_date,
          breed, origin, performance_rating, tag_number, birth_date
-
-queens_enhanced table: retained in DB as reference until Forager migration
-is complete. Do not drop until todo 797/798 migration is verified.
+- Removed: acquisition_cost, acquisition_date — use inventory_item.unit_cost
+           and inventory_item.purchase_date instead
 
 =head1 RELATIONSHIPS
 
 =over 4
+
+=item * inventory_item — queen as inventory item (cost, purchase_date, supplier via InventoryItem.pm)
 
 =item * parent_queen / offspring_queens — genetic family tree (self-ref)
 
