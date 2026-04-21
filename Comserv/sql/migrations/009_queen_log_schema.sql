@@ -16,8 +16,18 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- The queens table already exists from apiary_schema.sql (basic form).
 -- This migration adds the extended fields defined in Queen.pm Result class.
 
+-- INVENTORY ARCHITECTURE NOTE:
+-- Queen IS an inventory item (same as Box, HiveFrame, Honey).
+-- acquisition_cost and acquisition_date are NOT stored here — use inventory_items table.
+-- inventory_item_id is NULL while queen is a cell/virgin; set on mating confirmation (home-reared)
+-- or at purchase (bought queen). SKU format: Q-{sitename}-{tag_number}
+--
+-- MULTI-TENANCY: sitename column present on queens, queen_events, queen_hive_assignments.
+-- The unique tag_number constraint is PER SITE (tag_number + sitename).
+
 CREATE TABLE IF NOT EXISTS queens (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    sitename VARCHAR(50) NOT NULL COMMENT 'Site tenant identifier — all queries must filter by this',
     tag_number VARCHAR(50) NOT NULL COMMENT 'Unique identifier / physical tag on the queen',
     birth_date DATE COMMENT 'Date queen emerged or was estimated to have emerged',
     breed VARCHAR(100) COMMENT 'Breed or race (e.g. Italian, Carniolan, Buckfast)',
@@ -26,40 +36,46 @@ CREATE TABLE IF NOT EXISTS queens (
     origin VARCHAR(100) COMMENT 'Source / breeder of the queen',
     parent_queen_id INT COMMENT 'Mother queen — self-referential FK for genetic lineage tracking',
     drone_source VARCHAR(100) COMMENT 'Description or tag of drone source used for mating',
-    mating_status ENUM('virgin','mated','laying','drone_layer','superseded','missing','dead') NOT NULL DEFAULT 'virgin' COMMENT 'Current mating and laying lifecycle status',
-    laying_status ENUM('laying_well','laying_poor','not_laying','drone_layer','superseded','missing') COMMENT 'Quality of current laying pattern',
+    mating_status ENUM('virgin','mated','laying','drone_layer','superseded','missing','dead') NOT NULL DEFAULT 'virgin',
+    laying_status ENUM('laying_well','laying_poor','not_laying','drone_layer','superseded','missing'),
     performance_rating INT COMMENT 'Subjective performance score 1-10',
     temperament_rating ENUM('calm','moderate','aggressive','very_aggressive') NOT NULL DEFAULT 'calm',
     health_status ENUM('healthy','diseased','injured','missing','dead') NOT NULL DEFAULT 'healthy',
-    current_yard_id INT COMMENT 'FK → yards — current yard location (denormalised for quick lookup)',
+    current_yard_id INT COMMENT 'FK → yards — current yard (denormalised for quick lookup)',
     current_pallet_id INT COMMENT 'FK → pallets — current pallet (denormalised)',
     current_position INT COMMENT 'Position on pallet (1-based from left)',
-    current_hive_configuration_id INT COMMENT 'FK → hive_configurations — active hive configuration',
+    current_hive_configuration_id INT COMMENT 'FK → hive_configurations — active hive/nuc',
+    location_type ENUM('hive','nuc','mating_nuc','cage','transport_box','mail','bank','unknown') NOT NULL DEFAULT 'unknown'
+        COMMENT 'hive/nuc/mating_nuc: see current_hive_configuration_id; cage/transport_box/mail/bank: see location_notes',
+    location_notes VARCHAR(255) COMMENT 'Cage tag, box number, postal tracking, recipient name etc.',
     purpose ENUM('production','breeding','replacement','sale','research') NOT NULL DEFAULT 'production',
     introduction_date DATE COMMENT 'Date queen was introduced to her current hive',
     removal_date DATE COMMENT 'Date queen was removed, superseded, or died',
-    acquisition_cost DECIMAL(8,2),
-    acquisition_date DATE,
+    inventory_item_id INT COMMENT 'FK → inventory_items — NULL until queen reaches mated/purchased state',
     status ENUM('active','inactive','sold','dead','missing') NOT NULL DEFAULT 'active',
     comments TEXT COMMENT 'General notes (kept for backward compatibility)',
-    notes TEXT COMMENT 'Detailed notes on this queen',
+    notes TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     created_by VARCHAR(50),
     updated_by VARCHAR(50),
 
-    UNIQUE KEY tag_number_unique (tag_number),
+    UNIQUE KEY tag_number_sitename_unique (tag_number, sitename),
     FOREIGN KEY (parent_queen_id) REFERENCES queens(id) ON DELETE SET NULL,
     FOREIGN KEY (current_yard_id) REFERENCES yards(id) ON DELETE SET NULL,
     FOREIGN KEY (current_hive_configuration_id) REFERENCES hive_configurations(id) ON DELETE SET NULL,
+    FOREIGN KEY (inventory_item_id) REFERENCES inventory_items(id) ON DELETE SET NULL,
+    INDEX idx_sitename (sitename),
     INDEX idx_status (status),
     INDEX idx_mating_status (mating_status),
     INDEX idx_current_yard (current_yard_id),
-    INDEX idx_purpose (purpose)
+    INDEX idx_purpose (purpose),
+    INDEX idx_location_type (location_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- If queens table already exists (basic form), apply ALTER to add missing columns:
 -- ALTER TABLE queens
+--     ADD COLUMN sitename VARCHAR(50) NOT NULL DEFAULT 'BMaster' AFTER id,
 --     ADD COLUMN genetic_line VARCHAR(100) AFTER breed,
 --     ADD COLUMN color_marking VARCHAR(50) AFTER genetic_line,
 --     ADD COLUMN parent_queen_id INT AFTER origin,
@@ -69,15 +85,18 @@ CREATE TABLE IF NOT EXISTS queens (
 --     ADD COLUMN current_pallet_id INT AFTER current_yard_id,
 --     ADD COLUMN current_position INT AFTER current_pallet_id,
 --     ADD COLUMN current_hive_configuration_id INT AFTER current_position,
---     ADD COLUMN purpose ENUM('production','breeding','replacement','sale','research') NOT NULL DEFAULT 'production' AFTER current_hive_configuration_id,
---     ADD COLUMN acquisition_cost DECIMAL(8,2) AFTER removal_date,
---     ADD COLUMN acquisition_date DATE AFTER acquisition_cost,
+--     ADD COLUMN location_type ENUM('hive','nuc','mating_nuc','cage','transport_box','mail','bank','unknown') NOT NULL DEFAULT 'unknown' AFTER current_hive_configuration_id,
+--     ADD COLUMN location_notes VARCHAR(255) AFTER location_type,
+--     ADD COLUMN purpose ENUM('production','breeding','replacement','sale','research') NOT NULL DEFAULT 'production' AFTER location_notes,
+--     ADD COLUMN inventory_item_id INT AFTER removal_date,
 --     ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at,
 --     ADD COLUMN created_by VARCHAR(50) AFTER updated_at,
 --     ADD COLUMN updated_by VARCHAR(50) AFTER created_by,
---     ADD UNIQUE KEY tag_number_unique (tag_number),
+--     DROP INDEX tag_number_unique,
+--     ADD UNIQUE KEY tag_number_sitename_unique (tag_number, sitename),
 --     ADD CONSTRAINT fk_queen_parent FOREIGN KEY (parent_queen_id) REFERENCES queens(id) ON DELETE SET NULL,
---     ADD CONSTRAINT fk_queen_yard FOREIGN KEY (current_yard_id) REFERENCES yards(id) ON DELETE SET NULL;
+--     ADD CONSTRAINT fk_queen_yard FOREIGN KEY (current_yard_id) REFERENCES yards(id) ON DELETE SET NULL,
+--     ADD CONSTRAINT fk_queen_inventory FOREIGN KEY (inventory_item_id) REFERENCES inventory_items(id) ON DELETE SET NULL;
 
 -- ============================================================================
 -- TODO 794: Create queen_events table
@@ -85,6 +104,7 @@ CREATE TABLE IF NOT EXISTS queens (
 
 CREATE TABLE IF NOT EXISTS queen_events (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    sitename VARCHAR(50) NOT NULL COMMENT 'Site tenant identifier — propagated from queen.sitename',
     queen_id INT NOT NULL COMMENT 'FK → queens',
     event_type ENUM(
         'grafted','emerged','mated','introduced','superseded',
@@ -113,6 +133,7 @@ CREATE TABLE IF NOT EXISTS queen_events (
 
 CREATE TABLE IF NOT EXISTS queen_hive_assignments (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    sitename VARCHAR(50) NOT NULL COMMENT 'Site tenant identifier — propagated from queen.sitename',
     queen_id INT NOT NULL COMMENT 'FK → queens',
     hive_id INT NOT NULL COMMENT 'FK → hives',
     yard_id INT COMMENT 'FK → yards — denormalised from hive.yard_id for reporting',

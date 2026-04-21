@@ -105,7 +105,19 @@ __PACKAGE__->add_columns(
     current_hive_configuration_id => {
         data_type   => 'integer',
         is_nullable => 1,
-        comment     => 'FK → hive_configurations — active hive configuration',
+        comment     => 'FK → hive_configurations — active hive/nuc configuration (covers full hive, 5_frame_nuc, mating_nuc)',
+    },
+    location_type => {
+        data_type => 'enum',
+        extra     => { list => [qw/hive nuc mating_nuc cage transport_box mail bank unknown/] },
+        default_value => 'unknown',
+        comment   => 'Current physical location category. hive/nuc/mating_nuc = use current_hive_configuration_id; cage/transport_box/mail = see location_notes',
+    },
+    location_notes => {
+        data_type   => 'varchar',
+        size        => 255,
+        is_nullable => 1,
+        comment     => 'Free-form location detail: cage tag, transport box number, postal tracking, recipient name',
     },
     purpose => {
         data_type => 'enum',
@@ -244,15 +256,35 @@ sub display_name {
 
 sub current_location {
     my $self = shift;
-    return unless $self->current_yard_id;
-    my $yard = $self->current_yard;
-    return unless $yard;
-    my $loc = $yard->name;
-    if ( $self->current_pallet_id && $self->current_pallet ) {
-        $loc .= " — " . $self->current_pallet->code;
-        $loc .= " pos " . $self->current_position if $self->current_position;
+    my $lt = $self->location_type // 'unknown';
+
+    if ( $lt =~ /^(hive|nuc|mating_nuc)$/ && $self->current_hive_configuration_id ) {
+        my $cfg = $self->current_hive_configuration;
+        if ( $cfg ) {
+            my $label = ucfirst($lt) . ': ' . ( $cfg->hive ? $cfg->hive->hive_number : 'unknown hive' );
+            if ( $self->current_yard_id && $self->current_yard ) {
+                $label .= ' @ ' . $self->current_yard->name;
+            }
+            return $label;
+        }
     }
-    return $loc;
+
+    if ( $lt eq 'cage' )          { return 'Cage'          . ( $self->location_notes ? ': ' . $self->location_notes : '' ) }
+    if ( $lt eq 'transport_box' ) { return 'Transport Box' . ( $self->location_notes ? ': ' . $self->location_notes : '' ) }
+    if ( $lt eq 'mail' )          { return 'In Mail'       . ( $self->location_notes ? ' — ' . $self->location_notes : '' ) }
+    if ( $lt eq 'bank' )          { return 'Queen Bank'    . ( $self->location_notes ? ': ' . $self->location_notes : '' ) }
+
+    return 'Unknown location';
+}
+
+sub is_in_transit {
+    my $self = shift;
+    return ( $self->location_type // '' ) =~ /^(cage|transport_box|mail)$/;
+}
+
+sub is_placed {
+    my $self = shift;
+    return ( $self->location_type // '' ) =~ /^(hive|nuc|mating_nuc)$/;
 }
 
 sub current_hive {
@@ -324,10 +356,25 @@ Canonical queen tracking table. Replaces and extends the minimal original schema
 with full lifecycle management: genetic lineage, performance scoring, location
 tracking, event history, and hive assignment history.
 
-Architecture: Queen IS an InventoryItem. The inventory_item_id FK links to
-inventory_items for acquisition cost, purchase date, supplier, and stock
-management. Queen-specific attributes (genetics, lifecycle, location) stay here.
-Same pattern as Box.pm and HiveFrame.pm.
+Architecture: Queen IS an InventoryItem (same pattern as Box.pm, HiveFrame.pm).
+The inventory_item_id FK links to inventory_items for acquisition cost,
+purchase date, supplier, and marketable stock management.
+
+INVENTORY CREATION RULE:
+  - Home-reared queen: inventory_item_id is NULL while cell/virgin.
+    Controller creates the inventory_item record at mating confirmation
+    (mating_status transitions to 'mated'). SKU = "Q-{sitename}-{tag_number}".
+  - Purchased queen: inventory_item created first (at purchase/order).
+    Queen record created linked to that item. Queen enters at 'mated' or 'laying'.
+
+LOCATION MODEL:
+  location_type ENUM drives how to interpret current position:
+  - hive / nuc / mating_nuc → current_hive_configuration_id (HiveConfiguration.hive_type matches)
+  - cage             → location_notes = cage tag or description
+  - transport_box    → location_notes = box number / batch ID
+  - mail             → location_notes = postal tracking number / recipient
+  - bank             → location_notes = queen bank identifier
+  queen_hive_assignments records the full history of hive/nuc placements.
 
 Schema changes from the original queens table (applied via /admin/schema_comparison):
 - Added: genetic_line, color_marking, parent_queen_id (self-ref FK), drone_source
