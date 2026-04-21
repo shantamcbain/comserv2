@@ -228,9 +228,6 @@
         <button class="tab-button" onclick="switchTab(event, 'daily-plan-guide')">
             DAILY PLAN GUIDE
         </button>
-        <button class="tab-button" onclick="switchTab(event, 'zencoder-prompt')">
-            ZENCODER PROMPT
-        </button>
         <button class="tab-button" onclick="switchTab(event, 'master-plan-coordination')">
             MASTER PLAN COORDINATION
         </button>
@@ -1084,12 +1081,7 @@
     </div>
 
     [% IF is_csc %]
-    <!-- TAB 5: ZENCODER PROMPT (CSC only) -->
-    <div id="zencoder-prompt" class="tab-content">
-        [% INCLUDE "admin/documentation/ZencoderOpeningPrompt.tt" %]
-    </div>
-
-    <!-- TAB 6: MASTER PLAN COORDINATION (CSC only) — coordinator view only; detail lives in DB -->
+    <!-- TAB: MASTER PLAN COORDINATION (CSC only) — coordinator view only; detail lives in DB -->
     <div id="master-plan-coordination" class="tab-content">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--primary-color);">
             <h2 style="margin:0;font-size:1.2em;">🗺️ Master Plan Coordination — CSC</h2>
