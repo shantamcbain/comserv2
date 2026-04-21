@@ -329,47 +329,53 @@ sub _daily_log_action {
 
     my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
     my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+    my $now_time = do { my @t = localtime; sprintf('%02d:%02d:%02d', $t[2], $t[1], $t[0]) };
 
     my $schema;
     eval { $schema = $c->model('DBEncy')->schema };
     return { success => JSON::false, error => 'DB unavailable' } if $@ || !$schema;
 
-    my $plan;
-    eval {
-        $plan = $schema->resultset('DailyPlan')->find_or_create(
-            { sitename => $sitename, plan_name => "Daily Log $today" },
-            { key => 'dailyplan_sitename_plan_name',
-              default => {
-                  plan_description => "Auto-created daily log for $today",
-                  status           => 'active',
-                  start_date       => $today,
-                  due_date         => $today,
-                  priority         => 0,
-                  created_by       => $username,
-              }
-            }
-        );
-    };
-    return { success => JSON::false, error => "Could not find/create daily plan: $@" } if $@ || !$plan;
+    my $log_abstract = "\x{1F305} Good Morning - Daily Log - $today";
 
     if ($action eq 'start') {
-        my $entry;
+        # Check if a log entry already exists for today
+        my $existing;
         eval {
-            $entry = $schema->resultset('DailyPlanEntry')->create({
-                plan_id     => $plan->id,
-                entry_type  => 'note',
-                title       => "\x{1F305} Good Morning - Daily Log - $today",
-                description => "Start of day log entry for $today",
-                status      => 'in_progress',
-                created_by  => $username,
-                metadata    => '{}',
-            });
+            $existing = $schema->resultset('Log')->search(
+                { sitename => $sitename, abstract => { -like => "%Good Morning - Daily Log - $today%" }, status => 2 },
+                { rows => 1 }
+            )->first;
         };
-        return { success => JSON::false, error => "Could not create log entry: $@" } if $@ || !$entry;
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
-            "Start-of-day log #" . $entry->id . " created by $username via keyword");
+        if ($existing) {
+            return {
+                success  => JSON::true,
+                action   => 'start',
+                entry_id => $existing->id + 0,
+                response => "\x{1F305} Good morning, $username! You already have an open daily log for today (entry #" . $existing->id . "). Check <a href='/log'>your logs</a>.",
+                message  => "Daily log already open.",
+            };
+        }
 
-        # Check SystemLog for recent ERROR/CRITICAL entries (last 24 hours)
+        # --- Triage: find stale open logs from previous days ---
+        my @stale_logs;
+        eval {
+            @stale_logs = $schema->resultset('Log')->search(
+                { username => $username, status => 2, start_date => { '<' => $today } },
+                { order_by => { -desc => 'start_date' }, rows => 5 }
+            )->all;
+        };
+
+        # --- Top priorities for the day ---
+        my @top_todos;
+        eval {
+            @top_todos = $schema->resultset('Todo')->search(
+                { sitename => $sitename,
+                  status   => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
+                { order_by => [{ -asc => 'priority' }, { -desc => 'last_mod_date' }], rows => 5 }
+            )->all;
+        };
+
+        # --- System error check (last 24h) ---
         my $error_count  = 0;
         my $todo_created = 0;
         eval {
@@ -384,14 +390,13 @@ sub _daily_log_action {
             )->all;
             if (@errs) {
                 $error_count = scalar @errs;
-                my $todo_subject = "\x{26A0}\x{FE0F} Morning Check: $error_count system error(s) need review ($today)";
                 my $max_show = $error_count > 5 ? 5 : $error_count;
                 my $todo_desc = "Errors found during morning log check ($today):\n" .
                     join("\n", map { "[" . $_->level . "] " . $_->timestamp . " — " . substr($_->message, 0, 200) }
                          @errs[0..$max_show-1]);
                 eval {
                     $schema->resultset('Todo')->create({
-                        subject              => $todo_subject,
+                        subject              => "\x{26A0}\x{FE0F} Morning Check: $error_count system error(s) need review ($today)",
                         description          => $todo_desc,
                         status               => 2,
                         priority             => 1,
@@ -412,51 +417,103 @@ sub _daily_log_action {
                     });
                     $todo_created = 1;
                 };
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
-                    "Morning check: $error_count errors found, todo_created=$todo_created");
             }
         };
 
-        my $extra = $error_count
-            ? ($todo_created
-                ? " \x{26A0}\x{FE0F} $error_count system error(s) found in the last 24h — a review todo has been created."
-                : " \x{26A0}\x{FE0F} $error_count system error(s) found in the last 24h.")
-            : '';
+        # Build log details with triage summary
+        my $details = "=== Daily Log - $today ===\n\n";
+        if (@stale_logs) {
+            $details .= "⚠️ STALE OPEN LOGS (" . scalar(@stale_logs) . " unclosed from previous days):\n";
+            for my $sl (@stale_logs) {
+                $details .= "  • Log #" . $sl->id . " from " . ($sl->start_date || '?') . ": " . substr($sl->abstract || '', 0, 80) . "\n";
+            }
+            $details .= "\n";
+        }
+        if (@top_todos) {
+            $details .= "📋 TOP PRIORITIES FOR TODAY:\n";
+            my $n = 1;
+            for my $t (@top_todos) {
+                $details .= "  $n. [P" . ($t->priority || 0) . "] " . substr($t->subject || '', 0, 100) . "\n";
+                $n++;
+            }
+            $details .= "\n";
+        }
+        $details .= "Notes:\n";
+
+        my $group_of_poster = 'default';
+        if (defined $c->session->{roles}) {
+            $group_of_poster = ref $c->session->{roles} eq 'ARRAY'
+                ? join(',', @{$c->session->{roles}})
+                : $c->session->{roles};
+        }
+
+        my $log_entry;
+        eval {
+            $log_entry = $schema->resultset('Log')->create({
+                todo_record_id  => 0,
+                username        => $username,
+                sitename        => $sitename,
+                start_date      => $today,
+                project_code    => 'daily',
+                abstract        => $log_abstract,
+                details         => $details,
+                start_time      => $now_time,
+                end_time        => '00:00:00',
+                time            => 0,
+                group_of_poster => $group_of_poster,
+                status          => 2,
+                priority        => 1,
+                last_mod_by     => $username,
+                last_mod_date   => $today,
+                comments        => '',
+                points_processed => 0,
+            });
+        };
+        return { success => JSON::false, error => "Could not create log entry: $@" } if $@ || !$log_entry;
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
+            "Start-of-day Log #" . $log_entry->id . " created by $username");
+
+        my $stale_msg   = @stale_logs ? " \x{26A0}\x{FE0F} " . scalar(@stale_logs) . " unclosed log(s) from previous days." : '';
+        my $error_msg   = $error_count ? " \x{26A0}\x{FE0F} $error_count system error(s) found in the last 24h." . ($todo_created ? " A review todo was created." : '') : '';
+        my $priority_msg = @top_todos ? " Your top priority: " . substr($top_todos[0]->subject || '', 0, 60) . "." : '';
+
         return {
             success  => JSON::true,
             action   => 'start',
-            entry_id => $entry->id + 0,
-            response => "\x{1F305} Good morning, $username! Your daily log has been started (entry #" . $entry->id . ").$extra Have a productive day!",
-            message  => "Daily log started.",
+            entry_id => $log_entry->id + 0,
+            response => "\x{1F305} Good morning, $username! Your daily log has been started (Log #" . $log_entry->id . "). View it at <a href='/log'>/log</a>.$stale_msg$error_msg$priority_msg Have a productive day!",
+            message  => "Daily log started. Check /log.",
         };
     }
 
     if ($action eq 'end') {
-        my $log_title_prefix = "Good Morning - Daily Log - $today";
         my $open_entry;
         eval {
-            $open_entry = $schema->resultset('DailyPlanEntry')->search({
-                plan_id => $plan->id,
-                status  => 'in_progress',
-                title   => { -like => "%$log_title_prefix%" },
-            }, { order_by => { -desc => 'created_at' }, rows => 1 })->first;
+            $open_entry = $schema->resultset('Log')->search(
+                { username => $username, sitename => $sitename,
+                  abstract => { -like => "%Good Morning - Daily Log - $today%" },
+                  status   => 2 },
+                { order_by => { -desc => 'id' }, rows => 1 }
+            )->first;
         };
         unless ($open_entry) {
             return {
                 success  => JSON::false,
-                response => "No open daily log entry found for today. Type \"good morning\" or \"start day\" to start one.",
+                response => "No open daily log found for today. Click \x{1F305} Start Day or type \"good morning\" to start one.",
                 error    => 'No open log entry for today',
             };
         }
-        eval { $open_entry->update({ status => 'completed' }) };
+        my $now_end = do { my @t = localtime; sprintf('%02d:%02d:%02d', $t[2], $t[1], $t[0]) };
+        eval { $open_entry->update({ status => 3, end_time => $now_end }) };
         return { success => JSON::false, error => "Could not close log entry: $@" } if $@;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
-            "End-of-day log #" . $open_entry->id . " closed by $username via keyword");
+            "End-of-day Log #" . $open_entry->id . " closed by $username");
         return {
             success  => JSON::true,
             action   => 'end',
             entry_id => $open_entry->id + 0,
-            response => "\x{1F319} Good night, $username! Your daily log has been closed. Have a great rest of your day!",
+            response => "\x{1F319} Good night, $username! Your daily log has been closed (Log #" . $open_entry->id . "). View it at <a href='/log'>/log</a>.",
             message  => "Daily log closed.",
         };
     }
@@ -501,14 +558,14 @@ sub update_log_entry :Local :Args(0) {
     }
 
     my $entry;
-    eval { $entry = $schema->resultset('DailyPlanEntry')->find($entry_id) };
+    eval { $entry = $schema->resultset('Log')->find($entry_id) };
     unless ($entry) {
         $c->response->status(404);
         $c->response->body(encode_json({ success => JSON::false, error => 'Entry not found' }));
         return;
     }
 
-    eval { $entry->update({ title => $title, description => $description }) };
+    eval { $entry->update({ abstract => $title, details => $description }) };
     if ($@) {
         $c->response->status(500);
         $c->response->body(encode_json({ success => JSON::false, error => "Update failed: $@" }));
@@ -516,7 +573,7 @@ sub update_log_entry :Local :Args(0) {
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_log_entry',
-        "DailyPlanEntry #$entry_id updated by " . ($c->session->{username} || 'user'));
+        "Log #$entry_id updated by " . ($c->session->{username} || 'user'));
     $c->response->body(encode_json({ success => JSON::true, message => 'Saved' }));
 }
 

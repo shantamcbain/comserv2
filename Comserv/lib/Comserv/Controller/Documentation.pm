@@ -2759,18 +2759,13 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
             my $open;
             eval {
                 my $today_str = $current_date_str;
-                my $plan_name = "Daily Log $today_str";
-                my $dp = $c->model('DBEncy')->resultset('DailyPlan')->search(
-                    { sitename => $sitename, plan_name => $plan_name },
-                    { rows => 1 }
+                my $row = $c->model('DBEncy')->resultset('Log')->search(
+                    { sitename => $sitename,
+                      abstract => { -like => "%Good Morning - Daily Log - $today_str%" },
+                      status   => 2 },
+                    { order_by => { -desc => 'id' }, rows => 1 }
                 )->first;
-                if ($dp) {
-                    my $row = $c->model('DBEncy')->resultset('DailyPlanEntry')->search(
-                        { plan_id => $dp->id, status => 'in_progress' },
-                        { order_by => { -desc => 'id' }, rows => 1 }
-                    )->first;
-                    $open = { $row->get_columns } if $row;
-                }
+                $open = { $row->get_columns } if $row;
             };
             $open;
         },
