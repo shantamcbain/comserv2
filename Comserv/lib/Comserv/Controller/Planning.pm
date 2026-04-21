@@ -364,7 +364,8 @@ sub daily :Path('/planning/daily') :Args {
         "Could not fetch active priorities: $@") if $@;
 
     # Project dependencies
-    my (@project_deps, $auto_resolved_count, $auto_detected_count) = ((), 0, 0);
+    my @project_deps;
+    my ($auto_resolved_count, $auto_detected_count) = (0, 0);
     my @done_statuses_dep = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
 
     eval {
