@@ -4966,6 +4966,9 @@ sub _build_navigation_command_guide {
             [ 'New supplier invoice',       '/Inventory/invoice/new'    ],
             [ 'Stock transactions',         '/Inventory/stock/transactions' ],
             [ 'Customer sales',             '/Inventory/sales'          ],
+            [ 'Consignments',               '/Inventory/consignment'    ],
+            [ 'New consignment',            '/Inventory/consignment/new' ],
+            [ 'Consignment partners',       '/Inventory/consignment/partners' ],
         ]],
         [ 'Accounting', 'admin', [
             [ 'Accounting dashboard',       '/Accounting'               ],
@@ -5083,6 +5086,14 @@ sub _build_navigation_command_guide {
          . "Present the full list as a numbered or bulleted list so nothing is missed.\n"
          . "Only use URLs from this list; do not invent others. "
          . "If no match exists for a navigation request, say: 'I don't know that page — visit $base_url to browse available options.'\n"
+         . "CONSIGNMENT QUICK REFERENCE (for consignment questions from any page):\n"
+         . "Consignment = sending items to a partner store to sell on your behalf.\n"
+         . "  List:      $base_url/Inventory/consignment\n"
+         . "  New batch: $base_url/Inventory/consignment/new\n"
+         . "  Partners:  $base_url/Inventory/consignment/partners\n"
+         . "  Docs:      $base_url/Documentation/Inventory/consignment\n"
+         . "Workflow: Set up partner → create batch (select items + qty + retail price) → view/print slip → settle when partner pays\n"
+         . "Known partners: Monashee Arts Council (Lumby BC), Monashee Coop (30% commission)\n"
          . $guide;
 }
 
@@ -5190,6 +5201,40 @@ sub _build_page_navigation_hint {
             $hint .= "Navigation context — Projects (guest):\n"
                    . "- Log in to view project information.\n";
         }
+    } elsif ($page_path =~ m{/Inventory/consignment}i) {
+        $hint .= "Navigation context — Consignment Tracking:\n"
+               . "Consignment = sending items to a partner store; partner sells them and keeps a commission.\n"
+               . "- Consignment list:        $base_url/Inventory/consignment\n"
+               . "- Create new consignment:  $base_url/Inventory/consignment/new\n"
+               . "- Consignment partners:    $base_url/Inventory/consignment/partners\n"
+               . "- View/settle:             $base_url/Inventory/consignment/view/<id>\n"
+               . "- Full docs:               $base_url/Documentation/Inventory/consignment\n"
+               . "WORKFLOW: 1) Set up a partner at /Inventory/consignment/partners\n"
+               . "2) Create batch at /Inventory/consignment/new — select partner, enter items + qty + retail price\n"
+               . "3) View consignment to print slip or settle when partner pays\n"
+               . "4) On settlement: enter qty sold and qty returned per line; optionally post GL entry\n"
+               . "Partners: Monashee Arts Council (Lumby), Monashee Coop (30% commission)\n";
+    } elsif ($page_path =~ m{/Inventory}i) {
+        $hint .= "Navigation context — Inventory:\n"
+               . "- Inventory dashboard:    $base_url/Inventory\n"
+               . "- Items list:             $base_url/Inventory/items\n"
+               . "- Add item:               $base_url/Inventory/item/add\n"
+               . "- Suppliers:              $base_url/Inventory/suppliers\n"
+               . "- Supplier invoices:      $base_url/Inventory/invoice\n"
+               . "- New invoice:            $base_url/Inventory/invoice/new\n"
+               . "- Stock transactions:     $base_url/Inventory/stock/transactions\n"
+               . "- Customer sales:         $base_url/Inventory/sales\n"
+               . "- Consignments:           $base_url/Inventory/consignment\n"
+               . "- New consignment:        $base_url/Inventory/consignment/new\n"
+               . "- Consignment partners:   $base_url/Inventory/consignment/partners\n"
+               . "- Consignment docs:       $base_url/Documentation/Inventory/consignment\n";
+    } elsif ($page_path =~ m{/Accounting}i) {
+        $hint .= "Navigation context — Accounting:\n"
+               . "- Accounting dashboard:   $base_url/Accounting\n"
+               . "- Chart of accounts:      $base_url/Accounting/coa\n"
+               . "- General ledger:         $base_url/Accounting/gl\n"
+               . "- Consignment settlement posts GL: DR AR + Commission / CR Sales Revenue\n"
+               . "- For consignment management go to: $base_url/Inventory/consignment\n";
     } elsif ($page_path =~ m{/ency}i) {
         $hint .= "Navigation context — Encyclopedia:\n"
                 . "- Search for information: $base_url/ency/search?q=TERM\n";
@@ -8535,6 +8580,13 @@ account categories:
 - Customer sales list:        /Inventory/sales
 - Suppliers list:             /Inventory/suppliers
 - Add supplier:               /Inventory/supplier/add
+- Consignment list:           /Inventory/consignment
+- New consignment form:       /Inventory/consignment/new
+- View consignment:           /Inventory/consignment/view/<id>
+- Settle consignment:         /Inventory/consignment/settle/<id>  (POST from view page)
+- Delete consignment:         /Inventory/consignment/delete/<id>
+- Consignment partners:       /Inventory/consignment/partners
+- Consignment docs:           /Documentation/Inventory/consignment
 - AI usage cost allocation:   /Accounting/ai_usage
 - Accounting docs overview:   /Documentation/Accounting
 - COA documentation:          /Documentation/Accounting/coa
@@ -8571,6 +8623,40 @@ Debit increases Assets and Expenses; Credit increases Liabilities, Equity, Incom
 - expense_accno   → Expense/COGS (5000 COGS) — debited on supplier invoice purchase
 - returns_accno   → Contra-income (4100 Sales Returns) — debited on customer returns
 Warning: system does not enforce correct account type — admin must choose correctly.
+
+## CONSIGNMENT WORKFLOW
+
+Consignment means sending your items to a partner store who sells them on your behalf.
+The partner keeps a commission percentage; you receive the remainder. You retain ownership until sold or returned.
+
+### Step 1 — Set up a consignment partner (one-time per partner)
+Go to /Inventory/consignment/partners or click "Consignment partners" in the Inventory nav.
+Fill in: Partner Name, Address, Commission % (e.g. 30 for Monashee Coop), Contact info.
+Current partners for 3D: Monashee Arts Council (Vernon St, Lumby), Monashee Coop (30% commission).
+
+### Step 2 — Create a new consignment batch
+Go to /Inventory/consignment/new or click "New consignment" in the Inventory nav.
+Form fields:
+- Partner (required) — select from your partner list; shows commission % automatically
+- Date Sent (required) — defaults to today
+- Reference # — optional internal reference
+- Notes — any notes about the batch
+- Line items: select Item, enter Quantity Sent, set Retail Price per unit
+  - Click "Add Item" to add more rows; use the × button to remove a row
+  - Items must already exist in /Inventory/items before they can be consigned
+On save: stock is reduced by the consigned quantity (transaction_type = consignment_out).
+You are redirected to the consignment list at /Inventory/consignment.
+
+### Step 3 — View and print a consignment
+Click any consignment in the list at /Inventory/consignment to open /Inventory/consignment/view/<id>.
+The view page shows all lines, partner, dates, and a Print Slip button for a physical record.
+
+### Step 4 — Settle a consignment (when partner pays you)
+From the view page (/Inventory/consignment/view/<id>), enter qty sold and qty returned for each line, then click Settle.
+The system calculates: gross revenue, commission deducted, net revenue to you.
+Stock is reduced further by qty_sold (transaction_type = consignment_sold) and returned qty goes back to stock.
+If "Post GL entry" is checked on the settlement form, a journal entry posts automatically:
+  DR 1100 AR (net revenue) + DR 5600 Commission / CR 4000 Sales Revenue (gross)
 
 ### Automatic GL Posting
 - Supplier invoice saved → DR expense/inventory accounts + DR tax + DR shipping; CR AP (fully automatic)

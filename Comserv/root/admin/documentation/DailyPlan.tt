@@ -596,6 +596,9 @@
             { name => 'developer-time-logging-points-ba-542a', port => 4022, label => 'DevTimeLogging',       url => '/Documentation/DailyPlan' },
         ] %]
 
+        [%# workstation.local gets full table; other domains get dropdown only %]
+        [% SET is_workstation = (host.match('^workstation') || host == 'localhost') ? 1 : 0 %]
+
         <details style="margin-bottom:14px;border:1px solid #fd7e14;border-radius:6px;font-size:0.85em;">
             <summary style="padding:8px 14px;cursor:pointer;background:color-mix(in srgb,#fd7e14 10%,var(--bg-color));border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
                 <span style="font-weight:bold;color:#fd7e14;">🌿 Branch Servers
@@ -607,13 +610,16 @@
             </summary>
             <div style="padding:10px 14px;">
 
-                [%# Quick-open dropdown %]
+                [%# Quick-open dropdown — shown on ALL hosts %]
+                [%# On workstation.local: opens branch on workstation using the branch port %]
+                [%# On other hosts: opens branch on workstation.local (dev machine) using branch port %]
+                [% SET open_host = is_workstation ? host : 'workstation.local' %]
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
                     <label for="bs-select" style="font-weight:bold;color:#fd7e14;white-space:nowrap;">Open branch:</label>
                     <select id="bs-select" style="flex:1;min-width:180px;padding:4px 8px;border:1px solid #fd7e14;border-radius:4px;font-family:monospace;font-size:0.9em;">
                         <option value="">— select a branch —</option>
                         [% FOREACH b IN all_branches %]
-                        <option value="[% scheme %]://[% host %]:[% b.port %][% b.url %]"
+                        <option value="[% scheme %]://[% open_host %]:[% b.port %][% b.url %]"
                             [% IF b.name == cur_branch %]selected[% END %]>
                             [% b.label %] :[% b.port %][% IF b.name == cur_branch %] ←[% END %]
                         </option>
@@ -625,7 +631,8 @@
                     </button>
                 </div>
 
-                [%# Current branch highlight %]
+                [%# Full branch table — workstation.local only %]
+                [% IF is_workstation %]
                 [% IF cur_branch && cur_branch != 'main' %]
                 [% SET cur_port = bp.$cur_branch || '????' %]
                 <div style="margin-bottom:10px;padding:6px 10px;background:color-mix(in srgb,#fd7e14 8%,var(--bg-color));border-radius:4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -636,8 +643,6 @@
                        style="padding:3px 10px;background:#fd7e14;color:#fff;border-radius:3px;text-decoration:none;">Open →</a>
                 </div>
                 [% END %]
-
-                [%# All branch servers table %]
                 <table style="width:100%;border-collapse:collapse;font-size:0.88em;">
                     <tr style="border-bottom:1px solid var(--border-color);">
                         <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Branch</th>
@@ -657,6 +662,7 @@
                     </tr>
                     [% END %]
                 </table>
+                [% END %]
             </div>
         </details>
         [% END %]
