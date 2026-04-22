@@ -132,7 +132,7 @@ Complete gap analysis documented in `spec.md` (Hive Inspection Feature section).
 - Update `apiary_schema.sql` to rename `frames` table to `hive_frames` (for consistency with HiveFrame.pm)
 - Run verification: `perl -cw Comserv/script/comserv_server.pl`
 
-### [ ] Step: Hive Inspection — Controller Actions
+### [x] Step: Hive Inspection — Controller Actions
 Implement all missing inspection CRUD actions in `Apiary.pm`:
 - `inspections` GET: list inspections for user's hives (with hive/date filter)
 - `inspections_new` GET: render `new_inspection.tt` (prefill hive from param)
