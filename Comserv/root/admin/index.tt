@@ -493,24 +493,78 @@
             <h3><i class="fas fa-chart-bar"></i> System Statistics</h3>
         </div>
         <div class="stats-grid">
-            <div class="stat-item">
-                <div class="stat-value">[% stats.user_count || 0 %]</div>
-                <div class="stat-label">Users</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value">[% stats.content_count || 0 %]</div>
-                <div class="stat-label">Content Items</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value">[% stats.disk_usage || 'Unknown' %]</div>
-                <div class="stat-label">Disk Usage</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value">[% stats.uptime || 'Unknown' %]</div>
+
+            [%# ── Users ── %]
+            <a href="[% c.uri_for('/admin/users') %]" class="stat-item stat-item-link"
+               title="[% stats.active_user_count %] active of [% stats.user_count %] total — click to manage users">
+                <div class="stat-value">[% stats.active_user_count || 0 %]
+                    <span class="stat-sub">/ [% stats.user_count || 0 %]</span>
+                </div>
+                <div class="stat-label">Active / Total Users</div>
+            </a>
+
+            [%# ── NFS Files ── %]
+            <a href="[% c.uri_for('/file/list') %]" class="stat-item stat-item-link"
+               title="Active files in the database — click to manage">
+                <div class="stat-value">[% stats.file_count || 0 %]</div>
+                <div class="stat-label">Files in Database</div>
+            </a>
+
+            [%# ── Local Disk Usage ── %]
+            <a href="[% c.uri_for('/admin/hardware_monitor/disk_health') %]" class="stat-item stat-item-link"
+               title="[% stats.disk_used %] used of [% stats.disk_total %] — click to manage disk space">
+                [% SET dlevel = stats.disk_level || 'ok' %]
+                <div class="stat-value stat-disk-[% dlevel %]">
+                    [% stats.disk_usage || 'Unknown' %]
+                </div>
+                [% IF stats.disk_pct > 0 %]
+                <div class="stat-bar-wrap">
+                    <div class="stat-bar stat-bar-[% dlevel %]" style="width:[% stats.disk_pct %]%"></div>
+                </div>
+                <div class="stat-sub-detail">[% stats.disk_used %] / [% stats.disk_total %]</div>
+                [% END %]
+                <div class="stat-label">App Server Disk</div>
+            </a>
+
+            [%# ── NFS Disk Usage ── %]
+            <a href="[% c.uri_for('/admin/hardware_monitor/disk_health') %]" class="stat-item stat-item-link"
+               title="NFS storage: [% stats.nfs_used %] used of [% stats.nfs_total %] — click to manage">
+                [% SET nlevel = stats.nfs_level || 'ok' %]
+                [% IF stats.nfs_pct > 0 %]
+                <div class="stat-value stat-disk-[% nlevel %]">[% stats.nfs_pct %]%</div>
+                <div class="stat-bar-wrap">
+                    <div class="stat-bar stat-bar-[% nlevel %]" style="width:[% stats.nfs_pct %]%"></div>
+                </div>
+                <div class="stat-sub-detail">[% stats.nfs_used %] / [% stats.nfs_total %]</div>
+                [% ELSE %]
+                <div class="stat-value">—</div>
+                [% END %]
+                <div class="stat-label">NFS Storage</div>
+            </a>
+
+            [%# ── Uptime ── %]
+            <a href="[% c.uri_for('/admin/hardware_monitor') %]" class="stat-item stat-item-link"
+               title="Click to view hardware monitor">
+                <div class="stat-value" style="font-size:1rem">[% stats.uptime || 'Unknown' %]</div>
                 <div class="stat-label">System Uptime</div>
-            </div>
+            </a>
+
         </div>
     </div>
+    <style>
+    .stat-item-link { text-decoration:none; color:inherit; display:block; transition:box-shadow .15s, border-color .15s; }
+    .stat-item-link:hover { box-shadow:0 0 0 2px var(--primary-color,#1976d2); border-color:var(--primary-color,#1976d2); }
+    .stat-sub { font-size:.55em; color:#888; font-weight:normal; }
+    .stat-sub-detail { font-size:.75rem; color:#888; margin-top:2px; }
+    .stat-bar-wrap { height:8px; background:#e0e0e0; border-radius:4px; margin:4px 0 2px; overflow:hidden; }
+    .stat-bar { height:8px; border-radius:4px; }
+    .stat-bar-ok       { background:#4caf50; }
+    .stat-bar-warn     { background:#ff9800; }
+    .stat-bar-critical { background:#f44336; }
+    .stat-disk-ok       { color:inherit; }
+    .stat-disk-warn     { color:#e65100; }
+    .stat-disk-critical { color:#b71c1c; }
+    </style>
     [% END %]
 </div>
 
