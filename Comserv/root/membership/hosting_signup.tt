@@ -76,23 +76,26 @@
         <div class="content-section">
           <h2>Domain Setup</h2>
 
+          [% SET saved_domain_type = hosting_account.domain_type || 'subdomain' %]
           <div class="form-row">
             <div class="form-field">
               <label for="domain_type">Domain Type</label>
               <select name="domain_type" id="domain_type" onchange="toggleDomainFields(this.value)">
-                <option value="subdomain">Subdomain on a CSC partner domain (e.g. you.forager.com)</option>
-                <option value="custom">Custom domain (bring your own)</option>
-                <option value="subpath">CSC sub-path (e.g. csc.ca/yoursite)</option>
+                <option value="subdomain" [% IF saved_domain_type == 'subdomain' %]selected[% END %]>Subdomain on a CSC partner domain (e.g. you.forager.com)</option>
+                <option value="custom"    [% IF saved_domain_type == 'custom'    %]selected[% END %]>Custom domain (bring your own)</option>
+                <option value="subpath"   [% IF saved_domain_type == 'subpath'   %]selected[% END %]>CSC sub-path (e.g. csc.ca/yoursite)</option>
               </select>
             </div>
           </div>
 
+          [% SET saved_parent = hosting_account.parent_domain || '' %]
           <div class="form-row" id="row_parent_domain">
             <div class="form-field">
               <label for="parent_domain">Parent Domain <span style="color:#888;font-size:0.85em;">(the domain your subdomain will live under)</span></label>
               <select name="parent_domain" id="parent_domain">
                 [% FOREACH d IN domains %]
-                <option value="[% d.domain | html %]">[% d.domain | html %]</option>
+                <option value="[% d.domain | html %]"
+                  [% IF saved_parent == d.domain %]selected[% END %]>[% d.domain | html %]</option>
                 [% END %]
                 <option value="">— or type below —</option>
               </select>
@@ -175,5 +178,5 @@ function toggleDomainFields(type) {
         labelDomain.textContent = 'Desired Sub-path (e.g. beemaster)';
     }
 }
-toggleDomainFields('subdomain');
+toggleDomainFields('[% hosting_account.domain_type || 'subdomain' %]');
 </script>
