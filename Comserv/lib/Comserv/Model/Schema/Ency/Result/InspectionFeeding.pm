@@ -13,42 +13,27 @@ __PACKAGE__->add_columns(
         is_nullable => 0,
         comment     => 'FK → inspections',
     },
-    feed_type => {
-        data_type => 'enum',
-        extra     => {
-            list => [qw/
-                sugar_syrup
-                fondant
-                candy_board
-                pollen_substitute
-                protein_patty
-                dry_sugar
-                honey
-                other
-            /]
-        },
-        is_nullable => 0,
-        comment => 'Type of feed provided',
+    inventory_item_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+        comment     => 'FK → inventory_items — the feed product used (e.g. Sugar Syrup 1:1, Pollen Patty)',
     },
     feed_amount => {
         data_type   => 'varchar',
         size        => 50,
         is_nullable => 1,
-        comment     => 'Quantity of feed (e.g. 1L, 500g, 1kg)',
+        comment     => 'Quantity of feed provided (e.g. 1L, 500g, 1kg)',
     },
-    feeder_type => {
-        data_type => 'enum',
-        extra     => {
-            list => [qw/top_feeder boardman entrance hive_top pail frame_feeder open_feeding/]
-        },
+    feeder_inventory_item_id => {
+        data_type   => 'integer',
         is_nullable => 1,
-        comment => 'Type of feeder used',
+        comment     => 'FK → inventory_items — the feeder equipment used (e.g. Top Feeder, Boardman Feeder)',
     },
     concentration => {
         data_type   => 'varchar',
         size        => 20,
         is_nullable => 1,
-        comment     => 'Syrup concentration (e.g. 1:1, 2:1)',
+        comment     => 'Syrup concentration if applicable (e.g. 1:1, 2:1)',
     },
     notes => {
         data_type   => 'text',
@@ -71,6 +56,20 @@ __PACKAGE__->belongs_to(
     { is_deferrable => 1, on_delete => 'CASCADE' }
 );
 
+__PACKAGE__->belongs_to(
+    'inventory_item',
+    'Comserv::Model::Schema::Ency::Result::InventoryItem',
+    'inventory_item_id',
+    { is_deferrable => 1, on_delete => 'SET NULL', join_type => 'LEFT' }
+);
+
+__PACKAGE__->belongs_to(
+    'feeder_inventory_item',
+    'Comserv::Model::Schema::Ency::Result::InventoryItem',
+    'feeder_inventory_item_id',
+    { is_deferrable => 1, on_delete => 'SET NULL', join_type => 'LEFT' }
+);
+
 1;
 
 =head1 NAME
@@ -79,9 +78,12 @@ Comserv::Model::Schema::Ency::Result::InspectionFeeding - Feeding records per in
 
 =head1 DESCRIPTION
 
-Records feeding activities performed during a hive inspection. Multiple feed
-types can be recorded per inspection (e.g. syrup top-up and pollen substitute
-placed at the same visit).
+Records feeding activities performed during a hive inspection. Multiple feedings
+can be recorded per inspection (e.g. syrup top-up and pollen substitute placed
+at the same visit).
+
+Feed products and feeder equipment are referenced from the inventory system via
+inventory_item_id and feeder_inventory_item_id respectively — no local enums.
 
 DB table: inspection_feedings (new — created via /admin/schema_comparison)
 
@@ -90,6 +92,10 @@ DB table: inspection_feedings (new — created via /admin/schema_comparison)
 =over 4
 
 =item * inspection — the inspection during which feeding occurred
+
+=item * inventory_item — the feed product from inventory (e.g. Sugar Syrup 1:1, Pollen Patty)
+
+=item * feeder_inventory_item — the feeder equipment from inventory (e.g. Top Feeder, Boardman)
 
 =back
 
