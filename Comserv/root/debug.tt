@@ -1,68 +1,82 @@
-[% META title = 'Projects Documentation' %]
-[% PageVersion = 'Documentation/Projects.tt,v 0.01 2024/05/28 Shanta Exp shanta ' %]Debug Information
+[% META title = 'Debug Information' %]
+[% PageVersion = 'debug.tt,v 0.02 2026/04/22 shanta Exp shanta' %]
+[% USE Dumper %]
 
-
-Debug Errors
+<div class="debug-panel" style="background:#fffde7;border:1px solid #f9a825;padding:1rem;margin:0.5rem 0;font-size:0.85rem;">
+<h3 style="margin:0 0 0.5rem;">&#128027; Debug Information</h3>
 
 [% IF c.stash.debug_errors && c.stash.debug_errors.size > 0 %]
-    <h2>Debug Errors</h2>
+    <h4>Debug Errors</h4>
     <ul>
-        <!-- Iterate over each error and display it in a list item -->
         [% FOREACH error IN c.stash.debug_errors %]
             <li>[% error | html %]</li>
         [% END %]
     </ul>
-[% ELSE %]
-    <p>No debug errors.</p>
 [% END %]
 
-[% IF c.stash.debug_msg && c.stash.debug_msg.size > 0 %]
-    <h2>Debug Messages</h2>
+[% IF c.stash.debug_msg %]
+    [% SET msgs = ref(c.stash.debug_msg) == 'ARRAY' ? c.stash.debug_msg : [c.stash.debug_msg] %]
+    [% IF msgs.size > 0 %]
+    <h4>Debug Messages</h4>
     <ul>
-        <!-- Iterate over each debug message and display it in a list item -->
-        [% FOREACH msg IN c.stash.debug_msg %]
+        [% FOREACH msg IN msgs %]
             <li>[% msg | html %]</li>
         [% END %]
     </ul>
-[% ELSE %]
-    <p>No debug messages.</p>
+    [% END %]
 [% END %]
+
 [% IF debug_info %]
-<div style="background-color: #f8f9fa; padding: 15px; margin-bottom: 20px; border: 1px solid #ddd;">
-    <h3>Debug Information</h3>
-    <p><strong>User Exists:</strong> [% debug_info.user_exists %]</p>
-    <p><strong>Session ID:</strong> [% debug_info.session_id %]</p>
-    <p><strong>Roles:</strong> [% IF debug_info.roles %][% debug_info.roles.join(', ') %][% ELSE %]None[% END %]</p>
+<div style="margin:0.5rem 0;">
+    <strong>User Exists:</strong> [% debug_info.user_exists %]<br>
+    <strong>Session ID:</strong> [% debug_info.session_id %]<br>
+    <strong>Roles:</strong> [% IF debug_info.roles %][% debug_info.roles.join(', ') %][% ELSE %]None[% END %]
     <h4>Session Data:</h4>
-    <pre>[% USE Dumper; Dumper.dump(debug_info.session_data) %]</pre>
+    <pre style="overflow:auto;max-height:200px;">[% TRY %][% Dumper.dump(debug_info.session_data) | html %][% CATCH %](error dumping)[% END %]</pre>
 </div>
 [% END %]
-<h2>Stash Information</h2>
+
+<h4>Stash Keys</h4>
 <ul>
-    <!-- Iterate over each key in the stash and display its value -->
     [% FOREACH key IN c.stash.keys.sort %]
-        <li>
-            <strong>[% key %]:</strong>
-            [% IF ref(c.stash.$key) == 'ARRAY' %]
-                [% Dumper(c.stash.$key) | html %]
-            [% ELSE %]
-                [% c.stash.$key | html %]
-            [% END %]
+    [% TRY %]
+    [% SET val = c.stash.$key %]
+    [% SET r = ref(val) %]
+        <li><strong>[% key | html %]:</strong>
+        [% IF r == 'ARRAY' %]
+            <em>[Array, [% val.size %] item(s)]</em>
+        [% ELSIF r == 'HASH' %]
+            <em>[Hash, [% val.keys.size %] key(s)]</em>
+        [% ELSIF r %]
+            <em>[[% r | html %] object]</em>
+        [% ELSE %]
+            [% val | html %]
+        [% END %]
         </li>
+    [% CATCH %]
+        <li><strong>[% key | html %]:</strong> <em>(error reading value)</em></li>
+    [% END %]
     [% END %]
 </ul>
 
-<h2>Session Information</h2>
+<h4>Session Keys</h4>
 <ul>
-    <!-- Iterate over each key in the session and display its value -->
     [% FOREACH key IN c.session.keys.sort %]
-        <li>
-            <strong>[% key %]:</strong>
-            [% IF ref(c.session.$key) == 'ARRAY' %]
-                [% Dumper(c.session.$key) | html %]
-            [% ELSE %]
-                [% c.session.$key | html %]
-            [% END %]
+    [% TRY %]
+    [% SET val = c.session.$key %]
+    [% SET r = ref(val) %]
+        <li><strong>[% key | html %]:</strong>
+        [% IF r == 'ARRAY' %]
+            [% val.join(', ') | html %]
+        [% ELSIF r %]
+            <em>[[% r | html %] object]</em>
+        [% ELSE %]
+            [% val | html %]
+        [% END %]
         </li>
+    [% CATCH %]
+        <li><strong>[% key | html %]:</strong> <em>(error reading value)</em></li>
+    [% END %]
     [% END %]
 </ul>
+</div>

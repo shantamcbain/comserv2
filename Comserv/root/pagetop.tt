@@ -363,6 +363,7 @@ document.addEventListener('DOMContentLoaded', function() {
         [% INCLUDE 'Navigation/TopDropListPlanning.tt' %]
         [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
         [% INCLUDE 'Navigation/TopDropListWorkshop.tt' %]
+        [% INCLUDE 'Navigation/TopDropListBeekeeping.tt' %]
         </ul>
     </nav>
 

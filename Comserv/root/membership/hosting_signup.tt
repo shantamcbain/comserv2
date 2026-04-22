@@ -124,6 +124,7 @@
           <h2>Feature Add-ons</h2>
           <p style="color:#666;font-size:0.9rem;">Select any features you want enabled for your hosted site. CSC will confirm availability and pricing.</p>
           [% SET current_addons = hosting_account.requested_addons || '' %]
+          [% SET saved_addons = current_addons ? current_addons.split(',') : [] %]
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.75rem;">
             [% FOREACH addon IN [
                 { key = 'beekeeping',  label = '🐝 Beekeeping / Apiary',    hint = 'Hive management, inspections, honey tracking' },
@@ -138,7 +139,7 @@
             ] %]
             <label style="display:flex;gap:0.5rem;align-items:flex-start;border:1px solid #ddd;border-radius:6px;padding:0.75rem;cursor:pointer;background:#fafafa;">
               <input type="checkbox" name="addon_[% addon.key %]" value="1"
-                [% IF current_addons.search(addon.key) %]checked[% END %]
+                [% IF saved_addons.grep('^' _ addon.key _ '$').size %]checked[% END %]
                 style="margin-top:0.2rem;flex-shrink:0;">
               <div>
                 <strong>[% addon.label %]</strong><br>
