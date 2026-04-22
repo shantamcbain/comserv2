@@ -1,16 +1,23 @@
 [% META
-   title = "Register with CSC Hosting"
+   title = hosting_account ? "Edit CSC Hosting Registration" : "Register with CSC Hosting"
    TemplateType = "Application"
 %]
+[% SET is_edit = hosting_account ? 1 : 0 %]
 
 [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
 [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
 
 <div class="app-container">
   <div class="page-header">
+    [% IF is_edit %]
+    <h1>&#9998; Edit CSC Hosting Registration — [% site_name | html %]</h1>
+    <p>Update your hosting registration details for <strong>[% site_name | html %]</strong>.
+    Changes to add-ons or plan will be reviewed by CSC before taking effect.</p>
+    [% ELSE %]
     <h1>&#127760; Register [% site_name | html %] with CSC Hosting</h1>
     <p>Complete this form to register <strong>[% site_name | html %]</strong> as a CSC hosting partner.
     Once approved, your members will be able to purchase hosting plans directly from this site.</p>
+    [% END %]
   </div>
 
   <div class="content-container">
@@ -153,7 +160,11 @@
         </div>
 
         <div class="form-actions">
+          [% IF is_edit %]
+          <button type="submit" class="btn btn-primary">&#9998; Update Registration</button>
+          [% ELSE %]
           <button type="submit" class="btn btn-primary">Submit Registration →</button>
+          [% END %]
           <a href="[% c.uri_for('/membership') %]" class="btn btn-secondary">Cancel</a>
         </div>
 
