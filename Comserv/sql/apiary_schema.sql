@@ -55,8 +55,8 @@ CREATE TABLE IF NOT EXISTS boxes (
     INDEX idx_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Frames table - Individual frames within boxes
-CREATE TABLE IF NOT EXISTS frames (
+-- hive_frames table - Individual frames within boxes (renamed from 'frames')
+CREATE TABLE IF NOT EXISTS hive_frames (
     id INT AUTO_INCREMENT PRIMARY KEY,
     box_id INT NOT NULL,
     frame_position INT NOT NULL COMMENT '1-10 typically',
@@ -64,6 +64,10 @@ CREATE TABLE IF NOT EXISTS frames (
     foundation_type ENUM('wired', 'unwired', 'plastic', 'natural') DEFAULT 'wired',
     comb_condition ENUM('new', 'good', 'fair', 'poor', 'damaged') DEFAULT 'new',
     status ENUM('active', 'removed', 'stored') DEFAULT 'active',
+    frame_size ENUM('deep', 'dadant', 'medium', 'shallow') NULL COMMENT 'Physical size of the frame',
+    frame_code VARCHAR(50) NULL COMMENT 'Unique tracking code or label for this physical frame',
+    has_foundation TINYINT NOT NULL DEFAULT 0 COMMENT 'Whether foundation is installed in this frame',
+    inventory_item_id INT NULL COMMENT 'FK → inventory_items — defines frame type and BOM',
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -71,9 +75,11 @@ CREATE TABLE IF NOT EXISTS frames (
     updated_by VARCHAR(50),
     
     FOREIGN KEY (box_id) REFERENCES boxes(id) ON DELETE CASCADE,
+    FOREIGN KEY (inventory_item_id) REFERENCES inventory_items(id) ON DELETE SET NULL,
     UNIQUE KEY unique_box_position (box_id, frame_position),
     INDEX idx_frame_type (frame_type),
-    INDEX idx_status (status)
+    INDEX idx_status (status),
+    INDEX idx_frame_code (frame_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================
@@ -90,7 +96,7 @@ CREATE TABLE IF NOT EXISTS inspections (
     weather_conditions VARCHAR(100),
     temperature DECIMAL(5,2),
     inspector VARCHAR(50) NOT NULL,
-    inspection_type ENUM('routine', 'disease_check', 'harvest', 'treatment', 'emergency') DEFAULT 'routine',
+    inspection_type ENUM('routine', 'disease_check', 'harvest', 'treatment', 'emergency', 'queen_check') DEFAULT 'routine',
     overall_status ENUM('excellent', 'good', 'fair', 'poor', 'critical') DEFAULT 'good',
     queen_seen BOOLEAN DEFAULT FALSE,
     queen_marked BOOLEAN DEFAULT FALSE,
@@ -105,10 +111,17 @@ CREATE TABLE IF NOT EXISTS inspections (
     general_notes TEXT,
     action_required TEXT,
     next_inspection_date DATE,
+    queen_id INT NULL COMMENT 'FK → queens — queen confirmed present during this inspection',
+    feeding_done BOOLEAN DEFAULT FALSE COMMENT 'Whether feeding was performed during this inspection',
+    feed_type VARCHAR(50) NULL COMMENT 'Type of feed provided',
+    feed_amount VARCHAR(50) NULL COMMENT 'Amount of feed provided',
+    boosted_from_hive INT NULL COMMENT 'FK → hives — hive from which frames/bees were donated',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
     FOREIGN KEY (hive_id) REFERENCES hives(id) ON DELETE CASCADE,
+    FOREIGN KEY (queen_id) REFERENCES queens(id) ON DELETE SET NULL,
+    FOREIGN KEY (boosted_from_hive) REFERENCES hives(id) ON DELETE SET NULL,
     INDEX idx_inspection_date (inspection_date),
     INDEX idx_inspector (inspector),
     INDEX idx_inspection_type (inspection_type),
@@ -144,13 +157,15 @@ CREATE TABLE IF NOT EXISTS inspection_details (
     comb_removed BOOLEAN DEFAULT FALSE,
     honey_harvested BOOLEAN DEFAULT FALSE,
     treatment_applied VARCHAR(100),
+    treatment_id INT NULL COMMENT 'FK → treatments — structured treatment record applied during this inspection',
     
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     FOREIGN KEY (inspection_id) REFERENCES inspections(id) ON DELETE CASCADE,
     FOREIGN KEY (box_id) REFERENCES boxes(id) ON DELETE SET NULL,
-    FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE SET NULL,
+    FOREIGN KEY (frame_id) REFERENCES hive_frames(id) ON DELETE SET NULL,
+    FOREIGN KEY (treatment_id) REFERENCES treatments(id) ON DELETE SET NULL,
     INDEX idx_detail_type (detail_type),
     INDEX idx_brood_pattern (brood_pattern),
     INDEX idx_comb_condition (comb_condition)
@@ -185,7 +200,7 @@ CREATE TABLE IF NOT EXISTS hive_movements (
     
     FOREIGN KEY (source_hive_id) REFERENCES hives(id) ON DELETE SET NULL,
     FOREIGN KEY (source_box_id) REFERENCES boxes(id) ON DELETE SET NULL,
-    FOREIGN KEY (source_frame_id) REFERENCES frames(id) ON DELETE SET NULL,
+    FOREIGN KEY (source_frame_id) REFERENCES hive_frames(id) ON DELETE SET NULL,
     FOREIGN KEY (destination_hive_id) REFERENCES hives(id) ON DELETE SET NULL,
     FOREIGN KEY (destination_box_id) REFERENCES boxes(id) ON DELETE SET NULL,
     INDEX idx_movement_date (movement_date),
@@ -212,7 +227,7 @@ CREATE TABLE IF NOT EXISTS honey_harvests (
     
     FOREIGN KEY (hive_id) REFERENCES hives(id) ON DELETE CASCADE,
     FOREIGN KEY (box_id) REFERENCES boxes(id) ON DELETE SET NULL,
-    FOREIGN KEY (frame_id) REFERENCES frames(id) ON DELETE SET NULL,
+    FOREIGN KEY (frame_id) REFERENCES hive_frames(id) ON DELETE SET NULL,
     INDEX idx_harvest_date (harvest_date),
     INDEX idx_honey_type (honey_type),
     INDEX idx_harvested_by (harvested_by)
@@ -308,7 +323,7 @@ FROM hives h
 LEFT JOIN yards y ON h.yard_id = y.id
 LEFT JOIN sites s ON y.site_id = s.id
 LEFT JOIN boxes b ON h.id = b.hive_id AND b.status = 'active'
-LEFT JOIN frames f ON b.id = f.box_id AND f.status = 'active'
+LEFT JOIN hive_frames f ON b.id = f.box_id AND f.status = 'active'
 LEFT JOIN inspections i ON h.id = i.hive_id
 WHERE h.status IN ('active', 'inactive')
 GROUP BY h.id, h.hive_number, h.pallet_code, h.queen_code, h.status, h.owner, h.sitename, y.name, s.name, h.created_at, h.updated_at;
@@ -353,8 +368,138 @@ CREATE INDEX idx_movements_date_type ON hive_movements(movement_date, movement_t
 -- Set initial auto-increment values to avoid conflicts
 ALTER TABLE hives AUTO_INCREMENT = 1000;
 ALTER TABLE boxes AUTO_INCREMENT = 1000;
-ALTER TABLE frames AUTO_INCREMENT = 1000;
+ALTER TABLE hive_frames AUTO_INCREMENT = 1000;
 ALTER TABLE inspections AUTO_INCREMENT = 1000;
 ALTER TABLE inspection_details AUTO_INCREMENT = 1000;
+
+-- ============================================================================
+-- ALTER STATEMENTS — Schema updates applied after initial creation
+-- ============================================================================
+
+-- hives: add configuration_id FK
+ALTER TABLE hives
+    ADD COLUMN configuration_id INT NULL COMMENT 'FK → hive_configurations — current active configuration for this hive',
+    ADD CONSTRAINT fk_hives_configuration FOREIGN KEY (configuration_id) REFERENCES hive_configurations(id) ON DELETE SET NULL;
+
+-- inspections: inspection_type enum extended (apply via admin/schema_comparison)
+-- ALTER TABLE inspections MODIFY COLUMN inspection_type ENUM('routine','disease_check','harvest','treatment','emergency','queen_check') DEFAULT 'routine';
+
+-- inspections: queen_id and feeding columns (included in CREATE TABLE above for new installs)
+
+-- inspection_details: treatment_id FK (included in CREATE TABLE above for new installs)
+
+-- hive_frames: frame_size and frame_code (included in CREATE TABLE above for new installs)
+
+-- ============================================================================
+-- NEW TABLES — Added as part of hive inspection schema expansion
+-- ============================================================================
+
+-- frame_movements table - Track individual frame movements
+CREATE TABLE IF NOT EXISTS frame_movements (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    frame_id INT NOT NULL COMMENT 'FK → hive_frames',
+    movement_date DATE NOT NULL,
+    from_box_id INT NULL COMMENT 'FK → boxes — source box',
+    to_box_id INT NULL COMMENT 'FK → boxes — destination box',
+    from_position INT NULL,
+    to_position INT NULL,
+    reason VARCHAR(200) NULL,
+    moved_by VARCHAR(50) NOT NULL,
+    inspection_id INT NULL COMMENT 'FK → inspections — inspection context',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (frame_id) REFERENCES hive_frames(id) ON DELETE CASCADE,
+    FOREIGN KEY (from_box_id) REFERENCES boxes(id) ON DELETE SET NULL,
+    FOREIGN KEY (to_box_id) REFERENCES boxes(id) ON DELETE SET NULL,
+    FOREIGN KEY (inspection_id) REFERENCES inspections(id) ON DELETE SET NULL,
+    INDEX idx_frame_id (frame_id),
+    INDEX idx_movement_date (movement_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- inspection_feedings table - Detailed feeding records per inspection
+CREATE TABLE IF NOT EXISTS inspection_feedings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    inspection_id INT NOT NULL COMMENT 'FK → inspections',
+    feed_type ENUM('sugar_syrup','fondant','candy_board','pollen_substitute','protein_patty','dry_sugar','honey','other') NOT NULL,
+    feed_amount VARCHAR(50) NULL COMMENT 'Quantity of feed (e.g. 1L, 500g)',
+    feeder_type ENUM('top_feeder','boardman','entrance','hive_top','pail','frame_feeder','open_feeding') NULL,
+    concentration VARCHAR(20) NULL COMMENT 'Syrup concentration (e.g. 1:1, 2:1)',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (inspection_id) REFERENCES inspections(id) ON DELETE CASCADE,
+    INDEX idx_inspection_id (inspection_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- configuration_boxes table - Per-box specifications within a hive configuration
+CREATE TABLE IF NOT EXISTS configuration_boxes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    configuration_id INT NOT NULL COMMENT 'FK → hive_configurations',
+    box_position INT NOT NULL COMMENT '1=bottom, ascending toward top',
+    box_type ENUM('brood','super','honey','deep','medium','shallow') DEFAULT 'brood',
+    box_size ENUM('deep','medium','shallow') DEFAULT 'deep',
+    frame_count INT DEFAULT 10,
+    purpose ENUM('brood_nest','honey_storage','pollen_storage','feeder','split','other') NULL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (configuration_id) REFERENCES hive_configurations(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_config_position (configuration_id, box_position)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- configuration_inventory table - Bill of materials for a hive configuration
+CREATE TABLE IF NOT EXISTS configuration_inventory (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    configuration_id INT NOT NULL COMMENT 'FK → hive_configurations',
+    inventory_item_id INT NOT NULL COMMENT 'FK → inventory_items',
+    quantity INT DEFAULT 1,
+    is_optional BOOLEAN DEFAULT FALSE,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (configuration_id) REFERENCES hive_configurations(id) ON DELETE CASCADE,
+    FOREIGN KEY (inventory_item_id) REFERENCES inventory_items(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_config_item (configuration_id, inventory_item_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- hive_configuration_history table - History of configuration changes per hive
+CREATE TABLE IF NOT EXISTS hive_configuration_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    hive_configuration_id INT NOT NULL COMMENT 'FK → hive_configurations',
+    hive_id INT NOT NULL COMMENT 'FK → hives',
+    applied_date DATE NOT NULL,
+    removed_date DATE NULL COMMENT 'NULL = currently active',
+    applied_by VARCHAR(50) NULL,
+    change_reason VARCHAR(200) NULL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (hive_configuration_id) REFERENCES hive_configurations(id) ON DELETE CASCADE,
+    FOREIGN KEY (hive_id) REFERENCES hives(id) ON DELETE CASCADE,
+    INDEX idx_hive_id (hive_id),
+    INDEX idx_applied_date (applied_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- hive_assemblies table - Physical assemblies built from configurations
+CREATE TABLE IF NOT EXISTS hive_assemblies (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    configuration_id INT NOT NULL COMMENT 'FK → hive_configurations',
+    hive_id INT NULL COMMENT 'FK → hives — NULL until deployed',
+    assembly_date DATE NOT NULL,
+    assembled_by VARCHAR(50) NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    decommission_date DATE NULL,
+    decommission_reason VARCHAR(200) NULL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_by VARCHAR(50) NULL,
+
+    FOREIGN KEY (configuration_id) REFERENCES hive_configurations(id) ON DELETE CASCADE,
+    FOREIGN KEY (hive_id) REFERENCES hives(id) ON DELETE SET NULL,
+    INDEX idx_configuration_id (configuration_id),
+    INDEX idx_is_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 COMMIT;

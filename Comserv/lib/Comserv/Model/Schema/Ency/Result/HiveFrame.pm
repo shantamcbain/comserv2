@@ -75,6 +75,20 @@ __PACKAGE__->add_columns(
         default_value => 0,
         comment       => 'Whether foundation is installed in this frame',
     },
+    frame_size => {
+        data_type   => 'enum',
+        extra       => {
+            list => [qw/deep dadant medium shallow/]
+        },
+        is_nullable => 1,
+        comment     => 'Physical size of the frame',
+    },
+    frame_code => {
+        data_type   => 'varchar',
+        size        => 50,
+        is_nullable => 1,
+        comment     => 'Unique tracking code or label for this physical frame',
+    },
 );
 
 __PACKAGE__->set_primary_key('id');
@@ -108,6 +122,13 @@ __PACKAGE__->has_many(
     'honey_harvests',
     'Comserv::Model::Schema::Ency::Result::HoneyHarvest',
     'frame_id'
+);
+
+__PACKAGE__->has_many(
+    'frame_movements',
+    'Comserv::Model::Schema::Ency::Result::FrameMovement',
+    'frame_id',
+    { cascade_delete => 0 }
 );
 
 # Custom methods
