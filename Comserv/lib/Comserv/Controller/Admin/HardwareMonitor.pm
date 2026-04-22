@@ -352,9 +352,18 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
     my $run_cmd = sub {
         my (@cmd) = @_;
         if ($is_local) {
-            open my $fh, '-|', @cmd or return (undef, "Cannot run: $cmd[0]: $!");
-            my @lines = <$fh>;
-            close $fh;
+            require IPC::Open3;
+            my ($in, $out, $err_fh);
+            open $err_fh, '>', '/dev/null';
+            my $pid = eval { IPC::Open3::open3($in, $out, $err_fh, @cmd) };
+            if ($@ || !$pid) {
+                open my $fh, '-|', @cmd or return (undef, "Cannot run: $cmd[0]: $!");
+                my @lines = <$fh>;
+                close $fh;
+                return (\@lines, undef);
+            }
+            my @lines = <$out>;
+            waitpid($pid, 0);
             return (\@lines, undef);
         } else {
             my $ssh_user = $ENV{HW_SSH_USER} // 'root';
