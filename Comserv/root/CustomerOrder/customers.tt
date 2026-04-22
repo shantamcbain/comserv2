@@ -1,0 +1,76 @@
+[% PageVersion = 'CustomerOrder/customers.tt,v 0.01 2026/04/22 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+<div class="content-container">
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em;flex-wrap:wrap;gap:0.5em">
+  <h1 style="font-family:var(--header-font);color:var(--text-color);margin:0">
+    <i class="fas fa-users"></i> Customers — [% sitename | html %]
+  </h1>
+  <div style="display:flex;gap:0.5em">
+    <a href="/CustomerOrder" style="padding:6px 14px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font)">
+      <i class="fas fa-list"></i> Orders
+    </a>
+    <a href="/Cart/orders" style="padding:6px 14px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font)">
+      <i class="fas fa-receipt"></i> Invoices
+    </a>
+    <a href="/admin" style="padding:6px 14px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font)">
+      <i class="fas fa-tachometer-alt"></i> Admin
+    </a>
+  </div>
+</div>
+
+[% IF customers.size %]
+<table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:0.9rem">
+  <thead>
+    <tr style="border-bottom:2px solid var(--border-color);background:var(--secondary-color)">
+      <th style="padding:8px 10px;text-align:left">Name</th>
+      <th style="padding:8px 10px;text-align:left">Email</th>
+      <th style="padding:8px 10px;text-align:left">Phone</th>
+      <th style="padding:8px 10px;text-align:center">Orders</th>
+      <th style="padding:8px 10px;text-align:center">Invoices</th>
+      <th style="padding:8px 10px;text-align:right">Total Spend</th>
+      <th style="padding:8px 10px;text-align:left">Last Activity</th>
+      <th style="padding:8px 10px"></th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH cust IN customers %]
+  <tr style="border-bottom:1px solid var(--border-color)">
+    <td style="padding:7px 10px;font-weight:bold;color:var(--text-color)">[% cust.name | html %]</td>
+    <td style="padding:7px 10px">
+      [% IF cust.email %]<a href="mailto:[% cust.email | html %]" style="color:var(--link-color)">[% cust.email | html %]</a>[% ELSE %]—[% END %]
+    </td>
+    <td style="padding:7px 10px;color:var(--text-muted-color)">[% cust.phone || '—' | html %]</td>
+    <td style="padding:7px 10px;text-align:center">
+      [% IF cust.order_count > 0 %]
+        <span style="background:#e3f2fd;color:#1565c0;border-radius:3px;padding:2px 8px;font-size:0.85em">[% cust.order_count %]</span>
+      [% ELSE %]—[% END %]
+    </td>
+    <td style="padding:7px 10px;text-align:center">
+      [% IF cust.invoice_count > 0 %]
+        <span style="background:#e8f5e9;color:#2e7d32;border-radius:3px;padding:2px 8px;font-size:0.85em">[% cust.invoice_count %]</span>
+      [% ELSE %]—[% END %]
+    </td>
+    <td style="padding:7px 10px;text-align:right;font-weight:bold">
+      [% IF cust.total_spend > 0 %]$[% cust.total_spend | format('%.2f') %][% ELSE %]—[% END %]
+    </td>
+    <td style="padding:7px 10px;color:var(--text-muted-color);font-size:0.85em">[% cust.last_seen %]</td>
+    <td style="padding:7px 10px">
+      [% SET q = cust.email ? ('?email=' _ cust.email) : ('?name=' _ cust.name) %]
+      <a href="/CustomerOrder/customer[% q | html %]"
+         style="padding:4px 10px;background:var(--primary-color);color:#fff;border-radius:4px;text-decoration:none;font-size:0.85em">
+        View
+      </a>
+    </td>
+  </tr>
+  [% END %]
+  </tbody>
+</table>
+[% ELSE %]
+<p style="color:var(--text-muted-color);font-family:var(--body-font)">No customers found yet. Orders and invoices will appear here as they come in.</p>
+[% END %]
+
+</div>
+</div>

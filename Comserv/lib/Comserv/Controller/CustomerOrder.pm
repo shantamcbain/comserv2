@@ -198,6 +198,121 @@ sub order_status :Path('/CustomerOrder/status') :Args(1) {
     $c->res->redirect($c->uri_for('/CustomerOrder/view', [$id]));
 }
 
+# -------------------------------------------------------------------------
+# Admin: Customer List (aggregated from orders + invoices)
+# -------------------------------------------------------------------------
+
+sub customer_list :Path('/CustomerOrder/customers') :Args(0) {
+    my ($self, $c) = @_;
+    unless ($self->_is_admin($c)) {
+        $c->res->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my %customers;
+
+    eval {
+        my @orders = $schema->resultset('InventoryCustomerOrder')->search(
+            { sitename => $sitename },
+            { columns  => [qw(customer_name customer_email customer_phone created_at status)],
+              order_by => { -desc => 'created_at' } }
+        )->all;
+        for my $o (@orders) {
+            my $key = lc($o->customer_email || $o->customer_name || 'unknown');
+            $customers{$key} ||= {
+                name         => $o->customer_name,
+                email        => $o->customer_email,
+                phone        => $o->customer_phone,
+                first_seen   => $o->created_at,
+                last_seen    => $o->created_at,
+                order_count  => 0,
+                invoice_count => 0,
+            };
+            $customers{$key}{order_count}++;
+            $customers{$key}{last_seen} = $o->created_at
+                if $o->created_at gt $customers{$key}{last_seen};
+        }
+    };
+
+    eval {
+        my @invoices = $schema->resultset('InventoryCustomerInvoice')->search(
+            { sitename => $sitename },
+            { columns  => [qw(customer_name customer_email invoice_date total_amount payment_status)],
+              order_by => { -desc => 'invoice_date' } }
+        )->all;
+        for my $inv (@invoices) {
+            my $key = lc($inv->customer_email || $inv->customer_name || 'unknown');
+            $customers{$key} ||= {
+                name          => $inv->customer_name,
+                email         => $inv->customer_email,
+                phone         => undef,
+                first_seen    => $inv->invoice_date,
+                last_seen     => $inv->invoice_date,
+                order_count   => 0,
+                invoice_count => 0,
+                total_spend   => 0,
+            };
+            $customers{$key}{invoice_count}++;
+            $customers{$key}{total_spend} = ($customers{$key}{total_spend} || 0)
+                + ($inv->total_amount || 0);
+        }
+    };
+
+    my @customer_list = sort { ($b->{last_seen} || '') cmp ($a->{last_seen} || '') }
+                        values %customers;
+
+    $c->stash(
+        customers => \@customer_list,
+        sitename  => $sitename,
+        template  => 'CustomerOrder/customers.tt',
+    );
+}
+
+# -------------------------------------------------------------------------
+# Admin: Customer Detail View
+# -------------------------------------------------------------------------
+
+sub customer_view :Path('/CustomerOrder/customer') :Args(0) {
+    my ($self, $c) = @_;
+    unless ($self->_is_admin($c)) {
+        $c->res->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $email    = $c->req->params->{email} // '';
+    my $name     = $c->req->params->{name}  // '';
+
+    my (@orders, @invoices);
+    eval {
+        my %search = (sitename => $sitename);
+        if ($email) {
+            $search{customer_email} = $email;
+        } else {
+            $search{customer_name}  = $name;
+        }
+        @orders = $schema->resultset('InventoryCustomerOrder')->search(
+            \%search,
+            { prefetch => 'lines', order_by => { -desc => 'created_at' } }
+        )->all;
+        @invoices = $schema->resultset('InventoryCustomerInvoice')->search(
+            \%search,
+            { order_by => { -desc => 'invoice_date' } }
+        )->all;
+    };
+
+    $c->stash(
+        orders    => \@orders,
+        invoices  => \@invoices,
+        cust_email => $email,
+        cust_name  => $name || ($orders[0] ? $orders[0]->customer_name : $name),
+        sitename  => $sitename,
+        template  => 'CustomerOrder/customer.tt',
+    );
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
