@@ -150,6 +150,17 @@
       </div>
       [% END %]
 
+      [% SET current_site = c.stash.SiteName || c.session.SiteName || 'CSC' %]
+      [% UNLESS current_site == 'CSC' %]
+      <div class="content-section" style="border:1px solid #c8e6c9;border-radius:6px;padding:1rem;background:#f9fff9">
+        <h2 style="margin:0 0 0.5em">&#127760; CSC Membership</h2>
+        <p style="color:var(--text-muted-color);font-size:0.9em;margin:0 0 0.75em">
+          Manage your CSC hosting subscription, point balance, and renewal settings.
+        </p>
+        <a href="[% c.uri_for('/membership/csc_account') %]" class="btn btn-primary">Manage CSC Account</a>
+      </div>
+      [% END %]
+
     </div>
   </div>
 </div>
