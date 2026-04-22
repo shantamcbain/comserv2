@@ -9,31 +9,29 @@ __PACKAGE__->add_columns(
         is_auto_increment => 1,
     },
     box_id => {
-        data_type => 'integer',
+        data_type   => 'integer',
+        is_nullable => 0,
     },
     frame_position => {
-        data_type => 'integer',
+        data_type   => 'integer',
+        is_nullable => 0,
+        comment     => 'Position 1-10, left to right facing the hive entrance; feeder may occupy any position',
     },
-    frame_type => {
+    frame_state => {
         data_type => 'enum',
         extra => {
-            list => [qw/brood honey pollen empty foundation/]
+            list => [qw/frame frame_with_foundation comb_empty brood honey pollen drone feeder/]
         },
-        default_value => 'foundation',
-    },
-    foundation_type => {
-        data_type => 'enum',
-        extra => {
-            list => [qw/wired unwired plastic natural/]
-        },
-        default_value => 'wired',
+        default_value => 'frame',
+        comment       => 'Current state of the frame: bare frame → foundation → drawn comb → content type',
     },
     comb_condition => {
         data_type => 'enum',
         extra => {
             list => [qw/new good fair poor damaged/]
         },
-        default_value => 'new',
+        is_nullable   => 1,
+        comment       => 'Physical condition of the comb (applies when state is comb_empty, brood, honey, pollen, or drone)',
     },
     status => {
         data_type => 'enum',
@@ -41,39 +39,6 @@ __PACKAGE__->add_columns(
             list => [qw/active removed stored/]
         },
         default_value => 'active',
-    },
-    notes => {
-        data_type => 'text',
-        is_nullable => 1,
-    },
-    created_at => {
-        data_type => 'timestamp',
-        default_value => \'CURRENT_TIMESTAMP',
-    },
-    updated_at => {
-        data_type => 'timestamp',
-        default_value => \'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
-    },
-    created_by => {
-        data_type => 'varchar',
-        size => 50,
-        is_nullable => 1,
-    },
-    updated_by => {
-        data_type => 'varchar',
-        size => 50,
-        is_nullable => 1,
-    },
-    inventory_item_id => {
-        data_type   => 'integer',
-        is_nullable => 1,
-        comment     => 'FK → inventory_items — defines frame type and BOM (e.g. Standard Deep Frame)',
-    },
-    has_foundation => {
-        data_type     => 'tinyint',
-        is_nullable   => 0,
-        default_value => 0,
-        comment       => 'Whether foundation is installed in this frame',
     },
     frame_size => {
         data_type   => 'enum',
@@ -88,6 +53,33 @@ __PACKAGE__->add_columns(
         size        => 50,
         is_nullable => 1,
         comment     => 'Unique tracking code or label for this physical frame',
+    },
+    inventory_item_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+        comment     => 'FK → inventory_items — defines frame type and BOM (e.g. Standard Deep Frame)',
+    },
+    notes => {
+        data_type   => 'text',
+        is_nullable => 1,
+    },
+    created_at => {
+        data_type     => 'timestamp',
+        default_value => \'CURRENT_TIMESTAMP',
+    },
+    updated_at => {
+        data_type     => 'timestamp',
+        default_value => \'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+    },
+    created_by => {
+        data_type   => 'varchar',
+        size        => 50,
+        is_nullable => 1,
+    },
+    updated_by => {
+        data_type   => 'varchar',
+        size        => 50,
+        is_nullable => 1,
     },
 );
 
@@ -139,7 +131,7 @@ sub hive {
 
 sub full_position {
     my $self = shift;
-    return sprintf("Box %d, Frame %d", 
+    return sprintf("Box %d, Position %d (L→R from entrance)", 
         $self->box->box_position, 
         $self->frame_position
     );
@@ -147,21 +139,30 @@ sub full_position {
 
 sub display_name {
     my $self = shift;
-    return sprintf("Frame %d (%s)", 
-        $self->frame_position, 
-        $self->frame_type
-    );
+    my $state = $self->frame_state;
+    $state =~ s/_/ /g;
+    return sprintf("Position %d — %s", $self->frame_position, ucfirst($state));
 }
 
 sub is_productive {
     my $self = shift;
-    return $self->frame_type =~ /^(brood|honey|pollen)$/;
+    return $self->frame_state =~ /^(brood|honey|pollen|drone)$/;
+}
+
+sub has_drawn_comb {
+    my $self = shift;
+    return $self->frame_state =~ /^(comb_empty|brood|honey|pollen|drone)$/;
 }
 
 sub needs_attention {
     my $self = shift;
-    return $self->comb_condition =~ /^(poor|damaged)$/ || 
-           $self->frame_type eq 'empty';
+    return ($self->comb_condition && $self->comb_condition =~ /^(poor|damaged)$/) ||
+           $self->frame_state eq 'frame';
+}
+
+sub is_feeder {
+    my $self = shift;
+    return $self->frame_state eq 'feeder';
 }
 
 sub latest_inspection_detail {
@@ -184,8 +185,35 @@ Comserv::Model::Schema::Ency::Result::HiveFrame - HiveFrame table result class
 
 =head1 DESCRIPTION
 
-Represents individual frames within boxes. Each frame has a specific position within
-its box and tracks content type and condition. This provides the granular tracking
-that was missing in the legacy denormalized structure.
+Represents individual frames within a box. Each frame has a position (1-10, left to
+right facing the hive entrance) and a single frame_state that describes what it
+currently holds. A feeder may occupy any position.
+
+Frame state progression: frame → frame_with_foundation → comb_empty → brood/honey/pollen/drone
+
+The comb_condition field tracks physical quality when drawn comb is present.
+Frame type and BOM are tracked via inventory_item_id → inventory_items.
+
+=head1 FRAME STATES
+
+=over 4
+
+=item frame — bare frame, no foundation
+
+=item frame_with_foundation — foundation installed, not yet drawn
+
+=item comb_empty — drawn comb, currently empty
+
+=item brood — drawn comb containing brood
+
+=item honey — drawn comb containing honey
+
+=item pollen — drawn comb containing pollen
+
+=item drone — drawn drone-sized comb
+
+=item feeder — feeder occupying this position
+
+=back
 
 =cut
