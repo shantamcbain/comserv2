@@ -44,6 +44,11 @@ __PACKAGE__->add_columns(
         },
         is_nullable => 1,
     },
+    inventory_item_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+        comment     => 'FK → inventory_items — defines the physical box type and its BOM (e.g. Deep Box 10-frame)',
+    },
     notes => {
         data_type   => 'text',
         is_nullable => 1,
@@ -67,6 +72,13 @@ __PACKAGE__->belongs_to(
     'Comserv::Model::Schema::Ency::Result::HiveConfiguration',
     'configuration_id',
     { is_deferrable => 1, on_delete => 'CASCADE' }
+);
+
+__PACKAGE__->belongs_to(
+    'inventory_item',
+    'Comserv::Model::Schema::Ency::Result::InventoryItem',
+    'inventory_item_id',
+    { is_deferrable => 1, on_delete => 'SET NULL', join_type => 'LEFT' }
 );
 
 1;

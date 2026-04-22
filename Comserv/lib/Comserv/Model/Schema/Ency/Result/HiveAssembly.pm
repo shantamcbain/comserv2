@@ -44,6 +44,11 @@ __PACKAGE__->add_columns(
         size        => 200,
         is_nullable => 1,
     },
+    inventory_item_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+        comment     => 'FK → inventory_items — inventory record for this physical assembled hive unit',
+    },
     notes => {
         data_type   => 'text',
         is_nullable => 1,
@@ -78,6 +83,13 @@ __PACKAGE__->belongs_to(
     'hive',
     'Comserv::Model::Schema::Ency::Result::Hive',
     'hive_id',
+    { is_deferrable => 1, on_delete => 'SET NULL', join_type => 'LEFT' }
+);
+
+__PACKAGE__->belongs_to(
+    'inventory_item',
+    'Comserv::Model::Schema::Ency::Result::InventoryItem',
+    'inventory_item_id',
     { is_deferrable => 1, on_delete => 'SET NULL', join_type => 'LEFT' }
 );
 
